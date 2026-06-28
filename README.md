@@ -19,6 +19,7 @@ See the [v2 roadmap](docs/ROADMAP.md) for the full product direction and milesto
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13378/badge)](https://www.bestpractices.dev/projects/13378)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/boardreadyops)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
