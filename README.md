@@ -16,6 +16,8 @@ Generate → Validate → Decide → Package → Attest → Review → Handoff
 
 See the [v2 roadmap](docs/ROADMAP.md) for the full product direction and milestone plan.
 
+Repository maturity, OpenSSF readiness, and governance evidence are tracked in [docs/repo-maturity-report.md](docs/repo-maturity-report.md) and [docs/openssf-evidence.md](docs/openssf-evidence.md).
+
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
@@ -33,10 +35,9 @@ npm i -g boardreadyops
 The current public npm package is `boardreadyops@1.7.2`. It is verified on
 Node.js 22.14+ and 24, includes the current CLI bundle, schemas, docs, Action
 metadata, and matches the public `v1.7.2` tag archive.
-Binary release assets should be verified against `v1.7.2` when the matching
-binary asset matrix is published. Until then, the `v1.4.6` GitHub Release
-contains the last published binary asset matrix and `SHA256SUMS`. See
-[release channel verification](docs/release/channel-verification.md)
+Binary release assets should be verified against `v1.7.2`, which publishes the
+current Linux, macOS, and Windows binary matrix, `SHA256SUMS`, and SBOM release
+assets. See [release channel verification](docs/release/channel-verification.md)
 for the tested artifact list and remaining channel follow-ups.
 
 ## Runtime Support
@@ -124,7 +125,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@dc1b7bed613c7599309527ad69756018d8127363 # v1.7.1
+      - uses: oaslananka/boardreadyops@005afb83bd04f50a8da33bbffc441818910951f6 # v1.7.2
         with:
           config: boardreadyops.yml
           mode: enforce
@@ -137,7 +138,7 @@ Use the full container action when a workflow should carry KiCad CLI inside the
 BoardReadyOps runtime instead of installing KiCad separately:
 
 ```yaml
-      - uses: oaslananka/boardreadyops/apps/container@dc1b7bed613c7599309527ad69756018d8127363 # v1.7.1
+      - uses: oaslananka/boardreadyops/apps/container@005afb83bd04f50a8da33bbffc441818910951f6 # v1.7.2
         with:
           config: boardreadyops.yml
           require-kicad: "true"
