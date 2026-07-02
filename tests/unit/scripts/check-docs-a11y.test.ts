@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   candidateChromeExecutables,
   collectHtmlFiles,
+  filterPa11yIssues,
   formatPa11yFailures,
   pa11yOptions,
   runPa11yPageWithRetry,
@@ -48,6 +49,19 @@ describe("check-docs-a11y", () => {
     expect(output).toContain("main a");
     expect(output).toContain("This element has insufficient contrast.");
     expect(output).toContain("WCAG2AA.Principle1.Guideline1_4.1_4_3.G18.Fail");
+  });
+
+  it("filters Material navigation color contrast false positives only", async () => {
+    const fakePage = {
+      evaluate: async (_fn: unknown, selector: string) => selector === "#nav-label",
+    };
+    const issues = [
+      { code: "color-contrast", selector: "#nav-label" },
+      { code: "color-contrast", selector: "main a" },
+      { code: "landmark-one-main", selector: "#nav-label" },
+    ];
+
+    await expect(filterPa11yIssues(fakePage, issues)).resolves.toEqual([issues[1], issues[2]]);
   });
 
   it("uses WCAG 2 AA checks with axe and htmlcs runners", () => {

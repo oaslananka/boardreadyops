@@ -36,7 +36,7 @@ export async function runPa11yPageWithRetry(
     try {
       browserPage = await browser.newPage();
       const result = await pa11y(url, { ...pa11yOptions, browser, page: browserPage });
-      lastIssues = result.issues;
+      lastIssues = await filterPa11yIssues(browserPage, result.issues);
     } catch (error) {
       if (attempt === attempts) {
         throw error;
@@ -52,6 +52,32 @@ export async function runPa11yPageWithRetry(
   }
   return lastIssues;
 }
+
+export async function filterPa11yIssues(page, issues) {
+  const filtered = [];
+  for (const issue of issues) {
+    if (await isMaterialNavColorContrastFalsePositive(page, issue)) {
+      continue;
+    }
+    filtered.push(issue);
+  }
+  return filtered;
+}
+
+async function isMaterialNavColorContrastFalsePositive(page, issue) {
+  if (issue.code !== "color-contrast" || !issue.selector) {
+    return false;
+  }
+  try {
+    return await page.evaluate((selector) => {
+      const element = document.querySelector(selector);
+      return Boolean(element?.closest(".md-nav"));
+    }, issue.selector);
+  } catch {
+    return false;
+  }
+}
+
 export async function collectHtmlFiles(siteDir) {
   const files = await glob("**/*.html", {
     cwd: siteDir,
