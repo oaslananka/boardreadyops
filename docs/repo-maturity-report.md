@@ -77,7 +77,7 @@ conditions become true:
 
 | Check | Status | Evidence / gap |
 | --- | --- | --- |
-| Branch protection | Partial | `main` protection exists with one approval and CODEOWNERS review; required status checks need enforcement. |
+| Branch protection | Partial | `main` protection exists with one approval and CODEOWNERS review; required status checks are now configured; review the exact context list after workflow renames. |
 | Code review | Partial | Branch rule requires approval, but contributor history is mostly solo/bot. Independent human review is not yet proven. |
 | Maintained | Passed | Recent commits, releases, and scheduled workflows are active. |
 | Security policy | Passed | `SECURITY.md` exists. |
@@ -219,7 +219,7 @@ existing check names.
 1. [#2](https://github.com/oaslananka/boardreadyops/issues/2) Implement runtime plugin isolation or mark plugins as trusted-code execution.
 2. [#3](https://github.com/oaslananka/boardreadyops/issues/3) Done in this PR: mutation-nightly type-only file handling fixed for `src/core/config.types.ts`.
 3. [#4](https://github.com/oaslananka/boardreadyops/issues/4) Done in this PR: `docs:a11y` retries transient Puppeteer browser/page failures.
-4. [#5](https://github.com/oaslananka/boardreadyops/issues/5) Configure required status checks on `main` branch protection/rulesets.
+4. [#5](https://github.com/oaslananka/boardreadyops/issues/5) Done outside code in repo settings: required status checks configured on `main` branch protection.
 5. Add explicit deprecation and backward compatibility policy.
 6. Add maintainer/contributor growth plan for independent review coverage.
 7. Add Scorecard/Best Practices evidence refresh automation.
