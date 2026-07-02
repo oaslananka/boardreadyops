@@ -80,6 +80,39 @@ describe("check-docs-a11y", () => {
     expect(attempts).toBe(3); // exhausted all attempts before failing
   });
 
+  it("recovers from transient browser errors by reopening the browser", async () => {
+    const closedPage = { close: async () => undefined };
+    const cleanPage = { close: async () => undefined };
+    const firstBrowser = { newPage: async () => closedPage };
+    const recoveredBrowser = { newPage: async () => cleanPage };
+    let calls = 0;
+    let recoveries = 0;
+    const pa11y = async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("Connection closed.");
+      }
+      return { issues: [] };
+    };
+
+    const runPa11yPageWithRecovery: (
+      checker: typeof pa11y,
+      url: string,
+      browser: typeof firstBrowser,
+      attempts: number,
+      recoverBrowser: () => Promise<typeof recoveredBrowser>,
+    ) => Promise<Array<{ code?: string }>> = runPa11yPageWithRetry;
+
+    await expect(
+      runPa11yPageWithRecovery(pa11y, "http://x/", firstBrowser, 3, async () => {
+        recoveries += 1;
+        return recoveredBrowser;
+      }),
+    ).resolves.toEqual([]);
+    expect(calls).toBe(2);
+    expect(recoveries).toBe(1);
+  });
+
   it("detects standard Windows browser install paths", () => {
     const candidates = candidateChromeExecutables({
       "ProgramFiles(x86)": "C:\\Program Files (x86)",

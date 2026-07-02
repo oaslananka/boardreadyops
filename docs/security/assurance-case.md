@@ -55,4 +55,4 @@ Residual risk:
 
 - Private vulnerability reporting and sensitive-data scanning settings require
   maintainer confirmation.
-- Runtime plugin sandboxing is not yet implemented.
+- Plugins are explicitly documented as trusted-code execution in v1; runtime sandboxing is optional future hardening.

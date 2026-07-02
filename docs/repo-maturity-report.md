@@ -12,11 +12,9 @@ issue templates, PR template, CODEOWNERS, extensive CI, release automation,
 security scanning, SBOM/provenance work, and high local test coverage.
 
 The current maturity classification is **Professional OSS / Mature OSS** with a
-few gaps before it can credibly claim Gold or foundation-grade maturity. The main
-remaining gaps are not package-manager or test basics; they are sustained human
-review, independent maintainers/contributors, required status checks on `main`,
-OpenSSF Best Practices evidence completion, plugin runtime sandboxing, and a
-less flaky docs accessibility check.
+the right target for a solo-maintainer project. Gold or foundation-grade maturity is not a current goal. The main
+remaining gaps are sustained human review, independent maintainers/contributors if the project later expands, required status checks on `main`,
+OpenSSF Best Practices evidence completion, an explicit trusted-plugin execution model, and resilient docs accessibility checks.
 
 ## Current maturity level
 
@@ -40,8 +38,8 @@ Evidence:
 
 **Primary target: Professional OSS / Mature OSS.**
 
-Gold/foundation-grade should remain a gap-analysis target only until all of these
-conditions are true:
+Gold/foundation-grade is **not a current target** for this solo-maintainer project. Revisit it only if all of these
+conditions become true:
 
 - Multiple active maintainers.
 - Independent human contributor/reviewer activity.
@@ -72,7 +70,7 @@ conditions are true:
 | `.bestpractices.json` | Passed | Added repository-local metadata pointing to evidence docs and BadgeApp project. |
 | Passing readiness | Partial | Most repository hygiene exists; human-entered BadgeApp criteria still need maintainer confirmation. |
 | Silver readiness | Partial | Security, CI, tests, docs, and release evidence are strong; independent review and governance evidence need strengthening. |
-| Gold feasibility | Needs human confirmation | Do not claim Gold until multiple active maintainers and independent human review exist. |
+| Gold feasibility | Not applicable | Not a current target for a solo-maintainer project; keep only as future gap analysis. |
 | Evidence files | Passed | `docs/openssf-evidence.md`, `docs/openssf-gap-analysis.md`, and `docs/openssf-proposal-links.md` added. |
 
 ## Scorecard readiness
@@ -209,7 +207,7 @@ existing check names.
 
 ## Risky changes not applied
 
-- Runtime plugin sandbox implementation.
+- Runtime plugin sandbox implementation; v1 now documents plugins as trusted-code execution instead.
 - Changing release/publish workflow behavior.
 - Enforcing branch protection or repository rules through API.
 - Adding or changing required status checks.
@@ -219,8 +217,8 @@ existing check names.
 ## Recommended issues
 
 1. [#2](https://github.com/oaslananka/boardreadyops/issues/2) Implement runtime plugin isolation or mark plugins as trusted-code execution.
-2. [#3](https://github.com/oaslananka/boardreadyops/issues/3) Fix mutation-nightly type-only file handling for `src/core/config.types.ts`.
-3. [#4](https://github.com/oaslananka/boardreadyops/issues/4) Harden `docs:a11y` against Puppeteer connection flakes.
+2. [#3](https://github.com/oaslananka/boardreadyops/issues/3) Done in this PR: mutation-nightly type-only file handling fixed for `src/core/config.types.ts`.
+3. [#4](https://github.com/oaslananka/boardreadyops/issues/4) Done in this PR: `docs:a11y` retries transient Puppeteer browser/page failures.
 4. [#5](https://github.com/oaslananka/boardreadyops/issues/5) Configure required status checks on `main` branch protection/rulesets.
 5. Add explicit deprecation and backward compatibility policy.
 6. Add maintainer/contributor growth plan for independent review coverage.

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir as fsMkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateMutationMetrics,
   checkMutationThresholds,
+  expectedCoreMutationFiles,
   formatFailures,
   formatMissingMutationFiles,
   formatMutationSummary,
@@ -63,6 +64,17 @@ describe("check-mutation-thresholds", () => {
     expect(formatMissingMutationFiles(missing)).toEqual([
       "src/core/** mutation report is missing executable files:\nsrc/core/config.ts",
     ]);
+  });
+
+  it("excludes type-only and explicitly excluded core files from expected executable coverage", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-mutation-files-"));
+    await fsMkdir(path.join(root, "src", "core"), { recursive: true });
+    await writeFile(path.join(root, "src", "core", "pipeline.ts"), "export const pipeline = true;\n");
+    await writeFile(path.join(root, "src", "core", "config.types.ts"), "export interface Config {}\n");
+    await writeFile(path.join(root, "src", "core", "context.ts"), "export const context = true;\n");
+    await writeFile(path.join(root, "src", "core", "result.ts"), "export const result = true;\n");
+
+    await expect(expectedCoreMutationFiles(root)).resolves.toEqual(["src/core/pipeline.ts"]);
   });
 
   it("appends the summary file and exits cleanly for passing reports", async () => {

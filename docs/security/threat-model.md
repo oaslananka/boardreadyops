@@ -31,7 +31,7 @@ inside GitHub Actions.
 | --- | --- | --- | --- |
 | Malicious workflow change | Repository or release compromise | Pinned actions, minimum permissions, review expectations, security workflow. | Enforce required status checks and human review. |
 | Sensitive data leakage in logs/reports | Credential exposure | Logger redaction, issue templates warning about redaction, gitleaks. | Verify secret scanning/push protection in settings. |
-| Malicious plugin code | Arbitrary host process access | Plugin permission declaration and config approval. | Runtime sandbox missing. |
+| Malicious plugin code | Arbitrary host process access | Plugin permission declaration and config approval. | v1 trusted-code model documented; runtime sandbox optional future hardening. |
 | Tampered release asset | Unsafe install or CI use | Checksums, SBOM, provenance/attestation docs. | Strengthen reproducible-build verification. |
 | Unsafe manufacturer handoff | Bad board order or assembly failure | Rule checks, vendor profiles, readiness scoring, evidence bundles. | Vendor profile drift review process. |
 | Path traversal via inputs | File overwrite/read outside workspace | Action input path confinement and utility path helpers. | Continue fuzz/property tests for path normalization. |
