@@ -11,14 +11,18 @@ BoardReadyOps releases are expected to be repeatable, documented, and auditable.
 
 ## Release preparation
 
-Before release, validate:
+Before creating or publishing a release, validate the same gates used by release automation:
 
 ```bash
 corepack pnpm install --frozen-lockfile
-corepack pnpm run verify:release
+corepack pnpm run verify
 corepack pnpm run verify:release-channels
-corepack pnpm run security
+corepack pnpm run verify:clean-tree
+npm pack --dry-run --json
 ```
+
+The release package dry run must confirm that the npm tarball includes `package.json`, `README.md`,
+`LICENSE`, `NOTICE`, `SECURITY.md`, `action.yml`, `dist/cli/index.cjs`, and `dist/action/index.cjs`.
 
 ## Versioning
 
