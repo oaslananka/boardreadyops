@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: dist-check-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -29,3 +29,4 @@ jobs:
       - run: corepack install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run verify:dist
+      - run: node scripts/check-npm-pack.mjs
