@@ -135,3 +135,31 @@
   outline: 3px solid #004b8d;
   outline-offset: 2px;
 }
+
+[data-md-color-scheme="default"] .md-nav__link,
+[data-md-color-scheme="default"] .md-nav__link .md-ellipsis,
+[data-md-color-scheme="default"] .md-nav__label,
+[data-md-color-scheme="default"] .md-nav__title {
+  color: #111827;
+  opacity: 1;
+}
+
+[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link,
+[data-md-color-scheme="default"] .md-nav__item--nested > .md-nav__link .md-ellipsis {
+  color: #111827;
+  opacity: 1;
+}
+
+[data-md-color-scheme="slate"] .md-nav__link,
+[data-md-color-scheme="slate"] .md-nav__link .md-ellipsis,
+[data-md-color-scheme="slate"] .md-nav__label,
+[data-md-color-scheme="slate"] .md-nav__title {
+  color: #f9fafb;
+  opacity: 1;
+}
+
+[data-md-color-scheme="slate"] .md-nav__item--nested > .md-nav__link,
+[data-md-color-scheme="slate"] .md-nav__item--nested > .md-nav__link .md-ellipsis {
+  color: #f9fafb;
+  opacity: 1;
+}

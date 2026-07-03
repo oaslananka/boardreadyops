@@ -1,0 +1,58 @@
+name: Bug report
+about: Report a reproducible BoardReadyOps problem
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please avoid sharing private board files,
+        credentials, tokens, or supplier account data.
+  - type: input
+    id: version
+    attributes:
+      label: BoardReadyOps version
+      description: Output from `boardreadyops --version` or the npm/GitHub Action version.
+      placeholder: 1.7.2
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js version, KiCad CLI version if relevant, and package manager.
+      placeholder: Ubuntu 24.04, Node 24.x, pnpm, KiCad 10.0.x
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Include the exact command and a minimal fixture or redacted example when possible.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Paste relevant output with secrets redacted.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submit checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed or redacted private design data and secrets.
+          required: true

@@ -1,14 +1,28 @@
-# Each owner line applies the pattern to all subsequent lines
-# until the next pattern line. Order matters: last match wins.
-#
-# Default owner for everything
+# GitHub uses this CODEOWNERS file to identify the default reviewer for changes.
+# Keep this as the single active CODEOWNERS file unless governance changes.
+
 * @oaslananka
 
-# GitHub workflows and rulesets
+# Repository policy, automation, and release surfaces
 .github/ @oaslananka
+.github/workflows/ @oaslananka
+action.yml @oaslananka
+package.json @oaslananka
+pnpm-lock.yaml @oaslananka
+release-please-config.json @oaslananka
+.release-please-manifest.json @oaslananka
 
-# Docs
+# Documentation and governance
 docs/ @oaslananka
+README.md @oaslananka
+CONTRIBUTING.md @oaslananka
+CODE_OF_CONDUCT.md @oaslananka
+SECURITY.md @oaslananka
+SUPPORT.md @oaslananka
+GOVERNANCE.md @oaslananka
+MAINTAINERS.md @oaslananka
 
-# All changes receive automated review through CodeRabbit and CI.
-# No human reviewer is required by repository policy; Mergify merges eligible PRs.
+# Runtime source and public contracts
+src/ @oaslananka
+schemas/ @oaslananka
+packages/ @oaslananka

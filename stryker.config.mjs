@@ -32,6 +32,7 @@ export default {
     "src/rules/release/version-format.ts",
     "!src/**/*.d.ts",
     "!src/**/types.ts",
+    "!src/**/*.types.ts",
     "!src/generated/**",
   ],
   thresholds: {

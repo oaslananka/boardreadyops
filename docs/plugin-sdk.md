@@ -111,6 +111,12 @@ Plugins run in the same Node.js process as BoardReadyOps. They can read files av
 
 BoardReadyOps validates the exported plugin shape with Zod before registering rules. Validation catches malformed metadata and missing plugin fields, but it is not a sandbox and does not restrict plugin code execution.
 
+## Plugin trust model
+
+BoardReadyOps v1 treats plugins and local rules as trusted workspace code. The permission model is an audit and approval mechanism: it records requested capabilities, allows maintainers to deny unexpected capabilities, and prevents registration when declared permissions are not approved. It does not yet provide process-level isolation, syscall filtering, network egress control, or a JavaScript runtime sandbox.
+
+Only install or enable plugins from sources you review and trust. In CI, prefer explicit plugin lists in `boardreadyops.yml`, keep dependency updates reviewed, and treat any plugin that requests `fs:write`, `network`, `process`, or `kicad-cli` as security-sensitive. Runtime plugin isolation may be added in a later major release if the extension ecosystem grows beyond trusted project-local plugins.
+
 ## Current Extension Points
 
 `rules` are active today and are registered into the BoardReadyOps rule registry. The SDK also reserves shapes for `adapters`, `reportFormats`, `vendorProfiles`, and `notifiers` so plugin packages can expose those objects as the runtime integration points mature.

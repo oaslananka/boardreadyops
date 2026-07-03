@@ -30,7 +30,13 @@ export function runPa11yPageWithRetry<T extends { issues: unknown[] }>(
   url: string,
   browser: { newPage(): Promise<{ close(): Promise<void> }> },
   attempts?: number,
+  recoverBrowser?: (error: unknown, attempt: number) => Promise<{ newPage(): Promise<{ close(): Promise<void> }> }>,
 ): Promise<T["issues"]>;
+
+export function filterPa11yIssues<T extends { code?: string; selector?: string }>(
+  page: { evaluate(fn: unknown, selector: string): Promise<boolean> },
+  issues: T[],
+): Promise<T[]>;
 
 export function collectHtmlFiles(siteDir: string): Promise<string[]>;
 

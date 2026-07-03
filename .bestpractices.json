@@ -1,0 +1,11 @@
+{
+  "project_name": "BoardReadyOps",
+  "repo_url": "https://github.com/oaslananka/boardreadyops",
+  "badge_project_id": 13378,
+  "badge_url": "https://www.bestpractices.dev/projects/13378",
+  "target_level": "passing-to-silver",
+  "gold_claim": false,
+  "evidence": ["docs/openssf-evidence.md", "docs/openssf-gap-analysis.md", "docs/repo-maturity-report.md"],
+  "last_local_audit": "2026-07-02",
+  "notes": "This file is repository-local evidence metadata for OpenSSF Best Practices follow-up. BadgeApp remains the source of truth for submitted criteria."
+}
