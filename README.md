@@ -1,30 +1,37 @@
-<p align="center">
-  <a href="https://www.buymeacoffee.com/oaslananka">
-    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=oaslananka&button_colour=FFDD00&font_colour=000000&font_family=Arial&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" />
-  </a>
-</p>
+<div align="center">
 
 # BoardReadyOps
 
-End-to-end hardware release pipeline for KiCad projects.
+**End-to-end hardware release pipeline for KiCad projects.**
+
+Verified, signed, manufacturer-ready release packages for KiCad projects.
+Generate artifacts, validate release readiness, package evidence, and produce a clear release decision.
+
+[![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
+[![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13378/badge)](https://www.bestpractices.dev/projects/13378)
+
+[![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
+[![npm downloads](https://img.shields.io/npm/dt/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+[Repository Maturity](docs/repo-maturity-report.md) ·
+[OpenSSF Evidence](docs/openssf-evidence.md) ·
+[Governance](GOVERNANCE.md) ·
+[Roadmap](docs/ROADMAP.md) ·
+[Support](SUPPORT.md)
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-ffdd00?logo=buymeacoffee&logoColor=black&labelColor=ffdd00&color=111111)](https://www.buymeacoffee.com/oaslananka)
+
+</div>
 
 BoardReadyOps turns a KiCad project into a verified, signed, manufacturer-ready release package. It generates manufacturing artifacts, validates release readiness, packages evidence, and produces a clear release decision — running locally as a CLI and in CI as a GitHub Action, with JSON, SARIF, Markdown, HTML, JUnit, and workflow annotation output.
 
 ```
 Generate → Validate → Decide → Package → Attest → Review → Handoff
 ```
-
-See the [v2 roadmap](docs/ROADMAP.md) for the full product direction and milestone plan.
-
-Repository maturity, OpenSSF readiness, and governance evidence are tracked in [docs/repo-maturity-report.md](docs/repo-maturity-report.md) and [docs/openssf-evidence.md](docs/openssf-evidence.md).
-
-[![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
-[![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13378/badge)](https://www.bestpractices.dev/projects/13378)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/boardreadyops)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Installation
 
