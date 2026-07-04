@@ -69,3 +69,41 @@ Expected response:
 4. Add signed artifact upload and download endpoints.
 5. Add GitHub Actions dispatch runner integration.
 6. Add a managed worker container.
+
+## Repeatable VPS deploy from main
+
+After a change is merged to `main`, deploy the live VPS app from a clean main worktree:
+
+```bash
+cd /opt/repos/boardreadyops-prod
+git fetch origin --prune
+git checkout prod-main
+git reset --hard origin/main
+pnpm run cloud:deploy:self-hosted
+```
+
+The deploy script performs these steps:
+
+1. Installs dependencies with `pnpm install --frozen-lockfile`.
+2. Builds `@boardreadyops/web` with Next.js.
+3. Backs up the current `.next` output from the live `bro-web` container.
+4. Copies the new `.next` output into the container.
+5. Restarts the container.
+6. Verifies `https://boardreadyops.oaslananka.dev/api/health`.
+7. Restores the previous `.next` output and restarts the container if the health check fails.
+
+Supported environment overrides:
+
+```text
+BOARDREADYOPS_CLOUD_CONTAINER=bro-web
+BOARDREADYOPS_CLOUD_HEALTH_URL=https://boardreadyops.oaslananka.dev/api/health
+BOARDREADYOPS_CLOUD_BACKUP_ROOT=/opt/boardreadyops-cloud/backups
+BOARDREADYOPS_CLOUD_SKIP_INSTALL=1
+BOARDREADYOPS_CLOUD_DRY_RUN=1
+```
+
+For a dry run:
+
+```bash
+BOARDREADYOPS_CLOUD_DRY_RUN=1 pnpm run cloud:deploy:self-hosted
+```
