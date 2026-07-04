@@ -1,5 +1,7 @@
 import { verifyGitHubWebhook } from "@boardreadyops/cloud-core";
 import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
+import { executeGitHubAppLifecycleActions } from "@boardreadyops/cloud-core/lifecycle-executor";
+import { getGitHubAppLifecycleStore } from "./lifecycle-store.js";
 
 export const runtime = "nodejs";
 
@@ -44,6 +46,8 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  const execution = await executeGitHubAppLifecycleActions(lifecycle.actions, getGitHubAppLifecycleStore());
+
   return Response.json(
     {
       ok: true,
@@ -52,6 +56,7 @@ export async function POST(request: Request): Promise<Response> {
       delivery,
       action: lifecycle.action,
       lifecycleActions: lifecycle.actions,
+      execution,
     },
     { status: 202 },
   );

@@ -18,12 +18,19 @@
       "types": "./src/lifecycle-store.ts",
       "import": "./src/lifecycle-store.ts",
       "default": "./src/lifecycle-store.ts"
+    },
+    "./pg-executor": {
+      "types": "./src/pg-executor.ts",
+      "import": "./src/pg-executor.ts",
+      "default": "./src/pg-executor.ts"
     }
   },
   "devDependencies": {
-    "prisma": "7.8.0"
+    "prisma": "7.8.0",
+    "@types/pg": "8.16.0"
   },
   "dependencies": {
-    "@boardreadyops/cloud-core": "workspace:*"
+    "@boardreadyops/cloud-core": "workspace:*",
+    "pg": "8.16.3"
   }
 }
