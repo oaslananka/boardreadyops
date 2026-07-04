@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Installation {
+  id                   String       @id @default(uuid())
+  githubInstallationId BigInt       @unique
+  accountLogin         String
+  accountType          String
+  planTier             String       @default("free")
+  createdAt            DateTime     @default(now())
+  suspendedAt          DateTime?
+  repositories         Repository[]
+}
+
+model Repository {
+  id             String        @id @default(uuid())
+  installationId String
+  githubRepoId   BigInt        @unique
+  owner          String
+  name           String
+  private        Boolean       @default(false)
+  defaultBranch  String
+  enabledAt      DateTime      @default(now())
+  disabledAt     DateTime?
+  installation   Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  runs           ReleaseRun[]
+
+  @@unique([installationId, owner, name])
+}
+
+model ReleaseRun {
+  id                   String     @id @default(uuid())
+  repositoryId         String
+  commitSha            String
+  ref                  String
+  pullRequestNumber    Int?
+  triggerKind          String
+  status               String     @default("queued")
+  decision             String?
+  startedAt            DateTime   @default(now())
+  completedAt          DateTime?
+  durationMs           Int?
+  boardReadyOpsVersion String?
+  kicadVersion         String?
+  githubCheckRunId     BigInt?
+  readinessScore       Int?
+  repository           Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  findings             Finding[]
+  artifacts            Artifact[]
+
+  @@index([repositoryId, startedAt])
+  @@index([commitSha])
+}
+
+model Finding {
+  id       String     @id @default(uuid())
+  runId    String
+  ruleId   String
+  severity String
+  message  String
+  path     String?
+  kind     String?
+  waivedAt DateTime?
+  run      ReleaseRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model Artifact {
+  id          String     @id @default(uuid())
+  runId       String
+  kind        String
+  name        String
+  storagePath String
+  sha256      String
+  bytes       Int
+  role        String
+  uploadedAt  DateTime   @default(now())
+  run         ReleaseRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}

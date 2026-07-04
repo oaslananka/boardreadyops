@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  background: #070b12;
+  color: #eef4ff;
+  font-family: Arial, sans-serif;
+}
+
+.shell {
+  margin: 0 auto;
+  max-width: 1040px;
+  padding: 64px 24px;
+}
+
+.hero,
+.panel {
+  border: 1px solid #263244;
+  border-radius: 28px;
+  padding: 32px;
+  background: #0a1220;
+}
+
+.panel {
+  margin-top: 24px;
+}
+
+.eyebrow,
+code {
+  color: #7dd3fc;
+}
+
+h1 {
+  font-size: 4rem;
+}

@@ -1,12 +1,14 @@
 packages:
   - .
   - packages/*
+  - apps/*
   - examples/plugin-*
 
 allowBuilds:
   esbuild: true
   libxmljs2: false
   puppeteer: false
+  sharp: true
 
 overrides:
   '@octokit/plugin-paginate-rest@>=1.0.0 <9.2.2': '>=9.2.2'

@@ -1,0 +1,40 @@
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      ARTIFACT_STORAGE_ROOT: /data/artifacts
+      DATABASE_URL: postgresql://boardreadyops:boardreadyops-change-me@postgres:5432/boardreadyops
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - boardreadyops_artifacts:/data/artifacts
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: boardreadyops
+      POSTGRES_PASSWORD: boardreadyops-change-me
+      POSTGRES_DB: boardreadyops
+    volumes:
+      - boardreadyops_postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    volumes:
+      - boardreadyops_redis:/data
+
+volumes:
+  boardreadyops_artifacts:
+  boardreadyops_postgres:
+  boardreadyops_redis:

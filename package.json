@@ -81,7 +81,10 @@
     "security": "pnpm audit --audit-level moderate && pnpm run licenses:check && pnpm run notice:check && pnpm run check:reuse",
     "generated:check": "pnpm run notice:check && pnpm run compatibility:check",
     "verify:release-channels": "node scripts/verify-release-channels.mjs",
-    "verify:release": "pnpm run verify && pnpm run verify:release-channels && pnpm run verify:clean-tree"
+    "verify:release": "pnpm run verify && pnpm run verify:release-channels && pnpm run verify:clean-tree",
+    "cloud:typecheck": "pnpm --filter @boardreadyops/contracts typecheck && pnpm --filter @boardreadyops/cloud-core typecheck && pnpm --filter @boardreadyops/db typecheck && pnpm --filter @boardreadyops/web typecheck",
+    "cloud:build": "pnpm --filter @boardreadyops/web build",
+    "cloud:dev": "pnpm --filter @boardreadyops/web dev"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [
