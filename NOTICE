@@ -616,7 +616,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/git-client#readme
 - `@gerrit0/mini-shiki@3.23.0`
   - Homepage: https://github.com/Gerrit0/mini-shiki#readme
-- `@hono/node-server@1.19.11`
+- `@hono/node-server@1.19.13`
   - Description: Node.js Adapter for Hono
   - Homepage: https://github.com/honojs/node-server
 - `@html-validate/stylish@6.0.0`
