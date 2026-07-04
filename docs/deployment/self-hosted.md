@@ -8,8 +8,8 @@ This guide describes the first self-hosted MVP target for `boardreadyops.oaslana
 Cloudflare DNS
   -> boardreadyops.oaslananka.dev
   -> ops-vps-02 / 46.101.195.208
-  -> Caddy on the host
-  -> Docker Compose web service on 127.0.0.1:3000
+  -> Docker Compose Caddy service
+  -> Docker Compose internal web service on web:3000
   -> PostgreSQL, Redis, and local artifact volume
 ```
 
@@ -36,7 +36,7 @@ Recommended paths:
 
 ## Host requirements
 
-Install Docker Engine, Docker Compose plugin, and Caddy on the VPS. PostgreSQL and Redis run inside Docker Compose for the MVP.
+Install Docker Engine and the Docker Compose v2 plugin on the VPS. Caddy, PostgreSQL, and Redis run inside Docker Compose for the MVP.
 
 ## Deploy
 
@@ -44,14 +44,6 @@ Install Docker Engine, Docker Compose plugin, and Caddy on the VPS. PostgreSQL a
 cp deploy/env.example deploy/.env
 # Edit deploy/.env before public deployment.
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
-```
-
-Copy the Caddyfile after Caddy is installed:
-
-```bash
-cp deploy/Caddyfile /etc/caddy/Caddyfile
-caddy fmt --overwrite /etc/caddy/Caddyfile
-systemctl reload caddy
 ```
 
 ## Health check

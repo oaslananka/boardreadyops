@@ -1,4 +1,17 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - boardreadyops_caddy_data:/data
+      - boardreadyops_caddy_config:/config
+    depends_on:
+      - web
+
   web:
     build:
       context: ..
@@ -10,8 +23,8 @@ services:
       ARTIFACT_STORAGE_ROOT: /data/artifacts
       DATABASE_URL: postgresql://boardreadyops:boardreadyops-change-me@postgres:5432/boardreadyops
       REDIS_URL: redis://redis:6379
-    ports:
-      - "127.0.0.1:3000:3000"
+    expose:
+      - "3000"
     volumes:
       - boardreadyops_artifacts:/data/artifacts
     depends_on:
@@ -36,5 +49,7 @@ services:
 
 volumes:
   boardreadyops_artifacts:
+  boardreadyops_caddy_config:
+  boardreadyops_caddy_data:
   boardreadyops_postgres:
   boardreadyops_redis:

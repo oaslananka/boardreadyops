@@ -1,3 +1,4 @@
 boardreadyops.oaslananka.dev {
-  reverse_proxy 127.0.0.1:3000
+  encode zstd gzip
+  reverse_proxy web:3000
 }
