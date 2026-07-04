@@ -6,6 +6,7 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY scripts scripts
 COPY apps/web/package.json apps/web/package.json
 COPY packages/cloud-core/package.json packages/cloud-core/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
