@@ -1,11 +1,10 @@
-import type { GitHubAppLifecycleStore } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { createNoopGitHubAppLifecycleStore } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { createSqlGitHubAppLifecycleStore } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 
-let cachedStore: GitHubAppLifecycleStore | undefined;
+let cachedStore;
 
-export function getGitHubAppLifecycleStore(): GitHubAppLifecycleStore {
+export function getGitHubAppLifecycleStore() {
   if (cachedStore) {
     return cachedStore;
   }
@@ -29,6 +28,6 @@ export function getGitHubAppLifecycleStore(): GitHubAppLifecycleStore {
   return store;
 }
 
-export function resetGitHubAppLifecycleStoreForTests(): void {
+export function resetGitHubAppLifecycleStoreForTests() {
   cachedStore = undefined;
 }
