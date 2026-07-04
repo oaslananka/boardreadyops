@@ -107,3 +107,23 @@ For a dry run:
 ```bash
 BOARDREADYOPS_CLOUD_DRY_RUN=1 pnpm run cloud:deploy:self-hosted
 ```
+
+## Database bootstrap and migrations
+
+The self-hosted cloud control plane stores GitHub App installations, repositories, release runs, findings, and artifacts in PostgreSQL.
+
+Apply migrations from the production worktree after `DATABASE_URL` is configured:
+
+```bash
+cd /opt/repos/boardreadyops-prod
+pnpm --filter @boardreadyops/db db:migrate
+```
+
+Preview pending migrations without applying them:
+
+```bash
+cd /opt/repos/boardreadyops-prod
+pnpm --filter @boardreadyops/db db:migrate:dry-run
+```
+
+The migration runner records applied versions in `cloud_schema_migrations`; migrations are designed to be idempotent and safe to re-run.

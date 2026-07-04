@@ -6,7 +6,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "db:format": "prisma format --schema prisma/schema.prisma",
-    "db:validate": "prisma validate --schema prisma/schema.prisma"
+    "db:validate": "prisma validate --schema prisma/schema.prisma",
+    "db:migrate": "node scripts/apply-migrations.mjs",
+    "db:migrate:dry-run": "BOARDREADYOPS_DB_MIGRATE_DRY_RUN=1 node scripts/apply-migrations.mjs"
   },
   "exports": {
     ".": {
