@@ -12,3 +12,7 @@ reports
 .env
 .env.*
 !deploy/env.example
+
+**/node_modules
+
+**/.next

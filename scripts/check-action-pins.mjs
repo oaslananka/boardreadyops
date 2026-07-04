@@ -17,7 +17,7 @@ export function findUnpinnedActionUses(file, markdown) {
 export async function main(root = process.cwd()) {
   const markdownFiles = await glob("**/*.md", {
     cwd: root,
-    ignore: ["node_modules/**", "coverage/**", "dist/**", "site/**", ".stryker-tmp/**"],
+    ignore: ["**/node_modules/**", "coverage/**", "dist/**", "site/**", ".stryker-tmp/**"],
     onlyFiles: true,
   });
   const failures = [];

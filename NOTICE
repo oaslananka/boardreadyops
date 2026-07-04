@@ -68,6 +68,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@stryker-mutator/vitest-runner@9.6.1`
   - Description: A plugin to use the vitest test runner and framework in Stryker, the JavaScript mutation testing framework
   - Homepage: https://stryker-mutator.io/docs/stryker-js/vitest-runner
+- `@swc/helpers@0.5.15`
+  - Description: External helpers for the swc project.
+  - Homepage: https://swc.rs
 - `b4a@1.8.1`
   - Description: Bridging the gap between buffers and typed arrays
   - Homepage: https://github.com/holepunchto/b4a#readme
@@ -139,6 +142,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `rxjs@7.8.2`
   - Description: Reactive Extensions for modern JavaScript
   - Homepage: https://rxjs.dev
+- `sharp@0.34.5`
+  - Description: High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP, GIF, AVIF and TIFF images
+  - Homepage: https://sharp.pixelplumbing.com
 - `text-decoder@1.2.7`
   - Description: Streaming text decoder that preserves multibyte Unicode characters
   - Homepage: https://github.com/holepunchto/text-decoder#readme
@@ -338,6 +344,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `pa11y@9.1.1`
   - Description: Pa11y is your automated accessibility testing pal
   - Homepage: https://github.com/pa11y/pa11y
+
+## LGPL-3.0-or-later
+
 
 ## MIT
 
@@ -556,6 +565,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@html-validate/stylish@6.0.0`
   - Description: ESLint compatible stylish formatter
   - Homepage: https://gitlab.com/html-validate/stylish
+- `@img/colour@1.1.0`
+  - Description: The ESM-only 'color' package made compatible for use with CommonJS runtimes
+  - Homepage: https://github.com/lovell/colour#readme
 - `@inquirer/ansi@2.0.5`
   - Homepage: https://github.com/SBoudrias/Inquirer.js/blob/main/packages/ansi/README.md
 - `@inquirer/checkbox@5.1.5`
@@ -618,6 +630,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@jridgewell/trace-mapping@0.3.31`
   - Description: Trace the original position through a source map
   - Homepage: https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
+- `@next/env@16.2.10`
+  - Description: Next.js dotenv file loading
+  - Homepage: https://github.com/vercel/next.js#readme
 - `@nodable/entities@2.1.0`
   - Description: Entity parser for XML, HTML, External entites with security and NCR control
   - Homepage: https://github.com/nodable/val-parsers#readme
@@ -722,6 +737,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@types/node@24.13.2`
   - Description: TypeScript definitions for node
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node
+- `@types/react@19.2.17`
+  - Description: TypeScript definitions for react
+  - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react
+- `@types/react-dom@19.2.3`
+  - Description: TypeScript definitions for react-dom
+  - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react-dom
 - `@types/unist@3.0.3`
   - Description: TypeScript definitions for unist
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/unist
@@ -871,6 +892,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `cli-truncate@5.2.0`
   - Description: Truncate a string to a specific width in the terminal
   - Homepage: https://github.com/sindresorhus/cli-truncate#readme
+- `client-only@0.0.1`
+  - Description: This is a marker package to indicate that a module can only be used in Client Components.
+  - Homepage: https://reactjs.org/
 - `color-convert@2.0.1`
   - Description: Plain color conversion functions
   - Homepage: https://github.com/Qix-/color-convert#readme
@@ -910,6 +934,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `cross-spawn@7.0.6`
   - Description: Cross platform child_process#spawn and child_process#spawnSync
   - Homepage: https://github.com/moxystudio/node-cross-spawn
+- `csstype@3.2.3`
+  - Description: Strict TypeScript and Flow types for style based on MDN data
+  - Homepage: https://github.com/frenic/csstype#readme
 - `data-uri-to-buffer@6.0.2`
   - Description: Create an ArrayBuffer instance from a Data URI string
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
@@ -1255,6 +1282,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `netmask@2.1.1`
   - Description: Parse and lookup IP network blocks
   - Homepage: https://github.com/rs/node-netmask
+- `next@16.2.10`
+  - Description: The React Framework
+  - Homepage: https://nextjs.org
 - `node-releases@2.0.44`
   - Description: Node.js releases data
   - Homepage: https://github.com/chicoxyzzy/node-releases#readme
@@ -1345,6 +1375,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `queue-microtask@1.2.3`
   - Description: fast, tiny `queueMicrotask` shim for modern engines
   - Homepage: https://github.com/feross/queue-microtask
+- `react@19.2.7`
+  - Description: React is a JavaScript library for building user interfaces.
+  - Homepage: https://react.dev/
+- `react-dom@19.2.7`
+  - Description: React package for working with the DOM.
+  - Homepage: https://react.dev/
 - `readable-stream@2.3.8`, `readable-stream@4.7.0`
   - Description: Node.js Streams, a user-land copy of the stream library from Node.js
   - Homepage: https://github.com/nodejs/readable-stream
@@ -1381,6 +1417,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `safer-buffer@2.1.2`
   - Description: Modern Buffer API polyfill without footguns
   - Homepage: https://github.com/ChALkeR/safer-buffer#readme
+- `scheduler@0.27.0`
+  - Description: Cooperative scheduler for the browser environment.
+  - Homepage: https://react.dev/
 - `shebang-command@2.0.0`
   - Description: Get the command from a shebang
   - Homepage: https://github.com/kevva/shebang-command#readme
@@ -1444,6 +1483,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `strnum@2.2.3`
   - Description: Parse String to Number based on configuration
   - Homepage: https://github.com/NaturalIntelligence/strnum#readme
+- `styled-jsx@5.1.6`
+  - Description: Full CSS support for JSX without compromises
+  - Homepage: https://github.com/vercel/styled-jsx#readme
 - `supports-color@7.2.0`
   - Description: Detect whether a terminal supports color
   - Homepage: https://github.com/chalk/supports-color#readme

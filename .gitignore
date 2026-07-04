@@ -19,3 +19,5 @@ SHA256SUMS
 
 # Next.js app build output
 apps/web/.next/
+
+**/node_modules/

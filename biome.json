@@ -12,7 +12,9 @@
       "!reports",
       "!.stryker-tmp",
       "!site",
-      "!sbom.cyclonedx.json"
+      "!sbom.cyclonedx.json",
+      "!**/node_modules",
+      "!apps/web/.next"
     ]
   },
   "formatter": {

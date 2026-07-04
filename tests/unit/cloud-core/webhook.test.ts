@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createGitHubSignatureHeader,
@@ -31,8 +32,8 @@ describe("GitHub webhook verification", () => {
 
 describe("local artifact path resolution", () => {
   it("keeps artifact keys inside the configured artifact root", () => {
-    expect(resolveLocalArtifactPath("/tmp/artifacts", "runs/123/report.json")).toBe(
-      "/tmp/artifacts/runs/123/report.json",
+    expect(resolveLocalArtifactPath("artifact-root", "runs/123/report.json")).toMatch(
+      new RegExp(`${join("artifact-root", "runs", "123", "report.json").replaceAll("\\", "\\\\")}$`),
     );
   });
 
