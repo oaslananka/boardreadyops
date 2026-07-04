@@ -5,8 +5,10 @@ packages:
   - examples/plugin-*
 
 allowBuilds:
+  '@prisma/engines': true
   esbuild: true
   libxmljs2: false
+  prisma: true
   puppeteer: false
   sharp: true
 
