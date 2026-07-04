@@ -14,7 +14,8 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "@boardreadyops/cloud-core": "workspace:*",
-    "@boardreadyops/contracts": "workspace:*"
+    "@boardreadyops/contracts": "workspace:*",
+    "@boardreadyops/db": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.2.17",
