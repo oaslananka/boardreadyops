@@ -4,81 +4,89 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Installation {
   id                   String       @id @default(uuid())
-  githubInstallationId BigInt       @unique
-  accountLogin         String
-  accountType          String
-  planTier             String       @default("free")
-  createdAt            DateTime     @default(now())
-  suspendedAt          DateTime?
+  githubInstallationId BigInt       @unique @map("github_installation_id")
+  accountLogin         String       @map("account_login")
+  accountType          String       @map("account_type")
+  planTier             String       @default("free") @map("plan_tier")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  suspendedAt          DateTime?    @map("suspended_at")
   repositories         Repository[]
+
+  @@map("installations")
 }
 
 model Repository {
   id             String        @id @default(uuid())
-  installationId String
-  githubRepoId   BigInt        @unique
+  installationId String        @map("installation_id")
+  githubRepoId   BigInt        @unique @map("github_repo_id")
   owner          String
   name           String
   private        Boolean       @default(false)
-  defaultBranch  String
-  enabledAt      DateTime      @default(now())
-  disabledAt     DateTime?
+  defaultBranch  String        @map("default_branch")
+  enabledAt      DateTime      @default(now()) @map("enabled_at")
+  disabledAt     DateTime?     @map("disabled_at")
   installation   Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
   runs           ReleaseRun[]
 
   @@unique([installationId, owner, name])
+  @@map("repositories")
 }
 
 model ReleaseRun {
   id                   String     @id @default(uuid())
-  repositoryId         String
-  commitSha            String
+  repositoryId         String     @map("repository_id")
+  idempotencyKey       String?    @unique @map("idempotency_key")
+  commitSha            String     @map("commit_sha")
   ref                  String
-  pullRequestNumber    Int?
-  triggerKind          String
+  pullRequestNumber    Int?       @map("pull_request_number")
+  triggerKind          String     @map("trigger_kind")
   status               String     @default("queued")
   decision             String?
-  startedAt            DateTime   @default(now())
-  completedAt          DateTime?
-  durationMs           Int?
-  boardReadyOpsVersion String?
-  kicadVersion         String?
-  githubCheckRunId     BigInt?
-  readinessScore       Int?
+  startedAt            DateTime   @default(now()) @map("started_at")
+  completedAt          DateTime?  @map("completed_at")
+  durationMs           Int?       @map("duration_ms")
+  boardReadyOpsVersion String?    @map("board_ready_ops_version")
+  kicadVersion         String?    @map("kicad_version")
+  githubCheckRunId     BigInt?    @map("github_check_run_id")
+  readinessScore       Int?       @map("readiness_score")
   repository           Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   findings             Finding[]
   artifacts            Artifact[]
 
   @@index([repositoryId, startedAt])
   @@index([commitSha])
+  @@map("release_runs")
 }
 
 model Finding {
   id       String     @id @default(uuid())
-  runId    String
-  ruleId   String
+  runId    String     @map("run_id")
+  ruleId   String     @map("rule_id")
   severity String
   message  String
   path     String?
   kind     String?
-  waivedAt DateTime?
+  waivedAt DateTime?  @map("waived_at")
   run      ReleaseRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("findings")
 }
 
 model Artifact {
   id          String     @id @default(uuid())
-  runId       String
+  runId       String     @map("run_id")
   kind        String
   name        String
-  storagePath String
+  storagePath String     @map("storage_path")
   sha256      String
   bytes       Int
   role        String
-  uploadedAt  DateTime   @default(now())
+  uploadedAt  DateTime   @default(now()) @map("uploaded_at")
   run         ReleaseRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("artifacts")
 }
