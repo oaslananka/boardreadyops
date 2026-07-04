@@ -12,7 +12,10 @@ export type PnpmLicensePackage = {
 
 export type PnpmLicenseReport = Record<string, PnpmLicensePackage[]>;
 
-export declare function main(root?: string, options?: { includeAll?: boolean; includeDev?: boolean }): Promise<void>;
+export declare function main(
+  root?: string,
+  options?: { includeAll?: boolean; includeDev?: boolean; packageName?: string },
+): Promise<void>;
 export declare function findLicensePolicyViolations(
   report: PnpmLicenseReport,
   allowed?: readonly string[],

@@ -13,7 +13,8 @@ export const allowedLicenses = Object.freeze([
 ]);
 
 export async function main(root = process.cwd(), options = {}) {
-  const scopeArgs = options.includeAll ? [] : [options.includeDev ? "--dev" : "--prod"];
+  const rootPackageName = options.packageName ?? "boardreadyops";
+  const scopeArgs = options.includeAll ? [] : ["--filter", rootPackageName, options.includeDev ? "--dev" : "--prod"];
   const report = await readPnpmLicenseReport(root, [...scopeArgs, "--json"]);
   const violations = findLicensePolicyViolations(report);
 
@@ -66,5 +67,6 @@ if (import.meta.url === invokedPath) {
   await main(process.cwd(), {
     includeAll: process.argv.includes("--all"),
     includeDev: process.argv.includes("--dev"),
+    packageName: process.argv.find((arg) => arg.startsWith("--package="))?.slice("--package=".length),
   });
 }

@@ -1,0 +1,21 @@
+{
+  "name": "@boardreadyops/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:format": "prisma format --schema prisma/schema.prisma",
+    "db:validate": "prisma validate --schema prisma/schema.prisma"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "devDependencies": {
+    "prisma": "7.8.0"
+  }
+}

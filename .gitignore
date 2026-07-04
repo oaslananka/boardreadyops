@@ -16,3 +16,8 @@ SHA256SUMS
 .env
 .env.*
 !.env.example
+
+# Next.js app build output
+apps/web/.next/
+
+**/node_modules/
