@@ -70,6 +70,8 @@ nav:
       - Configuration: configuration.md
       - Support Matrix: support-matrix.md
       - Roadmap: ROADMAP.md
+      - Tutorials:
+          - Getting Started: tutorials/getting-started.md
   - Use:
       - CLI: cli.md
       - Agent Planning Output: agent-planning.md
@@ -86,6 +88,8 @@ nav:
           - Annotations: reports/annotations.md
       - Multi-project Workspaces: multi-project.md
       - Cross-platform Paths: cross-platform.md
+      - How-to Guides:
+          - CI Quality Gates: how-to/ci-quality-gates.md
   - Hardware Gates:
       - Rules:
           - Overview: rules/index.md
@@ -113,8 +117,16 @@ nav:
       - Security:
           - Policy: security/disclosure.md
           - Threat Model: security/threat-model.md
+          - Release Integrity: security/release-integrity.md
+          - Input Validation: security/input-validation.md
+          - Assurance Case: security/assurance-case.md
           - Scorecard: security/scorecard.md
       - Governance: governance.md
+      - Repository Maturity:
+          - Maturity Report: repo-maturity-report.md
+          - OpenSSF Evidence: openssf-evidence.md
+          - OpenSSF Gap Analysis: openssf-gap-analysis.md
+          - OpenSSF Proposal Links: openssf-proposal-links.md
       - Release:
           - History: release/history.md
           - Process: release/process.md
@@ -132,8 +144,14 @@ nav:
           - BoardReadyOps Studio: integrations/boardreadyops-studio.md
       - Plugin SDK: plugin-sdk.md
       - Plugin SDK API: reference/plugin-sdk/README.md
+      - Repository Standards: reference/repository-standards.md
       - Development:
           - Setup: development/setup.md
+          - Coding Standards: development/coding-standards.md
+          - Testing Policy: development/testing-policy.md
+          - Release Process: development/release-process.md
+          - Dependency Management: development/dependency-management.md
+          - Commit Conventions: development/commit-conventions.md
           - Writing Rules: development/writing-rules.md
           - Tooling: development/tooling.md
           - CI Policy: development/ci-policy.md
@@ -142,6 +160,7 @@ nav:
           - Overview: architecture/overview.md
           - Pipeline: architecture/pipeline.md
           - Rule Engine: architecture/rule-engine.md
+          - Explanation: explanation/architecture.md
           - Cloud Data Model: architecture/cloud-data-model.md
           - GitHub App RFC: architecture/github-app-rfc.md
           - ADR:

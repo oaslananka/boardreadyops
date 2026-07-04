@@ -28,6 +28,11 @@ export const defaultMutationThresholds = Object.freeze([
 const detectedStatuses = new Set(["Killed", "Timeout"]);
 const undetectedStatuses = new Set(["Survived", "NoCoverage"]);
 const coreMutationExcludes = new Set(["src/core/context.ts", "src/core/result.ts"]);
+
+export function isExecutableMutationFile(file) {
+  const normalized = normalizeFile(file);
+  return !coreMutationExcludes.has(normalized) && !normalized.endsWith(".d.ts") && !normalized.endsWith(".types.ts");
+}
 const parserModelMutationFiles = new Set([
   "src/kicad/sexpr.ts",
   "src/kicad/pcb.ts",
@@ -141,10 +146,7 @@ export function formatFailures(results) {
 
 export async function expectedCoreMutationFiles(root = process.cwd()) {
   const files = await glob("src/core/**/*.ts", { cwd: root, onlyFiles: true });
-  return files
-    .map(normalizeFile)
-    .filter((file) => !coreMutationExcludes.has(file))
-    .sort();
+  return files.map(normalizeFile).filter(isExecutableMutationFile).sort();
 }
 
 export function missingMutationFiles(report, expectedFiles) {

@@ -1,28 +1,37 @@
-<p align="center">
-  <a href="https://www.buymeacoffee.com/oaslananka">
-    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=oaslananka&button_colour=FFDD00&font_colour=000000&font_family=Arial&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" />
-  </a>
-</p>
+<div align="center">
 
 # BoardReadyOps
 
-End-to-end hardware release pipeline for KiCad projects.
+**End-to-end hardware release pipeline for KiCad projects.**
+
+Verified, signed, manufacturer-ready release packages for KiCad projects.
+Generate artifacts, validate release readiness, package evidence, and produce a clear release decision.
+
+[![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
+[![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13378/badge)](https://www.bestpractices.dev/projects/13378)
+
+[![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
+[![npm downloads](https://img.shields.io/npm/dt/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+[Repository Maturity](docs/repo-maturity-report.md) ·
+[OpenSSF Evidence](docs/openssf-evidence.md) ·
+[Governance](GOVERNANCE.md) ·
+[Roadmap](docs/ROADMAP.md) ·
+[Support](SUPPORT.md)
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support-ffdd00?logo=buymeacoffee&logoColor=black&labelColor=ffdd00&color=111111)](https://www.buymeacoffee.com/oaslananka)
+
+</div>
 
 BoardReadyOps turns a KiCad project into a verified, signed, manufacturer-ready release package. It generates manufacturing artifacts, validates release readiness, packages evidence, and produces a clear release decision — running locally as a CLI and in CI as a GitHub Action, with JSON, SARIF, Markdown, HTML, JUnit, and workflow annotation output.
 
 ```
 Generate → Validate → Decide → Package → Attest → Review → Handoff
 ```
-
-See the [v2 roadmap](docs/ROADMAP.md) for the full product direction and milestone plan.
-
-[![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
-[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
-[![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13378/badge)](https://www.bestpractices.dev/projects/13378)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/boardreadyops)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Installation
 
@@ -33,10 +42,9 @@ npm i -g boardreadyops
 The current public npm package is `boardreadyops@1.7.2`. It is verified on
 Node.js 22.14+ and 24, includes the current CLI bundle, schemas, docs, Action
 metadata, and matches the public `v1.7.2` tag archive.
-Binary release assets should be verified against `v1.7.2` when the matching
-binary asset matrix is published. Until then, the `v1.4.6` GitHub Release
-contains the last published binary asset matrix and `SHA256SUMS`. See
-[release channel verification](docs/release/channel-verification.md)
+Binary release assets should be verified against `v1.7.2`, which publishes the
+current Linux, macOS, and Windows binary matrix, `SHA256SUMS`, and SBOM release
+assets. See [release channel verification](docs/release/channel-verification.md)
 for the tested artifact list and remaining channel follow-ups.
 
 ## Runtime Support
@@ -124,7 +132,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@dc1b7bed613c7599309527ad69756018d8127363 # v1.7.1
+      - uses: oaslananka/boardreadyops@005afb83bd04f50a8da33bbffc441818910951f6 # v1.7.2
         with:
           config: boardreadyops.yml
           mode: enforce
@@ -137,7 +145,7 @@ Use the full container action when a workflow should carry KiCad CLI inside the
 BoardReadyOps runtime instead of installing KiCad separately:
 
 ```yaml
-      - uses: oaslananka/boardreadyops/apps/container@dc1b7bed613c7599309527ad69756018d8127363 # v1.7.1
+      - uses: oaslananka/boardreadyops/apps/container@005afb83bd04f50a8da33bbffc441818910951f6 # v1.7.2
         with:
           config: boardreadyops.yml
           require-kicad: "true"

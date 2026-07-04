@@ -1,0 +1,47 @@
+name: Feature request
+about: Propose a new capability, integration, rule, report, or workflow
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user, release, manufacturing, or automation problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior, CLI/API surface, or documentation change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - GitHub Action
+        - Rules
+        - Reports
+        - Release evidence
+        - Vendor handoff
+        - Plugin SDK
+        - Documentation
+        - Governance/community
+        - Security/supply chain
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution readiness
+      options:
+        - label: I can help test or review this change.
+        - label: I can submit a pull request after maintainer agreement.

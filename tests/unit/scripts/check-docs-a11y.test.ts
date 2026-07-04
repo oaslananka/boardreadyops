@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   candidateChromeExecutables,
   collectHtmlFiles,
+  filterPa11yIssues,
   formatPa11yFailures,
   pa11yOptions,
   runPa11yPageWithRetry,
@@ -50,6 +51,19 @@ describe("check-docs-a11y", () => {
     expect(output).toContain("WCAG2AA.Principle1.Guideline1_4.1_4_3.G18.Fail");
   });
 
+  it("filters Material navigation color contrast false positives only", async () => {
+    const fakePage = {
+      evaluate: async (_fn: unknown, selector: string) => selector === "#nav-label",
+    };
+    const issues = [
+      { code: "color-contrast", selector: "#nav-label" },
+      { code: "color-contrast", selector: "main a" },
+      { code: "landmark-one-main", selector: "#nav-label" },
+    ];
+
+    await expect(filterPa11yIssues(fakePage, issues)).resolves.toEqual([issues[1], issues[2]]);
+  });
+
   it("uses WCAG 2 AA checks with axe and htmlcs runners", () => {
     expect(pa11yOptions).toMatchObject({
       includeNotices: false,
@@ -78,6 +92,39 @@ describe("check-docs-a11y", () => {
     const issues = await runPa11yPageWithRetry(persistent, "http://x/", fakeBrowser, 3);
     expect(issues).toHaveLength(1);
     expect(attempts).toBe(3); // exhausted all attempts before failing
+  });
+
+  it("recovers from transient browser errors by reopening the browser", async () => {
+    const closedPage = { close: async () => undefined };
+    const cleanPage = { close: async () => undefined };
+    const firstBrowser = { newPage: async () => closedPage };
+    const recoveredBrowser = { newPage: async () => cleanPage };
+    let calls = 0;
+    let recoveries = 0;
+    const pa11y = async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("Connection closed.");
+      }
+      return { issues: [] };
+    };
+
+    const runPa11yPageWithRecovery: (
+      checker: typeof pa11y,
+      url: string,
+      browser: typeof firstBrowser,
+      attempts: number,
+      recoverBrowser: () => Promise<typeof recoveredBrowser>,
+    ) => Promise<Array<{ code?: string }>> = runPa11yPageWithRetry;
+
+    await expect(
+      runPa11yPageWithRecovery(pa11y, "http://x/", firstBrowser, 3, async () => {
+        recoveries += 1;
+        return recoveredBrowser;
+      }),
+    ).resolves.toEqual([]);
+    expect(calls).toBe(2);
+    expect(recoveries).toBe(1);
   });
 
   it("detects standard Windows browser install paths", () => {
