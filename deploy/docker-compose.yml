@@ -21,7 +21,7 @@ services:
       - ./.env
     environment:
       ARTIFACT_STORAGE_ROOT: /data/artifacts
-      DATABASE_URL: postgresql://boardreadyops:boardreadyops-change-me@postgres:5432/boardreadyops
+      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
       REDIS_URL: redis://redis:6379
     expose:
       - "3000"
@@ -35,9 +35,9 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: boardreadyops
-      POSTGRES_PASSWORD: boardreadyops-change-me
-      POSTGRES_DB: boardreadyops
+      POSTGRES_USER: ${POSTGRES_USER:-boardreadyops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-boardreadyops}
     volumes:
       - boardreadyops_postgres:/var/lib/postgresql/data
 
