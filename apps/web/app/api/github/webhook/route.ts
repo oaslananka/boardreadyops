@@ -1,4 +1,5 @@
 import { verifyGitHubWebhook } from "@boardreadyops/cloud-core";
+import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
 
 export const runtime = "nodejs";
 
@@ -17,5 +18,41 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "invalid webhook signature" }, { status: 401 });
   }
 
-  return Response.json({ ok: true, status: "accepted", event, delivery }, { status: 202 });
+  let parsedPayload: unknown;
+
+  try {
+    parsedPayload = JSON.parse(payload);
+  } catch {
+    return Response.json({ ok: false, error: "webhook payload is not valid JSON" }, { status: 400 });
+  }
+
+  const lifecycle = normalizeGitHubAppWebhook({
+    event,
+    delivery,
+    payload: parsedPayload,
+  });
+
+  if (!lifecycle.accepted) {
+    return Response.json(
+      {
+        ok: false,
+        event,
+        delivery,
+        error: lifecycle.reason ?? "unsupported GitHub App webhook event",
+      },
+      { status: 202 },
+    );
+  }
+
+  return Response.json(
+    {
+      ok: true,
+      status: "accepted",
+      event,
+      delivery,
+      action: lifecycle.action,
+      lifecycleActions: lifecycle.actions,
+    },
+    { status: 202 },
+  );
 }
