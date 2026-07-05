@@ -16,6 +16,15 @@ const repository = {
   defaultBranch: "main",
 };
 
+const enabledRepository = {
+  id: 1283305324,
+  owner: "oaslananka",
+  name: "boardreadyops",
+  fullName: "oaslananka/boardreadyops",
+  private: false,
+  defaultBranch: "main",
+};
+
 function recordingExecutor() {
   const calls: { sql: string; params: readonly unknown[] }[] = [];
   const executor: SqlQueryExecutor = {
@@ -80,7 +89,41 @@ describe("SQL GitHub App lifecycle store", () => {
     ]);
   });
 
-  it("enqueues release runs with an idempotency key", async () => {
+  it("enqueues release runs with an idempotency key for enabled repositories", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppLifecycleStore(executor, {
+      id: () => "run-row-id",
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    const result = await store.enqueueReleaseRun({
+      type: "release_run.enqueue",
+      installation,
+      repository: enabledRepository,
+      pullRequestNumber: 42,
+      ref: "feature/ready",
+      commitSha: "0123456789abcdef",
+      triggerKind: "pr",
+    });
+
+    expect(result.runId).toBe("run-row-id");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("insert into release_runs");
+    expect(calls[0]?.sql).toContain("on conflict (idempotency_key)");
+    expect(calls[0]?.params).toEqual([
+      1283305324,
+      "0123456789abcdef",
+      "feature/ready",
+      42,
+      "pr",
+      "2026-07-04T00:00:00.000Z",
+      12345,
+      "run-row-id",
+      "1283305324:42:0123456789abcdef",
+    ]);
+  });
+
+  it("skips release-run enqueue for repositories that are not enabled", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppLifecycleStore(executor, {
       id: () => "run-row-id",
@@ -97,20 +140,7 @@ describe("SQL GitHub App lifecycle store", () => {
       triggerKind: "pr",
     });
 
-    expect(result.runId).toBe("run-row-id");
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.sql).toContain("insert into release_runs");
-    expect(calls[0]?.sql).toContain("on conflict (idempotency_key)");
-    expect(calls[0]?.params).toEqual([
-      98765,
-      "0123456789abcdef",
-      "feature/ready",
-      42,
-      "pr",
-      "2026-07-04T00:00:00.000Z",
-      12345,
-      "run-row-id",
-      "98765:42:0123456789abcdef",
-    ]);
+    expect(result).toEqual({ idempotencyKey: "98765:42:0123456789abcdef" });
+    expect(calls).toHaveLength(0);
   });
 });
