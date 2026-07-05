@@ -279,6 +279,15 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
 
     return result(options, action, [
       {
+        type: "installation.upsert",
+        installation,
+      },
+      {
+        type: "repository.upsert",
+        installation,
+        repository,
+      },
+      {
         type: "release_run.enqueue",
         installation,
         repository,
