@@ -17,6 +17,10 @@
 - [PluginRuleMetadata](interfaces/PluginRuleMetadata.md)
 - [ReportEmitter](interfaces/ReportEmitter.md)
 - [Rule](interfaces/Rule.md)
+- [SupplierIntelligenceProvider](interfaces/SupplierIntelligenceProvider.md)
+- [SupplierIntelligenceQuery](interfaces/SupplierIntelligenceQuery.md)
+- [SupplierIntelligenceRecord](interfaces/SupplierIntelligenceRecord.md)
+- [SupplierIntelligenceResult](interfaces/SupplierIntelligenceResult.md)
 - [VendorProfile](interfaces/VendorProfile.md)
 
 ## Type Aliases
@@ -24,6 +28,8 @@
 - [PluginConfidenceLevel](type-aliases/PluginConfidenceLevel.md)
 - [PluginPermission](type-aliases/PluginPermission.md)
 - [PluginSeverity](type-aliases/PluginSeverity.md)
+- [SupplierDataTrust](type-aliases/SupplierDataTrust.md)
+- [SupplierLifecycleStatus](type-aliases/SupplierLifecycleStatus.md)
 
 ## Functions
 

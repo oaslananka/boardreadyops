@@ -46,6 +46,14 @@ Top-level plugin export consumed by BoardReadyOps plugin loading.
 
 ***
 
+### supplierProviders?
+
+> `optional` **supplierProviders?**: [`SupplierIntelligenceProvider`](SupplierIntelligenceProvider.md)[]
+
+Supplier intelligence providers contributed by this plugin.
+
+***
+
 ### vendorProfiles?
 
 > `optional` **vendorProfiles?**: [`VendorProfile`](VendorProfile.md)[]
