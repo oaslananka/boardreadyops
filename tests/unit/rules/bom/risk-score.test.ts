@@ -11,7 +11,7 @@ describe("bom.risk-score rule", () => {
     // D1 is DNP so should be skipped; R1 has full data; U1 has full data (single-source but no alternates check)
     const findings = expectRule(result, "bom.risk-score");
     expect(findings.length).toBeGreaterThan(0);
-    const refs = findings.map((f) => f.details?.["reference"]);
+    const refs = findings.map((f) => f.details?.reference);
     // LED1 has no MPN, no manufacturer, no supplier → should flag
     expect(refs).toContain("LED1");
     // C1 has no MPN → should flag
@@ -21,7 +21,7 @@ describe("bom.risk-score rule", () => {
   it("skips DNP rows", async () => {
     const result = await runFixture("bom-risk-score");
     const findings = expectRule(result, "bom.risk-score");
-    const refs = findings.map((f) => f.details?.["reference"]);
+    const refs = findings.map((f) => f.details?.reference);
     // D1 is DNP — must not appear
     expect(refs).not.toContain("D1");
   });
@@ -31,10 +31,10 @@ describe("bom.risk-score rule", () => {
     const withoutAlternates = await runFixture("bom-risk-score");
     const withRefs = withAlternates.findings
       .filter((f) => f.ruleId === "bom.risk-score")
-      .map((f) => f.details?.["reference"]);
+      .map((f) => f.details?.reference);
     const withoutRefs = withoutAlternates.findings
       .filter((f) => f.ruleId === "bom.risk-score")
-      .map((f) => f.details?.["reference"]);
+      .map((f) => f.details?.reference);
     // R2 has an approved alternate in with-alternates.yml — its single-source factor should drop
     // so it should appear less or with lower score in the alternates run
     expect(withoutRefs.length).toBeGreaterThanOrEqual(withRefs.length);
@@ -54,9 +54,9 @@ describe("bom.risk-score rule", () => {
     const findings = result.findings.filter((f) => f.ruleId === "bom.risk-score");
     expect(findings.length).toBeGreaterThan(0);
     for (const f of findings) {
-      expect(typeof f.details?.["riskScore"]).toBe("number");
-      expect(typeof f.details?.["overallBomRiskScore"]).toBe("number");
-      expect(["critical", "high", "medium", "low"]).toContain(f.details?.["riskLevel"]);
+      expect(typeof f.details?.riskScore).toBe("number");
+      expect(typeof f.details?.overallBomRiskScore).toBe("number");
+      expect(["critical", "high", "medium", "low"]).toContain(f.details?.riskLevel);
     }
   });
 });
