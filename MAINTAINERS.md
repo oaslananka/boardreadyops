@@ -14,8 +14,12 @@ BoardReadyOps is currently maintained by a single project owner.
   changes, but not yet sufficient for a Gold/foundation-grade claim.
 - CODEOWNERS: `.github/CODEOWNERS` assigns ownership to `@oaslananka`.
 - Branch protection: enabled on `main` as of the 2026-07-02 audit, with one
-  required approval and CODEOWNERS review; required status checks still need
-  maintainer confirmation/enforcement.
+  required approval, CODEOWNERS review, and admin enforcement (`enforce_admins`).
+- Required status checks: the expected required checks are documented in
+  `docs/development/release-assurance.md`. Maintainers should verify these match
+  the current `ci.yml` job names when updating branch protection settings.
+- Required signed commits: not yet enabled; this remains a future hardening
+  decision documented in `docs/development/release-assurance.md`.
 
 ## Adding maintainers
 
