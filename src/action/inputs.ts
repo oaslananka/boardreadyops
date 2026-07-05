@@ -33,6 +33,7 @@ export function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? pro
     project: optionalPath(root, core.getInput("project")),
     config: optionalPath(root, core.getInput("config") || "boardreadyops.yml"),
     mode: modeInput(core.getInput("mode") || "warn"),
+    releaseMode: releaseModeInput(core.getInput("release-mode")),
     requireKicad: boolInput("require-kicad", false),
     kicadCli: empty(core.getInput("kicad-cli")),
     bom: bomInput(root, core.getInput("bom") || "auto"),
@@ -104,6 +105,17 @@ function modeInput(value: string): "warn" | "enforce" {
     return value;
   }
   throw new Error("Input mode must be warn or enforce.");
+}
+
+function releaseModeInput(value: string): "prototype" | "pilot" | "production" | undefined {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return undefined;
+  }
+  if (trimmed === "prototype" || trimmed === "pilot" || trimmed === "production") {
+    return trimmed;
+  }
+  throw new Error("Input release-mode must be prototype, pilot, or production.");
 }
 
 function commentFormatInput(value: string): "report" | "review" {

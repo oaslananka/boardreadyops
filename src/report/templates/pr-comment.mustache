@@ -1,5 +1,9 @@
 <!-- boardreadyops:sticky:v1 -->
 {{> summary}}
+{{#hasReleaseMode}}
+
+> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} — {{releaseModeView.description}}
+{{/hasReleaseMode}}
 
 {{#hasFindings}}
 ## {{labels.topFindings}}

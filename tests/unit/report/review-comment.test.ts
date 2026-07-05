@@ -122,4 +122,15 @@ describe("formatReviewComment", () => {
     expect(body).toContain("`R1`");
     expect(body).toContain("single source");
   });
+
+  it("renders release mode badge in decision line when releaseMode is set", () => {
+    const productionResult: RunResult = { ...result([]), releaseMode: "production" };
+    const body = formatReviewComment(productionResult);
+    expect(body).toContain("🏭 production |");
+    expect(body).toContain("Decision: ✅ PASS");
+
+    const prototypeResult: RunResult = { ...result([]), releaseMode: "prototype" };
+    const protoBody = formatReviewComment(prototypeResult);
+    expect(protoBody).toContain("🔬 prototype |");
+  });
 });

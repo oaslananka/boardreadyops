@@ -408,6 +408,24 @@ describe("report formats", () => {
     expect(markdown).toContain("no MPN");
     expect(markdown).toContain("no manufacturer");
   });
+
+  it("renders release mode badge in PR Markdown when releaseMode is set", () => {
+    const result: RunResult = { ...sampleResult([]), releaseMode: "production" };
+    const markdown = formatMarkdown(result);
+    expect(markdown).toContain("🏭 Production");
+    expect(markdown).toContain("Release Mode");
+    expect(markdown).not.toMatch(/{{|}}/);
+  });
+
+  it("renders prototype and pilot release mode badges without unresolved tokens", () => {
+    const prototype = formatMarkdown({ ...sampleResult([]), releaseMode: "prototype" });
+    expect(prototype).toContain("🔬 Prototype");
+    expect(prototype).not.toMatch(/{{|}}/);
+
+    const pilot = formatMarkdown({ ...sampleResult([]), releaseMode: "pilot" });
+    expect(pilot).toContain("🧪 Pilot");
+    expect(pilot).not.toMatch(/{{|}}/);
+  });
 });
 
 function sampleResult(findings = [sampleFinding()]): RunResult {

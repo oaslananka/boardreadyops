@@ -178,6 +178,11 @@ export const en = {
   "report.bomRisk.overallScore": "Overall BOM risk score",
   "report.bomRisk.components": "at-risk components",
   "report.bomRisk.noRisk": "No BOM supply-chain risk detected.",
+  "report.releaseMode.title": "Release Mode",
+  "report.releaseMode.prototype":
+    "Controlled risk is allowed. Missing recommended outputs and expired waivers are advisory.",
+  "report.releaseMode.pilot": "Stricter review applies. Missing recommended outputs are advisory but flagged.",
+  "report.releaseMode.production": "Strict mode. Missing recommended outputs and expired waivers block the release.",
   "severity.critical": "Critical",
   "severity.high": "High",
   "severity.info": "Info",

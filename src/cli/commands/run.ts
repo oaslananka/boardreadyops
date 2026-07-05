@@ -21,6 +21,7 @@ export interface CommonCliOptions {
   config?: string;
   project?: string;
   mode?: "warn" | "enforce";
+  releaseMode?: "prototype" | "pilot" | "production";
   requireKicad?: boolean;
   kicadCli?: string;
   bom?: string;
@@ -74,6 +75,7 @@ export function pipelineInputFromCli(
     project: options.project,
     config: options.config,
     mode: options.mode ?? "warn",
+    releaseMode: options.releaseMode,
     requireKicad: options.requireKicad ?? false,
     kicadCli: options.kicadCli,
     bom: options.bom,
@@ -303,6 +305,7 @@ export function addCommonOptions(command: Command): Command {
     .option("--watch", "watch files for changes and re-run checks")
     .option("--project <path>", "specific .kicad_pro")
     .option("--mode <mode>", "warn or enforce", "warn")
+    .option("--release-mode <mode>", "prototype|pilot|production release context")
     .option("--require-kicad", "exit non-zero if kicad-cli missing")
     .option("--kicad-cli <path>", "explicit kicad-cli path")
     .option("--bom <path>", "BOM source path or auto")

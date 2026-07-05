@@ -40,6 +40,10 @@
       "type": "integer",
       "minimum": 0
     },
+    "releaseMode": {
+      "enum": ["prototype", "pilot", "production"],
+      "description": "Manufacturing release context used for this run."
+    },
     "projects": {
       "type": "array"
     },
@@ -73,8 +77,12 @@
       "additionalProperties": false,
       "required": ["active", "expired"],
       "properties": {
-        "active": { "$ref": "#/$defs/waiverList" },
-        "expired": { "$ref": "#/$defs/waiverList" }
+        "active": {
+          "$ref": "#/$defs/waiverList"
+        },
+        "expired": {
+          "$ref": "#/$defs/waiverList"
+        }
       }
     },
     "waiverList": {
@@ -84,12 +92,25 @@
         "additionalProperties": false,
         "required": ["rule", "owner", "reason", "expired", "matched"],
         "properties": {
-          "rule": { "type": "string" },
-          "owner": { "type": "string" },
-          "reason": { "type": "string" },
-          "expires": { "type": "string" },
-          "expired": { "type": "boolean" },
-          "matched": { "type": "integer", "minimum": 0 }
+          "rule": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "string"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "matched": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     },
@@ -98,8 +119,12 @@
       "additionalProperties": false,
       "required": ["status", "enforced", "rules"],
       "properties": {
-        "status": { "enum": ["pass", "fail"] },
-        "enforced": { "type": "boolean" },
+        "status": {
+          "enum": ["pass", "fail"]
+        },
+        "enforced": {
+          "type": "boolean"
+        },
         "rules": {
           "type": "array",
           "items": {
@@ -107,7 +132,9 @@
             "additionalProperties": false,
             "required": ["id", "type", "status", "message"],
             "properties": {
-              "id": { "type": "string" },
+              "id": {
+                "type": "string"
+              },
               "type": {
                 "enum": [
                   "max-severity",
@@ -119,8 +146,12 @@
                   "forbid-expired-waivers"
                 ]
               },
-              "status": { "enum": ["pass", "fail"] },
-              "message": { "type": "string" }
+              "status": {
+                "enum": ["pass", "fail"]
+              },
+              "message": {
+                "type": "string"
+              }
             }
           }
         }
@@ -145,9 +176,15 @@
           "additionalProperties": false,
           "required": ["id", "name", "service"],
           "properties": {
-            "id": { "type": "string" },
-            "name": { "type": "string" },
-            "service": { "type": "string" }
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "service": {
+              "type": "string"
+            }
           }
         },
         "score": {
@@ -173,23 +210,35 @@
             "additionalProperties": false,
             "required": ["output", "importance", "present"],
             "properties": {
-              "output": { "type": "string" },
-              "importance": { "enum": ["required", "recommended"] },
-              "present": { "type": "boolean" }
+              "output": {
+                "type": "string"
+              },
+              "importance": {
+                "enum": ["required", "recommended"]
+              },
+              "present": {
+                "type": "boolean"
+              }
             }
           }
         },
         "missingRequired": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "missingRecommended": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "warnings": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

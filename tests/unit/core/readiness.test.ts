@@ -81,3 +81,125 @@ describe("readiness scoring", () => {
     expect(result.missingRecommended).toEqual(["pdf"]);
   });
 });
+
+describe("release mode — prototype and pilot", () => {
+  it("prototype: missing recommended outputs produce at-risk status (unchanged behavior)", () => {
+    const result = computeReadiness({
+      requiredOutputs: ["gerber"],
+      recommendedOutputs: ["pdf"],
+      presentOutputs: new Set(["gerber"]),
+      findings: [],
+      failOn: "high",
+      releaseMode: "prototype",
+    });
+    expect(result.status).toBe("at-risk");
+    expect(result.missingRecommended).toEqual(["pdf"]);
+    expect(result.warnings).toContain("Recommended output pdf is missing.");
+  });
+
+  it("prototype: expired waivers do not affect readiness status", () => {
+    const result = computeReadiness({
+      requiredOutputs: [],
+      recommendedOutputs: [],
+      presentOutputs: new Set(),
+      findings: [],
+      failOn: "high",
+      releaseMode: "prototype",
+      expiredWaivers: 3,
+    });
+    expect(result.status).toBe("ready");
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("pilot: missing recommended outputs produce at-risk status (same as prototype)", () => {
+    const result = computeReadiness({
+      requiredOutputs: [],
+      recommendedOutputs: ["pdf"],
+      presentOutputs: new Set(),
+      findings: [],
+      failOn: "high",
+      releaseMode: "pilot",
+    });
+    expect(result.status).toBe("at-risk");
+  });
+});
+
+describe("release mode — production", () => {
+  it("production: missing recommended outputs produce blocked status", () => {
+    const result = computeReadiness({
+      requiredOutputs: ["gerber"],
+      recommendedOutputs: ["pdf"],
+      presentOutputs: new Set(["gerber"]),
+      findings: [],
+      failOn: "high",
+      releaseMode: "production",
+    });
+    expect(result.status).toBe("blocked");
+    expect(result.missingRecommended).toEqual(["pdf"]);
+    expect(result.warnings).toContain("Recommended output pdf is required in production mode.");
+  });
+
+  it("production: expired waivers produce blocked status", () => {
+    const result = computeReadiness({
+      requiredOutputs: [],
+      recommendedOutputs: [],
+      presentOutputs: new Set(),
+      findings: [],
+      failOn: "high",
+      releaseMode: "production",
+      expiredWaivers: 2,
+    });
+    expect(result.status).toBe("blocked");
+    expect(result.warnings).toContain("2 expired waiver(s) must be renewed or removed before production release.");
+  });
+
+  it("production: is ready when all outputs present and no expired waivers", () => {
+    const result = computeReadiness({
+      requiredOutputs: ["gerber"],
+      recommendedOutputs: ["pdf"],
+      presentOutputs: new Set(["gerber", "pdf"]),
+      findings: [],
+      failOn: "high",
+      releaseMode: "production",
+      expiredWaivers: 0,
+    });
+    expect(result.status).toBe("ready");
+    expect(result.score).toBe(100);
+  });
+
+  it("production: score is penalized for expired waivers", () => {
+    const noExpiredResult = computeReadiness({
+      requiredOutputs: [],
+      recommendedOutputs: [],
+      presentOutputs: new Set(),
+      findings: [],
+      failOn: "high",
+      releaseMode: "production",
+      expiredWaivers: 0,
+    });
+    const expiredResult = computeReadiness({
+      requiredOutputs: [],
+      recommendedOutputs: [],
+      presentOutputs: new Set(),
+      findings: [],
+      failOn: "high",
+      releaseMode: "production",
+      expiredWaivers: 1,
+    });
+    expect(expiredResult.score).toBeLessThan(noExpiredResult.score);
+  });
+
+  it("production: missing recommended and expired waivers both contribute to blocked status", () => {
+    const result = computeReadiness({
+      requiredOutputs: [],
+      recommendedOutputs: ["pdf"],
+      presentOutputs: new Set(),
+      findings: [],
+      failOn: "high",
+      releaseMode: "production",
+      expiredWaivers: 1,
+    });
+    expect(result.status).toBe("blocked");
+    expect(result.warnings.length).toBe(2);
+  });
+});

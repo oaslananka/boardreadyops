@@ -80140,6 +80140,10 @@ var config_schema_default = {
     mode: {
       enum: ["warn", "enforce"]
     },
+    releaseMode: {
+      enum: ["prototype", "pilot", "production"],
+      description: "Manufacturing release context that controls severity thresholds, required artifacts, and waiver behavior."
+    },
     plugins: {
       type: "array",
       items: {
@@ -80161,6 +80165,10 @@ var config_schema_default = {
           },
           mode: {
             enum: ["warn", "enforce"]
+          },
+          releaseMode: {
+            enum: ["prototype", "pilot", "production"],
+            description: "Per-project release mode override."
           },
           pinmap: {
             type: "string"
@@ -100786,10 +100794,12 @@ function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 function computeReadiness(input) {
+  const isProduction = input.releaseMode === "production";
   const required2 = [...new Set(input.requiredOutputs)].sort();
   const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required2.includes(output)).sort();
   const missingRequired = required2.filter((output) => !input.presentOutputs.has(output));
   const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
+  const expiredWaivers = input.expiredWaivers ?? 0;
   let blocking = 0;
   let nonBlocking = 0;
   for (const finding2 of input.findings) {
@@ -100802,10 +100812,11 @@ function computeReadiness(input) {
       nonBlocking += 1;
     }
   }
+  const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
   const score = clampScore(
-    100 - missingRequired.length * REQUIRED_PENALTY - missingRecommended.length * RECOMMENDED_PENALTY - blocking * BLOCKING_PENALTY - nonBlocking * NON_BLOCKING_PENALTY
+    100 - missingRequired.length * REQUIRED_PENALTY - missingRecommended.length * RECOMMENDED_PENALTY - blocking * BLOCKING_PENALTY - nonBlocking * NON_BLOCKING_PENALTY - productionBlockers * REQUIRED_PENALTY
   );
-  const status = missingRequired.length > 0 || blocking > 0 ? "blocked" : missingRecommended.length > 0 || nonBlocking > 0 ? "at-risk" : "ready";
+  const status = missingRequired.length > 0 || blocking > 0 || productionBlockers > 0 ? "blocked" : missingRecommended.length > 0 || nonBlocking > 0 ? "at-risk" : "ready";
   const evidence = [
     ...required2.map((output) => ({
       output,
@@ -100823,10 +100834,17 @@ function computeReadiness(input) {
     warnings.push(`Required output ${output} is missing.`);
   }
   for (const output of missingRecommended) {
-    warnings.push(`Recommended output ${output} is missing.`);
+    if (isProduction) {
+      warnings.push(`Recommended output ${output} is required in production mode.`);
+    } else {
+      warnings.push(`Recommended output ${output} is missing.`);
+    }
   }
   if (blocking > 0) {
     warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
+  }
+  if (isProduction && expiredWaivers > 0) {
+    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
   }
   return {
     profile: input.profile,
@@ -101055,6 +101073,7 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
       options: {
         ...ctx.options,
         mode: projectConfig.mode ?? ctx.options.mode,
+        releaseMode: projectConfig.releaseMode ?? ctx.options.releaseMode,
         bom: variantMatch?.bom ?? override?.bom ?? ctx.options.bom,
         pinmap: override?.pinmap ?? ctx.options.pinmap
       },
@@ -101100,7 +101119,14 @@ async function postProcessPhase(ctx, findings, projects) {
   const waiverResult = applyWaivers(sorted, ctx.config.waivers ?? []);
   const effectiveFindings = waiverResult.findings;
   const fabrication = await captureFabricationSnapshot(ctx.root, projects, ctx.options, ctx.config);
-  const readiness = await computeRunReadiness(ctx.root, ctx.config, ctx.options.failOn, effectiveFindings);
+  const readiness = await computeRunReadiness(
+    ctx.root,
+    ctx.config,
+    ctx.options.failOn,
+    effectiveFindings,
+    ctx.options.releaseMode,
+    waiverResult.expired.length
+  );
   const summary2 = summarizeFindings(effectiveFindings, ctx.options.failOn);
   const policy = ctx.config.policy ? evaluatePolicy(ctx.config.policy, {
     summary: summary2,
@@ -101120,12 +101146,14 @@ async function postProcessPhase(ctx, findings, projects) {
 }
 function assembleRunResult(ctx, effectiveFindings, fabrication, readiness, summary2, waiverResult, policy, pluginLoad, projects) {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
+  const releaseMode = ctx.options.releaseMode;
   return {
     schemaVersion: 1,
     tool: {
       name: "boardreadyops",
       version: boardReadyVersion
     },
+    ...releaseMode ? { releaseMode } : {},
     summary: summary2,
     readiness,
     ...bomRisk ? { bomRisk } : {},
@@ -101151,7 +101179,7 @@ function projectsLengthHint(input) {
 function registerPipelineRules() {
   registerBuiltInRules();
 }
-async function computeRunReadiness(root, config2, failOn, findings) {
+async function computeRunReadiness(root, config2, failOn, findings, releaseMode, expiredWaivers) {
   const resolved = resolveVendorProfile(config2.vendor);
   const presentOutputs = /* @__PURE__ */ new Set();
   for (const kind of VENDOR_OUTPUT_KINDS) {
@@ -101166,7 +101194,9 @@ async function computeRunReadiness(root, config2, failOn, findings) {
     recommendedOutputs: resolved?.recommendedOutputs ?? [],
     presentOutputs,
     findings,
-    failOn
+    failOn,
+    ...releaseMode ? { releaseMode } : {},
+    ...expiredWaivers !== void 0 ? { expiredWaivers } : {}
   });
 }
 async function controlledFindings(root, config2, options, findings) {
@@ -101193,6 +101223,7 @@ function normalizeOptions(cwd, root, config2, input, gate, forceFailOn) {
     project: input.project,
     config: input.config,
     mode: gate ? "enforce" : input.mode ?? config2.mode ?? "warn",
+    releaseMode: input.releaseMode ?? config2.releaseMode,
     requireKicad: input.requireKicad ?? false,
     kicadCli: input.kicadCli,
     bom: input.bom,
@@ -101277,6 +101308,9 @@ function configForProject(root, config2, project) {
   };
   if (override.mode) {
     projectConfig.mode = override.mode;
+  }
+  if (override.releaseMode) {
+    projectConfig.releaseMode = override.releaseMode;
   }
   if (override.firmware) {
     projectConfig.firmware = {
@@ -102188,6 +102222,10 @@ var en = {
   "report.bomRisk.overallScore": "Overall BOM risk score",
   "report.bomRisk.components": "at-risk components",
   "report.bomRisk.noRisk": "No BOM supply-chain risk detected.",
+  "report.releaseMode.title": "Release Mode",
+  "report.releaseMode.prototype": "Controlled risk is allowed. Missing recommended outputs and expired waivers are advisory.",
+  "report.releaseMode.pilot": "Stricter review applies. Missing recommended outputs are advisory but flagged.",
+  "report.releaseMode.production": "Strict mode. Missing recommended outputs and expired waivers block the release.",
   "severity.critical": "Critical",
   "severity.high": "High",
   "severity.info": "Info",
@@ -102295,7 +102333,7 @@ function reportCoordinateWithUnits(value, units) {
 }
 
 // src/report/templates/pr-comment.mustache
-var pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
+var pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
 
 // src/report/templates/summary.mustache
 var summary_default = "# {{labels.reportTitle}}\n\n| {{labels.metric}} | {{labels.count}} |\n| --- | ---: |\n| {{labels.total}} | {{summary.total}} |\n| {{labels.critical}} | {{summary.critical}} |\n| {{labels.high}} | {{summary.high}} |\n| {{labels.medium}} | {{summary.medium}} |\n| {{labels.low}} | {{summary.low}} |\n| {{labels.info}} | {{summary.info}} |\n";
@@ -102311,6 +102349,7 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
+  const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : void 0;
   return mustache_default.render(
     pr_comment_default,
     {
@@ -102327,6 +102366,8 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
       fabrication: fabricationView,
       hasBomRisk: Boolean(bomRiskView),
       bomRisk: bomRiskView,
+      hasReleaseMode: Boolean(releaseModeView),
+      releaseModeView,
       labels: markdownLabels(locale)
     },
     { summary: summary_default }
@@ -102387,6 +102428,7 @@ function markdownLabels(locale) {
     noFindings: t("report.noFindings", {}, locale),
     previous: t("report.previous", {}, locale),
     ref: t("report.ref", {}, locale),
+    releaseModeTitle: t("report.releaseMode.title", {}, locale),
     reportTitle: t("report.title", {}, locale),
     status: t("report.status", {}, locale),
     topFindings: t("report.topFindings", {}, locale),
@@ -102414,6 +102456,18 @@ function markdownFinding(finding2) {
   return {
     ...finding2,
     report: reportFindingContext(finding2)
+  };
+}
+var RELEASE_MODE_BADGE = {
+  prototype: "\u{1F52C} Prototype",
+  pilot: "\u{1F9EA} Pilot",
+  production: "\u{1F3ED} Production"
+};
+function formatReleaseMode(mode, locale) {
+  return {
+    mode,
+    badge: RELEASE_MODE_BADGE[mode],
+    description: t(`report.releaseMode.${mode}`, {}, locale)
   };
 }
 
@@ -106410,7 +106464,16 @@ function decisionLine(result) {
   if (result.policy?.enforced) {
     parts.push(`policy ${result.policy.status}`);
   }
-  return `**Decision: ${failed ? "\u274C FAIL" : "\u2705 PASS"}** \u2014 ${parts.join("; ")}`;
+  const modeBadge = result.releaseMode ? `${releaseModeEmoji(result.releaseMode)} ${result.releaseMode} | ` : "";
+  return `**Decision: ${failed ? "\u274C FAIL" : "\u2705 PASS"}** \u2014 ${modeBadge}${parts.join("; ")}`;
+}
+var RELEASE_MODE_EMOJI = {
+  prototype: "\u{1F52C}",
+  pilot: "\u{1F9EA}",
+  production: "\u{1F3ED}"
+};
+function releaseModeEmoji(mode) {
+  return RELEASE_MODE_EMOJI[mode];
 }
 function severityTable(result, locale) {
   const rows = ["| Severity | Count |", "| --- | ---: |"];
@@ -141739,6 +141802,7 @@ function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cw
     project: optionalPath(root, getInput("project")),
     config: optionalPath(root, getInput("config") || "boardreadyops.yml"),
     mode: modeInput(getInput("mode") || "warn"),
+    releaseMode: releaseModeInput(getInput("release-mode")),
     requireKicad: boolInput("require-kicad", false),
     kicadCli: empty(getInput("kicad-cli")),
     bom: bomInput(root, getInput("bom") || "auto"),
@@ -141807,6 +141871,16 @@ function modeInput(value) {
     return value;
   }
   throw new Error("Input mode must be warn or enforce.");
+}
+function releaseModeInput(value) {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return void 0;
+  }
+  if (trimmed === "prototype" || trimmed === "pilot" || trimmed === "production") {
+    return trimmed;
+  }
+  throw new Error("Input release-mode must be prototype, pilot, or production.");
 }
 function commentFormatInput(value) {
   if (value === "report" || value === "review") {

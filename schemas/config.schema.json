@@ -12,6 +12,10 @@
     "mode": {
       "enum": ["warn", "enforce"]
     },
+    "releaseMode": {
+      "enum": ["prototype", "pilot", "production"],
+      "description": "Manufacturing release context that controls severity thresholds, required artifacts, and waiver behavior."
+    },
     "plugins": {
       "type": "array",
       "items": {
@@ -33,6 +37,10 @@
           },
           "mode": {
             "enum": ["warn", "enforce"]
+          },
+          "releaseMode": {
+            "enum": ["prototype", "pilot", "production"],
+            "description": "Per-project release mode override."
           },
           "pinmap": {
             "type": "string"

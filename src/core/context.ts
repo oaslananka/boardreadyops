@@ -1,4 +1,5 @@
 import type { BoardReadyOpsConfig } from "./config.js";
+import type { ReleaseMode } from "./config.types.js";
 import type { FailOn } from "./findings.js";
 import type { Logger } from "./logger.js";
 
@@ -18,6 +19,7 @@ export interface PipelineOptions {
   project: string | undefined;
   config: string | undefined;
   mode: RunMode;
+  releaseMode?: ReleaseMode | undefined;
   requireKicad: boolean;
   kicadCli: string | undefined;
   bom: string | undefined;

@@ -239,4 +239,29 @@ describe("reporting", () => {
     expect(result.fabrication?.bom.map((row) => row.reference)).toContain("R1");
     expect(result.fabrication?.outputs.map((output) => output.kind)).toContain("bom");
   });
+
+  it("propagates releaseMode from pipeline options to run result", async () => {
+    const result = await runPipeline({
+      path: path.join(fixtureRoot, "safe-basic"),
+      failOn: "never",
+      releaseMode: "production",
+    });
+    expect(result.releaseMode).toBe("production");
+    expect(JSON.parse(formatJson(result)).releaseMode).toBe("production");
+  });
+
+  it("includes releaseMode in JSON output and omits it when not set", async () => {
+    const withMode = await runPipeline({
+      path: path.join(fixtureRoot, "safe-basic"),
+      failOn: "never",
+      releaseMode: "prototype",
+    });
+    expect(JSON.parse(formatJson(withMode)).releaseMode).toBe("prototype");
+
+    const withoutMode = await runPipeline({
+      path: path.join(fixtureRoot, "safe-basic"),
+      failOn: "never",
+    });
+    expect(JSON.parse(formatJson(withoutMode)).releaseMode).toBeUndefined();
+  });
 });
