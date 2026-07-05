@@ -252,4 +252,111 @@ describe("buildReleaseTrends", () => {
     expect(trend.from).toBe("2026-01-01T00:00:00.000Z");
     expect(trend.to).toBe("2026-03-01T00:00:00.000Z");
   });
+
+  it("sorts recurring findings by runCount desc then ruleId asc when tied", () => {
+    const run1 = makeRun({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      findings: [
+        createFinding({
+          ruleId: "rule.zzz",
+          severity: "high",
+          message: "z",
+          resource: { path: "board.kicad_pcb", kind: "pcb" },
+        }),
+        createFinding({
+          ruleId: "rule.aaa",
+          severity: "medium",
+          message: "a",
+          resource: { path: "board.kicad_pcb", kind: "pcb" },
+        }),
+      ],
+    });
+    const run2 = makeRun({
+      generatedAt: "2026-02-01T00:00:00.000Z",
+      findings: [
+        createFinding({
+          ruleId: "rule.zzz",
+          severity: "high",
+          message: "z",
+          resource: { path: "board.kicad_pcb", kind: "pcb" },
+        }),
+        createFinding({
+          ruleId: "rule.aaa",
+          severity: "medium",
+          message: "a",
+          resource: { path: "board.kicad_pcb", kind: "pcb" },
+        }),
+      ],
+    });
+
+    const trend = buildReleaseTrends([run1, run2]);
+
+    expect(trend.recurringFindings).toHaveLength(2);
+    // Both appear in 2 runs (tied) — secondary sort by ruleId ascending
+    expect(trend.recurringFindings[0]?.ruleId).toBe("rule.aaa");
+    expect(trend.recurringFindings[1]?.ruleId).toBe("rule.zzz");
+  });
+
+  it("excludes suppressed findings from recurring findings", () => {
+    const suppressedFinding = {
+      ...createFinding({
+        ruleId: "rule.suppressed",
+        severity: "high",
+        message: "suppressed",
+        resource: { path: "board.kicad_pcb", kind: "pcb" as const },
+      }),
+      suppressed: true,
+    };
+    const normalFinding = createFinding({
+      ruleId: "rule.normal",
+      severity: "medium",
+      message: "normal",
+      resource: { path: "board.kicad_pcb", kind: "pcb" as const },
+    });
+    const run1 = makeRun({ generatedAt: "2026-01-01T00:00:00.000Z", findings: [suppressedFinding, normalFinding] });
+    const run2 = makeRun({ generatedAt: "2026-02-01T00:00:00.000Z", findings: [suppressedFinding, normalFinding] });
+
+    const trend = buildReleaseTrends([run1, run2]);
+
+    // Suppressed rule should not appear in recurring findings
+    const ruleIds = trend.recurringFindings.map((r) => r.ruleId);
+    expect(ruleIds).not.toContain("rule.suppressed");
+    expect(ruleIds).toContain("rule.normal");
+  });
+
+  it("aggregates waiver counts from runs that have waivers", () => {
+    const activeWaiver = {
+      rule: "bom.missing-mpn",
+      owner: "test",
+      reason: "ok",
+      stale: false,
+      expired: false,
+      matched: 1,
+    };
+    const expiredWaiver = {
+      rule: "bom.missing-mpn",
+      owner: "test",
+      reason: "ok",
+      stale: true,
+      expired: true,
+      matched: 0,
+    };
+    const run1 = makeRun({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      waivers: { active: [activeWaiver], expired: [] },
+    });
+    const run2 = makeRun({
+      generatedAt: "2026-02-01T00:00:00.000Z",
+      waivers: { active: [], expired: [expiredWaiver] },
+    });
+    const run3 = makeRun({ generatedAt: "2026-03-01T00:00:00.000Z" }); // no waivers
+
+    const trend = buildReleaseTrends([run1, run2, run3]);
+
+    expect(trend.waivers).toHaveLength(2); // run3 has no waivers, filtered out
+    expect(trend.waivers[0]?.activeCount).toBe(1);
+    expect(trend.waivers[0]?.expiredCount).toBe(0);
+    expect(trend.waivers[1]?.activeCount).toBe(0);
+    expect(trend.waivers[1]?.expiredCount).toBe(1);
+  });
 });
