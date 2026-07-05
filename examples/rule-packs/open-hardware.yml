@@ -1,0 +1,59 @@
+# Open Hardware Release Rule Pack
+#
+# A preset for projects publishing under an open hardware license (e.g. CERN-OHL,
+# OSHWA). Focus: traceability, full component transparency, and documentation
+# completeness rather than CM-specific manufacturing outputs.
+
+id: com.boardreadyops.builtin.open-hardware
+name: "Open Hardware Release"
+version: "1.0.0"
+description: >
+  Enables checks that make an open hardware release trustworthy and reproducible:
+  full component traceability (MPN, manufacturer, lifecycle), a versioned
+  changelog, and enough fabrication data for community reproduction.
+tags:
+  - open-hardware
+  - oshwa
+  - cern-ohl
+  - community
+  - reproducible
+compatibility:
+  boardreadyopsMin: "1.8.0"
+  kicadVersions:
+    - "9"
+    - "10"
+    - "future"
+releaseMode: pilot
+rules:
+  # Component traceability (required for reproducibility)
+  bom.missing-mpn: true
+  bom.compliance: true
+  bom.lifecycle: true
+  bom.eol-detection: true
+  bom.unknown-lifecycle: true
+  bom.identity-conflicts: true
+  bom.risk-score:
+    enabled: true
+    severity: low       # risk is informational for community builds
+
+  # Design correctness
+  design.board-outline: true
+  design.unique-references: true
+  drc.kicad: true
+
+  # Fabrication traceability
+  manufacturing.fab-notes: true          # fab notes help community builders
+  manufacturing.layer-stackup: true      # needed for stack-up documentation
+  manufacturing.drill-coverage: true
+
+  # Release documentation
+  release.revision-set: true
+  release.changelog-present: true
+  release.version-format: true
+  release.tag-matches-revision: true
+
+  # Not typically required for open hardware
+  bom.single-source: false               # community can substitute
+  manufacturing.tooling-holes: false
+  manufacturing.test-points: false
+  manufacturing.polarity-markers: false  # should be in silkscreen by design

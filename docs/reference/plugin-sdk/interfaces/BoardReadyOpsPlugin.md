@@ -16,6 +16,12 @@ Top-level plugin export consumed by BoardReadyOps plugin loading.
 
 ***
 
+### compatibility?
+
+> `optional` **compatibility?**: [`CompatibilityConstraints`](CompatibilityConstraints.md)
+
+***
+
 ### name
 
 > **name**: `string`
@@ -37,6 +43,14 @@ Top-level plugin export consumed by BoardReadyOps plugin loading.
 ### reportFormats?
 
 > `optional` **reportFormats?**: [`ReportEmitter`](ReportEmitter.md)[]
+
+***
+
+### rulePacks?
+
+> `optional` **rulePacks?**: [`RulePackManifest`](RulePackManifest.md)[]
+
+Rule packs contributed by this plugin.
 
 ***
 

@@ -1,0 +1,63 @@
+# Contract Design Handoff Rule Pack
+#
+# A preset for design-house-to-client handoff packages.
+# Focus: complete evidence bundle, signed-off waivers, version traceability,
+# and audit trail.
+
+id: com.boardreadyops.builtin.contract-handoff
+name: "Contract Design Handoff"
+version: "1.0.0"
+description: >
+  Enables checks appropriate for a formal design handoff from a contract
+  design house to a client or procurement team. Requires a complete evidence
+  bundle, versioned release, and full supply-chain sign-off with all waivers
+  documented.
+tags:
+  - contract
+  - handoff
+  - design-house
+  - evidence-bundle
+  - audit
+compatibility:
+  boardreadyopsMin: "1.8.0"
+  kicadVersions:
+    - "9"
+    - "10"
+    - "future"
+releaseMode: production
+rules:
+  # Full supply-chain transparency
+  bom.missing-mpn: true
+  bom.compliance: true
+  bom.lifecycle: true
+  bom.eol-detection: true
+  bom.unknown-lifecycle: true
+  bom.single-source: true
+  bom.risk-score: true
+  bom.identity-conflicts: true
+
+  # Design quality
+  design.board-outline: true
+  design.unique-references: true
+  drc.kicad: true
+  erc.kicad: true
+
+  # Full manufacturing package
+  manufacturing.package-completeness: true
+  manufacturing.fab-notes: true
+  manufacturing.position-coverage: true
+  manufacturing.drill-coverage: true
+  manufacturing.tooling-holes: true
+  manufacturing.test-points: true
+  manufacturing.fiducials: true
+  manufacturing.layer-stackup: true
+  manufacturing.assembly-sides: true
+  manufacturing.pin1-markers: true
+  manufacturing.polarity-markers: true
+  manufacturing.silkscreen-over-pad: true
+
+  # Release audit trail
+  release.revision-set: true
+  release.changelog-present: true
+  release.tag-matches-revision: true
+  release.version-format: true

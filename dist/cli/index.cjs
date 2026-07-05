@@ -45979,15 +45979,35 @@ var ruleSchema = external_exports.strictObject({
 var extensionSchema = external_exports.looseObject({
   id: external_exports.string().min(1)
 });
+var rulePackOverrideSchema = external_exports.union([
+  external_exports.boolean(),
+  external_exports.looseObject({ enabled: external_exports.boolean().optional(), severity: external_exports.string().optional() })
+]);
+var rulePackSchema = external_exports.looseObject({
+  id: external_exports.string().min(1),
+  name: external_exports.string().min(1),
+  version: external_exports.string().min(1),
+  description: external_exports.string().min(1),
+  rules: external_exports.record(external_exports.string(), rulePackOverrideSchema).optional(),
+  vendorProfile: external_exports.string().optional(),
+  releaseMode: external_exports.enum(["prototype", "pilot", "production"]).optional()
+});
+var compatibilitySchema = external_exports.looseObject({
+  boardreadyopsMin: external_exports.string().optional(),
+  boardreadyopsMax: external_exports.string().optional(),
+  kicadVersions: external_exports.array(external_exports.string()).optional()
+});
 var pluginSchema = external_exports.strictObject({
   name: external_exports.string().min(1),
   version: external_exports.string().min(1),
   permissions: external_exports.array(permissionSchema).optional(),
+  compatibility: compatibilitySchema.optional(),
   rules: external_exports.array(ruleSchema).optional(),
   adapters: external_exports.array(extensionSchema).optional(),
   reportFormats: external_exports.array(extensionSchema).optional(),
   vendorProfiles: external_exports.array(extensionSchema).optional(),
   notifiers: external_exports.array(extensionSchema).optional(),
+  rulePacks: external_exports.array(rulePackSchema).optional(),
   supplierProviders: external_exports.array(extensionSchema).optional()
 });
 async function discoverPluginSpecifiers(root, configuredPlugins = []) {

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://boardreadyops.io/schemas/rule-pack.schema.json",
+  "title": "BoardReadyOps Rule Pack Manifest",
+  "description": "Defines a named, versioned bundle of rule configuration presets for a specific release context.",
+  "type": "object",
+  "required": ["id", "name", "version", "description"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique reverse-DNS-style pack identifier, e.g. 'com.example.prototype-fab'.",
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*)*$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name.",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Semver version string.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.+-]+)?(\\+[a-zA-Z0-9.+-]+)?$"
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line description shown in boardreadyops doctor output.",
+      "minLength": 1
+    },
+    "author": {
+      "type": "string",
+      "description": "Who authored or maintains this pack."
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX license expression, e.g. 'Apache-2.0' or 'MIT'."
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL to the pack homepage, repository, or registry entry."
+    },
+    "tags": {
+      "type": "array",
+      "description": "Category tags for discovery (e.g. prototype, production, automotive).",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "compatibility": {
+      "type": "object",
+      "description": "Version constraints the host must satisfy before loading this pack.",
+      "additionalProperties": false,
+      "properties": {
+        "boardreadyopsMin": {
+          "type": "string",
+          "description": "Minimum BoardReadyOps semver (inclusive), e.g. '1.8.0'."
+        },
+        "boardreadyopsMax": {
+          "type": "string",
+          "description": "Maximum BoardReadyOps semver (exclusive), e.g. '3.0.0'."
+        },
+        "kicadVersions": {
+          "type": "array",
+          "description": "KiCad major versions supported by this pack.",
+          "items": {
+            "type": "string",
+            "enum": ["9", "10", "future"]
+          }
+        }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "description": "Rule configuration overrides. Keys are rule IDs. Values are boolean (enable/disable) or config objects.",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "boolean",
+            "description": "true = enable, false = disable the rule."
+          },
+          {
+            "type": "object",
+            "description": "Rule override with optional severity and config keys.",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "severity": {
+                "type": "string",
+                "enum": ["critical", "high", "medium", "low", "info"]
+              }
+            },
+            "additionalProperties": true
+          }
+        ]
+      }
+    },
+    "vendorProfile": {
+      "type": "string",
+      "description": "Vendor profile ID to activate when this pack is used."
+    },
+    "releaseMode": {
+      "type": "string",
+      "enum": ["prototype", "pilot", "production"],
+      "description": "Release mode enforced when this pack is active."
+    }
+  }
+}

@@ -64,15 +64,38 @@ const extensionSchema = z.looseObject({
   id: z.string().min(1),
 });
 
+const rulePackOverrideSchema = z.union([
+  z.boolean(),
+  z.looseObject({ enabled: z.boolean().optional(), severity: z.string().optional() }),
+]);
+
+const rulePackSchema = z.looseObject({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  version: z.string().min(1),
+  description: z.string().min(1),
+  rules: z.record(z.string(), rulePackOverrideSchema).optional(),
+  vendorProfile: z.string().optional(),
+  releaseMode: z.enum(["prototype", "pilot", "production"]).optional(),
+});
+
+const compatibilitySchema = z.looseObject({
+  boardreadyopsMin: z.string().optional(),
+  boardreadyopsMax: z.string().optional(),
+  kicadVersions: z.array(z.string()).optional(),
+});
+
 const pluginSchema = z.strictObject({
   name: z.string().min(1),
   version: z.string().min(1),
   permissions: z.array(permissionSchema).optional(),
+  compatibility: compatibilitySchema.optional(),
   rules: z.array(ruleSchema).optional(),
   adapters: z.array(extensionSchema).optional(),
   reportFormats: z.array(extensionSchema).optional(),
   vendorProfiles: z.array(extensionSchema).optional(),
   notifiers: z.array(extensionSchema).optional(),
+  rulePacks: z.array(rulePackSchema).optional(),
   supplierProviders: z.array(extensionSchema).optional(),
 });
 
