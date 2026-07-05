@@ -2,8 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { GitHubAppLifecycleStore } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { releaseRunIdempotencyKey } from "@boardreadyops/cloud-core/lifecycle-executor";
 
+export type SqlQueryResult = {
+  rows?: readonly Record<string, unknown>[];
+};
+
 export type SqlQueryExecutor = {
-  query(sql: string, params?: readonly unknown[]): Promise<unknown>;
+  query(sql: string, params?: readonly unknown[]): Promise<SqlQueryResult | unknown>;
 };
 
 export type SqlLifecycleStoreOptions = {
@@ -13,6 +17,25 @@ export type SqlLifecycleStoreOptions = {
 
 function iso(now: () => Date): string {
   return now().toISOString();
+}
+
+function rows(result: unknown): readonly Record<string, unknown>[] {
+  if (typeof result !== "object" || result === null || !("rows" in result)) {
+    return [];
+  }
+
+  const value = (result as SqlQueryResult).rows;
+  return Array.isArray(value) ? value : [];
+}
+
+function stringColumn(row: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = row?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function checkRunColumn(row: Record<string, unknown> | undefined): string | number | null | undefined {
+  const value = row?.github_check_run_id;
+  return typeof value === "string" || typeof value === "number" || value === null ? value : undefined;
 }
 
 export function createSqlGitHubAppLifecycleStore(
@@ -84,14 +107,17 @@ export function createSqlGitHubAppLifecycleStore(
     },
 
     async enqueueReleaseRun(action) {
-      await executor.query(
+      const idempotencyKey = releaseRunIdempotencyKey(action);
+      const result = await executor.query(
         `insert into release_runs (id, repository_id, idempotency_key, commit_sha, ref, pull_request_number, trigger_kind, status, started_at)
          select $8, repositories.id, $9, $2, $3, $4, $5, 'queued', $6
          from repositories
          join installations on installations.id = repositories.installation_id
          where repositories.github_repo_id = $1
            and installations.github_installation_id = $7
-         on conflict (idempotency_key) do nothing`,
+         on conflict (idempotency_key)
+         do update set status = release_runs.status
+         returning id, github_check_run_id`,
         [
           action.repository.id,
           action.commitSha,
@@ -101,8 +127,36 @@ export function createSqlGitHubAppLifecycleStore(
           iso(now),
           action.installation.id,
           id(),
-          releaseRunIdempotencyKey(action),
+          idempotencyKey,
         ],
+      );
+      const row = rows(result)[0];
+
+      const enqueued = { idempotencyKey } as {
+        idempotencyKey: string;
+        runId?: string;
+        githubCheckRunId?: string | number | null;
+      };
+      const runId = stringColumn(row, "id");
+      const githubCheckRunId = checkRunColumn(row);
+
+      if (runId) {
+        enqueued.runId = runId;
+      }
+
+      if (githubCheckRunId !== undefined) {
+        enqueued.githubCheckRunId = githubCheckRunId;
+      }
+
+      return enqueued;
+    },
+
+    async attachGitHubCheckRun(input) {
+      await executor.query(
+        `update release_runs
+         set github_check_run_id = $2
+         where idempotency_key = $1`,
+        [input.idempotencyKey, input.githubCheckRunId],
       );
     },
   };
