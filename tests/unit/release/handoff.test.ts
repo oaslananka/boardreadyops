@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { releaseHandoffCommand } from "../../../src/cli/commands/release.js";
 import {
@@ -146,5 +147,27 @@ describe("manufacturer handoff package", () => {
 
     expect(code).toBe(2);
     expect(err.join("")).toContain("Unknown vendor profile: nope");
+  });
+});
+
+describe("release-manifest.schema.json", () => {
+  it("validates a well-formed handoff manifest", async () => {
+    const schemaPath = path.resolve("schemas/release-manifest.schema.json");
+    const schema = JSON.parse(await fs.readFile(schemaPath, "utf8"));
+    const ajv = new Ajv2020({ strict: true });
+
+    const plan = planHandoffPackage(
+      { gerber: ["fab/board.gtl"], drill: ["fab/board.drl"], bom: ["fab/bom.csv"], position: ["fab/cpl.csv"] },
+      profile,
+    );
+    const files = plan.files.map((file) => ({ ...file, sha256: "a".repeat(64), bytes: 100 }));
+    const manifest = buildHandoffManifest(profile, plan, files, "2026-06-22T00:00:00.000Z");
+
+    const validate = ajv.compile(schema);
+    const valid = validate(manifest);
+    if (!valid) {
+      throw new Error(`Schema validation failed: ${JSON.stringify(validate.errors, null, 2)}`);
+    }
+    expect(valid).toBe(true);
   });
 });

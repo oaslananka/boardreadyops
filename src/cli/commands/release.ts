@@ -90,6 +90,7 @@ export async function releasePackCommand(
   });
   streams.stdout.write(`Release evidence bundle written to ${normalizeRelative(root, bundle.outputDir)}\n`);
   streams.stdout.write(`Manifest: ${normalizeRelative(root, bundle.manifestPath)}\n`);
+  streams.stdout.write(`Checksums: ${normalizeRelative(root, bundle.checksumsPath)}\n`);
   streams.stdout.write(`Decision: ${bundle.manifest.decision.status.toUpperCase()}\n`);
   streams.stdout.write(`Artifacts: ${bundle.manifest.artifacts.length}; gaps: ${bundle.manifest.gaps.length}\n`);
   return result.summary.failed ? 1 : 0;

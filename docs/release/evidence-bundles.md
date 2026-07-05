@@ -7,7 +7,7 @@ boardreadyops release pack . --output build/boardreadyops-release
 boardreadyops release verify build/boardreadyops-release
 ```
 
-The pack command runs the normal BoardReadyOps pipeline, writes JSON and Markdown reports, copies discovered manufacturing artifacts from conventional output directories such as `fab/`, `fabrication/`, `manufacturing/`, `gerbers/`, and `production/`, and records every artifact in `manifest.json` with its SHA-256 digest and byte size.
+The pack command runs the normal BoardReadyOps pipeline, writes JSON and Markdown reports, copies discovered manufacturing artifacts from conventional output directories such as `fab/`, `fabrication/`, `manufacturing/`, `gerbers/`, and `production/`, and records every artifact in `manifest.json` with its SHA-256 digest and byte size. A companion `checksums.txt` file in GNU `sha256sum` format is also written for toolchain-agnostic verification.
 
 ## Bundle layout
 
@@ -16,6 +16,7 @@ The bundle uses a stable directory layout so reviewers and CI jobs always know w
 ```text
 build/boardreadyops-release/
 ├── manifest.json                # structured release record (schema version 2)
+├── checksums.txt                # SHA-256 checksums in GNU sha256sum format
 ├── reports/                     # JSON and Markdown validation reports
 │   ├── boardreadyops-report.json
 │   └── boardreadyops-report.md
@@ -72,6 +73,31 @@ boardreadyops release verify build/boardreadyops-release --format json
 ```
 
 A non-empty `gaps` list does not make verification fail. Gaps are explicit review evidence: they explain what was not present in the release package so a maintainer can block the release, add the missing output, or document a waiver in the normal release process.
+
+## Checksums file
+
+Every bundle also includes a `checksums.txt` file in GNU `sha256sum(1)` format:
+
+```
+a3f2...  artifacts/fab/board.GTL
+d9c1...  artifacts/fab/board.drl
+...
+```
+
+This allows independent verification without boardreadyops tooling:
+
+```bash
+cd build/boardreadyops-release
+sha256sum --check checksums.txt
+```
+
+The `checksums.txt` covers exactly the same files as `manifest.json`. The manifest is the authoritative source; `checksums.txt` is a convenience format for toolchains that consume standard checksum files.
+
+## Manifest coverage
+
+The manifest records every file that boardreadyops wrote into the bundle. If a post-processing step adds files to the bundle directory (for example an attestation tool that appends files), the `release verify` command's coverage check will flag them as uncovered.
+
+Uncovered files do not block `release verify` by default — coverage gaps are surfaced in the JSON output so automation can decide whether to treat them as blocking. Use `--strict-coverage` (when available) to make uncovered files a hard failure.
 
 ## Signing and provenance
 
