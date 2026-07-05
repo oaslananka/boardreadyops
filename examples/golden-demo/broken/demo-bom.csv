@@ -1,4 +1,4 @@
-Reference,Value,Manufacturer,MPN,RoHS
-R1,10k,Yageo,,Compliant
-R2,10k,Yageo,RC0603FR-0710KL,Non-Compliant
-C1,100nF,Murata,GRM188R71H104KA93D,Compliant
+Reference,Value,Manufacturer,MPN,RoHS,Lifecycle
+R1,10k,Yageo,,Compliant,Active
+R2,10k,Yageo,RC0603FR-0710KL,Non-Compliant,Active
+C1,100nF,Murata,GRM188R71H104KA93D,Compliant,Active

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { classifyLifecycleStatus } from "../../bom/lifecycle.js";
 import type { BomRow } from "../../bom/types.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
@@ -61,10 +62,11 @@ function lifecycleFindings(row: BomRow, databaseStatus: string | undefined, cont
     return [];
   }
   const ruleConfig = configFor(context, "bom.lifecycle");
+  const canonicalStatus = classifyLifecycleStatus(lifecycle);
   const severity =
     typeof ruleConfig.severity === "string"
       ? configuredSeverity(context, "bom.lifecycle", "medium")
-      : /\b(eol|obsolete|discontinued)\b/i.test(lifecycle)
+      : canonicalStatus === "eol" || canonicalStatus === "obsolete"
         ? "high"
         : configuredSeverity(context, "bom.lifecycle", "medium");
   return [
