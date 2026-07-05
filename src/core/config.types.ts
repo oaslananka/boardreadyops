@@ -7,7 +7,6 @@
  * The source-of-truth JSON Schema lives at `schemas/config.schema.json`.
  */
 
-import type { BomAlternateEntry } from "../bom/alternates.js";
 import type { VendorProfileConfig } from "../vendor/profiles.js";
 import type { FailOn, Severity } from "./findings.js";
 import type { PluginPermissionGrantConfig } from "./plugin-permissions.js";
@@ -152,7 +151,25 @@ export interface NotifiersConfig {
   email?: EmailNotifierConfig;
 }
 
-export interface BomTopLevelConfig {
+/** A single approved alternate part for a primary MPN. */
+interface BomAlternate {
+  /** Manufacturer part number of the approved alternate. */
+  mpn: string;
+  /** Manufacturer name (informational). */
+  manufacturer?: string | undefined;
+  /** Free-form note, e.g. "Verified compatible at Rev1 prototype". */
+  note?: string | undefined;
+}
+
+/** Maps a primary MPN to one or more tested, approved substitute parts. */
+interface BomAlternateEntry {
+  /** Primary MPN this alternate list applies to. */
+  mpn: string;
+  /** One or more approved substitute parts. */
+  alts: BomAlternate[];
+}
+
+interface BomTopLevelConfig {
   /**
    * Approved alternate parts for BOM supply chain risk management.
    * MPNs listed here have documented approved substitutes, so single-source

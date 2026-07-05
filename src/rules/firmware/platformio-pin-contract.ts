@@ -1,8 +1,8 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
 import { platformioAdapter } from "../../firmware/platformio.js";
-import { configFor, rule, shouldRun } from "../helpers.js";
-import { runFirmwareContractRule } from "./shared.js";
+import { configFor, rule } from "../helpers.js";
+import { makeFirmwareContractHandler } from "./shared.js";
 
 const ruleId = "firmware.platformio-pin-contract";
 
@@ -23,16 +23,7 @@ export const platformioPinContractRule = rule(
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "platformio", "contract"],
   },
-  async (context) => {
-    if (!shouldRun(context, ruleId)) {
-      return [];
-    }
-    const contractPath = resolvePlatformioContract(context);
-    if (!contractPath) {
-      return [];
-    }
-    return runFirmwareContractRule(context, { ruleId, adapter: platformioAdapter, contractPath });
-  },
+  makeFirmwareContractHandler(ruleId, platformioAdapter, resolvePlatformioContract),
 );
 
 function resolvePlatformioContract(context: RuleContext): string | undefined {

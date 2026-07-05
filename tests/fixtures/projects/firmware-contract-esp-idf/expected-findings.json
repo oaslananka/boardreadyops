@@ -1,0 +1,8 @@
+{
+  "fixture": "firmware-contract-esp-idf",
+  "expectedRules": ["firmware.esp-idf-pin-contract"],
+  "expectedSeverities": ["high"],
+  "expectPass": false,
+  "performanceBaselineMs": 100,
+  "runRules": ["firmware.esp-idf-pin-contract"]
+}

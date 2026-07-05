@@ -60,6 +60,11 @@
       "items": {
         "$ref": "#/$defs/plugin"
       }
+    },
+    "bomRisk": {
+      "type": "object",
+      "description": "Aggregate BOM supply-chain risk summary from the bom.risk-score rule.",
+      "additionalProperties": true
     }
   },
   "$defs": {
@@ -537,7 +542,12 @@
             "firmware.platformio-pin-contract",
             "manufacturing.fiducials",
             "manufacturing.tooling-holes",
-            "manufacturing.position-coverage"
+            "manufacturing.position-coverage",
+            "bom.risk-score",
+            "firmware.esp-idf-pin-contract",
+            "firmware.zephyr-pin-contract",
+            "firmware.arduino-pin-contract",
+            "firmware.stm32cubemx-pin-contract"
           ]
         },
         {

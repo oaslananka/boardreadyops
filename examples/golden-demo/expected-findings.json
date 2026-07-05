@@ -1,4 +1,4 @@
 {
-  "broken": ["bom.compliance", "bom.missing-mpn", "design.board-outline", "design.unique-references"],
+  "broken": ["bom.compliance", "bom.missing-mpn", "bom.risk-score", "design.board-outline", "design.unique-references"],
   "fixed": []
 }

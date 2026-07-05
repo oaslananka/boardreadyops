@@ -1,0 +1,7 @@
+Reference,Value,Footprint,Manufacturer,MPN,Supplier 1,Lifecycle,DNP
+R1,10k,Resistor_SMD:R_0603,Yageo,RC0603FR-0710KL,DigiKey,Active,false
+R2,100k,Resistor_SMD:R_0603,,RC0603FR-07100KL,,Active,false
+C1,100nF,Capacitor_SMD:C_0402,Murata,,Mouser,Active,false
+U1,MCU,Package_QFP:LQFP-48,STMicro,STM32F103C8T6,DigiKey,Active,false
+LED1,Red LED,LED_SMD:LED_0805,,,, ,false
+D1,Schottky,Diode_SMD:D_SOD-123,ON Semi,1N5819,DigiKey,Active,true

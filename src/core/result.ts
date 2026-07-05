@@ -1,3 +1,4 @@
+import type { BomRiskSummary } from "./bom-risk.js";
 import type { ProjectContext } from "./context.js";
 import type { FabricationSnapshot } from "./diff/fabrication.js";
 import type { Finding, FindingSummary } from "./findings.js";
@@ -16,6 +17,7 @@ export interface RunResult {
   exitCode?: number | undefined;
   summary: FindingSummary;
   readiness?: ReadinessScore | undefined;
+  bomRisk?: BomRiskSummary | undefined;
   policy?: PolicyEvaluation | undefined;
   waivers?: { active: WaiverStatus[]; expired: WaiverStatus[] } | undefined;
   projects: ProjectContext[];

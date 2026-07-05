@@ -332,6 +332,82 @@ describe("report formats", () => {
       confidence: "high",
     });
   });
+
+  it("includes BOM risk summary section when bomRisk is present", () => {
+    const base = sampleResult([]);
+    const result: RunResult = {
+      ...base,
+      bomRisk: {
+        totalComponents: 4,
+        overallRiskScore: 45,
+        overallRiskLevel: "high",
+        criticalCount: 0,
+        highCount: 2,
+        mediumCount: 1,
+        lowCount: 1,
+        components: [
+          {
+            reference: "U2",
+            mpn: undefined,
+            manufacturer: undefined,
+            riskScore: 60,
+            riskLevel: "high",
+            factors: {
+              missingMpn: true,
+              missingManufacturer: true,
+              noSuppliers: true,
+              singleSourceNoAlternates: false,
+            },
+          },
+          {
+            reference: "C1",
+            mpn: "CAP-100N",
+            manufacturer: "Murata",
+            riskScore: 25,
+            riskLevel: "medium",
+            factors: {
+              missingMpn: false,
+              missingManufacturer: false,
+              noSuppliers: false,
+              singleSourceNoAlternates: true,
+            },
+          },
+          {
+            reference: "R1",
+            mpn: "RES-0402",
+            manufacturer: "Yageo",
+            riskScore: 10,
+            riskLevel: "low",
+            // all factors false — exercises the "—" factorsSummary fallback
+            factors: {
+              missingMpn: false,
+              missingManufacturer: false,
+              noSuppliers: false,
+              singleSourceNoAlternates: false,
+            },
+          },
+          {
+            reference: "Q1",
+            mpn: "MOSFET-N",
+            manufacturer: undefined,
+            riskScore: 0,
+            riskLevel: "none",
+            factors: {
+              missingMpn: false,
+              missingManufacturer: false,
+              noSuppliers: false,
+              singleSourceNoAlternates: false,
+            },
+          },
+        ],
+      },
+    };
+    const markdown = formatMarkdown(result);
+    expect(markdown).toContain("BOM Supply-Chain Risk");
+    expect(markdown).toContain("U2");
+    expect(markdown).toContain("no MPN");
+    expect(markdown).toContain("no manufacturer");
+  });
 });
 
 function sampleResult(findings = [sampleFinding()]): RunResult {

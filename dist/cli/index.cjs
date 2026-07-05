@@ -7702,12 +7702,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats2(ajv3, list, fs24, exportName) {
+    function addFormats2(ajv3, list, fs22, exportName) {
       var _a3;
       var _b;
       (_a3 = (_b = ajv3.opts.code).formats) !== null && _a3 !== void 0 ? _a3 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv3.addFormat(f, fs24[f]);
+        ajv3.addFormat(f, fs22[f]);
     }
     module2.exports = exports2 = formatsPlugin;
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -7721,7 +7721,7 @@ var require_resolve_from = __commonJS({
     "use strict";
     var path58 = require("path");
     var Module = require("module");
-    var fs24 = require("fs");
+    var fs22 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
       if (typeof fromDir !== "string") {
         throw new TypeError(`Expected \`fromDir\` to be of type \`string\`, got \`${typeof fromDir}\``);
@@ -7730,7 +7730,7 @@ var require_resolve_from = __commonJS({
         throw new TypeError(`Expected \`moduleId\` to be of type \`string\`, got \`${typeof moduleId}\``);
       }
       try {
-        fromDir = fs24.realpathSync(fromDir);
+        fromDir = fs22.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
           fromDir = path58.resolve(fromDir);
@@ -16375,8 +16375,8 @@ var require_utils4 = __commonJS({
     exports2.array = array2;
     var errno = require_errno();
     exports2.errno = errno;
-    var fs24 = require_fs();
-    exports2.fs = fs24;
+    var fs22 = require_fs();
+    exports2.fs = fs22;
     var path58 = require_path();
     exports2.path = path58;
     var pattern = require_pattern2();
@@ -16560,12 +16560,12 @@ var require_fs2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.createFileSystemAdapter = exports2.FILE_SYSTEM_ADAPTER = void 0;
-    var fs24 = require("fs");
+    var fs22 = require("fs");
     exports2.FILE_SYSTEM_ADAPTER = {
-      lstat: fs24.lstat,
-      stat: fs24.stat,
-      lstatSync: fs24.lstatSync,
-      statSync: fs24.statSync
+      lstat: fs22.lstat,
+      stat: fs22.stat,
+      lstatSync: fs22.lstatSync,
+      statSync: fs22.statSync
     };
     function createFileSystemAdapter(fsMethods) {
       if (fsMethods === void 0) {
@@ -16582,12 +16582,12 @@ var require_settings = __commonJS({
   "node_modules/@nodelib/fs.stat/out/settings.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var fs24 = require_fs2();
+    var fs22 = require_fs2();
     var Settings = class {
       constructor(_options = {}) {
         this._options = _options;
         this.followSymbolicLink = this._getValue(this._options.followSymbolicLink, true);
-        this.fs = fs24.createFileSystemAdapter(this._options.fs);
+        this.fs = fs22.createFileSystemAdapter(this._options.fs);
         this.markSymbolicLink = this._getValue(this._options.markSymbolicLink, false);
         this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
       }
@@ -16742,8 +16742,8 @@ var require_utils5 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.fs = void 0;
-    var fs24 = require_fs3();
-    exports2.fs = fs24;
+    var fs22 = require_fs3();
+    exports2.fs = fs22;
   }
 });
 
@@ -16938,14 +16938,14 @@ var require_fs4 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.createFileSystemAdapter = exports2.FILE_SYSTEM_ADAPTER = void 0;
-    var fs24 = require("fs");
+    var fs22 = require("fs");
     exports2.FILE_SYSTEM_ADAPTER = {
-      lstat: fs24.lstat,
-      stat: fs24.stat,
-      lstatSync: fs24.lstatSync,
-      statSync: fs24.statSync,
-      readdir: fs24.readdir,
-      readdirSync: fs24.readdirSync
+      lstat: fs22.lstat,
+      stat: fs22.stat,
+      lstatSync: fs22.lstatSync,
+      statSync: fs22.statSync,
+      readdir: fs22.readdir,
+      readdirSync: fs22.readdirSync
     };
     function createFileSystemAdapter(fsMethods) {
       if (fsMethods === void 0) {
@@ -16964,12 +16964,12 @@ var require_settings2 = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     var path58 = require("path");
     var fsStat = require_out();
-    var fs24 = require_fs4();
+    var fs22 = require_fs4();
     var Settings = class {
       constructor(_options = {}) {
         this._options = _options;
         this.followSymbolicLinks = this._getValue(this._options.followSymbolicLinks, false);
-        this.fs = fs24.createFileSystemAdapter(this._options.fs);
+        this.fs = fs22.createFileSystemAdapter(this._options.fs);
         this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path58.sep);
         this.stats = this._getValue(this._options.stats, false);
         this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
@@ -18350,16 +18350,16 @@ var require_settings4 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.DEFAULT_FILE_SYSTEM_ADAPTER = void 0;
-    var fs24 = require("fs");
+    var fs22 = require("fs");
     var os4 = require("os");
     var CPU_COUNT = Math.max(os4.cpus().length, 1);
     exports2.DEFAULT_FILE_SYSTEM_ADAPTER = {
-      lstat: fs24.lstat,
-      lstatSync: fs24.lstatSync,
-      stat: fs24.stat,
-      statSync: fs24.statSync,
-      readdir: fs24.readdir,
-      readdirSync: fs24.readdirSync
+      lstat: fs22.lstat,
+      lstatSync: fs22.lstatSync,
+      stat: fs22.stat,
+      statSync: fs22.statSync,
+      readdir: fs22.readdir,
+      readdirSync: fs22.readdirSync
     };
     var Settings = class {
       constructor(_options = {}) {
@@ -22058,6 +22058,10 @@ var en = {
   "report.waivers.stale": "stale",
   "report.waivers.state": "State",
   "report.waivers.title": "Waivers",
+  "report.bomRisk.title": "BOM Supply-Chain Risk",
+  "report.bomRisk.overallScore": "Overall BOM risk score",
+  "report.bomRisk.components": "at-risk components",
+  "report.bomRisk.noRisk": "No BOM supply-chain risk detected.",
   "severity.critical": "Critical",
   "severity.high": "High",
   "severity.info": "Info",
@@ -22102,7 +22106,7 @@ function normalizeLocale(value) {
 }
 
 // src/cli/commands/baseline.ts
-var import_promises16 = __toESM(require("node:fs/promises"), 1);
+var import_promises14 = __toESM(require("node:fs/promises"), 1);
 var import_node_path41 = __toESM(require("node:path"), 1);
 
 // src/core/baseline.ts
@@ -25382,7 +25386,7 @@ function validateLoaded(config2, file2) {
 }
 
 // src/core/pipeline.ts
-var import_promises15 = __toESM(require("node:fs/promises"), 1);
+var import_promises13 = __toESM(require("node:fs/promises"), 1);
 var import_node_path40 = __toESM(require("node:path"), 1);
 
 // src/notifiers/Notifier.ts
@@ -26983,6 +26987,176 @@ function buildAlternatesMap(entries) {
 }
 function hasApprovedAlternates(mpn, map2) {
   return map2.has(mpn.trim().toUpperCase());
+}
+
+// src/util/risk-level.ts
+function riskLevelFromScore(score) {
+  if (score === 0) return "none";
+  if (score >= 60) return "critical";
+  if (score >= 40) return "high";
+  if (score >= 20) return "medium";
+  return "low";
+}
+
+// src/bom/risk.ts
+var DEFAULT_WEIGHTS = {
+  missingMpn: 60,
+  missingManufacturer: 20,
+  noSuppliers: 40,
+  singleSourceNoAlternates: 25
+};
+function computeComponentRisk(reference, mpn, manufacturer, supplierCount, alternatesMap, weights = {}, bomHasSupplierColumns = true) {
+  const w = { ...DEFAULT_WEIGHTS, ...weights };
+  const hasMpn = Boolean(mpn?.trim());
+  const hasManufacturer = Boolean(manufacturer?.trim());
+  const hasApprovedAlternates2 = hasMpn ? alternatesMap.has(mpn.trim().toUpperCase()) : false;
+  const approvedAlternates = hasMpn ? alternatesMap.get(mpn.trim().toUpperCase()) : void 0;
+  const supplierSignalsApply = bomHasSupplierColumns;
+  const factors = {
+    missingMpn: !hasMpn,
+    missingManufacturer: !hasManufacturer,
+    noSuppliers: supplierSignalsApply && supplierCount === 0,
+    singleSourceNoAlternates: supplierSignalsApply && supplierCount === 1 && !hasApprovedAlternates2
+  };
+  let rawScore = 0;
+  if (factors.missingMpn) rawScore += w.missingMpn;
+  if (factors.missingManufacturer) rawScore += w.missingManufacturer;
+  if (factors.noSuppliers) rawScore += w.noSuppliers;
+  else if (factors.singleSourceNoAlternates) rawScore += w.singleSourceNoAlternates;
+  const riskScore = Math.min(100, rawScore);
+  return {
+    reference,
+    mpn: mpn || void 0,
+    manufacturer: manufacturer || void 0,
+    riskScore,
+    riskLevel: riskLevelFromScore(riskScore),
+    factors,
+    approvedAlternates
+  };
+}
+function summarizeBomRisk(components) {
+  const risky = components.filter((c) => c.riskLevel !== "none");
+  const overallRiskScore = components.length === 0 ? 0 : Math.round(components.reduce((sum, c) => sum + c.riskScore, 0) / components.length);
+  return {
+    totalComponents: components.length,
+    overallRiskScore,
+    overallRiskLevel: riskLevelFromScore(overallRiskScore),
+    criticalCount: risky.filter((c) => c.riskLevel === "critical").length,
+    highCount: risky.filter((c) => c.riskLevel === "high").length,
+    mediumCount: risky.filter((c) => c.riskLevel === "medium").length,
+    lowCount: risky.filter((c) => c.riskLevel === "low").length,
+    components
+  };
+}
+
+// src/rules/bom/risk-score.ts
+var bomRiskScoreRule = rule(
+  {
+    id: "bom.risk-score",
+    title: "BOM component has elevated supply-chain risk",
+    description: "Scores each populated BOM row on missing MPN, missing manufacturer, no suppliers, and single-source-without-alternates signals. Emits a finding per at-risk component so release readiness reflects aggregate BOM supply-chain quality.",
+    rationale: "Individual per-row rules catch specific issues, but a scoring approach lets teams set a single policy gate that blocks production releases when the overall BOM quality falls below an acceptable threshold.",
+    defaultSeverity: "medium",
+    appliesTo: ["bom"],
+    configKeys: [
+      "rules.bom.risk-score.severity",
+      "rules.bom.risk-score.critical-severity",
+      "rules.bom.risk-score.high-severity",
+      "rules.bom.risk-score.medium-severity",
+      "rules.bom.risk-score.low-severity",
+      "rules.bom.risk-score.weights.missing-mpn",
+      "rules.bom.risk-score.weights.missing-manufacturer",
+      "rules.bom.risk-score.weights.no-suppliers",
+      "rules.bom.risk-score.weights.single-source-no-alternates",
+      "bom.alternates"
+    ],
+    kicadVersions: ["9", "10", "future"],
+    tags: ["bom", "risk", "sourcing", "supply-chain"]
+  },
+  async (context) => {
+    if (!shouldRun(context, "bom.risk-score")) {
+      return [];
+    }
+    const { bomRows } = await loadBomContext(context);
+    if (bomRows.length === 0) {
+      return [];
+    }
+    const config2 = configFor(context, "bom.risk-score");
+    const weights = parseWeights(config2);
+    const alternatesMap = buildAlternatesMap(context.config.bom?.alternates ?? []);
+    const bomHasSupplierColumns = bomRows.some((row) => (row.suppliers?.length ?? 0) > 0);
+    const componentRisks = bomRows.filter((row) => !row.dnp).map(
+      (row) => computeComponentRisk(
+        row.reference,
+        row.mpn,
+        row.manufacturer,
+        row.suppliers?.filter(Boolean).length ?? 0,
+        alternatesMap,
+        weights,
+        bomHasSupplierColumns
+      )
+    );
+    const summary = summarizeBomRisk(componentRisks);
+    return summary.components.filter((c) => c.riskLevel !== "none").map((c) => {
+      const level = c.riskLevel;
+      const resolvedSeverity = severityForLevel(level, config2, context);
+      const driverParts = buildDriverMessage(c.factors);
+      const message = `${c.reference} has supply-chain risk (score ${c.riskScore}/100): ${driverParts.join(", ")}.`;
+      const row = bomRows.find((r) => r.reference === c.reference);
+      return finding(context, {
+        ruleId: "bom.risk-score",
+        severity: resolvedSeverity,
+        message,
+        path: row?.sourcePath ?? bomRows[0].sourcePath,
+        kind: "bom",
+        line: row?.line,
+        details: {
+          reference: c.reference,
+          mpn: c.mpn,
+          manufacturer: c.manufacturer,
+          riskScore: c.riskScore,
+          riskLevel: c.riskLevel,
+          factors: c.factors,
+          overallBomRiskScore: summary.overallRiskScore,
+          totalComponents: summary.totalComponents
+        }
+      });
+    });
+  }
+);
+function parseWeights(config2) {
+  const w = config2["weights"] ?? {};
+  const num = (v) => typeof v === "number" ? v : void 0;
+  const result = {};
+  const missingMpn = num(w["missing-mpn"]);
+  const missingManufacturer = num(w["missing-manufacturer"]);
+  const noSuppliers = num(w["no-suppliers"]);
+  const singleSourceNoAlternates = num(w["single-source-no-alternates"]);
+  if (missingMpn !== void 0) result.missingMpn = missingMpn;
+  if (missingManufacturer !== void 0) result.missingManufacturer = missingManufacturer;
+  if (noSuppliers !== void 0) result.noSuppliers = noSuppliers;
+  if (singleSourceNoAlternates !== void 0) result.singleSourceNoAlternates = singleSourceNoAlternates;
+  return result;
+}
+function severityForLevel(level, config2, context) {
+  const configKey = `${level}-severity`;
+  const raw = config2[configKey];
+  if (typeof raw === "string" && isSeverity2(raw)) {
+    return raw;
+  }
+  return configuredSeverity(context, "bom.risk-score", "medium");
+}
+var SEVERITIES = /* @__PURE__ */ new Set(["critical", "high", "medium", "low", "info"]);
+function isSeverity2(v) {
+  return SEVERITIES.has(v);
+}
+function buildDriverMessage(factors) {
+  const parts = [];
+  if (factors.missingMpn) parts.push("no MPN");
+  if (factors.missingManufacturer) parts.push("no manufacturer");
+  if (factors.noSuppliers) parts.push("no suppliers");
+  else if (factors.singleSourceNoAlternates) parts.push("single source, no approved alternates");
+  return parts;
 }
 
 // src/rules/bom/single-source.ts
@@ -42456,6 +42630,18 @@ async function schematicNetGraph(context) {
 }
 
 // src/rules/firmware/shared.ts
+function makeFirmwareContractHandler(ruleId6, adapter, resolveContractPath) {
+  return async (context) => {
+    if (!shouldRun(context, ruleId6)) {
+      return [];
+    }
+    const contractPath = resolveContractPath(context);
+    if (!contractPath) {
+      return [];
+    }
+    return runFirmwareContractRule(context, { ruleId: ruleId6, adapter, contractPath });
+  };
+}
 async function runFirmwareContractRule(context, options) {
   const { ruleId: ruleId6, adapter, contractPath } = options;
   const pinmapPath = resolvePinmap(context);
@@ -42587,7 +42773,7 @@ function resolveArduinoContract(context) {
 // src/rules/firmware/esp-idf-pin-contract.ts
 var import_node_path20 = __toESM(require("node:path"), 1);
 
-// src/firmware/esp-idf.ts
+// src/firmware/yaml-contract.ts
 var import_promises9 = __toESM(require("node:fs/promises"), 1);
 var pinObjectSchema = external_exports.strictObject({
   hardware: external_exports.string().min(1),
@@ -42602,25 +42788,19 @@ var contractSchema = external_exports.strictObject({
   version: external_exports.literal(1),
   pins: external_exports.union([external_exports.record(external_exports.string().min(1), pinObjectSchema), external_exports.array(pinArrayEntrySchema)])
 });
-async function loadEspIdfPinContract(file2) {
+async function loadYamlPinContract(file2, adapterLabel) {
   try {
     const raw = load(await import_promises9.default.readFile(file2, "utf8"));
     const parsed = contractSchema.safeParse(raw);
     if (!parsed.success) {
       return { errors: parsed.error.issues.map((issue2) => `${issue2.path.join(".")}: ${issue2.message}`) };
     }
-    return { document: normalizeContract(parsed.data), errors: [] };
+    return { document: normalizeYamlContract(parsed.data), errors: [] };
   } catch (error51) {
-    return { errors: [error51 instanceof Error ? error51.message : "ESP-IDF pin contract could not be loaded"] };
+    return { errors: [error51 instanceof Error ? error51.message : `${adapterLabel} pin contract could not be loaded`] };
   }
 }
-var espIdfAdapter = {
-  id: "esp-idf",
-  label: "ESP-IDF",
-  configKey: "esp-idf",
-  load: loadEspIdfPinContract
-};
-function normalizeContract(input) {
+function normalizeYamlContract(input) {
   const pins = Array.isArray(input.pins) ? input.pins.map((entry) => ({
     signal: entry.signal,
     hardware: normalizeHardwareKey(entry.hardware),
@@ -42636,6 +42816,17 @@ function normalizeContract(input) {
   }));
   return { version: 1, pins };
 }
+
+// src/firmware/esp-idf.ts
+async function loadEspIdfPinContract(file2) {
+  return loadYamlPinContract(file2, "ESP-IDF");
+}
+var espIdfAdapter = {
+  id: "esp-idf",
+  label: "ESP-IDF",
+  configKey: "esp-idf",
+  load: loadEspIdfPinContract
+};
 
 // src/rules/firmware/esp-idf-pin-contract.ts
 var ruleId2 = "firmware.esp-idf-pin-contract";
@@ -42655,16 +42846,7 @@ var espIdfPinContractRule = rule(
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "esp-idf", "contract"]
   },
-  async (context) => {
-    if (!shouldRun(context, ruleId2)) {
-      return [];
-    }
-    const contractPath = resolveContract(context);
-    if (!contractPath) {
-      return [];
-    }
-    return runFirmwareContractRule(context, { ruleId: ruleId2, adapter: espIdfAdapter, contractPath });
-  }
+  makeFirmwareContractHandler(ruleId2, espIdfAdapter, resolveContract)
 );
 function resolveContract(context) {
   const ruleFile = configFor(context, ruleId2).file;
@@ -42676,31 +42858,8 @@ function resolveContract(context) {
 var import_node_path21 = __toESM(require("node:path"), 1);
 
 // src/firmware/platformio.ts
-var import_promises10 = __toESM(require("node:fs/promises"), 1);
-var pinObjectSchema2 = external_exports.strictObject({
-  hardware: external_exports.string().min(1),
-  net: external_exports.string().min(1).optional(),
-  pin: external_exports.string().min(1).optional(),
-  environment: external_exports.string().min(1).optional()
-});
-var pinArrayEntrySchema2 = pinObjectSchema2.extend({
-  signal: external_exports.string().min(1)
-});
-var contractSchema2 = external_exports.strictObject({
-  version: external_exports.literal(1),
-  pins: external_exports.union([external_exports.record(external_exports.string().min(1), pinObjectSchema2), external_exports.array(pinArrayEntrySchema2)])
-});
 async function loadPlatformioPinContract(file2) {
-  try {
-    const raw = load(await import_promises10.default.readFile(file2, "utf8"));
-    const parsed = contractSchema2.safeParse(raw);
-    if (!parsed.success) {
-      return { errors: parsed.error.issues.map((issue2) => `${issue2.path.join(".")}: ${issue2.message}`) };
-    }
-    return { document: normalizeContract2(parsed.data), errors: [] };
-  } catch (error51) {
-    return { errors: [error51 instanceof Error ? error51.message : "PlatformIO pin contract could not be loaded"] };
-  }
+  return loadYamlPinContract(file2, "PlatformIO");
 }
 var platformioAdapter = {
   id: "platformio",
@@ -42708,19 +42867,6 @@ var platformioAdapter = {
   configKey: "platformio",
   load: loadPlatformioPinContract
 };
-function normalizeContract2(input) {
-  const pins = Array.isArray(input.pins) ? input.pins : Object.entries(input.pins).map(([signal, assignment]) => ({ signal, ...assignment }));
-  return {
-    version: 1,
-    pins: pins.map((assignment) => ({
-      signal: assignment.signal,
-      hardware: normalizeHardwareKey(assignment.hardware),
-      ...assignment.net ? { net: assignment.net } : {},
-      ...assignment.pin ? { pin: assignment.pin } : {},
-      ...assignment.environment ? { environment: assignment.environment } : {}
-    }))
-  };
-}
 
 // src/rules/firmware/platformio-pin-contract.ts
 var ruleId3 = "firmware.platformio-pin-contract";
@@ -42740,16 +42886,7 @@ var platformioPinContractRule = rule(
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "platformio", "contract"]
   },
-  async (context) => {
-    if (!shouldRun(context, ruleId3)) {
-      return [];
-    }
-    const contractPath = resolvePlatformioContract(context);
-    if (!contractPath) {
-      return [];
-    }
-    return runFirmwareContractRule(context, { ruleId: ruleId3, adapter: platformioAdapter, contractPath });
-  }
+  makeFirmwareContractHandler(ruleId3, platformioAdapter, resolvePlatformioContract)
 );
 function resolvePlatformioContract(context) {
   const ruleFile = configFor(context, ruleId3).file;
@@ -42761,12 +42898,12 @@ function resolvePlatformioContract(context) {
 var import_node_path22 = __toESM(require("node:path"), 1);
 
 // src/firmware/stm32cubemx.ts
-var import_promises11 = __toESM(require("node:fs/promises"), 1);
+var import_promises10 = __toESM(require("node:fs/promises"), 1);
 var IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.([\w_]+)=(.+)$/;
 async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   let text;
   try {
-    text = await import_promises11.default.readFile(file2, "utf8");
+    text = await import_promises10.default.readFile(file2, "utf8");
   } catch (error51) {
     return { errors: [error51 instanceof Error ? error51.message : "STM32CubeMX .ioc file could not be loaded"] };
   }
@@ -42856,31 +42993,8 @@ function resolveContract2(context) {
 var import_node_path23 = __toESM(require("node:path"), 1);
 
 // src/firmware/zephyr.ts
-var import_promises12 = __toESM(require("node:fs/promises"), 1);
-var pinObjectSchema3 = external_exports.strictObject({
-  hardware: external_exports.string().min(1),
-  net: external_exports.string().min(1).optional(),
-  pin: external_exports.string().min(1).optional(),
-  environment: external_exports.string().min(1).optional()
-});
-var pinArrayEntrySchema3 = pinObjectSchema3.extend({
-  signal: external_exports.string().min(1)
-});
-var contractSchema3 = external_exports.strictObject({
-  version: external_exports.literal(1),
-  pins: external_exports.union([external_exports.record(external_exports.string().min(1), pinObjectSchema3), external_exports.array(pinArrayEntrySchema3)])
-});
 async function loadZephyrPinContract(file2) {
-  try {
-    const raw = load(await import_promises12.default.readFile(file2, "utf8"));
-    const parsed = contractSchema3.safeParse(raw);
-    if (!parsed.success) {
-      return { errors: parsed.error.issues.map((issue2) => `${issue2.path.join(".")}: ${issue2.message}`) };
-    }
-    return { document: normalizeContract3(parsed.data), errors: [] };
-  } catch (error51) {
-    return { errors: [error51 instanceof Error ? error51.message : "Zephyr pin contract could not be loaded"] };
-  }
+  return loadYamlPinContract(file2, "Zephyr");
 }
 var zephyrAdapter = {
   id: "zephyr",
@@ -42888,22 +43002,6 @@ var zephyrAdapter = {
   configKey: "zephyr",
   load: loadZephyrPinContract
 };
-function normalizeContract3(input) {
-  const pins = Array.isArray(input.pins) ? input.pins.map((entry) => ({
-    signal: entry.signal,
-    hardware: normalizeHardwareKey(entry.hardware),
-    ...entry.net ? { net: entry.net } : {},
-    ...entry.pin ? { pin: entry.pin } : {},
-    ...entry.environment ? { environment: entry.environment } : {}
-  })) : Object.entries(input.pins).map(([signal, entry]) => ({
-    signal,
-    hardware: normalizeHardwareKey(entry.hardware),
-    ...entry.net ? { net: entry.net } : {},
-    ...entry.pin ? { pin: entry.pin } : {},
-    ...entry.environment ? { environment: entry.environment } : {}
-  }));
-  return { version: 1, pins };
-}
 
 // src/rules/firmware/zephyr-pin-contract.ts
 var ruleId5 = "firmware.zephyr-pin-contract";
@@ -42923,16 +43021,7 @@ var zephyrPinContractRule = rule(
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "zephyr", "contract"]
   },
-  async (context) => {
-    if (!shouldRun(context, ruleId5)) {
-      return [];
-    }
-    const contractPath = resolveContract3(context);
-    if (!contractPath) {
-      return [];
-    }
-    return runFirmwareContractRule(context, { ruleId: ruleId5, adapter: zephyrAdapter, contractPath });
-  }
+  makeFirmwareContractHandler(ruleId5, zephyrAdapter, resolveContract3)
 );
 function resolveContract3(context) {
   const ruleFile = configFor(context, ruleId5).file;
@@ -44692,6 +44781,7 @@ function registerBuiltInRules() {
     runErcRule,
     missingMpnRule,
     singleSourceRule,
+    bomRiskScoreRule,
     eolDetectionRule,
     lifecycleRule,
     footprintMismatchRule,
@@ -44844,6 +44934,43 @@ async function outputFromRows(kind, rows) {
   };
 }
 
+// src/core/bom-risk.ts
+var RISK_LEVELS = /* @__PURE__ */ new Set(["critical", "high", "medium", "low", "none"]);
+function isRiskLevel(v) {
+  return typeof v === "string" && RISK_LEVELS.has(v);
+}
+function bomRiskSummaryFromFindings(findings) {
+  const riskFindings = findings.filter((f) => f.ruleId === "bom.risk-score" && f.details);
+  if (riskFindings.length === 0) {
+    return void 0;
+  }
+  const firstDetails = riskFindings[0].details;
+  const totalComponents = typeof firstDetails["totalComponents"] === "number" ? firstDetails["totalComponents"] : riskFindings.length;
+  const overallRiskScore = typeof firstDetails["overallBomRiskScore"] === "number" ? firstDetails["overallBomRiskScore"] : 0;
+  const components = riskFindings.map((f) => {
+    const d = f.details;
+    const factors = d["factors"] ?? {};
+    return {
+      reference: String(d["reference"] ?? ""),
+      mpn: typeof d["mpn"] === "string" ? d["mpn"] : void 0,
+      manufacturer: typeof d["manufacturer"] === "string" ? d["manufacturer"] : void 0,
+      riskScore: typeof d["riskScore"] === "number" ? d["riskScore"] : 0,
+      riskLevel: isRiskLevel(d["riskLevel"]) ? d["riskLevel"] : "none",
+      factors
+    };
+  });
+  return {
+    totalComponents,
+    overallRiskScore,
+    overallRiskLevel: riskLevelFromScore(overallRiskScore),
+    criticalCount: components.filter((c) => c.riskLevel === "critical").length,
+    highCount: components.filter((c) => c.riskLevel === "high").length,
+    mediumCount: components.filter((c) => c.riskLevel === "medium").length,
+    lowCount: components.filter((c) => c.riskLevel === "low").length,
+    components
+  };
+}
+
 // src/core/concurrency.ts
 var import_node_os2 = __toESM(require("node:os"), 1);
 
@@ -44872,7 +44999,7 @@ function defaultConcurrency() {
 }
 
 // src/core/discovery.ts
-var import_promises13 = __toESM(require("node:fs/promises"), 1);
+var import_promises11 = __toESM(require("node:fs/promises"), 1);
 var import_node_path37 = __toESM(require("node:path"), 1);
 async function discoverProjects(root, explicitProject) {
   const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path37.default.resolve(file2));
@@ -44885,7 +45012,7 @@ async function discoverProjects(root, explicitProject) {
 async function explicitProjectFiles(root, explicitProject) {
   const target = import_node_path37.default.resolve(root, normalizePathInput(explicitProject));
   try {
-    const stat = await import_promises13.default.stat(target);
+    const stat = await import_promises11.default.stat(target);
     if (stat.isDirectory()) {
       const files = await globFiles(target, ["**/*.kicad_pro"]);
       return files.map((file2) => import_node_path37.default.resolve(file2));
@@ -44935,7 +45062,7 @@ async function isInsideNestedProject(projectRoot, file2) {
 }
 async function safeReadDir(dir) {
   try {
-    return await import_promises13.default.readdir(dir);
+    return await import_promises11.default.readdir(dir);
   } catch {
     return [];
   }
@@ -45254,7 +45381,7 @@ function isNoEntry(error51) {
 }
 
 // src/core/plugin-loader.ts
-var import_promises14 = __toESM(require("node:fs/promises"), 1);
+var import_promises12 = __toESM(require("node:fs/promises"), 1);
 var import_node_module = require("node:module");
 var import_node_path39 = __toESM(require("node:path"), 1);
 var import_node_url = require("node:url");
@@ -45433,7 +45560,7 @@ async function discoverLocalPlugins(root) {
 }
 async function readDirectory(directory) {
   try {
-    return await import_promises14.default.readdir(directory, { withFileTypes: true });
+    return await import_promises12.default.readdir(directory, { withFileTypes: true });
   } catch (error51) {
     if (isMissingPath(error51)) {
       return [];
@@ -45988,6 +46115,7 @@ async function postProcessPhase(ctx, findings, projects) {
   };
 }
 function assembleRunResult(ctx, effectiveFindings, fabrication, readiness, summary, waiverResult, policy, pluginLoad, projects) {
+  const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   return {
     schemaVersion: 1,
     tool: {
@@ -45996,6 +46124,7 @@ function assembleRunResult(ctx, effectiveFindings, fabrication, readiness, summa
     },
     summary,
     readiness,
+    ...bomRisk ? { bomRisk } : {},
     ...policy ? { policy } : {},
     ...ctx.config.waivers && ctx.config.waivers.length > 0 ? { waivers: { active: waiverResult.active, expired: waiverResult.expired } } : {},
     projects,
@@ -46046,7 +46175,7 @@ async function controlledFindings(root, config2, options, findings) {
 }
 async function canonicalRoot(input) {
   try {
-    return await import_promises15.default.realpath(input);
+    return await import_promises13.default.realpath(input);
   } catch {
     return input;
   }
@@ -46314,7 +46443,7 @@ var diffBaselineCommand = async (pathInput, options, streams) => {
 };
 var clearBaselineCommand = async (pathInput, options, streams) => {
   return withBaselineRoot(pathInput, options.config, streams, async (root, file2) => {
-    await import_promises16.default.rm(file2, { force: true });
+    await import_promises14.default.rm(file2, { force: true });
     streams.stdout.write(`${t("cli.baseline.removed", { path: baselineDisplayPath(root, file2) })}
 `);
     return 0;
@@ -46926,7 +47055,7 @@ function reportCoordinateWithUnits(value, units) {
 }
 
 // src/report/templates/pr-comment.mustache
-var pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
+var pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
 
 // src/report/templates/summary.mustache
 var summary_default = "# {{labels.reportTitle}}\n\n| {{labels.metric}} | {{labels.count}} |\n| --- | ---: |\n| {{labels.total}} | {{summary.total}} |\n| {{labels.critical}} | {{summary.critical}} |\n| {{labels.high}} | {{summary.high}} |\n| {{labels.medium}} | {{summary.medium}} |\n| {{labels.low}} | {{summary.low}} |\n| {{labels.info}} | {{summary.info}} |\n";
@@ -46940,6 +47069,7 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
     ...plugin,
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
   }));
+  const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
   return mustache_default.render(
     pr_comment_default,
     {
@@ -46954,6 +47084,8 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasBomRisk: Boolean(bomRiskView),
+      bomRisk: bomRiskView,
       labels: markdownLabels(locale)
     },
     { summary: summary_default }
@@ -46995,6 +47127,8 @@ function markdownLabels(locale) {
     artifacts: t("report.artifacts", {}, locale),
     bom: t("report.bom", {}, locale),
     bomDiffTruncated: t("report.bomDiffTruncated", {}, locale),
+    bomRiskTitle: t("report.bomRisk.title", {}, locale),
+    bomRiskComponents: t("report.bomRisk.components", {}, locale),
     count: t("report.count", {}, locale),
     critical: t("severity.critical", {}, locale),
     current: t("report.current", {}, locale),
@@ -47016,6 +47150,23 @@ function markdownLabels(locale) {
     status: t("report.status", {}, locale),
     topFindings: t("report.topFindings", {}, locale),
     total: t("report.total", {}, locale)
+  };
+}
+function formatBomRisk(risk) {
+  const atRiskComponents = risk.components.filter((c) => c.riskLevel !== "none").map((c) => {
+    const parts = [];
+    if (c.factors.missingMpn) parts.push("no MPN");
+    if (c.factors.missingManufacturer) parts.push("no manufacturer");
+    if (c.factors.noSuppliers) parts.push("no suppliers");
+    else if (c.factors.singleSourceNoAlternates) parts.push("single source");
+    return { ...c, factorsSummary: parts.join(", ") || "\u2014" };
+  });
+  return {
+    overallRiskScore: risk.overallRiskScore,
+    overallRiskLevel: risk.overallRiskLevel,
+    totalComponents: risk.totalComponents,
+    atRiskCount: atRiskComponents.length,
+    atRiskComponents
   };
 }
 function markdownFinding(finding2) {
@@ -49239,7 +49390,7 @@ function formatExplanation(explanation) {
 
 // src/cli/commands/fix.ts
 var import_node_path48 = __toESM(require("node:path"), 1);
-var import_promises17 = require("node:readline/promises");
+var import_promises15 = require("node:readline/promises");
 
 // src/cli/fixes.ts
 var import_node_os3 = __toESM(require("node:os"), 1);
@@ -50120,7 +50271,7 @@ async function confirmApply(streams) {
     streams.stderr.write("Interactive fix requires a TTY. Use --dry-run or omit --interactive.\n");
     return void 0;
   }
-  const readline2 = (0, import_promises17.createInterface)({ input: process.stdin, output: process.stderr });
+  const readline2 = (0, import_promises15.createInterface)({ input: process.stdin, output: process.stderr });
   try {
     const answer = await readline2.question("Apply these fixes? [y/N] ");
     return /^(y|yes)$/i.test(answer.trim());
@@ -50134,7 +50285,7 @@ var import_node_path50 = __toESM(require("node:path"), 1);
 
 // src/release/generate.ts
 var import_node_crypto5 = require("node:crypto");
-var import_promises18 = __toESM(require("node:fs/promises"), 1);
+var import_promises16 = __toESM(require("node:fs/promises"), 1);
 var import_node_path49 = __toESM(require("node:path"), 1);
 var import__2 = __toESM(require__(), 1);
 
@@ -50295,8 +50446,8 @@ async function runGenerate(recipe, options) {
     schematic: Boolean(options.schematicFile)
   };
   const plan = buildGeneratePlan(recipe, available);
-  await import_promises18.default.rm(outputDir, { recursive: true, force: true });
-  await import_promises18.default.mkdir(outputDir, { recursive: true });
+  await import_promises16.default.rm(outputDir, { recursive: true, force: true });
+  await import_promises16.default.mkdir(outputDir, { recursive: true });
   const outcomes = plan.skipped.map((entry) => ({
     kind: entry.kind,
     status: "skipped",
@@ -50306,9 +50457,9 @@ async function runGenerate(recipe, options) {
   for (const step of plan.steps) {
     const absoluteOutput = import_node_path49.default.join(outputDir, step.output);
     if (step.isDirectory) {
-      await import_promises18.default.mkdir(absoluteOutput, { recursive: true });
+      await import_promises16.default.mkdir(absoluteOutput, { recursive: true });
     } else {
-      await import_promises18.default.mkdir(import_node_path49.default.dirname(absoluteOutput), { recursive: true });
+      await import_promises16.default.mkdir(import_node_path49.default.dirname(absoluteOutput), { recursive: true });
     }
     const args = generateStepArgs(step, {
       boardFile: options.boardFile,
@@ -50348,7 +50499,7 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
     artifacts
   };
   const manifestPath = import_node_path49.default.join(outputDir, "manifest.json");
-  await import_promises18.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
+  await import_promises16.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
   return {
     outputDir,
@@ -50384,7 +50535,7 @@ async function walkFiles(directory) {
   const output = [];
   let entries;
   try {
-    entries = await import_promises18.default.readdir(directory, { withFileTypes: true });
+    entries = await import_promises16.default.readdir(directory, { withFileTypes: true });
   } catch {
     return output;
   }
@@ -50400,13 +50551,13 @@ async function walkFiles(directory) {
 }
 async function fileExists2(file2) {
   try {
-    return (await import_promises18.default.stat(file2)).isFile();
+    return (await import_promises16.default.stat(file2)).isFile();
   } catch {
     return false;
   }
 }
 async function fileDigest(file2) {
-  const content = await import_promises18.default.readFile(file2);
+  const content = await import_promises16.default.readFile(file2);
   return { sha256: (0, import_node_crypto5.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function toPosix(value) {
@@ -50505,7 +50656,7 @@ function writeSummary(outputDir, result, stdout) {
 }
 
 // src/cli/commands/init.ts
-var import_promises19 = require("node:fs/promises");
+var import_promises17 = require("node:fs/promises");
 var import_node_path51 = __toESM(require("node:path"), 1);
 var import_node_readline = __toESM(require("node:readline"), 1);
 var yamlHeader = `version: 1
@@ -50724,10 +50875,10 @@ async function initCommand(cwd, options, streams) {
   }
   if (workflow === "github") {
     const workflowDir = import_node_path51.default.resolve(outputDir, ".github/workflows");
-    await (0, import_promises19.mkdir)(workflowDir, { recursive: true });
+    await (0, import_promises17.mkdir)(workflowDir, { recursive: true });
     const workflowFile = import_node_path51.default.resolve(workflowDir, "boardreadyops.yml");
     if (!await pathExists(workflowFile) || options.force) {
-      await (0, import_promises19.writeFile)(workflowFile, githubWorkflowYml, "utf-8");
+      await (0, import_promises17.writeFile)(workflowFile, githubWorkflowYml, "utf-8");
       streams.stdout.write(`\u2728 ${t("cli.init.workflowCreated")}: ${workflowFile}
 `);
     } else {
@@ -50924,7 +51075,7 @@ async function policyCommand(pathInput, options, streams) {
 
 // src/cli/commands/release.ts
 var import_node_child_process3 = require("node:child_process");
-var import_promises22 = __toESM(require("node:fs/promises"), 1);
+var import_promises20 = __toESM(require("node:fs/promises"), 1);
 var import_node_path56 = __toESM(require("node:path"), 1);
 var import_node_util3 = require("node:util");
 
@@ -51098,7 +51249,7 @@ function formatDelta(delta) {
 
 // src/release/evidence.ts
 var import_node_crypto6 = require("node:crypto");
-var import_promises20 = __toESM(require("node:fs/promises"), 1);
+var import_promises18 = __toESM(require("node:fs/promises"), 1);
 var import_node_path54 = __toESM(require("node:path"), 1);
 var FABRICATION_DIRS = ["fab", "fabrication", "manufacturing", "gerbers", "gerber", "production"];
 var MANUFACTURING_EXTENSIONS = /* @__PURE__ */ new Set([
@@ -51125,9 +51276,9 @@ var MANUFACTURING_EXTENSIONS = /* @__PURE__ */ new Set([
 var BUNDLE_LAYOUT = { reports: "reports", artifacts: "artifacts", generated: "generated" };
 async function writeReleaseEvidenceBundle(root, result, options) {
   const outputDir = import_node_path54.default.resolve(root, options.outputDir);
-  await import_promises20.default.rm(outputDir, { recursive: true, force: true });
-  await import_promises20.default.mkdir(import_node_path54.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
-  await import_promises20.default.mkdir(import_node_path54.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
+  await import_promises18.default.rm(outputDir, { recursive: true, force: true });
+  await import_promises18.default.mkdir(import_node_path54.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
+  await import_promises18.default.mkdir(import_node_path54.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
   const artifacts = [];
   artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)));
   artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)));
@@ -51154,7 +51305,7 @@ async function writeReleaseEvidenceBundle(root, result, options) {
     verification: { algorithm: "sha256", artifactCount: artifacts.length }
   };
   const manifestPath = import_node_path54.default.join(outputDir, "manifest.json");
-  await import_promises20.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
+  await import_promises18.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
   return { outputDir, manifestPath, manifest };
 }
@@ -51174,7 +51325,7 @@ async function verifyReleaseEvidenceBundle(bundleDir) {
   const errors = [];
   let manifest;
   try {
-    manifest = JSON.parse(await import_promises20.default.readFile(manifestPath, "utf8"));
+    manifest = JSON.parse(await import_promises18.default.readFile(manifestPath, "utf8"));
   } catch (error51) {
     return {
       ok: false,
@@ -51202,8 +51353,8 @@ async function verifyReleaseEvidenceBundle(bundleDir) {
 }
 async function writeReport(outputDir, relativePath, content) {
   const target = import_node_path54.default.join(outputDir, relativePath);
-  await import_promises20.default.mkdir(import_node_path54.default.dirname(target), { recursive: true });
-  await import_promises20.default.writeFile(target, content, "utf8");
+  await import_promises18.default.mkdir(import_node_path54.default.dirname(target), { recursive: true });
+  await import_promises18.default.writeFile(target, content, "utf8");
   const digest = await fileDigest2(target);
   return { path: relativePath, kind: "report", ...digest };
 }
@@ -51214,8 +51365,8 @@ async function copyManufacturingArtifacts(root, outputDir) {
     const relativeSource = normalizeRelative(root, source);
     const targetRelative = import_node_path54.default.join("artifacts", relativeSource).split(import_node_path54.default.sep).join("/");
     const target = import_node_path54.default.join(outputDir, targetRelative);
-    await import_promises20.default.mkdir(import_node_path54.default.dirname(target), { recursive: true });
-    await import_promises20.default.copyFile(source, target);
+    await import_promises18.default.mkdir(import_node_path54.default.dirname(target), { recursive: true });
+    await import_promises18.default.copyFile(source, target);
     const digest = await fileDigest2(target);
     artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest });
   }
@@ -51234,8 +51385,8 @@ async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
     const relativeSource = normalizeRelative(sourceDir, source);
     const targetRelative = import_node_path54.default.join(BUNDLE_LAYOUT.generated, relativeSource).split(import_node_path54.default.sep).join("/");
     const target = import_node_path54.default.join(outputDir, targetRelative);
-    await import_promises20.default.mkdir(import_node_path54.default.dirname(target), { recursive: true });
-    await import_promises20.default.copyFile(source, target);
+    await import_promises18.default.mkdir(import_node_path54.default.dirname(target), { recursive: true });
+    await import_promises18.default.copyFile(source, target);
     const digest = await fileDigest2(target);
     artifacts.push({
       path: targetRelative,
@@ -51258,7 +51409,7 @@ async function discoverManufacturingArtifacts(root) {
 async function collectFiles(directory, output) {
   let entries;
   try {
-    entries = await import_promises20.default.readdir(directory, { withFileTypes: true });
+    entries = await import_promises18.default.readdir(directory, { withFileTypes: true });
   } catch {
     return;
   }
@@ -51323,7 +51474,7 @@ function artifactKind(file2) {
   return "other";
 }
 async function fileDigest2(file2) {
-  const content = await import_promises20.default.readFile(file2);
+  const content = await import_promises18.default.readFile(file2);
   return { sha256: (0, import_node_crypto6.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function cleanObject(value) {
@@ -51486,7 +51637,7 @@ function releasePrepareExitCode(summary) {
 
 // src/release/signing.ts
 var import_node_crypto7 = require("node:crypto");
-var import_promises21 = __toESM(require("node:fs/promises"), 1);
+var import_promises19 = __toESM(require("node:fs/promises"), 1);
 var import_node_path55 = __toESM(require("node:path"), 1);
 var SIGNATURE_FILE = "manifest.sig";
 var MANIFEST_FILE = "manifest.json";
@@ -51540,10 +51691,10 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   return { ok: errors.length === 0, errors };
 }
 async function signReleaseBundle(bundleDir, privateKeyPem, signedAt) {
-  const bytes = await import_promises21.default.readFile(import_node_path55.default.join(bundleDir, MANIFEST_FILE));
+  const bytes = await import_promises19.default.readFile(import_node_path55.default.join(bundleDir, MANIFEST_FILE));
   const signature = signManifestBytes(bytes, privateKeyPem, signedAt);
   const signaturePath = import_node_path55.default.join(bundleDir, SIGNATURE_FILE);
-  await import_promises21.default.writeFile(signaturePath, `${JSON.stringify(signature, null, 2)}
+  await import_promises19.default.writeFile(signaturePath, `${JSON.stringify(signature, null, 2)}
 `, "utf8");
   return { signaturePath, signature };
 }
@@ -51551,7 +51702,7 @@ async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
   const signaturePath = import_node_path55.default.join(bundleDir, SIGNATURE_FILE);
   let signatureRaw;
   try {
-    signatureRaw = await import_promises21.default.readFile(signaturePath, "utf8");
+    signatureRaw = await import_promises19.default.readFile(signaturePath, "utf8");
   } catch {
     return { ok: false, present: false, errors: [] };
   }
@@ -51563,7 +51714,7 @@ async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
   }
   let bytes;
   try {
-    bytes = await import_promises21.default.readFile(import_node_path55.default.join(bundleDir, MANIFEST_FILE));
+    bytes = await import_promises19.default.readFile(import_node_path55.default.join(bundleDir, MANIFEST_FILE));
   } catch (error51) {
     return { ok: false, present: true, errors: [`manifest could not be read: ${asMessage(error51)}`] };
   }
@@ -51791,7 +51942,7 @@ async function runProjectJobsets(root, project, cliPath, outputDir) {
     return { artifacts: 0, failures: 0 };
   }
   const jobsetOutputDir = import_node_path56.default.join(outputDir, "jobsets");
-  await import_promises22.default.mkdir(jobsetOutputDir, { recursive: true });
+  await import_promises20.default.mkdir(jobsetOutputDir, { recursive: true });
   const result = await runJobset(cliPath, import_node_path56.default.resolve(root, project.projectFile), jobsetOutputDir);
   await writeTextFile(
     import_node_path56.default.join(jobsetOutputDir, "boardreadyops-jobset-run.json"),
@@ -51934,13 +52085,13 @@ async function releaseHandoffCommand(pathInput, options, streams) {
     outputs[kind] = files.map((file2) => normalizeRelative(root, file2)).filter((file2) => !file2.startsWith(outputDirPrefix));
   }
   const plan = planHandoffPackage(outputs, summary);
-  await import_promises22.default.rm(outputDir, { recursive: true, force: true });
-  await import_promises22.default.mkdir(outputDir, { recursive: true });
+  await import_promises20.default.rm(outputDir, { recursive: true, force: true });
+  await import_promises20.default.mkdir(outputDir, { recursive: true });
   const manifestFiles = [];
   for (const file2 of plan.files) {
     const target = import_node_path56.default.join(outputDir, file2.target);
-    await import_promises22.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
-    await import_promises22.default.copyFile(import_node_path56.default.resolve(root, file2.source), target);
+    await import_promises20.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
+    await import_promises20.default.copyFile(import_node_path56.default.resolve(root, file2.source), target);
     const digest = await sha256File(target);
     manifestFiles.push({ ...file2, ...digest });
   }
@@ -51954,7 +52105,7 @@ async function releaseHandoffCommand(pathInput, options, streams) {
     zipPath = `${outputDir}.zip`;
     const allFiles = await collectDirEntries(outputDir, outputDir);
     const zipBuffer = createZipBuffer(allFiles, new Date(generatedAt));
-    await import_promises22.default.writeFile(zipPath, zipBuffer);
+    await import_promises20.default.writeFile(zipPath, zipBuffer);
   }
   if (options.format === "json") {
     streams.stdout.write(`${JSON.stringify(manifest, null, 2)}
@@ -52040,14 +52191,14 @@ async function loadReleaseSnapshot(input) {
 }
 async function collectDirEntries(dir, baseDir) {
   const entries = [];
-  const items = await import_promises22.default.readdir(dir, { withFileTypes: true });
+  const items = await import_promises20.default.readdir(dir, { withFileTypes: true });
   for (const item2 of items) {
     const full = import_node_path56.default.join(dir, item2.name);
     if (item2.isDirectory()) {
       entries.push(...await collectDirEntries(full, baseDir));
     } else if (item2.isFile()) {
       const rel = import_node_path56.default.relative(baseDir, full).replace(/\\/g, "/");
-      entries.push({ name: rel, data: await import_promises22.default.readFile(full) });
+      entries.push({ name: rel, data: await import_promises20.default.readFile(full) });
     }
   }
   return entries;
@@ -52646,6 +52797,11 @@ var findings_schema_default = {
       items: {
         $ref: "#/$defs/plugin"
       }
+    },
+    bomRisk: {
+      type: "object",
+      description: "Aggregate BOM supply-chain risk summary from the bom.risk-score rule.",
+      additionalProperties: true
     }
   },
   $defs: {
@@ -53123,7 +53279,12 @@ var findings_schema_default = {
             "firmware.platformio-pin-contract",
             "manufacturing.fiducials",
             "manufacturing.tooling-holes",
-            "manufacturing.position-coverage"
+            "manufacturing.position-coverage",
+            "bom.risk-score",
+            "firmware.esp-idf-pin-contract",
+            "firmware.zephyr-pin-contract",
+            "firmware.arduino-pin-contract",
+            "firmware.stm32cubemx-pin-contract"
           ]
         },
         {

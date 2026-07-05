@@ -1,0 +1,8 @@
+{
+  "fixture": "firmware-contract-stm32cubemx",
+  "expectedRules": ["firmware.stm32cubemx-pin-contract"],
+  "expectedSeverities": ["high"],
+  "expectPass": false,
+  "performanceBaselineMs": 100,
+  "runRules": ["firmware.stm32cubemx-pin-contract"]
+}

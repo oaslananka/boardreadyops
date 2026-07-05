@@ -1,4 +1,5 @@
 import Mustache from "mustache";
+import type { BomRiskSummary } from "../core/bom-risk.js";
 import type { FabricationDiff } from "../core/diff/fabrication.js";
 import type { Finding } from "../core/findings.js";
 import type { RunResult } from "../core/result.js";
@@ -31,6 +32,7 @@ export function formatMarkdown(
     ...plugin,
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none",
   }));
+  const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : undefined;
   return Mustache.render(
     prCommentTemplate,
     {
@@ -45,6 +47,8 @@ export function formatMarkdown(
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasBomRisk: Boolean(bomRiskView),
+      bomRisk: bomRiskView,
       labels: markdownLabels(locale),
     },
     { summary: summaryTemplate },
@@ -90,6 +94,8 @@ function markdownLabels(locale: Locale): Record<string, string> {
     artifacts: t("report.artifacts", {}, locale),
     bom: t("report.bom", {}, locale),
     bomDiffTruncated: t("report.bomDiffTruncated", {}, locale),
+    bomRiskTitle: t("report.bomRisk.title", {}, locale),
+    bomRiskComponents: t("report.bomRisk.components", {}, locale),
     count: t("report.count", {}, locale),
     critical: t("severity.critical", {}, locale),
     current: t("report.current", {}, locale),
@@ -111,6 +117,26 @@ function markdownLabels(locale: Locale): Record<string, string> {
     status: t("report.status", {}, locale),
     topFindings: t("report.topFindings", {}, locale),
     total: t("report.total", {}, locale),
+  };
+}
+
+function formatBomRisk(risk: BomRiskSummary) {
+  const atRiskComponents = risk.components
+    .filter((c) => c.riskLevel !== "none")
+    .map((c) => {
+      const parts: string[] = [];
+      if (c.factors.missingMpn) parts.push("no MPN");
+      if (c.factors.missingManufacturer) parts.push("no manufacturer");
+      if (c.factors.noSuppliers) parts.push("no suppliers");
+      else if (c.factors.singleSourceNoAlternates) parts.push("single source");
+      return { ...c, factorsSummary: parts.join(", ") || "—" };
+    });
+  return {
+    overallRiskScore: risk.overallRiskScore,
+    overallRiskLevel: risk.overallRiskLevel,
+    totalComponents: risk.totalComponents,
+    atRiskCount: atRiskComponents.length,
+    atRiskComponents,
   };
 }
 
