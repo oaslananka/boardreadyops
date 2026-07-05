@@ -222,7 +222,7 @@ Rule packs are lightweight, versioned configuration bundles that enable/disable 
 
 ### YAML rule pack format
 
-Rule packs can be written as standalone YAML files and referenced from `boardreadyops.yml`. The full schema is at [`schemas/rule-pack.schema.json`](../schemas/rule-pack.schema.json).
+Rule packs can be written as standalone YAML files and referenced from `boardreadyops.yml`. The full schema is in `schemas/rule-pack.schema.json` at the repository root.
 
 ```yaml
 id: com.example.prototype-ready
