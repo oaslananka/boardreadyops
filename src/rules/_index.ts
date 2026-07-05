@@ -5,6 +5,7 @@ import { eolDetectionRule } from "./bom/eol-detection.js";
 import { footprintMismatchRule } from "./bom/footprint-mismatch.js";
 import { lifecycleRule } from "./bom/lifecycle.js";
 import { missingMpnRule } from "./bom/missing-mpn.js";
+import { bomRiskScoreRule } from "./bom/risk-score.js";
 import { singleSourceRule } from "./bom/single-source.js";
 import { variantConsistencyRule } from "./bom/variant-consistency.js";
 import { boardOutlineRule } from "./design/board-outline.js";
@@ -49,6 +50,7 @@ export function registerBuiltInRules(): void {
     runErcRule,
     missingMpnRule,
     singleSourceRule,
+    bomRiskScoreRule,
     eolDetectionRule,
     lifecycleRule,
     footprintMismatchRule,

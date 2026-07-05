@@ -9,6 +9,7 @@ import { normalizePathInput } from "../util/path.js";
 import { VENDOR_OUTPUT_KINDS, VENDOR_OUTPUT_PATTERNS } from "../vendor/outputs.js";
 import { resolveVendorProfile } from "../vendor/profiles.js";
 import { applyBaseline, readBaseline, resolveBaselinePath } from "./baseline.js";
+import { bomRiskSummaryFromFindings } from "./bom-risk.js";
 import { defaultConcurrency, mapLimit } from "./concurrency.js";
 import {
   type BoardReadyOpsConfig,
@@ -257,6 +258,7 @@ function assembleRunResult(
   pluginLoad: Awaited<ReturnType<typeof loadPlugins>>,
   projects: ProjectContext[],
 ): RunResult {
+  const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   return {
     schemaVersion: 1,
     tool: {
@@ -265,6 +267,7 @@ function assembleRunResult(
     },
     summary,
     readiness,
+    ...(bomRisk ? { bomRisk } : {}),
     ...(policy ? { policy } : {}),
     ...(ctx.config.waivers && ctx.config.waivers.length > 0
       ? { waivers: { active: waiverResult.active, expired: waiverResult.expired } }

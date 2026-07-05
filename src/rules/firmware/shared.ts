@@ -8,8 +8,29 @@ import {
   normalizeHardwareKey,
 } from "../../firmware/contract.js";
 import { loadPinmap } from "../../pinmap/loader.js";
-import { configuredSeverity, finding } from "../helpers.js";
+import { configuredSeverity, finding, shouldRun } from "../helpers.js";
 import { resolvePinmap } from "../pinmap/shared.js";
+
+/**
+ * Returns the async rule handler for a firmware pin-contract rule.
+ * Eliminates the identical shouldRun / resolveContract boilerplate across adapter-specific rules.
+ */
+export function makeFirmwareContractHandler(
+  ruleId: string,
+  adapter: FirmwareContractAdapter,
+  resolveContractPath: (context: RuleContext) => string | undefined,
+): (context: RuleContext) => Promise<Finding[]> {
+  return async (context) => {
+    if (!shouldRun(context, ruleId)) {
+      return [];
+    }
+    const contractPath = resolveContractPath(context);
+    if (!contractPath) {
+      return [];
+    }
+    return runFirmwareContractRule(context, { ruleId, adapter, contractPath });
+  };
+}
 
 /**
  * Shared body for adapter-driven firmware pin contract rules. Loads the adapter's contract and

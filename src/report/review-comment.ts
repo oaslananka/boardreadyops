@@ -1,3 +1,4 @@
+import type { BomRiskSummary } from "../core/bom-risk.js";
 import type { Finding, Severity } from "../core/findings.js";
 import type { RunResult } from "../core/result.js";
 import { type Locale, t } from "../i18n/t.js";
@@ -24,6 +25,9 @@ export function formatReviewComment(
   const lines: string[] = [stickyMarker, "", "## BoardReadyOps release review", "", decisionLine(result), ""];
   lines.push(...severityTable(result, locale), "");
   lines.push(...topFindings(result, locale));
+  if (result.bomRisk && result.bomRisk.overallRiskScore > 0) {
+    lines.push("", ...bomRiskSection(result.bomRisk));
+  }
   if (reports.length > 0) {
     lines.push("", "### Reports", ...reports.map((report) => `- [${report.label}](${report.url})`));
   }
@@ -95,4 +99,26 @@ function location(finding: Finding): string {
 
 function severityLabel(severity: Severity, locale: Locale): string {
   return t(`severity.${severity}`, {}, locale);
+}
+
+function bomRiskSection(risk: BomRiskSummary): string[] {
+  const atRisk = risk.components.filter((c) => c.riskLevel !== "none");
+  const lines: string[] = [
+    "### BOM Supply-Chain Risk",
+    "",
+    `Overall risk score: **${risk.overallRiskScore}/100** (${risk.overallRiskLevel}) — ` +
+      `${risk.totalComponents} component(s) evaluated, ${atRisk.length} at risk.`,
+  ];
+  if (atRisk.length > 0) {
+    lines.push("", "| Component | Score | Level | Factors |", "| --- | ---: | --- | --- |");
+    for (const c of atRisk) {
+      const parts: string[] = [];
+      if (c.factors.missingMpn) parts.push("no MPN");
+      if (c.factors.missingManufacturer) parts.push("no manufacturer");
+      if (c.factors.noSuppliers) parts.push("no suppliers");
+      else if (c.factors.singleSourceNoAlternates) parts.push("single source");
+      lines.push(`| \`${c.reference}\` | ${c.riskScore} | ${c.riskLevel} | ${parts.join(", ") || "—"} |`);
+    }
+  }
+  return lines;
 }

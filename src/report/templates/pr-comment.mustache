@@ -57,6 +57,18 @@ _{{fabrication.findings.addedRemainingLabel}}_
 {{/fabrication.findings.hasAdded}}
 {{/hasFabricationDiff}}
 
+{{#hasBomRisk}}
+
+## {{labels.bomRiskTitle}}
+
+Overall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) — {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.
+
+| Component | Risk Score | Risk Level | Factors |
+| --- | ---: | --- | --- |
+{{#bomRisk.atRiskComponents}}
+| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |
+{{/bomRisk.atRiskComponents}}
+{{/hasBomRisk}}
 {{#hasPlugins}}
 ## {{labels.plugins}}
 

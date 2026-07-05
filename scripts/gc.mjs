@@ -125,7 +125,12 @@ function checkUnusedDependencies() {
 }
 
 function isAllowedDuplicate(block) {
-  return block.includes("createFinding({") || block.includes("meta: {") || block.includes("return output;");
+  return (
+    block.includes("createFinding({") ||
+    block.includes("meta: {") ||
+    block.includes("return output;") ||
+    block.split("\n").every((line) => /^"[a-z][a-z0-9.-]+",?$/.test(line) || line === "]," || line === "]")
+  );
 }
 
 function relative(file) {

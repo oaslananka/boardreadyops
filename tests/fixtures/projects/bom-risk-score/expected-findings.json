@@ -1,0 +1,8 @@
+{
+  "fixture": "bom-risk-score",
+  "expectedRules": ["bom.risk-score"],
+  "expectedSeverities": ["medium"],
+  "expectPass": true,
+  "performanceBaselineMs": 200,
+  "runRules": ["bom.risk-score"]
+}

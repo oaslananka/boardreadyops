@@ -6,7 +6,7 @@ actively managed single-source decision from an oversight.
 
 ## Why Use Alternates?
 
-The [`bom.single-source`](../rules/bom.single-source.md) rule flags BOM rows
+The [`bom.single-source`](rules/bom.single-source.md) rule flags BOM rows
 where only one supplier is listed — a signal that availability risk has not been
 addressed.  When a team has already validated a drop-in replacement but chooses
 to order only from the primary supplier, the `bom.alternates` list documents

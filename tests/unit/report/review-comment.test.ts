@@ -72,4 +72,54 @@ describe("formatReviewComment", () => {
     const body = formatReviewComment(result(findings));
     expect(body).toContain("…and 2 more.");
   });
+
+  it("renders BOM supply-chain risk section when bomRisk is present", () => {
+    const resultWithRisk: RunResult = {
+      ...result([]),
+      bomRisk: {
+        totalComponents: 3,
+        overallRiskScore: 65,
+        overallRiskLevel: "critical",
+        criticalCount: 1,
+        highCount: 1,
+        mediumCount: 1,
+        lowCount: 0,
+        components: [
+          {
+            reference: "U1",
+            mpn: undefined,
+            manufacturer: undefined,
+            riskScore: 80,
+            riskLevel: "critical",
+            factors: {
+              missingMpn: true,
+              missingManufacturer: true,
+              noSuppliers: false,
+              singleSourceNoAlternates: false,
+            },
+          },
+          {
+            reference: "R1",
+            mpn: "RES-0402",
+            manufacturer: "Yageo",
+            riskScore: 40,
+            riskLevel: "high",
+            factors: {
+              missingMpn: false,
+              missingManufacturer: false,
+              noSuppliers: false,
+              singleSourceNoAlternates: true,
+            },
+          },
+        ],
+      },
+    };
+    const body = formatReviewComment(resultWithRisk);
+    expect(body).toContain("### BOM Supply-Chain Risk");
+    expect(body).toContain("65/100");
+    expect(body).toContain("`U1`");
+    expect(body).toContain("no MPN");
+    expect(body).toContain("`R1`");
+    expect(body).toContain("single source");
+  });
 });

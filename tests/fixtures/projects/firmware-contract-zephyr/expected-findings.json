@@ -1,0 +1,8 @@
+{
+  "fixture": "firmware-contract-zephyr",
+  "expectedRules": ["firmware.zephyr-pin-contract"],
+  "expectedSeverities": ["high"],
+  "expectPass": false,
+  "performanceBaselineMs": 100,
+  "runRules": ["firmware.zephyr-pin-contract"]
+}

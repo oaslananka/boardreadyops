@@ -6,6 +6,7 @@ BoardReadyOps rules use stable `group.rule` identifiers. Each rule page records 
 - [erc.kicad](erc.kicad.md)
 - [bom.missing-mpn](bom.missing-mpn.md)
 - [bom.single-source](bom.single-source.md)
+- [bom.risk-score](bom.risk-score.md)
 - [bom.eol-detection](bom.eol-detection.md)
 - [bom.lifecycle](bom.lifecycle.md)
 - [bom.footprint-mismatch](bom.footprint-mismatch.md)

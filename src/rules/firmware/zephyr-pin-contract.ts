@@ -1,8 +1,8 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
 import { zephyrAdapter } from "../../firmware/zephyr.js";
-import { configFor, rule, shouldRun } from "../helpers.js";
-import { runFirmwareContractRule } from "./shared.js";
+import { configFor, rule } from "../helpers.js";
+import { makeFirmwareContractHandler } from "./shared.js";
 
 const ruleId = "firmware.zephyr-pin-contract";
 
@@ -23,16 +23,7 @@ export const zephyrPinContractRule = rule(
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "zephyr", "contract"],
   },
-  async (context) => {
-    if (!shouldRun(context, ruleId)) {
-      return [];
-    }
-    const contractPath = resolveContract(context);
-    if (!contractPath) {
-      return [];
-    }
-    return runFirmwareContractRule(context, { ruleId, adapter: zephyrAdapter, contractPath });
-  },
+  makeFirmwareContractHandler(ruleId, zephyrAdapter, resolveContract),
 );
 
 function resolveContract(context: RuleContext): string | undefined {
