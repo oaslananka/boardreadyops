@@ -51769,7 +51769,9 @@ async function writeReleaseEvidenceBundle(root, result, options) {
   const manifestPath = import_node_path55.default.join(outputDir, "manifest.json");
   await import_promises18.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
-  return { outputDir, manifestPath, manifest };
+  const checksumsPath = import_node_path54.default.join(outputDir, "checksums.txt");
+  await import_promises18.default.writeFile(checksumsPath, formatChecksumsTxt(artifacts), "utf8");
+  return { outputDir, manifestPath, checksumsPath, manifest };
 }
 function evidenceDecision(result, gaps) {
   const reasons = [];
@@ -51780,6 +51782,9 @@ function evidenceDecision(result, gaps) {
     reasons.push(`bundle has ${gaps.length} evidence gap(s) requiring review`);
   }
   return { status: result.summary.failed ? "fail" : "pass", reasons };
+}
+function formatChecksumsTxt(artifacts) {
+  return artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n") + "\n";
 }
 async function verifyReleaseEvidenceBundle(bundleDir) {
   const outputDir = import_node_path55.default.resolve(bundleDir);
@@ -52326,6 +52331,8 @@ async function releasePackCommand(pathInput, options, streams) {
   streams.stdout.write(`Release evidence bundle written to ${normalizeRelative(root, bundle.outputDir)}
 `);
   streams.stdout.write(`Manifest: ${normalizeRelative(root, bundle.manifestPath)}
+`);
+  streams.stdout.write(`Checksums: ${normalizeRelative(root, bundle.checksumsPath)}
 `);
   streams.stdout.write(`Decision: ${bundle.manifest.decision.status.toUpperCase()}
 `);

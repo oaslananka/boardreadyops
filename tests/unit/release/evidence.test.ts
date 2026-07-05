@@ -4,7 +4,11 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import evidenceSchema from "../../../schemas/evidence.schema.json" with { type: "json" };
 import { runPipeline } from "../../../src/core/pipeline.js";
-import { verifyReleaseEvidenceBundle, writeReleaseEvidenceBundle } from "../../../src/release/evidence.js";
+import {
+  verifyManifestCoverage,
+  verifyReleaseEvidenceBundle,
+  writeReleaseEvidenceBundle,
+} from "../../../src/release/evidence.js";
 import { writeFixture } from "../rules/helpers.js";
 
 describe("release evidence bundles", () => {
@@ -65,10 +69,18 @@ describe("release evidence bundles", () => {
     const ajv = new Ajv2020({ allErrors: true });
     const validate = ajv.compile(evidenceSchema);
     expect(validate(JSON.parse(rawManifest)), JSON.stringify(validate.errors)).toBe(true);
+    const checksumsContent = await fs.readFile(path.join(root, "bundle", "checksums.txt"), "utf8");
+    expect(checksumsContent).toContain("  artifacts/fab/board.drl\n");
+    expect(checksumsContent).toContain("  reports/boardreadyops-report.json\n");
+    expect(checksumsContent.split("\n").filter(Boolean)).toHaveLength(7);
+    expect(written.checksumsPath).toBe(path.join(root, "bundle", "checksums.txt"));
     await expect(verifyReleaseEvidenceBundle(path.join(root, "bundle"))).resolves.toMatchObject({
       ok: true,
       checked: 7,
     });
+    const coverage = await verifyManifestCoverage(path.join(root, "bundle"));
+    expect(coverage.ok).toBe(true);
+    expect(coverage.uncovered).toHaveLength(0);
   });
 
   it("reports explicit gaps and detects checksum drift", async () => {
@@ -92,5 +104,32 @@ describe("release evidence bundles", () => {
     const verification = await verifyReleaseEvidenceBundle(path.join(root, "bundle"));
     expect(verification.ok).toBe(false);
     expect(verification.errors.join("\n")).toContain("checksum or size mismatch");
+  });
+});
+
+describe("verifyManifestCoverage", () => {
+  it("detects files not listed in manifest", async () => {
+    const root = await writeFixture({
+      "board.kicad_pro": "{}",
+      "board.kicad_sch": "(kicad_sch)",
+      "boardreadyops.yml": "version: 1\nfail-on: never\n",
+    });
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["manifest.project-discovery"] });
+    const written = await writeReleaseEvidenceBundle(root, result, {
+      outputDir: "bundle",
+      generatedAt: "2026-06-20T00:00:00.000Z",
+    });
+    expect((await verifyManifestCoverage(written.outputDir)).ok).toBe(true);
+    await fs.writeFile(path.join(written.outputDir, "reports", "extra.txt"), "unlisted", "utf8");
+    const after = await verifyManifestCoverage(written.outputDir);
+    expect(after.ok).toBe(false);
+    expect(after.uncovered).toContain("reports/extra.txt");
+  });
+
+  it("returns errors when manifest is missing", async () => {
+    const root = await writeFixture({});
+    const result = await verifyManifestCoverage(path.join(root, "nonexistent-bundle"));
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toContain("manifest could not be read");
   });
 });
