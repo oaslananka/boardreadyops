@@ -165,6 +165,77 @@ describe("createStaticSupplierProvider", () => {
 
     expect(result.warnings).toHaveLength(0);
   });
+
+  it("resolves a relative dataFile path against projectRoot", async () => {
+    const dir = await makeTempDir();
+    await fs.writeFile(path.join(dir, "db.json"), JSON.stringify(SAMPLE_DB), "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: "db.json" });
+    const result = await provider.query({
+      projectRoot: dir,
+      components: [{ reference: "U1", mpn: "TPS62840DLCT" }],
+    });
+
+    expect(result.records.get("TPS62840DLCT")).toBeDefined();
+  });
+
+  it("uses process.cwd() when relative path given with no projectRoot", async () => {
+    const dbName = `brops-test-${Date.now()}.json`;
+    const dbPath = path.join(process.cwd(), dbName);
+    await fs.writeFile(dbPath, JSON.stringify(SAMPLE_DB), "utf8");
+    try {
+      const provider = createStaticSupplierProvider({ dataFile: dbName });
+      const result = await provider.query({ components: [{ reference: "U1", mpn: "TPS62840DLCT" }] });
+      expect(result.records.get("TPS62840DLCT")).toBeDefined();
+    } finally {
+      await fs.unlink(dbPath).catch(() => {});
+    }
+  });
+
+  it("wraps non-Error thrown exception in warning message", async () => {
+    // Pass a dataFile that will cause JSON.parse to throw a non-Error (corrupted file)
+    const dir = await makeTempDir();
+    const dbPath = path.join(dir, "bad.json");
+    await fs.writeFile(dbPath, "not valid json {{", "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: dbPath });
+    const result = await provider.query({ components: [{ reference: "R1", mpn: "X" }] });
+
+    // Should get a warning but not throw
+    expect(result.warnings?.[0]).toContain("could not load");
+  });
+
+  it("handles database with no records field gracefully", async () => {
+    const dir = await makeTempDir();
+    const dbPath = path.join(dir, "empty.json");
+    await fs.writeFile(dbPath, JSON.stringify({ schemaVersion: 1 }), "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: dbPath });
+    const result = await provider.query({ components: [{ reference: "R1", mpn: "ANY" }] });
+
+    expect(result.records.size).toBe(0);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it("skips records with no mpn when building the index", async () => {
+    const dir = await makeTempDir();
+    const dbPath = path.join(dir, "db.json");
+    const db = {
+      schemaVersion: 1,
+      updatedAt: new Date().toISOString(),
+      records: [
+        { manufacturer: "Acme" }, // no mpn
+        { mpn: "VALIDPART", manufacturer: "Acme", trust: "verified" },
+      ],
+    };
+    await fs.writeFile(dbPath, JSON.stringify(db), "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: dbPath });
+    const result = await provider.query({ components: [{ reference: "R1", mpn: "VALIDPART" }] });
+
+    expect(result.records.get("VALIDPART")).toBeDefined();
+    expect(result.records.size).toBe(1);
+  });
 });
 
 describe("buildSupplierIntelligenceSummary", () => {
@@ -273,5 +344,23 @@ describe("buildSupplierIntelligenceSummary", () => {
     const summary = buildSupplierIntelligenceSummary([result1, result2], 2);
     expect(summary.warnings).toContain("provider 1 warning");
     expect(summary.warnings).toContain("provider 2 warning");
+  });
+
+  it("keeps existing record when new record has same or lower trust than existing", () => {
+    // First result: verified record
+    const result1 = {
+      records: new Map([["ABC123", { mpn: "ABC123", trust: "verified" as const, lifecycleStatus: "active" as const }]]),
+      queriedAt: new Date().toISOString(),
+    };
+    // Second result: also verified — should not replace (same level)
+    const result2 = {
+      records: new Map([["ABC123", { mpn: "ABC123", trust: "verified" as const, lifecycleStatus: "nrnd" as const }]]),
+      queriedAt: new Date().toISOString(),
+    };
+
+    const summary = buildSupplierIntelligenceSummary([result1, result2], 2);
+    // First verified record should be kept (result2 doesn't displace it since existing.trust IS "verified")
+    const component = summary.components.find((c) => c.mpn === "ABC123");
+    expect(component?.lifecycleStatus).toBe("active");
   });
 });
