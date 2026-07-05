@@ -102605,6 +102605,7 @@ function formatSarif(result) {
       rules.set(finding2.ruleId, finding2);
     }
   }
+  const ruleTagsByRuleId = buildRuleTagsIndex();
   const sarif = {
     version: "2.1.0",
     $schema: "https://json.schemastore.org/sarif-2.1.0.json",
@@ -102624,7 +102625,8 @@ function formatSarif(result) {
               helpUri: finding2.references?.[0] ?? "https://github.com/oaslananka/boardreadyops/tree/main/docs/rules",
               defaultConfiguration: {
                 level: sarifLevel(finding2.severity)
-              }
+              },
+              ...ruleTagsByRuleId.has(finding2.ruleId) ? { properties: { tags: ruleTagsByRuleId.get(finding2.ruleId) } } : {}
             }))
           }
         },
@@ -102684,6 +102686,15 @@ function sarifLocation(finding2) {
     },
     ...logicalLocation
   };
+}
+function buildRuleTagsIndex() {
+  const index = /* @__PURE__ */ new Map();
+  for (const rule2 of listRules()) {
+    if (rule2.meta.tags.length > 0) {
+      index.set(rule2.meta.id, rule2.meta.tags);
+    }
+  }
+  return index;
 }
 function sarifLevel(severity) {
   if (severity === "critical" || severity === "high") {

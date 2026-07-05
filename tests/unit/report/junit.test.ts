@@ -14,7 +14,9 @@ describe("configured JUnit reports", () => {
     const written = await writeReports(sampleResult(), root, {}, loadedConfig("reports/junit.xml"), nullStream());
 
     expect(written).toMatchObject({ junit: path.join(root, "reports/junit.xml") });
-    expect(isJUnitTestsuiteXml(await fs.readFile(path.join(root, "reports/junit.xml"), "utf8"))).toBe(true);
+    const xml = await fs.readFile(path.join(root, "reports/junit.xml"), "utf8");
+    expect(isJUnitTestsuiteXml(xml)).toBe(true);
+    expect(hasTimestamp(xml)).toBe(true);
   });
 
   it("counts only non-info findings as JUnit failures", async () => {
@@ -84,4 +86,8 @@ function isJUnitTestsuiteXml(xml: string): boolean {
     /<testsuite [^>]*tests="\d+"[^>]*failures="\d+"[^>]*>/.test(xml) &&
     xml.endsWith("</testsuite>\n")
   );
+}
+
+function hasTimestamp(xml: string): boolean {
+  return /timestamp="[^"]+"/.test(xml);
 }

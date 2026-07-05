@@ -15,7 +15,8 @@ export function formatJunit(result: RunResult): string {
       )}" id="${xml(context.stableId)}">${failure}</testcase>`;
     })
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8"?><testsuite name="boardreadyops" tests="${result.findings.length}" failures="${result.summary.total - result.summary.info}">${cases}</testsuite>\n`;
+  const timestamp = result.generatedAt ? ` timestamp="${xml(result.generatedAt)}"` : "";
+  return `<?xml version="1.0" encoding="UTF-8"?><testsuite name="boardreadyops" tests="${result.findings.length}" failures="${result.summary.total - result.summary.info}"${timestamp}>${cases}</testsuite>\n`;
 }
 
 function xml(value: string): string {
