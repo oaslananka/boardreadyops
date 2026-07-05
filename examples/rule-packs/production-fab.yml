@@ -1,0 +1,61 @@
+# Production Fabrication Rule Pack
+#
+# A strict preset for production-ready hardware.
+# Requires all fabrication outputs, full supply-chain sign-off,
+# and a signed-off changelog and version tag.
+
+id: com.boardreadyops.builtin.production-fab
+name: "Production Fabrication"
+version: "1.0.0"
+description: >
+  Enables all built-in checks required before committing a design to
+  production fabrication. Enforces full evidence package, supply-chain
+  visibility, manufacturing completeness, and a tagged release.
+tags:
+  - production
+  - fabrication
+  - supply-chain
+  - release
+compatibility:
+  boardreadyopsMin: "1.8.0"
+  kicadVersions:
+    - "9"
+    - "10"
+    - "future"
+releaseMode: production
+rules:
+  # Supply-chain (all required)
+  bom.missing-mpn: true
+  bom.compliance: true
+  bom.lifecycle: true
+  bom.risk-score: true
+  bom.eol-detection: true
+  bom.unknown-lifecycle: true
+  bom.single-source: true
+  bom.identity-conflicts: true
+
+  # Design correctness
+  design.board-outline: true
+  design.unique-references: true
+  drc.kicad: true
+  erc.kicad: true
+
+  # Manufacturing completeness (all required)
+  manufacturing.package-completeness: true
+  manufacturing.fab-notes: true
+  manufacturing.position-coverage: true
+  manufacturing.drill-coverage: true
+  manufacturing.tooling-holes: true
+  manufacturing.test-points: true
+  manufacturing.fiducials: true
+  manufacturing.assembly-sides: true
+  manufacturing.layer-stackup: true
+  manufacturing.pin1-markers: true
+  manufacturing.polarity-markers: true
+  manufacturing.silkscreen-over-pad: true
+
+  # Release (all required)
+  release.revision-set: true
+  release.changelog-present: true
+  release.tag-matches-revision: true
+  release.version-format: true

@@ -1,0 +1,51 @@
+# Prototype Fabrication Rule Pack
+#
+# A lightweight preset for first-build prototypes.
+# Focus: catch critical supply-chain gaps and basic design errors.
+# Does not require full fabrication outputs or evidence bundles.
+
+id: com.boardreadyops.builtin.prototype-fab
+name: "Prototype Fabrication"
+version: "1.0.0"
+description: >
+  Enables the supply-chain and basic design rules required for a first-build
+  prototype. Relaxes or disables manufacturing completeness checks that are
+  not relevant until pilot or production.
+tags:
+  - prototype
+  - fabrication
+  - supply-chain
+compatibility:
+  boardreadyopsMin: "1.8.0"
+  kicadVersions:
+    - "9"
+    - "10"
+    - "future"
+releaseMode: prototype
+rules:
+  # Supply-chain (always required)
+  bom.missing-mpn: true
+  bom.compliance: true
+  bom.lifecycle: true
+  bom.risk-score: true
+  bom.eol-detection: true
+  bom.unknown-lifecycle: true
+  bom.single-source: false         # not required at prototype stage
+
+  # Design correctness (required)
+  design.board-outline: true
+  design.unique-references: true
+  drc.kicad: true
+
+  # Manufacturing (relaxed for prototype)
+  manufacturing.package-completeness: false   # not yet building fab package
+  manufacturing.fab-notes: false
+  manufacturing.position-coverage: false
+  manufacturing.drill-coverage: false
+  manufacturing.tooling-holes: false
+  manufacturing.test-points: false
+
+  # Release
+  release.revision-set: true
+  release.changelog-present: false     # optional at prototype
+  release.tag-matches-revision: false  # no tags required at prototype

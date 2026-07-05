@@ -1,0 +1,51 @@
+# Assembly Readiness Rule Pack
+#
+# A preset for designs being handed off to a contract manufacturer for assembly.
+# Focus: component placement, pick-and-place file presence, silkscreen quality,
+# and complete BOM with approved supplier information.
+
+id: com.boardreadyops.builtin.assembly-ready
+name: "Assembly Ready"
+version: "1.0.0"
+description: >
+  Enables checks that a contract manufacturer needs before accepting an assembly
+  order: CPL/position file, BOM completeness, silkscreen quality, placement
+  markers, and polarity indicators.
+tags:
+  - assembly
+  - manufacturing
+  - cpl
+  - contract-manufacturer
+compatibility:
+  boardreadyopsMin: "1.8.0"
+  kicadVersions:
+    - "9"
+    - "10"
+    - "future"
+rules:
+  # BOM completeness required for assembly
+  bom.missing-mpn: true
+  bom.compliance: true
+  bom.lifecycle: true
+  bom.risk-score: true
+  bom.eol-detection: true
+  bom.single-source: true
+  bom.identity-conflicts: true
+
+  # Assembly-specific manufacturing
+  manufacturing.package-completeness: true
+  manufacturing.position-coverage: true
+  manufacturing.assembly-sides: true
+  manufacturing.pin1-markers: true
+  manufacturing.polarity-markers: true
+  manufacturing.silkscreen-over-pad: true
+  manufacturing.fiducials: true
+
+  # Basic design correctness
+  design.board-outline: true
+  design.unique-references: true
+
+  # Not required at assembly handoff
+  manufacturing.tooling-holes: false  # tooling is CM responsibility
+  release.changelog-present: false
+  release.tag-matches-revision: false

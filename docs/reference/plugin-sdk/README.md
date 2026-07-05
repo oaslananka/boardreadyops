@@ -7,6 +7,7 @@
 ## Interfaces
 
 - [BoardReadyOpsPlugin](interfaces/BoardReadyOpsPlugin.md)
+- [CompatibilityConstraints](interfaces/CompatibilityConstraints.md)
 - [ComponentAdapter](interfaces/ComponentAdapter.md)
 - [Notifier](interfaces/Notifier.md)
 - [PluginFinding](interfaces/PluginFinding.md)
@@ -17,6 +18,8 @@
 - [PluginRuleMetadata](interfaces/PluginRuleMetadata.md)
 - [ReportEmitter](interfaces/ReportEmitter.md)
 - [Rule](interfaces/Rule.md)
+- [RulePackManifest](interfaces/RulePackManifest.md)
+- [RulePackRuleOverride](interfaces/RulePackRuleOverride.md)
 - [SupplierIntelligenceProvider](interfaces/SupplierIntelligenceProvider.md)
 - [SupplierIntelligenceQuery](interfaces/SupplierIntelligenceQuery.md)
 - [SupplierIntelligenceRecord](interfaces/SupplierIntelligenceRecord.md)
@@ -34,3 +37,4 @@
 ## Functions
 
 - [definePlugin](functions/definePlugin.md)
+- [defineRulePack](functions/defineRulePack.md)

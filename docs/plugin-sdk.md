@@ -204,3 +204,104 @@ The provider warns when the database is older than 90 days.
 
 Providers include `trust` and `fetchedAt` on each record. The `buildSupplierIntelligenceSummary` helper aggregates results across providers and produces per-component lifecycle warnings and a `freshness` status (`fresh`, `stale`, `unknown`). These are surfaced in the BOM risk report section for PR comments and the dashboard.
 
+
+`rules` are active today and are registered into the BoardReadyOps rule registry. The SDK also reserves shapes for `adapters`, `reportFormats`, `vendorProfiles`, and `notifiers` so plugin packages can expose those objects as the runtime integration points mature.
+
+## Rule Packs
+
+Rule packs are lightweight, versioned configuration bundles that enable/disable rules and set defaults for a specific release context. Unlike full plugins, rule packs **do not ship rule implementations** — they layer on top of the existing built-in rule set.
+
+### What a rule pack can do
+
+- Enable or disable any built-in rule.
+- Override the default severity of any rule.
+- Set configuration defaults for rule-specific options.
+- Declare a `vendorProfile` to activate when the pack is applied.
+- Declare a `releaseMode` (`prototype`, `pilot`, `production`).
+- Carry compatibility metadata to ensure the pack is only loaded by compatible BoardReadyOps versions.
+
+### YAML rule pack format
+
+Rule packs can be written as standalone YAML files and referenced from `boardreadyops.yml`. The full schema is in `schemas/rule-pack.schema.json` at the repository root.
+
+```yaml
+id: com.example.prototype-ready
+name: "Prototype Ready"
+version: "1.0.0"
+description: >
+  Enables the most important checks for a first-build prototype while silencing
+  rules that are only relevant to production manufacturing.
+tags:
+  - prototype
+compatibility:
+  boardreadyopsMin: "1.8.0"
+  kicadVersions:
+    - "9"
+    - "10"
+    - "future"
+rules:
+  bom.missing-mpn: true
+  bom.lifecycle: true
+  bom.compliance:
+    enabled: true
+    severity: low
+  manufacturing.tooling-holes: false
+  manufacturing.test-points: false
+```
+
+### TypeScript `defineRulePack()` helper
+
+Rule packs can also be expressed in TypeScript when bundled inside a plugin package, giving you full type-checking via the SDK:
+
+```ts
+import { defineRulePack } from "@boardreadyops/plugin-sdk";
+
+export const prototypeReadyPack = defineRulePack({
+  id: "com.example.prototype-ready",
+  name: "Prototype Ready",
+  version: "1.0.0",
+  description: "First-build prototype preset.",
+  rules: {
+    "bom.missing-mpn": true,
+    "bom.lifecycle": { enabled: true, severity: "low" },
+    "manufacturing.tooling-holes": false,
+  },
+});
+```
+
+Expose the pack from your plugin's `rulePacks` array:
+
+```ts
+import { definePlugin } from "@boardreadyops/plugin-sdk";
+import { prototypeReadyPack } from "./packs/prototype-ready.js";
+
+export default definePlugin({
+  name: "boardreadyops-plugin-example",
+  version: "1.0.0",
+  rulePacks: [prototypeReadyPack],
+});
+```
+
+### Built-in example rule packs
+
+The `examples/rule-packs/` directory contains ready-to-copy YAML rule pack presets:
+
+| File | Purpose |
+|---|---|
+| `prototype-fab.yml` | First-build prototype with low friction |
+| `production-fab.yml` | Full production-mode checks |
+| `assembly-ready.yml` | Contract manufacturer assembly handoff |
+| `open-hardware.yml` | Open hardware community release |
+| `contract-handoff.yml` | Design-house-to-client delivery evidence bundle |
+
+### Merge order and precedence
+
+When multiple rule packs are active (e.g., from multiple plugins), BoardReadyOps merges their `rules` maps in pack registration order. Later entries win. Project-level `boardreadyops.yml` rule overrides always take precedence over any rule pack setting.
+
+### Versioning and deprecation
+
+Pack authors should follow semver. A new major version signals breaking changes such as a renamed rule ID or a removed rule. When a rule ID is renamed, keep the old ID in the pack as `false` and the new ID as `true` so consumers upgrading do not silently lose coverage.
+
+### Security boundary
+
+Rule packs are configuration only. They cannot execute arbitrary code, access the file system, or affect plugin loading. A YAML rule pack loaded from disk is parsed and validated against the JSON schema before any rules are applied. A TypeScript rule pack bundled inside a plugin inherits that plugin's trust boundary — see [Plugin trust model](#plugin-trust-model) above.

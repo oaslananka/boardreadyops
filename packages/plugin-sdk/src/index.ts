@@ -192,11 +192,91 @@ export interface SupplierIntelligenceProvider {
 /** Runtime capabilities a plugin asks the host to approve before loading. */
 export type PluginPermission = "fs:read" | "fs:write" | "network" | "process" | "kicad-cli";
 
+/**
+ * Compatibility constraint declared by a plugin or rule pack.
+ *
+ * Used to ensure that packs are only loaded by compatible BoardReadyOps host
+ * versions and against compatible KiCad projects.
+ */
+export interface CompatibilityConstraints {
+  /** Minimum BoardReadyOps semver (inclusive), e.g. "1.8.0". */
+  boardreadyopsMin?: string | undefined;
+  /** Maximum BoardReadyOps semver (exclusive), e.g. "3.0.0". */
+  boardreadyopsMax?: string | undefined;
+  /** KiCad major versions that this pack supports. */
+  kicadVersions?: ("9" | "10" | "future")[] | undefined;
+}
+
+/**
+ * Per-rule configuration override declared inside a rule pack.
+ *
+ * Consumers can enable/disable rules, override severity, and set config keys
+ * without writing their own boardreadyops.yml rule overrides.
+ */
+export interface RulePackRuleOverride {
+  enabled?: boolean | undefined;
+  severity?: "critical" | "high" | "medium" | "low" | "info" | undefined;
+  [configKey: string]: unknown;
+}
+
+/**
+ * A rule pack: a named, versioned bundle of rule configuration presets.
+ *
+ * Rule packs are not full plugins — they do not ship rule implementations.
+ * Instead they layer on top of the built-in or plugin-contributed rule set
+ * by enabling/disabling rules and setting configuration defaults suited to
+ * a specific release context (prototype, production, open-hardware, etc.).
+ *
+ * Rule packs can be distributed as npm packages or as local YAML files.
+ * The host merges rule overrides in pack order (later entries win).
+ */
+export interface RulePackManifest {
+  /** Unique reverse-DNS-style pack identifier. */
+  id: string;
+  /** Human-readable display name. */
+  name: string;
+  /** Semver version string. */
+  version: string;
+  /** One-line description shown in `boardreadyops doctor` output. */
+  description: string;
+  /** Who authored or maintains this pack. */
+  author?: string | undefined;
+  /** SPDX license expression. */
+  license?: string | undefined;
+  /** URL to the pack homepage, repository, or registry entry. */
+  homepage?: string | undefined;
+  /**
+   * Category tags used for discovery in the marketplace or CLI.
+   * Examples: "prototype", "production", "open-hardware", "automotive", "iec-62443"
+   */
+  tags?: string[] | undefined;
+  /** Compatibility constraints the host must check before loading. */
+  compatibility?: CompatibilityConstraints | undefined;
+  /**
+   * Rule configuration overrides applied when the pack is active.
+   *
+   * Keys are rule IDs (e.g. "bom.missing-mpn"). The value is a boolean
+   * (true = enable, false = disable) or a RulePackRuleOverride object.
+   */
+  rules?: Record<string, boolean | RulePackRuleOverride> | undefined;
+  /**
+   * Vendor profile ID to activate when this pack is used.
+   * Must match a built-in or plugin-contributed vendor profile ID.
+   */
+  vendorProfile?: string | undefined;
+  /**
+   * Release mode to enforce when this pack is active.
+   * Overrides the project-level releaseMode.
+   */
+  releaseMode?: "prototype" | "pilot" | "production" | undefined;
+}
+
 /** Top-level plugin export consumed by BoardReadyOps plugin loading. */
 export interface BoardReadyOpsPlugin {
   name: string;
   version: string;
   permissions?: PluginPermission[] | undefined;
+  compatibility?: CompatibilityConstraints | undefined;
   rules?: Rule[] | undefined;
   adapters?: ComponentAdapter[] | undefined;
   reportFormats?: ReportEmitter[] | undefined;
@@ -204,6 +284,8 @@ export interface BoardReadyOpsPlugin {
   notifiers?: Notifier[] | undefined;
   /** Supplier intelligence providers contributed by this plugin. */
   supplierProviders?: SupplierIntelligenceProvider[] | undefined;
+  /** Rule packs contributed by this plugin. */
+  rulePacks?: RulePackManifest[] | undefined;
 }
 
 /**
@@ -222,4 +304,29 @@ export interface BoardReadyOpsPlugin {
  */
 export function definePlugin(plugin: BoardReadyOpsPlugin): BoardReadyOpsPlugin {
   return plugin;
+}
+
+/**
+ * Returns a rule pack manifest with its public type checked at authoring time.
+ *
+ * @example
+ * ```ts
+ * import { defineRulePack } from "@boardreadyops/plugin-sdk";
+ *
+ * export const prototypeReadyPack = defineRulePack({
+ *   id: "com.example.prototype-ready",
+ *   name: "Prototype Ready",
+ *   version: "1.0.0",
+ *   description: "Enables all checks required for a first-build prototype.",
+ *   tags: ["prototype"],
+ *   rules: {
+ *     "bom.missing-mpn": true,
+ *     "bom.lifecycle": { enabled: true, severity: "medium" },
+ *     "manufacturing.package-completeness": false,
+ *   },
+ * });
+ * ```
+ */
+export function defineRulePack(pack: RulePackManifest): RulePackManifest {
+  return pack;
 }
