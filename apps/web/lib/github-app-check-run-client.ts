@@ -1,5 +1,5 @@
-import { createAppAuth } from "@octokit/auth-app";
 import type { GitHubAppCheckRunClient } from "@boardreadyops/cloud-core/lifecycle-executor";
+import { createAppAuth } from "@octokit/auth-app";
 
 type GitHubTokenAuth = {
   token: string;
