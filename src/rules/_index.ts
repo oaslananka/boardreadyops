@@ -8,6 +8,7 @@ import { lifecycleRule } from "./bom/lifecycle.js";
 import { missingMpnRule } from "./bom/missing-mpn.js";
 import { bomRiskScoreRule } from "./bom/risk-score.js";
 import { singleSourceRule } from "./bom/single-source.js";
+import { unknownLifecycleRule } from "./bom/unknown-lifecycle.js";
 import { variantConsistencyRule } from "./bom/variant-consistency.js";
 import { boardOutlineRule } from "./design/board-outline.js";
 import { copperBalanceRule } from "./design/copper-balance.js";
@@ -56,6 +57,7 @@ export function registerBuiltInRules(): void {
     bomRiskScoreRule,
     eolDetectionRule,
     lifecycleRule,
+    unknownLifecycleRule,
     footprintMismatchRule,
     dnpConsistencyRule,
     variantConsistencyRule,
