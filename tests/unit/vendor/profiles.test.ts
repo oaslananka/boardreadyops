@@ -11,6 +11,9 @@ describe("vendor profiles", () => {
       "aisler",
       "seeed-fusion",
       "eurocircuits",
+      "generic-prototype",
+      "generic-assembly-ready",
+      "generic-production",
     ]);
     expect(findVendorProfile("JLCPCB")?.id).toBe("jlcpcb");
   });
@@ -51,5 +54,28 @@ describe("vendor profiles", () => {
     expect(validateConfig({ version: 1, vendor: { profile: "jlcpcb", service: "invalid" } }).join("\n")).toContain(
       "must be equal to one of the allowed values",
     );
+  });
+
+  it("generic preset profiles have correct required evidence", () => {
+    const prototype = resolveVendorProfile({ profile: "generic-prototype" });
+    expect(prototype?.requiredOutputs).toEqual(["drill", "gerber"]);
+    expect(prototype?.recommendedOutputs).toContain("bom");
+    expect(prototype?.recommendedOutputs).toContain("pdf");
+
+    const assemblyReady = resolveVendorProfile({ profile: "generic-assembly-ready" });
+    expect(assemblyReady?.requiredOutputs).toEqual(["bom", "drill", "gerber", "position"]);
+    expect(assemblyReady?.recommendedOutputs).toContain("step");
+    expect(assemblyReady?.recommendedOutputs).toContain("pdf");
+
+    const production = resolveVendorProfile({ profile: "generic-production" });
+    expect(production?.requiredOutputs).toEqual(["bom", "drill", "gerber", "pdf", "position", "step"]);
+    expect(production?.recommendedOutputs).toHaveLength(0);
+  });
+
+  it("generic presets support service narrowing", () => {
+    const fabOnly = resolveVendorProfile({ profile: "generic-assembly-ready", service: "fabrication" });
+    expect(fabOnly?.requiredOutputs).toEqual(["drill", "gerber"]);
+    expect(fabOnly?.requiredOutputs).not.toContain("bom");
+    expect(fabOnly?.requiredOutputs).not.toContain("position");
   });
 });

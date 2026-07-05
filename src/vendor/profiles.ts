@@ -246,6 +246,137 @@ const profiles: VendorProfile[] = [
     },
     caveats: ["Treat as fabrication-only unless a separate assembly profile is selected."],
   },
+  {
+    id: "generic-prototype",
+    name: "Generic Prototype Fab",
+    service: "fabrication",
+    summary:
+      "Minimal evidence preset for fast prototype fabrication. Requires only Gerbers and drill files; BOM and documentation are recommended but not required.",
+    evidence: [
+      {
+        output: "gerber",
+        requiredFor: "fabrication",
+        rationale: "Fabrication requires Gerber layer artwork to produce PCB copper layers.",
+      },
+      {
+        output: "drill",
+        requiredFor: "fabrication",
+        rationale: "Drill files define hole sizes and locations for all plated and non-plated holes.",
+      },
+      {
+        output: "bom",
+        requiredFor: "documentation",
+        importance: "recommended",
+        rationale: "A BOM is recommended even for prototypes to facilitate sourcing review.",
+      },
+      {
+        output: "pdf",
+        requiredFor: "documentation",
+        importance: "recommended",
+        rationale: "Assembly or fabrication drawings help catch stackup and finish issues early.",
+      },
+    ],
+    caveats: [
+      "Generic preset — not tuned to a specific vendor. Select a named vendor profile for production.",
+      "Recommended outputs (BOM, PDF) are surfaced as warnings only.",
+    ],
+  },
+  {
+    id: "generic-assembly-ready",
+    name: "Generic Assembly-Ready Package",
+    service: "fabrication+assembly",
+    summary:
+      "Evidence preset for a complete fabrication and assembly handoff. Requires Gerbers, drill, BOM, and CPL/position; STEP and documentation are recommended.",
+    evidence: [
+      {
+        output: "gerber",
+        requiredFor: "fabrication",
+        rationale: "Assembly-ready packages require complete Gerber layer artwork for board fabrication.",
+      },
+      {
+        output: "drill",
+        requiredFor: "fabrication",
+        rationale: "Assembly-ready packages require drill files covering all plated and non-plated holes.",
+      },
+      {
+        output: "bom",
+        requiredFor: "assembly",
+        rationale: "Assembly review requires a BOM with manufacturer part data for component sourcing.",
+      },
+      {
+        output: "position",
+        requiredFor: "assembly",
+        rationale: "SMT assembly requires a CPL/position file mapping designators to placement coordinates.",
+      },
+      {
+        output: "step",
+        requiredFor: "documentation",
+        importance: "recommended",
+        rationale: "A STEP model enables mechanical interference and fit checks.",
+      },
+      {
+        output: "pdf",
+        requiredFor: "documentation",
+        importance: "recommended",
+        rationale: "Fabrication and assembly drawings document stackup, finish, and controlled assumptions.",
+      },
+    ],
+    caveats: [
+      "Generic preset — not tuned to a specific vendor. Select a named vendor profile for production.",
+      "STEP and PDF are recommended; their absence lowers the readiness score but does not block.",
+    ],
+  },
+  {
+    id: "generic-production",
+    name: "Generic Production Fab",
+    service: "fabrication+assembly",
+    summary:
+      "Comprehensive evidence preset for production releases. Requires Gerbers, drill, BOM, CPL/position, STEP, and documentation PDF.",
+    evidence: [
+      {
+        output: "gerber",
+        requiredFor: "fabrication",
+        rationale: "Production fabrication requires complete, reviewed Gerber outputs.",
+      },
+      {
+        output: "drill",
+        requiredFor: "fabrication",
+        rationale: "Production drill files must cover all plated and non-plated holes.",
+      },
+      {
+        output: "bom",
+        requiredFor: "assembly",
+        rationale: "Production assembly requires a fully reviewed BOM with approved part numbers.",
+      },
+      {
+        output: "position",
+        requiredFor: "assembly",
+        rationale: "Production SMT assembly requires a validated CPL/position file.",
+      },
+      {
+        output: "step",
+        requiredFor: "documentation",
+        rationale: "A STEP model is required for production mechanical integration and DFM review.",
+      },
+      {
+        output: "pdf",
+        requiredFor: "documentation",
+        rationale:
+          "Production fabrication and assembly drawings are required to document controlled assumptions and sign-off.",
+      },
+    ],
+    fabrication: {
+      minTrackMm: 0.1,
+      minSpaceMm: 0.1,
+      minDrillMm: 0.2,
+      minAnnularRingMm: 0.1,
+      minBoardEdgeClearanceMm: 0.2,
+    },
+    caveats: [
+      "Generic preset — not tuned to a specific vendor. Select a named vendor profile for your manufacturer.",
+      "All evidence kinds are required; missing any item blocks the release readiness score.",
+    ],
+  },
 ];
 
 export function listVendorProfiles(): VendorProfile[] {
