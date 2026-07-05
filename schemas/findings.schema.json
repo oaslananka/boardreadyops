@@ -580,6 +580,7 @@
             "pinmap.collision",
             "pinmap.net-label",
             "manufacturing.outputs-present",
+            "manufacturing.package-completeness",
             "manufacturing.jobset-outputs",
             "manufacturing.panel-sanity",
             "manufacturing.fab-notes",

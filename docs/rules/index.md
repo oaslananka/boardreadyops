@@ -26,6 +26,7 @@ BoardReadyOps rules use stable `group.rule` identifiers. Each rule page records 
 - [firmware.zephyr-pin-contract](firmware.zephyr-pin-contract.md)
 - [firmware.esp-idf-pin-contract](firmware.esp-idf-pin-contract.md)
 - [firmware.stm32cubemx-pin-contract](firmware.stm32cubemx-pin-contract.md)
+- [manufacturing.package-completeness](manufacturing.package-completeness.md)
 - [manufacturing.outputs-present](manufacturing.outputs-present.md)
 - [manufacturing.jobset-outputs](manufacturing.jobset-outputs.md)
 - [manufacturing.panel-sanity](manufacturing.panel-sanity.md)

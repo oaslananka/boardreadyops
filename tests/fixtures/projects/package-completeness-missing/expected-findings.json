@@ -1,0 +1,13 @@
+{
+  "fixture": "package-completeness-missing",
+  "expectedRules": [
+    "manufacturing.package-completeness",
+    "manufacturing.package-completeness",
+    "manufacturing.package-completeness",
+    "manufacturing.package-completeness"
+  ],
+  "expectedSeverities": ["high", "high", "high", "high"],
+  "expectPass": false,
+  "performanceBaselineMs": 200,
+  "runRules": ["manufacturing.package-completeness"]
+}

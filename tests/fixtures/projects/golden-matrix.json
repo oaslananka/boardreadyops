@@ -89,6 +89,13 @@
       "risk": "multi-rule failure aggregation drift",
       "fixtures": ["all-violations"],
       "requiredRules": ["design.board-outline", "manufacturing.outputs-present", "manufacturing.panel-sanity"]
+    },
+    {
+      "id": "package-completeness-checks",
+      "title": "release package completeness validation",
+      "risk": "missing manufacturing output category detection drift",
+      "fixtures": ["package-completeness-missing", "package-completeness-pass"],
+      "requiredRules": ["manufacturing.package-completeness"]
     }
   ]
 }

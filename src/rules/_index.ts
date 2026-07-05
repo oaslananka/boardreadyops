@@ -26,6 +26,7 @@ import { fiducialsRule } from "./manufacturing/fiducials.js";
 import { jobsetOutputsRule } from "./manufacturing/jobset-outputs.js";
 import { layerStackupRule } from "./manufacturing/layer-stackup.js";
 import { outputsPresentRule } from "./manufacturing/outputs-present.js";
+import { packageCompletenessRule } from "./manufacturing/package-completeness.js";
 import { panelSanityRule } from "./manufacturing/panel-sanity.js";
 import { pin1MarkersRule } from "./manufacturing/pin1-markers.js";
 import { polarityMarkersRule } from "./manufacturing/polarity-markers.js";
@@ -72,6 +73,7 @@ export function registerBuiltInRules(): void {
     espIdfPinContractRule,
     stm32CubeMxPinContractRule,
     outputsPresentRule,
+    packageCompletenessRule,
     jobsetOutputsRule,
     panelSanityRule,
     fabNotesRule,

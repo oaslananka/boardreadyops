@@ -1,0 +1,8 @@
+{
+  "fixture": "package-completeness-pass",
+  "expectedRules": [],
+  "expectedSeverities": [],
+  "expectPass": true,
+  "performanceBaselineMs": 200,
+  "runRules": ["manufacturing.package-completeness"]
+}
