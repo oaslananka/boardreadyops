@@ -67,4 +67,17 @@ describe("release.version-format", () => {
       }),
     ]);
   });
+
+  it("does not flag PCB or schematic files with no revision set", async () => {
+    const root = await writeFixture({
+      "version.kicad_pro": "{}",
+      "version.kicad_sch": "(kicad_sch)",
+      "version.kicad_pcb": "(kicad_pcb)",
+      "boardreadyops.yml": "version: 1\nfail-on: never\n",
+    });
+
+    const result = await runPipeline({ path: root, rules: ["release.version-format"], failOn: "never" });
+
+    expect(result.findings).toEqual([]);
+  });
 });
