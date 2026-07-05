@@ -16,7 +16,7 @@
 import type { RunResult } from "./result.js";
 
 /** Readiness score snapshot for a single run. */
-export interface ReadinessDataPoint {
+interface ReadinessDataPoint {
   /** ISO-8601 timestamp of the run. */
   generatedAt: string;
   /** Readiness score 0–100, or null if the run produced no readiness data. */
@@ -28,7 +28,7 @@ export interface ReadinessDataPoint {
 }
 
 /** A finding rule that appeared in multiple runs. */
-export interface RecurringFinding {
+interface RecurringFinding {
   ruleId: string;
   /** Number of runs in which this rule fired at least once. */
   runCount: number;
@@ -39,14 +39,14 @@ export interface RecurringFinding {
 }
 
 /** Waiver usage statistics for a single run. */
-export interface WaiverDataPoint {
+interface WaiverDataPoint {
   generatedAt: string;
   activeCount: number;
   expiredCount: number;
 }
 
 /** Artifact (evidence kind) presence across runs. */
-export interface ArtifactHealthDataPoint {
+interface ArtifactHealthDataPoint {
   generatedAt: string;
   /** Set of output kinds detected in this run's fabrication snapshot. */
   presentKinds: string[];

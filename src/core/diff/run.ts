@@ -17,7 +17,7 @@ import type { RunResult } from "../result.js";
 import { diffFabrication, type FabricationDiff, type FabricationDiffOptions } from "./fabrication.js";
 
 /** Delta in readiness score and status between two runs. */
-export interface ReadinessDelta {
+interface ReadinessDelta {
   /** Previous readiness score (0–100), or null if absent. */
   previousScore: number | null;
   /** Current readiness score (0–100), or null if absent. */
@@ -35,7 +35,7 @@ export interface ReadinessDelta {
 }
 
 /** Lightweight finding representation used in diff output. */
-export interface FindingRef {
+interface FindingRef {
   fingerprint: string;
   ruleId: string;
   severity: string;
@@ -44,7 +44,7 @@ export interface FindingRef {
 }
 
 /** New, resolved, and unchanged finding sets. */
-export interface FindingsDelta {
+interface FindingsDelta {
   /** Findings present in current but absent in previous (new risk introduced). */
   added: FindingRef[];
   /** Findings present in previous but absent in current (risk resolved). */
