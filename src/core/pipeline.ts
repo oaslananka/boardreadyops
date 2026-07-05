@@ -458,6 +458,22 @@ function configForProject(root: string, config: BoardReadyOpsConfig, project: Pr
         ...(config.firmware?.platformio ?? {}),
         ...(override.firmware.platformio ?? {}),
       },
+      arduino: {
+        ...(config.firmware?.arduino ?? {}),
+        ...(override.firmware.arduino ?? {}),
+      },
+      zephyr: {
+        ...(config.firmware?.zephyr ?? {}),
+        ...(override.firmware.zephyr ?? {}),
+      },
+      "esp-idf": {
+        ...(config.firmware?.["esp-idf"] ?? {}),
+        ...(override.firmware["esp-idf"] ?? {}),
+      },
+      stm32cubemx: {
+        ...(config.firmware?.stm32cubemx ?? {}),
+        ...(override.firmware.stm32cubemx ?? {}),
+      },
     };
   }
   if (override.vendor) {

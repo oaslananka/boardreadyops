@@ -1,0 +1,14 @@
+version: 1
+pins:
+  LED_STATUS:
+    hardware: U1.PA1
+    net: LED_STATUS
+    pin: GPIO2
+  I2C_SDA:
+    hardware: U1.PA2
+    net: I2C_SDA
+    pin: GPIO21
+  UART_TX:
+    hardware: U1.PA3
+    net: UART_TX
+    pin: GPIO17

@@ -27,7 +27,7 @@ export interface FirmwareContractAdapter {
   /** Human-facing label used in rule messages, e.g. `PlatformIO`. */
   label: string;
   /** Key under `firmware:` in `boardreadyops.yml` that points at this adapter's contract file. */
-  configKey: "platformio" | "arduino";
+  configKey: "platformio" | "arduino" | "zephyr" | "esp-idf" | "stm32cubemx";
   load(file: string): Promise<LoadedFirmwareContract>;
 }
 

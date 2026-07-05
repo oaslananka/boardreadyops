@@ -32,6 +32,22 @@ interface FirmwareConfig {
         pinAssignments?: string | undefined;
       }
     | undefined;
+  zephyr?:
+    | {
+        pinAssignments?: string | undefined;
+      }
+    | undefined;
+  "esp-idf"?:
+    | {
+        pinAssignments?: string | undefined;
+      }
+    | undefined;
+  stm32cubemx?:
+    | {
+        project?: string | undefined;
+        mcuDesignator?: string | undefined;
+      }
+    | undefined;
 }
 
 interface ProjectConfig {

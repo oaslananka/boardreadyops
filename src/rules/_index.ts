@@ -13,7 +13,10 @@ import { uniqueReferencesRule } from "./design/unique-references.js";
 import { runDrcRule } from "./drc/run-drc.js";
 import { runErcRule } from "./erc/run-erc.js";
 import { arduinoPinContractRule } from "./firmware/arduino-pin-contract.js";
+import { espIdfPinContractRule } from "./firmware/esp-idf-pin-contract.js";
 import { platformioPinContractRule } from "./firmware/platformio-pin-contract.js";
+import { stm32CubeMxPinContractRule } from "./firmware/stm32cubemx-pin-contract.js";
+import { zephyrPinContractRule } from "./firmware/zephyr-pin-contract.js";
 import { assemblySidesRule } from "./manufacturing/assembly-sides.js";
 import { drillCoverageRule } from "./manufacturing/drill-coverage.js";
 import { fabNotesRule } from "./manufacturing/fab-notes.js";
@@ -61,6 +64,9 @@ export function registerBuiltInRules(): void {
     pinmapNetLabelRule,
     platformioPinContractRule,
     arduinoPinContractRule,
+    zephyrPinContractRule,
+    espIdfPinContractRule,
+    stm32CubeMxPinContractRule,
     outputsPresentRule,
     jobsetOutputsRule,
     panelSanityRule,

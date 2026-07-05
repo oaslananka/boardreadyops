@@ -1,0 +1,14 @@
+version: 1
+pins:
+  - designator: U1
+    pin: PA1
+    net: LED_STATUS
+    firmware: LED_STATUS
+  - designator: U1
+    pin: PA2
+    net: I2C1_SDA
+    firmware: I2C_SDA
+  - designator: U1
+    pin: PB6
+    net: USART1_TX
+    firmware: UART_TX

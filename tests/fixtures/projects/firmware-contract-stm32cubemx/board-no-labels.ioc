@@ -1,0 +1,4 @@
+# STM32CubeMX .ioc file with no GPIO_Label entries
+Mcu.Name=STM32F103RBTx
+PA0.Signal=GPIO_Input
+PB1.Signal=GPIO_Output

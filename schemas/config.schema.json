@@ -631,6 +631,40 @@
               "minLength": 1
             }
           }
+        },
+        "zephyr": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pinAssignments": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "esp-idf": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pinAssignments": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "stm32cubemx": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "project": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mcuDesignator": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       }
     }

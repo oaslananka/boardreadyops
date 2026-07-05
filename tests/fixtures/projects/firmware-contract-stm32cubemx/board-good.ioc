@@ -1,0 +1,15 @@
+# STM32CubeMX .ioc project file (simplified for boardreadyops test fixture)
+Mcu.Name=STM32F103RBTx
+Mcu.Package=LQFP64
+ProjectManager.ProjectName=test_board
+ProjectManager.LibraryCopySrc=1
+
+PA1.GPIO_Label=LED_STATUS
+PA1.GPIOParameters=GPIO_Label
+PA1.Signal=GPIO_Output
+PA2.GPIO_Label=I2C_SDA
+PA2.GPIOParameters=GPIO_Label
+PA2.Signal=I2C1_SDA
+PB6.GPIO_Label=UART_TX
+PB6.GPIOParameters=GPIO_Label
+PB6.Signal=USART1_TX
