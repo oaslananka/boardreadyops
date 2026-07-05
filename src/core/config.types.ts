@@ -7,6 +7,7 @@
  * The source-of-truth JSON Schema lives at `schemas/config.schema.json`.
  */
 
+import type { BomAlternateEntry } from "../bom/alternates.js";
 import type { VendorProfileConfig } from "../vendor/profiles.js";
 import type { FailOn, Severity } from "./findings.js";
 import type { PluginPermissionGrantConfig } from "./plugin-permissions.js";
@@ -151,6 +152,15 @@ export interface NotifiersConfig {
   email?: EmailNotifierConfig;
 }
 
+export interface BomTopLevelConfig {
+  /**
+   * Approved alternate parts for BOM supply chain risk management.
+   * MPNs listed here have documented approved substitutes, so single-source
+   * risk findings will not be raised for them.
+   */
+  alternates?: BomAlternateEntry[] | undefined;
+}
+
 export interface BoardReadyOpsConfig {
   version: 1;
   mode?: "warn" | "enforce";
@@ -158,6 +168,7 @@ export interface BoardReadyOpsConfig {
   pluginPermissions?: PluginPermissionGrantConfig;
   vendor?: VendorProfileConfig;
   firmware?: FirmwareConfig;
+  bom?: BomTopLevelConfig;
   projects?: ProjectConfig[];
   rules?: Record<string, RuleConfig | boolean>;
   "fail-on"?: FailOn;

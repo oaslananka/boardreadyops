@@ -512,6 +512,9 @@
     },
     "firmware": {
       "$ref": "#/$defs/firmwareConfig"
+    },
+    "bom": {
+      "$ref": "#/$defs/bomConfig"
     }
   },
   "$defs": {
@@ -663,6 +666,49 @@
             "mcuDesignator": {
               "type": "string",
               "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "bomConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "alternates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mpn", "alts"],
+            "properties": {
+              "mpn": {
+                "type": "string",
+                "minLength": 1
+              },
+              "alts": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["mpn"],
+                  "properties": {
+                    "mpn": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "manufacturer": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "note": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
             }
           }
         }

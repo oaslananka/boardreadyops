@@ -24941,6 +24941,9 @@ var config_schema_default = {
     },
     firmware: {
       $ref: "#/$defs/firmwareConfig"
+    },
+    bom: {
+      $ref: "#/$defs/bomConfig"
     }
   },
   $defs: {
@@ -25092,6 +25095,49 @@ var config_schema_default = {
             mcuDesignator: {
               type: "string",
               minLength: 1
+            }
+          }
+        }
+      }
+    },
+    bomConfig: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        alternates: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["mpn", "alts"],
+            properties: {
+              mpn: {
+                type: "string",
+                minLength: 1
+              },
+              alts: {
+                type: "array",
+                minItems: 1,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["mpn"],
+                  properties: {
+                    mpn: {
+                      type: "string",
+                      minLength: 1
+                    },
+                    manufacturer: {
+                      type: "string",
+                      minLength: 1
+                    },
+                    note: {
+                      type: "string",
+                      minLength: 1
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -26925,6 +26971,20 @@ var missingMpnRule = rule(
   }
 );
 
+// src/bom/alternates.ts
+function buildAlternatesMap(entries) {
+  const map2 = /* @__PURE__ */ new Map();
+  for (const entry of entries) {
+    if (entry.mpn && entry.alts.length > 0) {
+      map2.set(entry.mpn.trim().toUpperCase(), entry.alts);
+    }
+  }
+  return map2;
+}
+function hasApprovedAlternates(mpn, map2) {
+  return map2.has(mpn.trim().toUpperCase());
+}
+
 // src/rules/bom/single-source.ts
 var singleSourceRule = rule(
   {
@@ -26934,7 +26994,7 @@ var singleSourceRule = rule(
     rationale: "Single-source parts increase procurement risk when a supplier changes availability.",
     defaultSeverity: "medium",
     appliesTo: ["bom"],
-    configKeys: ["rules.bom.single-source.severity"],
+    configKeys: ["rules.bom.single-source.severity", "bom.alternates"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "sourcing", "supplier"]
   },
@@ -26943,7 +27003,10 @@ var singleSourceRule = rule(
       return [];
     }
     const { bomRows } = await loadBomContext(context);
-    return bomRows.filter((row) => !row.dnp && row.mpn && row.suppliers?.length === 1).map(
+    const alternatesMap = buildAlternatesMap(context.config.bom?.alternates ?? []);
+    return bomRows.filter(
+      (row) => !row.dnp && row.mpn && row.suppliers?.length === 1 && !hasApprovedAlternates(row.mpn, alternatesMap)
+    ).map(
       (row) => finding(context, {
         ruleId: "bom.single-source",
         severity: configuredSeverity(context, "bom.single-source", "medium"),
