@@ -91,8 +91,11 @@ function computeScoreTrend(points: ReadinessDataPoint[]): ReleaseTrend["scoreTre
   if (scoredPoints.length < 2) {
     return "insufficient-data";
   }
-  const first = scoredPoints[0]?.score ?? 0;
-  const last = scoredPoints[scoredPoints.length - 1]?.score ?? 0;
+  // scoredPoints has ≥ 2 entries after the guard above
+  // biome-ignore lint/style/noNonNullAssertion: guarded by length check above
+  const first = scoredPoints[0]!.score ?? 0;
+  // biome-ignore lint/style/noNonNullAssertion: guarded by length check above
+  const last = scoredPoints[scoredPoints.length - 1]!.score ?? 0;
   const delta = last - first;
   if (delta > 2) return "improving";
   if (delta < -2) return "degrading";
@@ -145,8 +148,8 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
     for (const finding of run.findings) {
       if (!finding.suppressed) {
         const current = ruleMaxSeverity.get(finding.ruleId) ?? "info";
-        const currentRank = SEVERITY_RANK[current] ?? -1;
-        const newRank = SEVERITY_RANK[finding.severity] ?? -1;
+        const currentRank = SEVERITY_RANK[current] ?? 0;
+        const newRank = SEVERITY_RANK[finding.severity] ?? 0;
         if (newRank > currentRank) {
           ruleMaxSeverity.set(finding.ruleId, finding.severity);
         }
@@ -159,8 +162,13 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
     .map(([ruleId, runCount]) => ({
       ruleId,
       runCount,
-      totalCount: ruleTotalCounts.get(ruleId) ?? runCount,
-      maxSeverity: ruleMaxSeverity.get(ruleId) ?? "info",
+      // ruleId is in ruleRunCounts only because it appeared in rulesThisRun,
+      // which requires at least one unsuppressed finding — so both maps always
+      // have an entry for this ruleId at this point.
+      // biome-ignore lint/style/noNonNullAssertion: see above
+      totalCount: ruleTotalCounts.get(ruleId)!,
+      // biome-ignore lint/style/noNonNullAssertion: see above
+      maxSeverity: ruleMaxSeverity.get(ruleId)!,
     }))
     .sort((left, right) => right.runCount - left.runCount || left.ruleId.localeCompare(right.ruleId));
 
@@ -168,8 +176,11 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
     .filter((run) => run.waivers !== undefined)
     .map((run) => ({
       generatedAt: run.generatedAt,
-      activeCount: run.waivers?.active.length ?? 0,
-      expiredCount: run.waivers?.expired.length ?? 0,
+      // run.waivers is defined here (filtered above); optional chain satisfies TS narrowing
+      // biome-ignore lint/style/noNonNullAssertion: filtered to non-undefined above
+      activeCount: run.waivers!.active.length,
+      // biome-ignore lint/style/noNonNullAssertion: filtered to non-undefined above
+      expiredCount: run.waivers!.expired.length,
     }));
 
   const artifactHealth: ArtifactHealthDataPoint[] = runs.map((run) => ({
