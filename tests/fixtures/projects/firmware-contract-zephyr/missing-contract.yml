@@ -1,0 +1,9 @@
+version: 1
+rules:
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false
+  release.changelog-present:
+    enabled: false
+fail-on: never

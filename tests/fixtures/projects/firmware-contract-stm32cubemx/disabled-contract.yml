@@ -1,0 +1,11 @@
+version: 1
+rules:
+  firmware.stm32cubemx-pin-contract:
+    enabled: false
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false
+  release.changelog-present:
+    enabled: false
+fail-on: never

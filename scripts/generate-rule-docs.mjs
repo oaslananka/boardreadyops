@@ -185,6 +185,50 @@ const rules = [
     details: "{ firmware, hardware, sources }",
   },
   {
+    id: "firmware.zephyr-pin-contract",
+    severity: "high",
+    appliesTo: ["firmware", "pinmap"],
+    configKeys: [
+      "firmware.zephyr.pinAssignments",
+      "projects.firmware.zephyr.pinAssignments",
+      "rules.firmware.zephyr-pin-contract.file",
+    ],
+    checks: "Checks a Zephyr firmware pin contract YAML against BoardReadyOps pinmap firmware labels.",
+    fires:
+      "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
+    details: "{ firmware, hardware, sources }",
+  },
+  {
+    id: "firmware.esp-idf-pin-contract",
+    severity: "high",
+    appliesTo: ["firmware", "pinmap"],
+    configKeys: [
+      "firmware.esp-idf.pinAssignments",
+      "projects.firmware.esp-idf.pinAssignments",
+      "rules.firmware.esp-idf-pin-contract.file",
+    ],
+    checks: "Checks an ESP-IDF firmware pin contract YAML against BoardReadyOps pinmap firmware labels.",
+    fires:
+      "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
+    details: "{ firmware, hardware, sources }",
+  },
+  {
+    id: "firmware.stm32cubemx-pin-contract",
+    severity: "high",
+    appliesTo: ["firmware", "pinmap"],
+    configKeys: [
+      "firmware.stm32cubemx.project",
+      "projects.firmware.stm32cubemx.project",
+      "rules.firmware.stm32cubemx-pin-contract.file",
+      "rules.firmware.stm32cubemx-pin-contract.mcu-designator",
+    ],
+    checks:
+      "Parses a STM32CubeMX `.ioc` project file and checks GPIO labels against BoardReadyOps pinmap firmware labels.",
+    fires:
+      "Fires when GPIO labels disagree with the hardware pinmap, when extra labels exist, or when hardware firmware signals are missing from the .ioc file.",
+    details: "{ firmware, hardware, sources }",
+  },
+  {
     id: "manufacturing.outputs-present",
     severity: "high",
     appliesTo: ["manifest", "pcb"],

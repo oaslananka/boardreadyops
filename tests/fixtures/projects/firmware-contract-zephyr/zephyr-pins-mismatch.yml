@@ -1,0 +1,10 @@
+version: 1
+pins:
+  LED_STATUS:
+    hardware: U1.PA9
+    net: LED_WRONG
+    pin: GPIO2
+  EXTRA_SIGNAL:
+    hardware: U1.PA4
+    net: EXTRA
+    pin: GPIO4

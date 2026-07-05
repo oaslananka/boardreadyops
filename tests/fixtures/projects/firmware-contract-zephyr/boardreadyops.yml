@@ -1,0 +1,17 @@
+version: 1
+projects:
+  - path: .
+    pinmap: pins.yml
+    firmware:
+      zephyr:
+        pinAssignments: zephyr-pins-mismatch.yml
+rules:
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false
+  release.changelog-present:
+    enabled: false
+  bom.missing-mpn:
+    enabled: false
+fail-on: high

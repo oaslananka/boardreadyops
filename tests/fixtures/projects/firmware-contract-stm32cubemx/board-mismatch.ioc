@@ -1,0 +1,7 @@
+# STM32CubeMX .ioc project file — mismatched pin assignments
+Mcu.Name=STM32F103RBTx
+
+PA9.GPIO_Label=LED_STATUS
+PA9.Signal=GPIO_Output
+PA4.GPIO_Label=EXTRA_SIGNAL
+PA4.Signal=GPIO_Output

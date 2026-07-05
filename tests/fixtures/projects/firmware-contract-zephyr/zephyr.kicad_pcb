@@ -1,0 +1,6 @@
+(kicad_pcb
+  (version 20250114)
+  (title_block (title "firmware-contract-platformio") (rev "v1.0"))
+  (gr_rect (start 0 0) (end 10 10) (layer "Edge.Cuts"))
+  (footprint "Package_QFP:LQFP-48" (property "Reference" "U1"))
+)

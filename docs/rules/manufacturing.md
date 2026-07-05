@@ -11,6 +11,3 @@
 - [manufacturing.assembly-sides](manufacturing.assembly-sides.md): Checks explicitly enabled assembly jobs for components placed on the bottom copper layer.
 - [manufacturing.tooling-holes](manufacturing.tooling-holes.md): Checks explicitly enabled manufacturing jobs for minimum tooling or mounting hole coverage.
 - [manufacturing.position-coverage](manufacturing.position-coverage.md): Checks explicitly enabled assembly jobs for populated reference coverage in position/CPL outputs.
-- [manufacturing.dfm-pin1-markers](manufacturing.dfm-pin1-markers.md): Checks ICs and polarised connectors with custom footprints for missing pin-1 markers.
-- [manufacturing.dfm-polarity-markers](manufacturing.dfm-polarity-markers.md): Checks polarised components (diodes, LEDs, electrolytic capacitors) with custom footprints for missing polarity markings.
-- [manufacturing.dfm-silkscreen-over-pad](manufacturing.dfm-silkscreen-over-pad.md): Flags dense SMD boards as a reminder to verify silkscreen markings do not overlap solder pads.
