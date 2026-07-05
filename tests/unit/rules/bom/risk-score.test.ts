@@ -43,10 +43,10 @@ describe("bom.risk-score rule", () => {
   it("populates bomRisk summary on the result", async () => {
     const result = await runFixture("bom-risk-score");
     expect(result.bomRisk).toBeDefined();
-    expect(result.bomRisk!.totalComponents).toBeGreaterThan(0);
-    expect(result.bomRisk!.overallRiskScore).toBeGreaterThanOrEqual(0);
-    expect(result.bomRisk!.overallRiskScore).toBeLessThanOrEqual(100);
-    expect(["critical", "high", "medium", "low", "none"]).toContain(result.bomRisk!.overallRiskLevel);
+    expect(result.bomRisk?.totalComponents).toBeGreaterThan(0);
+    expect(result.bomRisk?.overallRiskScore).toBeGreaterThanOrEqual(0);
+    expect(result.bomRisk?.overallRiskScore).toBeLessThanOrEqual(100);
+    expect(["critical", "high", "medium", "low", "none"]).toContain(result.bomRisk?.overallRiskLevel);
   });
 
   it("finding details contain riskScore, riskLevel, factors, and overallBomRiskScore", async () => {
@@ -173,9 +173,9 @@ describe("bomRiskSummaryFromFindings", () => {
     ];
     const summary = bomRiskSummaryFromFindings(findings);
     expect(summary).toBeDefined();
-    expect(summary!.criticalCount).toBe(1);
-    expect(summary!.totalComponents).toBe(4);
-    expect(summary!.overallRiskScore).toBe(30);
+    expect(summary?.criticalCount).toBe(1);
+    expect(summary?.totalComponents).toBe(4);
+    expect(summary?.overallRiskScore).toBe(30);
   });
 
   it("uses fallback values when finding details are missing or malformed", () => {
@@ -190,11 +190,11 @@ describe("bomRiskSummaryFromFindings", () => {
     ];
     const summary = bomRiskSummaryFromFindings(findings);
     expect(summary).toBeDefined();
-    expect(summary!.overallRiskScore).toBe(0);
-    expect(summary!.totalComponents).toBe(1);
-    expect(summary!.components[0]!.mpn).toBeUndefined();
-    expect(summary!.components[0]!.manufacturer).toBeUndefined();
-    expect(summary!.components[0]!.riskScore).toBe(0);
-    expect(summary!.components[0]!.riskLevel).toBe("none");
+    expect(summary?.overallRiskScore).toBe(0);
+    expect(summary?.totalComponents).toBe(1);
+    expect(summary?.components[0]?.mpn).toBeUndefined();
+    expect(summary?.components[0]?.manufacturer).toBeUndefined();
+    expect(summary?.components[0]?.riskScore).toBe(0);
+    expect(summary?.components[0]?.riskLevel).toBe("none");
   });
 });

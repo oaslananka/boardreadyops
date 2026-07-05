@@ -71,7 +71,8 @@ export function bomRiskSummaryFromFindings(
   }
 
   const firstDetails = riskFindings[0]?.details ?? {};
-  const totalComponents = typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
+  const totalComponents =
+    typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
   const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
 
   const components: BomComponentRisk[] = riskFindings.map((f) => {
