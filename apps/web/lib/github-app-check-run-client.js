@@ -1,15 +1,6 @@
-import type { GitHubAppCheckRunClient } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { createAppAuth } from "@octokit/auth-app";
 
-type GitHubTokenAuth = {
-  token: string;
-};
-
-type GitHubCheckRunResponse = {
-  id?: number;
-};
-
-function requiredEnv(name: string): string {
+function requiredEnv(name) {
   const value = process.env[name];
 
   if (!value) {
@@ -19,11 +10,11 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-function githubPrivateKey(): string {
+function githubPrivateKey() {
   return requiredEnv("GITHUB_APP_PRIVATE_KEY").replace(/\\n/g, "\n");
 }
 
-function detailsUrl(runId: string): string | undefined {
+function detailsUrl(runId) {
   const baseUrl = process.env.BOARDREADYOPS_PUBLIC_URL ?? process.env.NEXT_PUBLIC_APP_URL;
 
   if (!baseUrl) {
@@ -33,17 +24,17 @@ function detailsUrl(runId: string): string | undefined {
   return `${baseUrl.replace(/\/$/, "")}/runs/${encodeURIComponent(runId)}`;
 }
 
-async function readJson<T>(response: Response, context: string): Promise<T> {
+async function readJson(response, context) {
   const text = await response.text();
 
   if (!response.ok) {
     throw new Error(`${context} failed with status ${response.status}: ${text.slice(0, 256)}`);
   }
 
-  return text ? (JSON.parse(text) as T) : ({} as T);
+  return text ? JSON.parse(text) : {};
 }
 
-export function createGitHubAppCheckRunClient(): GitHubAppCheckRunClient | undefined {
+export function createGitHubAppCheckRunClient() {
   const appId = process.env.GITHUB_APP_ID;
 
   if (!appId || !process.env.GITHUB_APP_PRIVATE_KEY) {
@@ -59,8 +50,8 @@ export function createGitHubAppCheckRunClient(): GitHubAppCheckRunClient | undef
         privateKey: githubPrivateKey(),
         installationId: input.action.installation.id,
       });
-      const installationAuth = (await auth({ type: "installation" })) as GitHubTokenAuth;
-      const body: Record<string, unknown> = {
+      const installationAuth = await auth({ type: "installation" });
+      const body = {
         name: "BoardReadyOps / release readiness",
         head_sha: input.action.commitSha,
         status: "queued",
@@ -87,7 +78,7 @@ export function createGitHubAppCheckRunClient(): GitHubAppCheckRunClient | undef
           body: JSON.stringify(body),
         },
       );
-      const json = await readJson<GitHubCheckRunResponse>(response, "GitHub check run creation");
+      const json = await readJson(response, "GitHub check run creation");
 
       if (typeof json.id !== "number") {
         throw new Error("GitHub check run response did not include a numeric id");
