@@ -265,6 +265,18 @@ const rules = [
     details: "{ firmware, hardware, sources }",
   },
   {
+    id: "manufacturing.package-completeness",
+    severity: "high",
+    appliesTo: ["manifest", "pcb"],
+    configKeys: ["rules.manufacturing.package-completeness.severity"],
+    checks:
+      "Checks that all required manufacturing output categories are present. " +
+      "Base categories (gerbers, drill, drill-report, BOM, CPL) are required for every release. " +
+      "Production categories (fab-notes, assembly-notes, board-pdf) are additionally required when releaseMode is production.",
+    fires: "Fires for each missing output category with a structured completeness breakdown.",
+    details: "{ missingCategory, requirementLevel, completenessScore, presentCategories, missingCategories }",
+  },
+  {
     id: "manufacturing.outputs-present",
     severity: "high",
     appliesTo: ["manifest", "pcb"],

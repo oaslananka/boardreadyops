@@ -1,0 +1,1 @@
+(kicad_sch (version 20250114) (label "MCU_PA0") (symbol (property "Reference" "R1") (property "Value" "10k") (property "Footprint" "Resistor_SMD:R_0603")) (symbol (property "Reference" "C1") (property "Value" "100n") (property "Footprint" "Capacitor_SMD:C_0402")))

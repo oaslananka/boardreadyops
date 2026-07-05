@@ -1,5 +1,6 @@
 # Manufacturing Rules
 
+- [manufacturing.package-completeness](manufacturing.package-completeness.md): Checks that all required manufacturing output categories are present. Base categories (gerbers, drill, drill-report, BOM, CPL) are required for every release. Production categories (fab-notes, assembly-notes, board-pdf) are additionally required when releaseMode is production.
 - [manufacturing.outputs-present](manufacturing.outputs-present.md): Checks configured and vendor-profile fabrication output patterns and freshness against PCB source mtimes.
 - [manufacturing.jobset-outputs](manufacturing.jobset-outputs.md): Checks enabled KiCad 10 jobset entries for their expected output files.
 - [manufacturing.panel-sanity](manufacturing.panel-sanity.md): Checks that panelized builds include expected panel output files.

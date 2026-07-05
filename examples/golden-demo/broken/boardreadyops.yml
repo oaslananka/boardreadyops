@@ -15,6 +15,8 @@ rules:
     enabled: false
   manufacturing.fab-notes:
     enabled: false
+  manufacturing.package-completeness:
+    enabled: false
   design.copper-balance:
     enabled: false
   # Opt-in rules that this demo showcases.
