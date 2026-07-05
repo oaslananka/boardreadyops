@@ -18,7 +18,7 @@ export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): SqlQ
 
   return {
     async query(sql, params = []) {
-      await pool.query(sql, [...params]);
+      return await pool.query(sql, [...params]);
     },
   };
 }
