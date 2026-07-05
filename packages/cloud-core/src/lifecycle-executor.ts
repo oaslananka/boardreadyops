@@ -102,7 +102,10 @@ export async function executeGitHubAppLifecycleActions(
             runId: releaseRun.runId,
             idempotencyKey: releaseRun.idempotencyKey,
           });
-          await store.attachGitHubCheckRun({ idempotencyKey: releaseRun.idempotencyKey, githubCheckRunId: checkRun.id });
+          await store.attachGitHubCheckRun({
+            idempotencyKey: releaseRun.idempotencyKey,
+            githubCheckRunId: checkRun.id,
+          });
           result.checkRunsCreated += 1;
         } else if (releaseRun.githubCheckRunId) {
           result.checkRunsSkipped += 1;
