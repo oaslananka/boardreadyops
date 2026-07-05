@@ -1,0 +1,26 @@
+version: 1
+projects:
+  - path: .
+    bom: bom.csv
+    releaseMode: production
+fail-on: high
+rules:
+  manufacturing.package-completeness:
+    enabled: false
+  design.board-outline:
+    enabled: false
+  design.unique-references:
+    enabled: false
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false
+waivers:
+  - rule: bom.single-source
+    owner: alice@example.com
+    reason: >
+      U3 (W25Q128JVSIQ) is single-sourced from Winbond. No drop-in alternate
+      with identical footprint and timing exists. Risk accepted for v2.0
+      with procurement monitoring in place.
+    expires: "2027-01-01"
+    approvedBy: hardware-leads

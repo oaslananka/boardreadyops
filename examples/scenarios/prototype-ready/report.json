@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "boardreadyops",
+    "version": "1.7.2"
+  },
+  "summary": {
+    "total": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 1,
+    "low": 0,
+    "info": 0,
+    "maxSeverity": "medium",
+    "failed": false
+  },
+  "readiness": {
+    "score": 97,
+    "status": "at-risk",
+    "blocking": 0,
+    "nonBlocking": 1,
+    "evidence": [],
+    "missingRequired": [],
+    "missingRecommended": [],
+    "warnings": []
+  },
+  "projects": [
+    {
+      "projectFile": "board.kicad_pro",
+      "root": ".",
+      "schematicFiles": ["board.kicad_sch"],
+      "boardFiles": ["board.kicad_pcb"],
+      "jobsetFiles": []
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "manufacturing.fab-notes",
+      "severity": "medium",
+      "message": "Fabrication notes file was not found.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": ".",
+        "kind": "manifest"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/manufacturing.md"],
+      "fix": {
+        "description": "Resolve the manufacturing.fab-notes finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/manufacturing.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "fingerprint": "a55a9ec19e918bacb1b1ddc0df655e11caf1243c1d4b323ddef54ba2547b49ae"
+    }
+  ],
+  "fabrication": {
+    "bom": [
+      {
+        "reference": "C1",
+        "sourcePath": "bom.csv",
+        "value": "100nF",
+        "manufacturer": "Murata",
+        "mpn": "GRM188R71H104KA93D",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "C2",
+        "sourcePath": "bom.csv",
+        "value": "10uF",
+        "manufacturer": "Samsung",
+        "mpn": "CL10A106MA8NRNC",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "R1",
+        "sourcePath": "bom.csv",
+        "value": "10k",
+        "manufacturer": "Yageo",
+        "mpn": "RC0603FR-0710KL",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "R2",
+        "sourcePath": "bom.csv",
+        "value": "10k",
+        "manufacturer": "Yageo",
+        "mpn": "RC0603FR-0710KL",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "U1",
+        "sourcePath": "bom.csv",
+        "value": "MCU",
+        "manufacturer": "STMicro",
+        "mpn": "STM32F411CEU6",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "U2",
+        "sourcePath": "bom.csv",
+        "value": "PMIC",
+        "manufacturer": "Monolithic Power",
+        "mpn": "MP2451",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      }
+    ],
+    "outputs": [
+      {
+        "kind": "bom",
+        "files": [
+          {
+            "path": "bom.csv",
+            "digest": "101c45ed0d9761722a7e59d07263c22540b76b9161ae663ba64d703ca20a7872"
+          }
+        ]
+      },
+      {
+        "kind": "drill",
+        "files": []
+      },
+      {
+        "kind": "gerber",
+        "files": []
+      },
+      {
+        "kind": "position",
+        "files": []
+      }
+    ]
+  },
+  "plugins": [],
+  "generatedAt": "2026-07-05T04:47:29.796Z",
+  "status": "passed",
+  "exitCode": 0
+}

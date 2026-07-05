@@ -1,0 +1,16 @@
+version: 1
+projects:
+  - path: .
+    bom: bom.csv
+fail-on: high
+rules:
+  manufacturing.package-completeness:
+    enabled: false
+  design.board-outline:
+    enabled: false
+  design.unique-references:
+    enabled: false
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false

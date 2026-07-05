@@ -30,4 +30,34 @@ The `fixed` board resolves all four and reports nothing. Each problem maps to on
 
 - [Quickstart](quickstart.md) for running BoardReadyOps on your own project.
 - [Rules](rules/index.md) for the full rule catalog behind the demo findings.
-- [Roadmap #192](https://github.com/oaslananka/boardreadyops/issues/192) for where the demo fits in the v2 plan.
+- [Demo scenarios](#demo-scenarios) for more realistic examples below.
+
+## Demo scenarios
+
+Three shareable, self-contained scenarios live under [`examples/scenarios/`](https://github.com/oaslananka/boardreadyops/tree/main/examples/scenarios). Each includes a `report.json` snapshot and a `README.md` explaining what it demonstrates.
+
+| Scenario | Outcome | Demonstrates |
+|----------|---------|--------------|
+| [`failing-pr/`](https://github.com/oaslananka/boardreadyops/tree/main/examples/scenarios/failing-pr) | ❌ blocked | Missing MPN, non-compliant part, NRND lifecycle |
+| [`prototype-ready/`](https://github.com/oaslananka/boardreadyops/tree/main/examples/scenarios/prototype-ready) | ✅ passes | Clean BOM, all components documented, non-blocking advisories only |
+| [`production-ready/`](https://github.com/oaslananka/boardreadyops/tree/main/examples/scenarios/production-ready) | ✅ passes | Production mode, active waiver with owner/reason/expiry, changelog present |
+
+### Run a scenario
+
+```bash
+boardreadyops run examples/scenarios/failing-pr
+boardreadyops run examples/scenarios/prototype-ready
+boardreadyops run examples/scenarios/production-ready
+```
+
+The `report.json` in each scenario directory is a pre-generated snapshot you can share as a stable link, embed in documentation, or use in sales and onboarding materials without exposing private design data.
+
+### Keeping reports up to date
+
+The scenario fixtures are validated by `tests/unit/examples/scenarios.test.ts`. After any rule changes, regenerate the snapshots:
+
+```bash
+boardreadyops run examples/scenarios/failing-pr --format json > examples/scenarios/failing-pr/report.json
+boardreadyops run examples/scenarios/prototype-ready --format json > examples/scenarios/prototype-ready/report.json
+boardreadyops run examples/scenarios/production-ready --format json > examples/scenarios/production-ready/report.json
+```
