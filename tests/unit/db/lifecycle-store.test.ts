@@ -67,6 +67,7 @@ describe("SQL GitHub App lifecycle store", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("insert into repositories");
     expect(calls[0]?.sql).toContain("where github_installation_id = $1");
+    expect(calls[0]?.sql).toContain("installation_id = excluded.installation_id");
     expect(calls[0]?.params).toEqual([
       12345,
       98765,
