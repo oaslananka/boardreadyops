@@ -23,13 +23,12 @@ export type LifecycleStatus = "active" | "nrnd" | "obsolete" | "eol" | "unknown"
 /**
  * Origin of the lifecycle data for a component.
  *
- * Consumers use this to decide how much trust to place in the status:
  * - `bom-field`       — value came from a BOM column (e.g. "Lifecycle")
  * - `lifecycle-db`    — matched against a project-local JSON database file
  * - `supplier-plugin` — returned by a registered SupplierIntelligenceProvider
  * - `manual-config`   — hardcoded in boardreadyops.yml or an overlay config
  */
-export type LifecycleSourceType = "bom-field" | "lifecycle-db" | "supplier-plugin" | "manual-config";
+type LifecycleSourceType = "bom-field" | "lifecycle-db" | "supplier-plugin" | "manual-config";
 
 /** Structured lifecycle metadata attached to a single component. */
 export interface LifecycleMetadata {
