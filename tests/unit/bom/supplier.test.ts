@@ -115,6 +115,56 @@ describe("createStaticSupplierProvider", () => {
 
     expect((result.warnings ?? []).join("\n")).toContain("consider refreshing");
   });
+
+  it("uses custom name from options", async () => {
+    const dir = await makeTempDir();
+    const dbPath = path.join(dir, "db.json");
+    await fs.writeFile(dbPath, JSON.stringify(SAMPLE_DB), "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: dbPath, name: "My Custom DB" });
+    expect(provider.name).toBe("My Custom DB");
+  });
+
+  it("sets unverified trust default when record has no trust field", async () => {
+    const dir = await makeTempDir();
+    const dbPath = path.join(dir, "db.json");
+    const db = {
+      schemaVersion: 1,
+      updatedAt: new Date().toISOString(),
+      records: [{ mpn: "NOTRUSTPART", manufacturer: "Acme" }],
+    };
+    await fs.writeFile(dbPath, JSON.stringify(db), "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: dbPath });
+    const result = await provider.query({ components: [{ reference: "R1", mpn: "NOTRUSTPART" }] });
+
+    expect(result.records.get("NOTRUSTPART")?.trust).toBe("unverified");
+  });
+
+  it("skips components without mpn when querying", async () => {
+    const dir = await makeTempDir();
+    const dbPath = path.join(dir, "db.json");
+    await fs.writeFile(dbPath, JSON.stringify(SAMPLE_DB), "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: dbPath });
+    const result = await provider.query({
+      components: [{ reference: "R1" }, { reference: "U1", mpn: "TPS62840DLCT" }],
+    });
+
+    expect(result.records.size).toBe(1);
+  });
+
+  it("handles database with no updatedAt without warnings", async () => {
+    const dir = await makeTempDir();
+    const dbPath = path.join(dir, "db.json");
+    const db = { schemaVersion: 1, records: [{ mpn: "SOMEPART", manufacturer: "Acme" }] };
+    await fs.writeFile(dbPath, JSON.stringify(db), "utf8");
+
+    const provider = createStaticSupplierProvider({ dataFile: dbPath });
+    const result = await provider.query({ components: [{ reference: "R1", mpn: "SOMEPART" }] });
+
+    expect(result.warnings).toHaveLength(0);
+  });
 });
 
 describe("buildSupplierIntelligenceSummary", () => {
@@ -166,5 +216,62 @@ describe("buildSupplierIntelligenceSummary", () => {
 
     const summary = buildSupplierIntelligenceSummary([result], 1);
     expect(summary.freshness).toBe("stale");
+  });
+
+  it("reports unknown freshness when no queriedAt is available", () => {
+    const result = {
+      records: new Map([["ABC123", { mpn: "ABC123", trust: "verified" as const }]]),
+    };
+
+    const summary = buildSupplierIntelligenceSummary([result], 1);
+    expect(summary.freshness).toBe("unknown");
+  });
+
+  it("includes restricted substances warning", () => {
+    const result = {
+      records: new Map([
+        [
+          "XYZ001",
+          { mpn: "XYZ001", lifecycleStatus: "active" as const, restrictedSubstances: true, trust: "verified" as const },
+        ],
+      ]),
+      queriedAt: new Date().toISOString(),
+    };
+
+    const summary = buildSupplierIntelligenceSummary([result], 1);
+    const component = summary.components.find((c) => c.mpn === "XYZ001");
+    expect(component?.warnings).toContain("restricted substances flag set");
+  });
+
+  it("prefers verified trust over unverified when merging providers", () => {
+    const result1 = {
+      records: new Map([
+        ["ABC123", { mpn: "ABC123", trust: "unverified" as const, lifecycleStatus: "active" as const }],
+      ]),
+      queriedAt: new Date().toISOString(),
+    };
+    const result2 = {
+      records: new Map([["ABC123", { mpn: "ABC123", trust: "verified" as const, lifecycleStatus: "active" as const }]]),
+      queriedAt: new Date().toISOString(),
+    };
+
+    const summary = buildSupplierIntelligenceSummary([result1, result2], 2);
+    const component = summary.components.find((c) => c.mpn === "ABC123");
+    expect(component?.trust).toBe("verified");
+  });
+
+  it("propagates warnings from all results", () => {
+    const result1 = {
+      records: new Map<string, { mpn: string; trust: "verified" }>(),
+      warnings: ["provider 1 warning"],
+    };
+    const result2 = {
+      records: new Map<string, { mpn: string; trust: "verified" }>(),
+      warnings: ["provider 2 warning"],
+    };
+
+    const summary = buildSupplierIntelligenceSummary([result1, result2], 2);
+    expect(summary.warnings).toContain("provider 1 warning");
+    expect(summary.warnings).toContain("provider 2 warning");
   });
 });
