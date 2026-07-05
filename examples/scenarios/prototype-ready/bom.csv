@@ -1,0 +1,7 @@
+Reference,Value,Manufacturer,MPN,RoHS,Lifecycle
+U1,MCU,STMicro,STM32F411CEU6,Compliant,Active
+U2,PMIC,Monolithic Power,MP2451,Compliant,Active
+C1,100nF,Murata,GRM188R71H104KA93D,Compliant,Active
+C2,10uF,Samsung,CL10A106MA8NRNC,Compliant,Active
+R1,10k,Yageo,RC0603FR-0710KL,Compliant,Active
+R2,10k,Yageo,RC0603FR-0710KL,Compliant,Active

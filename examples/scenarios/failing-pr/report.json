@@ -1,0 +1,363 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "boardreadyops",
+    "version": "1.7.2"
+  },
+  "summary": {
+    "total": 7,
+    "critical": 0,
+    "high": 3,
+    "medium": 4,
+    "low": 0,
+    "info": 0,
+    "maxSeverity": "high",
+    "failed": true
+  },
+  "readiness": {
+    "score": 43,
+    "status": "blocked",
+    "blocking": 3,
+    "nonBlocking": 4,
+    "evidence": [],
+    "missingRequired": [],
+    "missingRecommended": [],
+    "warnings": ["3 blocking finding(s) must be resolved before release."]
+  },
+  "bomRisk": {
+    "totalComponents": 4,
+    "overallRiskScore": 20,
+    "overallRiskLevel": "medium",
+    "criticalCount": 1,
+    "highCount": 0,
+    "mediumCount": 1,
+    "lowCount": 0,
+    "components": [
+      {
+        "reference": "R1",
+        "mpn": "RC0603FR-0710KL",
+        "riskScore": 20,
+        "riskLevel": "medium",
+        "factors": {
+          "missingMpn": false,
+          "missingManufacturer": true,
+          "noSuppliers": false,
+          "singleSourceNoAlternates": false
+        }
+      },
+      {
+        "reference": "U1",
+        "manufacturer": "STMicro",
+        "riskScore": 60,
+        "riskLevel": "critical",
+        "factors": {
+          "missingMpn": true,
+          "missingManufacturer": false,
+          "noSuppliers": false,
+          "singleSourceNoAlternates": false
+        }
+      }
+    ]
+  },
+  "projects": [
+    {
+      "projectFile": "board.kicad_pro",
+      "root": ".",
+      "schematicFiles": ["board.kicad_sch"],
+      "boardFiles": ["board.kicad_pcb"],
+      "jobsetFiles": []
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "bom.compliance",
+      "severity": "high",
+      "message": "U2 is not compliant: Non-Compliant.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": "bom.csv",
+        "kind": "bom"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+      "fix": {
+        "description": "Resolve the bom.compliance finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "location": {
+        "line": 3
+      },
+      "details": {
+        "reference": "U2",
+        "mpn": "MP2451",
+        "compliance": "Non-Compliant"
+      },
+      "fingerprint": "15d9ccc267f39573b4f98136098b592661ed7760136d4461b7c3d4e2169fe00f"
+    },
+    {
+      "ruleId": "bom.eol-detection",
+      "severity": "high",
+      "message": "U2 is marked NRND.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": "bom.csv",
+        "kind": "bom"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+      "fix": {
+        "description": "Resolve the bom.eol-detection finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "location": {
+        "line": 3
+      },
+      "details": {
+        "reference": "U2",
+        "lifecycle": "NRND",
+        "mpn": "MP2451"
+      },
+      "fingerprint": "bbc8567b60d69ecaeed66e12282b4c95371b5e21fe245ec6f34f1e007383da44"
+    },
+    {
+      "ruleId": "bom.missing-mpn",
+      "severity": "high",
+      "message": "U1 is missing an MPN.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": "bom.csv",
+        "kind": "bom"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+      "fix": {
+        "description": "Resolve the bom.missing-mpn finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "location": {
+        "line": 2
+      },
+      "details": {
+        "reference": "U1"
+      },
+      "fingerprint": "0066bde04ab0c5739d07c99271eef337dc601457b428144b07f21a533a5b5f5f"
+    },
+    {
+      "ruleId": "bom.risk-score",
+      "severity": "medium",
+      "message": "R1 has supply-chain risk (score 20/100): no manufacturer.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": "bom.csv",
+        "kind": "bom"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+      "fix": {
+        "description": "Resolve the bom.risk-score finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "location": {
+        "line": 5
+      },
+      "details": {
+        "reference": "R1",
+        "mpn": "RC0603FR-0710KL",
+        "riskScore": 20,
+        "riskLevel": "medium",
+        "factors": {
+          "missingMpn": false,
+          "missingManufacturer": true,
+          "noSuppliers": false,
+          "singleSourceNoAlternates": false
+        },
+        "overallBomRiskScore": 20,
+        "totalComponents": 4
+      },
+      "fingerprint": "e725c91e61fead538091dc08cf747ab711598d9500c37d684fb30fed72c1f395"
+    },
+    {
+      "ruleId": "bom.risk-score",
+      "severity": "medium",
+      "message": "U1 has supply-chain risk (score 60/100): no MPN.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": "bom.csv",
+        "kind": "bom"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+      "fix": {
+        "description": "Resolve the bom.risk-score finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/bom.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "location": {
+        "line": 2
+      },
+      "details": {
+        "reference": "U1",
+        "manufacturer": "STMicro",
+        "riskScore": 60,
+        "riskLevel": "critical",
+        "factors": {
+          "missingMpn": true,
+          "missingManufacturer": false,
+          "noSuppliers": false,
+          "singleSourceNoAlternates": false
+        },
+        "overallBomRiskScore": 20,
+        "totalComponents": 4
+      },
+      "fingerprint": "024408c628495dcfcbea89048fc996d0a36cfb533d387336517e5682c920c007"
+    },
+    {
+      "ruleId": "manufacturing.fab-notes",
+      "severity": "medium",
+      "message": "Fabrication notes file was not found.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": ".",
+        "kind": "manifest"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/manufacturing.md"],
+      "fix": {
+        "description": "Resolve the manufacturing.fab-notes finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/manufacturing.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "fingerprint": "a55a9ec19e918bacb1b1ddc0df655e11caf1243c1d4b323ddef54ba2547b49ae"
+    },
+    {
+      "ruleId": "release.changelog-present",
+      "severity": "medium",
+      "message": "CHANGELOG.md is missing.",
+      "project": "board.kicad_pro",
+      "resource": {
+        "path": ".",
+        "kind": "manifest"
+      },
+      "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/release.md"],
+      "fix": {
+        "description": "Resolve the release.changelog-present finding before fabrication.",
+        "steps": [
+          "Review the affected file and rule guidance.",
+          "Update the project evidence.",
+          "Run BoardReadyOps again."
+        ],
+        "references": ["https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/release.md"],
+        "automated": false
+      },
+      "confidence": "high",
+      "fingerprint": "6367da2929a43182f878e709aab50f32ce329088b27f8aab15df866e325d8bc0"
+    }
+  ],
+  "fabrication": {
+    "bom": [
+      {
+        "reference": "C1",
+        "sourcePath": "bom.csv",
+        "value": "100nF",
+        "manufacturer": "Murata",
+        "mpn": "GRM188R71H104KA93D",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "R1",
+        "sourcePath": "bom.csv",
+        "value": "10k",
+        "mpn": "RC0603FR-0710KL",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "U1",
+        "sourcePath": "bom.csv",
+        "value": "MCU",
+        "manufacturer": "STMicro",
+        "suppliers": [],
+        "lifecycle": "Active",
+        "dnp": false,
+        "compliance": "Compliant"
+      },
+      {
+        "reference": "U2",
+        "sourcePath": "bom.csv",
+        "value": "PMIC",
+        "manufacturer": "Monolithic Power",
+        "mpn": "MP2451",
+        "suppliers": [],
+        "lifecycle": "NRND",
+        "dnp": false,
+        "compliance": "Non-Compliant"
+      }
+    ],
+    "outputs": [
+      {
+        "kind": "bom",
+        "files": [
+          {
+            "path": "bom.csv",
+            "digest": "8c03fc5cbf662d8054ab95bda3f1078a478ec79316c3ddfb333846b6f4c90ca8"
+          }
+        ]
+      },
+      {
+        "kind": "drill",
+        "files": []
+      },
+      {
+        "kind": "gerber",
+        "files": []
+      },
+      {
+        "kind": "position",
+        "files": []
+      }
+    ]
+  },
+  "plugins": [],
+  "generatedAt": "2026-07-05T04:46:20.325Z",
+  "status": "failed",
+  "exitCode": 1
+}
