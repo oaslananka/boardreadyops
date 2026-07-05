@@ -78,7 +78,7 @@ export function createSqlGitHubAppLifecycleStore(
          from installations
          where github_installation_id = $1
          on conflict (github_repo_id)
-         do update set owner = excluded.owner, name = excluded.name, private = excluded.private, default_branch = excluded.default_branch, disabled_at = null`,
+         do update set installation_id = excluded.installation_id, owner = excluded.owner, name = excluded.name, private = excluded.private, default_branch = excluded.default_branch, disabled_at = null`,
         [
           action.installation.id,
           action.repository.id,
