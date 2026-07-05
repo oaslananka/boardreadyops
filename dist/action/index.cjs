@@ -14428,8 +14428,8 @@ var require_snapshot_utils = __commonJS({
         match: new Set(matchHeaders.map((header) => caseSensitive ? header : header.toLowerCase()))
       };
     }
-    var crypto7 = runtimeFeatures.has("crypto") ? require("node:crypto") : null;
-    var hashId = crypto7?.hash ? (value) => crypto7.hash("sha256", value, "base64url") : (value) => Buffer.from(value).toString("base64url");
+    var crypto8 = runtimeFeatures.has("crypto") ? require("node:crypto") : null;
+    var hashId = crypto8?.hash ? (value) => crypto8.hash("sha256", value, "base64url") : (value) => Buffer.from(value).toString("base64url");
     function isUndiciHeaders(headers) {
       return Array.isArray(headers) && (headers.length & 1) === 0;
     }
@@ -20580,10 +20580,10 @@ var require_subresource_integrity = __commonJS({
     var assert2 = require("node:assert");
     var { runtimeFeatures } = require_runtime_features();
     var validSRIHashAlgorithmTokenSet = /* @__PURE__ */ new Map([["sha256", 0], ["sha384", 1], ["sha512", 2]]);
-    var crypto7;
+    var crypto8;
     if (runtimeFeatures.has("crypto")) {
-      crypto7 = require("node:crypto");
-      const cryptoHashes = crypto7.getHashes();
+      crypto8 = require("node:crypto");
+      const cryptoHashes = crypto8.getHashes();
       if (cryptoHashes.length === 0) {
         validSRIHashAlgorithmTokenSet.clear();
       }
@@ -20673,7 +20673,7 @@ var require_subresource_integrity = __commonJS({
       return result;
     }
     var applyAlgorithmToBytes = (algorithm, bytes) => {
-      return crypto7.hash(algorithm, bytes, "base64");
+      return crypto8.hash(algorithm, bytes, "base64");
     };
     function caseSensitiveMatch(actualValue, expectedValue) {
       let actualValueLength = actualValue.length;
@@ -23611,7 +23611,7 @@ var require_connection = __commonJS({
     var { WebsocketFrameSend } = require_frame();
     var assert2 = require("node:assert");
     var { runtimeFeatures } = require_runtime_features();
-    var crypto7 = runtimeFeatures.has("crypto") ? require("node:crypto") : null;
+    var crypto8 = runtimeFeatures.has("crypto") ? require("node:crypto") : null;
     var warningEmitted = false;
     function establishWebSocketConnection(url3, protocols, client2, handler2, options) {
       const requestURL = url3;
@@ -23631,7 +23631,7 @@ var require_connection = __commonJS({
         const headersList = getHeadersList(new Headers2(options.headers));
         request2.headersList = headersList;
       }
-      const keyValue = crypto7.randomBytes(16).toString("base64");
+      const keyValue = crypto8.randomBytes(16).toString("base64");
       request2.headersList.append("sec-websocket-key", keyValue, true);
       request2.headersList.append("sec-websocket-version", "13", true);
       for (const protocol of protocols) {
@@ -23671,7 +23671,7 @@ var require_connection = __commonJS({
             return;
           }
           const secWSAccept = response.headersList.get("Sec-WebSocket-Accept");
-          const digest = crypto7.hash("sha1", keyValue + uid, "base64");
+          const digest = crypto8.hash("sha1", keyValue + uid, "base64");
           if (secWSAccept !== digest) {
             failWebsocketConnection(handler2, 1002, "Incorrect hash received in Sec-WebSocket-Accept header.");
             return;
@@ -81125,6 +81125,17 @@ function parseDelimitedRows(text, delimiter2) {
   return rows;
 }
 
+// src/bom/identity.ts
+var import_node_crypto3 = __toESM(require("node:crypto"), 1);
+function stableComponentKey(reference, mpn, manufacturer) {
+  const parts = [
+    reference.trim().toLowerCase(),
+    (mpn ?? "").trim().toLowerCase(),
+    (manufacturer ?? "").trim().toLowerCase()
+  ].join("|");
+  return import_node_crypto3.default.createHash("sha256").update(parts).digest("hex").slice(0, 16);
+}
+
 // src/bom/normalizer.ts
 var aliases = {
   reference: ["reference", "refs", "ref", "designator", "references"],
@@ -81138,44 +81149,77 @@ var aliases = {
 function normalizeBomRows(rows, sourcePath2) {
   const output = [];
   for (const [index, raw] of rows.entries()) {
-    const referenceValue = getField(raw, aliases.reference);
+    const normalized = normalizedMap(raw);
+    const referenceValue = getFieldWithSource(normalized, aliases.reference);
     if (!referenceValue) {
       continue;
     }
-    const refs = splitRefs(referenceValue);
-    const quantity = Number(getField(raw, ["quantity", "qty"]));
+    const refs = splitRefs(referenceValue.value);
+    const quantity = Number(getField(normalized, ["quantity", "qty"]));
     const suppliers = supplierValues(raw);
+    const provenanceFields = buildProvenance(normalized);
     for (const reference of refs) {
+      const mpn = getField(normalized, aliases.mpn);
+      const manufacturer = getField(normalized, aliases.manufacturer);
       output.push({
         reference,
-        value: getField(raw, aliases.value),
-        footprint: getField(raw, aliases.footprint),
-        manufacturer: getField(raw, aliases.manufacturer),
-        mpn: getField(raw, aliases.mpn),
+        value: getField(normalized, aliases.value),
+        footprint: getField(normalized, aliases.footprint),
+        manufacturer,
+        mpn,
         suppliers,
-        lifecycle: getField(raw, aliases.lifecycle),
-        compliance: getField(raw, aliases.compliance),
-        dnp: isDnp(getField(raw, ["dnp", "do not populate", "populate"])),
+        lifecycle: getField(normalized, aliases.lifecycle),
+        compliance: getField(normalized, aliases.compliance),
+        dnp: isDnp(getField(normalized, ["dnp", "do not populate", "populate"])),
         sourcePath: sourcePath2,
         sourceKind: "bom",
         line: index + 2,
         raw,
         groupedReferences: refs,
-        quantity: Number.isFinite(quantity) ? quantity : void 0
+        quantity: Number.isFinite(quantity) ? quantity : void 0,
+        provenance: provenanceFields,
+        identityKey: stableComponentKey(reference, mpn, manufacturer)
       });
     }
   }
   return output;
 }
-function getField(row, names) {
-  const normalized = new Map(Object.entries(row).map(([key, value]) => [key.trim().toLowerCase(), value.trim()]));
+function normalizedMap(raw) {
+  return new Map(
+    Object.entries(raw).map(([key, value]) => [key.trim().toLowerCase(), { value: value.trim(), sourceField: key }])
+  );
+}
+function getField(normalized, names) {
   for (const name of names) {
-    const value = normalized.get(name);
-    if (value) {
-      return value;
+    const entry = normalized.get(name);
+    if (entry?.value) {
+      return entry.value;
     }
   }
   return void 0;
+}
+function getFieldWithSource(normalized, names) {
+  for (const name of names) {
+    const entry = normalized.get(name);
+    if (entry?.value) {
+      return entry;
+    }
+  }
+  return void 0;
+}
+function buildProvenance(normalized) {
+  const provenance = [];
+  const fieldAliases = Object.entries(aliases);
+  for (const [field, names] of fieldAliases) {
+    for (const name of names) {
+      const entry = normalized.get(name);
+      if (entry?.value) {
+        provenance.push({ field, sourceField: entry.sourceField });
+        break;
+      }
+    }
+  }
+  return provenance;
 }
 function supplierValues(row) {
   return Object.entries(row).filter(([key, value]) => /supplier|vendor|distributor/i.test(key) && value.trim() !== "").map(([, value]) => value.trim());
@@ -82085,6 +82129,87 @@ var footprintMismatchRule = rule(
         }
       })
     );
+  }
+);
+
+// src/rules/bom/identity-conflicts.ts
+var identityConflictsRule = rule(
+  {
+    id: "bom.identity-conflicts",
+    title: "BOM component identity conflict",
+    description: "Detects components whose identity fields (MPN, manufacturer) differ between BOM and schematic sources, or appear multiple times within the same BOM with conflicting values.",
+    rationale: "Conflicting component identities produce ambiguous sourcing decisions and unreliable release diffs. A stable, consistent identity ensures every tool in the release pipeline references the same part.",
+    defaultSeverity: "high",
+    appliesTo: ["bom", "schematic"],
+    configKeys: ["rules.bom.identity-conflicts.severity"],
+    kicadVersions: ["9", "10", "future"],
+    tags: ["bom", "identity", "sourcing"]
+  },
+  async (context5) => {
+    if (!shouldRun(context5, "bom.identity-conflicts")) {
+      return [];
+    }
+    const { bomRows, schematicRows } = await loadBomContext(context5);
+    const findings = [];
+    const bomByRef = /* @__PURE__ */ new Map();
+    for (const row of bomRows) {
+      if (!row.reference || row.dnp) continue;
+      const existing = bomByRef.get(row.reference) ?? [];
+      existing.push({ mpn: row.mpn ?? "", line: row.line, path: row.sourcePath });
+      bomByRef.set(row.reference, existing);
+    }
+    for (const [reference, entries] of bomByRef) {
+      const uniqueMpns = new Set(entries.map((entry) => entry.mpn.toLowerCase()));
+      if (uniqueMpns.size > 1) {
+        const first = entries[0];
+        findings.push(
+          finding(context5, {
+            ruleId: "bom.identity-conflicts",
+            severity: configuredSeverity(context5, "bom.identity-conflicts", "high"),
+            message: `${reference} appears ${entries.length} times in the BOM with conflicting MPNs: ${[...uniqueMpns].join(", ")}.`,
+            path: first?.path ?? "",
+            kind: "bom",
+            line: first?.line,
+            details: {
+              reference,
+              conflictType: "within-bom",
+              mpns: [...uniqueMpns]
+            }
+          })
+        );
+      }
+    }
+    if (bomRows.length > 0 && schematicRows.length > 0) {
+      const schematicMpn = /* @__PURE__ */ new Map();
+      for (const row of schematicRows) {
+        if (row.mpn) {
+          schematicMpn.set(row.reference, row.mpn);
+        }
+      }
+      for (const row of bomRows) {
+        if (!row.mpn || row.dnp) continue;
+        const schemMpn = schematicMpn.get(row.reference);
+        if (schemMpn && schemMpn.toLowerCase() !== row.mpn.toLowerCase()) {
+          findings.push(
+            finding(context5, {
+              ruleId: "bom.identity-conflicts",
+              severity: configuredSeverity(context5, "bom.identity-conflicts", "high"),
+              message: `${row.reference} has MPN "${row.mpn}" in the BOM but "${schemMpn}" in the schematic.`,
+              path: row.sourcePath,
+              kind: "bom",
+              line: row.line,
+              details: {
+                reference: row.reference,
+                conflictType: "bom-schematic",
+                bomMpn: row.mpn,
+                schematicMpn: schemMpn
+              }
+            })
+          );
+        }
+      }
+    }
+    return findings;
   }
 );
 
@@ -99977,6 +100102,7 @@ function registerBuiltInRules() {
     runErcRule,
     missingMpnRule,
     singleSourceRule,
+    identityConflictsRule,
     bomRiskScoreRule,
     eolDetectionRule,
     lifecycleRule,
@@ -100019,7 +100145,7 @@ function registerBuiltInRules() {
 }
 
 // src/rules/fabrication-snapshot.ts
-var import_node_crypto3 = __toESM(require("node:crypto"), 1);
+var import_node_crypto4 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = require("node:fs");
 var import_node_path35 = __toESM(require("node:path"), 1);
 var manufacturingPatterns = {
@@ -100112,7 +100238,7 @@ async function outputFromFiles(root, kind, files) {
   };
 }
 async function hashFile(file2) {
-  const hash2 = import_node_crypto3.default.createHash("sha256");
+  const hash2 = import_node_crypto4.default.createHash("sha256");
   for await (const chunk of (0, import_node_fs2.createReadStream)(file2)) {
     hash2.update(chunk);
   }
@@ -100124,7 +100250,7 @@ async function outputFromRows(kind, rows) {
     files: rows.length === 0 ? [] : [
       {
         path: "schematic",
-        digest: import_node_crypto3.default.createHash("sha256").update(JSON.stringify(rows)).digest("hex")
+        digest: import_node_crypto4.default.createHash("sha256").update(JSON.stringify(rows)).digest("hex")
       }
     ]
   };
@@ -118838,7 +118964,7 @@ var AnonymousCredential = class extends Credential {
 };
 
 // node_modules/@azure/storage-common/dist/esm/credentials/StorageSharedKeyCredential.js
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 
 // node_modules/@azure/storage-common/dist/esm/utils/SharedKeyComparator.js
 var table_lv0 = new Uint32Array([
@@ -119424,7 +119550,7 @@ var StorageSharedKeyCredential = class extends Credential {
    * @param stringToSign -
    */
   computeHMACSHA256(stringToSign) {
-    return (0, import_node_crypto4.createHmac)("sha256", this.accountKey).update(stringToSign, "utf8").digest("base64");
+    return (0, import_node_crypto5.createHmac)("sha256", this.accountKey).update(stringToSign, "utf8").digest("base64");
   }
 };
 
@@ -119798,7 +119924,7 @@ function storageRetryPolicy(options = {}) {
 }
 
 // node_modules/@azure/storage-common/dist/esm/policies/StorageSharedKeyCredentialPolicyV2.js
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 var storageSharedKeyCredentialPolicyName = "storageSharedKeyCredentialPolicy";
 function storageSharedKeyCredentialPolicy(options) {
   function signRequest(request2) {
@@ -119820,7 +119946,7 @@ function storageSharedKeyCredentialPolicy(options) {
       getHeaderValueToSign(request2, HeaderConstants.IF_UNMODIFIED_SINCE),
       getHeaderValueToSign(request2, HeaderConstants.RANGE)
     ].join("\n") + "\n" + getCanonicalizedHeadersString(request2) + getCanonicalizedResourceString(request2);
-    const signature = (0, import_node_crypto5.createHmac)("sha256", options.accountKey).update(stringToSign, "utf8").digest("base64");
+    const signature = (0, import_node_crypto6.createHmac)("sha256", options.accountKey).update(stringToSign, "utf8").digest("base64");
     request2.headers.set(HeaderConstants.AUTHORIZATION, `SharedKey ${options.accountName}:${signature}`);
   }
   function getHeaderValueToSign(request2, headerName) {
@@ -119910,7 +120036,7 @@ function storageRequestFailureDetailsParserPolicy() {
 }
 
 // node_modules/@azure/storage-common/dist/esm/credentials/UserDelegationKeyCredential.js
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 var UserDelegationKeyCredential = class {
   /**
    * Azure Storage account name; readonly.
@@ -119940,7 +120066,7 @@ var UserDelegationKeyCredential = class {
    * @param stringToSign -
    */
   computeHMACSHA256(stringToSign) {
-    return (0, import_node_crypto6.createHmac)("sha256", this.key).update(stringToSign, "utf8").digest("base64");
+    return (0, import_node_crypto7.createHmac)("sha256", this.key).update(stringToSign, "utf8").digest("base64");
   }
 };
 
@@ -140448,7 +140574,7 @@ var KnownEncryptionAlgorithmType2;
 })(KnownEncryptionAlgorithmType2 || (KnownEncryptionAlgorithmType2 = {}));
 
 // node_modules/@actions/artifact/lib/internal/upload/blob-upload.js
-var crypto5 = __toESM(require("crypto"), 1);
+var crypto6 = __toESM(require("crypto"), 1);
 var stream = __toESM(require("stream"), 1);
 var __awaiter6 = function(thisArg, _arguments, P, generator) {
   function adopt(value) {
@@ -140512,7 +140638,7 @@ function uploadToBlobStorage(authenticatedUploadURL, uploadStream, contentType2)
     };
     let sha256Hash = void 0;
     const blobUploadStream = new stream.PassThrough();
-    const hashStream = crypto5.createHash("sha256");
+    const hashStream = crypto6.createHash("sha256");
     uploadStream.pipe(blobUploadStream);
     uploadStream.pipe(hashStream).setEncoding("hex");
     info("Beginning upload of artifact content to blob storage");
@@ -140869,7 +140995,7 @@ function uploadArtifact(name, files, rootDirectory, options) {
 // node_modules/@actions/artifact/lib/internal/download/download-artifact.js
 var import_promises16 = __toESM(require("fs/promises"), 1);
 var fsSync = __toESM(require("fs"), 1);
-var crypto6 = __toESM(require("crypto"), 1);
+var crypto7 = __toESM(require("crypto"), 1);
 var stream3 = __toESM(require("stream"), 1);
 var path41 = __toESM(require("path"), 1);
 var import_unzip_stream = __toESM(require_unzip(), 1);
@@ -140970,7 +141096,7 @@ function streamExtractExternal(url_1, directory_1) {
         clearTimeout(timer);
         reject(error52);
       };
-      const hashStream = crypto6.createHash("sha256").setEncoding("hex");
+      const hashStream = crypto7.createHash("sha256").setEncoding("hex");
       const passThrough = new stream3.PassThrough().on("data", () => {
         timer.refresh();
       }).on("error", onError);

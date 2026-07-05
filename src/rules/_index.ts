@@ -3,6 +3,7 @@ import { complianceRule } from "./bom/compliance.js";
 import { dnpConsistencyRule } from "./bom/dnp-consistency.js";
 import { eolDetectionRule } from "./bom/eol-detection.js";
 import { footprintMismatchRule } from "./bom/footprint-mismatch.js";
+import { identityConflictsRule } from "./bom/identity-conflicts.js";
 import { lifecycleRule } from "./bom/lifecycle.js";
 import { missingMpnRule } from "./bom/missing-mpn.js";
 import { bomRiskScoreRule } from "./bom/risk-score.js";
@@ -50,6 +51,7 @@ export function registerBuiltInRules(): void {
     runErcRule,
     missingMpnRule,
     singleSourceRule,
+    identityConflictsRule,
     bomRiskScoreRule,
     eolDetectionRule,
     lifecycleRule,

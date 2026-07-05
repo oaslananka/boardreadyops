@@ -1,0 +1,12 @@
+version: 1
+projects:
+  - path: .
+    bom: bom.csv
+rules:
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false
+  release.changelog-present:
+    enabled: false
+fail-on: never

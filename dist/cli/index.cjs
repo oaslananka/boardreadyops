@@ -25925,6 +25925,17 @@ function parseDelimitedRows(text, delimiter) {
   return rows;
 }
 
+// src/bom/identity.ts
+var import_node_crypto3 = __toESM(require("node:crypto"), 1);
+function stableComponentKey(reference, mpn, manufacturer) {
+  const parts = [
+    reference.trim().toLowerCase(),
+    (mpn ?? "").trim().toLowerCase(),
+    (manufacturer ?? "").trim().toLowerCase()
+  ].join("|");
+  return import_node_crypto3.default.createHash("sha256").update(parts).digest("hex").slice(0, 16);
+}
+
 // src/bom/normalizer.ts
 var aliases = {
   reference: ["reference", "refs", "ref", "designator", "references"],
@@ -25938,44 +25949,77 @@ var aliases = {
 function normalizeBomRows(rows, sourcePath2) {
   const output = [];
   for (const [index, raw] of rows.entries()) {
-    const referenceValue = getField(raw, aliases.reference);
+    const normalized = normalizedMap(raw);
+    const referenceValue = getFieldWithSource(normalized, aliases.reference);
     if (!referenceValue) {
       continue;
     }
-    const refs = splitRefs(referenceValue);
-    const quantity = Number(getField(raw, ["quantity", "qty"]));
+    const refs = splitRefs(referenceValue.value);
+    const quantity = Number(getField(normalized, ["quantity", "qty"]));
     const suppliers = supplierValues(raw);
+    const provenanceFields = buildProvenance(normalized);
     for (const reference of refs) {
+      const mpn = getField(normalized, aliases.mpn);
+      const manufacturer = getField(normalized, aliases.manufacturer);
       output.push({
         reference,
-        value: getField(raw, aliases.value),
-        footprint: getField(raw, aliases.footprint),
-        manufacturer: getField(raw, aliases.manufacturer),
-        mpn: getField(raw, aliases.mpn),
+        value: getField(normalized, aliases.value),
+        footprint: getField(normalized, aliases.footprint),
+        manufacturer,
+        mpn,
         suppliers,
-        lifecycle: getField(raw, aliases.lifecycle),
-        compliance: getField(raw, aliases.compliance),
-        dnp: isDnp(getField(raw, ["dnp", "do not populate", "populate"])),
+        lifecycle: getField(normalized, aliases.lifecycle),
+        compliance: getField(normalized, aliases.compliance),
+        dnp: isDnp(getField(normalized, ["dnp", "do not populate", "populate"])),
         sourcePath: sourcePath2,
         sourceKind: "bom",
         line: index + 2,
         raw,
         groupedReferences: refs,
-        quantity: Number.isFinite(quantity) ? quantity : void 0
+        quantity: Number.isFinite(quantity) ? quantity : void 0,
+        provenance: provenanceFields,
+        identityKey: stableComponentKey(reference, mpn, manufacturer)
       });
     }
   }
   return output;
 }
-function getField(row, names) {
-  const normalized = new Map(Object.entries(row).map(([key, value]) => [key.trim().toLowerCase(), value.trim()]));
+function normalizedMap(raw) {
+  return new Map(
+    Object.entries(raw).map(([key, value]) => [key.trim().toLowerCase(), { value: value.trim(), sourceField: key }])
+  );
+}
+function getField(normalized, names) {
   for (const name of names) {
-    const value = normalized.get(name);
-    if (value) {
-      return value;
+    const entry = normalized.get(name);
+    if (entry?.value) {
+      return entry.value;
     }
   }
   return void 0;
+}
+function getFieldWithSource(normalized, names) {
+  for (const name of names) {
+    const entry = normalized.get(name);
+    if (entry?.value) {
+      return entry;
+    }
+  }
+  return void 0;
+}
+function buildProvenance(normalized) {
+  const provenance = [];
+  const fieldAliases = Object.entries(aliases);
+  for (const [field, names] of fieldAliases) {
+    for (const name of names) {
+      const entry = normalized.get(name);
+      if (entry?.value) {
+        provenance.push({ field, sourceField: entry.sourceField });
+        break;
+      }
+    }
+  }
+  return provenance;
 }
 function supplierValues(row) {
   return Object.entries(row).filter(([key, value]) => /supplier|vendor|distributor/i.test(key) && value.trim() !== "").map(([, value]) => value.trim());
@@ -26885,6 +26929,87 @@ var footprintMismatchRule = rule(
         }
       })
     );
+  }
+);
+
+// src/rules/bom/identity-conflicts.ts
+var identityConflictsRule = rule(
+  {
+    id: "bom.identity-conflicts",
+    title: "BOM component identity conflict",
+    description: "Detects components whose identity fields (MPN, manufacturer) differ between BOM and schematic sources, or appear multiple times within the same BOM with conflicting values.",
+    rationale: "Conflicting component identities produce ambiguous sourcing decisions and unreliable release diffs. A stable, consistent identity ensures every tool in the release pipeline references the same part.",
+    defaultSeverity: "high",
+    appliesTo: ["bom", "schematic"],
+    configKeys: ["rules.bom.identity-conflicts.severity"],
+    kicadVersions: ["9", "10", "future"],
+    tags: ["bom", "identity", "sourcing"]
+  },
+  async (context) => {
+    if (!shouldRun(context, "bom.identity-conflicts")) {
+      return [];
+    }
+    const { bomRows, schematicRows } = await loadBomContext(context);
+    const findings = [];
+    const bomByRef = /* @__PURE__ */ new Map();
+    for (const row of bomRows) {
+      if (!row.reference || row.dnp) continue;
+      const existing = bomByRef.get(row.reference) ?? [];
+      existing.push({ mpn: row.mpn ?? "", line: row.line, path: row.sourcePath });
+      bomByRef.set(row.reference, existing);
+    }
+    for (const [reference, entries] of bomByRef) {
+      const uniqueMpns = new Set(entries.map((entry) => entry.mpn.toLowerCase()));
+      if (uniqueMpns.size > 1) {
+        const first = entries[0];
+        findings.push(
+          finding(context, {
+            ruleId: "bom.identity-conflicts",
+            severity: configuredSeverity(context, "bom.identity-conflicts", "high"),
+            message: `${reference} appears ${entries.length} times in the BOM with conflicting MPNs: ${[...uniqueMpns].join(", ")}.`,
+            path: first?.path ?? "",
+            kind: "bom",
+            line: first?.line,
+            details: {
+              reference,
+              conflictType: "within-bom",
+              mpns: [...uniqueMpns]
+            }
+          })
+        );
+      }
+    }
+    if (bomRows.length > 0 && schematicRows.length > 0) {
+      const schematicMpn = /* @__PURE__ */ new Map();
+      for (const row of schematicRows) {
+        if (row.mpn) {
+          schematicMpn.set(row.reference, row.mpn);
+        }
+      }
+      for (const row of bomRows) {
+        if (!row.mpn || row.dnp) continue;
+        const schemMpn = schematicMpn.get(row.reference);
+        if (schemMpn && schemMpn.toLowerCase() !== row.mpn.toLowerCase()) {
+          findings.push(
+            finding(context, {
+              ruleId: "bom.identity-conflicts",
+              severity: configuredSeverity(context, "bom.identity-conflicts", "high"),
+              message: `${row.reference} has MPN "${row.mpn}" in the BOM but "${schemMpn}" in the schematic.`,
+              path: row.sourcePath,
+              kind: "bom",
+              line: row.line,
+              details: {
+                reference: row.reference,
+                conflictType: "bom-schematic",
+                bomMpn: row.mpn,
+                schematicMpn: schemMpn
+              }
+            })
+          );
+        }
+      }
+    }
+    return findings;
   }
 );
 
@@ -44793,6 +44918,7 @@ function registerBuiltInRules() {
     runErcRule,
     missingMpnRule,
     singleSourceRule,
+    identityConflictsRule,
     bomRiskScoreRule,
     eolDetectionRule,
     lifecycleRule,
@@ -44835,7 +44961,7 @@ function registerBuiltInRules() {
 }
 
 // src/rules/fabrication-snapshot.ts
-var import_node_crypto3 = __toESM(require("node:crypto"), 1);
+var import_node_crypto4 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = require("node:fs");
 var import_node_path36 = __toESM(require("node:path"), 1);
 var manufacturingPatterns = {
@@ -44928,7 +45054,7 @@ async function outputFromFiles(root, kind, files) {
   };
 }
 async function hashFile(file2) {
-  const hash2 = import_node_crypto3.default.createHash("sha256");
+  const hash2 = import_node_crypto4.default.createHash("sha256");
   for await (const chunk of (0, import_node_fs2.createReadStream)(file2)) {
     hash2.update(chunk);
   }
@@ -44940,7 +45066,7 @@ async function outputFromRows(kind, rows) {
     files: rows.length === 0 ? [] : [
       {
         path: "schematic",
-        digest: import_node_crypto3.default.createHash("sha256").update(JSON.stringify(rows)).digest("hex")
+        digest: import_node_crypto4.default.createHash("sha256").update(JSON.stringify(rows)).digest("hex")
       }
     ]
   };
@@ -45175,7 +45301,7 @@ function requirementMatchesFinding(requirement, finding2) {
 }
 
 // src/core/logger.ts
-var import_node_crypto4 = require("node:crypto");
+var import_node_crypto5 = require("node:crypto");
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path38 = __toESM(require("node:path"), 1);
 var import_picocolors = __toESM(require_picocolors(), 1);
@@ -45236,7 +45362,7 @@ function normalizeLoggerOptions(input, json2, stream) {
       format: json2 ? "json" : "text",
       stream,
       requestId: void 0,
-      sessionId: (0, import_node_crypto4.randomUUID)(),
+      sessionId: (0, import_node_crypto5.randomUUID)(),
       projectRoot: void 0,
       logFile: void 0,
       maxFileBytes: defaultMaxFileBytes,
@@ -45250,7 +45376,7 @@ function normalizeLoggerOptions(input, json2, stream) {
     format: input.format ?? "text",
     stream: input.stream ?? process.stderr,
     requestId: input.requestId,
-    sessionId: input.sessionId ?? (0, import_node_crypto4.randomUUID)(),
+    sessionId: input.sessionId ?? (0, import_node_crypto5.randomUUID)(),
     projectRoot: input.projectRoot ? normalizePath2(input.projectRoot) : void 0,
     logFile: input.logFile,
     maxFileBytes: input.maxFileBytes ?? defaultMaxFileBytes,
@@ -50339,7 +50465,7 @@ async function confirmApply(streams) {
 var import_node_path50 = __toESM(require("node:path"), 1);
 
 // src/release/generate.ts
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto6 = require("node:crypto");
 var import_promises16 = __toESM(require("node:fs/promises"), 1);
 var import_node_path49 = __toESM(require("node:path"), 1);
 var import__2 = __toESM(require__(), 1);
@@ -50613,7 +50739,7 @@ async function fileExists2(file2) {
 }
 async function fileDigest(file2) {
   const content = await import_promises16.default.readFile(file2);
-  return { sha256: (0, import_node_crypto5.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
+  return { sha256: (0, import_node_crypto6.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function toPosix(value) {
   return value.split(import_node_path49.default.sep).join("/").replace(/\\/g, "/");
@@ -51303,7 +51429,7 @@ function formatDelta(delta) {
 }
 
 // src/release/evidence.ts
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 var import_promises18 = __toESM(require("node:fs/promises"), 1);
 var import_node_path54 = __toESM(require("node:path"), 1);
 var FABRICATION_DIRS = ["fab", "fabrication", "manufacturing", "gerbers", "gerber", "production"];
@@ -51530,7 +51656,7 @@ function artifactKind(file2) {
 }
 async function fileDigest2(file2) {
   const content = await import_promises18.default.readFile(file2);
-  return { sha256: (0, import_node_crypto6.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
+  return { sha256: (0, import_node_crypto7.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function cleanObject(value) {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== void 0));
@@ -51691,7 +51817,7 @@ function releasePrepareExitCode(summary) {
 }
 
 // src/release/signing.ts
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 var import_promises19 = __toESM(require("node:fs/promises"), 1);
 var import_node_path55 = __toESM(require("node:path"), 1);
 var SIGNATURE_FILE = "manifest.sig";
@@ -51703,12 +51829,12 @@ function signManifestBytes(bytes, privateKeyPem, signedAt) {
       `release signing requires an Ed25519 private key, received ${privateKey.asymmetricKeyType ?? "unknown"}`
     );
   }
-  const signature = (0, import_node_crypto7.sign)(null, bytes, privateKey);
-  const publicKey = (0, import_node_crypto7.createPublicKey)(privateKey).export({ type: "spki", format: "pem" }).toString();
+  const signature = (0, import_node_crypto8.sign)(null, bytes, privateKey);
+  const publicKey = (0, import_node_crypto8.createPublicKey)(privateKey).export({ type: "spki", format: "pem" }).toString();
   return {
     schemaVersion: 1,
     algorithm: "ed25519",
-    manifestDigest: (0, import_node_crypto7.createHash)("sha256").update(bytes).digest("hex"),
+    manifestDigest: (0, import_node_crypto8.createHash)("sha256").update(bytes).digest("hex"),
     signature: signature.toString("base64"),
     publicKey,
     signedAt
@@ -51719,7 +51845,7 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   if (signature.algorithm !== "ed25519") {
     return { ok: false, errors: [`unsupported signature algorithm: ${signature.algorithm}`] };
   }
-  const digest = (0, import_node_crypto7.createHash)("sha256").update(bytes).digest("hex");
+  const digest = (0, import_node_crypto8.createHash)("sha256").update(bytes).digest("hex");
   if (signature.manifestDigest && signature.manifestDigest !== digest) {
     errors.push("manifest digest in signature does not match manifest contents");
   }
@@ -51731,7 +51857,7 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   }
   let valid = false;
   try {
-    valid = (0, import_node_crypto7.verify)(null, bytes, publicKey, Buffer.from(signature.signature, "base64"));
+    valid = (0, import_node_crypto8.verify)(null, bytes, publicKey, Buffer.from(signature.signature, "base64"));
   } catch {
     valid = false;
   }
@@ -51776,12 +51902,12 @@ async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
   return { present: true, ...verifyManifestSignature(bytes, signature, trustedPublicKeyPem) };
 }
 function loadKey(pem, kind) {
-  return kind === "private" ? (0, import_node_crypto7.createPrivateKey)(pem) : (0, import_node_crypto7.createPublicKey)(pem);
+  return kind === "private" ? (0, import_node_crypto8.createPrivateKey)(pem) : (0, import_node_crypto8.createPublicKey)(pem);
 }
 function publicKeysMatch(publicKey, trustedPublicKeyPem) {
   let trusted;
   try {
-    trusted = (0, import_node_crypto7.createPublicKey)(trustedPublicKeyPem);
+    trusted = (0, import_node_crypto8.createPublicKey)(trustedPublicKeyPem);
   } catch {
     return false;
   }
@@ -53359,6 +53485,7 @@ var findings_schema_default = {
             "gate.requirement",
             "bom.missing-mpn",
             "bom.single-source",
+            "bom.identity-conflicts",
             "bom.eol-detection",
             "bom.lifecycle",
             "bom.footprint-mismatch",

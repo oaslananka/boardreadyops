@@ -39,6 +39,17 @@ const rules = [
     details: "{ reference, mpn, supplier }",
   },
   {
+    id: "bom.identity-conflicts",
+    severity: "high",
+    appliesTo: ["bom", "schematic"],
+    configKeys: ["rules.bom.identity-conflicts.enabled", "rules.bom.identity-conflicts.severity"],
+    checks:
+      "Checks for components whose identity fields (MPN, manufacturer) differ between BOM and schematic sources, or appear multiple times within the same BOM with conflicting values.",
+    fires:
+      "Fires when the same reference designator has inconsistent MPNs across sources. Covers both within-BOM duplicate rows and BOM-vs-schematic conflicts.",
+    details: "{ reference, conflictType, mpns } or { reference, conflictType, bomMpn, schematicMpn }",
+  },
+  {
     id: "bom.risk-score",
     severity: "medium",
     appliesTo: ["bom"],

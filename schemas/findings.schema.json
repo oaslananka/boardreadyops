@@ -567,6 +567,7 @@
             "gate.requirement",
             "bom.missing-mpn",
             "bom.single-source",
+            "bom.identity-conflicts",
             "bom.eol-detection",
             "bom.lifecycle",
             "bom.footprint-mismatch",
