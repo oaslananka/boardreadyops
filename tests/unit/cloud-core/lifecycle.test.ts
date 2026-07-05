@@ -105,6 +105,30 @@ describe("GitHub App lifecycle normalization", () => {
     expect(normalized.accepted).toBe(true);
     expect(normalized.actions).toEqual([
       {
+        type: "installation.upsert",
+        installation: {
+          id: 12345,
+          accountLogin: "octo-org",
+          accountType: "Organization",
+        },
+      },
+      {
+        type: "repository.upsert",
+        installation: {
+          id: 12345,
+          accountLogin: "octo-org",
+          accountType: "Organization",
+        },
+        repository: {
+          id: 98765,
+          owner: "octo-org",
+          name: "hardware-board",
+          fullName: "octo-org/hardware-board",
+          private: true,
+          defaultBranch: "main",
+        },
+      },
+      {
         type: "release_run.enqueue",
         installation: {
           id: 12345,
