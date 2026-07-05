@@ -51769,7 +51769,7 @@ async function writeReleaseEvidenceBundle(root, result, options) {
   const manifestPath = import_node_path55.default.join(outputDir, "manifest.json");
   await import_promises18.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
-  const checksumsPath = import_node_path54.default.join(outputDir, "checksums.txt");
+  const checksumsPath = import_node_path55.default.join(outputDir, "checksums.txt");
   await import_promises18.default.writeFile(checksumsPath, formatChecksumsTxt(artifacts), "utf8");
   return { outputDir, manifestPath, checksumsPath, manifest };
 }
@@ -51789,18 +51789,12 @@ function formatChecksumsTxt(artifacts) {
 async function verifyReleaseEvidenceBundle(bundleDir) {
   const outputDir = import_node_path55.default.resolve(bundleDir);
   const manifestPath = import_node_path55.default.join(outputDir, "manifest.json");
-  const errors = [];
-  let manifest;
-  try {
-    manifest = JSON.parse(await import_promises18.default.readFile(manifestPath, "utf8"));
-  } catch (error51) {
-    return {
-      ok: false,
-      manifestPath,
-      checked: 0,
-      errors: [`manifest could not be read: ${error51 instanceof Error ? error51.message : String(error51)}`]
-    };
+  const readResult = await readBundleManifest(manifestPath);
+  if (!readResult.ok) {
+    return { ok: false, manifestPath, checked: 0, errors: readResult.errors };
   }
+  const manifest = readResult.manifest;
+  const errors = [];
   for (const artifact of manifest.artifacts ?? []) {
     const artifactPath = import_node_path55.default.resolve(outputDir, artifact.path);
     if (!isInside2(outputDir, artifactPath)) {
@@ -51817,6 +51811,17 @@ async function verifyReleaseEvidenceBundle(bundleDir) {
     }
   }
   return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors };
+}
+async function readBundleManifest(manifestPath) {
+  try {
+    const manifest = JSON.parse(await import_promises18.default.readFile(manifestPath, "utf8"));
+    return { ok: true, manifest };
+  } catch (error51) {
+    return {
+      ok: false,
+      errors: [`manifest could not be read: ${error51 instanceof Error ? error51.message : String(error51)}`]
+    };
+  }
 }
 async function writeReport(outputDir, relativePath, content) {
   const target = import_node_path55.default.join(outputDir, relativePath);

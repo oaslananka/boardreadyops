@@ -163,18 +163,11 @@ export interface ReleaseManifestCoverage {
 export async function verifyManifestCoverage(bundleDir: string): Promise<ReleaseManifestCoverage> {
   const outputDir = path.resolve(bundleDir);
   const manifestPath = path.join(outputDir, "manifest.json");
-  const errors: string[] = [];
-  let manifest: ReleaseEvidenceManifest;
-  try {
-    manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as ReleaseEvidenceManifest;
-  } catch (error) {
-    return {
-      ok: false,
-      manifestPath,
-      uncovered: [],
-      errors: [`manifest could not be read: ${error instanceof Error ? error.message : String(error)}`],
-    };
+  const readResult = await readBundleManifest(manifestPath);
+  if (!readResult.ok) {
+    return { ok: false, manifestPath, uncovered: [], errors: readResult.errors };
   }
+  const manifest = readResult.manifest;
   const covered = new Set((manifest.artifacts ?? []).map((artifact) => path.resolve(outputDir, artifact.path)));
   const SKIP = new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
   const allFiles: string[] = [];
@@ -183,24 +176,18 @@ export async function verifyManifestCoverage(bundleDir: string): Promise<Release
     .filter((file) => !SKIP.has(path.basename(file)) && !covered.has(file))
     .map((file) => path.relative(outputDir, file).split(path.sep).join("/"))
     .sort();
-  return { ok: uncovered.length === 0 && errors.length === 0, manifestPath, uncovered, errors };
+  return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
 }
 
 export async function verifyReleaseEvidenceBundle(bundleDir: string): Promise<ReleaseEvidenceVerification> {
   const outputDir = path.resolve(bundleDir);
   const manifestPath = path.join(outputDir, "manifest.json");
-  const errors: string[] = [];
-  let manifest: ReleaseEvidenceManifest;
-  try {
-    manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as ReleaseEvidenceManifest;
-  } catch (error) {
-    return {
-      ok: false,
-      manifestPath,
-      checked: 0,
-      errors: [`manifest could not be read: ${error instanceof Error ? error.message : String(error)}`],
-    };
+  const readResult = await readBundleManifest(manifestPath);
+  if (!readResult.ok) {
+    return { ok: false, manifestPath, checked: 0, errors: readResult.errors };
   }
+  const manifest = readResult.manifest;
+  const errors: string[] = [];
   for (const artifact of manifest.artifacts ?? []) {
     const artifactPath = path.resolve(outputDir, artifact.path);
     if (!isInside(outputDir, artifactPath)) {
@@ -217,6 +204,20 @@ export async function verifyReleaseEvidenceBundle(bundleDir: string): Promise<Re
     }
   }
   return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors };
+}
+
+async function readBundleManifest(
+  manifestPath: string,
+): Promise<{ ok: true; manifest: ReleaseEvidenceManifest } | { ok: false; errors: string[] }> {
+  try {
+    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as ReleaseEvidenceManifest;
+    return { ok: true, manifest };
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [`manifest could not be read: ${error instanceof Error ? error.message : String(error)}`],
+    };
+  }
 }
 
 async function writeReport(outputDir: string, relativePath: string, content: string): Promise<ReleaseEvidenceArtifact> {
