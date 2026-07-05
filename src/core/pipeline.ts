@@ -176,6 +176,7 @@ async function validatePhase(
       options: {
         ...ctx.options,
         mode: projectConfig.mode ?? ctx.options.mode,
+        releaseMode: projectConfig.releaseMode ?? ctx.options.releaseMode,
         bom: variantMatch?.bom ?? override?.bom ?? ctx.options.bom,
         pinmap: override?.pinmap ?? ctx.options.pinmap,
       },
@@ -224,7 +225,14 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
   const waiverResult = applyWaivers(sorted, ctx.config.waivers ?? []);
   const effectiveFindings = waiverResult.findings;
   const fabrication = await captureFabricationSnapshot(ctx.root, projects, ctx.options, ctx.config);
-  const readiness = await computeRunReadiness(ctx.root, ctx.config, ctx.options.failOn, effectiveFindings);
+  const readiness = await computeRunReadiness(
+    ctx.root,
+    ctx.config,
+    ctx.options.failOn,
+    effectiveFindings,
+    ctx.options.releaseMode,
+    waiverResult.expired.length,
+  );
   const summary = summarizeFindings(effectiveFindings, ctx.options.failOn);
 
   const policy = ctx.config.policy
@@ -259,12 +267,14 @@ function assembleRunResult(
   projects: ProjectContext[],
 ): RunResult {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
+  const releaseMode = ctx.options.releaseMode;
   return {
     schemaVersion: 1,
     tool: {
       name: "boardreadyops",
       version: boardReadyVersion,
     },
+    ...(releaseMode ? { releaseMode } : {}),
     summary,
     readiness,
     ...(bomRisk ? { bomRisk } : {}),
@@ -301,6 +311,8 @@ async function computeRunReadiness(
   config: BoardReadyOpsConfig,
   failOn: FailOn,
   findings: Finding[],
+  releaseMode?: import("./config.types.js").ReleaseMode,
+  expiredWaivers?: number,
 ): Promise<ReadinessScore> {
   const resolved = resolveVendorProfile(config.vendor);
   const presentOutputs = new Set<string>();
@@ -319,6 +331,8 @@ async function computeRunReadiness(
     presentOutputs,
     findings,
     failOn,
+    ...(releaseMode ? { releaseMode } : {}),
+    ...(expiredWaivers !== undefined ? { expiredWaivers } : {}),
   });
 }
 
@@ -360,6 +374,7 @@ function normalizeOptions(
     project: input.project,
     config: input.config,
     mode: gate ? "enforce" : (input.mode ?? config.mode ?? "warn"),
+    releaseMode: input.releaseMode ?? config.releaseMode,
     requireKicad: input.requireKicad ?? false,
     kicadCli: input.kicadCli,
     bom: input.bom,
@@ -452,6 +467,9 @@ function configForProject(root: string, config: BoardReadyOpsConfig, project: Pr
   };
   if (override.mode) {
     projectConfig.mode = override.mode;
+  }
+  if (override.releaseMode) {
+    projectConfig.releaseMode = override.releaseMode;
   }
   if (override.firmware) {
     projectConfig.firmware = {

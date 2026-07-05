@@ -11,6 +11,9 @@ import type { VendorProfileConfig } from "../vendor/profiles.js";
 import type { FailOn, Severity } from "./findings.js";
 import type { PluginPermissionGrantConfig } from "./plugin-permissions.js";
 
+/** Manufacturing release context that controls severity thresholds, required artifacts, and waiver behavior. */
+export type ReleaseMode = "prototype" | "pilot" | "production";
+
 export interface RuleConfig {
   enabled?: boolean;
   severity?: Severity;
@@ -53,6 +56,7 @@ interface FirmwareConfig {
 interface ProjectConfig {
   path: string;
   mode?: "warn" | "enforce";
+  releaseMode?: ReleaseMode;
   pinmap?: string;
   bom?: string;
   vendor?: VendorProfileConfig;
@@ -181,6 +185,7 @@ interface BomTopLevelConfig {
 export interface BoardReadyOpsConfig {
   version: 1;
   mode?: "warn" | "enforce";
+  releaseMode?: ReleaseMode;
   plugins?: string[];
   pluginPermissions?: PluginPermissionGrantConfig;
   vendor?: VendorProfileConfig;

@@ -1,4 +1,5 @@
 import type { BomRiskSummary } from "./bom-risk.js";
+import type { ReleaseMode } from "./config.types.js";
 import type { ProjectContext } from "./context.js";
 import type { FabricationSnapshot } from "./diff/fabrication.js";
 import type { Finding, FindingSummary } from "./findings.js";
@@ -15,6 +16,7 @@ export interface RunResult {
   };
   status?: "passed" | "failed" | undefined;
   exitCode?: number | undefined;
+  releaseMode?: ReleaseMode | undefined;
   summary: FindingSummary;
   readiness?: ReadinessScore | undefined;
   bomRisk?: BomRiskSummary | undefined;

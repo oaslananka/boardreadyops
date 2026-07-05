@@ -1,5 +1,6 @@
 import Mustache from "mustache";
 import type { BomRiskSummary } from "../core/bom-risk.js";
+import type { ReleaseMode } from "../core/config.types.js";
 import type { FabricationDiff } from "../core/diff/fabrication.js";
 import type { Finding } from "../core/findings.js";
 import type { RunResult } from "../core/result.js";
@@ -33,6 +34,7 @@ export function formatMarkdown(
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none",
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : undefined;
+  const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : undefined;
   return Mustache.render(
     prCommentTemplate,
     {
@@ -49,6 +51,8 @@ export function formatMarkdown(
       fabrication: fabricationView,
       hasBomRisk: Boolean(bomRiskView),
       bomRisk: bomRiskView,
+      hasReleaseMode: Boolean(releaseModeView),
+      releaseModeView,
       labels: markdownLabels(locale),
     },
     { summary: summaryTemplate },
@@ -113,6 +117,7 @@ function markdownLabels(locale: Locale): Record<string, string> {
     noFindings: t("report.noFindings", {}, locale),
     previous: t("report.previous", {}, locale),
     ref: t("report.ref", {}, locale),
+    releaseModeTitle: t("report.releaseMode.title", {}, locale),
     reportTitle: t("report.title", {}, locale),
     status: t("report.status", {}, locale),
     topFindings: t("report.topFindings", {}, locale),
@@ -144,5 +149,19 @@ function markdownFinding(finding: Finding) {
   return {
     ...finding,
     report: reportFindingContext(finding),
+  };
+}
+
+const RELEASE_MODE_BADGE: Record<ReleaseMode, string> = {
+  prototype: "🔬 Prototype",
+  pilot: "🧪 Pilot",
+  production: "🏭 Production",
+};
+
+function formatReleaseMode(mode: ReleaseMode, locale: Locale) {
+  return {
+    mode,
+    badge: RELEASE_MODE_BADGE[mode],
+    description: t(`report.releaseMode.${mode}`, {}, locale),
   };
 }

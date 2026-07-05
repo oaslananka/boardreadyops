@@ -26,6 +26,10 @@ inputs:
     description: "warn or enforce"
     required: false
     default: warn
+  release-mode:
+    description: Manufacturing release context. One of prototype, pilot, production. Empty disables release mode behavior.
+    required: false
+    default: ""
   require-kicad:
     description: Fail when kicad-cli is not available.
     required: false

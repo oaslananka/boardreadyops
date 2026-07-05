@@ -1,3 +1,4 @@
+import type { ReleaseMode } from "./config.types.js";
 import { type FailOn, type Finding, severityRankValue } from "./findings.js";
 
 interface ReadinessEvidence {
@@ -25,6 +26,9 @@ export interface ReadinessInput {
   presentOutputs: Set<string>;
   findings: Finding[];
   failOn: FailOn;
+  releaseMode?: ReleaseMode | undefined;
+  /** Number of expired waivers; in production mode these block the release. */
+  expiredWaivers?: number | undefined;
 }
 
 const REQUIRED_PENALTY = 25;
@@ -44,11 +48,13 @@ function clampScore(value: number): number {
 }
 
 export function computeReadiness(input: ReadinessInput): ReadinessScore {
+  const isProduction = input.releaseMode === "production";
   const required = [...new Set(input.requiredOutputs)].sort();
   const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required.includes(output)).sort();
 
   const missingRequired = required.filter((output) => !input.presentOutputs.has(output));
   const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
+  const expiredWaivers = input.expiredWaivers ?? 0;
 
   let blocking = 0;
   let nonBlocking = 0;
@@ -63,16 +69,20 @@ export function computeReadiness(input: ReadinessInput): ReadinessScore {
     }
   }
 
+  // In production mode, missing recommended outputs and expired waivers are treated as blocking.
+  const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
+
   const score = clampScore(
     100 -
       missingRequired.length * REQUIRED_PENALTY -
       missingRecommended.length * RECOMMENDED_PENALTY -
       blocking * BLOCKING_PENALTY -
-      nonBlocking * NON_BLOCKING_PENALTY,
+      nonBlocking * NON_BLOCKING_PENALTY -
+      productionBlockers * REQUIRED_PENALTY,
   );
 
   const status: ReadinessScore["status"] =
-    missingRequired.length > 0 || blocking > 0
+    missingRequired.length > 0 || blocking > 0 || productionBlockers > 0
       ? "blocked"
       : missingRecommended.length > 0 || nonBlocking > 0
         ? "at-risk"
@@ -96,10 +106,17 @@ export function computeReadiness(input: ReadinessInput): ReadinessScore {
     warnings.push(`Required output ${output} is missing.`);
   }
   for (const output of missingRecommended) {
-    warnings.push(`Recommended output ${output} is missing.`);
+    if (isProduction) {
+      warnings.push(`Recommended output ${output} is required in production mode.`);
+    } else {
+      warnings.push(`Recommended output ${output} is missing.`);
+    }
   }
   if (blocking > 0) {
     warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
+  }
+  if (isProduction && expiredWaivers > 0) {
+    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
   }
 
   return {

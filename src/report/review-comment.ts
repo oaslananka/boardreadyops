@@ -1,4 +1,5 @@
 import type { BomRiskSummary } from "../core/bom-risk.js";
+import type { ReleaseMode } from "../core/config.types.js";
 import type { Finding, Severity } from "../core/findings.js";
 import type { RunResult } from "../core/result.js";
 import { type Locale, t } from "../i18n/t.js";
@@ -56,7 +57,18 @@ function decisionLine(result: RunResult): string {
   if (result.policy?.enforced) {
     parts.push(`policy ${result.policy.status}`);
   }
-  return `**Decision: ${failed ? "❌ FAIL" : "✅ PASS"}** — ${parts.join("; ")}`;
+  const modeBadge = result.releaseMode ? `${releaseModeEmoji(result.releaseMode)} ${result.releaseMode} | ` : "";
+  return `**Decision: ${failed ? "❌ FAIL" : "✅ PASS"}** — ${modeBadge}${parts.join("; ")}`;
+}
+
+const RELEASE_MODE_EMOJI: Record<ReleaseMode, string> = {
+  prototype: "🔬",
+  pilot: "🧪",
+  production: "🏭",
+};
+
+function releaseModeEmoji(mode: ReleaseMode): string {
+  return RELEASE_MODE_EMOJI[mode];
 }
 
 function severityTable(result: RunResult, locale: Locale): string[] {
