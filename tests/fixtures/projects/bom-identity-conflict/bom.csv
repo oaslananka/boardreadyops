@@ -1,0 +1,4 @@
+Reference,Value,Footprint,Manufacturer,MPN,Supplier 1,Lifecycle,DNP
+R1,10k,Resistor_SMD:R_0603,Yageo,RC0603FR-0710KL,DigiKey,Active,false
+R1,10k,Resistor_SMD:R_0603,Vishay,CRCW06031K00FKEA,Mouser,Active,false
+C1,100n,Capacitor_SMD:C_0402,Murata,GRM155R60J104KA01D,DigiKey,Active,false

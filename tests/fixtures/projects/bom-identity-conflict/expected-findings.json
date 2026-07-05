@@ -1,0 +1,8 @@
+{
+  "fixture": "bom-identity-conflict",
+  "expectedRules": ["bom.identity-conflicts"],
+  "expectedSeverities": ["high"],
+  "expectPass": true,
+  "performanceBaselineMs": 100,
+  "runRules": ["bom.identity-conflicts"]
+}
