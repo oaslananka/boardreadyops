@@ -1,5 +1,6 @@
 import type { Finding, FixSuggestion } from "../core/findings.js";
 import type { RunResult } from "../core/result.js";
+import { listRules } from "../core/rule-registry.js";
 import { reportCoordinate, reportCoordinateWithUnits, reportFindingContext } from "./finding-context.js";
 
 export function formatSarif(result: RunResult): string {
@@ -9,6 +10,7 @@ export function formatSarif(result: RunResult): string {
       rules.set(finding.ruleId, finding);
     }
   }
+  const ruleTagsByRuleId = buildRuleTagsIndex();
   const sarif = {
     version: "2.1.0",
     $schema: "https://json.schemastore.org/sarif-2.1.0.json",
@@ -29,6 +31,9 @@ export function formatSarif(result: RunResult): string {
               defaultConfiguration: {
                 level: sarifLevel(finding.severity),
               },
+              ...(ruleTagsByRuleId.has(finding.ruleId)
+                ? { properties: { tags: ruleTagsByRuleId.get(finding.ruleId) } }
+                : {}),
             })),
           },
         },
@@ -93,6 +98,16 @@ function sarifLocation(finding: Finding) {
     },
     ...logicalLocation,
   };
+}
+
+function buildRuleTagsIndex(): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const rule of listRules()) {
+    if (rule.meta.tags.length > 0) {
+      index.set(rule.meta.id, rule.meta.tags);
+    }
+  }
+  return index;
 }
 
 function sarifLevel(severity: Finding["severity"]): "error" | "warning" | "note" | "none" {

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oaslananka/boardreadyops/schemas/evidence-v2.json",
+  "title": "BoardReadyOps release evidence manifest",
+  "description": "Manifest emitted by writeReleaseEvidenceBundle documenting every artifact included in a hardware release evidence package.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "tool",
+    "generatedAt",
+    "git",
+    "decision",
+    "summary",
+    "projects",
+    "layout",
+    "artifacts",
+    "gaps",
+    "provenance",
+    "verification"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "boardreadyops" },
+        "version": { "type": "string" }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "description": "ISO 8601 UTC timestamp of bundle generation."
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sha": { "type": "string" },
+        "dirty": { "type": "boolean" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["status", "reasons"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["pass", "fail"] },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Finding summary from the associated run result."
+    },
+    "projects": {
+      "type": "array",
+      "description": "Project contexts from the associated run result."
+    },
+    "layout": {
+      "type": "object",
+      "required": ["reports", "artifacts", "generated"],
+      "additionalProperties": false,
+      "properties": {
+        "reports": { "type": "string" },
+        "artifacts": { "type": "string" },
+        "generated": { "type": "string" }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "kind", "sha256", "bytes"],
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" },
+          "sourcePath": { "type": "string" },
+          "kind": {
+            "enum": ["report", "fabrication", "bom", "cpl", "drill", "gerber", "generated", "other"]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 hex digest of the artifact file."
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "enum": ["missing-artifact", "missing-project-file"] },
+          "path": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attestation": { "type": "string" },
+        "source": { "type": "string" }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": ["algorithm", "artifactCount"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "artifactCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

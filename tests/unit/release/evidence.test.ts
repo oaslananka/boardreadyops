@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
+import evidenceSchema from "../../../schemas/evidence.schema.json" with { type: "json" };
 import { runPipeline } from "../../../src/core/pipeline.js";
 import { verifyReleaseEvidenceBundle, writeReleaseEvidenceBundle } from "../../../src/release/evidence.js";
 import { writeFixture } from "../rules/helpers.js";
@@ -59,6 +61,10 @@ describe("release evidence bundles", () => {
     await expect(fs.readFile(path.join(root, "bundle", "manifest.json"), "utf8")).resolves.toContain(
       '"schemaVersion": 2',
     );
+    const rawManifest = await fs.readFile(path.join(root, "bundle", "manifest.json"), "utf8");
+    const ajv = new Ajv2020({ allErrors: true });
+    const validate = ajv.compile(evidenceSchema);
+    expect(validate(JSON.parse(rawManifest)), JSON.stringify(validate.errors)).toBe(true);
     await expect(verifyReleaseEvidenceBundle(path.join(root, "bundle"))).resolves.toMatchObject({
       ok: true,
       checked: 7,

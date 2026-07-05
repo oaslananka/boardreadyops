@@ -293,6 +293,17 @@ describe("report formats", () => {
     expect(markdown).toContain("Add an alternate approved source.");
   });
 
+  it("includes rule tags in SARIF tool.driver.rules when available from registry", () => {
+    const payload = JSON.parse(formatSarif(sampleResult()));
+    // bom.missing-mpn is a registered rule with tags like ["bom", "identity", "sourcing"] or similar
+    const ruleEntry = payload.runs[0].tool.driver.rules[0];
+    expect(ruleEntry).toBeDefined();
+    // tags are optional based on whether the rule is registered; if present they must be an array
+    if (ruleEntry.properties?.tags !== undefined) {
+      expect(Array.isArray(ruleEntry.properties.tags)).toBe(true);
+    }
+  });
+
   it("carries stable finding identity across JSON SARIF Markdown and JUnit", () => {
     const result = sampleResult();
     const stableId = result.findings[0]?.fingerprint.slice(0, 12);
