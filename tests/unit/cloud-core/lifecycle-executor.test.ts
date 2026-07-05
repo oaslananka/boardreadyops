@@ -37,6 +37,10 @@ function recordingStore(calls: string[]): GitHubAppLifecycleStore {
     },
     async enqueueReleaseRun() {
       calls.push("release_run.enqueue");
+      return { idempotencyKey: "98765:12:0123456789abcdef", runId: "run-row-id" };
+    },
+    async attachGitHubCheckRun() {
+      calls.push("release_run.attach_check_run");
     },
   };
 }
@@ -68,6 +72,8 @@ describe("GitHub App lifecycle execution", () => {
       repositoriesUpserted: 1,
       repositoriesRemoved: 0,
       releaseRunsQueued: 1,
+      checkRunsCreated: 0,
+      checkRunsSkipped: 0,
     });
   });
 

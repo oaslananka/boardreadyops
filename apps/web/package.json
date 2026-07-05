@@ -15,7 +15,8 @@
     "react-dom": "19.2.7",
     "@boardreadyops/cloud-core": "workspace:*",
     "@boardreadyops/contracts": "workspace:*",
-    "@boardreadyops/db": "workspace:*"
+    "@boardreadyops/db": "workspace:*",
+    "@octokit/auth-app": "latest"
   },
   "devDependencies": {
     "@types/react": "19.2.17",

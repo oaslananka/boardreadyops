@@ -21,6 +21,12 @@ function recordingExecutor() {
   const executor: SqlQueryExecutor = {
     async query(sql, params = []) {
       calls.push({ sql, params });
+
+      if (sql.includes("returning id")) {
+        return { rows: [{ id: "run-row-id", github_check_run_id: null }] };
+      }
+
+      return { rows: [] };
     },
   };
 
@@ -80,7 +86,7 @@ describe("SQL GitHub App lifecycle store", () => {
       now: () => new Date("2026-07-04T00:00:00.000Z"),
     });
 
-    await store.enqueueReleaseRun({
+    const result = await store.enqueueReleaseRun({
       type: "release_run.enqueue",
       installation,
       repository,
@@ -90,9 +96,10 @@ describe("SQL GitHub App lifecycle store", () => {
       triggerKind: "pr",
     });
 
+    expect(result.runId).toBe("run-row-id");
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("insert into release_runs");
-    expect(calls[0]?.sql).toContain("on conflict (idempotency_key) do nothing");
+    expect(calls[0]?.sql).toContain("on conflict (idempotency_key)");
     expect(calls[0]?.params).toEqual([
       98765,
       "0123456789abcdef",

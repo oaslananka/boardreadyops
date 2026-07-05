@@ -2,12 +2,34 @@ import type { GitHubAppLifecycleAction } from "./lifecycle.js";
 
 export type EnqueueReleaseRunInput = Extract<GitHubAppLifecycleAction, { type: "release_run.enqueue" }>;
 
+export type EnqueuedReleaseRun = {
+  idempotencyKey: string;
+  runId?: string;
+  githubCheckRunId?: number | string | null;
+};
+
+export type AttachGitHubCheckRunInput = {
+  idempotencyKey: string;
+  githubCheckRunId: number;
+};
+
+export type CreatePullRequestCheckRunInput = {
+  action: EnqueueReleaseRunInput;
+  runId: string;
+  idempotencyKey: string;
+};
+
+export type GitHubAppCheckRunClient = {
+  createPullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
+};
+
 export type GitHubAppLifecycleStore = {
   upsertInstallation(action: Extract<GitHubAppLifecycleAction, { type: "installation.upsert" }>): Promise<void>;
   deleteInstallation(action: Extract<GitHubAppLifecycleAction, { type: "installation.deleted" }>): Promise<void>;
   upsertRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.upsert" }>): Promise<void>;
   removeRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.removed" }>): Promise<void>;
-  enqueueReleaseRun(action: EnqueueReleaseRunInput): Promise<void>;
+  enqueueReleaseRun(action: EnqueueReleaseRunInput): Promise<EnqueuedReleaseRun>;
+  attachGitHubCheckRun(input: AttachGitHubCheckRunInput): Promise<void>;
 };
 
 export type GitHubAppLifecycleExecutionResult = {
@@ -17,6 +39,8 @@ export type GitHubAppLifecycleExecutionResult = {
   repositoriesUpserted: number;
   repositoriesRemoved: number;
   releaseRunsQueued: number;
+  checkRunsCreated: number;
+  checkRunsSkipped: number;
 };
 
 export const emptyGitHubAppLifecycleExecutionResult = {
@@ -26,6 +50,8 @@ export const emptyGitHubAppLifecycleExecutionResult = {
   repositoriesUpserted: 0,
   repositoriesRemoved: 0,
   releaseRunsQueued: 0,
+  checkRunsCreated: 0,
+  checkRunsSkipped: 0,
 } as const satisfies GitHubAppLifecycleExecutionResult;
 
 export function releaseRunIdempotencyKey(action: EnqueueReleaseRunInput): string {
@@ -35,6 +61,7 @@ export function releaseRunIdempotencyKey(action: EnqueueReleaseRunInput): string
 export async function executeGitHubAppLifecycleActions(
   actions: readonly GitHubAppLifecycleAction[],
   store: GitHubAppLifecycleStore,
+  checkRunClient?: GitHubAppCheckRunClient,
 ): Promise<GitHubAppLifecycleExecutionResult> {
   const result: GitHubAppLifecycleExecutionResult = {
     ...emptyGitHubAppLifecycleExecutionResult,
@@ -59,10 +86,32 @@ export async function executeGitHubAppLifecycleActions(
         await store.removeRepository(action);
         result.repositoriesRemoved += 1;
         break;
-      case "release_run.enqueue":
-        await store.enqueueReleaseRun(action);
+      case "release_run.enqueue": {
+        const releaseRun = await store.enqueueReleaseRun(action);
+
+        if (!releaseRun.runId) {
+          result.checkRunsSkipped += 1;
+          break;
+        }
+
         result.releaseRunsQueued += 1;
+
+        if (checkRunClient && !releaseRun.githubCheckRunId) {
+          const checkRun = await checkRunClient.createPullRequestCheckRun({
+            action,
+            runId: releaseRun.runId,
+            idempotencyKey: releaseRun.idempotencyKey,
+          });
+          await store.attachGitHubCheckRun({
+            idempotencyKey: releaseRun.idempotencyKey,
+            githubCheckRunId: checkRun.id,
+          });
+          result.checkRunsCreated += 1;
+        } else if (releaseRun.githubCheckRunId) {
+          result.checkRunsSkipped += 1;
+        }
         break;
+      }
       default: {
         const exhaustive: never = action;
         throw new Error(`Unsupported GitHub App lifecycle action: ${JSON.stringify(exhaustive)}`);
@@ -79,6 +128,9 @@ export function createNoopGitHubAppLifecycleStore(): GitHubAppLifecycleStore {
     async deleteInstallation() {},
     async upsertRepository() {},
     async removeRepository() {},
-    async enqueueReleaseRun() {},
+    async enqueueReleaseRun() {
+      return { idempotencyKey: "noop" };
+    },
+    async attachGitHubCheckRun() {},
   };
 }
