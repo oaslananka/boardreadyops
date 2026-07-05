@@ -263,7 +263,7 @@ exports[`report snapshots > formats stable JSON 1`] = `
 `;
 
 exports[`report snapshots > formats stable JUnit 1`] = `
-"<?xml version="1.0" encoding="UTF-8"?><testsuite name="boardreadyops" tests="1" failures="1"><testcase classname="bom.missing-mpn" name="bom.csv:2:1" file="bom.csv" id="6b8bae8b505e"><failure message="R1 is missing an MPN.">{&quot;reference&quot;:&quot;R1&quot;,&quot;fingerprint&quot;:&quot;6b8bae8b505e9461a9c3b8df7fb0e0f7daa70750a14eb6fd1c74144431e31b8f&quot;,&quot;location&quot;:&quot;bom.csv:2:1&quot;,&quot;help&quot;:&quot;See the BoardReadyOps rule documentation for remediation guidance.&quot;}</failure></testcase></testsuite>
+"<?xml version="1.0" encoding="UTF-8"?><testsuite name="boardreadyops" tests="1" failures="1" timestamp="2026-05-18T00:00:00.000Z"><testcase classname="bom.missing-mpn" name="bom.csv:2:1" file="bom.csv" id="6b8bae8b505e"><failure message="R1 is missing an MPN.">{&quot;reference&quot;:&quot;R1&quot;,&quot;fingerprint&quot;:&quot;6b8bae8b505e9461a9c3b8df7fb0e0f7daa70750a14eb6fd1c74144431e31b8f&quot;,&quot;location&quot;:&quot;bom.csv:2:1&quot;,&quot;help&quot;:&quot;See the BoardReadyOps rule documentation for remediation guidance.&quot;}</failure></testcase></testsuite>
 "
 `;
 
