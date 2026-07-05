@@ -45901,7 +45901,8 @@ var pluginSchema = external_exports.strictObject({
   adapters: external_exports.array(extensionSchema).optional(),
   reportFormats: external_exports.array(extensionSchema).optional(),
   vendorProfiles: external_exports.array(extensionSchema).optional(),
-  notifiers: external_exports.array(extensionSchema).optional()
+  notifiers: external_exports.array(extensionSchema).optional(),
+  supplierProviders: external_exports.array(extensionSchema).optional()
 });
 async function discoverPluginSpecifiers(root, configuredPlugins = []) {
   const specifiers = [];

@@ -123,6 +123,72 @@ export interface Notifier {
   [key: string]: unknown;
 }
 
+/** Lifecycle status for a component part number from a supplier intelligence provider. */
+export type SupplierLifecycleStatus = "active" | "nrnd" | "last-time-buy" | "eol" | "obsolete" | "unknown";
+
+/** Trust level of the data returned by a supplier intelligence provider. */
+export type SupplierDataTrust = "verified" | "estimated" | "unverified" | "unknown";
+
+/** Per-component intelligence record returned by a supplier provider. */
+export interface SupplierIntelligenceRecord {
+  /** The MPN this record covers. */
+  mpn: string;
+  /** Manufacturer name, if known. */
+  manufacturer?: string | undefined;
+  /** Part lifecycle status from the supplier or distributor. */
+  lifecycleStatus?: SupplierLifecycleStatus | undefined;
+  /** Number of known active distributors stocking this part. */
+  supplierCount?: number | undefined;
+  /** Whether the part is currently available (sufficient stock for the project). */
+  available?: boolean | undefined;
+  /** Approved or known alternate MPNs that can substitute this part. */
+  alternates?: string[] | undefined;
+  /** Whether the part is on any regulatory restricted substances list. */
+  restrictedSubstances?: boolean | undefined;
+  /** Compliance notes (e.g. RoHS, REACH, ECCN). */
+  complianceNotes?: string[] | undefined;
+  /** Indicative lead time in weeks at query time. */
+  leadTimeWeeks?: number | undefined;
+  /** Free-form notes from the provider. */
+  notes?: string | undefined;
+  /** ISO 8601 timestamp when this record was last fetched or updated. */
+  fetchedAt?: string | undefined;
+  /** Trust level of the data in this record. */
+  trust?: SupplierDataTrust | undefined;
+}
+
+/** Input passed to a supplier intelligence provider when querying component data. */
+export interface SupplierIntelligenceQuery {
+  /** Components to look up; each entry has at minimum a reference and optionally mpn/manufacturer. */
+  components: Array<{
+    reference: string;
+    mpn?: string | undefined;
+    manufacturer?: string | undefined;
+  }>;
+  /** Optional project root path (read-only access). */
+  projectRoot?: string | undefined;
+}
+
+/** Result returned by a supplier intelligence provider. */
+export interface SupplierIntelligenceResult {
+  /** Per-component records, keyed by MPN. */
+  records: Map<string, SupplierIntelligenceRecord>;
+  /** Provider-level warnings (e.g. API rate limit, partial data, freshness). */
+  warnings?: string[] | undefined;
+  /** ISO 8601 timestamp when the query was executed. */
+  queriedAt?: string | undefined;
+}
+
+/** Supplier intelligence provider extension point for plugins. */
+export interface SupplierIntelligenceProvider {
+  id: string;
+  name: string;
+  /** True when this provider requires network access. */
+  requiresNetwork?: boolean | undefined;
+  /** Fetch supplier intelligence for the given components. */
+  query(input: SupplierIntelligenceQuery): Promise<SupplierIntelligenceResult>;
+}
+
 /** Runtime capabilities a plugin asks the host to approve before loading. */
 export type PluginPermission = "fs:read" | "fs:write" | "network" | "process" | "kicad-cli";
 
@@ -136,6 +202,8 @@ export interface BoardReadyOpsPlugin {
   reportFormats?: ReportEmitter[] | undefined;
   vendorProfiles?: VendorProfile[] | undefined;
   notifiers?: Notifier[] | undefined;
+  /** Supplier intelligence providers contributed by this plugin. */
+  supplierProviders?: SupplierIntelligenceProvider[] | undefined;
 }
 
 /**

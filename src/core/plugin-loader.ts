@@ -73,6 +73,7 @@ const pluginSchema = z.strictObject({
   reportFormats: z.array(extensionSchema).optional(),
   vendorProfiles: z.array(extensionSchema).optional(),
   notifiers: z.array(extensionSchema).optional(),
+  supplierProviders: z.array(extensionSchema).optional(),
 });
 
 export async function discoverPluginSpecifiers(root: string, configuredPlugins: string[] = []): Promise<string[]> {
