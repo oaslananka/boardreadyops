@@ -32,10 +32,11 @@ const rules = [
     id: "bom.single-source",
     severity: "medium",
     appliesTo: ["bom"],
-    configKeys: ["rules.bom.single-source.enabled", "rules.bom.single-source.severity"],
+    configKeys: ["rules.bom.single-source.enabled", "rules.bom.single-source.severity", "bom.alternates"],
     checks: "Checks supplier columns for parts that only list one source.",
-    fires: "Fires when supplier metadata is present and a row has a single supplier.",
-    details: "{ reference, mpn, suppliers }",
+    fires:
+      "Fires when supplier metadata is present and a row has a single supplier and no approved alternates are configured for its MPN.",
+    details: "{ reference, mpn, supplier }",
   },
   {
     id: "bom.eol-detection",

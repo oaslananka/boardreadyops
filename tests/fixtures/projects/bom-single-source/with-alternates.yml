@@ -1,0 +1,19 @@
+version: 1
+projects:
+  - path: .
+    bom: bom.csv
+bom:
+  alternates:
+    - mpn: "RC0603FR-0710KL"
+      alts:
+        - mpn: "RMCF0603FT10K0"
+          manufacturer: "Stackpole Electronics"
+          note: "Verified drop-in replacement for 10k 0603"
+rules:
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false
+  release.changelog-present:
+    enabled: false
+fail-on: never

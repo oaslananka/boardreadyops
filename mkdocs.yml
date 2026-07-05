@@ -102,6 +102,7 @@ nav:
           - Pinmap: rules/pinmap.md
           - Release: rules/release.md
       - Vendor Profiles: vendor-profiles.md
+      - BOM Approved Alternates: bom-alternates.md
       - Readiness Scoring: release/readiness-scoring.md
       - Hardware SBOM: sbom.md
       - Release Evidence: release/evidence-bundles.md

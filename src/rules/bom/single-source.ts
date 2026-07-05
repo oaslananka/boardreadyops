@@ -1,3 +1,4 @@
+import { buildAlternatesMap, hasApprovedAlternates } from "../../bom/alternates.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -9,7 +10,7 @@ export const singleSourceRule = rule(
     rationale: "Single-source parts increase procurement risk when a supplier changes availability.",
     defaultSeverity: "medium",
     appliesTo: ["bom"],
-    configKeys: ["rules.bom.single-source.severity"],
+    configKeys: ["rules.bom.single-source.severity", "bom.alternates"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "sourcing", "supplier"],
   },
@@ -18,8 +19,11 @@ export const singleSourceRule = rule(
       return [];
     }
     const { bomRows } = await loadBomContext(context);
+    const alternatesMap = buildAlternatesMap(context.config.bom?.alternates ?? []);
     return bomRows
-      .filter((row) => !row.dnp && row.mpn && row.suppliers?.length === 1)
+      .filter(
+        (row) => !row.dnp && row.mpn && row.suppliers?.length === 1 && !hasApprovedAlternates(row.mpn, alternatesMap),
+      )
       .map((row) =>
         finding(context, {
           ruleId: "bom.single-source",

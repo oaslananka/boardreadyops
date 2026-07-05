@@ -6,6 +6,7 @@ applies-to:
 config-keys:
   - rules.bom.single-source.enabled
   - rules.bom.single-source.severity
+  - bom.alternates
 ---
 
 # bom.single-source
@@ -16,7 +17,7 @@ Checks supplier columns for parts that only list one source.
 
 ## When It Fires
 
-Fires when supplier metadata is present and a row has a single supplier.
+Fires when supplier metadata is present and a row has a single supplier and no approved alternates are configured for its MPN.
 
 ## Configuration Example
 
@@ -31,7 +32,7 @@ rules:
 ## JSON Finding Details Shape
 
 ```text
-{ reference, mpn, suppliers }
+{ reference, mpn, supplier }
 ```
 
 ## Report Context
