@@ -15,7 +15,7 @@ export type AttachGitHubCheckRunInput = {
 
 export type MarkReleaseRunDispatchedInput = {
   runId: string;
-  workflowDispatchId?: string;
+  workflowDispatchId?: string | undefined;
 };
 
 export type CreatePullRequestCheckRunInput = {
