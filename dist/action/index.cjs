@@ -82472,7 +82472,7 @@ var bomRiskScoreRule = rule(
         ruleId: "bom.risk-score",
         severity: resolvedSeverity,
         message,
-        path: row?.sourcePath ?? bomRows[0].sourcePath,
+        path: row?.sourcePath ?? bomRows[0]?.sourcePath ?? context5.root,
         kind: "bom",
         line: row?.line,
         details: {
@@ -82490,7 +82490,7 @@ var bomRiskScoreRule = rule(
   }
 );
 function parseWeights(config2) {
-  const w = config2["weights"] ?? {};
+  const w = config2.weights ?? {};
   const num = (v) => typeof v === "number" ? v : void 0;
   const result = {};
   const missingMpn = num(w["missing-mpn"]);
@@ -100664,18 +100664,18 @@ function bomRiskSummaryFromFindings(findings) {
   if (riskFindings.length === 0) {
     return void 0;
   }
-  const firstDetails = riskFindings[0].details;
-  const totalComponents = typeof firstDetails["totalComponents"] === "number" ? firstDetails["totalComponents"] : riskFindings.length;
-  const overallRiskScore = typeof firstDetails["overallBomRiskScore"] === "number" ? firstDetails["overallBomRiskScore"] : 0;
+  const firstDetails = riskFindings[0]?.details ?? {};
+  const totalComponents = typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
+  const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
   const components = riskFindings.map((f) => {
-    const d = f.details;
-    const factors = d["factors"] ?? {};
+    const d = f.details ?? {};
+    const factors = d.factors ?? {};
     return {
-      reference: String(d["reference"] ?? ""),
-      mpn: typeof d["mpn"] === "string" ? d["mpn"] : void 0,
-      manufacturer: typeof d["manufacturer"] === "string" ? d["manufacturer"] : void 0,
-      riskScore: typeof d["riskScore"] === "number" ? d["riskScore"] : 0,
-      riskLevel: isRiskLevel(d["riskLevel"]) ? d["riskLevel"] : "none",
+      reference: String(d.reference ?? ""),
+      mpn: typeof d.mpn === "string" ? d.mpn : void 0,
+      manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : void 0,
+      riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,
+      riskLevel: isRiskLevel(d.riskLevel) ? d.riskLevel : "none",
       factors
     };
   });

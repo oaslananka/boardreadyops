@@ -38,6 +38,12 @@ function checkRunColumn(row: Record<string, unknown> | undefined): string | numb
   return typeof value === "string" || typeof value === "number" || value === null ? value : undefined;
 }
 
+const enabledReleaseRepositories = new Set(["oaslananka/boardreadyops", "oaslananka/zaptrace"]);
+
+function releaseRepositoryEnabled(fullName: string | undefined): boolean {
+  return Boolean(fullName && enabledReleaseRepositories.has(fullName.toLowerCase()));
+}
+
 export function createSqlGitHubAppLifecycleStore(
   executor: SqlQueryExecutor,
   options: SqlLifecycleStoreOptions = {},
@@ -108,6 +114,11 @@ export function createSqlGitHubAppLifecycleStore(
 
     async enqueueReleaseRun(action) {
       const idempotencyKey = releaseRunIdempotencyKey(action);
+
+      if (!releaseRepositoryEnabled(action.repository.fullName)) {
+        return { idempotencyKey };
+      }
+
       const result = await executor.query(
         `insert into release_runs (id, repository_id, idempotency_key, commit_sha, ref, pull_request_number, trigger_kind, status, started_at)
          select $8, repositories.id, $9, $2, $3, $4, $5, 'queued', $6

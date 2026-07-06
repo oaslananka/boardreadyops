@@ -81,7 +81,7 @@ export const bomRiskScoreRule = rule(
           ruleId: "bom.risk-score",
           severity: resolvedSeverity,
           message,
-          path: row?.sourcePath ?? bomRows[0]!.sourcePath,
+          path: row?.sourcePath ?? bomRows[0]?.sourcePath ?? context.root,
           kind: "bom",
           line: row?.line,
           details: {
@@ -100,7 +100,7 @@ export const bomRiskScoreRule = rule(
 );
 
 function parseWeights(config: Record<string, unknown>): Partial<BomRiskWeights> {
-  const w = (config["weights"] ?? {}) as Record<string, unknown>;
+  const w = (config.weights ?? {}) as Record<string, unknown>;
   const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
   const result: Partial<BomRiskWeights> = {};
   const missingMpn = num(w["missing-mpn"]);

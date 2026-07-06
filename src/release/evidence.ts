@@ -149,7 +149,7 @@ function evidenceDecision(result: RunResult, gaps: ReleaseEvidenceGap[]): Releas
 }
 
 function formatChecksumsTxt(artifacts: ReleaseEvidenceArtifact[]): string {
-  return artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n") + "\n";
+  return `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n")}\n`;
 }
 
 export interface ReleaseManifestCoverage {

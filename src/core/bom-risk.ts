@@ -70,21 +70,20 @@ export function bomRiskSummaryFromFindings(
     return undefined;
   }
 
-  const firstDetails = riskFindings[0]!.details!;
+  const firstDetails = riskFindings[0]?.details ?? {};
   const totalComponents =
-    typeof firstDetails["totalComponents"] === "number" ? firstDetails["totalComponents"] : riskFindings.length;
-  const overallRiskScore =
-    typeof firstDetails["overallBomRiskScore"] === "number" ? firstDetails["overallBomRiskScore"] : 0;
+    typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
+  const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
 
   const components: BomComponentRisk[] = riskFindings.map((f) => {
-    const d = f.details!;
-    const factors = (d["factors"] ?? {}) as BomRiskFactors;
+    const d = f.details ?? {};
+    const factors = (d.factors ?? {}) as BomRiskFactors;
     return {
-      reference: String(d["reference"] ?? ""),
-      mpn: typeof d["mpn"] === "string" ? d["mpn"] : undefined,
-      manufacturer: typeof d["manufacturer"] === "string" ? d["manufacturer"] : undefined,
-      riskScore: typeof d["riskScore"] === "number" ? d["riskScore"] : 0,
-      riskLevel: isRiskLevel(d["riskLevel"]) ? d["riskLevel"] : "none",
+      reference: String(d.reference ?? ""),
+      mpn: typeof d.mpn === "string" ? d.mpn : undefined,
+      manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : undefined,
+      riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,
+      riskLevel: isRiskLevel(d.riskLevel) ? d.riskLevel : "none",
       factors,
     };
   });
