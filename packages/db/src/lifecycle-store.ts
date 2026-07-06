@@ -170,5 +170,15 @@ export function createSqlGitHubAppLifecycleStore(
         [input.idempotencyKey, input.githubCheckRunId],
       );
     },
+
+    async markReleaseRunDispatched(input) {
+      await executor.query(
+        `update release_runs
+         set status = 'dispatched', decision = coalesce($2, decision)
+         where id = $1
+           and status = 'queued'`,
+        [input.runId, input.workflowDispatchId],
+      );
+    },
   };
 }
