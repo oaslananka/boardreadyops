@@ -2,6 +2,7 @@ import { verifyGitHubWebhook } from "@boardreadyops/cloud-core";
 import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
 import { executeGitHubAppLifecycleActions } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { createGitHubAppCheckRunClient } from "../../../../lib/github-app-check-run-client.js";
+import { createRunnerClient } from "../../../../lib/runner-client.js";
 import { getGitHubAppLifecycleStore } from "./lifecycle-store.js";
 
 export const runtime = "nodejs";
@@ -51,6 +52,7 @@ export async function POST(request: Request): Promise<Response> {
     lifecycle.actions,
     getGitHubAppLifecycleStore(),
     createGitHubAppCheckRunClient(),
+    createRunnerClient(),
   );
 
   return Response.json(
