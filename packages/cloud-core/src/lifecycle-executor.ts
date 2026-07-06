@@ -13,14 +13,27 @@ export type AttachGitHubCheckRunInput = {
   githubCheckRunId: number;
 };
 
+export type MarkReleaseRunDispatchedInput = {
+  runId: string;
+  workflowDispatchId?: string | undefined;
+};
+
 export type CreatePullRequestCheckRunInput = {
   action: EnqueueReleaseRunInput;
   runId: string;
   idempotencyKey: string;
 };
 
+export type DispatchReleaseRunWorkflowInput = CreatePullRequestCheckRunInput & {
+  githubCheckRunId: number;
+};
+
 export type GitHubAppCheckRunClient = {
   createPullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
+};
+
+export type GitHubAppWorkflowDispatchClient = {
+  dispatchReleaseRunWorkflow(input: DispatchReleaseRunWorkflowInput): Promise<{ workflowDispatchId?: string }>;
 };
 
 export type GitHubAppLifecycleStore = {
@@ -30,6 +43,7 @@ export type GitHubAppLifecycleStore = {
   removeRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.removed" }>): Promise<void>;
   enqueueReleaseRun(action: EnqueueReleaseRunInput): Promise<EnqueuedReleaseRun>;
   attachGitHubCheckRun(input: AttachGitHubCheckRunInput): Promise<void>;
+  markReleaseRunDispatched(input: MarkReleaseRunDispatchedInput): Promise<void>;
 };
 
 export type GitHubAppLifecycleExecutionResult = {
@@ -41,6 +55,8 @@ export type GitHubAppLifecycleExecutionResult = {
   releaseRunsQueued: number;
   checkRunsCreated: number;
   checkRunsSkipped: number;
+  workflowDispatchesCreated: number;
+  workflowDispatchesSkipped: number;
 };
 
 export const emptyGitHubAppLifecycleExecutionResult = {
@@ -52,6 +68,8 @@ export const emptyGitHubAppLifecycleExecutionResult = {
   releaseRunsQueued: 0,
   checkRunsCreated: 0,
   checkRunsSkipped: 0,
+  workflowDispatchesCreated: 0,
+  workflowDispatchesSkipped: 0,
 } as const satisfies GitHubAppLifecycleExecutionResult;
 
 export function releaseRunIdempotencyKey(action: EnqueueReleaseRunInput): string {
@@ -62,6 +80,7 @@ export async function executeGitHubAppLifecycleActions(
   actions: readonly GitHubAppLifecycleAction[],
   store: GitHubAppLifecycleStore,
   checkRunClient?: GitHubAppCheckRunClient,
+  workflowDispatchClient?: GitHubAppWorkflowDispatchClient,
 ): Promise<GitHubAppLifecycleExecutionResult> {
   const result: GitHubAppLifecycleExecutionResult = {
     ...emptyGitHubAppLifecycleExecutionResult,
@@ -91,6 +110,7 @@ export async function executeGitHubAppLifecycleActions(
 
         if (!releaseRun.runId) {
           result.checkRunsSkipped += 1;
+          result.workflowDispatchesSkipped += 1;
           break;
         }
 
@@ -107,8 +127,27 @@ export async function executeGitHubAppLifecycleActions(
             githubCheckRunId: checkRun.id,
           });
           result.checkRunsCreated += 1;
+
+          if (workflowDispatchClient) {
+            const workflowDispatch = await workflowDispatchClient.dispatchReleaseRunWorkflow({
+              action,
+              runId: releaseRun.runId,
+              idempotencyKey: releaseRun.idempotencyKey,
+              githubCheckRunId: checkRun.id,
+            });
+            await store.markReleaseRunDispatched({
+              runId: releaseRun.runId,
+              workflowDispatchId: workflowDispatch.workflowDispatchId,
+            });
+            result.workflowDispatchesCreated += 1;
+          } else {
+            result.workflowDispatchesSkipped += 1;
+          }
         } else if (releaseRun.githubCheckRunId) {
           result.checkRunsSkipped += 1;
+          result.workflowDispatchesSkipped += 1;
+        } else {
+          result.workflowDispatchesSkipped += 1;
         }
         break;
       }
@@ -132,5 +171,6 @@ export function createNoopGitHubAppLifecycleStore(): GitHubAppLifecycleStore {
       return { idempotencyKey: "noop" };
     },
     async attachGitHubCheckRun() {},
+    async markReleaseRunDispatched() {},
   };
 }

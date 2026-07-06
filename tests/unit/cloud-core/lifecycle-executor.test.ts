@@ -42,6 +42,9 @@ function recordingStore(calls: string[]): GitHubAppLifecycleStore {
     async attachGitHubCheckRun() {
       calls.push("release_run.attach_check_run");
     },
+    async markReleaseRunDispatched() {
+      calls.push("release_run.dispatched");
+    },
   };
 }
 
@@ -74,6 +77,8 @@ describe("GitHub App lifecycle execution", () => {
       releaseRunsQueued: 1,
       checkRunsCreated: 0,
       checkRunsSkipped: 0,
+      workflowDispatchesCreated: 0,
+      workflowDispatchesSkipped: 1,
     });
   });
 
