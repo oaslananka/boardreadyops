@@ -1,5 +1,7 @@
 import { createAppAuth } from "@octokit/auth-app";
 
+const readinessCommentMarker = "<!-- boardreadyops:release-readiness -->";
+
 function requiredEnv(name) {
   const value = process.env[name];
 
@@ -14,7 +16,7 @@ function githubPrivateKey() {
   return requiredEnv("GITHUB_APP_PRIVATE_KEY").replace(/\\n/g, "\n");
 }
 
-function detailsUrl(runId) {
+export function detailsUrl(runId) {
   const baseUrl = process.env.BOARDREADYOPS_PUBLIC_URL ?? process.env.NEXT_PUBLIC_APP_URL;
 
   if (!baseUrl) {
@@ -47,6 +49,26 @@ function requestHeaders(token) {
     "content-type": "application/json",
     "x-github-api-version": "2022-11-28",
   };
+}
+
+function issueCommentsEndpoint(apiBaseUrl, owner, name, issueNumber) {
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/issues/${encodeURIComponent(
+    String(issueNumber),
+  )}/comments`;
+}
+
+function issueCommentEndpoint(apiBaseUrl, owner, name, commentId) {
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/issues/comments/${encodeURIComponent(
+    String(commentId),
+  )}`;
+}
+
+function existingReadinessComment(comments) {
+  if (!Array.isArray(comments)) {
+    return undefined;
+  }
+
+  return comments.find((comment) => typeof comment?.body === "string" && comment.body.includes(readinessCommentMarker));
 }
 
 export function createGitHubAppCheckRunClient() {
@@ -126,6 +148,41 @@ export function createGitHubAppCheckRunClient() {
           body: JSON.stringify(body),
         }),
         "GitHub check run completion",
+      );
+    },
+
+    async createPullRequestComment(input) {
+      const token = await installationToken(input.installationId);
+      const headers = requestHeaders(token);
+      const commentsUrl = issueCommentsEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, input.pullRequestNumber);
+      const comments = await readJson(
+        await fetch(commentsUrl, {
+          method: "GET",
+          headers,
+        }),
+        "GitHub pull request comment lookup",
+      );
+      const existing = existingReadinessComment(comments);
+
+      if (existing?.id) {
+        await readJson(
+          await fetch(issueCommentEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, existing.id), {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ body: input.body }),
+          }),
+          "GitHub pull request comment update",
+        );
+        return;
+      }
+
+      await readJson(
+        await fetch(commentsUrl, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ body: input.body }),
+        }),
+        "GitHub pull request comment creation",
       );
     },
   };
