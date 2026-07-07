@@ -14,20 +14,20 @@ type QueryResult = {
 type RunDetail = {
   id: string;
   status: string;
-  decision?: string;
+  decision: string | undefined;
   commitSha: string;
   ref: string;
-  pullRequestNumber?: number;
+  pullRequestNumber: number | undefined;
   triggerKind: string;
   startedAt: string;
-  completedAt?: string;
-  durationMs?: number;
-  boardReadyOpsVersion?: string;
-  kicadVersion?: string;
-  githubCheckRunId?: string;
-  readinessScore?: number;
+  completedAt: string | undefined;
+  durationMs: number | undefined;
+  boardReadyOpsVersion: string | undefined;
+  kicadVersion: string | undefined;
+  githubCheckRunId: string | undefined;
+  readinessScore: number | undefined;
   repository: string;
-  accountLogin?: string;
+  accountLogin: string | undefined;
   findings: FindingDetail[];
   artifacts: ArtifactDetail[];
 };
@@ -36,9 +36,9 @@ type FindingDetail = {
   ruleId: string;
   severity: string;
   message: string;
-  path?: string;
-  kind?: string;
-  waivedAt?: string;
+  path: string | undefined;
+  kind: string | undefined;
+  waivedAt: string | undefined;
 };
 
 type ArtifactDetail = {
@@ -93,7 +93,7 @@ function requiredString(row: Record<string, unknown>, key: string): string {
   return stringValue(row, key) ?? "";
 }
 
-function formatDate(input?: string): string {
+function formatDate(input: string | undefined): string {
   if (!input) {
     return "—";
   }
@@ -102,7 +102,7 @@ function formatDate(input?: string): string {
   return Number.isNaN(date.getTime()) ? input : date.toISOString();
 }
 
-function formatDuration(durationMs?: number): string {
+function formatDuration(durationMs: number | undefined): string {
   if (durationMs === undefined) {
     return "—";
   }
@@ -237,7 +237,7 @@ async function lookupRun(runId: string): Promise<RunLookupResult> {
   };
 }
 
-function StatusPill({ value }: { value?: string }) {
+function StatusPill({ value }: { value: string | undefined }) {
   return <span className="badge">{value ?? "unknown"}</span>;
 }
 
