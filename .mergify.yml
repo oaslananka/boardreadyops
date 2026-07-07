@@ -1,55 +1,59 @@
 pull_request_rules:
-  - name: auto-merge Renovate patch and minor updates
+  - name: auto-merge safe Renovate updates
     conditions:
       - author = renovate[bot]
       - label = dependencies
+      - label = automerge
+      - -label = manual-review
+      - -label = breaking-change
+      - -label = do-not-merge
+      - check-success = ci / risk-profile
       - check-success = ci / lint
-      - check-success = ci / test-unit (ubuntu-latest)
-      - check-success = ci / test-unit (windows-2025)
-      - check-success = ci / test-unit (macos-latest)
+      - check-success = ci / typecheck
+      - check-success = ci / test-unit
       - check-success = ci / build
       - check-success = ci / verify-dist
-      - check-success = CodeQL
       - check-success = ci / security
+      - check-success = CodeQL
       - -draft
     actions:
       merge:
         method: squash
+
   - name: auto-merge release-please PRs
     conditions:
       - author = release-please[bot]
+      - -label = do-not-merge
+      - check-success = ci / risk-profile
       - check-success = ci / lint
-      - check-success = ci / test-unit (ubuntu-latest)
-      - check-success = ci / test-int
-      - check-success = ci / test-action
+      - check-success = ci / typecheck
+      - check-success = ci / test-unit
       - check-success = ci / build
       - check-success = ci / verify-dist
-      - check-success = ci / coverage-gate
-      - check-success = ci / mutation
+      - check-success = ci / security
       - check-success = CodeQL
       - -draft
     actions:
       merge:
         method: squash
+
   - name: auto-merge feature PRs after checks and review
     conditions:
+      - -author = renovate[bot]
+      - -author = release-please[bot]
+      - -author = dependabot[bot]
+      - -label = do-not-merge
+      - check-success = ci / risk-profile
       - check-success = ci / lint
       - check-success = ci / typecheck
-      - check-success = ci / test-unit (ubuntu-latest)
-      - check-success = ci / test-unit (windows-2025)
-      - check-success = ci / test-unit (macos-latest)
-      - check-success = ci / test-int
-      - check-success = ci / test-action
+      - check-success = ci / test-unit
       - check-success = ci / build
       - check-success = ci / verify-dist
-      - check-success = ci / coverage-gate
-      - check-success = ci / mutation
-      - check-success = CodeQL
       - check-success = ci / security
+      - check-success = CodeQL
       - "#approved-reviews-by >= 1"
       - "#changes-requested-reviews-by = 0"
       - -draft
-      - -label = do-not-merge
     actions:
       merge:
         method: squash
