@@ -143,7 +143,7 @@ export async function POST(request: Request): Promise<Response> {
     const repositoryOwner = stringCell(row, "owner");
     const repositoryName = stringCell(row, "name");
 
-    if (!checkRunClient || !installationId || !repositoryOwner || !repositoryName) {
+    if (!checkRunClient?.completeCheckRun || !installationId || !repositoryOwner || !repositoryName) {
       return Response.json({ ok: false, error: "GitHub check-run completion is not configured" }, { status: 503 });
     }
 
