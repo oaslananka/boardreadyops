@@ -110,6 +110,14 @@ function verifyRunnerAuthentication(request: Request, input: { key: string; runI
   return request.headers.get(resultKeyHeaderName) === input.key;
 }
 
+function parseJson(input: string): unknown {
+  try {
+    return JSON.parse(input);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   const configuredKey = process.env[resultKeyEnvName];
 
@@ -129,7 +137,13 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "invalid runner result signature" }, { status: 401 });
   }
 
-  const parsed = releaseRunResultSchema.safeParse(JSON.parse(bodyText));
+  const body = parseJson(bodyText);
+
+  if (body === undefined) {
+    return Response.json({ ok: false, error: "invalid runner result JSON" }, { status: 400 });
+  }
+
+  const parsed = releaseRunResultSchema.safeParse(body);
 
   if (!parsed.success) {
     return Response.json({ ok: false, error: "invalid runner result" }, { status: 400 });
