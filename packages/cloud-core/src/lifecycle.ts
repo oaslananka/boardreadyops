@@ -47,6 +47,8 @@ export type GitHubAppLifecycleAction =
       ref: string;
       commitSha: string;
       triggerKind: "pr";
+      pullRequestDraft?: boolean;
+      pullRequestFromFork?: boolean;
       safeMode?: PullRequestSafeMode;
     };
 
@@ -197,15 +199,23 @@ function pullRequestHeadRepositoryIsFork(pullRequest: Record<string, unknown>): 
   return boolValue(head.repo, "fork") ?? false;
 }
 
-function pullRequestSafeMode(repository: GitHubRepositoryRef, pullRequest: Record<string, unknown>): PullRequestSafeMode | undefined {
-  const reasons = [] as string[];
+function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Record<string, unknown>): boolean {
   const headRepository = pullRequestHeadRepository(pullRequest);
+  return pullRequestHeadRepositoryIsFork(pullRequest) || (headRepository !== undefined && headRepository !== repository.fullName);
+}
+
+function pullRequestSafeMode(
+  repository: GitHubRepositoryRef,
+  pullRequest: Record<string, unknown>,
+  fromFork: boolean,
+): PullRequestSafeMode | undefined {
+  const reasons = [] as string[];
 
   if (repository.private) {
     reasons.push("private-repository");
   }
 
-  if (pullRequestHeadRepositoryIsFork(pullRequest) || (headRepository !== undefined && headRepository !== repository.fullName)) {
+  if (fromFork) {
     reasons.push("fork-pull-request");
   }
 
@@ -318,6 +328,7 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       return unsupported(options, "pull request payload does not include number, head sha, and head ref");
     }
 
+    const pullRequestFromFork = pullRequestIsFromFork(repository, pullRequest);
     const enqueueAction: GitHubAppLifecycleAction = {
       type: "release_run.enqueue",
       installation,
@@ -326,8 +337,10 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       ref,
       commitSha,
       triggerKind: "pr",
+      pullRequestDraft: boolValue(pullRequest, "draft") ?? false,
+      pullRequestFromFork,
     };
-    const safeMode = pullRequestSafeMode(repository, pullRequest);
+    const safeMode = pullRequestSafeMode(repository, pullRequest, pullRequestFromFork);
 
     if (safeMode) {
       enqueueAction.safeMode = safeMode;
