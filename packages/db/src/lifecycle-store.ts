@@ -79,10 +79,7 @@ function releaseRepositoryRolloutPolicyFromEnvironment(env: Environment): Releas
   return parseReleaseRepositoryRolloutPolicy(env[releaseRepositoryRolloutEnvName]);
 }
 
-function releaseRepositoryEnabled(
-  fullName: string | undefined,
-  policy: ReleaseRepositoryRolloutPolicy,
-): boolean {
+function releaseRepositoryEnabled(fullName: string | undefined, policy: ReleaseRepositoryRolloutPolicy): boolean {
   if (!fullName) {
     return false;
   }
