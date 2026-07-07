@@ -15,6 +15,11 @@ export type GitHubInstallationRef = {
   accountType?: string;
 };
 
+export type PullRequestSafeMode = {
+  enabled: boolean;
+  reasons: string[];
+};
+
 export type GitHubAppLifecycleAction =
   | {
       type: "installation.upsert";
@@ -42,9 +47,7 @@ export type GitHubAppLifecycleAction =
       ref: string;
       commitSha: string;
       triggerKind: "pr";
-      pullRequestFromFork: boolean;
-      pullRequestDraft: boolean;
-      pullRequestHeadRepositoryFullName?: string;
+      safeMode?: PullRequestSafeMode;
     };
 
 export type GitHubAppLifecycleResult = {
@@ -174,7 +177,7 @@ function pullRequestRef(pullRequest: Record<string, unknown>): string | null {
   return stringValue(head, "ref") ?? null;
 }
 
-function pullRequestHeadRepositoryFullName(pullRequest: Record<string, unknown>): string | undefined {
+function pullRequestHeadRepository(pullRequest: Record<string, unknown>): string | undefined {
   const head = pullRequest.head;
 
   if (!isRecord(head) || !isRecord(head.repo)) {
@@ -182,6 +185,31 @@ function pullRequestHeadRepositoryFullName(pullRequest: Record<string, unknown>)
   }
 
   return stringValue(head.repo, "full_name");
+}
+
+function pullRequestHeadRepositoryIsFork(pullRequest: Record<string, unknown>): boolean {
+  const head = pullRequest.head;
+
+  if (!isRecord(head) || !isRecord(head.repo)) {
+    return false;
+  }
+
+  return boolValue(head.repo, "fork") ?? false;
+}
+
+function pullRequestSafeMode(repository: GitHubRepositoryRef, pullRequest: Record<string, unknown>): PullRequestSafeMode | undefined {
+  const reasons = [] as string[];
+  const headRepository = pullRequestHeadRepository(pullRequest);
+
+  if (repository.private) {
+    reasons.push("private-repository");
+  }
+
+  if (pullRequestHeadRepositoryIsFork(pullRequest) || (headRepository !== undefined && headRepository !== repository.fullName)) {
+    reasons.push("fork-pull-request");
+  }
+
+  return reasons.length > 0 ? { enabled: true, reasons } : undefined;
 }
 
 function isQueuedPullRequestAction(action: string | undefined): boolean {
@@ -285,13 +313,12 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
     const pullRequestNumber = numberValue(pullRequest, "number");
     const commitSha = pullRequestCommitSha(pullRequest);
     const ref = pullRequestRef(pullRequest);
-    const headRepositoryFullName = pullRequestHeadRepositoryFullName(pullRequest);
 
     if (pullRequestNumber === undefined || !commitSha || !ref) {
       return unsupported(options, "pull request payload does not include number, head sha, and head ref");
     }
 
-    const enqueueAction: Extract<GitHubAppLifecycleAction, { type: "release_run.enqueue" }> = {
+    const enqueueAction: GitHubAppLifecycleAction = {
       type: "release_run.enqueue",
       installation,
       repository,
@@ -299,12 +326,11 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       ref,
       commitSha,
       triggerKind: "pr",
-      pullRequestFromFork: Boolean(headRepositoryFullName && headRepositoryFullName !== repository.fullName),
-      pullRequestDraft: boolValue(pullRequest, "draft") ?? false,
     };
+    const safeMode = pullRequestSafeMode(repository, pullRequest);
 
-    if (headRepositoryFullName) {
-      enqueueAction.pullRequestHeadRepositoryFullName = headRepositoryFullName;
+    if (safeMode) {
+      enqueueAction.safeMode = safeMode;
     }
 
     return result(options, action, [
