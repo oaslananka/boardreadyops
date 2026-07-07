@@ -15,6 +15,14 @@ on:
       result_url:
         required: true
         type: string
+      safe_mode:
+        required: false
+        type: string
+        default: "false"
+      safe_mode_reasons:
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
