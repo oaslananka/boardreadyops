@@ -12,6 +12,9 @@ on:
       head_sha:
         required: true
         type: string
+      result_url:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -20,4 +23,34 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     steps:
-      - run: echo runner-ready
+      - name: Prepare runner
+        id: readiness
+        run: echo runner-ready
+
+      - name: Publish runner result
+        if: always()
+        env:
+          RESULT_URL: ${{ inputs.result_url }}
+          RESULT_KEY: ${{ secrets.BRO_RUNNER_KEY }}
+          READINESS_OUTCOME: ${{ steps.readiness.outcome }}
+        run: |
+          if [ -z "$RESULT_KEY" ]; then
+            echo "BRO_RUNNER_KEY secret is required" >&2
+            exit 1
+          fi
+
+          status="completed"
+          decision="pass"
+
+          if [ "$READINESS_OUTCOME" != "success" ]; then
+            status="failed"
+            decision="error"
+          fi
+
+          payload="{\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
+
+          curl --fail --silent --show-error \
+            --request POST "$RESULT_URL" \
+            --header "content-type: application/json" \
+            --header "x-boardreadyops-runner-key: $RESULT_KEY" \
+            --data "$payload"

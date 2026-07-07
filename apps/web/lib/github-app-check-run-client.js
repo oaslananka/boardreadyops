@@ -34,6 +34,21 @@ async function readJson(response, context) {
   return text ? JSON.parse(text) : {};
 }
 
+function checkRunEndpoint(apiBaseUrl, owner, name, checkRunId) {
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/check-runs/${encodeURIComponent(
+    String(checkRunId),
+  )}`;
+}
+
+function requestHeaders(token) {
+  return {
+    accept: "application/vnd.github+json",
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+    "x-github-api-version": "2022-11-28",
+  };
+}
+
 export function createGitHubAppCheckRunClient() {
   const appId = process.env.GITHUB_APP_ID;
 
@@ -43,14 +58,19 @@ export function createGitHubAppCheckRunClient() {
 
   const apiBaseUrl = process.env.GITHUB_API_BASE_URL ?? "https://api.github.com";
 
+  async function installationToken(installationId) {
+    const auth = createAppAuth({
+      appId,
+      privateKey: githubPrivateKey(),
+      installationId,
+    });
+    const installationAuth = await auth({ type: "installation" });
+    return installationAuth.token;
+  }
+
   return {
     async createPullRequestCheckRun(input) {
-      const auth = createAppAuth({
-        appId,
-        privateKey: githubPrivateKey(),
-        installationId: input.action.installation.id,
-      });
-      const installationAuth = await auth({ type: "installation" });
+      const token = await installationToken(input.action.installation.id);
       const body = {
         name: "BoardReadyOps / release readiness",
         head_sha: input.action.commitSha,
@@ -69,12 +89,7 @@ export function createGitHubAppCheckRunClient() {
         )}/check-runs`,
         {
           method: "POST",
-          headers: {
-            accept: "application/vnd.github+json",
-            authorization: `Bearer ${installationAuth.token}`,
-            "content-type": "application/json",
-            "x-github-api-version": "2022-11-28",
-          },
+          headers: requestHeaders(token),
           body: JSON.stringify(body),
         },
       );
@@ -85,6 +100,33 @@ export function createGitHubAppCheckRunClient() {
       }
 
       return { id: json.id };
+    },
+
+    async completeCheckRun(input) {
+      const token = await installationToken(input.installationId);
+      const body = {
+        status: "completed",
+        conclusion: input.conclusion,
+        completed_at: input.completedAt ?? new Date().toISOString(),
+        output: {
+          title: input.title,
+          summary: input.summary,
+        },
+      };
+      const url = detailsUrl(input.runId);
+
+      if (url) {
+        body.details_url = url;
+      }
+
+      await readJson(
+        await fetch(checkRunEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, input.checkRunId), {
+          method: "PATCH",
+          headers: requestHeaders(token),
+          body: JSON.stringify(body),
+        }),
+        "GitHub check run completion",
+      );
     },
   };
 }

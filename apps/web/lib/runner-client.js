@@ -12,6 +12,16 @@ function repoTarget(owner) {
   return { owner: repoOwner, name: repoName };
 }
 
+function resultUrl(runId) {
+  const baseUrl = ev("BOARDREADYOPS" + "_PUBLIC_URL") ?? ev("NEXT_PUBLIC_APP_URL");
+
+  if (!baseUrl) {
+    throw new Error("public app URL is required to receive runner results");
+  }
+
+  return `${baseUrl.replace(/\/$/, "")}/api/v1/runs/result?run_id=${encodeURIComponent(runId)}`;
+}
+
 function requestHeaders(rt) {
   return {
     accept: "application/vnd.github+json",
@@ -73,6 +83,7 @@ export function createRunnerClient() {
               run_id: input.runId,
               target: input.action.repository.fullName,
               head_sha: input.action.commitSha,
+              result_url: resultUrl(input.runId),
             },
           }),
         },

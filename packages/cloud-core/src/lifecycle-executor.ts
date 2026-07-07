@@ -28,8 +28,21 @@ export type DispatchReleaseRunWorkflowInput = CreatePullRequestCheckRunInput & {
   githubCheckRunId: number;
 };
 
+export type CompleteGitHubCheckRunInput = {
+  installationId: string | number;
+  repositoryOwner: string;
+  repositoryName: string;
+  checkRunId: string | number;
+  runId: string;
+  conclusion: "failure" | "neutral" | "success" | "timed_out";
+  title: string;
+  summary: string;
+  completedAt?: string | undefined;
+};
+
 export type GitHubAppCheckRunClient = {
   createPullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
+  completeCheckRun?: (input: CompleteGitHubCheckRunInput) => Promise<void>;
 };
 
 export type GitHubAppWorkflowDispatchClient = {

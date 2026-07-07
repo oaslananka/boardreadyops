@@ -10,10 +10,20 @@ export type SqlQueryExecutor = {
   query(sql: string, params?: readonly unknown[]): Promise<SqlQueryResult | unknown>;
 };
 
+export type ReleaseRepositoryRolloutPolicy = {
+  allowAllRepositories?: boolean;
+  repositories?: readonly string[];
+};
+
 export type SqlLifecycleStoreOptions = {
   now?: () => Date;
   id?: () => string;
+  releaseRepositoryRolloutPolicy?: ReleaseRepositoryRolloutPolicy;
 };
+
+export const releaseRepositoryRolloutEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES";
+
+type Environment = Record<string, string | undefined>;
 
 function iso(now: () => Date): string {
   return now().toISOString();
@@ -38,10 +48,52 @@ function checkRunColumn(row: Record<string, unknown> | undefined): string | numb
   return typeof value === "string" || typeof value === "number" || value === null ? value : undefined;
 }
 
-const enabledReleaseRepositories = new Set(["oaslananka/boardreadyops", "oaslananka/zaptrace"]);
+function normalizeRepositoryFullName(fullName: string): string | undefined {
+  const normalized = fullName.trim().toLowerCase();
+  return normalized.includes("/") ? normalized : undefined;
+}
 
-function releaseRepositoryEnabled(fullName: string | undefined): boolean {
-  return Boolean(fullName && enabledReleaseRepositories.has(fullName.toLowerCase()));
+export function parseReleaseRepositoryRolloutPolicy(input: string | undefined): ReleaseRepositoryRolloutPolicy {
+  const tokens = (input ?? "")
+    .split(/[\s,]+/)
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (tokens.some((token) => token === "*" || token === "all")) {
+    return { allowAllRepositories: true };
+  }
+
+  const repositories = Array.from(
+    new Set(
+      tokens.flatMap((token) => {
+        const normalized = normalizeRepositoryFullName(token);
+        return normalized ? [normalized] : [];
+      }),
+    ),
+  );
+
+  return { repositories };
+}
+
+function releaseRepositoryRolloutPolicyFromEnvironment(env: Environment): ReleaseRepositoryRolloutPolicy {
+  return parseReleaseRepositoryRolloutPolicy(env[releaseRepositoryRolloutEnvName]);
+}
+
+function releaseRepositoryEnabled(fullName: string | undefined, policy: ReleaseRepositoryRolloutPolicy): boolean {
+  if (!fullName) {
+    return false;
+  }
+
+  if (policy.allowAllRepositories === true) {
+    return true;
+  }
+
+  const normalized = normalizeRepositoryFullName(fullName);
+  if (!normalized) {
+    return false;
+  }
+
+  return new Set(policy.repositories ?? []).has(normalized);
 }
 
 export function createSqlGitHubAppLifecycleStore(
@@ -50,6 +102,8 @@ export function createSqlGitHubAppLifecycleStore(
 ): GitHubAppLifecycleStore {
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
+  const releaseRepositoryRolloutPolicy =
+    options.releaseRepositoryRolloutPolicy ?? releaseRepositoryRolloutPolicyFromEnvironment(process.env);
 
   return {
     async upsertInstallation(action) {
@@ -115,7 +169,7 @@ export function createSqlGitHubAppLifecycleStore(
     async enqueueReleaseRun(action) {
       const idempotencyKey = releaseRunIdempotencyKey(action);
 
-      if (!releaseRepositoryEnabled(action.repository.fullName)) {
+      if (!releaseRepositoryEnabled(action.repository.fullName, releaseRepositoryRolloutPolicy)) {
         return { idempotencyKey };
       }
 
