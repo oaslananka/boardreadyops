@@ -20,6 +20,11 @@ const repository = {
   },
 };
 
+const publicRepository = {
+  ...repository,
+  private: false,
+};
+
 describe("GitHub App lifecycle normalization", () => {
   it("converts installation created events into installation and repository upserts", () => {
     const normalized = normalizeGitHubAppWebhook({
@@ -84,7 +89,7 @@ describe("GitHub App lifecycle normalization", () => {
     expect(normalized.actions.map((action) => action.type)).toEqual(["repository.upsert", "repository.removed"]);
   });
 
-  it("queues a release run for pull request opened events", () => {
+  it("queues a safe-mode release run for private pull request opened events", () => {
     const normalized = normalizeGitHubAppWebhook({
       event: "pull_request",
       delivery: "delivery-3",
@@ -97,6 +102,10 @@ describe("GitHub App lifecycle normalization", () => {
           head: {
             ref: "feature/pcb-release",
             sha: "0123456789abcdef",
+            repo: {
+              full_name: "octo-org/hardware-board",
+              fork: false,
+            },
           },
         },
       },
@@ -147,8 +156,44 @@ describe("GitHub App lifecycle normalization", () => {
         ref: "feature/pcb-release",
         commitSha: "0123456789abcdef",
         triggerKind: "pr",
+        safeMode: {
+          enabled: true,
+          reasons: ["private-repository"],
+        },
       },
     ]);
+  });
+
+  it("annotates fork pull requests with safe mode", () => {
+    const normalized = normalizeGitHubAppWebhook({
+      event: "pull_request",
+      delivery: "delivery-3b",
+      payload: {
+        action: "opened",
+        installation,
+        repository: publicRepository,
+        pull_request: {
+          number: 42,
+          head: {
+            ref: "feature/pcb-release",
+            sha: "0123456789abcdef",
+            repo: {
+              full_name: "contributor/hardware-board",
+              fork: true,
+            },
+          },
+        },
+      },
+    });
+
+    expect(normalized.accepted).toBe(true);
+    expect(normalized.actions.at(-1)).toMatchObject({
+      type: "release_run.enqueue",
+      safeMode: {
+        enabled: true,
+        reasons: ["fork-pull-request"],
+      },
+    });
   });
 
   it("accepts ignored pull request actions without enqueueing work", () => {
