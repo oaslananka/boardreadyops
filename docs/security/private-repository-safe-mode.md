@@ -4,47 +4,32 @@ Issue: #42
 
 ## Goal
 
-BoardReadyOps must not run privileged readiness workflows on private repositories, fork pull requests, or draft pull requests unless an explicit safer execution mode is available.
+BoardReadyOps should treat private repository pull requests and fork pull requests as higher-risk runner contexts.
 
-## Default policy
+## Safe-mode triggers
 
-The GitHub App still records the release run and creates a check run, but runner dispatch is skipped when any of these conditions is true:
+Safe mode is enabled for:
 
-- the repository is private,
-- the pull request comes from a fork,
-- the pull request is a draft.
+- private repositories,
+- pull requests from forks,
+- pull requests whose head repository differs from the base repository.
 
-The check run is completed as neutral with a safe-mode explanation instead of remaining queued.
+The lifecycle action carries safe-mode reasons:
 
-## Why this is the default
+- `private-repository`
+- `fork-pull-request`
 
-- Private repositories may contain customer or proprietary hardware data.
-- Fork pull requests may originate from untrusted code and should not receive privileged runner access.
-- Draft pull requests are not ready for release-readiness execution.
+## Dispatch behavior
 
-## Captured metadata
+The GitHub App passes safe-mode context to the readiness runner workflow with these inputs:
 
-For pull request events, the lifecycle normalizer records:
+- `safe_mode`
+- `safe_mode_reasons`
 
-- whether the repository is private,
-- whether the PR head repository differs from the base repository,
-- whether the PR is draft,
-- the PR head repository full name when present.
+## Runner expectations
 
-## Future expansion
+When safe mode is enabled, runners should avoid privileged writes, avoid exposing private artifacts, avoid using private secrets with fork code, and prefer advisory findings unless a repository policy explicitly opts into enforcement.
 
-A later self-hosted runner mode can allow private repositories when all of these are true:
+## Current implementation slice
 
-- the installation owner explicitly enables private repository execution,
-- the runner is tenant-scoped,
-- artifact storage is tenant-scoped,
-- fork PRs remain restricted unless reviewed and approved,
-- audit logs record the safe-mode override.
-
-## Acceptance criteria
-
-- Fork PRs do not dispatch the readiness runner by default.
-- Private repositories do not dispatch the readiness runner by default.
-- Draft PRs do not dispatch the readiness runner by default.
-- Skipped checks complete as neutral with an actionable explanation.
-- Normal public same-repository PRs continue to dispatch as before.
+This change adds detection, metadata, workflow dispatch inputs, and unit coverage. Additional runtime enforcement should be added before public Marketplace launch.
