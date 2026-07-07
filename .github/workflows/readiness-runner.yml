@@ -50,7 +50,7 @@ jobs:
 
           payload="{\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
           timestamp="$(date +%s)"
-          signature="sha256=$(printf '%s.%s.%s' "$timestamp" "$RUN_ID" "$payload" | openssl dgst -sha256 -hmac "$RESULT_KEY" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+          signature="sha256=$(printf '%s.%s.%s' "$timestamp" "$RUN_ID" "$payload" | openssl dgst -sha256 -hmac "$RESULT_KEY" -hex | awk '{print $2}')"
 
           curl --fail --silent --show-error \
             --request POST "$RESULT_URL" \
