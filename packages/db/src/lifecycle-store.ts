@@ -173,6 +173,19 @@ export function createSqlGitHubAppLifecycleStore(
         return { idempotencyKey };
       }
 
+      await executor.query(
+        `update release_runs
+         set status = 'superseded',
+             completed_at = coalesce(completed_at, $4::timestamptz)
+         from repositories
+         where release_runs.repository_id = repositories.id
+           and repositories.github_repo_id = $1
+           and release_runs.pull_request_number = $2
+           and release_runs.commit_sha <> $3
+           and release_runs.status in ('queued', 'dispatched', 'running')`,
+        [action.repository.id, action.pullRequestNumber, action.commitSha, iso(now)],
+      );
+
       const result = await executor.query(
         `insert into release_runs (id, repository_id, idempotency_key, commit_sha, ref, pull_request_number, trigger_kind, status, started_at)
          select $8, repositories.id, $9, $2, $3, $4, $5, 'queued', $6
