@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createGitHubAppCheckRunClient } from "../../../../../lib/github-app-check-run-client.js";
@@ -9,6 +10,9 @@ type CheckConclusion = "failure" | "neutral" | "success" | "timed_out";
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
 const resultKeyHeaderName = "x-boardreadyops-runner-key";
+const resultSignatureHeaderName = "x-boardreadyops-runner-signature";
+const resultTimestampHeaderName = "x-boardreadyops-runner-timestamp";
+const signatureToleranceSeconds = 10 * 60;
 
 function rows(result: unknown): QueryRow[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) {
@@ -67,16 +71,50 @@ function checkSummary(input: { status: string; decision: string | null; findings
   return `Runner reported status=${input.status}, decision=${input.decision ?? "none"}, ${input.findings.length} ${plural}.`;
 }
 
+function expectedSignature(key: string, timestamp: string, runId: string, body: string): string {
+  return `sha256=${createHmac("sha256", key).update(`${timestamp}.${runId}.${body}`).digest("hex")}`;
+}
+
+function signatureIsFresh(timestamp: string): boolean {
+  const value = Number(timestamp);
+  if (!Number.isInteger(value)) {
+    return false;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  return Math.abs(now - value) <= signatureToleranceSeconds;
+}
+
+function secureCompare(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function verifyRunnerAuthentication(request: Request, input: { key: string; runId: string; body: string }): boolean {
+  const suppliedSignature = request.headers.get(resultSignatureHeaderName);
+  const suppliedTimestamp = request.headers.get(resultTimestampHeaderName);
+
+  if (suppliedSignature && suppliedTimestamp) {
+    if (!signatureIsFresh(suppliedTimestamp)) {
+      return false;
+    }
+
+    return secureCompare(suppliedSignature, expectedSignature(input.key, suppliedTimestamp, input.runId, input.body));
+  }
+
+  if (process.env.BOARDREADYOPS_REQUIRE_RUNNER_SIGNATURE === "1") {
+    return false;
+  }
+
+  return request.headers.get(resultKeyHeaderName) === input.key;
+}
+
 export async function POST(request: Request): Promise<Response> {
   const configuredKey = process.env[resultKeyEnvName];
-  const suppliedKey = request.headers.get(resultKeyHeaderName);
 
   if (!configuredKey) {
     return Response.json({ ok: false, error: "runner result key is not configured" }, { status: 503 });
-  }
-
-  if (!suppliedKey || suppliedKey !== configuredKey) {
-    return Response.json({ ok: false, error: "invalid runner result key" }, { status: 401 });
   }
 
   const runId = new URL(request.url).searchParams.get("run_id");
@@ -85,7 +123,13 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "run_id query parameter is required" }, { status: 400 });
   }
 
-  const parsed = releaseRunResultSchema.safeParse(await request.json());
+  const bodyText = await request.text();
+
+  if (!verifyRunnerAuthentication(request, { key: configuredKey, runId, body: bodyText })) {
+    return Response.json({ ok: false, error: "invalid runner result signature" }, { status: 401 });
+  }
+
+  const parsed = releaseRunResultSchema.safeParse(JSON.parse(bodyText));
 
   if (!parsed.success) {
     return Response.json({ ok: false, error: "invalid runner result" }, { status: 400 });
