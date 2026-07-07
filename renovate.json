@@ -9,49 +9,56 @@
     "group:allNonMajor"
   ],
   "timezone": "Europe/Istanbul",
+  "dependencyDashboardTitle": "Dependency Dashboard",
+  "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose"],
+  "ignorePaths": ["**/.next/**", "**/node_modules/**", "dist/**", "tmp/**"],
   "labels": ["dependencies"],
   "prHourlyLimit": 5,
   "prConcurrentLimit": 10,
   "rangeStrategy": "auto",
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 6am on monday"]
+    "schedule": ["before 6am on monday"],
+    "addLabels": ["lockfile-maintenance"]
   },
   "packageRules": [
     {
+      "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true,
-      "automergeType": "pr",
-      "automergeStrategy": "squash"
+      "addLabels": ["automerge"]
     },
     {
+      "description": "Treat TypeScript compiler updates as manual because they can change type-checking behavior.",
       "matchPackageNames": ["typescript"],
       "minimumReleaseAge": "7 days",
-      "automerge": false
+      "automerge": false,
+      "addLabels": ["manual-review"]
     },
     {
+      "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
       "matchPackageNames": ["/^@types\\//"],
       "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true,
-      "automergeType": "pr",
-      "automergeStrategy": "squash"
+      "addLabels": ["types", "automerge"]
     },
     {
+      "description": "Require explicit dependency dashboard approval for major upgrades.",
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true,
       "automerge": false,
-      "labels": ["dependencies", "breaking-change"]
+      "addLabels": ["breaking-change", "manual-review"]
     },
     {
+      "description": "Keep supply-chain surface updates visible and manually reviewed.",
       "matchManagers": ["github-actions", "dockerfile", "docker-compose"],
       "pinDigests": true,
-      "automerge": false
+      "automerge": false,
+      "addLabels": ["supply-chain", "manual-review"]
     }
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": ["security"]
+    "labels": ["security", "dependencies"]
   },
   "osvVulnerabilityAlerts": true
 }

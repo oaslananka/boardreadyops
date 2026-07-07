@@ -26,7 +26,8 @@ BoardReadyOps is a local-first CLI and GitHub Action for KiCad hardware review. 
 
 ## Repository Layout
 
-- `.github/` contains issue templates, Dependabot, and hosted-runner workflows.
+- `.github/` contains issue templates, rulesets, and hosted-runner workflows.
+- `renovate.json` owns dependency version-update policy.
 - `dist/` contains the two committed Node action and CLI bundles.
 - `docs/` contains MkDocs pages, rule docs, reports docs, and ADRs.
 - `schemas/` contains JSON schemas for config, findings, and pinmaps.
@@ -58,6 +59,7 @@ BoardReadyOps is a local-first CLI and GitHub Action for KiCad hardware review. 
 - Architecture decisions: `docs/architecture/adr/`
 - Security policy: `SECURITY.md`
 - Contribution rules: `CONTRIBUTING.md`
+- Dependency automation policy: `docs/dependency-automation.md`
 - Rule behavior: `docs/rules/` and `src/rules/`
 - Report contracts: `docs/reports/` and `schemas/findings.schema.json`
 
