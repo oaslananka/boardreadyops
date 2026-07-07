@@ -1,5 +1,6 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { notFound } from "next/navigation";
+import { artifactDownloadExpiry, artifactDownloadUrl } from "../../../lib/artifact-downloads.js";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ type FindingDetail = {
 };
 
 type ArtifactDetail = {
+  id: string;
   kind: string;
   name: string;
   storagePath: string;
@@ -49,6 +51,7 @@ type ArtifactDetail = {
   bytes: number;
   role: string;
   uploadedAt: string;
+  downloadUrl: string | undefined;
 };
 
 type RunLookupResult =
@@ -58,6 +61,7 @@ type RunLookupResult =
 
 const severityRank: Record<string, number> = {
   critical: 0,
+  error: 0,
   high: 1,
   medium: 2,
   low: 3,
@@ -182,7 +186,7 @@ async function lookupRun(runId: string): Promise<RunLookupResult> {
   );
 
   const artifactsResult = await executor.query(
-    `select kind, name, storage_path, sha256, bytes, role, uploaded_at
+    `select id, kind, name, storage_path, sha256, bytes, role, uploaded_at
      from artifacts
      where run_id = $1
      order by uploaded_at desc`,
@@ -200,8 +204,11 @@ async function lookupRun(runId: string): Promise<RunLookupResult> {
     }))
     .sort(bySeverityThenRule);
 
-  const artifacts = rows(artifactsResult).map(
-    (row): ArtifactDetail => ({
+  const expiresAt = artifactDownloadExpiry();
+  const artifacts = rows(artifactsResult).map((row): ArtifactDetail => {
+    const artifactId = requiredString(row, "id");
+    return {
+      id: artifactId,
       kind: requiredString(row, "kind"),
       name: requiredString(row, "name"),
       storagePath: requiredString(row, "storage_path"),
@@ -209,8 +216,9 @@ async function lookupRun(runId: string): Promise<RunLookupResult> {
       bytes: numberValue(row, "bytes") ?? 0,
       role: requiredString(row, "role"),
       uploadedAt: requiredString(row, "uploaded_at"),
-    }),
-  );
+      downloadUrl: artifactDownloadUrl({ runId, artifactId, expiresAt }),
+    };
+  });
 
   return {
     state: "found",
@@ -400,6 +408,13 @@ export default async function RunPage({ params }: RunPageProps) {
                 <p>
                   SHA-256: <code>{artifact.sha256}</code>
                 </p>
+                {artifact.downloadUrl ? (
+                  <p>
+                    <a href={artifact.downloadUrl}>Download signed artifact</a>
+                  </p>
+                ) : (
+                  <p>Signed download URL is not configured for this artifact.</p>
+                )}
               </li>
             ))}
           </ul>
