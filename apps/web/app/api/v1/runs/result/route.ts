@@ -1,6 +1,7 @@
 import { releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { createGitHubAppCheckRunClient } from "../../../../../lib/github-app-check-run-client.js";
+import { createGitHubAppCheckRunClient, detailsUrl } from "../../../../../lib/github-app-check-run-client.js";
+import { buildReadinessCheckOutput, buildReadinessPrComment } from "../../../../../lib/readiness-result-format.js";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,11 @@ function rows(result: unknown): QueryRow[] {
 function stringCell(row: QueryRow, key: string): string | undefined {
   const value = row[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function numberCell(row: QueryRow, key: string): number | undefined {
+  const value = row[key];
+  return typeof value === "number" ? value : undefined;
 }
 
 function numberLikeCell(row: QueryRow, key: string): number | string | undefined {
@@ -60,11 +66,6 @@ function checkConclusion(status: string, decision: string | null): CheckConclusi
   }
 
   return "neutral";
-}
-
-function checkSummary(input: { status: string; decision: string | null; findings: readonly unknown[] }): string {
-  const plural = input.findings.length === 1 ? "finding" : "findings";
-  return `Runner reported status=${input.status}, decision=${input.decision ?? "none"}, ${input.findings.length} ${plural}.`;
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -106,10 +107,11 @@ export async function POST(request: Request): Promise<Response> {
            completed_at = case when $2 in ('completed', 'failed', 'timed_out') then coalesce(completed_at, $4::timestamptz) else completed_at end,
            duration_ms = case when $2 in ('completed', 'failed', 'timed_out') then greatest(0, floor(extract(epoch from ($4::timestamptz - started_at)) * 1000))::integer else duration_ms end
        where id = $1
-       returning id, github_check_run_id, repository_id
+       returning id, github_check_run_id, repository_id, pull_request_number
      )
      select updated.id,
             updated.github_check_run_id,
+            updated.pull_request_number,
             repositories.owner,
             repositories.name,
             installations.github_installation_id
@@ -136,30 +138,50 @@ export async function POST(request: Request): Promise<Response> {
 
   const githubCheckRunId = numberLikeCell(row, "github_check_run_id");
   let checkRunUpdated = false;
+  let pullRequestCommentCreated = false;
 
-  if (githubCheckRunId && terminalStatus(parsed.data.status)) {
+  if (terminalStatus(parsed.data.status)) {
     const checkRunClient = createGitHubAppCheckRunClient();
     const installationId = numberLikeCell(row, "github_installation_id");
     const repositoryOwner = stringCell(row, "owner");
     const repositoryName = stringCell(row, "name");
+    const runDetailsUrl = detailsUrl(runId);
+    const checkOutput = buildReadinessCheckOutput({ ...parsed.data, detailsUrl: runDetailsUrl });
 
-    if (!checkRunClient?.completeCheckRun || !installationId || !repositoryOwner || !repositoryName) {
-      return Response.json({ ok: false, error: "GitHub check-run completion is not configured" }, { status: 503 });
+    if (githubCheckRunId) {
+      if (!checkRunClient?.completeCheckRun || !installationId || !repositoryOwner || !repositoryName) {
+        return Response.json({ ok: false, error: "GitHub check-run completion is not configured" }, { status: 503 });
+      }
+
+      await checkRunClient.completeCheckRun({
+        installationId,
+        repositoryOwner,
+        repositoryName,
+        checkRunId: githubCheckRunId,
+        runId,
+        conclusion: checkConclusion(parsed.data.status, parsed.data.decision),
+        title: checkOutput.title,
+        summary: checkOutput.summary,
+        completedAt: new Date().toISOString(),
+      });
+      checkRunUpdated = true;
     }
 
-    await checkRunClient.completeCheckRun({
-      installationId,
-      repositoryOwner,
-      repositoryName,
-      checkRunId: githubCheckRunId,
-      runId,
-      conclusion: checkConclusion(parsed.data.status, parsed.data.decision),
-      title: "BoardReadyOps release readiness",
-      summary: checkSummary(parsed.data),
-      completedAt: new Date().toISOString(),
-    });
-    checkRunUpdated = true;
+    const pullRequestNumber = numberCell(row, "pull_request_number");
+    if (pullRequestNumber && checkRunClient?.createPullRequestComment && installationId && repositoryOwner && repositoryName) {
+      await checkRunClient.createPullRequestComment({
+        installationId,
+        repositoryOwner,
+        repositoryName,
+        pullRequestNumber,
+        body: buildReadinessPrComment({ ...parsed.data, detailsUrl: runDetailsUrl }),
+      });
+      pullRequestCommentCreated = true;
+    }
   }
 
-  return Response.json({ ok: true, status: "accepted", runId, checkRunUpdated, result: parsed.data }, { status: 202 });
+  return Response.json(
+    { ok: true, status: "accepted", runId, checkRunUpdated, pullRequestCommentCreated, result: parsed.data },
+    { status: 202 },
+  );
 }
