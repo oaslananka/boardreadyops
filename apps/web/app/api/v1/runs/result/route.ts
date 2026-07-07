@@ -7,6 +7,9 @@ export const runtime = "nodejs";
 type QueryRow = Record<string, unknown>;
 type CheckConclusion = "failure" | "neutral" | "success" | "timed_out";
 
+const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
+const resultKeyHeaderName = "x-boardreadyops-runner-key";
+
 function rows(result: unknown): QueryRow[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) {
     return [];
@@ -65,6 +68,17 @@ function checkSummary(input: { status: string; decision: string | null; findings
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const configuredKey = process.env[resultKeyEnvName];
+  const suppliedKey = request.headers.get(resultKeyHeaderName);
+
+  if (!configuredKey) {
+    return Response.json({ ok: false, error: "runner result key is not configured" }, { status: 503 });
+  }
+
+  if (!suppliedKey || suppliedKey !== configuredKey) {
+    return Response.json({ ok: false, error: "invalid runner result key" }, { status: 401 });
+  }
+
   const runId = new URL(request.url).searchParams.get("run_id");
 
   if (!runId) {
