@@ -63,6 +63,13 @@ async function markCheckRunning(rt, input) {
   await ensureOk(response, "check update");
 }
 
+function safeModeInputs(action) {
+  return {
+    safe_mode: action.safeMode?.enabled === true ? "true" : "false",
+    safe_mode_reasons: (action.safeMode?.reasons ?? []).join(","),
+  };
+}
+
 export function createRunnerClient() {
   return {
     async dispatchReleaseRunWorkflow(input) {
@@ -84,6 +91,7 @@ export function createRunnerClient() {
               target: input.action.repository.fullName,
               head_sha: input.action.commitSha,
               result_url: resultUrl(input.runId),
+              ...safeModeInputs(input.action),
             },
           }),
         },
