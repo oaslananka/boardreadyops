@@ -20,7 +20,7 @@ function statusLabel(status) {
     case "queued":
       return "Queued";
     default:
-      return status;
+      return sanitizeInline(status);
   }
 }
 
@@ -36,7 +36,7 @@ function decisionLabel(decision) {
     case undefined:
       return "None";
     default:
-      return decision;
+      return sanitizeInline(decision);
   }
 }
 
@@ -94,6 +94,19 @@ function detailsLine(detailsUrl) {
   return detailsUrl ? `\n\nOpen the hosted run dashboard: ${detailsUrl}` : "";
 }
 
+function sanitizeInline(value) {
+  return String(value).replace(/[\r\n|]/g, " ").trim();
+}
+
+function code(value) {
+  return `\`${String(value).replace(/`/g, "'").replace(/[\r\n]/g, " ").trim()}\``;
+}
+
+function findingLine(finding) {
+  const location = finding.path ? ` (${code(finding.path)})` : "";
+  return `- **${sanitizeInline(finding.severity)}** ${code(finding.ruleId)}${location}: ${sanitizeInline(finding.message)}`;
+}
+
 export function buildReadinessCheckOutput(input) {
   const findings = input.findings ?? [];
   const title = `${decisionEmoji(input.decision, input.status)} BoardReadyOps release readiness: ${decisionLabel(input.decision)}`;
@@ -108,8 +121,7 @@ export function buildReadinessCheckOutput(input) {
   if (visibleFindings.length > 0) {
     lines.push("", "### Top findings");
     for (const finding of visibleFindings) {
-      const location = finding.path ? ` (${finding.path})` : "";
-      lines.push(`- **${finding.severity}** \`${finding.ruleId}\`${location}: ${finding.message}`);
+      lines.push(findingLine(finding));
     }
   }
 
@@ -140,8 +152,7 @@ export function buildReadinessPrComment(input) {
   if (visibleFindings.length > 0) {
     lines.push("", "### Highest-priority findings", "");
     for (const finding of visibleFindings) {
-      const location = finding.path ? ` (${finding.path})` : "";
-      lines.push(`- **${finding.severity}** \`${finding.ruleId}\`${location}: ${finding.message}`);
+      lines.push(findingLine(finding));
     }
   }
 
