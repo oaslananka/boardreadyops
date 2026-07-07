@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createSqlGitHubAppLifecycleStore, type SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
+import {
+  createSqlGitHubAppLifecycleStore,
+  parseReleaseRepositoryRolloutPolicy,
+  releaseRepositoryRolloutEnvName,
+  type SqlQueryExecutor,
+} from "../../../packages/db/src/lifecycle-store.js";
 
 const installation = {
   id: 12345,
@@ -43,6 +48,24 @@ function recordingExecutor() {
 }
 
 describe("SQL GitHub App lifecycle store", () => {
+  it("documents the environment variable used for rollout opt-in", () => {
+    expect(releaseRepositoryRolloutEnvName).toBe("BOARDREADYOPS_RELEASE_REPOSITORIES");
+  });
+
+  it("parses explicit release repository rollout lists", () => {
+    expect(
+      parseReleaseRepositoryRolloutPolicy(" Oaslananka/BoardReadyOps, octo-org/hardware-board invalid-token "),
+    ).toEqual({
+      repositories: ["oaslananka/boardreadyops", "octo-org/hardware-board"],
+    });
+  });
+
+  it("requires an explicit all-repositories rollout token", () => {
+    expect(parseReleaseRepositoryRolloutPolicy("all")).toEqual({ allowAllRepositories: true });
+    expect(parseReleaseRepositoryRolloutPolicy("*")).toEqual({ allowAllRepositories: true });
+    expect(parseReleaseRepositoryRolloutPolicy(undefined)).toEqual({ repositories: [] });
+  });
+
   it("upserts installations into the mapped installations table", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppLifecycleStore(executor, {
@@ -89,11 +112,12 @@ describe("SQL GitHub App lifecycle store", () => {
     ]);
   });
 
-  it("enqueues release runs with an idempotency key for enabled repositories", async () => {
+  it("enqueues release runs with an idempotency key for configured repositories", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppLifecycleStore(executor, {
       id: () => "run-row-id",
       now: () => new Date("2026-07-04T00:00:00.000Z"),
+      releaseRepositoryRolloutPolicy: parseReleaseRepositoryRolloutPolicy("OASLANANKA/BOARDREADYOPS"),
     });
 
     const result = await store.enqueueReleaseRun({
@@ -121,6 +145,28 @@ describe("SQL GitHub App lifecycle store", () => {
       "run-row-id",
       "1283305324:42:0123456789abcdef",
     ]);
+  });
+
+  it("can explicitly roll out release runs to all installed repositories", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppLifecycleStore(executor, {
+      id: () => "run-row-id",
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+
+    const result = await store.enqueueReleaseRun({
+      type: "release_run.enqueue",
+      installation,
+      repository,
+      pullRequestNumber: 42,
+      ref: "feature/ready",
+      commitSha: "0123456789abcdef",
+      triggerKind: "pr",
+    });
+
+    expect(result.runId).toBe("run-row-id");
+    expect(calls).toHaveLength(1);
   });
 
   it("skips release-run enqueue for repositories that are not enabled", async () => {
