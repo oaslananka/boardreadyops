@@ -42,6 +42,9 @@ export type GitHubAppLifecycleAction =
       ref: string;
       commitSha: string;
       triggerKind: "pr";
+      pullRequestFromFork: boolean;
+      pullRequestDraft: boolean;
+      pullRequestHeadRepositoryFullName?: string;
     };
 
 export type GitHubAppLifecycleResult = {
@@ -171,6 +174,16 @@ function pullRequestRef(pullRequest: Record<string, unknown>): string | null {
   return stringValue(head, "ref") ?? null;
 }
 
+function pullRequestHeadRepositoryFullName(pullRequest: Record<string, unknown>): string | undefined {
+  const head = pullRequest.head;
+
+  if (!isRecord(head) || !isRecord(head.repo)) {
+    return undefined;
+  }
+
+  return stringValue(head.repo, "full_name");
+}
+
 function isQueuedPullRequestAction(action: string | undefined): boolean {
   return action === "opened" || action === "reopened" || action === "synchronize" || action === "ready_for_review";
 }
@@ -272,9 +285,26 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
     const pullRequestNumber = numberValue(pullRequest, "number");
     const commitSha = pullRequestCommitSha(pullRequest);
     const ref = pullRequestRef(pullRequest);
+    const headRepositoryFullName = pullRequestHeadRepositoryFullName(pullRequest);
 
     if (pullRequestNumber === undefined || !commitSha || !ref) {
       return unsupported(options, "pull request payload does not include number, head sha, and head ref");
+    }
+
+    const enqueueAction: Extract<GitHubAppLifecycleAction, { type: "release_run.enqueue" }> = {
+      type: "release_run.enqueue",
+      installation,
+      repository,
+      pullRequestNumber,
+      ref,
+      commitSha,
+      triggerKind: "pr",
+      pullRequestFromFork: Boolean(headRepositoryFullName && headRepositoryFullName !== repository.fullName),
+      pullRequestDraft: boolValue(pullRequest, "draft") ?? false,
+    };
+
+    if (headRepositoryFullName) {
+      enqueueAction.pullRequestHeadRepositoryFullName = headRepositoryFullName;
     }
 
     return result(options, action, [
@@ -287,15 +317,7 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
         installation,
         repository,
       },
-      {
-        type: "release_run.enqueue",
-        installation,
-        repository,
-        pullRequestNumber,
-        ref,
-        commitSha,
-        triggerKind: "pr",
-      },
+      enqueueAction,
     ]);
   }
 
