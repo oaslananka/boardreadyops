@@ -89,6 +89,46 @@ export function releaseRunIdempotencyKey(action: EnqueueReleaseRunInput): string
   return [action.repository.id, action.pullRequestNumber, action.commitSha].join(":");
 }
 
+function dispatchSkipReason(action: EnqueueReleaseRunInput): string | undefined {
+  if (action.pullRequestDraft) {
+    return "draft pull request";
+  }
+
+  if (action.pullRequestFromFork) {
+    return "fork pull request safe mode";
+  }
+
+  if (action.repository.private) {
+    return "private repository safe mode";
+  }
+
+  return undefined;
+}
+
+async function completeSkippedCheckRun(
+  action: EnqueueReleaseRunInput,
+  runId: string,
+  checkRunId: number,
+  reason: string,
+  checkRunClient: GitHubAppCheckRunClient,
+): Promise<void> {
+  if (!checkRunClient.completeCheckRun) {
+    return;
+  }
+
+  await checkRunClient.completeCheckRun({
+    installationId: action.installation.id,
+    repositoryOwner: action.repository.owner,
+    repositoryName: action.repository.name,
+    checkRunId,
+    runId,
+    conclusion: "neutral",
+    title: "BoardReadyOps release readiness skipped",
+    summary: `Runner dispatch was skipped by BoardReadyOps safe mode: ${reason}.`,
+    completedAt: new Date().toISOString(),
+  });
+}
+
 export async function executeGitHubAppLifecycleActions(
   actions: readonly GitHubAppLifecycleAction[],
   store: GitHubAppLifecycleStore,
@@ -141,7 +181,12 @@ export async function executeGitHubAppLifecycleActions(
           });
           result.checkRunsCreated += 1;
 
-          if (workflowDispatchClient) {
+          const skipReason = dispatchSkipReason(action);
+
+          if (skipReason) {
+            await completeSkippedCheckRun(action, releaseRun.runId, checkRun.id, skipReason, checkRunClient);
+            result.workflowDispatchesSkipped += 1;
+          } else if (workflowDispatchClient) {
             const workflowDispatch = await workflowDispatchClient.dispatchReleaseRunWorkflow({
               action,
               runId: releaseRun.runId,
