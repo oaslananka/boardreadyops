@@ -204,11 +204,7 @@ function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Rec
   return pullRequestHeadRepositoryIsFork(pullRequest) || (headRepository !== undefined && headRepository !== repository.fullName);
 }
 
-function pullRequestSafeMode(
-  repository: GitHubRepositoryRef,
-  pullRequest: Record<string, unknown>,
-  fromFork: boolean,
-): PullRequestSafeMode | undefined {
+function pullRequestSafeMode(repository: GitHubRepositoryRef, fromFork: boolean): PullRequestSafeMode | undefined {
   const reasons = [] as string[];
 
   if (repository.private) {
@@ -340,7 +336,7 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       pullRequestDraft: boolValue(pullRequest, "draft") ?? false,
       pullRequestFromFork,
     };
-    const safeMode = pullRequestSafeMode(repository, pullRequest, pullRequestFromFork);
+    const safeMode = pullRequestSafeMode(repository, pullRequestFromFork);
 
     if (safeMode) {
       enqueueAction.safeMode = safeMode;
