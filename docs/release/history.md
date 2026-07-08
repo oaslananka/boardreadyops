@@ -8,6 +8,48 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.8.0](https://github.com/oaslananka/boardreadyops/compare/v1.7.2...v1.8.0) (2026-07-08)
+
+
+### Features
+
+* **adapters:** add Zephyr, ESP-IDF, and STM32CubeMX firmware contract adapters ([#74](https://github.com/oaslananka/boardreadyops/issues/74)) ([1580cdc](https://github.com/oaslananka/boardreadyops/commit/1580cdc7556e606707db778582d19c915bbfc673)), closes [#40](https://github.com/oaslananka/boardreadyops/issues/40)
+* add cloud database bootstrap migrations ([#68](https://github.com/oaslananka/boardreadyops/issues/68)) ([6596105](https://github.com/oaslananka/boardreadyops/commit/6596105fa758b66ce209aee6640bb0deaec7dffc))
+* add GitHub App lifecycle persistence ports ([#65](https://github.com/oaslananka/boardreadyops/issues/65)) ([46c0228](https://github.com/oaslananka/boardreadyops/commit/46c022830c6e0103e37ff3d5b6f7f7b453ab95e4))
+* add readiness runner workflow ([f0c5daf](https://github.com/oaslananka/boardreadyops/commit/f0c5daf0897f2a3db5eb2d1b76b9292de9834252))
+* add readiness workflow lifecycle dispatch hooks ([70a1d8c](https://github.com/oaslananka/boardreadyops/commit/70a1d8c727bdfa53abcf3c4e9ae64a7cfa5007e6))
+* add self-hosted cloud skeleton ([#61](https://github.com/oaslananka/boardreadyops/issues/61)) ([56a571d](https://github.com/oaslananka/boardreadyops/commit/56a571dab414cf1abbc327da0d2c69551d0cb5a0))
+* **bom:** add approved alternates schema and suppress single-source risk for documented substitutes ([#75](https://github.com/oaslananka/boardreadyops/issues/75)) ([8ea5063](https://github.com/oaslananka/boardreadyops/commit/8ea5063b3dbc9b1a9860ec3272d96dd69deb3cbd)), closes [#36](https://github.com/oaslananka/boardreadyops/issues/36)
+* **bom:** add bom.risk-score rule and BOM supply-chain risk summary ([#76](https://github.com/oaslananka/boardreadyops/issues/76)) ([7451205](https://github.com/oaslananka/boardreadyops/commit/7451205e88ec30918788e7ba4d438756e8c249b9)), closes [#37](https://github.com/oaslananka/boardreadyops/issues/37)
+* **bom:** add component identity normalization and conflict detection ([#78](https://github.com/oaslananka/boardreadyops/issues/78)) ([2af8e5a](https://github.com/oaslananka/boardreadyops/commit/2af8e5a43047de845f34efec0490bdbe3531c02b))
+* **bom:** lifecycle status abstraction and unknown-lifecycle rule (closes [#38](https://github.com/oaslananka/boardreadyops/issues/38)) ([10e58cb](https://github.com/oaslananka/boardreadyops/commit/10e58cb74762a82b9d518769148600949dc52134))
+* **bom:** supplier intelligence plugin interface and static provider (closes [#39](https://github.com/oaslananka/boardreadyops/issues/39)) ([7451dec](https://github.com/oaslananka/boardreadyops/commit/7451dec4dc665954cadb47994536d5d4dc0baa65))
+* **core:** rule pack architecture with defineRulePack and 5 built-in presets (closes [#50](https://github.com/oaslananka/boardreadyops/issues/50), closes [#51](https://github.com/oaslananka/boardreadyops/issues/51)) ([5080332](https://github.com/oaslananka/boardreadyops/commit/508033220de195e1acff0591bcb990b2b1bd73ec))
+* create PR readiness check run lifecycle ([94944ed](https://github.com/oaslananka/boardreadyops/commit/94944ed77b367e6974cd589bd39d2366a9d264ab))
+* **docs:** shareable public demo scenarios with pre-generated reports (closes [#49](https://github.com/oaslananka/boardreadyops/issues/49)) ([29db629](https://github.com/oaslananka/boardreadyops/commit/29db62946a3cd99613cb125664e7dc677443e5c1))
+* normalize GitHub App lifecycle events ([#64](https://github.com/oaslananka/boardreadyops/issues/64)) ([5c60432](https://github.com/oaslananka/boardreadyops/commit/5c6043252b46a951a5fe726e0eabd41128e17c40))
+* persist GitHub webhook lifecycle actions ([#66](https://github.com/oaslananka/boardreadyops/issues/66)) ([ab060c1](https://github.com/oaslananka/boardreadyops/commit/ab060c1a6c5830fa6f196088fc5a2cc2bd001c17))
+* persist GitHub webhook lifecycle actions ([#67](https://github.com/oaslananka/boardreadyops/issues/67)) ([2b88cc5](https://github.com/oaslananka/boardreadyops/commit/2b88cc5a91fa20fa8c6e66d7f57002ed72ad9aa7))
+* **release:** add prototype/pilot/production release modes ([#77](https://github.com/oaslananka/boardreadyops/issues/77)) ([0e15675](https://github.com/oaslananka/boardreadyops/commit/0e1567514c6da2410db7183152ba84a780d002d0)), closes [#31](https://github.com/oaslananka/boardreadyops/issues/31)
+* **release:** add release manifest schema, checksums.txt, and manifest coverage verification ([#81](https://github.com/oaslananka/boardreadyops/issues/81)) ([eb647b6](https://github.com/oaslananka/boardreadyops/commit/eb647b67b634ad8a6f5f2c60f2a7369d5e08a4d5))
+* **release:** run diff comparison and release history trend analysis (closes [#27](https://github.com/oaslananka/boardreadyops/issues/27), closes [#29](https://github.com/oaslananka/boardreadyops/issues/29)) ([5da9e97](https://github.com/oaslananka/boardreadyops/commit/5da9e97a7cbc989afa3b00ea3a0814732bb01648))
+* **report:** standardize report contracts with evidence schema, SARIF tags, and JUnit timestamp ([#79](https://github.com/oaslananka/boardreadyops/issues/79)) ([4717933](https://github.com/oaslananka/boardreadyops/commit/4717933d8e608719a460ce032a4bd7582339913d))
+* **rules:** add manufacturing.package-completeness rule ([#80](https://github.com/oaslananka/boardreadyops/issues/80)) ([1b6d13a](https://github.com/oaslananka/boardreadyops/commit/1b6d13a030d6734a65e5290349cfdb00626c716b)), closes [#30](https://github.com/oaslananka/boardreadyops/issues/30)
+* **vendors:** add generic preset profiles for prototype, assembly-ready, and production ([#82](https://github.com/oaslananka/boardreadyops/issues/82)) ([8b0c06c](https://github.com/oaslananka/boardreadyops/commit/8b0c06cec7344a76a426def840fc1f7252456dea)), closes [#32](https://github.com/oaslananka/boardreadyops/issues/32)
+* wire web runner client into GitHub webhook lifecycle ([1589257](https://github.com/oaslananka/boardreadyops/commit/1589257d23d2e0217e2e636baee03a368e256994)), closes [#21](https://github.com/oaslananka/boardreadyops/issues/21)
+
+
+### Bug Fixes
+
+* add runtime JS check run client ([cb6dae6](https://github.com/oaslananka/boardreadyops/commit/cb6dae61ec1d74536203ca3c2ec924e160a30420))
+* copy scripts into web Docker deps stage ([#70](https://github.com/oaslananka/boardreadyops/issues/70)) ([cc86032](https://github.com/oaslananka/boardreadyops/commit/cc86032a0776eb1452fcf081f3b80649a57cabf0))
+* **github-app:** make release rollout opt-in by config ([#109](https://github.com/oaslananka/boardreadyops/issues/109)) ([eeb9f6e](https://github.com/oaslananka/boardreadyops/commit/eeb9f6ed5819c96a6cee4ca6f618e00ae0391e4d))
+* make webhook lifecycle store resolvable by Next ([#69](https://github.com/oaslananka/boardreadyops/issues/69)) ([44a219c](https://github.com/oaslananka/boardreadyops/commit/44a219c4335a771f9f4167db579485c1568d5137))
+* relink repository installation on upsert ([7ec3820](https://github.com/oaslananka/boardreadyops/commit/7ec382006344bd0867d00678a4db8992fb72f2f0))
+* restrict BoardReadyOps checks to enabled repositories ([ccec5d4](https://github.com/oaslananka/boardreadyops/commit/ccec5d4f7f0a90c7f927a59a9f9aa5f044c5b104))
+* return pg query results ([79bf78b](https://github.com/oaslananka/boardreadyops/commit/79bf78b7a111257e0fbc971be877bbf0a42a681c))
+* upsert PR webhook state before enqueue ([#98](https://github.com/oaslananka/boardreadyops/issues/98)) ([6a00f94](https://github.com/oaslananka/boardreadyops/commit/6a00f94d4697c98119b013dad37ad2152e502501))
+
 ## [1.7.2](https://github.com/oaslananka/boardreadyops/compare/v1.7.1...v1.7.2) (2026-06-28)
 
 
