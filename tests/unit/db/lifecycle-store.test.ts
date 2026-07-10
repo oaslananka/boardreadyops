@@ -131,10 +131,13 @@ describe("SQL GitHub App lifecycle store", () => {
     });
 
     expect(result.runId).toBe("run-row-id");
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.sql).toContain("insert into release_runs");
-    expect(calls[0]?.sql).toContain("on conflict (idempotency_key)");
-    expect(calls[0]?.params).toEqual([
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.sql).toContain("set status = 'superseded'");
+    expect(calls[0]?.sql).toContain("release_runs.status in ('queued', 'dispatched', 'running')");
+    expect(calls[0]?.params).toEqual([1283305324, 42, "0123456789abcdef", "2026-07-04T00:00:00.000Z"]);
+    expect(calls[1]?.sql).toContain("insert into release_runs");
+    expect(calls[1]?.sql).toContain("on conflict (idempotency_key)");
+    expect(calls[1]?.params).toEqual([
       1283305324,
       "0123456789abcdef",
       "feature/ready",
@@ -166,7 +169,9 @@ describe("SQL GitHub App lifecycle store", () => {
     });
 
     expect(result.runId).toBe("run-row-id");
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.sql).toContain("set status = 'superseded'");
+    expect(calls[1]?.sql).toContain("insert into release_runs");
   });
 
   it("skips release-run enqueue for repositories that are not enabled", async () => {

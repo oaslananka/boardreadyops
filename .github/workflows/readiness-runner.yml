@@ -32,6 +32,7 @@ jobs:
         env:
           RESULT_URL: ${{ inputs.result_url }}
           RESULT_KEY: ${{ secrets.BRO_RUNNER_KEY }}
+          RUN_ID: ${{ inputs.run_id }}
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
         run: |
           if [ -z "$RESULT_KEY" ]; then
@@ -48,9 +49,12 @@ jobs:
           fi
 
           payload="{\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
+          timestamp="$(date +%s)"
+          signature="sha256=$(printf '%s.%s.%s' "$timestamp" "$RUN_ID" "$payload" | openssl dgst -sha256 -hmac "$RESULT_KEY" -hex | awk '{print $2}')"
 
           curl --fail --silent --show-error \
             --request POST "$RESULT_URL" \
             --header "content-type: application/json" \
-            --header "x-boardreadyops-runner-key: $RESULT_KEY" \
+            --header "x-boardreadyops-runner-timestamp: $timestamp" \
+            --header "x-boardreadyops-runner-signature: $signature" \
             --data "$payload"
