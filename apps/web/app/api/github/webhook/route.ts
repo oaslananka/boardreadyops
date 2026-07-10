@@ -3,7 +3,7 @@ import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
 import { executeGitHubAppLifecycleActions } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { createGitHubAppCheckRunClient } from "../../../../lib/github-app-check-run-client.js";
 import { createRunnerClient } from "../../../../lib/runner-client.js";
-import { runnerModeSummary } from "../../../../lib/runner-mode.js";
+import { runnerModeSummary, runnerWorkflowDispatchClient } from "../../../../lib/runner-mode.js";
 import { getGitHubAppLifecycleStore } from "./lifecycle-store.js";
 
 export const runtime = "nodejs";
@@ -50,7 +50,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const runner = runnerModeSummary();
-  const workflowDispatchClient = runner.mode === "github-actions" ? createRunnerClient() : undefined;
+  const workflowDispatchClient = runnerWorkflowDispatchClient(runner, createRunnerClient);
   const execution = await executeGitHubAppLifecycleActions(
     lifecycle.actions,
     getGitHubAppLifecycleStore(),
