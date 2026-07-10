@@ -39,10 +39,10 @@ bom:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `mpn` (top-level) | ✅ | Primary MPN in the BOM that this entry covers |
-| `alts[].mpn` | ✅ | Approved substitute MPN |
-| `alts[].manufacturer` | ✗ | Manufacturer of the substitute (informational) |
-| `alts[].note` | ✗ | Free-form note, e.g. test result, footprint caveat |
+| `mpn` (top-level) | Yes | Primary MPN in the BOM that this entry covers |
+| `alts[].mpn` | Yes | Approved substitute MPN |
+| `alts[].manufacturer` | No | Manufacturer of the substitute (informational) |
+| `alts[].note` | No | Free-form note, e.g. test result, footprint caveat |
 
 MPN matching is **case-insensitive** and trims leading/trailing whitespace.
 
