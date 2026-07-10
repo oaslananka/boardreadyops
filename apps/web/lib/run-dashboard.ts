@@ -1,6 +1,6 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 
-export type RunDetail = {
+type RunDetail = {
   id: string;
   status: string;
   decision: string | undefined;
@@ -20,7 +20,7 @@ export type RunDetail = {
   artifacts: ArtifactDetail[];
 };
 
-export type FindingDetail = {
+type FindingDetail = {
   ruleId: string;
   severity: string;
   message: string;
@@ -29,7 +29,7 @@ export type FindingDetail = {
   waivedAt: string | undefined;
 };
 
-export type ArtifactDetail = {
+type ArtifactDetail = {
   kind: string;
   name: string;
   sha256: string;
