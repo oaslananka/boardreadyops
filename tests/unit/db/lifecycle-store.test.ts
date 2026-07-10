@@ -37,7 +37,7 @@ function recordingExecutor() {
       calls.push({ sql, params });
 
       if (sql.includes("returning id")) {
-        return { rows: [{ id: "run-row-id", github_check_run_id: null }] };
+        return { rows: [{ id: "run-row-id", github_check_run_id: null, status: "queued" }] };
       }
 
       return { rows: [] };
@@ -130,7 +130,7 @@ describe("SQL GitHub App lifecycle store", () => {
       triggerKind: "pr",
     });
 
-    expect(result.runId).toBe("run-row-id");
+    expect(result).toMatchObject({ runId: "run-row-id", status: "queued" });
     expect(calls).toHaveLength(2);
     expect(calls[0]?.sql).toContain("set status = 'superseded'");
     expect(calls[0]?.sql).toContain("release_runs.status in ('queued', 'dispatched', 'running')");
@@ -172,6 +172,37 @@ describe("SQL GitHub App lifecycle store", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]?.sql).toContain("set status = 'superseded'");
     expect(calls[1]?.sql).toContain("insert into release_runs");
+  });
+
+  it("marks workflow dispatch without changing the readiness decision", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppLifecycleStore(executor);
+
+    await store.markReleaseRunDispatched({ runId: "run-row-id" });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("set status = 'dispatched'");
+    expect(calls[0]?.sql).not.toContain("decision");
+    expect(calls[0]?.sql).toContain("status = 'queued'");
+    expect(calls[0]?.params).toEqual(["run-row-id"]);
+  });
+
+  it("terminalizes safe-mode skips as completed and neutral", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppLifecycleStore(executor);
+
+    await store.markReleaseRunSkipped({
+      runId: "run-row-id",
+      completedAt: "2026-07-10T18:00:00.000Z",
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("set status = 'completed'");
+    expect(calls[0]?.sql).toContain("decision = 'neutral'");
+    expect(calls[0]?.sql).toContain("completed_at = coalesce");
+    expect(calls[0]?.sql).toContain("duration_ms");
+    expect(calls[0]?.sql).toContain("status = 'queued'");
+    expect(calls[0]?.params).toEqual(["run-row-id", "2026-07-10T18:00:00.000Z"]);
   });
 
   it("skips release-run enqueue for repositories that are not enabled", async () => {

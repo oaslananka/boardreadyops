@@ -15,9 +15,11 @@ export type GitHubInstallationRef = {
   accountType?: string;
 };
 
+export type PullRequestSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
+
 export type PullRequestSafeMode = {
   enabled: boolean;
-  reasons: string[];
+  reasons: PullRequestSafeModeReason[];
 };
 
 export type GitHubAppLifecycleAction =
@@ -201,18 +203,29 @@ function pullRequestHeadRepositoryIsFork(pullRequest: Record<string, unknown>): 
 
 function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Record<string, unknown>): boolean {
   const headRepository = pullRequestHeadRepository(pullRequest);
-  return pullRequestHeadRepositoryIsFork(pullRequest) || (headRepository !== undefined && headRepository !== repository.fullName);
+  return (
+    pullRequestHeadRepositoryIsFork(pullRequest) ||
+    (headRepository !== undefined && headRepository !== repository.fullName)
+  );
 }
 
-function pullRequestSafeMode(repository: GitHubRepositoryRef, fromFork: boolean): PullRequestSafeMode | undefined {
-  const reasons = [] as string[];
+function pullRequestSafeMode(
+  repository: GitHubRepositoryRef,
+  fromFork: boolean,
+  draft: boolean,
+): PullRequestSafeMode | undefined {
+  const reasons: PullRequestSafeModeReason[] = [];
 
-  if (repository.private) {
-    reasons.push("private-repository");
+  if (draft) {
+    reasons.push("draft-pull-request");
   }
 
   if (fromFork) {
     reasons.push("fork-pull-request");
+  }
+
+  if (repository.private) {
+    reasons.push("private-repository");
   }
 
   return reasons.length > 0 ? { enabled: true, reasons } : undefined;
@@ -325,6 +338,7 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
     }
 
     const pullRequestFromFork = pullRequestIsFromFork(repository, pullRequest);
+    const pullRequestDraft = boolValue(pullRequest, "draft") ?? false;
     const enqueueAction: GitHubAppLifecycleAction = {
       type: "release_run.enqueue",
       installation,
@@ -333,10 +347,10 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       ref,
       commitSha,
       triggerKind: "pr",
-      pullRequestDraft: boolValue(pullRequest, "draft") ?? false,
+      pullRequestDraft,
       pullRequestFromFork,
     };
-    const safeMode = pullRequestSafeMode(repository, pullRequestFromFork);
+    const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
 
     if (safeMode) {
       enqueueAction.safeMode = safeMode;

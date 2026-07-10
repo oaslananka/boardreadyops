@@ -63,10 +63,30 @@ async function markCheckRunning(rt, input) {
   await ensureOk(response, "check update");
 }
 
-function safeModeInputs(action) {
+const safeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"];
+const allowedSafeModeReasons = new Set(safeModeReasonOrder);
+
+export function safeModeInputs(action) {
+  const safeMode = action.safeMode;
+  const reasons = safeMode?.reasons ?? [];
+
+  if (!Array.isArray(reasons) || reasons.some((reason) => !allowedSafeModeReasons.has(reason))) {
+    throw new Error("unsupported runner safe-mode reason");
+  }
+
+  const normalizedReasons = safeModeReasonOrder.filter((reason) => reasons.includes(reason));
+
+  if (safeMode?.enabled === true && normalizedReasons.length === 0) {
+    throw new Error("runner safe mode requires at least one reason");
+  }
+
+  if (safeMode?.enabled !== true && normalizedReasons.length > 0) {
+    throw new Error("runner safe-mode reasons require safe mode to be enabled");
+  }
+
   return {
-    safe_mode: action.safeMode?.enabled === true ? "true" : "false",
-    safe_mode_reasons: (action.safeMode?.reasons ?? []).join(","),
+    safe_mode: safeMode?.enabled === true ? "true" : "false",
+    safe_mode_reasons: normalizedReasons.join(","),
   };
 }
 

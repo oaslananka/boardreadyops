@@ -156,6 +156,8 @@ describe("GitHub App lifecycle normalization", () => {
         ref: "feature/pcb-release",
         commitSha: "0123456789abcdef",
         triggerKind: "pr",
+        pullRequestDraft: false,
+        pullRequestFromFork: false,
         safeMode: {
           enabled: true,
           reasons: ["private-repository"],
@@ -189,9 +191,45 @@ describe("GitHub App lifecycle normalization", () => {
     expect(normalized.accepted).toBe(true);
     expect(normalized.actions.at(-1)).toMatchObject({
       type: "release_run.enqueue",
+      pullRequestDraft: false,
+      pullRequestFromFork: true,
       safeMode: {
         enabled: true,
         reasons: ["fork-pull-request"],
+      },
+    });
+  });
+
+  it("orders draft, fork, and private safe-mode reasons deterministically", () => {
+    const normalized = normalizeGitHubAppWebhook({
+      event: "pull_request",
+      delivery: "delivery-3c",
+      payload: {
+        action: "opened",
+        installation,
+        repository,
+        pull_request: {
+          number: 42,
+          draft: true,
+          head: {
+            ref: "feature/pcb-release",
+            sha: "0123456789abcdef",
+            repo: {
+              full_name: "contributor/hardware-board",
+              fork: true,
+            },
+          },
+        },
+      },
+    });
+
+    expect(normalized.actions.at(-1)).toMatchObject({
+      type: "release_run.enqueue",
+      pullRequestDraft: true,
+      pullRequestFromFork: true,
+      safeMode: {
+        enabled: true,
+        reasons: ["draft-pull-request", "fork-pull-request", "private-repository"],
       },
     });
   });
