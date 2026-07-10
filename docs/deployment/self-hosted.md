@@ -1,6 +1,6 @@
 # Self-hosted BoardReadyOps Cloud deployment
 
-This guide describes the first self-hosted MVP target for `boardreadyops.oaslananka.dev` on `ops-vps-02`.
+This guide describes the self-hosted deployment target for `boardreadyops.oaslananka.dev` on `ops-vps-02`.
 
 ## Target topology
 
@@ -8,9 +8,9 @@ This guide describes the first self-hosted MVP target for `boardreadyops.oaslana
 Cloudflare DNS
   -> boardreadyops.oaslananka.dev
   -> ops-vps-02 / 46.101.195.208
-  -> Docker Compose Caddy service
-  -> Docker Compose internal web service on web:3000
-  -> PostgreSQL, Redis, and local artifact volume
+  -> Caddy on the boardreadyops-cloud Docker network
+  -> immutable BoardReadyOps web image on web:3000
+  -> PostgreSQL, Redis, and a persistent artifact volume
 ```
 
 ## DNS
@@ -30,21 +30,30 @@ TTL: 60
 Recommended paths:
 
 ```text
-/opt/repos/boardreadyops-cloud-skeleton   # source worktree
-/opt/boardreadyops-cloud                  # deployment env and runtime files
+/opt/repos/boardreadyops-prod       # clean production worktree tracking origin/main
+/opt/boardreadyops-cloud            # deployment env, stable Caddyfile, and runtime files
+/opt/boardreadyops-cloud/runtime-env # root-only symlink or file mounted read-only into web
 ```
+
+Keep the live Caddy bind mount under `/opt/boardreadyops-cloud`; do not bind it from an expendable Git worktree.
 
 ## Host requirements
 
-Install Docker Engine and the Docker Compose v2 plugin on the VPS. Caddy, PostgreSQL, and Redis run inside Docker Compose for the MVP.
+Install Docker Engine and the Docker Compose v2 plugin on the VPS. The web image includes a native Docker healthcheck. PostgreSQL and Redis healthchecks are also defined in `deploy/docker-compose.yml`.
 
-## Deploy
+## First Compose deployment
 
 ```bash
 cp deploy/env.example deploy/.env
 # Edit deploy/.env before public deployment.
+export BOARDREADYOPS_GIT_SHA="$(git rev-parse HEAD)"
+export BOARDREADYOPS_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+export BOARDREADYOPS_VERSION="$(node -p "require('./package.json').version")"
+export BOARDREADYOPS_IMAGE_TAG="$BOARDREADYOPS_GIT_SHA"
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
 ```
+
+The build writes the commit SHA, package version, and build timestamp into standard OCI image labels.
 
 ## Health check
 
@@ -61,45 +70,56 @@ Expected response:
 }
 ```
 
-## Next milestones
+Inspect the native Docker health state with:
 
-1. Add GitHub App installation handling.
-2. Persist release runs to PostgreSQL.
-3. Add check-run and sticky PR comment lifecycle.
-4. Add signed artifact upload and download endpoints.
-5. Add GitHub Actions dispatch runner integration.
-6. Add a managed worker container.
+```bash
+docker inspect --format '{{json .State.Health}}' bro-web
+```
 
 ## Repeatable VPS deploy from main
 
-After a change is merged to `main`, deploy the live VPS app from a clean main worktree:
+After a change is merged to `main`, update the clean production worktree without rewriting local history:
 
 ```bash
 cd /opt/repos/boardreadyops-prod
 git fetch origin --prune
 git checkout prod-main
-git reset --hard origin/main
+git merge --ff-only origin/main
 pnpm run cloud:deploy:self-hosted
 ```
 
 The deploy script performs these steps:
 
-1. Installs dependencies with `pnpm install --frozen-lockfile`.
-2. Builds `@boardreadyops/web` with Next.js.
-3. Backs up the current `.next` output from the live `bro-web` container.
-4. Copies the new `.next` output into the container.
-5. Restarts the container.
-6. Verifies `https://boardreadyops.oaslananka.dev/api/health`.
-7. Restores the previous `.next` output and restarts the container if the health check fails.
+1. Installs dependencies with `pnpm install --frozen-lockfile` unless explicitly skipped.
+2. Builds an immutable web image tagged with the current Git commit.
+3. Adds OCI revision, version, and build-date labels to the image.
+4. Starts a temporary canary container on `127.0.0.1:3004`.
+5. Requires both the image-native Docker healthcheck and the canary HTTP health endpoint to pass.
+6. Tags the current live image as a timestamped rollback image.
+7. Stops the old container and starts the new image as `bro-web` with `restart=unless-stopped`.
+8. Verifies the public HTTPS health endpoint.
+9. Restores the previous container automatically if the new deployment fails.
+10. Removes the previous container after success while retaining its rollback image.
+
+The deploy no longer copies `.next` into a running container. Each release is an immutable Docker image tied to one Git revision.
 
 Supported environment overrides:
 
 ```text
 BOARDREADYOPS_CLOUD_CONTAINER=bro-web
 BOARDREADYOPS_CLOUD_HEALTH_URL=https://boardreadyops.oaslananka.dev/api/health
-BOARDREADYOPS_CLOUD_BACKUP_ROOT=/opt/boardreadyops-cloud/backups
+BOARDREADYOPS_CLOUD_CANARY_HEALTH_URL=http://127.0.0.1:3004/api/health
+BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY=boardreadyops-web-runtime
+BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE=/opt/boardreadyops-cloud/runtime-env
+BOARDREADYOPS_CLOUD_ARTIFACT_VOLUME=boardreadyops_artifacts
+BOARDREADYOPS_CLOUD_NETWORK=boardreadyops-cloud
+BOARDREADYOPS_CLOUD_LIVE_PUBLISH=127.0.0.1:3003:3000
+BOARDREADYOPS_CLOUD_CANARY_PUBLISH=127.0.0.1:3004:3000
+BOARDREADYOPS_CLOUD_REVISION=<git-sha>
 BOARDREADYOPS_CLOUD_SKIP_INSTALL=1
 BOARDREADYOPS_CLOUD_DRY_RUN=1
+BOARDREADYOPS_CLOUD_HEALTH_ATTEMPTS=60
+BOARDREADYOPS_CLOUD_HEALTH_DELAY_MS=1000
 ```
 
 For a dry run:
