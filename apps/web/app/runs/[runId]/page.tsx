@@ -169,6 +169,11 @@ export default async function RunPage({ params }: RunPageProps) {
                 <p>
                   SHA-256: <code>{artifact.sha256}</code>
                 </p>
+                {artifact.downloadUrl ? (
+                  <p>
+                    <a href={artifact.downloadUrl}>Download artifact</a>
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
