@@ -6,15 +6,21 @@ import { cloudDatabaseModels, cloudDatabaseSchemaVersion } from "../../../packag
 const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
-  it("publishes the runner registration schema version and model", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(3);
+  it("publishes the audit-log schema version and models", () => {
+    expect(cloudDatabaseSchemaVersion).toBe(4);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
+    expect(cloudDatabaseModels).toContain("AuditEvent");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
     const files = (await readdir(migrationsDir)).filter((file) => /^\d+_.+\.sql$/u.test(file)).sort();
 
-    expect(files).toEqual(["0001_cloud_schema.sql", "0002_release_run_lifecycle.sql", "0003_runner_registrations.sql"]);
+    expect(files).toEqual([
+      "0001_cloud_schema.sql",
+      "0002_release_run_lifecycle.sql",
+      "0003_runner_registrations.sql",
+      "0004_audit_logs.sql",
+    ]);
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
@@ -38,6 +44,39 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("create unique index if not exists runner_registrations_installation_fingerprint_idx");
     expect(sql).toContain("create index if not exists runner_registrations_active_heartbeat_idx");
     expect(sql).toContain("where status = 'active' and disabled_at is null");
+  });
+
+  it("keeps audit events tenant-scoped, bounded, and append-only", async () => {
+    const sql = await readFile(join(migrationsDir, "0004_audit_logs.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists audit_events");
+    expect(sql).toContain("installation_id text not null references installations(id) on delete cascade");
+    expect(sql).toContain("runner_registration_id text references runner_registrations(id) on delete set null");
+    expect(sql).toContain("constraint audit_events_metadata_valid");
+    expect(sql).toContain("jsonb_typeof(metadata) = 'object'");
+    expect(sql).toContain("pg_column_size(metadata) <= 65536");
+    expect(sql).toContain("constraint audit_events_release_run_dimension_valid");
+    expect(sql).toContain("constraint audit_events_artifact_dimension_valid");
+    expect(sql).toContain("boardreadyops_validate_audit_event_scope");
+    expect(sql).toContain("audit repository does not belong to installation");
+    expect(sql).toContain("audit release run does not belong to repository");
+    expect(sql).toContain("audit artifact does not belong to release run");
+    expect(sql).toContain("audit runner does not belong to installation");
+    expect(sql).toContain("boardreadyops_reject_audit_event_mutation");
+    expect(sql).toContain("before update or delete on audit_events");
+    expect(sql).toContain("audit_events is append-only");
+  });
+
+  it("keeps audit query indexes tenant-prefixed and deterministic", async () => {
+    const sql = await readFile(join(migrationsDir, "0004_audit_logs.sql"), "utf8");
+
+    expect(sql).toContain("on audit_events(installation_id, created_at desc, id desc)");
+    expect(sql).toContain("on audit_events(installation_id, event_type, created_at desc, id desc)");
+    expect(sql).toContain("on audit_events(installation_id, repository_id, created_at desc, id desc)");
+    expect(sql).toContain("on audit_events(installation_id, release_run_id, created_at desc, id desc)");
+    expect(sql).toContain("on audit_events(installation_id, artifact_id, created_at desc, id desc)");
+    expect(sql).toContain("on audit_events(installation_id, runner_registration_id, created_at desc, id desc)");
+    expect(sql).toContain("on audit_events(installation_id, request_id, created_at desc, id desc)");
   });
 
   it("keeps the initial schema idempotent", async () => {
