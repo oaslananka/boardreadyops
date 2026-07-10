@@ -15,6 +15,13 @@ export type GitHubInstallationRef = {
   accountType?: string;
 };
 
+export type PullRequestSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
+
+export type PullRequestSafeMode = {
+  enabled: boolean;
+  reasons: PullRequestSafeModeReason[];
+};
+
 export type GitHubAppLifecycleAction =
   | {
       type: "installation.upsert";
@@ -42,6 +49,9 @@ export type GitHubAppLifecycleAction =
       ref: string;
       commitSha: string;
       triggerKind: "pr";
+      pullRequestDraft?: boolean;
+      pullRequestFromFork?: boolean;
+      safeMode?: PullRequestSafeMode;
     };
 
 export type GitHubAppLifecycleResult = {
@@ -171,6 +181,56 @@ function pullRequestRef(pullRequest: Record<string, unknown>): string | null {
   return stringValue(head, "ref") ?? null;
 }
 
+function pullRequestHeadRepository(pullRequest: Record<string, unknown>): string | undefined {
+  const head = pullRequest.head;
+
+  if (!isRecord(head) || !isRecord(head.repo)) {
+    return undefined;
+  }
+
+  return stringValue(head.repo, "full_name");
+}
+
+function pullRequestHeadRepositoryIsFork(pullRequest: Record<string, unknown>): boolean {
+  const head = pullRequest.head;
+
+  if (!isRecord(head) || !isRecord(head.repo)) {
+    return false;
+  }
+
+  return boolValue(head.repo, "fork") ?? false;
+}
+
+function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Record<string, unknown>): boolean {
+  const headRepository = pullRequestHeadRepository(pullRequest);
+  return (
+    pullRequestHeadRepositoryIsFork(pullRequest) ||
+    (headRepository !== undefined && headRepository !== repository.fullName)
+  );
+}
+
+function pullRequestSafeMode(
+  repository: GitHubRepositoryRef,
+  fromFork: boolean,
+  draft: boolean,
+): PullRequestSafeMode | undefined {
+  const reasons: PullRequestSafeModeReason[] = [];
+
+  if (draft) {
+    reasons.push("draft-pull-request");
+  }
+
+  if (fromFork) {
+    reasons.push("fork-pull-request");
+  }
+
+  if (repository.private) {
+    reasons.push("private-repository");
+  }
+
+  return reasons.length > 0 ? { enabled: true, reasons } : undefined;
+}
+
 function isQueuedPullRequestAction(action: string | undefined): boolean {
   return action === "opened" || action === "reopened" || action === "synchronize" || action === "ready_for_review";
 }
@@ -277,6 +337,25 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       return unsupported(options, "pull request payload does not include number, head sha, and head ref");
     }
 
+    const pullRequestFromFork = pullRequestIsFromFork(repository, pullRequest);
+    const pullRequestDraft = boolValue(pullRequest, "draft") ?? false;
+    const enqueueAction: GitHubAppLifecycleAction = {
+      type: "release_run.enqueue",
+      installation,
+      repository,
+      pullRequestNumber,
+      ref,
+      commitSha,
+      triggerKind: "pr",
+      pullRequestDraft,
+      pullRequestFromFork,
+    };
+    const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
+
+    if (safeMode) {
+      enqueueAction.safeMode = safeMode;
+    }
+
     return result(options, action, [
       {
         type: "installation.upsert",
@@ -287,15 +366,7 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
         installation,
         repository,
       },
-      {
-        type: "release_run.enqueue",
-        installation,
-        repository,
-        pullRequestNumber,
-        ref,
-        commitSha,
-        triggerKind: "pr",
-      },
+      enqueueAction,
     ]);
   }
 

@@ -195,7 +195,7 @@ export function createSqlGitHubAppLifecycleStore(
            and installations.github_installation_id = $7
          on conflict (idempotency_key)
          do update set status = release_runs.status
-         returning id, github_check_run_id`,
+         returning id, github_check_run_id, status`,
         [
           action.repository.id,
           action.commitSha,
@@ -214,9 +214,11 @@ export function createSqlGitHubAppLifecycleStore(
         idempotencyKey: string;
         runId?: string;
         githubCheckRunId?: string | number | null;
+        status?: string;
       };
       const runId = stringColumn(row, "id");
       const githubCheckRunId = checkRunColumn(row);
+      const status = stringColumn(row, "status");
 
       if (runId) {
         enqueued.runId = runId;
@@ -224,6 +226,10 @@ export function createSqlGitHubAppLifecycleStore(
 
       if (githubCheckRunId !== undefined) {
         enqueued.githubCheckRunId = githubCheckRunId;
+      }
+
+      if (status) {
+        enqueued.status = status;
       }
 
       return enqueued;
@@ -241,10 +247,27 @@ export function createSqlGitHubAppLifecycleStore(
     async markReleaseRunDispatched(input) {
       await executor.query(
         `update release_runs
-         set status = 'dispatched', decision = coalesce($2, decision)
+         set status = 'dispatched'
          where id = $1
            and status = 'queued'`,
-        [input.runId, input.workflowDispatchId],
+        [input.runId],
+      );
+    },
+
+    async markReleaseRunSkipped(input) {
+      await executor.query(
+        `update release_runs
+         set status = 'completed',
+             decision = 'neutral',
+             completed_at = coalesce(completed_at, $2::timestamptz),
+             duration_ms = case
+               when completed_at is null
+                 then greatest(0, floor(extract(epoch from ($2::timestamptz - started_at)) * 1000))::integer
+               else duration_ms
+             end
+         where id = $1
+           and status = 'queued'`,
+        [input.runId, input.completedAt],
       );
     },
   };

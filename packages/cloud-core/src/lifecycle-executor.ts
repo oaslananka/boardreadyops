@@ -6,6 +6,7 @@ export type EnqueuedReleaseRun = {
   idempotencyKey: string;
   runId?: string;
   githubCheckRunId?: number | string | null;
+  status?: string;
 };
 
 export type AttachGitHubCheckRunInput = {
@@ -15,7 +16,11 @@ export type AttachGitHubCheckRunInput = {
 
 export type MarkReleaseRunDispatchedInput = {
   runId: string;
-  workflowDispatchId?: string | undefined;
+};
+
+export type MarkReleaseRunSkippedInput = {
+  runId: string;
+  completedAt: string;
 };
 
 export type CreatePullRequestCheckRunInput = {
@@ -25,7 +30,7 @@ export type CreatePullRequestCheckRunInput = {
 };
 
 export type DispatchReleaseRunWorkflowInput = CreatePullRequestCheckRunInput & {
-  githubCheckRunId: number;
+  githubCheckRunId: number | string;
 };
 
 export type CompleteGitHubCheckRunInput = {
@@ -57,6 +62,7 @@ export type GitHubAppLifecycleStore = {
   enqueueReleaseRun(action: EnqueueReleaseRunInput): Promise<EnqueuedReleaseRun>;
   attachGitHubCheckRun(input: AttachGitHubCheckRunInput): Promise<void>;
   markReleaseRunDispatched(input: MarkReleaseRunDispatchedInput): Promise<void>;
+  markReleaseRunSkipped(input: MarkReleaseRunSkippedInput): Promise<void>;
 };
 
 export type GitHubAppLifecycleExecutionResult = {
@@ -87,6 +93,119 @@ export const emptyGitHubAppLifecycleExecutionResult = {
 
 export function releaseRunIdempotencyKey(action: EnqueueReleaseRunInput): string {
   return [action.repository.id, action.pullRequestNumber, action.commitSha].join(":");
+}
+
+function dispatchSkipReason(action: EnqueueReleaseRunInput): string | undefined {
+  if (action.pullRequestDraft) {
+    return "draft pull request";
+  }
+
+  if (action.pullRequestFromFork) {
+    return "fork pull request safe mode";
+  }
+
+  return undefined;
+}
+
+async function completeSkippedCheckRun(
+  action: EnqueueReleaseRunInput,
+  runId: string,
+  checkRunId: number | string,
+  reason: string,
+  completedAt: string,
+  checkRunClient: GitHubAppCheckRunClient,
+): Promise<void> {
+  if (!checkRunClient.completeCheckRun) {
+    return;
+  }
+
+  await checkRunClient.completeCheckRun({
+    installationId: action.installation.id,
+    repositoryOwner: action.repository.owner,
+    repositoryName: action.repository.name,
+    checkRunId,
+    runId,
+    conclusion: "neutral",
+    title: "BoardReadyOps release readiness skipped",
+    summary: `Runner dispatch was skipped by BoardReadyOps safe mode: ${reason}.`,
+    completedAt,
+  });
+}
+
+async function executeReleaseRun(
+  action: EnqueueReleaseRunInput,
+  releaseRun: EnqueuedReleaseRun & { runId: string },
+  store: GitHubAppLifecycleStore,
+  result: GitHubAppLifecycleExecutionResult,
+  checkRunClient?: GitHubAppCheckRunClient,
+  workflowDispatchClient?: GitHubAppWorkflowDispatchClient,
+): Promise<void> {
+  let checkRunId = releaseRun.githubCheckRunId ?? undefined;
+  let checkRunCreated = false;
+
+  if (checkRunId === undefined || checkRunId === null) {
+    if (!checkRunClient) {
+      result.workflowDispatchesSkipped += 1;
+      return;
+    }
+
+    const checkRun = await checkRunClient.createPullRequestCheckRun({
+      action,
+      runId: releaseRun.runId,
+      idempotencyKey: releaseRun.idempotencyKey,
+    });
+    await store.attachGitHubCheckRun({
+      idempotencyKey: releaseRun.idempotencyKey,
+      githubCheckRunId: checkRun.id,
+    });
+    checkRunId = checkRun.id;
+    checkRunCreated = true;
+    result.checkRunsCreated += 1;
+  } else {
+    result.checkRunsSkipped += 1;
+  }
+
+  const skipReason = dispatchSkipReason(action);
+  if (skipReason) {
+    if (releaseRun.status === undefined || releaseRun.status === "queued") {
+      const completedAt = new Date().toISOString();
+      await store.markReleaseRunSkipped({ runId: releaseRun.runId, completedAt });
+      if (checkRunClient) {
+        await completeSkippedCheckRun(action, releaseRun.runId, checkRunId, skipReason, completedAt, checkRunClient);
+      }
+    } else if (releaseRun.status === "completed" && checkRunClient) {
+      await completeSkippedCheckRun(
+        action,
+        releaseRun.runId,
+        checkRunId,
+        skipReason,
+        new Date().toISOString(),
+        checkRunClient,
+      );
+    }
+
+    result.workflowDispatchesSkipped += 1;
+    return;
+  }
+
+  if (!workflowDispatchClient) {
+    result.workflowDispatchesSkipped += 1;
+    return;
+  }
+
+  if (!checkRunCreated && releaseRun.status !== undefined && releaseRun.status !== "queued") {
+    result.workflowDispatchesSkipped += 1;
+    return;
+  }
+
+  await workflowDispatchClient.dispatchReleaseRunWorkflow({
+    action,
+    runId: releaseRun.runId,
+    idempotencyKey: releaseRun.idempotencyKey,
+    githubCheckRunId: checkRunId,
+  });
+  await store.markReleaseRunDispatched({ runId: releaseRun.runId });
+  result.workflowDispatchesCreated += 1;
 }
 
 export async function executeGitHubAppLifecycleActions(
@@ -128,40 +247,14 @@ export async function executeGitHubAppLifecycleActions(
         }
 
         result.releaseRunsQueued += 1;
-
-        if (checkRunClient && !releaseRun.githubCheckRunId) {
-          const checkRun = await checkRunClient.createPullRequestCheckRun({
-            action,
-            runId: releaseRun.runId,
-            idempotencyKey: releaseRun.idempotencyKey,
-          });
-          await store.attachGitHubCheckRun({
-            idempotencyKey: releaseRun.idempotencyKey,
-            githubCheckRunId: checkRun.id,
-          });
-          result.checkRunsCreated += 1;
-
-          if (workflowDispatchClient) {
-            const workflowDispatch = await workflowDispatchClient.dispatchReleaseRunWorkflow({
-              action,
-              runId: releaseRun.runId,
-              idempotencyKey: releaseRun.idempotencyKey,
-              githubCheckRunId: checkRun.id,
-            });
-            await store.markReleaseRunDispatched({
-              runId: releaseRun.runId,
-              workflowDispatchId: workflowDispatch.workflowDispatchId,
-            });
-            result.workflowDispatchesCreated += 1;
-          } else {
-            result.workflowDispatchesSkipped += 1;
-          }
-        } else if (releaseRun.githubCheckRunId) {
-          result.checkRunsSkipped += 1;
-          result.workflowDispatchesSkipped += 1;
-        } else {
-          result.workflowDispatchesSkipped += 1;
-        }
+        await executeReleaseRun(
+          action,
+          { ...releaseRun, runId: releaseRun.runId },
+          store,
+          result,
+          checkRunClient,
+          workflowDispatchClient,
+        );
         break;
       }
       default: {
@@ -185,5 +278,6 @@ export function createNoopGitHubAppLifecycleStore(): GitHubAppLifecycleStore {
     },
     async attachGitHubCheckRun() {},
     async markReleaseRunDispatched() {},
+    async markReleaseRunSkipped() {},
   };
 }

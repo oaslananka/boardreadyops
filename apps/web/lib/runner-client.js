@@ -63,6 +63,33 @@ async function markCheckRunning(rt, input) {
   await ensureOk(response, "check update");
 }
 
+const safeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"];
+const allowedSafeModeReasons = new Set(safeModeReasonOrder);
+
+export function safeModeInputs(action) {
+  const safeMode = action.safeMode;
+  const reasons = safeMode?.reasons ?? [];
+
+  if (!Array.isArray(reasons) || reasons.some((reason) => !allowedSafeModeReasons.has(reason))) {
+    throw new Error("unsupported runner safe-mode reason");
+  }
+
+  const normalizedReasons = safeModeReasonOrder.filter((reason) => reasons.includes(reason));
+
+  if (safeMode?.enabled === true && normalizedReasons.length === 0) {
+    throw new Error("runner safe mode requires at least one reason");
+  }
+
+  if (safeMode?.enabled !== true && normalizedReasons.length > 0) {
+    throw new Error("runner safe-mode reasons require safe mode to be enabled");
+  }
+
+  return {
+    safe_mode: safeMode?.enabled === true ? "true" : "false",
+    safe_mode_reasons: normalizedReasons.join(","),
+  };
+}
+
 export function createRunnerClient() {
   return {
     async dispatchReleaseRunWorkflow(input) {
@@ -84,6 +111,7 @@ export function createRunnerClient() {
               target: input.action.repository.fullName,
               head_sha: input.action.commitSha,
               result_url: resultUrl(input.runId),
+              ...safeModeInputs(input.action),
             },
           }),
         },

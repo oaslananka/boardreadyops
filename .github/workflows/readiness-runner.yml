@@ -15,6 +15,14 @@ on:
       result_url:
         required: true
         type: string
+      safe_mode:
+        required: false
+        type: string
+        default: "false"
+      safe_mode_reasons:
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -26,7 +34,49 @@ jobs:
     steps:
       - name: Prepare runner
         id: readiness
-        run: echo runner-ready
+        env:
+          SAFE_MODE: ${{ inputs.safe_mode }}
+          SAFE_MODE_REASONS: ${{ inputs.safe_mode_reasons }}
+        run: |
+          case "$SAFE_MODE" in
+            true|false) ;;
+            *)
+              echo "safe_mode must be true or false" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ "$SAFE_MODE" = "false" ] && [ -n "$SAFE_MODE_REASONS" ]; then
+            echo "safe_mode_reasons requires safe_mode=true" >&2
+            exit 1
+          fi
+
+          if [ "$SAFE_MODE" = "true" ]; then
+            if [ -z "$SAFE_MODE_REASONS" ]; then
+              echo "safe_mode=true requires at least one reason" >&2
+              exit 1
+            fi
+
+            declare -A seen_reasons=()
+            IFS=',' read -r -a reasons <<< "$SAFE_MODE_REASONS"
+            for reason in "${reasons[@]}"; do
+              case "$reason" in
+                draft-pull-request|fork-pull-request|private-repository) ;;
+                *)
+                  echo "unsupported safe-mode reason: $reason" >&2
+                  exit 1
+                  ;;
+              esac
+
+              if [ -n "${seen_reasons[$reason]:-}" ]; then
+                echo "duplicate safe-mode reason: $reason" >&2
+                exit 1
+              fi
+              seen_reasons[$reason]=1
+            done
+          fi
+
+          echo "runner-ready safe_mode=$SAFE_MODE"
 
       - name: Publish runner result
         if: always()
@@ -37,6 +87,11 @@ jobs:
           HEAD_SHA: ${{ inputs.head_sha }}
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
         run: |
+          if ! [[ "$RUN_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+            echo "run_id must be a lowercase UUID" >&2
+            exit 1
+          fi
+
           expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${RUN_ID}"
 
           if [ "$RESULT_URL" != "$expected_url" ]; then
@@ -44,8 +99,15 @@ jobs:
             exit 1
           fi
 
-          if [ "$TARGET" != "oaslananka/boardreadyops" ]; then
-            echo "target must be oaslananka/boardreadyops" >&2
+          if ! [[ "$TARGET" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || [[ "$TARGET" == *..* ]]; then
+            echo "target must be a valid GitHub owner/repository name" >&2
+            exit 1
+          fi
+
+          target_owner="${TARGET%%/*}"
+          target_repository="${TARGET#*/}"
+          if [ "${#target_owner}" -gt 39 ] || [ "${#target_repository}" -gt 100 ]; then
+            echo "target owner or repository name exceeds GitHub limits" >&2
             exit 1
           fi
 
