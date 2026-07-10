@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   prepare:
@@ -31,12 +32,25 @@ jobs:
         if: always()
         env:
           RESULT_URL: ${{ inputs.result_url }}
-          RESULT_KEY: ${{ secrets.BRO_RUNNER_KEY }}
           RUN_ID: ${{ inputs.run_id }}
+          TARGET: ${{ inputs.target }}
+          HEAD_SHA: ${{ inputs.head_sha }}
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
         run: |
-          if [ -z "$RESULT_KEY" ]; then
-            echo "BRO_RUNNER_KEY secret is required" >&2
+          expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${RUN_ID}"
+
+          if [ "$RESULT_URL" != "$expected_url" ]; then
+            echo "result_url must target the BoardReadyOps production callback for this run" >&2
+            exit 1
+          fi
+
+          if [ "$TARGET" != "oaslananka/boardreadyops" ]; then
+            echo "target must be oaslananka/boardreadyops" >&2
+            exit 1
+          fi
+
+          if ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "head_sha must be a full lowercase commit SHA" >&2
             exit 1
           fi
 
@@ -49,12 +63,20 @@ jobs:
           fi
 
           payload="{\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
-          timestamp="$(date +%s)"
-          signature="sha256=$(printf '%s.%s.%s' "$timestamp" "$RUN_ID" "$payload" | openssl dgst -sha256 -hmac "$RESULT_KEY" -hex | awk '{print $2}')"
+          audience="boardreadyops-cloud:${RUN_ID}"
+          encoded_audience="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$audience")"
+          oidc_response="$(curl --fail --silent --show-error \
+            --header "authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${encoded_audience}")"
+          oidc_token="$(printf '%s' "$oidc_response" | python3 -c 'import json, sys; print(json.load(sys.stdin)["value"])')"
+
+          if [ -z "$oidc_token" ]; then
+            echo "GitHub OIDC token request returned an empty token" >&2
+            exit 1
+          fi
 
           curl --fail --silent --show-error \
             --request POST "$RESULT_URL" \
+            --header "authorization: Bearer $oidc_token" \
             --header "content-type: application/json" \
-            --header "x-boardreadyops-runner-timestamp: $timestamp" \
-            --header "x-boardreadyops-runner-signature: $signature" \
             --data "$payload"

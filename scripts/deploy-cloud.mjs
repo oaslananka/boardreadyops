@@ -23,6 +23,7 @@ export const defaultDeployOptions = {
   runtimeEnvFile: "/opt/boardreadyops-cloud/runtime-env",
   runnerResultKeyFile: "",
   artifactSigningKeyFile: "",
+  requireGithubOidc: false,
   artifactVolume: "boardreadyops_artifacts",
   network: "boardreadyops-cloud",
   livePublish: "127.0.0.1:3003:3000",
@@ -65,6 +66,7 @@ export function readDeployOptions(env = process.env) {
       "BOARDREADYOPS_CLOUD_ARTIFACT_SIGNING_KEY_FILE",
       defaultDeployOptions.artifactSigningKeyFile,
     ),
+    requireGithubOidc: envFlag(env, "BOARDREADYOPS_CLOUD_REQUIRE_GITHUB_OIDC"),
     artifactVolume: envValue(env, "BOARDREADYOPS_CLOUD_ARTIFACT_VOLUME", defaultDeployOptions.artifactVolume),
     network: envValue(env, "BOARDREADYOPS_CLOUD_NETWORK", defaultDeployOptions.network),
     livePublish: envValue(env, "BOARDREADYOPS_CLOUD_LIVE_PUBLISH", defaultDeployOptions.livePublish),
@@ -206,6 +208,10 @@ export function runtimeContainerArgs({ name, image, publish, networkAlias, resta
       "--env",
       "ARTIFACT_DOWNLOAD_SIGNING_KEY_FILE=/run/keys/b",
     );
+  }
+
+  if (options.requireGithubOidc) {
+    args.push("--env", "BOARDREADYOPS_REQUIRE_GITHUB_OIDC=1");
   }
 
   args.push(

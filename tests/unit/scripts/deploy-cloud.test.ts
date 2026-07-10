@@ -20,6 +20,7 @@ describe("deploy-cloud", () => {
         BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE: "/run/secrets/cloud.env",
         BOARDREADYOPS_CLOUD_RUNNER_RESULT_KEY_FILE: "/run/secrets/runner-key",
         BOARDREADYOPS_CLOUD_ARTIFACT_SIGNING_KEY_FILE: "/run/secrets/artifact-key",
+        BOARDREADYOPS_CLOUD_REQUIRE_GITHUB_OIDC: "true",
         BOARDREADYOPS_CLOUD_REVISION: "abc123",
         BOARDREADYOPS_CLOUD_DRY_RUN: "true",
         BOARDREADYOPS_CLOUD_HEALTH_ATTEMPTS: "9",
@@ -29,18 +30,20 @@ describe("deploy-cloud", () => {
       runtimeEnvFile: "/run/secrets/cloud.env",
       runnerResultKeyFile: "/run/secrets/runner-key",
       artifactSigningKeyFile: "/run/secrets/artifact-key",
+      requireGithubOidc: true,
       revision: "abc123",
       dryRun: true,
       healthAttempts: 9,
     });
   });
 
-  it("builds runtime containers with read-only secrets, health mounts, and provenance", () => {
+  it("builds runtime containers with read-only secrets, OIDC-only callbacks, health mounts, and provenance", () => {
     const options = {
       ...defaultDeployOptions,
       runtimeEnvFile: "/opt/cloud/runtime-env",
       runnerResultKeyFile: "/opt/cloud/runner-key",
       artifactSigningKeyFile: "/opt/cloud/artifact-key",
+      requireGithubOidc: true,
       artifactVolume: "cloud_artifacts",
       network: "cloud-network",
     };
@@ -78,6 +81,8 @@ describe("deploy-cloud", () => {
       "type=bind,src=/opt/cloud/artifact-key,dst=/run/keys/b,readonly",
       "--env",
       "ARTIFACT_DOWNLOAD_SIGNING_KEY_FILE=/run/keys/b",
+      "--env",
+      "BOARDREADYOPS_REQUIRE_GITHUB_OIDC=1",
       "--mount",
       "type=volume,src=cloud_artifacts,dst=/data/artifacts",
       "-p",

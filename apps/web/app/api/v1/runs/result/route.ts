@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { verifyGitHubActionsOidcToken } from "../../../../../lib/github-actions-oidc.js";
 import {
   createGitHubAppCheckRunClient,
   detailsUrl as githubDetailsUrl,
@@ -20,6 +21,7 @@ export type ResultRouteDependencies = {
   checkRunClient: () => GitHubAppCheckRunClient | undefined;
   detailsUrl: (runId: string) => string | undefined;
   now: () => Date;
+  verifyOidcToken: (token: string, runId: string) => Promise<boolean>;
 };
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
@@ -106,7 +108,27 @@ function secureCompare(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-function verifyRunnerAuthentication(request: Request, input: { key: string; runId: string; body: string }): boolean {
+async function verifyRunnerAuthentication(
+  request: Request,
+  input: { key: string | undefined; runId: string; body: string },
+  verifyOidcToken: ResultRouteDependencies["verifyOidcToken"],
+): Promise<boolean> {
+  const authorization = request.headers.get("authorization");
+
+  if (authorization !== null) {
+    const bearer = /^Bearer ([A-Za-z0-9._~-]+)$/u.exec(authorization);
+    const token = bearer?.[1];
+    return token !== undefined && (await verifyOidcToken(token, input.runId));
+  }
+
+  if (process.env.BOARDREADYOPS_REQUIRE_GITHUB_OIDC === "1") {
+    return false;
+  }
+
+  if (!input.key) {
+    return false;
+  }
+
   const suppliedSignature = request.headers.get(resultSignatureHeaderName);
   const suppliedTimestamp = request.headers.get(resultTimestampHeaderName);
 
@@ -138,21 +160,13 @@ const defaultDependencies: ResultRouteDependencies = {
   checkRunClient: createGitHubAppCheckRunClient,
   detailsUrl: githubDetailsUrl,
   now: () => new Date(),
+  verifyOidcToken: (token, runId) => verifyGitHubActionsOidcToken(token, { runId }),
 };
 
 export async function handleResultRequest(
   request: Request,
   dependencies: ResultRouteDependencies = defaultDependencies,
 ): Promise<Response> {
-  const configuredKey = configuredSecretValue({
-    valueName: resultKeyEnvName,
-    fileName: resultKeyFileEnvName,
-  });
-
-  if (!configuredKey) {
-    return Response.json({ ok: false, error: "runner result key is not configured" }, { status: 503 });
-  }
-
   const runId = new URL(request.url).searchParams.get("run_id");
 
   if (!runId) {
@@ -160,9 +174,19 @@ export async function handleResultRequest(
   }
 
   const bodyText = await request.text();
+  const configuredKey = configuredSecretValue({
+    valueName: resultKeyEnvName,
+    fileName: resultKeyFileEnvName,
+  });
 
-  if (!verifyRunnerAuthentication(request, { key: configuredKey, runId, body: bodyText })) {
-    return Response.json({ ok: false, error: "invalid runner result signature" }, { status: 401 });
+  if (
+    !(await verifyRunnerAuthentication(
+      request,
+      { key: configuredKey, runId, body: bodyText },
+      dependencies.verifyOidcToken,
+    ))
+  ) {
+    return Response.json({ ok: false, error: "invalid runner result authentication" }, { status: 401 });
   }
 
   const body = parseJson(bodyText);

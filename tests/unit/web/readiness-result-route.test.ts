@@ -6,23 +6,27 @@ const query = vi.fn();
 const createPullRequestCheckRun = vi.fn(async () => ({ id: 1 }));
 const completeCheckRun = vi.fn();
 const createPullRequestComment = vi.fn();
+const verifyOidcToken = vi.fn(async () => false);
 
 const dependencies: ResultRouteDependencies = {
   queryExecutor: () => ({ query }),
   checkRunClient: () => ({ createPullRequestCheckRun, completeCheckRun, createPullRequestComment }),
   detailsUrl: (runId) => `https://boardreadyops.test/runs/${encodeURIComponent(runId)}`,
   now: () => new Date("2026-07-10T18:00:00.000Z"),
+  verifyOidcToken,
 };
 
 const originalEnvironment = {
   resultKey: process.env.BOARDREADYOPS_RUNNER_RESULT_KEY,
   requireSignature: process.env.BOARDREADYOPS_REQUIRE_RUNNER_SIGNATURE,
+  requireOidc: process.env.BOARDREADYOPS_REQUIRE_GITHUB_OIDC,
 };
 
 function restoreEnvironment(): void {
   const values: Array<[string, string | undefined]> = [
     ["BOARDREADYOPS_RUNNER_RESULT_KEY", originalEnvironment.resultKey],
     ["BOARDREADYOPS_REQUIRE_RUNNER_SIGNATURE", originalEnvironment.requireSignature],
+    ["BOARDREADYOPS_REQUIRE_GITHUB_OIDC", originalEnvironment.requireOidc],
   ];
 
   for (const [name, value] of values) {
@@ -44,13 +48,16 @@ function resultRequest(input: {
   key?: string;
   timestamp?: string;
   legacy?: boolean;
+  oidcToken?: string;
 }): Request {
   const runId = input.runId ?? "run-123";
   const key = input.key ?? "runner-secret";
   const timestamp = input.timestamp ?? String(Math.floor(Date.now() / 1000));
   const headers = new Headers({ "content-type": "application/json" });
 
-  if (input.legacy) {
+  if (input.oidcToken) {
+    headers.set("authorization", `Bearer ${input.oidcToken}`);
+  } else if (input.legacy) {
     headers.set("x-boardreadyops-runner-key", key);
   } else {
     headers.set("x-boardreadyops-runner-timestamp", timestamp);
@@ -67,11 +74,14 @@ function resultRequest(input: {
 beforeEach(() => {
   process.env.BOARDREADYOPS_RUNNER_RESULT_KEY = "runner-secret";
   delete process.env.BOARDREADYOPS_REQUIRE_RUNNER_SIGNATURE;
+  delete process.env.BOARDREADYOPS_REQUIRE_GITHUB_OIDC;
 
   query.mockReset();
   createPullRequestCheckRun.mockClear();
   completeCheckRun.mockReset();
   createPullRequestComment.mockReset();
+  verifyOidcToken.mockReset();
+  verifyOidcToken.mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -118,6 +128,34 @@ describe("readiness result route authentication and publication", () => {
       }),
     );
     expect(createPullRequestComment).toHaveBeenCalledWith(expect.objectContaining({ pullRequestNumber: 42 }));
+  });
+
+  it("accepts a run-bound GitHub OIDC token without a shared key", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    delete process.env.BOARDREADYOPS_RUNNER_RESULT_KEY;
+    verifyOidcToken.mockResolvedValueOnce(true);
+    query.mockResolvedValueOnce({ rows: [] });
+
+    const response = await handleResultRequest(
+      resultRequest({ body, oidcToken: "header.payload.signature" }),
+      dependencies,
+    );
+
+    expect(response.status).toBe(404);
+    expect(verifyOidcToken).toHaveBeenCalledWith("header.payload.signature", "run-123");
+    expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("does not downgrade an invalid bearer token to shared-key authentication", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    const request = resultRequest({ body });
+    request.headers.set("authorization", "Bearer invalid.token.value");
+
+    const response = await handleResultRequest(request, dependencies);
+
+    expect(response.status).toBe(401);
+    expect(verifyOidcToken).toHaveBeenCalledWith("invalid.token.value", "run-123");
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("accepts the result when the optional PR comment cannot be published", async () => {
@@ -167,6 +205,17 @@ describe("readiness result route authentication and publication", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "invalid runner result JSON" });
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it("rejects shared-key callbacks when GitHub OIDC-only mode is enabled", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    process.env.BOARDREADYOPS_REQUIRE_GITHUB_OIDC = "1";
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(401);
+    expect(query).not.toHaveBeenCalled();
+    expect(verifyOidcToken).not.toHaveBeenCalled();
   });
 
   it("keeps legacy shared-key callbacks unless signed-only mode is enabled", async () => {
