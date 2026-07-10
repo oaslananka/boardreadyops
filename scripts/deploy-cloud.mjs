@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const packageVersion = JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")).version;
 
 function log(message) {
   process.stdout.write(`${message}\n`);
@@ -17,103 +18,274 @@ export const defaultDeployOptions = {
   appName: "boardreadyops-cloud",
   container: "bro-web",
   healthUrl: "https://boardreadyops.oaslananka.dev/api/health",
-  backupRoot: "/opt/boardreadyops-cloud/backups",
+  canaryHealthUrl: "http://127.0.0.1:3004/api/health",
+  imageRepository: "boardreadyops-web-runtime",
+  runtimeEnvFile: "/opt/boardreadyops-cloud/runtime-env",
+  artifactVolume: "boardreadyops_artifacts",
+  network: "boardreadyops-cloud",
+  livePublish: "127.0.0.1:3003:3000",
+  canaryPublish: "127.0.0.1:3004:3000",
+  revision: "",
   skipInstall: false,
   dryRun: false,
+  healthAttempts: 60,
+  healthDelayMs: 1000,
 };
 
-function envFlag(name) {
-  return ["1", "true", "yes"].includes(String(process.env[name] ?? "").toLowerCase());
+function envFlag(env, name) {
+  return ["1", "true", "yes"].includes(String(env[name] ?? "").toLowerCase());
 }
 
-function optionValue(name, fallback) {
-  return process.env[name] ?? fallback;
+function envValue(env, name, fallback) {
+  return env[name] ?? fallback;
 }
 
-export function readDeployOptions() {
+function envInteger(env, name, fallback) {
+  const value = Number.parseInt(String(env[name] ?? ""), 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+export function readDeployOptions(env = process.env) {
   return {
-    appName: optionValue("BOARDREADYOPS_CLOUD_APP_NAME", defaultDeployOptions.appName),
-    container: optionValue("BOARDREADYOPS_CLOUD_CONTAINER", defaultDeployOptions.container),
-    healthUrl: optionValue("BOARDREADYOPS_CLOUD_HEALTH_URL", defaultDeployOptions.healthUrl),
-    backupRoot: optionValue("BOARDREADYOPS_CLOUD_BACKUP_ROOT", defaultDeployOptions.backupRoot),
-    skipInstall: envFlag("BOARDREADYOPS_CLOUD_SKIP_INSTALL"),
-    dryRun: envFlag("BOARDREADYOPS_CLOUD_DRY_RUN"),
+    appName: envValue(env, "BOARDREADYOPS_CLOUD_APP_NAME", defaultDeployOptions.appName),
+    container: envValue(env, "BOARDREADYOPS_CLOUD_CONTAINER", defaultDeployOptions.container),
+    healthUrl: envValue(env, "BOARDREADYOPS_CLOUD_HEALTH_URL", defaultDeployOptions.healthUrl),
+    canaryHealthUrl: envValue(env, "BOARDREADYOPS_CLOUD_CANARY_HEALTH_URL", defaultDeployOptions.canaryHealthUrl),
+    imageRepository: envValue(env, "BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY", defaultDeployOptions.imageRepository),
+    runtimeEnvFile: envValue(env, "BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE", defaultDeployOptions.runtimeEnvFile),
+    artifactVolume: envValue(env, "BOARDREADYOPS_CLOUD_ARTIFACT_VOLUME", defaultDeployOptions.artifactVolume),
+    network: envValue(env, "BOARDREADYOPS_CLOUD_NETWORK", defaultDeployOptions.network),
+    livePublish: envValue(env, "BOARDREADYOPS_CLOUD_LIVE_PUBLISH", defaultDeployOptions.livePublish),
+    canaryPublish: envValue(env, "BOARDREADYOPS_CLOUD_CANARY_PUBLISH", defaultDeployOptions.canaryPublish),
+    revision: envValue(env, "BOARDREADYOPS_CLOUD_REVISION", defaultDeployOptions.revision),
+    skipInstall: envFlag(env, "BOARDREADYOPS_CLOUD_SKIP_INSTALL"),
+    dryRun: envFlag(env, "BOARDREADYOPS_CLOUD_DRY_RUN"),
+    healthAttempts: envInteger(env, "BOARDREADYOPS_CLOUD_HEALTH_ATTEMPTS", defaultDeployOptions.healthAttempts),
+    healthDelayMs: envInteger(env, "BOARDREADYOPS_CLOUD_HEALTH_DELAY_MS", defaultDeployOptions.healthDelayMs),
   };
 }
 
-function run(command, args, options) {
-  const rendered = [command, ...args].join(" ");
+export function dockerTagFromRevision(revision) {
+  const normalized = revision.replaceAll(/[^A-Za-z0-9_.-]/g, "-").replaceAll(/^-+|-+$/g, "");
+  return (normalized || "unknown").slice(0, 128);
+}
+
+function render(command, args) {
+  return [command, ...args].join(" ");
+}
+
+function run(command, args, options, { capture = false, allowFailure = false } = {}) {
+  const rendered = render(command, args);
   log(`$ ${rendered}`);
 
   if (options.dryRun) {
-    return;
+    return "";
   }
 
   const result = spawnSync(command, args, {
     cwd: rootDir,
     encoding: "utf8",
-    stdio: "inherit",
+    stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit",
   });
 
-  if (result.status !== 0) {
+  if (result.status !== 0 && !allowFailure) {
     throw new Error(`${rendered} failed with exit code ${result.status ?? "unknown"}`);
   }
+
+  return capture ? String(result.stdout ?? "").trim() : "";
 }
 
-async function healthCheck(url, options) {
-  log(`Checking ${url}`);
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
+async function waitForHttpHealth(url, options) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= options.healthAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      const body = await response.json();
+
+      if (response.ok && body?.ok === true) {
+        log(`Health check passed: ${url}`);
+        return;
+      }
+
+      lastError = new Error(`HTTP ${response.status}: ${JSON.stringify(body)}`);
+    } catch (error) {
+      lastError = error;
+    }
+
+    if (attempt < options.healthAttempts) {
+      await sleep(options.healthDelayMs);
+    }
+  }
+
+  throw new Error(
+    `Health check failed for ${url}: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
+}
+
+async function waitForContainerHealth(container, options) {
   if (options.dryRun) {
     return;
   }
 
-  const response = await fetch(url, { cache: "no-store" });
+  for (let attempt = 1; attempt <= options.healthAttempts; attempt += 1) {
+    const stateJson = run("docker", ["inspect", "--format", "{{json .State}}", container], options, {
+      capture: true,
+    });
+    const state = JSON.parse(stateJson);
+    const health = state.Health?.Status;
 
-  if (!response.ok) {
-    throw new Error(`Health check failed with HTTP ${response.status}`);
+    if (health === "healthy") {
+      log(`Container health passed: ${container}`);
+      return;
+    }
+
+    if (health === "unhealthy" || state.Status === "exited" || state.Status === "dead") {
+      throw new Error(`${container} entered state status=${state.Status} health=${health ?? "missing"}`);
+    }
+
+    if (attempt < options.healthAttempts) {
+      await sleep(options.healthDelayMs);
+    }
   }
 
-  const body = await response.json();
+  throw new Error(`${container} did not become healthy before the deployment timeout`);
+}
 
-  if (body?.ok !== true) {
-    throw new Error(`Health check returned an unexpected body: ${JSON.stringify(body)}`);
-  }
+export function runtimeContainerArgs({ name, image, publish, networkAlias, restart, revision, options }) {
+  return [
+    "run",
+    "-d",
+    "--name",
+    name,
+    "--restart",
+    restart,
+    "--network",
+    options.network,
+    "--network-alias",
+    networkAlias,
+    "--mount",
+    `type=bind,src=${options.runtimeEnvFile},dst=/run/app-env,readonly`,
+    "--mount",
+    `type=volume,src=${options.artifactVolume},dst=/data/artifacts`,
+    "-p",
+    publish,
+    "--label",
+    `com.boardreadyops.deployment.revision=${revision}`,
+    image,
+  ];
 }
 
 export async function deployCloud(options = readDeployOptions()) {
-  const stamp = new Date().toISOString().replaceAll(/[:.]/g, "-");
-  const backupDir = join(options.backupRoot, stamp);
-  const nextDir = "apps/web/.next";
-  const containerNextDir = `/app/${nextDir}`;
+  const revision =
+    options.revision || (options.dryRun ? "dry-run" : run("git", ["rev-parse", "HEAD"], options, { capture: true }));
+  const revisionTag = dockerTagFromRevision(revision);
+  const shortRevision = revisionTag.slice(0, 12);
+  const buildDate = new Date().toISOString();
+  const stamp = buildDate.replaceAll(/[:.]/g, "-");
+  const image = `${options.imageRepository}:${revisionTag}`;
+  const latestImage = `${options.imageRepository}:latest`;
+  const rollbackImage = `${options.imageRepository}:rollback-${stamp}`;
+  const canaryContainer = `${options.container}-canary-${shortRevision}`;
+  const previousContainer = `${options.container}-previous-${stamp}`;
 
   if (!options.skipInstall) {
     run("pnpm", ["install", "--frozen-lockfile"], options);
   }
 
-  run("pnpm", ["--filter", "@boardreadyops/web", "build"], options);
-  log(`Backing up ${options.container}:${containerNextDir} to ${backupDir}`);
+  run("docker", ["volume", "create", options.artifactVolume], options);
+  run(
+    "docker",
+    [
+      "build",
+      "--file",
+      "apps/web/Dockerfile",
+      "--build-arg",
+      `BUILD_DATE=${buildDate}`,
+      "--build-arg",
+      `VCS_REF=${revision}`,
+      "--build-arg",
+      `VERSION=${packageVersion}`,
+      "--tag",
+      image,
+      "--tag",
+      latestImage,
+      ".",
+    ],
+    options,
+  );
 
-  if (!options.dryRun) {
-    await rm(backupDir, { force: true, recursive: true });
-    await mkdir(backupDir, { recursive: true });
-  }
-
-  run("docker", ["cp", `${options.container}:${containerNextDir}`, join(backupDir, ".next")], options);
+  run("docker", ["rm", "-f", canaryContainer], options, { allowFailure: true });
 
   try {
-    run("docker", ["cp", join(rootDir, nextDir), `${options.container}:${containerNextDir}`], options);
-    run("docker", ["container", "restart", options.container], options);
-    await healthCheck(options.healthUrl, options);
+    run(
+      "docker",
+      runtimeContainerArgs({
+        name: canaryContainer,
+        image,
+        publish: options.canaryPublish,
+        networkAlias: "web-canary",
+        restart: "no",
+        revision,
+        options,
+      }),
+      options,
+    );
+    await waitForContainerHealth(canaryContainer, options);
+    if (!options.dryRun) {
+      await waitForHttpHealth(options.canaryHealthUrl, options);
+    }
+  } finally {
+    run("docker", ["rm", "-f", canaryContainer], options, { allowFailure: true });
+  }
+
+  const currentImageId = options.dryRun
+    ? "current-image-id"
+    : run("docker", ["inspect", "--format", "{{.Image}}", options.container], options, { capture: true });
+
+  run("docker", ["image", "tag", currentImageId, rollbackImage], options);
+  run("docker", ["rename", options.container, previousContainer], options);
+  run("docker", ["update", "--restart=no", previousContainer], options);
+  run("docker", ["stop", "--time", "20", previousContainer], options);
+
+  try {
+    run(
+      "docker",
+      runtimeContainerArgs({
+        name: options.container,
+        image,
+        publish: options.livePublish,
+        networkAlias: "web",
+        restart: "unless-stopped",
+        revision,
+        options,
+      }),
+      options,
+    );
+    await waitForContainerHealth(options.container, options);
+    if (!options.dryRun) {
+      await waitForHttpHealth(options.healthUrl, options);
+    }
   } catch (error) {
     logError(error instanceof Error ? error.message : String(error));
-    logError("Deployment failed; restoring previous .next output.");
-    run("docker", ["cp", join(backupDir, ".next"), `${options.container}:${containerNextDir}`], options);
-    run("docker", ["container", "restart", options.container], options);
-    await healthCheck(options.healthUrl, options);
+    logError(`Deployment failed; restoring ${previousContainer}.`);
+    run("docker", ["rm", "-f", options.container], options, { allowFailure: true });
+    run("docker", ["rename", previousContainer, options.container], options);
+    run("docker", ["update", "--restart=unless-stopped", options.container], options);
+    run("docker", ["start", options.container], options);
+    if (!options.dryRun) {
+      await waitForHttpHealth(options.healthUrl, options);
+    }
     throw error;
   }
 
-  log(`${options.appName} deployment completed successfully.`);
+  run("docker", ["rm", previousContainer], options);
+  log(`${options.appName} deployment completed successfully at revision ${revision}.`);
+  log(`Rollback image retained as ${rollbackImage}.`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

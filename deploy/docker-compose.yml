@@ -10,15 +10,21 @@ services:
       - boardreadyops_caddy_data:/data
       - boardreadyops_caddy_config:/config
     depends_on:
-      - web
+      web:
+        condition: service_healthy
 
   web:
+    image: boardreadyops-web-runtime:${BOARDREADYOPS_IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+      args:
+        BUILD_DATE: ${BOARDREADYOPS_BUILD_DATE:-unknown}
+        VCS_REF: ${BOARDREADYOPS_GIT_SHA:-unknown}
+        VERSION: ${BOARDREADYOPS_VERSION:-dev}
     restart: unless-stopped
     env_file:
-      - ./.env
+      - ${BOARDREADYOPS_ENV_FILE:-./.env}
     environment:
       ARTIFACT_STORAGE_ROOT: /data/artifacts
       DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
@@ -28,8 +34,10 @@ services:
     volumes:
       - boardreadyops_artifacts:/data/artifacts
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:17-alpine
@@ -40,12 +48,24 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-boardreadyops}
     volumes:
       - boardreadyops_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
     image: redis:8-alpine
     restart: unless-stopped
     volumes:
       - boardreadyops_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
   boardreadyops_artifacts:
