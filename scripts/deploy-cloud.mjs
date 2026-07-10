@@ -74,7 +74,7 @@ function render(command, args) {
   return [command, ...args].join(" ");
 }
 
-function run(command, args, options, { capture = false, allowFailure = false } = {}) {
+function run(command, args, options, { capture = false, allowFailure = false, quiet = false } = {}) {
   const rendered = render(command, args);
   log(`$ ${rendered}`);
 
@@ -85,10 +85,14 @@ function run(command, args, options, { capture = false, allowFailure = false } =
   const result = spawnSync(command, args, {
     cwd: rootDir,
     encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit",
+    stdio: capture || quiet ? ["ignore", "pipe", "pipe"] : "inherit",
   });
 
   if (result.status !== 0 && !allowFailure) {
+    const details = String(result.stderr ?? "").trim();
+    if (details) {
+      logError(details);
+    }
     throw new Error(`${rendered} failed with exit code ${result.status ?? "unknown"}`);
   }
 
@@ -219,7 +223,7 @@ export async function deployCloud(options = readDeployOptions()) {
     options,
   );
 
-  run("docker", ["rm", "-f", canaryContainer], options, { allowFailure: true });
+  run("docker", ["rm", "-f", canaryContainer], options, { allowFailure: true, quiet: true });
 
   try {
     run(
@@ -240,7 +244,7 @@ export async function deployCloud(options = readDeployOptions()) {
       await waitForHttpHealth(options.canaryHealthUrl, options);
     }
   } finally {
-    run("docker", ["rm", "-f", canaryContainer], options, { allowFailure: true });
+    run("docker", ["rm", "-f", canaryContainer], options, { allowFailure: true, quiet: true });
   }
 
   const currentImageId = options.dryRun
@@ -250,7 +254,7 @@ export async function deployCloud(options = readDeployOptions()) {
   run("docker", ["image", "tag", currentImageId, rollbackImage], options);
   run("docker", ["rename", options.container, previousContainer], options);
   run("docker", ["update", "--restart=no", previousContainer], options);
-  run("docker", ["stop", "--time", "20", previousContainer], options);
+  run("docker", ["stop", "--timeout", "20", previousContainer], options);
 
   try {
     run(
@@ -273,7 +277,7 @@ export async function deployCloud(options = readDeployOptions()) {
   } catch (error) {
     logError(error instanceof Error ? error.message : String(error));
     logError(`Deployment failed; restoring ${previousContainer}.`);
-    run("docker", ["rm", "-f", options.container], options, { allowFailure: true });
+    run("docker", ["rm", "-f", options.container], options, { allowFailure: true, quiet: true });
     run("docker", ["rename", previousContainer, options.container], options);
     run("docker", ["update", "--restart=unless-stopped", options.container], options);
     run("docker", ["start", options.container], options);
