@@ -75,6 +75,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   restoreEnvironment();
 });
 
@@ -117,6 +118,37 @@ describe("readiness result route authentication and publication", () => {
       }),
     );
     expect(createPullRequestComment).toHaveBeenCalledWith(expect.objectContaining({ pullRequestNumber: 42 }));
+  });
+
+  it("accepts the result when the optional PR comment cannot be published", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            github_installation_id: 12345,
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+    createPullRequestComment.mockRejectedValueOnce(
+      new Error("GitHub pull request comment creation failed with status 403"),
+    );
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      checkRunUpdated: true,
+      pullRequestCommentCreated: false,
+    });
+    expect(completeCheckRun).toHaveBeenCalledOnce();
   });
 
   it("rejects stale signed callbacks before touching the database", async () => {

@@ -260,14 +260,18 @@ export async function handleResultRequest(
       repositoryOwner &&
       repositoryName
     ) {
-      await checkRunClient.createPullRequestComment({
-        installationId,
-        repositoryOwner,
-        repositoryName,
-        pullRequestNumber,
-        body: buildReadinessPrComment({ ...parsed.data, detailsUrl: runDetailsUrl }),
-      });
-      pullRequestCommentCreated = true;
+      try {
+        await checkRunClient.createPullRequestComment({
+          installationId,
+          repositoryOwner,
+          repositoryName,
+          pullRequestNumber,
+          body: buildReadinessPrComment({ ...parsed.data, detailsUrl: runDetailsUrl }),
+        });
+        pullRequestCommentCreated = true;
+      } catch {
+        // PR comments are optional; the check run remains the authoritative result.
+      }
     }
   }
 
