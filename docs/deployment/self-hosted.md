@@ -128,6 +128,24 @@ For a dry run:
 BOARDREADYOPS_CLOUD_DRY_RUN=1 pnpm run cloud:deploy:self-hosted
 ```
 
+## Signed artifact downloads
+
+Hosted run dashboards expose artifact metadata without revealing the internal storage path. A download link is rendered only when both `NEXT_PUBLIC_APP_URL` (or `BOARDREADYOPS_PUBLIC_URL`) and a dedicated `ARTIFACT_DOWNLOAD_SIGNING_KEY` are configured.
+
+Generate an independent key with at least 32 random bytes:
+
+```bash
+openssl rand -base64 48
+```
+
+Store the result in the root-only runtime environment file:
+
+```text
+ARTIFACT_DOWNLOAD_SIGNING_KEY=<generated-value>
+```
+
+The artifact signer does not fall back to `SESSION_SECRET`. URLs are bound to the run ID, artifact ID, and expiry, and are accepted for at most 15 minutes. Rotating the key immediately invalidates previously issued links. Local-file downloads also verify the resolved filesystem path remains inside `ARTIFACT_STORAGE_ROOT` and that the stored byte count matches the file before streaming it.
+
 ## Database bootstrap and migrations
 
 The self-hosted cloud control plane stores GitHub App installations, repositories, release runs, findings, and artifacts in PostgreSQL.

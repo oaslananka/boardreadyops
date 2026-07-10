@@ -84,6 +84,7 @@ describe("run dashboard data", () => {
       {
         rows: [
           {
+            id: "artifact-456",
             kind: "release-archive",
             name: "boardreadyops-release.zip",
             storage_path: "/data/artifacts/private/internal/path.zip",
@@ -96,7 +97,9 @@ describe("run dashboard data", () => {
       },
     ]);
 
-    const result = await lookupRunDashboard("run-123", executor);
+    const result = await lookupRunDashboard("run-123", executor, {
+      artifactDownloadUrl: ({ runId, artifactId }) => `https://boardreadyops.test/download/${runId}/${artifactId}`,
+    });
 
     expect(result).toEqual({
       state: "found",
@@ -136,12 +139,14 @@ describe("run dashboard data", () => {
         ],
         artifacts: [
           {
+            id: "artifact-456",
             kind: "release-archive",
             name: "boardreadyops-release.zip",
             sha256: "a".repeat(64),
             bytes: 2048,
             role: "primary",
             uploadedAt: "2026-07-10T17:00:03.000Z",
+            downloadUrl: "https://boardreadyops.test/download/run-123/artifact-456",
           },
         ],
       },
@@ -151,6 +156,7 @@ describe("run dashboard data", () => {
     const artifactSql = String(query.mock.calls[2]?.[0]);
     expect(runSql).not.toContain("installations");
     expect(runSql).not.toContain("account_login");
+    expect(artifactSql).toContain("select id, kind");
     expect(artifactSql).not.toContain("storage_path");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
   });

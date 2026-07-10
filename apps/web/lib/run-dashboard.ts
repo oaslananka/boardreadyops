@@ -1,4 +1,5 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { artifactDownloadExpiry, artifactDownloadUrl } from "./artifact-downloads.js";
 
 type RunDetail = {
   id: string;
@@ -30,12 +31,14 @@ type FindingDetail = {
 };
 
 type ArtifactDetail = {
+  id: string;
   kind: string;
   name: string;
   sha256: string;
   bytes: number;
   role: string;
   uploadedAt: string;
+  downloadUrl: string | undefined;
 };
 
 export type RunLookupResult = { state: "not-configured" } | { state: "not-found" } | { state: "found"; run: RunDetail };
@@ -49,6 +52,10 @@ type QueryResult = {
 };
 
 type RunDashboardEnvironment = Readonly<Record<string, string | undefined>>;
+
+type RunDashboardOptions = {
+  artifactDownloadUrl?: (input: { runId: string; artifactId: string }) => string | undefined;
+};
 
 const severityRank: Readonly<Record<string, number>> = {
   critical: 0,
@@ -126,7 +133,11 @@ export function formatArtifactBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export async function lookupRunDashboard(runId: string, executor: RunDashboardQueryExecutor): Promise<RunLookupResult> {
+export async function lookupRunDashboard(
+  runId: string,
+  executor: RunDashboardQueryExecutor,
+  options: RunDashboardOptions = {},
+): Promise<RunLookupResult> {
   const runResult = await executor.query(
     `select
        release_runs.id,
@@ -164,7 +175,7 @@ export async function lookupRunDashboard(runId: string, executor: RunDashboardQu
       [runId],
     ),
     executor.query(
-      `select kind, name, sha256, bytes, role, uploaded_at
+      `select id, kind, name, sha256, bytes, role, uploaded_at
        from artifacts
        where run_id = $1
        order by uploaded_at desc`,
@@ -185,16 +196,19 @@ export async function lookupRunDashboard(runId: string, executor: RunDashboardQu
     )
     .sort(bySeverityThenRule);
 
-  const artifacts = rows(artifactsResult).map(
-    (row): ArtifactDetail => ({
+  const artifacts = rows(artifactsResult).map((row): ArtifactDetail => {
+    const artifactId = requiredString(row, "id");
+    return {
+      id: artifactId,
       kind: requiredString(row, "kind"),
       name: requiredString(row, "name"),
       sha256: requiredString(row, "sha256"),
       bytes: numberValue(row, "bytes") ?? 0,
       role: requiredString(row, "role"),
       uploadedAt: requiredString(row, "uploaded_at"),
-    }),
-  );
+      downloadUrl: options.artifactDownloadUrl?.({ runId, artifactId }),
+    };
+  });
 
   return {
     state: "found",
@@ -230,11 +244,27 @@ export async function loadRunDashboard(
     return { state: "not-configured" };
   }
 
+  const baseUrl = environment.BOARDREADYOPS_PUBLIC_URL ?? environment.NEXT_PUBLIC_APP_URL;
+  const key = environment.ARTIFACT_DOWNLOAD_SIGNING_KEY;
+  const expiresAt = baseUrl && key ? artifactDownloadExpiry() : undefined;
+
   return await lookupRunDashboard(
     runId,
     createPgQueryExecutor({
       connectionString,
       max: Number(environment.DATABASE_POOL_MAX ?? 5),
     }),
+    baseUrl && key && expiresAt
+      ? {
+          artifactDownloadUrl: ({ runId: resultRunId, artifactId }) =>
+            artifactDownloadUrl({
+              runId: resultRunId,
+              artifactId,
+              expiresAt,
+              baseUrl,
+              key,
+            }),
+        }
+      : {},
   );
 }
