@@ -6,6 +6,7 @@ import {
   detailsUrl as githubDetailsUrl,
 } from "../../../../../lib/github-app-check-run-client.js";
 import { buildReadinessCheckOutput, buildReadinessPrComment } from "../../../../../lib/readiness-result-format.js";
+import { configuredSecretValue } from "../../../../../lib/secret-value.js";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,7 @@ export type ResultRouteDependencies = {
 };
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
+const resultKeyFileEnvName = `${resultKeyEnvName}_FILE`;
 const resultKeyHeaderName = "x-boardreadyops-runner-key";
 const resultSignatureHeaderName = "x-boardreadyops-runner-signature";
 const resultTimestampHeaderName = "x-boardreadyops-runner-timestamp";
@@ -142,7 +144,10 @@ export async function handleResultRequest(
   request: Request,
   dependencies: ResultRouteDependencies = defaultDependencies,
 ): Promise<Response> {
-  const configuredKey = process.env[resultKeyEnvName];
+  const configuredKey = configuredSecretValue({
+    valueName: resultKeyEnvName,
+    fileName: resultKeyFileEnvName,
+  });
 
   if (!configuredKey) {
     return Response.json({ ok: false, error: "runner result key is not configured" }, { status: 503 });
