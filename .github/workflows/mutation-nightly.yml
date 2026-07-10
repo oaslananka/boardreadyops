@@ -20,7 +20,7 @@ jobs:
     if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: mutation-nightly / full
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -29,10 +29,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
+      - name: Restore mutation incremental state
+        id: mutation-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: reports/stryker-incremental.json
+          key: mutation-${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'stryker.config.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            mutation-${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'stryker.config.mjs') }}-
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run mutation
+      - run: pnpm exec stryker run --incremental --incrementalFile reports/stryker-incremental.json
+      - name: Save mutation incremental state
+        if: always() && steps.mutation-cache.outputs.cache-hit != 'true' && hashFiles('reports/stryker-incremental.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: reports/stryker-incremental.json
+          key: ${{ steps.mutation-cache.outputs.cache-primary-key }}
       - name: Check mutation thresholds
         if: always()
         run: pnpm run mutation:check --summary
