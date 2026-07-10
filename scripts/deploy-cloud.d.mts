@@ -7,6 +7,7 @@ export interface DeployOptions {
   readonly runtimeEnvFile: string;
   readonly runnerResultKeyFile: string;
   readonly artifactSigningKeyFile: string;
+  readonly requireGithubOidc: boolean;
   readonly artifactVolume: string;
   readonly network: string;
   readonly livePublish: string;
