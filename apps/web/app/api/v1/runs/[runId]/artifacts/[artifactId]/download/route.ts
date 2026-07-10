@@ -4,6 +4,7 @@ import { Readable } from "node:stream";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import {
   artifactAttachmentHeader,
+  configuredArtifactDownloadSigningKey,
   resolveLocalArtifactFile,
   verifyArtifactDownloadSignature,
 } from "../../../../../../../../lib/artifact-downloads.js";
@@ -153,7 +154,7 @@ export async function handleArtifactDownloadRequest(
   const url = new URL(request.url);
   const expiresAt = Number(url.searchParams.get("exp"));
   const signature = url.searchParams.get("sig") ?? "";
-  const signingKey = dependencies.environment.ARTIFACT_DOWNLOAD_SIGNING_KEY;
+  const signingKey = configuredArtifactDownloadSigningKey(dependencies.environment);
 
   if (!Number.isSafeInteger(expiresAt) || !signature) {
     return jsonError("signed artifact URL is required", 401);

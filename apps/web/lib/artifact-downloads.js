@@ -1,13 +1,18 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
+import { configuredSecretValue } from "./secret-value.js";
 
 export const artifactDownloadMaxTtlSeconds = 15 * 60;
 const minimumSigningKeyBytes = 32;
 const signaturePattern = /^[A-Za-z0-9_-]{43}$/;
 
-function configuredSigningKey() {
-  return process.env.ARTIFACT_DOWNLOAD_SIGNING_KEY;
+export function configuredArtifactDownloadSigningKey(environment = process.env) {
+  return configuredSecretValue({
+    environment,
+    valueName: "ARTIFACT_DOWNLOAD_SIGNING_KEY",
+    fileName: "ARTIFACT_DOWNLOAD_SIGNING_KEY_FILE",
+  });
 }
 
 function validSigningKey(key) {
@@ -43,7 +48,7 @@ export function artifactDownloadExpiry(now = Date.now(), ttlSeconds = artifactDo
   return Math.floor(now / 1000) + ttlSeconds;
 }
 
-export function signArtifactDownload(input, key = configuredSigningKey()) {
+export function signArtifactDownload(input, key = configuredArtifactDownloadSigningKey()) {
   if (!validSigningKey(key) || !Number.isSafeInteger(input.expiresAt)) {
     return undefined;
   }
@@ -51,7 +56,7 @@ export function signArtifactDownload(input, key = configuredSigningKey()) {
   return createHmac("sha256", key).update(payload(input)).digest("base64url");
 }
 
-export function verifyArtifactDownloadSignature(input, key = configuredSigningKey(), now = Date.now()) {
+export function verifyArtifactDownloadSignature(input, key = configuredArtifactDownloadSigningKey(), now = Date.now()) {
   if (!Number.isFinite(now) || !Number.isSafeInteger(input.expiresAt) || !signaturePattern.test(input.signature)) {
     return false;
   }

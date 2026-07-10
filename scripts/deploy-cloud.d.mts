@@ -5,6 +5,8 @@ export interface DeployOptions {
   readonly canaryHealthUrl: string;
   readonly imageRepository: string;
   readonly runtimeEnvFile: string;
+  readonly runnerResultKeyFile: string;
+  readonly artifactSigningKeyFile: string;
   readonly artifactVolume: string;
   readonly network: string;
   readonly livePublish: string;

@@ -17,6 +17,10 @@ export type LocalArtifactResolution =
 
 export const artifactDownloadMaxTtlSeconds: number;
 
+export function configuredArtifactDownloadSigningKey(
+  environment?: Readonly<Record<string, string | undefined>>,
+): string | undefined;
+
 export function artifactDownloadExpiry(now?: number, ttlSeconds?: number): number;
 export function signArtifactDownload(input: ArtifactDownloadSignatureInput, key?: string): string | undefined;
 export function verifyArtifactDownloadSignature(

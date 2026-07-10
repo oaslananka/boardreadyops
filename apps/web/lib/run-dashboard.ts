@@ -1,5 +1,9 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { artifactDownloadExpiry, artifactDownloadUrl } from "./artifact-downloads.js";
+import {
+  artifactDownloadExpiry,
+  artifactDownloadUrl,
+  configuredArtifactDownloadSigningKey,
+} from "./artifact-downloads.js";
 
 type RunDetail = {
   id: string;
@@ -245,7 +249,7 @@ export async function loadRunDashboard(
   }
 
   const baseUrl = environment.BOARDREADYOPS_PUBLIC_URL ?? environment.NEXT_PUBLIC_APP_URL;
-  const key = environment.ARTIFACT_DOWNLOAD_SIGNING_KEY;
+  const key = configuredArtifactDownloadSigningKey(environment);
   const expiresAt = baseUrl && key ? artifactDownloadExpiry() : undefined;
 
   return await lookupRunDashboard(

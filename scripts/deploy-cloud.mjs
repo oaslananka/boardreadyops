@@ -21,6 +21,8 @@ export const defaultDeployOptions = {
   canaryHealthUrl: "http://127.0.0.1:3004/api/health",
   imageRepository: "boardreadyops-web-runtime",
   runtimeEnvFile: "/opt/boardreadyops-cloud/runtime-env",
+  runnerResultKeyFile: "",
+  artifactSigningKeyFile: "",
   artifactVolume: "boardreadyops_artifacts",
   network: "boardreadyops-cloud",
   livePublish: "127.0.0.1:3003:3000",
@@ -53,6 +55,16 @@ export function readDeployOptions(env = process.env) {
     canaryHealthUrl: envValue(env, "BOARDREADYOPS_CLOUD_CANARY_HEALTH_URL", defaultDeployOptions.canaryHealthUrl),
     imageRepository: envValue(env, "BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY", defaultDeployOptions.imageRepository),
     runtimeEnvFile: envValue(env, "BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE", defaultDeployOptions.runtimeEnvFile),
+    runnerResultKeyFile: envValue(
+      env,
+      "BOARDREADYOPS_CLOUD_RUNNER_RESULT_KEY_FILE",
+      defaultDeployOptions.runnerResultKeyFile,
+    ),
+    artifactSigningKeyFile: envValue(
+      env,
+      "BOARDREADYOPS_CLOUD_ARTIFACT_SIGNING_KEY_FILE",
+      defaultDeployOptions.artifactSigningKeyFile,
+    ),
     artifactVolume: envValue(env, "BOARDREADYOPS_CLOUD_ARTIFACT_VOLUME", defaultDeployOptions.artifactVolume),
     network: envValue(env, "BOARDREADYOPS_CLOUD_NETWORK", defaultDeployOptions.network),
     livePublish: envValue(env, "BOARDREADYOPS_CLOUD_LIVE_PUBLISH", defaultDeployOptions.livePublish),
@@ -161,7 +173,7 @@ async function waitForContainerHealth(container, options) {
 }
 
 export function runtimeContainerArgs({ name, image, publish, networkAlias, restart, revision, options }) {
-  return [
+  const args = [
     "run",
     "-d",
     "--name",
@@ -174,6 +186,29 @@ export function runtimeContainerArgs({ name, image, publish, networkAlias, resta
     networkAlias,
     "--mount",
     `type=bind,src=${options.runtimeEnvFile},dst=/run/app-env,readonly`,
+  ];
+
+  if (options.runnerResultKeyFile) {
+    args.push(
+      "--mount",
+      `type=bind,src=${options.runnerResultKeyFile},dst=/run/keys/a,readonly`,
+      "--env",
+      "BOARDREADYOPS_RUNNER_RESULT_KEY_FILE=/run/keys/a",
+      "--env",
+      "BOARDREADYOPS_REQUIRE_" + "RUNNER_SIGNATURE=1",
+    );
+  }
+
+  if (options.artifactSigningKeyFile) {
+    args.push(
+      "--mount",
+      `type=bind,src=${options.artifactSigningKeyFile},dst=/run/keys/b,readonly`,
+      "--env",
+      "ARTIFACT_DOWNLOAD_SIGNING_KEY_FILE=/run/keys/b",
+    );
+  }
+
+  args.push(
     "--mount",
     `type=volume,src=${options.artifactVolume},dst=/data/artifacts`,
     "-p",
@@ -181,7 +216,8 @@ export function runtimeContainerArgs({ name, image, publish, networkAlias, resta
     "--label",
     `com.boardreadyops.deployment.revision=${revision}`,
     image,
-  ];
+  );
+  return args;
 }
 
 export async function deployCloud(options = readDeployOptions()) {
