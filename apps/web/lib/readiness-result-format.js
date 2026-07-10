@@ -95,11 +95,16 @@ function detailsLine(detailsUrl) {
 }
 
 function sanitizeInline(value) {
-  return String(value).replace(/[\r\n|]/g, " ").trim();
+  return String(value)
+    .replace(/[\r\n|]/g, " ")
+    .trim();
 }
 
 function code(value) {
-  return `\`${String(value).replace(/`/g, "'").replace(/[\r\n]/g, " ").trim()}\``;
+  return `\`${String(value)
+    .replace(/`/g, "'")
+    .replace(/[\r\n]/g, " ")
+    .trim()}\``;
 }
 
 function findingLine(finding) {

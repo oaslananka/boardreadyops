@@ -1,13 +1,25 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { createGitHubAppCheckRunClient, detailsUrl } from "../../../../../lib/github-app-check-run-client.js";
+import {
+  createGitHubAppCheckRunClient,
+  detailsUrl as githubDetailsUrl,
+} from "../../../../../lib/github-app-check-run-client.js";
 import { buildReadinessCheckOutput, buildReadinessPrComment } from "../../../../../lib/readiness-result-format.js";
 
 export const runtime = "nodejs";
 
 type QueryRow = Record<string, unknown>;
 type CheckConclusion = "failure" | "neutral" | "success" | "timed_out";
+type ResultQueryExecutor = ReturnType<typeof createPgQueryExecutor>;
+type GitHubAppCheckRunClient = NonNullable<ReturnType<typeof createGitHubAppCheckRunClient>>;
+
+export type ResultRouteDependencies = {
+  queryExecutor: () => ResultQueryExecutor | undefined;
+  checkRunClient: () => GitHubAppCheckRunClient | undefined;
+  detailsUrl: (runId: string) => string | undefined;
+  now: () => Date;
+};
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
 const resultKeyHeaderName = "x-boardreadyops-runner-key";
@@ -39,7 +51,7 @@ function numberLikeCell(row: QueryRow, key: string): number | string | undefined
   return typeof value === "number" || typeof value === "string" ? value : undefined;
 }
 
-function queryExecutor() {
+function createDefaultQueryExecutor() {
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
@@ -119,7 +131,17 @@ function parseJson(input: string): unknown {
   }
 }
 
-export async function POST(request: Request): Promise<Response> {
+const defaultDependencies: ResultRouteDependencies = {
+  queryExecutor: createDefaultQueryExecutor,
+  checkRunClient: createGitHubAppCheckRunClient,
+  detailsUrl: githubDetailsUrl,
+  now: () => new Date(),
+};
+
+export async function handleResultRequest(
+  request: Request,
+  dependencies: ResultRouteDependencies = defaultDependencies,
+): Promise<Response> {
   const configuredKey = process.env[resultKeyEnvName];
 
   if (!configuredKey) {
@@ -150,13 +172,13 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "invalid runner result" }, { status: 400 });
   }
 
-  const executor = queryExecutor();
+  const executor = dependencies.queryExecutor();
 
   if (!executor) {
     return Response.json({ ok: false, error: "database is not configured" }, { status: 503 });
   }
 
-  const completedAt = new Date().toISOString();
+  const completedAt = dependencies.now().toISOString();
   const updateResult = await executor.query(
     `with updated as (
        update release_runs
@@ -199,11 +221,11 @@ export async function POST(request: Request): Promise<Response> {
   let pullRequestCommentCreated = false;
 
   if (terminalStatus(parsed.data.status)) {
-    const checkRunClient = createGitHubAppCheckRunClient();
+    const checkRunClient = dependencies.checkRunClient();
     const installationId = numberLikeCell(row, "github_installation_id");
     const repositoryOwner = stringCell(row, "owner");
     const repositoryName = stringCell(row, "name");
-    const runDetailsUrl = detailsUrl(runId);
+    const runDetailsUrl = dependencies.detailsUrl(runId);
     const checkOutput = buildReadinessCheckOutput({ ...parsed.data, detailsUrl: runDetailsUrl });
 
     if (githubCheckRunId) {
@@ -220,13 +242,19 @@ export async function POST(request: Request): Promise<Response> {
         conclusion: checkConclusion(parsed.data.status, parsed.data.decision),
         title: checkOutput.title,
         summary: checkOutput.summary,
-        completedAt: new Date().toISOString(),
+        completedAt,
       });
       checkRunUpdated = true;
     }
 
     const pullRequestNumber = numberCell(row, "pull_request_number");
-    if (pullRequestNumber && checkRunClient?.createPullRequestComment && installationId && repositoryOwner && repositoryName) {
+    if (
+      pullRequestNumber &&
+      checkRunClient?.createPullRequestComment &&
+      installationId &&
+      repositoryOwner &&
+      repositoryName
+    ) {
       await checkRunClient.createPullRequestComment({
         installationId,
         repositoryOwner,
@@ -242,4 +270,8 @@ export async function POST(request: Request): Promise<Response> {
     { ok: true, status: "accepted", runId, checkRunUpdated, pullRequestCommentCreated, result: parsed.data },
     { status: 202 },
   );
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return await handleResultRequest(request);
 }

@@ -71,6 +71,46 @@ function existingReadinessComment(comments) {
   return comments.find((comment) => typeof comment?.body === "string" && comment.body.includes(readinessCommentMarker));
 }
 
+export async function upsertReadinessComment(input) {
+  const request = input.request ?? fetch;
+  const headers = requestHeaders(input.token);
+  const commentsUrl = issueCommentsEndpoint(
+    input.apiBaseUrl,
+    input.repositoryOwner,
+    input.repositoryName,
+    input.pullRequestNumber,
+  );
+  const comments = await readJson(
+    await request(commentsUrl, {
+      method: "GET",
+      headers,
+    }),
+    "GitHub pull request comment lookup",
+  );
+  const existing = existingReadinessComment(comments);
+
+  if (existing?.id) {
+    await readJson(
+      await request(issueCommentEndpoint(input.apiBaseUrl, input.repositoryOwner, input.repositoryName, existing.id), {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ body: input.body }),
+      }),
+      "GitHub pull request comment update",
+    );
+    return;
+  }
+
+  await readJson(
+    await request(commentsUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ body: input.body }),
+    }),
+    "GitHub pull request comment creation",
+  );
+}
+
 export function createGitHubAppCheckRunClient() {
   const appId = process.env.GITHUB_APP_ID;
 
@@ -153,37 +193,14 @@ export function createGitHubAppCheckRunClient() {
 
     async createPullRequestComment(input) {
       const token = await installationToken(input.installationId);
-      const headers = requestHeaders(token);
-      const commentsUrl = issueCommentsEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, input.pullRequestNumber);
-      const comments = await readJson(
-        await fetch(commentsUrl, {
-          method: "GET",
-          headers,
-        }),
-        "GitHub pull request comment lookup",
-      );
-      const existing = existingReadinessComment(comments);
-
-      if (existing?.id) {
-        await readJson(
-          await fetch(issueCommentEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, existing.id), {
-            method: "PATCH",
-            headers,
-            body: JSON.stringify({ body: input.body }),
-          }),
-          "GitHub pull request comment update",
-        );
-        return;
-      }
-
-      await readJson(
-        await fetch(commentsUrl, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ body: input.body }),
-        }),
-        "GitHub pull request comment creation",
-      );
+      await upsertReadinessComment({
+        apiBaseUrl,
+        token,
+        repositoryOwner: input.repositoryOwner,
+        repositoryName: input.repositoryName,
+        pullRequestNumber: input.pullRequestNumber,
+        body: input.body,
+      });
     },
   };
 }
