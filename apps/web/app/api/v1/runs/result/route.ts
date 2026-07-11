@@ -217,7 +217,13 @@ export async function handleResultRequest(
     })),
   );
   const updateResult = await executor.query(
-    `with updated as (
+    `with existing as materialized (
+       select id, status, github_check_run_id, repository_id, pull_request_number
+       from release_runs
+       where id = $1
+       for update
+     ),
+     updated as (
        update release_runs
        set status = $2,
            decision = $3,
@@ -237,8 +243,13 @@ export async function handleResultRequest(
              )
              else duration_ms
            end
-       where id = $1
-       returning id, github_check_run_id, repository_id, pull_request_number
+       from existing
+       where release_runs.id = existing.id
+         and existing.status <> 'superseded'
+       returning release_runs.id,
+                 release_runs.github_check_run_id,
+                 release_runs.repository_id,
+                 release_runs.pull_request_number
      ),
      deleted_findings as (
        delete from findings
@@ -267,7 +278,8 @@ export async function handleResultRequest(
        )
        returning id
      )
-     select updated.id,
+     select 'accepted'::text as persistence_outcome,
+            updated.id,
             updated.github_check_run_id,
             updated.pull_request_number,
             repositories.owner,
@@ -276,13 +288,30 @@ export async function handleResultRequest(
             (select count(*) from inserted_findings) as inserted_finding_count
      from updated
      join repositories on repositories.id = updated.repository_id
-     join installations on installations.id = repositories.installation_id`,
+     join installations on installations.id = repositories.installation_id
+     union all
+     select 'superseded'::text as persistence_outcome,
+            existing.id,
+            existing.github_check_run_id,
+            existing.pull_request_number,
+            repositories.owner,
+            repositories.name,
+            installations.github_installation_id,
+            0::bigint as inserted_finding_count
+     from existing
+     join repositories on repositories.id = existing.repository_id
+     join installations on installations.id = repositories.installation_id
+     where existing.status = 'superseded'`,
     [runId, parsed.data.status, parsed.data.decision, completedAt, findingsJson],
   );
   const row = rows(updateResult)[0];
 
   if (!row) {
     return Response.json({ ok: false, error: "release run not found" }, { status: 404 });
+  }
+
+  if (stringCell(row, "persistence_outcome") === "superseded") {
+    return Response.json({ ok: false, error: "release run was superseded by a newer commit", runId }, { status: 409 });
   }
 
   const githubCheckRunId = numberLikeCell(row, "github_check_run_id");
