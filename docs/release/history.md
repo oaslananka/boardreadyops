@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.8.4](https://github.com/oaslananka/boardreadyops/compare/v1.8.3...v1.8.4) (2026-07-11)
+
+
+### Bug Fixes
+
+* **release:** use publisher token for GHCR ([#142](https://github.com/oaslananka/boardreadyops/issues/142)) ([7efd10c](https://github.com/oaslananka/boardreadyops/commit/7efd10c54482af5c5c7bab631704f04500c64bfa))
+
 ## [1.8.3](https://github.com/oaslananka/boardreadyops/compare/v1.8.2...v1.8.3) (2026-07-11)
 
 
