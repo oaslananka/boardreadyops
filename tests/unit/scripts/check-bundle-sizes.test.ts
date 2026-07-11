@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeSizePolicy } from "../../../scripts/check-bundle-sizes.mjs";
+import {
+  formatChildProcessStderr,
+  normalizeSizePolicy,
+  parseNpmPackOutput,
+  resolveNpmCliPath,
+} from "../../../scripts/check-bundle-sizes.mjs";
 
 describe("check-bundle-sizes", () => {
   it("normalizes legacy numeric budgets", () => {
@@ -16,6 +21,35 @@ describe("check-bundle-sizes", () => {
       budget: 4096,
       failAtRatio: 0.75,
     });
+  });
+
+  it("parses direct npm pack JSON and validates size metadata", () => {
+    expect(
+      parseNpmPackOutput(JSON.stringify([{ name: "boardreadyops", version: "1.8.0", size: 1234, unpackedSize: 5678 }])),
+    ).toMatchObject({ size: 1234, unpackedSize: 5678 });
+  });
+
+  it("rejects npm pack output without numeric size metadata", () => {
+    expect(() => parseNpmPackOutput(JSON.stringify([{ name: "boardreadyops" }]))).toThrow("numeric size metadata");
+  });
+
+  it("resolves the npm CLI from fixed paths beside the Node.js runtime", () => {
+    expect(
+      resolveNpmCliPath("/opt/node/bin/node", "linux", (file) => file.endsWith("/lib/node_modules/npm/bin/npm-cli.js")),
+    ).toBe("/opt/node/lib/node_modules/npm/bin/npm-cli.js");
+    expect(resolveNpmCliPath("C:\\node\\node.exe", "win32", () => true)).toMatch(
+      /node_modules[\\/]npm[\\/]bin[\\/]npm-cli\.js$/u,
+    );
+  });
+
+  it("fails closed when npm cannot be resolved beside Node.js", () => {
+    expect(() => resolveNpmCliPath("/opt/node/bin/node", "linux", () => false)).toThrow("npm CLI was not found");
+  });
+
+  it("formats child-process stderr without object default stringification", () => {
+    expect(formatChildProcessStderr(Buffer.from(" npm failed \n"))).toBe("npm failed");
+    expect(formatChildProcessStderr(" text error ")).toBe("text error");
+    expect(formatChildProcessStderr({ message: "hidden" })).toBe("");
   });
 
   it("rejects policies without a positive numeric budget", () => {
