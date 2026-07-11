@@ -123,6 +123,15 @@ describe("container action release surfaces", () => {
     expect(workflow).toContain("aquasecurity/trivy-action@");
   });
 
+  it("uses the package publisher token for the unlinked historical GHCR package", async () => {
+    const workflow = await readFile(".github/workflows/container-build.yml", "utf8");
+
+    expect(workflow).toContain("name: Log in to GHCR with the package publisher token");
+    expect(workflow).toContain(`username: ${actionExpression("github.repository_owner")}`);
+    expect(workflow).toContain(`password: ${actionExpression("secrets.GH_AUTH_TOKEN")}`);
+    expect(workflow).not.toContain(`password: ${actionExpression("secrets.GITHUB_TOKEN")}`);
+  });
+
   it("allows explicit manual GHCR publish for an already-published package version", async () => {
     const workflow = await readFile(".github/workflows/container-build.yml", "utf8");
 
