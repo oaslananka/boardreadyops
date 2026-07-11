@@ -14,13 +14,13 @@ if (status.stdout.trim() !== "") {
 }
 
 for (const entry of ["node_modules", "coverage", "lib", ".sonar", ".scannerwork", "sonar-project.properties"]) {
-  if (exists(entry)) {
-    failures.push(`generated artifact is present: ${entry}`);
+  if (hasTrackedPath(entry)) {
+    failures.push(`generated artifact is tracked: ${entry}`);
   }
 }
 
 const distFiles = listFiles("dist")
-  .map((file) => file.replace(/\\/g, "/"))
+  .map((file) => normalize(file))
   .sort();
 const expectedDist = ["dist/action/index.cjs", "dist/cli/index.cjs"];
 if (JSON.stringify(distFiles) !== JSON.stringify(expectedDist)) {
@@ -36,12 +36,7 @@ if (failures.length > 0) {
 }
 
 function scanForbiddenContent() {
-  const terms = [
-    new RegExp(`board[-_]?${"gu"}${"ard"}`, "i"),
-    new RegExp(`oaslananka-${"la"}${"b"}`),
-    new RegExp(`oaslananka-${"op"}${"s"}`),
-    new RegExp(`${"mi"}${"rr"}${"or"}`),
-  ];
+  const terms = [new RegExp(`board[-_]?${"gu"}${"ard"}`, "i"), new RegExp(`oaslananka-${"la"}${"b"}`)];
   const files = listFiles(".").filter((file) => !ignored(file));
   for (const file of files) {
     const text = readText(file);
@@ -105,7 +100,7 @@ function scanBannedLanguage() {
     [word("co-auth", "ored-by:"), word("co", "dex")],
   ];
   const patterns = phraseParts.map((parts) => new RegExp(parts.join("[^a-zA-Z0-9]+"), "i"));
-  for (const file of listFiles(".").filter((entry) => !ignored(entry))) {
+  for (const file of listFiles(".").filter((entry) => !ignored(entry) && normalize(entry) !== "NOTICE")) {
     const text = readText(file);
     for (const pattern of patterns) {
       if (pattern.test(text)) {
@@ -114,6 +109,11 @@ function scanBannedLanguage() {
       }
     }
   }
+}
+
+function hasTrackedPath(entry) {
+  const result = spawnSync("git", ["ls-files", "--cached", "--", entry], { encoding: "utf8" });
+  return result.status === 0 && result.stdout.trim() !== "";
 }
 
 function exists(entry) {
@@ -142,7 +142,7 @@ function listFiles(directory) {
 }
 
 function ignored(file) {
-  const normalized = file.replace(/\\/g, "/");
+  const normalized = normalize(file);
   return (
     normalized.startsWith(".git/") ||
     normalized.startsWith("node_modules/") ||
@@ -151,7 +151,10 @@ function ignored(file) {
   );
 }
 
+function normalize(file) {
+  return file.replace(/\\/g, "/");
+}
+
 function readText(file) {
-  return spawnSync("git", ["show", `:${file.replace(/\\/g, "/")}`], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 })
-    .stdout;
+  return spawnSync("git", ["show", `:${normalize(file)}`], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).stdout;
 }

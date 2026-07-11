@@ -353,6 +353,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `once@1.4.0`
   - Description: Run a function exactly one time
   - Homepage: https://github.com/isaacs/once#readme
+- `pg-int8@1.0.1`
+  - Description: 64-bit big-endian signed integer-to-string conversion
+  - Homepage: https://github.com/charmander/pg-int8#readme
 - `picocolors@1.1.1`
   - Description: The tiniest and the fastest library for terminal output formatting with ANSI colors
   - Homepage: https://github.com/alexeyraspopov/picocolors#readme
@@ -365,6 +368,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `signal-exit@3.0.7`, `signal-exit@4.1.0`
   - Description: when you want to fire an event no matter how a process exits.
   - Homepage: https://github.com/tapjs/signal-exit#readme
+- `split2@4.2.0`
+  - Description: split a Text Stream into a Line Stream, using Stream 3
+  - Homepage: https://github.com/mcollina/split2#readme
 - `unbash@4.0.1`
   - Description: Fast 0-deps bash parser written in TypeScript
   - Homepage: https://github.com/webpro-nl/unbash#readme
@@ -705,6 +711,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@nodelib/fs.walk@1.2.8`
   - Description: A library for efficiently walking a directory recursively
   - Homepage: https://github.com/nodelib/nodelib/tree/master#readme
+- `@octokit/auth-app@8.2.0`
+  - Description: GitHub App authentication for JavaScript
+  - Homepage: https://github.com/octokit/auth-app.js#readme
+- `@octokit/auth-oauth-app@9.0.3`
+  - Description: GitHub OAuth App authentication for JavaScript
+  - Homepage: https://github.com/octokit/auth-oauth-app.js#readme
+- `@octokit/auth-oauth-device@8.0.3`
+  - Description: GitHub OAuth Device authentication strategy for JavaScript
+  - Homepage: https://github.com/octokit/auth-oauth-device.js#readme
+- `@octokit/auth-oauth-user@6.0.2`
+  - Description: Octokit authentication strategy for OAuth clients
+  - Homepage: https://github.com/octokit/auth-oauth-user.js#readme
 - `@octokit/auth-token@6.0.0`
   - Description: GitHub API token authentication for browsers and Node.js
   - Homepage: https://github.com/octokit/auth-token.js#readme
@@ -717,6 +735,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@octokit/graphql@9.0.3`
   - Description: GitHub GraphQL API client for browsers and Node
   - Homepage: https://github.com/octokit/graphql.js#readme
+- `@octokit/oauth-authorization-url@8.0.0`
+  - Description: Universal library to retrieve GitHubâs identity URL for the OAuth web flow
+  - Homepage: https://github.com/octokit/oauth-authorization-url.js#readme
+- `@octokit/oauth-methods@6.0.2`
+  - Description: Set of stateless request methods to create, check, reset, refresh, and delete user access tokens for OAuth and GitHub Apps
+  - Homepage: https://github.com/octokit/oauth-methods.js#readme
 - `@octokit/openapi-types@27.0.0`
   - Description: Generated TypeScript definitions based on GitHub's OpenAPI spec for api.github.com
   - Homepage: https://github.com/octokit/openapi-types.ts#readme
@@ -813,6 +837,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@types/node@24.13.2`
   - Description: TypeScript definitions for node
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node
+- `@types/pg@8.16.0`
+  - Description: TypeScript definitions for pg
+  - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/pg
 - `@types/react@19.2.17`
   - Description: TypeScript definitions for react
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react
@@ -1483,6 +1510,27 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/andrewrk/node-pend#readme
 - `perfect-debounce@2.1.0`
   - Homepage: https://github.com/unjs/perfect-debounce#readme
+- `pg@8.16.3`
+  - Description: PostgreSQL client - pure javascript & libpq with the same API
+  - Homepage: https://github.com/brianc/node-postgres
+- `pg-cloudflare@1.4.0`
+  - Description: A socket implementation that can run on Cloudflare Workers using native TCP connections.
+  - Homepage: https://github.com/brianc/node-postgres#readme
+- `pg-connection-string@2.14.0`
+  - Description: Functions for dealing with a PostgreSQL connection string
+  - Homepage: https://github.com/brianc/node-postgres/tree/master/packages/pg-connection-string
+- `pg-pool@3.14.0`
+  - Description: Connection pool for node-postgres
+  - Homepage: https://github.com/brianc/node-postgres/tree/master/packages/pg-pool#readme
+- `pg-protocol@1.15.0`
+  - Description: The postgres client/server binary protocol, implemented in TypeScript
+  - Homepage: https://github.com/brianc/node-postgres#readme
+- `pg-types@2.2.0`
+  - Description: Query result type converters for node-postgres
+  - Homepage: https://github.com/brianc/node-pg-types
+- `pgpass@1.0.5`
+  - Description: Module for reading .pgpass
+  - Homepage: https://github.com/hoegaarden/pgpass#readme
 - `picomatch@2.3.2`, `picomatch@4.0.4`
   - Description: Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.
   - Homepage: https://github.com/micromatch/picomatch
@@ -1492,6 +1540,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `postcss@8.5.15`
   - Description: Tool for transforming styles with JS plugins
   - Homepage: https://postcss.org/
+- `postgres-array@2.0.0`
+  - Description: Parse postgres array columns
+  - Homepage: https://github.com/bendrucker/postgres-array#readme
+- `postgres-bytea@1.0.1`
+  - Description: Postgres bytea parser
+  - Homepage: https://github.com/bendrucker/postgres-bytea#readme
+- `postgres-date@1.0.7`
+  - Description: Postgres date column parser
+  - Homepage: https://github.com/bendrucker/postgres-date#readme
+- `postgres-interval@1.2.0`
+  - Description: Parse Postgres interval columns
+  - Homepage: https://github.com/bendrucker/postgres-interval#readme
 - `pretty-ms@9.3.0`
   - Description: Convert milliseconds to a human readable string: `1337000000` → `15d 11h 23m 20s`
   - Homepage: https://github.com/sindresorhus/pretty-ms#readme
@@ -1683,6 +1743,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `to-regex-range@5.0.1`
   - Description: Pass two numbers, get a regex-compatible source string for matching ranges. Validated against more than 2.78 million test assertions.
   - Homepage: https://github.com/micromatch/to-regex-range
+- `toad-cache@3.7.4`
+  - Description: LRU and FIFO caches for Client or Server
+  - Homepage: https://github.com/kibertoad/toad-cache
 - `tree-kill@1.2.2`
   - Description: kill trees of processes
   - Homepage: https://github.com/pkrumins/node-tree-kill
@@ -1716,6 +1779,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `unicorn-magic@0.3.0`
   - Description: Some useful utilities I often need
   - Homepage: https://github.com/sindresorhus/unicorn-magic#readme
+- `universal-github-app-jwt@2.2.2`
+  - Description: Calculate GitHub App bearer tokens for Node & modern browsers
+  - Homepage: https://github.com/gr2m/universal-github-app-jwt#readme
 - `unzip-stream@0.3.4`
   - Description: Process zip files using streaming API
   - Homepage: https://github.com/mhr3/unzip-stream#readme
@@ -1746,6 +1812,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `ws@8.21.0`
   - Description: Simple to use, blazing fast and thoroughly tested websocket client and server for Node.js
   - Homepage: https://github.com/websockets/ws
+- `xtend@4.0.2`
+  - Description: extend like a boss
+  - Homepage: https://github.com/Raynos/xtend
 - `yargs@17.7.3`, `yargs@18.0.0`
   - Description: yargs the modern, pirate-themed, successor to optimist.
   - Homepage: https://yargs.js.org/

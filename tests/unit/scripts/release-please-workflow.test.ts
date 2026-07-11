@@ -12,6 +12,7 @@ describe("release-please workflow contract", () => {
     expect(workflow).toContain(`token: ${releasePleaseTokenExpression}`);
     expect(workflow).toContain(`GH_TOKEN: ${releasePleaseTokenExpression}`);
     expect(workflow).toContain("pull-requests: write");
+    expect(workflow).toContain("pnpm run release:readme");
   });
 
   it("does not hide release-please failures", async () => {

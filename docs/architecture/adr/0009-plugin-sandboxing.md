@@ -11,7 +11,7 @@ Currently, the plugin loader (`src/core/plugin-loader.ts`) validates that loaded
 
 However, this is only a **declaration-level check**. Once Node.js loads a plugin via `import()`, the plugin runs with the full privileges of the host Node.js process. A buggy or malicious plugin could bypass these checks and execute arbitrary file system access, network calls, or launch external processes.
 
-To build a enterprise-grade, secure CLI and GitHub Action, we need a **runtime sandbox** that guarantees a plugin cannot access unauthorized capabilities.
+To provide a secure CLI and GitHub Action, we need a **runtime sandbox** that guarantees a plugin cannot access unauthorized capabilities.
 
 ## Requirements
 

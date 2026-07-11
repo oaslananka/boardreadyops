@@ -72,6 +72,7 @@
     "gc": "node scripts/gc.mjs",
     "api:docs": "node scripts/generate-api-docs.mjs",
     "release:history": "node scripts/generate-release-history.mjs",
+    "release:readme": "node scripts/sync-release-readme.mjs",
     "docs": "node scripts/compatibility.mjs render && node scripts/generate-rule-docs.mjs && node scripts/update-action-inputs-docs.mjs && pnpm run api:docs && pnpm run release:history && node scripts/docs-build.mjs",
     "docs:a11y": "node scripts/check-docs-a11y.mjs",
     "docs:serve": "mkdocs serve",

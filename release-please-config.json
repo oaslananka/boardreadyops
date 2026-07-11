@@ -15,10 +15,6 @@
         {
           "type": "generic",
           "path": "src/generated/version.ts"
-        },
-        {
-          "type": "generic",
-          "path": "README.md"
         }
       ],
       "changelog-sections": [
