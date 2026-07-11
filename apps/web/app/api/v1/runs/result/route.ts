@@ -208,41 +208,81 @@ export async function handleResultRequest(
   }
 
   const completedAt = dependencies.now().toISOString();
+  const findingsJson = JSON.stringify(
+    parsed.data.findings.map((finding) => ({
+      rule_id: finding.ruleId,
+      severity: finding.severity,
+      message: finding.message,
+      path: finding.path ?? null,
+    })),
+  );
   const updateResult = await executor.query(
     `with updated as (
        update release_runs
        set status = $2,
            decision = $3,
-           completed_at = case when $2 in ('completed', 'failed', 'timed_out') then coalesce(completed_at, $4::timestamptz) else completed_at end,
-           duration_ms = case when $2 in ('completed', 'failed', 'timed_out') then greatest(0, floor(extract(epoch from ($4::timestamptz - started_at)) * 1000))::integer else duration_ms end
+           completed_at = case
+             when $2 in ('completed', 'failed', 'timed_out') then coalesce(completed_at, $4::timestamptz)
+             else completed_at
+           end,
+           duration_ms = case
+             when $2 in ('completed', 'failed', 'timed_out') then coalesce(
+               duration_ms,
+               greatest(
+                 0,
+                 floor(
+                   extract(epoch from (coalesce(completed_at, $4::timestamptz) - started_at)) * 1000
+                 )::integer
+               )
+             )
+             else duration_ms
+           end
        where id = $1
        returning id, github_check_run_id, repository_id, pull_request_number
+     ),
+     deleted_findings as (
+       delete from findings
+       using updated
+       where findings.run_id = updated.id
+       returning findings.run_id
+     ),
+     cleared_findings as (
+       select count(*) as deleted_count
+       from deleted_findings
+     ),
+     inserted_findings as (
+       insert into findings (run_id, rule_id, severity, message, path)
+       select updated.id,
+              finding.rule_id,
+              finding.severity,
+              finding.message,
+              finding.path
+       from updated
+       cross join cleared_findings
+       cross join jsonb_to_recordset($5::jsonb) as finding(
+         rule_id text,
+         severity text,
+         message text,
+         path text
+       )
+       returning id
      )
      select updated.id,
             updated.github_check_run_id,
             updated.pull_request_number,
             repositories.owner,
             repositories.name,
-            installations.github_installation_id
+            installations.github_installation_id,
+            (select count(*) from inserted_findings) as inserted_finding_count
      from updated
      join repositories on repositories.id = updated.repository_id
      join installations on installations.id = repositories.installation_id`,
-    [runId, parsed.data.status, parsed.data.decision, completedAt],
+    [runId, parsed.data.status, parsed.data.decision, completedAt, findingsJson],
   );
   const row = rows(updateResult)[0];
 
   if (!row) {
     return Response.json({ ok: false, error: "release run not found" }, { status: 404 });
-  }
-
-  await executor.query("delete from findings where run_id = $1", [runId]);
-
-  for (const finding of parsed.data.findings) {
-    await executor.query(
-      `insert into findings (run_id, rule_id, severity, message, path)
-       values ($1, $2, $3, $4, $5)`,
-      [runId, finding.ruleId, finding.severity, finding.message, finding.path ?? null],
-    );
   }
 
   const githubCheckRunId = numberLikeCell(row, "github_check_run_id");
