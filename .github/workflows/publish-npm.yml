@@ -180,7 +180,8 @@ jobs:
           PACK_JSON="${pack_json}" node <<'NODE'
           const { readFileSync, statSync } = require("node:fs");
 
-          const [pack] = JSON.parse(readFileSync(process.env.PACK_JSON, "utf8"));
+          const parsed = JSON.parse(readFileSync(process.env.PACK_JSON, "utf8"));
+          const pack = Array.isArray(parsed) ? parsed[0] : parsed;
           const files = new Set(pack.files.map((file) => file.path));
           const required = ["package.json", "dist/cli/index.cjs", "dist/action/index.cjs"];
           const missing = required.filter((file) => !files.has(file));

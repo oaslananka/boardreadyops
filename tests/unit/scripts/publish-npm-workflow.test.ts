@@ -17,6 +17,7 @@ describe("publish-npm workflow contract", () => {
     expect(verificationBlock).toContain(`PACK_JSON="${packJsonExpression}" node`);
     expect(verificationBlock).toContain('"dist/cli/index.cjs"');
     expect(verificationBlock).toContain('"dist/action/index.cjs"');
+    expect(verificationBlock).toContain("Array.isArray(parsed) ? parsed[0] : parsed");
     expect(verificationBlock).toContain("pack.unpackedSize");
     expect(verificationBlock).not.toContain("pnpm run check:size");
   });
