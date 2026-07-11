@@ -181,7 +181,15 @@ jobs:
           const { readFileSync, statSync } = require("node:fs");
 
           const parsed = JSON.parse(readFileSync(process.env.PACK_JSON, "utf8"));
-          const pack = Array.isArray(parsed) ? parsed[0] : parsed;
+          const candidates = Array.isArray(parsed)
+            ? parsed
+            : Array.isArray(parsed?.files)
+              ? [parsed]
+              : Object.values(parsed ?? {}).filter((value) => Array.isArray(value?.files));
+          if (candidates.length !== 1) {
+            throw new Error(`npm pack returned ${candidates.length} metadata candidates`);
+          }
+          const [pack] = candidates;
           const files = new Set(pack.files.map((file) => file.path));
           const required = ["package.json", "dist/cli/index.cjs", "dist/action/index.cjs"];
           const missing = required.filter((file) => !files.has(file));
