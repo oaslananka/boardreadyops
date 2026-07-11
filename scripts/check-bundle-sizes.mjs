@@ -26,11 +26,19 @@ export function normalizeSizePolicy(policy, label = "size budget") {
 }
 
 export function parseNpmPackOutput(raw) {
-  const jsonStart = raw.indexOf("[");
+  const jsonStart = raw.search(/[[{]/u);
   const parsed = JSON.parse(jsonStart >= 0 ? raw.slice(jsonStart) : raw);
-  const packResult = Array.isArray(parsed) ? parsed[0] : parsed;
+  const candidates = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed?.files)
+      ? [parsed]
+      : Object.values(parsed ?? {}).filter((value) => Array.isArray(value?.files));
+  if (candidates.length !== 1) {
+    throw new Error(`npm pack output included ${candidates.length} metadata candidates`);
+  }
+  const [packResult] = candidates;
 
-  if (!packResult || !Number.isFinite(packResult.size) || !Number.isFinite(packResult.unpackedSize)) {
+  if (!Number.isFinite(packResult.size) || !Number.isFinite(packResult.unpackedSize)) {
     throw new Error("npm pack output did not include numeric size metadata");
   }
 

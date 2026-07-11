@@ -23,14 +23,28 @@ describe("check-bundle-sizes", () => {
     });
   });
 
-  it("parses direct npm pack JSON and validates size metadata", () => {
-    expect(
-      parseNpmPackOutput(JSON.stringify([{ name: "boardreadyops", version: "1.8.0", size: 1234, unpackedSize: 5678 }])),
-    ).toMatchObject({ size: 1234, unpackedSize: 5678 });
+  it("parses npm 11 array metadata", () => {
+    const metadata = { name: "boardreadyops", version: "1.8.0", size: 1234, unpackedSize: 5678, files: [] };
+    expect(parseNpmPackOutput(JSON.stringify([metadata]))).toMatchObject({ size: 1234, unpackedSize: 5678 });
+  });
+
+  it("parses direct object metadata", () => {
+    const metadata = { name: "boardreadyops", version: "1.8.0", size: 1234, unpackedSize: 5678, files: [] };
+    expect(parseNpmPackOutput(JSON.stringify(metadata))).toMatchObject({ size: 1234, unpackedSize: 5678 });
+  });
+
+  it("parses npm 12 package-keyed metadata", () => {
+    const metadata = { name: "boardreadyops", version: "1.8.0", size: 1234, unpackedSize: 5678, files: [] };
+    expect(parseNpmPackOutput(JSON.stringify({ boardreadyops: metadata }))).toMatchObject({
+      size: 1234,
+      unpackedSize: 5678,
+    });
   });
 
   it("rejects npm pack output without numeric size metadata", () => {
-    expect(() => parseNpmPackOutput(JSON.stringify([{ name: "boardreadyops" }]))).toThrow("numeric size metadata");
+    expect(() => parseNpmPackOutput(JSON.stringify([{ name: "boardreadyops", files: [] }]))).toThrow(
+      "numeric size metadata",
+    );
   });
 
   it("resolves the npm CLI from fixed paths beside the Node.js runtime", () => {
