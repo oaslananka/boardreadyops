@@ -130,6 +130,68 @@ describe("readiness result route authentication and publication", () => {
     expect(createPullRequestComment).toHaveBeenCalledWith(expect.objectContaining({ pullRequestNumber: 42 }));
   });
 
+  it("persists the run result and replacement findings in one atomic statement", async () => {
+    const body = JSON.stringify({
+      status: "completed",
+      decision: "fail",
+      findings: [
+        {
+          ruleId: "bom.missing-mpn",
+          severity: "high",
+          message: "A production part is missing its MPN.",
+          path: "board.kicad_sch",
+        },
+        {
+          ruleId: "pcb.unrouted",
+          severity: "error",
+          message: "Two tracks remain unrouted.",
+        },
+      ],
+    });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: "run-123",
+          github_check_run_id: null,
+          pull_request_number: null,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(202);
+    expect(query).toHaveBeenCalledOnce();
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("deleted_findings as");
+    expect(sql).toContain("inserted_findings as");
+    expect(sql).toContain("jsonb_to_recordset($5::jsonb)");
+    expect(sql).toMatch(/coalesce\(\s+duration_ms/u);
+    expect(params).toEqual([
+      "run-123",
+      "completed",
+      "fail",
+      "2026-07-10T18:00:00.000Z",
+      JSON.stringify([
+        {
+          rule_id: "bom.missing-mpn",
+          severity: "high",
+          message: "A production part is missing its MPN.",
+          path: "board.kicad_sch",
+        },
+        {
+          rule_id: "pcb.unrouted",
+          severity: "error",
+          message: "Two tracks remain unrouted.",
+          path: null,
+        },
+      ]),
+    ]);
+  });
+
   it("accepts a run-bound GitHub OIDC token without a shared key", async () => {
     const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
     delete process.env.BOARDREADYOPS_RUNNER_RESULT_KEY;
