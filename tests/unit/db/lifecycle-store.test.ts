@@ -174,17 +174,29 @@ describe("SQL GitHub App lifecycle store", () => {
     expect(calls[1]?.sql).toContain("insert into release_runs");
   });
 
-  it("marks workflow dispatch without changing the readiness decision", async () => {
+  it("binds and marks the exact workflow execution attempt", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppLifecycleStore(executor);
+    const executionAttemptId = "6ec0d9ac-a4e4-4dd3-9f91-777f43f1e801";
 
-    await store.markReleaseRunDispatched({ runId: "run-row-id" });
+    await expect(
+      store.bindReleaseRunExecutionAttempt({
+        runId: "run-row-id",
+        executionAttemptId,
+        startedAt: "2026-07-11T15:00:00.000Z",
+      }),
+    ).resolves.toBe(true);
+    await store.markReleaseRunDispatched({ runId: "run-row-id", executionAttemptId });
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.sql).toContain("set status = 'dispatched'");
-    expect(calls[0]?.sql).not.toContain("decision");
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.sql).toContain("execution_attempt_id = $2");
+    expect(calls[0]?.sql).toContain("execution_attempt_started_at = $3::timestamptz");
     expect(calls[0]?.sql).toContain("status = 'queued'");
-    expect(calls[0]?.params).toEqual(["run-row-id"]);
+    expect(calls[0]?.params).toEqual(["run-row-id", executionAttemptId, "2026-07-11T15:00:00.000Z"]);
+    expect(calls[1]?.sql).toContain("set status = 'dispatched'");
+    expect(calls[1]?.sql).not.toContain("decision");
+    expect(calls[1]?.sql).toContain("execution_attempt_id = $2");
+    expect(calls[1]?.params).toEqual(["run-row-id", executionAttemptId]);
   });
 
   it("terminalizes safe-mode skips as completed and neutral", async () => {

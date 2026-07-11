@@ -244,13 +244,28 @@ export function createSqlGitHubAppLifecycleStore(
       );
     },
 
+    async bindReleaseRunExecutionAttempt(input) {
+      const result = await executor.query(
+        `update release_runs
+         set execution_attempt_id = $2,
+             execution_attempt_started_at = $3::timestamptz
+         where id = $1
+           and status = 'queued'
+         returning id`,
+        [input.runId, input.executionAttemptId, input.startedAt],
+      );
+
+      return rows(result).length === 1;
+    },
+
     async markReleaseRunDispatched(input) {
       await executor.query(
         `update release_runs
          set status = 'dispatched'
          where id = $1
+           and execution_attempt_id = $2
            and status = 'queued'`,
-        [input.runId],
+        [input.runId, input.executionAttemptId],
       );
     },
 

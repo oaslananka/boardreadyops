@@ -16,6 +16,8 @@ const dependencies: ResultRouteDependencies = {
   verifyOidcToken,
 };
 
+const executionAttemptId = "7559e99b-4998-4e02-a94a-7a7a4686ae11";
+
 const originalEnvironment = {
   resultKey: process.env.BOARDREADYOPS_RUNNER_RESULT_KEY,
   requireSignature: process.env.BOARDREADYOPS_REQUIRE_RUNNER_SIGNATURE,
@@ -38,8 +40,25 @@ function restoreEnvironment(): void {
   }
 }
 
-function signature(key: string, timestamp: string, runId: string, body: string): string {
-  return `sha256=${createHmac("sha256", key).update(`${timestamp}.${runId}.${body}`).digest("hex")}`;
+function signature(key: string, timestamp: string, runId: string, attemptId: string | undefined, body: string): string {
+  const signedPayload = attemptId ? `${timestamp}.${runId}.${attemptId}.${body}` : `${timestamp}.${runId}.${body}`;
+  return `sha256=${createHmac("sha256", key).update(signedPayload).digest("hex")}`;
+}
+
+function bindResultBody(body: string, attemptId: string | undefined): string {
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return JSON.stringify({
+        ...(attemptId ? { executionAttemptId: attemptId } : {}),
+        ...(parsed as Record<string, unknown>),
+      });
+    }
+  } catch {
+    // Preserve malformed payloads so raw-body authentication remains testable.
+  }
+
+  return body;
 }
 
 function resultRequest(input: {
@@ -49,9 +68,12 @@ function resultRequest(input: {
   timestamp?: string;
   legacy?: boolean;
   oidcToken?: string;
+  attemptId?: string | null;
 }): Request {
   const runId = input.runId ?? "run-123";
   const key = input.key ?? "runner-secret";
+  const attemptId = input.attemptId === undefined ? executionAttemptId : (input.attemptId ?? undefined);
+  const body = bindResultBody(input.body, attemptId);
   const timestamp = input.timestamp ?? String(Math.floor(Date.now() / 1000));
   const headers = new Headers({ "content-type": "application/json" });
 
@@ -61,13 +83,19 @@ function resultRequest(input: {
     headers.set("x-boardreadyops-runner-key", key);
   } else {
     headers.set("x-boardreadyops-runner-timestamp", timestamp);
-    headers.set("x-boardreadyops-runner-signature", signature(key, timestamp, runId, input.body));
+    headers.set("x-boardreadyops-runner-signature", signature(key, timestamp, runId, attemptId, body));
   }
 
-  return new Request(`https://boardreadyops.test/api/v1/runs/result?run_id=${encodeURIComponent(runId)}`, {
+  const callbackUrl = new URL("https://boardreadyops.test/api/v1/runs/result");
+  callbackUrl.searchParams.set("run_id", runId);
+  if (attemptId) {
+    callbackUrl.searchParams.set("attempt_id", attemptId);
+  }
+
+  return new Request(callbackUrl, {
     method: "POST",
     headers,
-    body: input.body,
+    body,
   });
 }
 
@@ -130,6 +158,34 @@ describe("readiness result route authentication and publication", () => {
     expect(createPullRequestComment).toHaveBeenCalledWith(expect.objectContaining({ pullRequestNumber: 42 }));
   });
 
+  it("computes the same terminal digest regardless of finding order", async () => {
+    const firstBody = JSON.stringify({
+      status: "completed",
+      decision: "fail",
+      findings: [
+        { ruleId: "pcb.unrouted", severity: "error", message: "Two tracks remain unrouted." },
+        { ruleId: "bom.missing-mpn", severity: "high", message: "Missing MPN." },
+      ],
+    });
+    const secondBody = JSON.stringify({
+      status: "completed",
+      decision: "fail",
+      findings: [
+        { ruleId: "bom.missing-mpn", severity: "high", message: "Missing MPN." },
+        { ruleId: "pcb.unrouted", severity: "error", message: "Two tracks remain unrouted." },
+      ],
+    });
+    query.mockResolvedValue({ rows: [] });
+
+    await handleResultRequest(resultRequest({ body: firstBody }), dependencies);
+    await handleResultRequest(resultRequest({ body: secondBody }), dependencies);
+
+    const firstParams = query.mock.calls[0]?.[1] as unknown[];
+    const secondParams = query.mock.calls[1]?.[1] as unknown[];
+    expect(firstParams[6]).toMatch(/^[0-9a-f]{64}$/u);
+    expect(secondParams[6]).toBe(firstParams[6]);
+  });
+
   it("persists the run result and replacement findings in one atomic statement", async () => {
     const body = JSON.stringify({
       status: "completed",
@@ -168,10 +224,13 @@ describe("readiness result route authentication and publication", () => {
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("deleted_findings as");
     expect(sql).toContain("inserted_findings as");
-    expect(sql).toContain("jsonb_to_recordset($5::jsonb)");
-    expect(sql).toMatch(/coalesce\(\s+duration_ms/u);
-    expect(params).toEqual([
+    expect(sql).toContain("jsonb_to_recordset($6::jsonb)");
+    expect(sql).toContain("coalesce(release_runs.completed_at");
+    expect(sql).toContain("release_runs.terminal_result_digest");
+    expect(sql).toMatch(/coalesce\(\s+release_runs\.duration_ms/u);
+    expect(params.slice(0, 6)).toEqual([
       "run-123",
+      executionAttemptId,
       "completed",
       "fail",
       "2026-07-10T18:00:00.000Z",
@@ -190,6 +249,7 @@ describe("readiness result route authentication and publication", () => {
         },
       ]),
     ]);
+    expect(params[6]).toMatch(/^[0-9a-f]{64}$/u);
   });
 
   it("rejects a superseded run without replacing findings or publishing stale GitHub output", async () => {
@@ -223,9 +283,144 @@ describe("readiness result route authentication and publication", () => {
     });
     expect(query).toHaveBeenCalledOnce();
     const [sql] = query.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain("existing.status <> 'superseded'");
+    expect(sql).toContain("existing.status = 'superseded'");
     expect(completeCheckRun).not.toHaveBeenCalled();
     expect(createPullRequestComment).not.toHaveBeenCalled();
+  });
+
+  it("rejects a callback from an execution attempt that is no longer current", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          persistence_outcome: "stale_attempt",
+          id: "run-123",
+          github_check_run_id: 987,
+          pull_request_number: 42,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "execution attempt is no longer current",
+      runId: "run-123",
+      executionAttemptId,
+    });
+    expect(completeCheckRun).not.toHaveBeenCalled();
+    expect(createPullRequestComment).not.toHaveBeenCalled();
+  });
+
+  it("accepts an exact terminal replay and republishes GitHub output with the original completion time", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          persistence_outcome: "replayed",
+          id: "run-123",
+          github_check_run_id: 987,
+          pull_request_number: 42,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+          completed_at: "2026-07-10T17:58:00.000Z",
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "replayed",
+      runId: "run-123",
+      executionAttemptId,
+      checkRunUpdated: true,
+    });
+    expect(completeCheckRun).toHaveBeenCalledWith(expect.objectContaining({ completedAt: "2026-07-10T17:58:00.000Z" }));
+    const [sql] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("existing.terminal_result_digest = $7");
+    expect(sql).toContain("then 'replayed'");
+  });
+
+  it("rejects a conflicting terminal replay without changing GitHub output", async () => {
+    const body = JSON.stringify({ status: "failed", decision: "error", findings: [] });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          persistence_outcome: "conflicting_terminal_result",
+          id: "run-123",
+          github_check_run_id: 987,
+          pull_request_number: 42,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "terminal result conflicts with the persisted result",
+      runId: "run-123",
+      executionAttemptId,
+    });
+    expect(completeCheckRun).not.toHaveBeenCalled();
+    expect(createPullRequestComment).not.toHaveBeenCalled();
+  });
+
+  it("rejects a body attempt that does not match the authenticated callback URL", async () => {
+    const body = JSON.stringify({
+      executionAttemptId: "b942dbea-fec5-4696-b645-68fd91d936ea",
+      status: "completed",
+      decision: "pass",
+      findings: [],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "execution attempt does not match callback URL",
+    });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("keeps attempt-less callbacks compatible only with legacy unassigned runs", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          persistence_outcome: "accepted",
+          id: "run-123",
+          github_check_run_id: null,
+          pull_request_number: null,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+          completed_at: "2026-07-10T18:00:00.000Z",
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body, attemptId: null }), dependencies);
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, status: "accepted", runId: "run-123" });
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("existing.execution_attempt_id is distinct from $2");
+    expect(params[1]).toBeNull();
   });
 
   it("accepts a run-bound GitHub OIDC token without a shared key", async () => {
@@ -240,7 +435,7 @@ describe("readiness result route authentication and publication", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(verifyOidcToken).toHaveBeenCalledWith("header.payload.signature", "run-123");
+    expect(verifyOidcToken).toHaveBeenCalledWith("header.payload.signature", "run-123", executionAttemptId);
     expect(query).toHaveBeenCalledOnce();
   });
 
@@ -252,7 +447,7 @@ describe("readiness result route authentication and publication", () => {
     const response = await handleResultRequest(request, dependencies);
 
     expect(response.status).toBe(401);
-    expect(verifyOidcToken).toHaveBeenCalledWith("invalid.token.value", "run-123");
+    expect(verifyOidcToken).toHaveBeenCalledWith("invalid.token.value", "run-123", executionAttemptId);
     expect(query).not.toHaveBeenCalled();
   });
 

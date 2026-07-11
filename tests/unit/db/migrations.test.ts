@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the audit-log schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(4);
+    expect(cloudDatabaseSchemaVersion).toBe(5);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("AuditEvent");
   });
@@ -20,7 +20,18 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0002_release_run_lifecycle.sql",
       "0003_runner_registrations.sql",
       "0004_audit_logs.sql",
+      "0005_release_run_execution_attempts.sql",
     ]);
+  });
+
+  it("binds release results to execution attempts and terminal digests", async () => {
+    const sql = await readFile(join(migrationsDir, "0005_release_run_execution_attempts.sql"), "utf8");
+
+    expect(sql).toContain("execution_attempt_id text");
+    expect(sql).toContain("execution_attempt_started_at timestamptz");
+    expect(sql).toContain("terminal_result_digest text");
+    expect(sql).toContain("release_runs_execution_attempt_id_idx");
+    expect(sql).toContain("release_runs_terminal_result_digest_valid");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {

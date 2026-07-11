@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { GitHubAppLifecycleAction } from "./lifecycle.js";
 
 export type EnqueueReleaseRunInput = Extract<GitHubAppLifecycleAction, { type: "release_run.enqueue" }>;
@@ -14,8 +15,15 @@ export type AttachGitHubCheckRunInput = {
   githubCheckRunId: number;
 };
 
+export type BindReleaseRunExecutionAttemptInput = {
+  runId: string;
+  executionAttemptId: string;
+  startedAt: string;
+};
+
 export type MarkReleaseRunDispatchedInput = {
   runId: string;
+  executionAttemptId: string;
 };
 
 export type MarkReleaseRunSkippedInput = {
@@ -31,6 +39,7 @@ export type CreatePullRequestCheckRunInput = {
 
 export type DispatchReleaseRunWorkflowInput = CreatePullRequestCheckRunInput & {
   githubCheckRunId: number | string;
+  executionAttemptId: string;
 };
 
 export type CompleteGitHubCheckRunInput = {
@@ -61,6 +70,7 @@ export type GitHubAppLifecycleStore = {
   removeRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.removed" }>): Promise<void>;
   enqueueReleaseRun(action: EnqueueReleaseRunInput): Promise<EnqueuedReleaseRun>;
   attachGitHubCheckRun(input: AttachGitHubCheckRunInput): Promise<void>;
+  bindReleaseRunExecutionAttempt(input: BindReleaseRunExecutionAttemptInput): Promise<boolean>;
   markReleaseRunDispatched(input: MarkReleaseRunDispatchedInput): Promise<void>;
   markReleaseRunSkipped(input: MarkReleaseRunSkippedInput): Promise<void>;
 };
@@ -198,13 +208,26 @@ async function executeReleaseRun(
     return;
   }
 
+  const executionAttemptId = randomUUID();
+  const attemptBound = await store.bindReleaseRunExecutionAttempt({
+    runId: releaseRun.runId,
+    executionAttemptId,
+    startedAt: new Date().toISOString(),
+  });
+
+  if (!attemptBound) {
+    result.workflowDispatchesSkipped += 1;
+    return;
+  }
+
   await workflowDispatchClient.dispatchReleaseRunWorkflow({
     action,
     runId: releaseRun.runId,
     idempotencyKey: releaseRun.idempotencyKey,
     githubCheckRunId: checkRunId,
+    executionAttemptId,
   });
-  await store.markReleaseRunDispatched({ runId: releaseRun.runId });
+  await store.markReleaseRunDispatched({ runId: releaseRun.runId, executionAttemptId });
   result.workflowDispatchesCreated += 1;
 }
 
@@ -277,6 +300,9 @@ export function createNoopGitHubAppLifecycleStore(): GitHubAppLifecycleStore {
       return { idempotencyKey: "noop" };
     },
     async attachGitHubCheckRun() {},
+    async bindReleaseRunExecutionAttempt() {
+      return false;
+    },
     async markReleaseRunDispatched() {},
     async markReleaseRunSkipped() {},
   };

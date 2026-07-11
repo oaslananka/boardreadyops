@@ -6,6 +6,7 @@ import {
 } from "../../../apps/web/lib/github-actions-oidc.js";
 
 const runId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
+const executionAttemptId = "7559e99b-4998-4e02-a94a-7a7a4686ae11";
 const repository = "oaslananka/boardreadyops";
 const workflowRef = `${repository}/.github/workflows/readiness-runner.yml@refs/heads/main`;
 const nowMs = Date.UTC(2026, 6, 10, 20, 30, 0);
@@ -29,7 +30,7 @@ function token(
   const payload = Buffer.from(
     JSON.stringify({
       iss: "https://token.actions.githubusercontent.com",
-      aud: `boardreadyops-cloud:${runId}`,
+      aud: `boardreadyops-cloud:${runId}:${executionAttemptId}`,
       sub: `repo:${repository}:ref:refs/heads/main`,
       repository,
       workflow_ref: workflowRef,
@@ -62,12 +63,13 @@ beforeEach(() => {
 });
 
 describe("GitHub Actions OIDC verification", () => {
-  it("accepts a signed token bound to the repository, workflow, ref, event, and release run", async () => {
+  it("accepts a signed token bound to the repository, workflow, ref, event, and release run and execution attempt", async () => {
     const fetchImpl = jwksFetch();
 
     await expect(
       verifyGitHubActionsOidcToken(token(), {
         runId,
+        executionAttemptId,
         fetchImpl,
         now: () => nowMs,
       }),
@@ -76,6 +78,18 @@ describe("GitHub Actions OIDC verification", () => {
       "https://token.actions.githubusercontent.com/.well-known/jwks",
       expect.objectContaining({ cache: "no-store" }),
     );
+  });
+
+  it("accepts the legacy run-only audience during the rolling upgrade", async () => {
+    const fetchImpl = jwksFetch();
+
+    await expect(
+      verifyGitHubActionsOidcToken(token({ aud: `boardreadyops-cloud:${runId}` }), {
+        runId,
+        fetchImpl,
+        now: () => nowMs,
+      }),
+    ).resolves.toBe(true);
   });
 
   it.each([
@@ -92,6 +106,7 @@ describe("GitHub Actions OIDC verification", () => {
     await expect(
       verifyGitHubActionsOidcToken(token(payloadOverrides), {
         runId,
+        executionAttemptId,
         fetchImpl,
         now: () => nowMs,
       }),
@@ -110,6 +125,7 @@ describe("GitHub Actions OIDC verification", () => {
       await expect(
         verifyGitHubActionsOidcToken(token(payloadOverrides), {
           runId,
+          executionAttemptId,
           fetchImpl,
           now: () => nowMs,
         }),
@@ -123,6 +139,7 @@ describe("GitHub Actions OIDC verification", () => {
     await expect(
       verifyGitHubActionsOidcToken(token({}, { alg: "HS256" }), {
         runId,
+        executionAttemptId,
         fetchImpl: jwksFetch(),
         now: () => nowMs,
       }),
@@ -131,6 +148,7 @@ describe("GitHub Actions OIDC verification", () => {
     await expect(
       verifyGitHubActionsOidcToken(token(), {
         runId,
+        executionAttemptId,
         fetchImpl: jwksFetch([publicJwk, publicJwk]),
         now: () => nowMs,
       }),
@@ -143,6 +161,7 @@ describe("GitHub Actions OIDC verification", () => {
     await expect(
       verifyGitHubActionsOidcToken(token(), {
         runId,
+        executionAttemptId,
         fetchImpl,
         now: () => nowMs,
       }),

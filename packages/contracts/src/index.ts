@@ -21,6 +21,7 @@ export const findingSchema = z.object({
 });
 
 export const releaseRunResultSchema = z.object({
+  executionAttemptId: z.string().uuid().optional(),
   status: releaseRunStatusSchema,
   decision: releaseDecisionSchema.nullable(),
   findings: z.array(findingSchema).default([]),

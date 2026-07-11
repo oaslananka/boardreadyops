@@ -6,6 +6,10 @@ on:
       run_id:
         required: true
         type: string
+      execution_attempt_id:
+        required: false
+        type: string
+        default: ""
       target:
         required: true
         type: string
@@ -83,6 +87,7 @@ jobs:
         env:
           RESULT_URL: ${{ inputs.result_url }}
           RUN_ID: ${{ inputs.run_id }}
+          EXECUTION_ATTEMPT_ID: ${{ inputs.execution_attempt_id }}
           TARGET: ${{ inputs.target }}
           HEAD_SHA: ${{ inputs.head_sha }}
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
@@ -92,7 +97,15 @@ jobs:
             exit 1
           fi
 
-          expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${RUN_ID}"
+          if [ -n "$EXECUTION_ATTEMPT_ID" ]; then
+            if ! [[ "$EXECUTION_ATTEMPT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+              echo "execution_attempt_id must be a lowercase UUID" >&2
+              exit 1
+            fi
+            expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${RUN_ID}&attempt_id=${EXECUTION_ATTEMPT_ID}"
+          else
+            expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${RUN_ID}"
+          fi
 
           if [ "$RESULT_URL" != "$expected_url" ]; then
             echo "result_url must target the BoardReadyOps production callback for this run" >&2
@@ -124,8 +137,13 @@ jobs:
             decision="error"
           fi
 
-          payload="{\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
-          audience="boardreadyops-cloud:${RUN_ID}"
+          if [ -n "$EXECUTION_ATTEMPT_ID" ]; then
+            payload="{\"executionAttemptId\":\"$EXECUTION_ATTEMPT_ID\",\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
+            audience="boardreadyops-cloud:${RUN_ID}:${EXECUTION_ATTEMPT_ID}"
+          else
+            payload="{\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
+            audience="boardreadyops-cloud:${RUN_ID}"
+          fi
           encoded_audience="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$audience")"
           oidc_response="$(curl --fail --silent --show-error \
             --header "authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \

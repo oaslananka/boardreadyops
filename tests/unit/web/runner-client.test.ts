@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeModeInputs } from "../../../apps/web/lib/runner-client.js";
+import { runnerDispatchInputs, safeModeInputs } from "../../../apps/web/lib/runner-client.js";
 import type { EnqueueReleaseRunInput } from "../../../packages/cloud-core/src/lifecycle-executor.js";
 
 const action: EnqueueReleaseRunInput = {
@@ -17,6 +17,40 @@ const action: EnqueueReleaseRunInput = {
   commitSha: "0123456789abcdef",
   triggerKind: "pr",
 };
+
+describe("runner workflow dispatch binding", () => {
+  it("binds workflow inputs and callback URL to the execution attempt", () => {
+    const previousPublicUrl = process.env.BOARDREADYOPS_PUBLIC_URL;
+    process.env.BOARDREADYOPS_PUBLIC_URL = "https://boardreadyops.test/";
+
+    try {
+      expect(
+        runnerDispatchInputs({
+          action,
+          runId: "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d",
+          idempotencyKey: "98765:42:0123456789abcdef",
+          githubCheckRunId: 555,
+          executionAttemptId: "7559e99b-4998-4e02-a94a-7a7a4686ae11",
+        }),
+      ).toEqual({
+        run_id: "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d",
+        execution_attempt_id: "7559e99b-4998-4e02-a94a-7a7a4686ae11",
+        target: "octo-org/hardware-board",
+        head_sha: "0123456789abcdef",
+        result_url:
+          "https://boardreadyops.test/api/v1/runs/result?run_id=5dc4193b-5c7e-4df8-b86f-e4d3266fc22d&attempt_id=7559e99b-4998-4e02-a94a-7a7a4686ae11",
+        safe_mode: "false",
+        safe_mode_reasons: "",
+      });
+    } finally {
+      if (previousPublicUrl === undefined) {
+        delete process.env.BOARDREADYOPS_PUBLIC_URL;
+      } else {
+        process.env.BOARDREADYOPS_PUBLIC_URL = previousPublicUrl;
+      }
+    }
+  });
+});
 
 describe("runner workflow safe-mode inputs", () => {
   it("uses an explicit false value when safe mode is absent", () => {

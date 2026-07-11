@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GitHubAppLifecycleAction } from "../../../packages/cloud-core/src/lifecycle.js";
 import {
+  type DispatchReleaseRunWorkflowInput,
   type EnqueueReleaseRunInput,
   executeGitHubAppLifecycleActions,
   type GitHubAppLifecycleStore,
@@ -53,6 +54,7 @@ function lifecycleStore(overrides: Partial<GitHubAppLifecycleStore> = {}): GitHu
       runId: "run-row-id",
     })),
     attachGitHubCheckRun: vi.fn(async () => undefined),
+    bindReleaseRunExecutionAttempt: vi.fn(async () => true),
     markReleaseRunDispatched: vi.fn(async () => undefined),
     markReleaseRunSkipped: vi.fn(async () => undefined),
     ...overrides,
@@ -68,7 +70,9 @@ function checkRunClient() {
 
 function workflowClient() {
   return {
-    dispatchReleaseRunWorkflow: vi.fn(async () => ({ workflowDispatchId: "dispatch-123" })),
+    dispatchReleaseRunWorkflow: vi.fn(async (_input: DispatchReleaseRunWorkflowInput) => ({
+      workflowDispatchId: "dispatch-123",
+    })),
   };
 }
 
@@ -130,8 +134,17 @@ describe("GitHub App lifecycle execution", () => {
       runId: "run-row-id",
       idempotencyKey: "98765:12:0123456789abcdef",
       githubCheckRunId: 555,
+      executionAttemptId: expect.stringMatching(/^[0-9a-f-]{36}$/u),
     });
-    expect(store.markReleaseRunDispatched).toHaveBeenCalledWith({ runId: "run-row-id" });
+    expect(store.bindReleaseRunExecutionAttempt).toHaveBeenCalledWith({
+      runId: "run-row-id",
+      executionAttemptId: expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      startedAt: expect.any(String),
+    });
+    expect(store.markReleaseRunDispatched).toHaveBeenCalledWith({
+      runId: "run-row-id",
+      executionAttemptId: expect.stringMatching(/^[0-9a-f-]{36}$/u),
+    });
     expect(store.markReleaseRunSkipped).not.toHaveBeenCalled();
     expect(checks.completeCheckRun).not.toHaveBeenCalled();
     expect(result.workflowDispatchesCreated).toBe(1);
@@ -223,9 +236,27 @@ describe("GitHub App lifecycle execution", () => {
     expect(checks.createPullRequestCheckRun).toHaveBeenCalledOnce();
     expect(store.attachGitHubCheckRun).toHaveBeenCalledOnce();
     expect(workflows.dispatchReleaseRunWorkflow).toHaveBeenCalledTimes(2);
+    const firstAttemptId = workflows.dispatchReleaseRunWorkflow.mock.calls[0]?.[0].executionAttemptId;
+    const secondAttemptId = workflows.dispatchReleaseRunWorkflow.mock.calls[1]?.[0].executionAttemptId;
+    expect(firstAttemptId).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(secondAttemptId).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(secondAttemptId).not.toBe(firstAttemptId);
     expect(store.markReleaseRunDispatched).toHaveBeenCalledOnce();
     expect(retry.checkRunsSkipped).toBe(1);
     expect(retry.workflowDispatchesCreated).toBe(1);
+  });
+
+  it("does not dispatch when the queued run is no longer claimable", async () => {
+    const store = lifecycleStore({ bindReleaseRunExecutionAttempt: vi.fn(async () => false) });
+    const workflows = workflowClient();
+
+    const result = await executeGitHubAppLifecycleActions([releaseAction()], store, checkRunClient(), workflows);
+
+    expect(store.bindReleaseRunExecutionAttempt).toHaveBeenCalledOnce();
+    expect(workflows.dispatchReleaseRunWorkflow).not.toHaveBeenCalled();
+    expect(store.markReleaseRunDispatched).not.toHaveBeenCalled();
+    expect(result.workflowDispatchesCreated).toBe(0);
+    expect(result.workflowDispatchesSkipped).toBe(1);
   });
 
   it("repairs the neutral check for an already completed safe-mode run", async () => {
