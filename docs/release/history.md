@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.8.3](https://github.com/oaslananka/boardreadyops/compare/v1.8.2...v1.8.3) (2026-07-11)
+
+
+### Bug Fixes
+
+* **core:** bind runner results to execution attempts ([#140](https://github.com/oaslananka/boardreadyops/issues/140)) ([4074403](https://github.com/oaslananka/boardreadyops/commit/407440369edcab46fb1ec5160217bfd23bbd83f7))
+
 ## [1.8.2](https://github.com/oaslananka/boardreadyops/compare/v1.8.1...v1.8.2) (2026-07-11)
 
 
