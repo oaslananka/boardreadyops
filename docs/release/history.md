@@ -8,6 +8,15 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.8.1](https://github.com/oaslananka/boardreadyops/compare/v1.8.0...v1.8.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* **ci:** accept npm 12 pack metadata ([#134](https://github.com/oaslananka/boardreadyops/issues/134)) ([552596d](https://github.com/oaslananka/boardreadyops/commit/552596d3b76fa21a63cd0bf1841498dc23881921))
+* **ci:** parse npm 12 package maps ([#135](https://github.com/oaslananka/boardreadyops/issues/135)) ([ab72c61](https://github.com/oaslananka/boardreadyops/commit/ab72c61c8d2cf99f4b77ebc4919a58173a2d04c9))
+* **ci:** verify npm tarballs directly ([#132](https://github.com/oaslananka/boardreadyops/issues/132)) ([741df47](https://github.com/oaslananka/boardreadyops/commit/741df47e9f6a5f6f1fa2c0e954f61c3300055cfc))
+
 ## [1.8.0](https://github.com/oaslananka/boardreadyops/compare/v1.7.2...v1.8.0) (2026-07-11)
 
 
