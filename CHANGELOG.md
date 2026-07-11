@@ -4,6 +4,14 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.8.2](https://github.com/oaslananka/boardreadyops/compare/v1.8.1...v1.8.2) (2026-07-11)
+
+
+### Bug Fixes
+
+* **core:** persist runner results atomically ([#137](https://github.com/oaslananka/boardreadyops/issues/137)) ([f3b83df](https://github.com/oaslananka/boardreadyops/commit/f3b83dfa0c6f7befd282e2c7622ff5b560d06791))
+* **core:** reject superseded runner results ([#139](https://github.com/oaslananka/boardreadyops/issues/139)) ([7d67ea3](https://github.com/oaslananka/boardreadyops/commit/7d67ea378b01801e728a52593e8c058240fb9848))
+
 ## [1.8.1](https://github.com/oaslananka/boardreadyops/compare/v1.8.0...v1.8.1) (2026-07-11)
 
 
