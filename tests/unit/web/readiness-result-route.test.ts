@@ -192,6 +192,42 @@ describe("readiness result route authentication and publication", () => {
     ]);
   });
 
+  it("rejects a superseded run without replacing findings or publishing stale GitHub output", async () => {
+    const body = JSON.stringify({
+      status: "completed",
+      decision: "pass",
+      findings: [{ ruleId: "release.ready", severity: "info", message: "The stale commit passed." }],
+    });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          persistence_outcome: "superseded",
+          id: "run-123",
+          github_check_run_id: 987,
+          pull_request_number: 42,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+          inserted_finding_count: 0,
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "release run was superseded by a newer commit",
+      runId: "run-123",
+    });
+    expect(query).toHaveBeenCalledOnce();
+    const [sql] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("existing.status <> 'superseded'");
+    expect(completeCheckRun).not.toHaveBeenCalled();
+    expect(createPullRequestComment).not.toHaveBeenCalled();
+  });
+
   it("accepts a run-bound GitHub OIDC token without a shared key", async () => {
     const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
     delete process.env.BOARDREADYOPS_RUNNER_RESULT_KEY;
