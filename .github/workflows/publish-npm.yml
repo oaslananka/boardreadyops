@@ -175,10 +175,32 @@ jobs:
           pnpm run verify:marketplace
           test -s dist/cli/index.cjs
           test -s dist/action/index.cjs
-          pnpm run check:size
-          npm pack --dry-run --json > "${RUNNER_TEMP}/npm-pack.json"
-          jq -e '.[0].files | map(.path) | index("dist/cli/index.cjs") and index("dist/action/index.cjs") and index("package.json")' \
-            "${RUNNER_TEMP}/npm-pack.json" > /dev/null
+          pack_json="${RUNNER_TEMP}/npm-pack.json"
+          npm pack --dry-run --json > "${pack_json}"
+          PACK_JSON="${pack_json}" node <<'NODE'
+          const { readFileSync, statSync } = require("node:fs");
+
+          const [pack] = JSON.parse(readFileSync(process.env.PACK_JSON, "utf8"));
+          const files = new Set(pack.files.map((file) => file.path));
+          const required = ["package.json", "dist/cli/index.cjs", "dist/action/index.cjs"];
+          const missing = required.filter((file) => !files.has(file));
+          if (missing.length > 0) {
+            throw new Error(`npm pack is missing required files: ${missing.join(", ")}`);
+          }
+
+          const budgets = [
+            ["dist/action/index.cjs", statSync("dist/action/index.cjs").size, 16_000_000],
+            ["dist/cli/index.cjs", statSync("dist/cli/index.cjs").size, 12_500_000],
+            ["packed size", pack.size, 6_000_000],
+            ["unpacked size", pack.unpackedSize, 32_000_000],
+          ];
+          for (const [label, actual, budget] of budgets) {
+            if (!Number.isFinite(actual) || actual > budget * 0.9) {
+              throw new Error(`${label} exceeds its release budget: ${actual}/${budget}`);
+            }
+            console.log(`${label}: ${actual}/${budget}`);
+          }
+          NODE
       - if: env.SHOULD_PUBLISH == 'true'
         run: pnpm run sbom
       - name: Attest provenance
