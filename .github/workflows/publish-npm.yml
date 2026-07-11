@@ -1,9 +1,6 @@
 name: publish-npm
 
 on:
-  release:
-    types:
-      - published
   workflow_dispatch:
     inputs:
       tag:
@@ -22,7 +19,7 @@ on:
         type: boolean
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.tag || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -50,16 +47,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.ref }}
       - name: Resolve release metadata
         id: release
         env:
           DISPATCH_PRERELEASE: ${{ inputs.prerelease }}
           DISPATCH_TAG: ${{ inputs.tag }}
           DISPATCH_UPDATE_FLOATING_TAGS: ${{ inputs.update_floating_tags }}
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
-          EVENT_RELEASE_TAG: ${{ github.event.release.tag_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -68,25 +62,12 @@ jobs:
           release_allows_floating_tags="false"
           should_publish="true"
 
-          case "${EVENT_NAME}" in
-            workflow_dispatch)
-              release_tag="${DISPATCH_TAG}"
-              release_is_prerelease="${DISPATCH_PRERELEASE}"
-              release_allows_floating_tags="${DISPATCH_UPDATE_FLOATING_TAGS}"
-              ;;
-            release)
-              release_tag="${EVENT_RELEASE_TAG}"
-              release_is_prerelease="${EVENT_RELEASE_PRERELEASE}"
-              release_allows_floating_tags="true"
-              ;;
-            *)
-              echo "::error::Unsupported event: ${EVENT_NAME}"
-              exit 1
-              ;;
-          esac
+          release_tag="${DISPATCH_TAG}"
+          release_is_prerelease="${DISPATCH_PRERELEASE}"
+          release_allows_floating_tags="${DISPATCH_UPDATE_FLOATING_TAGS}"
 
           if [ "${should_publish}" = "true" ] && [ -z "${release_tag}" ]; then
-            echo "::error::Could not resolve a release tag for ${EVENT_NAME}."
+            echo "::error::Could not resolve a release tag for workflow_dispatch."
             exit 1
           fi
 
@@ -105,7 +86,7 @@ jobs:
       - name: Verify release commit
         if: env.SHOULD_PUBLISH == 'true'
         env:
-          REQUIRE_EXACT_MAIN: ${{ github.event_name == 'release' }}
+          REQUIRE_EXACT_MAIN: "false"
         run: |
           set -euo pipefail
           git fetch --no-tags origin main "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"

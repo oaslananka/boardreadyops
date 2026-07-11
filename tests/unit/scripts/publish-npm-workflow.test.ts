@@ -6,6 +6,17 @@ const workflowPath = join(process.cwd(), ".github/workflows/publish-npm.yml");
 const packJsonExpression = ["$", "{pack_json}"].join("");
 
 describe("publish-npm workflow contract", () => {
+  it("uses one canonical workflow-dispatch publish trigger", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+    const triggerBlock = workflow.slice(workflow.indexOf("on:"), workflow.indexOf("concurrency:"));
+
+    expect(triggerBlock).toContain("workflow_dispatch:");
+    expect(triggerBlock).not.toMatch(/^ {2}release:/mu);
+    expect(workflow).not.toContain("github.event.release");
+    expect(workflow).not.toContain("EVENT_RELEASE_TAG");
+    expect(workflow).toContain(["ref: $", "{{ inputs.tag || github.ref }}"].join(""));
+  });
+
   it("validates the release tarball with direct npm pack instead of the tag's size script", async () => {
     const workflow = await readFile(workflowPath, "utf8");
     const verificationBlock = workflow.slice(
