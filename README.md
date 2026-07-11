@@ -39,10 +39,10 @@ Generate → Validate → Decide → Package → Attest → Review → Handoff
 npm i -g boardreadyops
 ```
 
-The current public npm package is `boardreadyops@1.8.2`. It is verified on
+The current public npm package is `boardreadyops@1.8.3`. It is verified on
 Node.js 22.14+ and 24, includes the current CLI bundle, schemas, docs, Action
-metadata, and matches the public `v1.8.2` tag archive.
-Binary release assets should be verified against `v1.8.2`, which publishes the
+metadata, and matches the public `v1.8.3` tag archive.
+Binary release assets should be verified against `v1.8.3`, which publishes the
 current Linux, macOS, and Windows binary matrix, `SHA256SUMS`, and SBOM release
 assets. See [release channel verification](docs/release/channel-verification.md)
 for the tested artifact list and remaining channel follow-ups.
