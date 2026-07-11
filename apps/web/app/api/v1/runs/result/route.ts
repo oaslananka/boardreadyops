@@ -1,5 +1,5 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { releaseRunResultSchema } from "@boardreadyops/contracts";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { type ReleaseRunResult, releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { verifyGitHubActionsOidcToken } from "../../../../../lib/github-actions-oidc.js";
 import {
@@ -21,7 +21,7 @@ export type ResultRouteDependencies = {
   checkRunClient: () => GitHubAppCheckRunClient | undefined;
   detailsUrl: (runId: string) => string | undefined;
   now: () => Date;
-  verifyOidcToken: (token: string, runId: string) => Promise<boolean>;
+  verifyOidcToken: (token: string, runId: string, executionAttemptId: string | undefined) => Promise<boolean>;
 };
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
@@ -30,6 +30,7 @@ const resultKeyHeaderName = "x-boardreadyops-runner-key";
 const resultSignatureHeaderName = "x-boardreadyops-runner-signature";
 const resultTimestampHeaderName = "x-boardreadyops-runner-timestamp";
 const signatureToleranceSeconds = 10 * 60;
+const lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 function rows(result: unknown): QueryRow[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) {
@@ -88,8 +89,17 @@ function checkConclusion(status: string, decision: string | null): CheckConclusi
   return "neutral";
 }
 
-function expectedSignature(key: string, timestamp: string, runId: string, body: string): string {
-  return `sha256=${createHmac("sha256", key).update(`${timestamp}.${runId}.${body}`).digest("hex")}`;
+function expectedSignature(
+  key: string,
+  timestamp: string,
+  runId: string,
+  executionAttemptId: string | undefined,
+  body: string,
+): string {
+  const signedPayload = executionAttemptId
+    ? `${timestamp}.${runId}.${executionAttemptId}.${body}`
+    : `${timestamp}.${runId}.${body}`;
+  return `sha256=${createHmac("sha256", key).update(signedPayload).digest("hex")}`;
 }
 
 function signatureIsFresh(timestamp: string): boolean {
@@ -110,7 +120,7 @@ function secureCompare(a: string, b: string): boolean {
 
 async function verifyRunnerAuthentication(
   request: Request,
-  input: { key: string | undefined; runId: string; body: string },
+  input: { key: string | undefined; runId: string; executionAttemptId: string | undefined; body: string },
   verifyOidcToken: ResultRouteDependencies["verifyOidcToken"],
 ): Promise<boolean> {
   const authorization = request.headers.get("authorization");
@@ -118,7 +128,7 @@ async function verifyRunnerAuthentication(
   if (authorization !== null) {
     const bearer = /^Bearer ([A-Za-z0-9._~-]+)$/u.exec(authorization);
     const token = bearer?.[1];
-    return token !== undefined && (await verifyOidcToken(token, input.runId));
+    return token !== undefined && (await verifyOidcToken(token, input.runId, input.executionAttemptId));
   }
 
   if (process.env.BOARDREADYOPS_REQUIRE_GITHUB_OIDC === "1") {
@@ -137,7 +147,10 @@ async function verifyRunnerAuthentication(
       return false;
     }
 
-    return secureCompare(suppliedSignature, expectedSignature(input.key, suppliedTimestamp, input.runId, input.body));
+    return secureCompare(
+      suppliedSignature,
+      expectedSignature(input.key, suppliedTimestamp, input.runId, input.executionAttemptId, input.body),
+    );
   }
 
   if (process.env.BOARDREADYOPS_REQUIRE_RUNNER_SIGNATURE === "1") {
@@ -155,22 +168,60 @@ function parseJson(input: string): unknown {
   }
 }
 
+function terminalResultDigest(result: ReleaseRunResult): string | undefined {
+  if (!terminalStatus(result.status)) {
+    return undefined;
+  }
+
+  const findings = result.findings
+    .map((finding) => ({
+      ruleId: finding.ruleId,
+      severity: finding.severity,
+      message: finding.message,
+      path: finding.path ?? null,
+    }))
+    .sort((left, right) => {
+      const leftKey = JSON.stringify(left);
+      const rightKey = JSON.stringify(right);
+      return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+    });
+
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        executionAttemptId: result.executionAttemptId ?? null,
+        status: result.status,
+        decision: result.decision,
+        findings,
+      }),
+    )
+    .digest("hex");
+}
+
 const defaultDependencies: ResultRouteDependencies = {
   queryExecutor: createDefaultQueryExecutor,
   checkRunClient: createGitHubAppCheckRunClient,
   detailsUrl: githubDetailsUrl,
   now: () => new Date(),
-  verifyOidcToken: (token, runId) => verifyGitHubActionsOidcToken(token, { runId }),
+  verifyOidcToken: (token, runId, executionAttemptId) =>
+    verifyGitHubActionsOidcToken(token, executionAttemptId === undefined ? { runId } : { runId, executionAttemptId }),
 };
 
 export async function handleResultRequest(
   request: Request,
   dependencies: ResultRouteDependencies = defaultDependencies,
 ): Promise<Response> {
-  const runId = new URL(request.url).searchParams.get("run_id");
+  const searchParams = new URL(request.url).searchParams;
+  const runId = searchParams.get("run_id");
+  const attemptIdParameter = searchParams.get("attempt_id");
+  const executionAttemptId = attemptIdParameter ?? undefined;
 
   if (!runId) {
     return Response.json({ ok: false, error: "run_id query parameter is required" }, { status: 400 });
+  }
+
+  if (executionAttemptId !== undefined && !lowercaseUuidPattern.test(executionAttemptId)) {
+    return Response.json({ ok: false, error: "attempt_id query parameter must be a valid UUID" }, { status: 400 });
   }
 
   const bodyText = await request.text();
@@ -182,7 +233,7 @@ export async function handleResultRequest(
   if (
     !(await verifyRunnerAuthentication(
       request,
-      { key: configuredKey, runId, body: bodyText },
+      { key: configuredKey, runId, executionAttemptId, body: bodyText },
       dependencies.verifyOidcToken,
     ))
   ) {
@@ -201,6 +252,10 @@ export async function handleResultRequest(
     return Response.json({ ok: false, error: "invalid runner result" }, { status: 400 });
   }
 
+  if (parsed.data.executionAttemptId !== executionAttemptId) {
+    return Response.json({ ok: false, error: "execution attempt does not match callback URL" }, { status: 400 });
+  }
+
   const executor = dependencies.queryExecutor();
 
   if (!executor) {
@@ -208,6 +263,7 @@ export async function handleResultRequest(
   }
 
   const completedAt = dependencies.now().toISOString();
+  const resultDigest = terminalResultDigest(parsed.data) ?? null;
   const findingsJson = JSON.stringify(
     parsed.data.findings.map((finding) => ({
       rule_id: finding.ruleId,
@@ -218,38 +274,66 @@ export async function handleResultRequest(
   );
   const updateResult = await executor.query(
     `with existing as materialized (
-       select id, status, github_check_run_id, repository_id, pull_request_number
+       select id,
+              status,
+              github_check_run_id,
+              repository_id,
+              pull_request_number,
+              execution_attempt_id,
+              terminal_result_digest,
+              completed_at
        from release_runs
        where id = $1
        for update
      ),
+     classified as (
+       select existing.*,
+              case
+                when existing.status = 'superseded' then 'superseded'
+                when existing.execution_attempt_id is distinct from $2 then 'stale_attempt'
+                when existing.status in ('completed', 'failed', 'timed_out') then
+                  case
+                    when $3 in ('completed', 'failed', 'timed_out')
+                      and existing.terminal_result_digest = $7
+                    then 'replayed'
+                    else 'conflicting_terminal_result'
+                  end
+                else 'accepted'
+              end as persistence_outcome
+       from existing
+     ),
      updated as (
        update release_runs
-       set status = $2,
-           decision = $3,
+       set status = $3,
+           decision = $4,
            completed_at = case
-             when $2 in ('completed', 'failed', 'timed_out') then coalesce(completed_at, $4::timestamptz)
-             else completed_at
+             when $3 in ('completed', 'failed', 'timed_out') then coalesce(release_runs.completed_at, $5::timestamptz)
+             else release_runs.completed_at
            end,
            duration_ms = case
-             when $2 in ('completed', 'failed', 'timed_out') then coalesce(
-               duration_ms,
+             when $3 in ('completed', 'failed', 'timed_out') then coalesce(
+               release_runs.duration_ms,
                greatest(
                  0,
                  floor(
-                   extract(epoch from (coalesce(completed_at, $4::timestamptz) - started_at)) * 1000
+                   extract(epoch from (coalesce(release_runs.completed_at, $5::timestamptz) - release_runs.started_at)) * 1000
                  )::integer
                )
              )
-             else duration_ms
+             else release_runs.duration_ms
+           end,
+           terminal_result_digest = case
+             when $3 in ('completed', 'failed', 'timed_out') then $7
+             else release_runs.terminal_result_digest
            end
-       from existing
-       where release_runs.id = existing.id
-         and existing.status <> 'superseded'
+       from classified
+       where release_runs.id = classified.id
+         and classified.persistence_outcome = 'accepted'
        returning release_runs.id,
                  release_runs.github_check_run_id,
                  release_runs.repository_id,
-                 release_runs.pull_request_number
+                 release_runs.pull_request_number,
+                 release_runs.completed_at
      ),
      deleted_findings as (
        delete from findings
@@ -270,7 +354,7 @@ export async function handleResultRequest(
               finding.path
        from updated
        cross join cleared_findings
-       cross join jsonb_to_recordset($5::jsonb) as finding(
+       cross join jsonb_to_recordset($6::jsonb) as finding(
          rule_id text,
          severity text,
          message text,
@@ -278,31 +362,28 @@ export async function handleResultRequest(
        )
        returning id
      )
-     select 'accepted'::text as persistence_outcome,
-            updated.id,
-            updated.github_check_run_id,
-            updated.pull_request_number,
+     select classified.persistence_outcome,
+            classified.id,
+            classified.github_check_run_id,
+            classified.pull_request_number,
             repositories.owner,
             repositories.name,
             installations.github_installation_id,
+            coalesce(updated.completed_at, classified.completed_at) as completed_at,
             (select count(*) from inserted_findings) as inserted_finding_count
-     from updated
-     join repositories on repositories.id = updated.repository_id
-     join installations on installations.id = repositories.installation_id
-     union all
-     select 'superseded'::text as persistence_outcome,
-            existing.id,
-            existing.github_check_run_id,
-            existing.pull_request_number,
-            repositories.owner,
-            repositories.name,
-            installations.github_installation_id,
-            0::bigint as inserted_finding_count
-     from existing
-     join repositories on repositories.id = existing.repository_id
-     join installations on installations.id = repositories.installation_id
-     where existing.status = 'superseded'`,
-    [runId, parsed.data.status, parsed.data.decision, completedAt, findingsJson],
+     from classified
+     left join updated on updated.id = classified.id
+     join repositories on repositories.id = classified.repository_id
+     join installations on installations.id = repositories.installation_id`,
+    [
+      runId,
+      executionAttemptId ?? null,
+      parsed.data.status,
+      parsed.data.decision,
+      completedAt,
+      findingsJson,
+      resultDigest,
+    ],
   );
   const row = rows(updateResult)[0];
 
@@ -310,10 +391,27 @@ export async function handleResultRequest(
     return Response.json({ ok: false, error: "release run not found" }, { status: 404 });
   }
 
-  if (stringCell(row, "persistence_outcome") === "superseded") {
+  const persistenceOutcome = stringCell(row, "persistence_outcome") ?? "accepted";
+
+  if (persistenceOutcome === "superseded") {
     return Response.json({ ok: false, error: "release run was superseded by a newer commit", runId }, { status: 409 });
   }
 
+  if (persistenceOutcome === "stale_attempt") {
+    return Response.json(
+      { ok: false, error: "execution attempt is no longer current", runId, executionAttemptId },
+      { status: 409 },
+    );
+  }
+
+  if (persistenceOutcome === "conflicting_terminal_result") {
+    return Response.json(
+      { ok: false, error: "terminal result conflicts with the persisted result", runId, executionAttemptId },
+      { status: 409 },
+    );
+  }
+
+  const publicationCompletedAt = stringCell(row, "completed_at") ?? completedAt;
   const githubCheckRunId = numberLikeCell(row, "github_check_run_id");
   let checkRunUpdated = false;
   let pullRequestCommentCreated = false;
@@ -340,7 +438,7 @@ export async function handleResultRequest(
         conclusion: checkConclusion(parsed.data.status, parsed.data.decision),
         title: checkOutput.title,
         summary: checkOutput.summary,
-        completedAt,
+        completedAt: publicationCompletedAt,
       });
       checkRunUpdated = true;
     }
@@ -368,9 +466,19 @@ export async function handleResultRequest(
     }
   }
 
+  const responseStatus = persistenceOutcome === "replayed" ? "replayed" : "accepted";
+
   return Response.json(
-    { ok: true, status: "accepted", runId, checkRunUpdated, pullRequestCommentCreated, result: parsed.data },
-    { status: 202 },
+    {
+      ok: true,
+      status: responseStatus,
+      runId,
+      executionAttemptId,
+      checkRunUpdated,
+      pullRequestCommentCreated,
+      result: parsed.data,
+    },
+    { status: responseStatus === "replayed" ? 200 : 202 },
   );
 }
 

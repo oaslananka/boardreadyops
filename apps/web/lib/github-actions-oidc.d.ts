@@ -1,5 +1,6 @@
 export type GitHubActionsOidcVerificationOptions = {
   readonly runId: string;
+  readonly executionAttemptId?: string;
   readonly repository?: string;
   readonly workflowRef?: string;
   readonly fetchImpl?: typeof fetch;

@@ -20,15 +20,15 @@ model Installation {
 }
 
 model Repository {
-  id             String        @id @default(uuid())
-  installationId String        @map("installation_id")
-  githubRepoId   BigInt        @unique @map("github_repo_id")
+  id             String       @id @default(uuid())
+  installationId String       @map("installation_id")
+  githubRepoId   BigInt       @unique @map("github_repo_id")
   owner          String
   name           String
-  private        Boolean       @default(false)
-  defaultBranch  String        @map("default_branch")
-  enabledAt      DateTime      @default(now()) @map("enabled_at")
-  disabledAt     DateTime?     @map("disabled_at")
+  private        Boolean      @default(false)
+  defaultBranch  String       @map("default_branch")
+  enabledAt      DateTime     @default(now()) @map("enabled_at")
+  disabledAt     DateTime?    @map("disabled_at")
   installation   Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
   runs           ReleaseRun[]
 
@@ -37,25 +37,28 @@ model Repository {
 }
 
 model ReleaseRun {
-  id                   String     @id @default(uuid())
-  repositoryId         String     @map("repository_id")
-  idempotencyKey       String?    @unique @map("idempotency_key")
-  commitSha            String     @map("commit_sha")
-  ref                  String
-  pullRequestNumber    Int?       @map("pull_request_number")
-  triggerKind          String     @map("trigger_kind")
-  status               String     @default("queued")
-  decision             String?
-  startedAt            DateTime   @default(now()) @map("started_at")
-  completedAt          DateTime?  @map("completed_at")
-  durationMs           Int?       @map("duration_ms")
-  boardReadyOpsVersion String?    @map("board_ready_ops_version")
-  kicadVersion         String?    @map("kicad_version")
-  githubCheckRunId     BigInt?    @map("github_check_run_id")
-  readinessScore       Int?       @map("readiness_score")
-  repository           Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  findings             Finding[]
-  artifacts            Artifact[]
+  id                        String     @id @default(uuid())
+  repositoryId              String     @map("repository_id")
+  idempotencyKey            String?    @unique @map("idempotency_key")
+  commitSha                 String     @map("commit_sha")
+  ref                       String
+  pullRequestNumber         Int?       @map("pull_request_number")
+  triggerKind               String     @map("trigger_kind")
+  status                    String     @default("queued")
+  decision                  String?
+  startedAt                 DateTime   @default(now()) @map("started_at")
+  completedAt               DateTime?  @map("completed_at")
+  durationMs                Int?       @map("duration_ms")
+  boardReadyOpsVersion      String?    @map("board_ready_ops_version")
+  kicadVersion              String?    @map("kicad_version")
+  githubCheckRunId          BigInt?    @map("github_check_run_id")
+  readinessScore            Int?       @map("readiness_score")
+  executionAttemptId        String?    @unique(map: "release_runs_execution_attempt_id_idx") @map("execution_attempt_id")
+  executionAttemptStartedAt DateTime?  @map("execution_attempt_started_at")
+  terminalResultDigest      String?    @map("terminal_result_digest")
+  repository                Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  findings                  Finding[]
+  artifacts                 Artifact[]
 
   @@index([repositoryId, startedAt])
   @@index([commitSha])

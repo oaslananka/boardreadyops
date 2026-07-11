@@ -60,7 +60,12 @@ function claimsAreTrusted(payload, expectations, nowSeconds) {
 
   return (
     stringClaim(payload, "iss") === githubActionsOidcIssuer &&
-    audienceMatches(payload.aud, `boardreadyops-cloud:${expectations.runId}`) &&
+    audienceMatches(
+      payload.aud,
+      expectations.executionAttemptId
+        ? `boardreadyops-cloud:${expectations.runId}:${expectations.executionAttemptId}`
+        : `boardreadyops-cloud:${expectations.runId}`,
+    ) &&
     stringClaim(payload, "repository") === expectations.repository &&
     stringClaim(payload, "workflow_ref") === expectations.workflowRef &&
     stringClaim(payload, "ref") === "refs/heads/main" &&
@@ -103,6 +108,7 @@ export async function verifyGitHubActionsOidcToken(
   token,
   {
     runId,
+    executionAttemptId,
     repository = defaultRepository,
     workflowRef = defaultWorkflowRef,
     fetchImpl = globalThis.fetch,
@@ -129,7 +135,7 @@ export async function verifyGitHubActionsOidcToken(
     header.typ !== "JWT" ||
     typeof header.kid !== "string" ||
     header.kid.length === 0 ||
-    !claimsAreTrusted(payload, { runId, repository, workflowRef }, Math.floor(now() / 1000))
+    !claimsAreTrusted(payload, { runId, executionAttemptId, repository, workflowRef }, Math.floor(now() / 1000))
   ) {
     return false;
   }

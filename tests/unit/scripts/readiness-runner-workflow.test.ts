@@ -12,7 +12,9 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("id-token: write");
     expect(workflow).toContain("ACTIONS_ID_TOKEN_REQUEST_TOKEN");
     expect(workflow).toContain("authorization: Bearer $oidc_token");
-    expect(workflow).toContain(`audience="boardreadyops-cloud:${shellExpansion("RUN_ID")}"`);
+    expect(workflow).toContain(
+      `audience="boardreadyops-cloud:${shellExpansion("RUN_ID")}:${shellExpansion("EXECUTION_ATTEMPT_ID")}"`,
+    );
     expect(workflow).not.toContain("BRO_RUNNER_KEY");
   });
 
@@ -20,14 +22,26 @@ describe("readiness runner workflow security contract", () => {
     const workflow = await readFile(workflowPath, "utf8");
 
     expect(workflow).toContain("run_id must be a lowercase UUID");
+    expect(workflow).toContain("execution_attempt_id must be a lowercase UUID");
     expect(workflow).toContain(`target_owner="${shellExpansion("TARGET%%/*")}"`);
     expect(workflow).toContain(`target_repository="${shellExpansion("TARGET#*/")}"`);
     expect(workflow).toContain(`"${shellExpansion("#target_owner")}" -gt 39`);
     expect(workflow).toContain(`"${shellExpansion("#target_repository")}" -gt 100`);
     expect(workflow).toContain(
-      `expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${shellExpansion("RUN_ID")}"`,
+      `expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${shellExpansion("RUN_ID")}&attempt_id=${shellExpansion("EXECUTION_ATTEMPT_ID")}"`,
     );
     expect(workflow).toContain('[[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]');
+  });
+
+  it("keeps the legacy callback shape available during the rolling upgrade", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain("execution_attempt_id:");
+    expect(workflow).toContain('default: ""');
+    expect(workflow).toContain(`audience="boardreadyops-cloud:${shellExpansion("RUN_ID")}"`);
+    expect(workflow).toContain(
+      `expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${shellExpansion("RUN_ID")}"`,
+    );
   });
 
   it("allows only consistent, known safe-mode inputs", async () => {

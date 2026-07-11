@@ -12,14 +12,14 @@ function repoTarget(owner) {
   return { owner: repoOwner, name: repoName };
 }
 
-function resultUrl(runId) {
+function resultUrl(runId, executionAttemptId) {
   const baseUrl = ev("BOARDREADYOPS" + "_PUBLIC_URL") ?? ev("NEXT_PUBLIC_APP_URL");
 
   if (!baseUrl) {
     throw new Error("public app URL is required to receive runner results");
   }
 
-  return `${baseUrl.replace(/\/$/, "")}/api/v1/runs/result?run_id=${encodeURIComponent(runId)}`;
+  return `${baseUrl.replace(/\/$/, "")}/api/v1/runs/result?run_id=${encodeURIComponent(runId)}&attempt_id=${encodeURIComponent(executionAttemptId)}`;
 }
 
 function requestHeaders(rt) {
@@ -90,6 +90,17 @@ export function safeModeInputs(action) {
   };
 }
 
+export function runnerDispatchInputs(input) {
+  return {
+    run_id: input.runId,
+    execution_attempt_id: input.executionAttemptId,
+    target: input.action.repository.fullName,
+    head_sha: input.action.commitSha,
+    result_url: resultUrl(input.runId, input.executionAttemptId),
+    ...safeModeInputs(input.action),
+  };
+}
+
 export function createRunnerClient() {
   return {
     async dispatchReleaseRunWorkflow(input) {
@@ -106,19 +117,15 @@ export function createRunnerClient() {
           headers: requestHeaders(rt),
           body: JSON.stringify({
             ref,
-            inputs: {
-              run_id: input.runId,
-              target: input.action.repository.fullName,
-              head_sha: input.action.commitSha,
-              result_url: resultUrl(input.runId),
-              ...safeModeInputs(input.action),
-            },
+            inputs: runnerDispatchInputs(input),
           }),
         },
       );
       await ensureOk(response, "runner start");
       await markCheckRunning(rt, input);
-      return { workflowDispatchId: `${repo.owner}/${repo.name}/${workflow}/${input.runId}` };
+      return {
+        workflowDispatchId: `${repo.owner}/${repo.name}/${workflow}/${input.runId}/${input.executionAttemptId}`,
+      };
     },
   };
 }
