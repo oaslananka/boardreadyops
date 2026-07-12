@@ -6,17 +6,17 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  fix:
-    if: github.repository_owner == 'oaslananka' && github.event.pull_request.head.repo.full_name == github.repository
+  diagnose:
+    if: github.repository_owner == 'oaslananka'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 24
@@ -24,16 +24,19 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - name: Patch verified result core and commit
+      - name: Capture patch and validation diagnostics
         shell: bash
         run: |
-          python - <<'PY'
+          mkdir -p diagnostics
+          set +e
+          python - <<'PY' > diagnostics/patch.txt 2>&1
           from pathlib import Path
           import re
 
           target = Path("apps/web/app/api/v1/runs/result/route.ts")
           text = target.read_text()
 
+          print("type before", "authenticationVerified?: boolean" in text)
           if "authenticationVerified?: boolean" not in text:
             text, count = re.subn(
               r'(  verifyOidcToken: \(token: string, runId: string, executionAttemptId: string \| undefined\) => Promise<boolean>;\n)(};)',
@@ -41,21 +44,28 @@ jobs:
               text,
               count=1,
             )
+            print("type count", count)
             if count != 1:
               raise SystemExit("dependency type marker not found")
 
+          print("default before", "export const defaultResultRouteDependencies" in text)
           if "export const defaultResultRouteDependencies" not in text:
+            if "const defaultDependencies: ResultRouteDependencies = {" not in text:
+              raise SystemExit("default dependency marker not found")
             text = text.replace(
               "const defaultDependencies: ResultRouteDependencies = {",
               "export const defaultResultRouteDependencies: ResultRouteDependencies = {",
               1,
             )
+          if "dependencies: ResultRouteDependencies = defaultDependencies," not in text:
+            raise SystemExit("default handler dependency marker not found")
           text = text.replace(
             "dependencies: ResultRouteDependencies = defaultDependencies,",
             "dependencies: ResultRouteDependencies = defaultResultRouteDependencies,",
             1,
           )
 
+          print("auth before", "!dependencies.authenticationVerified &&" in text)
           if "!dependencies.authenticationVerified &&" not in text:
             text, count = re.subn(
               r'(  if \(\n)(    !\(await verifyRunnerAuthentication\()',
@@ -63,9 +73,11 @@ jobs:
               text,
               count=1,
             )
+            print("auth count", count)
             if count != 1:
               raise SystemExit("authentication marker not found")
 
+          print("lease before", "completed_lease as (" in text)
           if "completed_lease as (" not in text:
             completed_lease = '''     completed_lease as (
                update runner_job_leases
@@ -84,15 +96,15 @@ jobs:
                returning runner_job_leases.id
              ),
           '''
-            text, count = re.subn(
-              r'(\n\s+deleted_findings as \(\n)',
-              "\n" + completed_lease + r'\1'.lstrip("\\n"),
-              text,
-              count=1,
-            )
-            if count != 1:
+            match = re.search(r'\n(?P<indent>\s+)deleted_findings as \(\n', text)
+            print("lease match", bool(match), repr(match.group("indent") if match else None))
+            if not match:
               raise SystemExit("completed lease insertion marker not found")
+            start, end = match.span()
+            original = match.group(0)
+            text = text[:start] + "\n" + completed_lease + original[1:] + text[end:]
 
+          print("audit before", "'leaseCompleted'" in text)
           if "'leaseCompleted'" not in text:
             text, count = re.subn(
               r"('attemptUpdated', exists\(select 1 from updated_attempt\),\n\s*)('findingCount')",
@@ -100,9 +112,11 @@ jobs:
               text,
               count=1,
             )
+            print("audit count", count)
             if count != 1:
               raise SystemExit("audit metadata marker not found")
 
+          print("params before", "dependencies.verifiedLeaseId ?? null" in text)
           if "dependencies.verifiedLeaseId ?? null" not in text:
             text, count = re.subn(
               r'(\n\s+artifactsJson,\n)(\s+\],\n\s+\);)',
@@ -110,28 +124,32 @@ jobs:
               text,
               count=1,
             )
+            print("params count", count)
             if count != 1:
               raise SystemExit("SQL parameter marker not found")
 
           target.write_text(text)
+          print("patch complete")
           PY
+          echo "$?" > diagnostics/patch-exit.txt
+          git diff -- apps/web/app/api/v1/runs/result/route.ts > diagnostics/route.diff
           pnpm exec biome check --write \
             apps/web/app/api/v1/runs/result/route.ts \
             apps/web/lib/runner-terminal-result-routes.ts \
             apps/web/app/api/v1/runner/results/route.ts \
-            tests/unit/web/runner-terminal-result-route.test.ts
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            apps/web/app/api/v1/runs/result/route.ts \
-            apps/web/lib/runner-terminal-result-routes.ts \
-            apps/web/app/api/v1/runner/results/route.ts \
-            tests/unit/web/runner-terminal-result-route.test.ts
-          git commit -m "feat(runner): integrate signed terminal results"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-      - name: Validate focused result routes
-        run: |
-          pnpm run typecheck
+            tests/unit/web/runner-terminal-result-route.test.ts \
+            > diagnostics/biome.txt 2>&1
+          echo "$?" > diagnostics/biome-exit.txt
+          pnpm run typecheck > diagnostics/typecheck.txt 2>&1
+          echo "$?" > diagnostics/typecheck-exit.txt
           pnpm exec vitest run \
             tests/unit/web/readiness-result-route.test.ts \
-            tests/unit/web/runner-terminal-result-route.test.ts
+            tests/unit/web/runner-terminal-result-route.test.ts \
+            --reporter=verbose > diagnostics/test.txt 2>&1
+          echo "$?" > diagnostics/test-exit.txt
+          exit 0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: terminal-result-route-diagnostics
+          path: diagnostics
