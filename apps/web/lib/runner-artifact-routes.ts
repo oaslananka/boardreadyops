@@ -222,6 +222,9 @@ export async function handleRunnerArtifactCapabilityRequest(
   if (!authenticated) {
     return jsonResponse({ ok: false, error: "invalid runner request authentication" }, 401);
   }
+  if (!hasHttpsPublicBaseUrl(dependencies.environment)) {
+    return jsonResponse({ ok: false, error: "HTTPS public URL is not configured" }, 503);
+  }
 
   try {
     const result = await dependencies.createArtifactStore(executor).issueCapabilities({
@@ -232,13 +235,18 @@ export async function handleRunnerArtifactCapabilityRequest(
       executionAttemptId: parsed.data.executionAttemptId,
       leaseId: parsed.data.leaseId,
       leaseToken: parsed.data.leaseToken,
-      artifacts: parsed.data.artifacts,
+      artifacts: parsed.data.artifacts.map((artifact) => ({
+        kind: artifact.kind,
+        name: artifact.name,
+        role: artifact.role,
+        bytes: artifact.bytes,
+        ...(artifact.sha256 === undefined ? {} : { sha256: artifact.sha256 }),
+      })),
     });
-    if (result.status === "replayed") {
-      return jsonResponse({ ok: false, error: "artifact capability request was replayed" }, 409);
-    }
-    if (result.status === "stale") {
-      return jsonResponse({ ok: false, error: "runner lease is stale" }, 409);
+    if (result.status !== "accepted") {
+      return result.status === "replayed"
+        ? jsonResponse({ ok: false, error: "artifact capability request was replayed" }, 409)
+        : jsonResponse({ ok: false, error: "runner lease is stale" }, 409);
     }
 
     const uploads = result.uploads.map((upload) => {
@@ -285,16 +293,20 @@ export async function handleRunnerArtifactUploadRequest(
 
   const begun = await store.beginUpload({ artifactId, uploadToken }).catch(() => undefined);
   if (!begun) return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
-  if (begun.status === "expired") return jsonResponse({ ok: false, error: "artifact upload capability expired" }, 410);
-  if (begun.status === "replayed")
-    return jsonResponse({ ok: false, error: "artifact upload capability was already used" }, 409);
-  if (begun.status === "stale") return jsonResponse({ ok: false, error: "artifact upload capability is invalid" }, 403);
+  if (begun.status !== "accepted") {
+    if (begun.status === "expired") {
+      return jsonResponse({ ok: false, error: "artifact upload capability expired" }, 410);
+    }
+    return begun.status === "replayed"
+      ? jsonResponse({ ok: false, error: "artifact upload capability was already used" }, 409)
+      : jsonResponse({ ok: false, error: "artifact upload capability is invalid" }, 403);
+  }
 
   const target = await localArtifactTarget(storageRoot, begun.storagePath);
   if (!target) {
-    await store
-      .failUpload({ artifactId, uploadToken, reason: "Artifact storage path is unavailable." })
-      .catch(() => undefined);
+    await Promise.resolve(
+      store.failUpload({ artifactId, uploadToken, reason: "Artifact storage path is unavailable." }),
+    ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact storage path is unavailable" }, 503);
   }
 
@@ -305,15 +317,15 @@ export async function handleRunnerArtifactUploadRequest(
   });
   if (!written.ok) {
     await removeFile(target.temporaryPath);
-    await store.failUpload({ artifactId, uploadToken, reason: written.reason }).catch(() => undefined);
+    await Promise.resolve(store.failUpload({ artifactId, uploadToken, reason: written.reason })).catch(() => undefined);
     return jsonResponse({ ok: false, error: written.reason }, written.status);
   }
 
   if (begun.expectedSha256 !== undefined && begun.expectedSha256 !== written.sha256) {
     await removeFile(target.temporaryPath);
-    await store
-      .failUpload({ artifactId, uploadToken, reason: "Artifact SHA-256 does not match its declaration." })
-      .catch(() => undefined);
+    await Promise.resolve(
+      store.failUpload({ artifactId, uploadToken, reason: "Artifact SHA-256 does not match its declaration." }),
+    ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact SHA-256 does not match its declaration" }, 409);
   }
 
@@ -322,9 +334,9 @@ export async function handleRunnerArtifactUploadRequest(
     await removeFile(target.temporaryPath);
   } catch {
     await removeFile(target.temporaryPath);
-    await store
-      .failUpload({ artifactId, uploadToken, reason: "Artifact destination already exists or is unavailable." })
-      .catch(() => undefined);
+    await Promise.resolve(
+      store.failUpload({ artifactId, uploadToken, reason: "Artifact destination already exists or is unavailable." }),
+    ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact destination is unavailable" }, 409);
   }
 
@@ -333,9 +345,9 @@ export async function handleRunnerArtifactUploadRequest(
     .catch(() => undefined);
   if (!completed) {
     await removeFile(target.finalPath);
-    await store
-      .failUpload({ artifactId, uploadToken, reason: "Artifact metadata persistence failed." })
-      .catch(() => undefined);
+    await Promise.resolve(
+      store.failUpload({ artifactId, uploadToken, reason: "Artifact metadata persistence failed." }),
+    ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
   }
   if (completed.status !== "accepted" && completed.status !== "replayed") {
