@@ -679,6 +679,7 @@ export async function handleResultRequest(
   const githubCheckRunId = numberLikeCell(row, "github_check_run_id");
   let checkRunUpdated = false;
   let pullRequestCommentCreated = false;
+  const publicationWarnings: string[] = [];
 
   if (terminalStatus(parsed.data.status)) {
     const checkRunClient = dependencies.checkRunClient();
@@ -687,12 +688,12 @@ export async function handleResultRequest(
     const repositoryName = stringCell(row, "name");
     const runDetailsUrl = dependencies.detailsUrl(runId);
     const checkOutput = buildReadinessCheckOutput({ ...parsed.data, detailsUrl: runDetailsUrl });
-    const publicationErrors: string[] = [];
+    const blockingPublicationErrors: string[] = [];
     let publicationConfigurationError = false;
 
     if (githubCheckRunId) {
       if (!checkRunClient?.completeCheckRun || !installationId || !repositoryOwner || !repositoryName) {
-        publicationErrors.push("GitHub check-run completion is not configured");
+        blockingPublicationErrors.push("GitHub check-run completion is not configured");
         publicationConfigurationError = true;
       } else {
         try {
@@ -709,7 +710,7 @@ export async function handleResultRequest(
           });
           checkRunUpdated = true;
         } catch (error) {
-          publicationErrors.push(`GitHub check run: ${publicationErrorMessage(error)}`);
+          blockingPublicationErrors.push(`GitHub check run: ${publicationErrorMessage(error)}`);
         }
       }
     }
@@ -717,8 +718,7 @@ export async function handleResultRequest(
     const pullRequestNumber = numberCell(row, "pull_request_number");
     if (pullRequestNumber) {
       if (!checkRunClient?.createPullRequestComment || !installationId || !repositoryOwner || !repositoryName) {
-        publicationErrors.push("GitHub pull-request comment publication is not configured");
-        publicationConfigurationError = true;
+        publicationWarnings.push("GitHub pull-request comment publication is not configured");
       } else {
         try {
           await checkRunClient.createPullRequestComment({
@@ -730,11 +730,12 @@ export async function handleResultRequest(
           });
           pullRequestCommentCreated = true;
         } catch (error) {
-          publicationErrors.push(`GitHub pull request comment: ${publicationErrorMessage(error)}`);
+          publicationWarnings.push(`GitHub pull request comment: ${publicationErrorMessage(error)}`);
         }
       }
     }
 
+    const publicationErrors = [...blockingPublicationErrors, ...publicationWarnings];
     await recordPublicationState(executor, {
       runId,
       completedAt: publicationCompletedAt,
@@ -743,13 +744,14 @@ export async function handleResultRequest(
       errors: publicationErrors,
     });
 
-    if (publicationErrors.length > 0) {
+    if (blockingPublicationErrors.length > 0) {
       return Response.json(
         {
           ok: false,
           persisted: true,
           error: "runner result was persisted but GitHub publication is incomplete",
-          publicationErrors,
+          publicationErrors: blockingPublicationErrors,
+          publicationWarnings,
           runId,
           executionAttemptId,
           checkRunUpdated,
@@ -770,6 +772,7 @@ export async function handleResultRequest(
       executionAttemptId,
       checkRunUpdated,
       pullRequestCommentCreated,
+      ...(publicationWarnings.length === 0 ? {} : { publicationWarnings }),
       result: parsed.data,
     },
     { status: responseStatus === "replayed" ? 200 : 202 },
