@@ -1,4 +1,4 @@
-export const cloudDatabaseSchemaVersion = 10;
+export const cloudDatabaseSchemaVersion = 11;
 
 export const cloudDatabaseModels = [
   "Installation",
@@ -10,6 +10,7 @@ export const cloudDatabaseModels = [
   "ManagedRunnerIdentity",
   "RunnerJobLease",
   "RunnerRequestNonce",
+  "RunnerArtifactUploadCapability",
   "AuditEvent",
   "ReleaseRunResult",
   "ReleaseRunAttempt",

@@ -26,6 +26,11 @@
       "import": "./src/pg-executor.ts",
       "default": "./src/pg-executor.ts"
     },
+    "./runner-artifact-store": {
+      "types": "./src/runner-artifact-store.ts",
+      "import": "./src/runner-artifact-store.ts",
+      "default": "./src/runner-artifact-store.ts"
+    },
     "./runner-lease-store": {
       "types": "./src/runner-lease-store.ts",
       "import": "./src/runner-lease-store.ts",
