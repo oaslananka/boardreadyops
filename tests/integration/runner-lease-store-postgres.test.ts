@@ -19,7 +19,7 @@ function rows(result: unknown): Record<string, unknown>[] {
 }
 
 function fingerprint(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+  return createHash("sha256\").update(value).digest("hex");
 }
 
 function requestTimestamp(value: string): number {
@@ -84,8 +84,11 @@ async function createManagedIdentity(label: string, now: string, capabilities = 
   await executor.query(
     `insert into managed_runner_identities (
        id, name, public_key, public_key_fingerprint, capabilities, status,
-       activated_at, last_heartbeat_at
-     ) values ($1, $2, $3, $4, $5::jsonb, 'active', $6::timestamptz, $6::timestamptz)`,
+       created_at, activated_at, last_heartbeat_at
+     ) values (
+       $1, $2, $3, $4, $5::jsonb, 'active',
+       $6::timestamptz, $6::timestamptz, $6::timestamptz
+     )`,
     [
       identityId,
       `managed-${label}-${identityId}`,
@@ -109,10 +112,10 @@ async function createSelfHostedRunner(
   await executor.query(
     `insert into runner_registrations (
        id, installation_id, name, allowed_repositories, public_key_fingerprint,
-       signing_algorithm, public_key, capabilities, status, activated_at, last_heartbeat_at
+       signing_algorithm, public_key, capabilities, status, created_at, activated_at, last_heartbeat_at
      ) values (
        $1, $2, $3, $4::text[], $5, 'ed25519', $6, $7::jsonb,
-       'active', $8::timestamptz, $8::timestamptz
+       'active', $8::timestamptz, $8::timestamptz, $8::timestamptz
      )`,
     [
       runnerId,
@@ -187,7 +190,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
     try {
       const base = {
         workerClass: "managed" as const,
-        managedRunnerIdentityId: managedIdentityId,
+        managedRunnerIdentityId,
         requestTimestamp: requestTimestamp(now),
         capabilities: ["kicad:10"],
       };
@@ -233,7 +236,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
           maximumLeaseDurationSeconds: 300,
         }).claimJob({
           workerClass: "managed",
-          managedRunnerIdentityId: managedIdentityId,
+          managedRunnerIdentityId,
           requestTimestamp: requestTimestamp(claimedAt),
           requestNonce: nonce("expiry-one"),
           capabilities: ["kicad:10"],
@@ -249,7 +252,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
           maximumLeaseDurationSeconds: 300,
         }).claimJob({
           workerClass: "managed",
-          managedRunnerIdentityId: managedIdentityId,
+          managedRunnerIdentityId,
           requestTimestamp: requestTimestamp(recoveredAt),
           requestNonce: nonce("expiry-two"),
           capabilities: ["kicad:10"],
