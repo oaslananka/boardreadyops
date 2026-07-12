@@ -43,7 +43,7 @@ export type ClaimedRunnerJob = {
   };
   safeMode: {
     enabled: boolean;
-    reasons: readonly ("private-repository")[];
+    reasons: readonly "private-repository"[];
   };
 };
 
@@ -53,12 +53,7 @@ export type ClaimRunnerJobResult =
   | { status: "replayed" }
   | { status: "rejected"; reason: "invalid_request" | "stale_request" };
 
-export type RunnerLeaseStage =
-  | "claimed"
-  | "preparing_source"
-  | "reporting"
-  | "running"
-  | "uploading_artifacts";
+export type RunnerLeaseStage = "claimed" | "preparing_source" | "reporting" | "running" | "uploading_artifacts";
 
 export type RunnerLeaseMutationContext = RunnerWorkerIdentity &
   RunnerSignedMutation & {
@@ -211,10 +206,9 @@ export function createSqlRunnerLeaseStore(
   }
 
   async function expireLeasesAt(at: Date): Promise<number> {
-    const result = await executor.query(
-      "select boardreadyops_expire_runner_leases($1::timestamptz) as expired_count",
-      [at.toISOString()],
-    );
+    const result = await executor.query("select boardreadyops_expire_runner_leases($1::timestamptz) as expired_count", [
+      at.toISOString(),
+    ]);
     return numberColumn(rows(result)[0], "expired_count") ?? 0;
   }
 
