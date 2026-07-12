@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(9);
+    expect(cloudDatabaseSchemaVersion).toBe(10);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
@@ -30,6 +30,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0007_release_run_attempts.sql",
       "0008_runner_protocol_leases.sql",
       "0009_runner_lease_deferred_scope.sql",
+      "0010_runner_lease_heartbeat_qualification.sql",
     ]);
   });
 
@@ -113,6 +114,16 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("security invoker");
     expect(sql).toContain("for update of release_runs skip locked");
     expect(sql).not.toContain("before insert");
+  });
+
+  it("qualifies heartbeat lease columns in schema v10", async () => {
+    const sql = await readFile(join(migrationsDir, "0010_runner_lease_heartbeat_qualification.sql"), "utf8");
+
+    expect(sql).toContain("create or replace function boardreadyops_heartbeat_runner_lease");
+    expect(sql).toContain("least(runner_job_leases.maximum_expires_at, p_extension_expires_at)");
+    expect(sql).toContain("runner_job_leases.progress_percent");
+    expect(sql).toContain("runner_job_leases.last_message");
+    expect(sql).toContain("security invoker");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
