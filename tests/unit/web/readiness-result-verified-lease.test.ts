@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  handleResultRequest,
-  type ResultRouteDependencies,
-} from "../../../apps/web/app/api/v1/runs/result/route.js";
+import { handleResultRequest, type ResultRouteDependencies } from "../../../apps/web/app/api/v1/runs/result/route.js";
 
 const runId = "run-signed-terminal";
 const executionAttemptId = "b31b614e-b656-491e-a6fa-59e13846bb0a";
@@ -34,24 +31,24 @@ describe("verified readiness result lease closure", () => {
       authenticationVerified: true,
       verifiedLeaseId: leaseId,
     };
-    const request = new Request(
-      `https://boardreadyops.internal/api/v1/runs/result?run_id=${encodeURIComponent(runId)}&attempt_id=${encodeURIComponent(executionAttemptId)}`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          executionAttemptId,
-          version: 1,
-          status: "completed",
-          conclusion: "success",
-          decision: "pass",
-          findings: [],
-          artifacts: [],
-          metrics: {},
-          reportLinks: [],
-        }),
-      },
-    );
+    const internalUrl = new URL("https://boardreadyops.internal/api/v1/runs/result");
+    internalUrl.searchParams.set("run_id", runId);
+    internalUrl.searchParams.set("attempt_id", executionAttemptId);
+    const request = new Request(internalUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        executionAttemptId,
+        version: 1,
+        status: "completed",
+        conclusion: "success",
+        decision: "pass",
+        findings: [],
+        artifacts: [],
+        metrics: {},
+        reportLinks: [],
+      }),
+    });
 
     const response = await handleResultRequest(request, dependencies);
 
