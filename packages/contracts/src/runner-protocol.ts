@@ -147,7 +147,7 @@ export const runnerLeaseHeartbeatRequestSchema = runnerLeaseContextSchema
   })
   .strict();
 
-export const runnerLeaseHeartbeatResponseSchema = z.discriminatedUnion("status", [
+export const runnerLeaseHeartbeatResponseSchema = z.union([
   z
     .object({
       protocolVersion: runnerProtocolVersionSchema,
