@@ -120,6 +120,7 @@ nav:
           - Threat Model: security/threat-model.md
           - Release Integrity: security/release-integrity.md
           - Input Validation: security/input-validation.md
+          - GitHub App Permissions: security/github-app-permissions.md
           - Assurance Case: security/assurance-case.md
           - Scorecard: security/scorecard.md
       - Governance: governance.md
@@ -169,7 +170,7 @@ nav:
               - "0002: Bundled Dist": architecture/adr/0002-bundled-dist-strategy.md
               - "0003: Rule ID Namespace": architecture/adr/0003-rule-id-namespace.md
               - "0004: KiCad 10 Variants": architecture/adr/0004-kicad10-variant-support.md
-              - "0005: KiCad IPC API": architecture/adr/0005-kicad-ipc-api.md
+              - "0005: KiCad IPC API": architecture/adr/0005-kicad10-ipc-api.md
               - "0006: License Compliance": architecture/adr/0006-license-compliance.md
               - "0007: Docs Toolchain Lifecycle": architecture/adr/0007-docs-toolchain-lifecycle.md
               - "0008: Vercel Control Plane": architecture/adr/0008-vercel-control-plane.md
