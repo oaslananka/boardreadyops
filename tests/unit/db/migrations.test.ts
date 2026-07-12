@@ -98,7 +98,7 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).not.toContain("request_nonce text");
   });
 
-  it("defers current-attempt lease validation until the claim transaction completes", async () => {
+  it("defers current-attempt lease validation and installs ordered lease operations", async () => {
     const sql = await readFile(join(migrationsDir, "0009_runner_lease_deferred_scope.sql"), "utf8");
 
     expect(sql).toContain("drop trigger if exists runner_job_leases_validate_scope");
@@ -106,6 +106,12 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("after insert or update on runner_job_leases");
     expect(sql).toContain("deferrable initially deferred");
     expect(sql).toContain("boardreadyops_validate_runner_job_lease_scope()");
+    expect(sql).toContain("boardreadyops_expire_runner_leases");
+    expect(sql).toContain("boardreadyops_claim_runner_job");
+    expect(sql).toContain("boardreadyops_heartbeat_runner_lease");
+    expect(sql).toContain("boardreadyops_relinquish_runner_lease");
+    expect(sql).toContain("security invoker");
+    expect(sql).toContain("for update of release_runs skip locked");
     expect(sql).not.toContain("before insert");
   });
 
