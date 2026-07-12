@@ -2,6 +2,8 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 
+export * from "./runner-request-signature.js";
+
 export interface VerifyGitHubWebhookOptions {
   payload: string | Buffer;
   secret: string;
