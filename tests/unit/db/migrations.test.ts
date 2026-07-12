@@ -7,11 +7,12 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(10);
+    expect(cloudDatabaseSchemaVersion).toBe(11);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
     expect(cloudDatabaseModels).toContain("RunnerRequestNonce");
+    expect(cloudDatabaseModels).toContain("RunnerArtifactUploadCapability");
     expect(cloudDatabaseModels).toContain("AuditEvent");
     expect(cloudDatabaseModels).toContain("ReleaseRunResult");
     expect(cloudDatabaseModels).toContain("ReleaseRunAttempt");
@@ -31,6 +32,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0008_runner_protocol_leases.sql",
       "0009_runner_lease_deferred_scope.sql",
       "0010_runner_lease_heartbeat_qualification.sql",
+      "0011_runner_artifact_upload_capabilities.sql",
     ]);
   });
 
@@ -124,6 +126,22 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("runner_job_leases.progress_percent");
     expect(sql).toContain("runner_job_leases.last_message");
     expect(sql).toContain("security invoker");
+  });
+
+  it("stores attempt-bound single-use artifact upload capabilities in schema v11", async () => {
+    const sql = await readFile(join(migrationsDir, "0011_runner_artifact_upload_capabilities.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists runner_artifact_upload_capabilities");
+    expect(sql).toContain("upload_token_digest text not null");
+    expect(sql).toContain("runner_artifact_upload_capabilities_lease_fk");
+    expect(sql).toContain("boardreadyops_issue_artifact_upload_capabilities");
+    expect(sql).toContain("boardreadyops_begin_artifact_upload");
+    expect(sql).toContain("boardreadyops_complete_artifact_upload");
+    expect(sql).toContain("boardreadyops_fail_artifact_upload");
+    expect(sql).toContain("release_runs.execution_attempt_id = runner_job_leases.execution_attempt_id");
+    expect(sql).toContain("runner_job_leases.status = 'active'");
+    expect(sql).toContain("security invoker");
+    expect(sql).not.toContain("upload_token text");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
