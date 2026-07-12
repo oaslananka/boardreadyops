@@ -11,6 +11,11 @@ const connectionString = process.env.DATABASE_URL;
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
 let githubIdentifier = 970_000_000;
+const testEpochMilliseconds = Date.now() + 60_000;
+
+function testTime(offsetSeconds: number): string {
+  return new Date(testEpochMilliseconds + offsetSeconds * 1000).toISOString();
+}
 
 function rows(result: unknown): Record<string, unknown>[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
@@ -173,7 +178,7 @@ afterAll(async () => {
 
 describeDatabase("runner lease PostgreSQL store", () => {
   it("allows only one concurrent claim for one queued logical run", async () => {
-    const now = "2026-07-12T12:00:00.000Z";
+    const now = testTime(0);
     const tenant = await createTenant("lease-test-race");
     const runId = await createQueuedRun(tenant, now);
     const managedIdentityId = await createManagedIdentity("lease-test-race", now);
@@ -216,8 +221,8 @@ describeDatabase("runner lease PostgreSQL store", () => {
   });
 
   it("expires an abandoned lease and creates a fresh execution attempt", async () => {
-    const claimedAt = "2026-07-12T12:10:00.000Z";
-    const recoveredAt = "2026-07-12T12:12:00.000Z";
+    const claimedAt = testTime(600);
+    const recoveredAt = testTime(720);
     const tenant = await createTenant("lease-test-expiry");
     const runId = await createQueuedRun(tenant, claimedAt);
     const managedIdentityId = await createManagedIdentity("lease-test-expiry", claimedAt);
@@ -285,9 +290,9 @@ describeDatabase("runner lease PostgreSQL store", () => {
   });
 
   it("renews and relinquishes a self-hosted lease with nonce replay protection", async () => {
-    const claimedAt = "2026-07-12T12:20:00.000Z";
-    const heartbeatAt = "2026-07-12T12:20:30.000Z";
-    const relinquishedAt = "2026-07-12T12:20:50.000Z";
+    const claimedAt = testTime(1200);
+    const heartbeatAt = testTime(1230);
+    const relinquishedAt = testTime(1250);
     const tenant = await createTenant("lease-test-self-hosted");
     const runId = await createQueuedRun(tenant, claimedAt);
     const runnerId = await createSelfHostedRunner(tenant, "lease-test-self-hosted", claimedAt, [
@@ -328,13 +333,13 @@ describeDatabase("runner lease PostgreSQL store", () => {
       expect(replayedHeartbeat).toEqual({ status: "replayed" });
 
       const staleHeartbeat = await fixedStore({
-        now: "2026-07-12T12:20:40.000Z",
+        now: testTime(1240),
         ids: [],
         tokens: [],
       }).heartbeat({
         ...heartbeatInput,
         leaseToken: token("wrong"),
-        requestTimestamp: requestTimestamp("2026-07-12T12:20:40.000Z"),
+        requestTimestamp: requestTimestamp(testTime(1240)),
         requestNonce: nonce("wrong-heartbeat"),
       });
       expect(staleHeartbeat).toEqual({ status: "stale" });
@@ -381,7 +386,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
   });
 
   it("does not let a self-hosted runner claim another installation's run", async () => {
-    const now = "2026-07-12T12:30:00.000Z";
+    const now = testTime(1800);
     const tenantA = await createTenant("lease-test-tenant-a", false);
     const tenantB = await createTenant("lease-test-tenant-b", false);
     const runB = await createQueuedRun(tenantB, now);
