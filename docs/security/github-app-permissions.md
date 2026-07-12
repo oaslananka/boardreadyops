@@ -40,16 +40,35 @@ that contains the dispatch workflow.
 
 Do not grant any organization or account permissions for this profile.
 
-### Self-hosted or managed execution profile
+### Customer self-hosted execution profile
 
-When execution does not use GitHub workflow dispatch, omit `Actions` access.
-The minimum profile is then:
+When a customer runner uses customer-controlled checkout credentials or a local
+repository mirror, omit both `Actions` and `Contents` access from the App:
 
 | Permission | Level |
 | --- | --- |
 | Metadata | Read |
 | Pull requests | Read |
 | Checks | Read and write |
+
+### Planned managed Marketplace execution profile
+
+ADR-0009 selects a managed, lease-based worker plane and a source broker for the
+future public Marketplace App. After that source broker is implemented and
+validated, the managed profile is:
+
+| Permission | Level | Required for |
+| --- | --- | --- |
+| Metadata | Read | Installation and repository context |
+| Pull requests | Read | Supported pull request webhook events |
+| Checks | Read and write | Check Run lifecycle |
+| Contents | Read | Source broker access to the exact repository and commit |
+
+The managed profile omits `Actions`. The source broker must mint an installation
+token restricted to the exact repository and `contents: read`, fetch the exact
+commit archive, and keep the GitHub token out of worker processes. Do not grant
+Contents access to the production/public App before the ADR-0009 source broker
+and its two-installation end-to-end tests are complete.
 
 ## Optional pull request summary comments
 
@@ -99,7 +118,7 @@ Unless a future feature has a reviewed permission rationale, keep these set to
 No access:
 
 - Administration
-- Contents
+- Contents, until the ADR-0009 managed source broker ships
 - Commit statuses
 - Deployments
 - Environments
@@ -116,7 +135,8 @@ No access:
 
 The GitHub Actions runner workflow has its own job-scoped `contents: read`
 permission. That workflow token is separate from the GitHub App installation
-token and does not justify granting repository Contents access to the App.
+token and does not justify granting repository Contents access to the App in the
+current compatibility mode.
 
 ## Execution-plane boundary
 
@@ -125,24 +145,22 @@ received the pull request webhook, then dispatches a workflow in the configured
 runner repository. An installation token cannot cross installation ownership
 or repository access boundaries.
 
-Therefore, the existing mode is valid for the current single-owner deployment,
-but it is not by itself a zero-configuration multi-tenant Marketplace
-execution plane. Before a public Marketplace launch, choose and validate one of
-these designs:
+ADR-0009 chooses a control-plane queue with short-lived job leases,
+BoardReadyOps-managed workers for the future public default, and the same
+lease/result protocol for customer self-hosted workers. Managed source access is
+brokered with an exact-repository, contents-read installation token that is not
+exposed to workers.
 
-- a managed runner that does not require customer installation tokens to access
-  a BoardReadyOps-owned dispatch repository;
-- a customer-owned runner repository and workflow installed in the same
-  installation scope; or
-- a separately authenticated dispatch service with an explicit trust model.
-
-Do not broaden the public GitHub App's permissions to work around this boundary.
+The existing GitHub Actions mode remains a same-installation compatibility mode.
+Do not broaden the public GitHub App's permissions to work around the dispatch
+boundary.
 
 ## Production change procedure
 
 1. Keep a separate development/test App when broad exploratory permissions are
    still required.
-2. Configure the public/production App with the minimum profile above.
+2. Configure the public/production App with the profile for the execution mode
+   that is actually deployed.
 3. Select only the `pull_request` event.
 4. Install the App on selected repositories first, not all repositories.
 5. Rotate the webhook secret and private key if development credentials were
@@ -162,10 +180,13 @@ reduced production/public App:
 - pull request `opened`, `reopened`, `synchronize`, and `ready_for_review`;
 - Check Run creation, transition to in-progress, and completion;
 - exact runner-result replay behavior;
-- GitHub Actions dispatch when that runner mode is enabled;
+- GitHub Actions dispatch only when that compatibility mode is enabled;
+- managed source-broker access and exact-commit verification only when managed
+  execution is enabled;
+- self-hosted claim isolation only when customer runners are enabled;
 - pull request comment creation and update only when comment write permission is
   intentionally enabled; and
 - confirmation that unsupported or unsubscribed events are not delivered.
 
 Issue #88 must remain open until the external GitHub App settings are changed
-and this matrix is re-run end to end.
+and the applicable matrix is re-run end to end.
