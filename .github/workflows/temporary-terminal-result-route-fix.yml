@@ -1,0 +1,146 @@
+name: temporary-terminal-result-route-fix
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.repository_owner == 'oaslananka' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile
+      - name: Patch verified result core and validate
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          target = Path("apps/web/app/api/v1/runs/result/route.ts")
+          text = target.read_text()
+
+          type_marker = '''  verifyOidcToken: (token: string, runId: string, executionAttemptId: string | undefined) => Promise<boolean>;
+          };'''
+          type_replacement = '''  verifyOidcToken: (token: string, runId: string, executionAttemptId: string | undefined) => Promise<boolean>;
+            authenticationVerified?: boolean;
+            verifiedLeaseId?: string;
+          };'''
+          if "authenticationVerified?: boolean" not in text:
+            if type_marker not in text:
+              raise SystemExit("dependency type marker not found")
+            text = text.replace(type_marker, type_replacement, 1)
+
+          text = text.replace(
+            "const defaultDependencies: ResultRouteDependencies = {",
+            "export const defaultResultRouteDependencies: ResultRouteDependencies = {",
+            1,
+          )
+          text = text.replace(
+            "dependencies: ResultRouteDependencies = defaultDependencies,",
+            "dependencies: ResultRouteDependencies = defaultResultRouteDependencies,",
+            1,
+          )
+
+          auth_marker = '''  if (
+            !(await verifyRunnerAuthentication(
+              request,
+              { key: configuredKey, runId, executionAttemptId, body: bodyText },
+              dependencies.verifyOidcToken,
+            ))
+          ) {'''
+          auth_replacement = '''  if (
+            !dependencies.authenticationVerified &&
+            !(await verifyRunnerAuthentication(
+              request,
+              { key: configuredKey, runId, executionAttemptId, body: bodyText },
+              dependencies.verifyOidcToken,
+            ))
+          ) {'''
+          if "!dependencies.authenticationVerified &&" not in text:
+            if auth_marker not in text:
+              raise SystemExit("authentication marker not found")
+            text = text.replace(auth_marker, auth_replacement, 1)
+
+          deleted_marker = '''      deleted_findings as (
+          '''
+          completed_lease = '''      completed_lease as (
+            update runner_job_leases
+            set status = 'completed',
+                stage = 'reporting',
+                heartbeat_at = greatest(runner_job_leases.heartbeat_at, $5::timestamptz),
+                closed_at = coalesce(runner_job_leases.closed_at, $5::timestamptz),
+                close_reason = coalesce(runner_job_leases.close_reason, 'Terminal result accepted.')
+            from updated
+            where $15::text is not null
+              and $3 in ('completed', 'failed', 'timed_out')
+              and runner_job_leases.id = $15
+              and runner_job_leases.run_id = updated.id
+              and runner_job_leases.execution_attempt_id = $2
+              and runner_job_leases.status = 'active'
+            returning runner_job_leases.id
+          ),
+          deleted_findings as (
+          '''
+          if "completed_lease as (" not in text:
+            if deleted_marker not in text:
+              raise SystemExit("completed lease insertion marker not found")
+            text = text.replace(deleted_marker, completed_lease, 1)
+
+          audit_marker = '''                 'attemptUpdated', exists(select 1 from updated_attempt),
+                           'findingCount','''
+          audit_replacement = '''                 'attemptUpdated', exists(select 1 from updated_attempt),
+                           'leaseCompleted', exists(select 1 from completed_lease),
+                           'findingCount','''
+          if "'leaseCompleted'" not in text:
+            if audit_marker not in text:
+              raise SystemExit("audit metadata marker not found")
+            text = text.replace(audit_marker, audit_replacement, 1)
+
+          params_marker = '''      digest,
+            artifactsJson,
+          ],'''
+          params_replacement = '''      digest,
+            artifactsJson,
+            dependencies.verifiedLeaseId ?? null,
+          ],'''
+          if "dependencies.verifiedLeaseId ?? null" not in text:
+            if params_marker not in text:
+              raise SystemExit("SQL parameter marker not found")
+            text = text.replace(params_marker, params_replacement, 1)
+
+          target.write_text(text)
+          PY
+          pnpm exec biome check --write \
+            apps/web/app/api/v1/runs/result/route.ts \
+            apps/web/lib/runner-terminal-result-routes.ts \
+            apps/web/app/api/v1/runner/results/route.ts \
+            tests/unit/web/runner-terminal-result-route.test.ts
+          pnpm run typecheck
+          pnpm exec vitest run \
+            tests/unit/web/readiness-result-route.test.ts \
+            tests/unit/web/runner-terminal-result-route.test.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/web/app/api/v1/runs/result/route.ts \
+            apps/web/lib/runner-terminal-result-routes.ts \
+            apps/web/app/api/v1/runner/results/route.ts \
+            tests/unit/web/runner-terminal-result-route.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "feat(runner): integrate signed terminal results"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
