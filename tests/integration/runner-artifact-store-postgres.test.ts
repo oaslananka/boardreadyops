@@ -205,7 +205,10 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
           [artifactId],
         ),
       )[0];
-      expect(pending).toMatchObject({ status: "pending", storage_path: `${fixture.runId}/${fixture.attemptId}/${artifactId}.bin` });
+      expect(pending).toMatchObject({
+        status: "pending",
+        storage_path: `${fixture.runId}/${fixture.attemptId}/${artifactId}.bin`,
+      });
       expect(pending?.upload_token_digest).toBe(fingerprint(uploadToken));
       expect(pending?.upload_token_digest).not.toBe(uploadToken);
 

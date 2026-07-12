@@ -41,9 +41,7 @@ export type BegunRunnerArtifactUpload = {
   expectedSha256?: string;
 };
 
-export type BeginRunnerArtifactUploadResult =
-  | BegunRunnerArtifactUpload
-  | { status: "expired" | "replayed" | "stale" };
+export type BeginRunnerArtifactUploadResult = BegunRunnerArtifactUpload | { status: "expired" | "replayed" | "stale" };
 
 export type CompleteRunnerArtifactUploadInput = BeginRunnerArtifactUploadInput & {
   sha256: string;
@@ -347,12 +345,7 @@ export function createSqlRunnerArtifactStore(
         [at.toISOString(), input.artifactId, digest(input.uploadToken), input.sha256, input.bytes],
       );
       const outcome = stringColumn(rows(result)[0], "outcome");
-      if (
-        outcome === "accepted" ||
-        outcome === "expired" ||
-        outcome === "rejected" ||
-        outcome === "replayed"
-      ) {
+      if (outcome === "accepted" || outcome === "expired" || outcome === "rejected" || outcome === "replayed") {
         return { status: outcome };
       }
       return { status: "stale" };
