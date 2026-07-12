@@ -22,6 +22,8 @@ export type RunnerTerminalResultRouteDependencies = {
 
 type ParsedBody = { ok: true; text: string; value: unknown } | { ok: false; response: Response };
 
+type TerminalResultAuthorization = Awaited<ReturnType<RunnerTerminalResultAuthorizer["authorize"]>>;
+
 function jsonResponse(value: unknown, status: number): Response {
   return Response.json(value, {
     status,
@@ -104,7 +106,7 @@ export async function handleRunnerTerminalResultRequest(
     return jsonResponse({ ok: false, error: "invalid runner request authentication" }, 401);
   }
 
-  let authorization;
+  let authorization: TerminalResultAuthorization;
   try {
     authorization = await dependencies.createAuthorizer(executor).authorize({
       ...authenticated.identity,
