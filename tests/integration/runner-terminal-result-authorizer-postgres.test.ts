@@ -100,7 +100,7 @@ async function setup(label: string): Promise<Fixture> {
     maximumLeaseDurationSeconds: 600,
   }).claimJob({
     workerClass: "managed",
-    managedRunnerIdentityId,
+    managedRunnerIdentityId: managedIdentityId,
     requestTimestamp: requestTimestamp(base),
     requestNonce: nonce(`claim-${label}`),
     capabilities: ["kicad:10"],
