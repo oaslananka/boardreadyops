@@ -35,6 +35,11 @@
       "types": "./src/runner-lease-store.ts",
       "import": "./src/runner-lease-store.ts",
       "default": "./src/runner-lease-store.ts"
+    },
+    "./runner-terminal-result-store": {
+      "types": "./src/runner-terminal-result-store.ts",
+      "import": "./src/runner-terminal-result-store.ts",
+      "default": "./src/runner-terminal-result-store.ts"
     }
   },
   "devDependencies": {
