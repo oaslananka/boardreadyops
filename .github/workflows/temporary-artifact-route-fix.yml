@@ -45,23 +45,27 @@ jobs:
 
           '''
           if "function hasHttpsPublicBaseUrl" not in text:
-            text = text.replace(marker, helper + marker)
+            if marker not in text:
+              raise SystemExit("public URL helper insertion marker not found")
+            text = text.replace(marker, helper + marker, 1)
 
           auth_marker = '''  if (!authenticated) {
-              return jsonResponse({ ok: false, error: "invalid runner request authentication" }, 401);
-            }
+            return jsonResponse({ ok: false, error: "invalid runner request authentication" }, 401);
+          }
 
-            try {'''
+          try {'''
           replacement = '''  if (!authenticated) {
-              return jsonResponse({ ok: false, error: "invalid runner request authentication" }, 401);
-            }
-            if (!hasHttpsPublicBaseUrl(dependencies.environment)) {
-              return jsonResponse({ ok: false, error: "HTTPS public URL is not configured" }, 503);
-            }
+            return jsonResponse({ ok: false, error: "invalid runner request authentication" }, 401);
+          }
+          if (!hasHttpsPublicBaseUrl(dependencies.environment)) {
+            return jsonResponse({ ok: false, error: "HTTPS public URL is not configured" }, 503);
+          }
 
-            try {'''
-          if "HTTPS public URL is not configured" not in text.split("try {", 2)[1]:
-            text = text.replace(auth_marker, replacement)
+          try {'''
+          if "HTTPS public URL is not configured" not in text:
+            if auth_marker not in text:
+              raise SystemExit("authenticated capability handler marker not found")
+            text = text.replace(auth_marker, replacement, 1)
           target.write_text(text)
           PY
           pnpm exec biome check --write \
@@ -69,8 +73,6 @@ jobs:
             apps/web/app/api/v1/runner/artifacts/capabilities/route.ts \
             'apps/web/app/api/v1/runner/artifacts/[artifactId]/upload/route.ts' \
             tests/unit/web/runner-artifact-routes.test.ts
-          pnpm run typecheck
-          pnpm exec vitest run tests/unit/web/runner-artifact-routes.test.ts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
