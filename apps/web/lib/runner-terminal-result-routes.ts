@@ -38,7 +38,10 @@ async function parseBody(request: Request): Promise<ParsedBody> {
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null) {
     if (!/^\d+$/u.test(contentLength) || String(Number(contentLength)) !== contentLength) {
-      return { ok: false, response: jsonResponse({ ok: false, error: "runner result content length is invalid" }, 400) };
+      return {
+        ok: false,
+        response: jsonResponse({ ok: false, error: "runner result content length is invalid" }, 400),
+      };
     }
     if (Number(contentLength) > maximumTerminalResultBodyBytes) {
       return { ok: false, response: jsonResponse({ ok: false, error: "runner result payload is too large" }, 413) };

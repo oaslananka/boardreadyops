@@ -22,6 +22,8 @@ export type ResultRouteDependencies = {
   detailsUrl: (runId: string) => string | undefined;
   now: () => Date;
   verifyOidcToken: (token: string, runId: string, executionAttemptId: string | undefined) => Promise<boolean>;
+  authenticationVerified?: boolean;
+  verifiedLeaseId?: string;
 };
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
@@ -280,7 +282,7 @@ async function recordPublicationState(
   );
 }
 
-const defaultDependencies: ResultRouteDependencies = {
+export const defaultResultRouteDependencies: ResultRouteDependencies = {
   queryExecutor: createDefaultQueryExecutor,
   checkRunClient: createGitHubAppCheckRunClient,
   detailsUrl: githubDetailsUrl,
@@ -291,7 +293,7 @@ const defaultDependencies: ResultRouteDependencies = {
 
 export async function handleResultRequest(
   request: Request,
-  dependencies: ResultRouteDependencies = defaultDependencies,
+  dependencies: ResultRouteDependencies = defaultResultRouteDependencies,
 ): Promise<Response> {
   const searchParams = new URL(request.url).searchParams;
   const runId = searchParams.get("run_id");
@@ -325,6 +327,7 @@ export async function handleResultRequest(
   });
 
   if (
+    !dependencies.authenticationVerified &&
     !(await verifyRunnerAuthentication(
       request,
       { key: configuredKey, runId, executionAttemptId, body: bodyText },
@@ -481,6 +484,22 @@ export async function handleResultRequest(
          )
        returning release_run_attempts.id
      ),
+     completed_lease as (
+     update runner_job_leases
+     set status = 'completed',
+         stage = 'reporting',
+         heartbeat_at = greatest(runner_job_leases.heartbeat_at, $5::timestamptz),
+         closed_at = coalesce(runner_job_leases.closed_at, $5::timestamptz),
+         close_reason = coalesce(runner_job_leases.close_reason, 'Terminal result accepted.')
+     from updated
+     where $15::text is not null
+       and $3 in ('completed', 'failed', 'timed_out')
+       and runner_job_leases.id = $15
+       and runner_job_leases.run_id = updated.id
+       and runner_job_leases.execution_attempt_id = $2
+       and runner_job_leases.status = 'active'
+     returning runner_job_leases.id
+   ),
      deleted_findings as (
        delete from findings
        using updated
@@ -606,7 +625,8 @@ export async function handleResultRequest(
                 'resultDigest', $13,
                 'executionAttemptId', $2,
                 'attemptUpdated', exists(select 1 from updated_attempt),
-                'findingCount', (select count(*) from inserted_findings),
+                'leaseCompleted', exists(select 1 from completed_lease),
+                 'findingCount', (select count(*) from inserted_findings),
                 'artifactCount', (select count(*) from inserted_artifacts),
                 'metricCount', (select count(*) from jsonb_object_keys($10::jsonb)),
                 'reportLinkCount', jsonb_array_length($11::jsonb)
@@ -647,6 +667,7 @@ export async function handleResultRequest(
       payloadJson,
       digest,
       artifactsJson,
+      dependencies.verifiedLeaseId ?? null,
     ],
   );
   const row = rows(updateResult)[0];

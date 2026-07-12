@@ -1,10 +1,10 @@
 import { generateKeyPairSync } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { runnerProtocolHeaderNames } from "../../../apps/web/lib/runner-request-auth.js";
 import {
   handleRunnerTerminalResultRequest,
   type RunnerTerminalResultRouteDependencies,
 } from "../../../apps/web/lib/runner-terminal-result-routes.js";
-import { runnerProtocolHeaderNames } from "../../../apps/web/lib/runner-request-auth.js";
 import { signRunnerRequest } from "../../../packages/cloud-core/src/runner-request-signature.js";
 
 const runnerId = "e81ec5a4-c6d0-4d87-a520-f7ab922ba183";
@@ -38,11 +38,13 @@ const dependencies: RunnerTerminalResultRouteDependencies = {
   now: () => now,
 };
 
-function envelope(input: {
-  status?: "completed" | "failed" | "running" | "timed_out";
-  nestedAttemptId?: string;
-  decision?: "error" | "fail" | "pass" | null;
-} = {}): Record<string, unknown> {
+function envelope(
+  input: {
+    status?: "completed" | "failed" | "running" | "timed_out";
+    nestedAttemptId?: string;
+    decision?: "error" | "fail" | "pass" | null;
+  } = {},
+): Record<string, unknown> {
   const status = input.status ?? "completed";
   return {
     protocolVersion: 1,
@@ -59,11 +61,7 @@ function envelope(input: {
   };
 }
 
-function signedRequest(input: {
-  body?: Record<string, unknown>;
-  signedBody?: string;
-  path?: string;
-} = {}): Request {
+function signedRequest(input: { body?: Record<string, unknown>; signedBody?: string; path?: string } = {}): Request {
   const path = input.path ?? "/api/v1/runner/results";
   const body = JSON.stringify(input.body ?? envelope());
   const signature = signRunnerRequest({
