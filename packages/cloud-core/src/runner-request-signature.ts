@@ -1,4 +1,4 @@
-import { createHash, sign as signBytes, verify as verifyBytes, type KeyLike } from "node:crypto";
+import { createHash, type KeyLike, sign as signBytes, verify as verifyBytes } from "node:crypto";
 
 const canonicalPrefix = "boardreadyops-runner-request-v1";
 const canonicalBaseUrl = "https://boardreadyops.invalid";
@@ -34,8 +34,9 @@ function compareText(left: string, right: string): number {
 }
 
 function encodeQueryComponent(value: string): string {
-  return encodeURIComponent(value).replace(/[!'()*]/gu, (character) =>
-    `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  return encodeURIComponent(value).replace(
+    /[!'()*]/gu,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
   );
 }
 
