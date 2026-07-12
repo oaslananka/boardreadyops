@@ -2,8 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import {
-  createSqlRunnerLeaseStore,
   type ClaimRunnerJobResult,
+  createSqlRunnerLeaseStore,
   type RunnerLeaseStore,
 } from "../../packages/db/src/runner-lease-store.js";
 
@@ -268,10 +268,9 @@ describeDatabase("runner lease PostgreSQL store", () => {
         { status: "active", execution_attempt_id: second.executionAttemptId },
       ]);
       const attemptRows = rows(
-        await executor!.query(
-          `select status, id from release_run_attempts where run_id = $1 order by attempt_number`,
-          [runId],
-        ),
+        await executor!.query(`select status, id from release_run_attempts where run_id = $1 order by attempt_number`, [
+          runId,
+        ]),
       );
       expect(attemptRows).toEqual([
         { status: "stale", id: first.executionAttemptId },
@@ -288,12 +287,9 @@ describeDatabase("runner lease PostgreSQL store", () => {
     const relinquishedAt = "2026-07-12T12:20:50.000Z";
     const tenant = await createTenant("lease-test-self-hosted");
     const runId = await createQueuedRun(tenant, claimedAt);
-    const runnerId = await createSelfHostedRunner(
-      tenant,
-      "lease-test-self-hosted",
-      claimedAt,
-      [`${tenant.owner}/${tenant.name}`],
-    );
+    const runnerId = await createSelfHostedRunner(tenant, "lease-test-self-hosted", claimedAt, [
+      `${tenant.owner}/${tenant.name}`,
+    ]);
     const attemptId = randomUUID();
     const leaseId = randomUUID();
     const leaseSecret = token("self-hosted");
@@ -371,10 +367,9 @@ describeDatabase("runner lease PostgreSQL store", () => {
       expect(state).toEqual({ run_status: "queued", attempt_status: "stale", lease_status: "relinquished" });
 
       const auditTypes = rows(
-        await executor!.query(
-          `select event_type from audit_events where release_run_id = $1 order by created_at, id`,
-          [runId],
-        ),
+        await executor!.query(`select event_type from audit_events where release_run_id = $1 order by created_at, id`, [
+          runId,
+        ]),
       ).map((row) => row.event_type);
       expect(auditTypes).toEqual(["runner.lease.claimed", "runner.lease.renewed", "runner.lease.relinquished"]);
     } finally {
