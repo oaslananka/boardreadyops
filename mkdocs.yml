@@ -174,3 +174,4 @@ nav:
               - "0006: License Compliance": architecture/adr/0006-license-compliance.md
               - "0007: Docs Toolchain Lifecycle": architecture/adr/0007-docs-toolchain-lifecycle.md
               - "0008: Vercel Control Plane": architecture/adr/0008-vercel-control-plane.md
+              - "0009: Managed Execution Plane": architecture/adr/0009-managed-execution-plane.md

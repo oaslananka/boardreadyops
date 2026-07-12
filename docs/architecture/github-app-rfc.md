@@ -5,6 +5,8 @@ Marketplace execution remains incomplete.
 
 **Security review:** [GitHub App permissions and webhook subscriptions](../security/github-app-permissions.md)
 
+**Execution decision:** [ADR-0009 — Managed, lease-based execution plane](adr/0009-managed-execution-plane.md)
+
 **Tracking issue:** [#88](https://github.com/oaslananka/boardreadyops/issues/88)
 
 ## Summary
@@ -32,7 +34,7 @@ proposal:
 | Trigger | Workflow event | Signed GitHub App webhook |
 | Execution | Job-scoped runner token | Configured execution plane |
 | Result display | Workflow annotations and artifacts | Native Check Run and hosted dashboard |
-| Authentication | `GITHUB_TOKEN` and optional OIDC | Installation token, webhook HMAC, and runner OIDC |
+| Authentication | `GITHUB_TOKEN` and optional OIDC | Installation token, webhook HMAC, and runner identity |
 
 The App complements the Action. It does not grant its installation token to the
 runner and does not use broad repository permissions as a substitute for a
@@ -53,12 +55,17 @@ permissions are:
 | Checks | Read and write | Create, start, and complete Check Runs |
 | Actions | Read and write | Dispatch the configured runner workflow |
 
+The future managed Marketplace profile replaces Actions access with Contents
+read for the source broker. Customer self-hosted execution can omit both when
+it uses customer-controlled checkout credentials. The profile must match the
+execution mode that is actually deployed.
+
 Pull request summary comments require either Pull requests write or Issues
 write. They are not required for the readiness decision and must not expand the
 public App's permission surface unless the feature is intentionally enabled.
 
 No organization or account permissions are required by the shipped control
-plane.
+plane or the accepted managed execution design.
 
 ## Webhook events
 
@@ -129,8 +136,10 @@ Private-repository execution remains explicitly marked for safe-mode handling.
 - Every incoming webhook is verified with HMAC-SHA256 before JSON processing.
 - GitHub App installation tokens are created on demand, expire according to
   GitHub policy, and are not persisted.
-- Runner callbacks use GitHub Actions OIDC bound to the logical run and current
-  execution-attempt ID in hardened production mode.
+- GitHub Actions callbacks use OIDC bound to the logical run and current
+  execution-attempt ID in hardened compatibility mode.
+- Managed and self-hosted workers use the asymmetric, lease-bound runner
+  identity defined by ADR-0009.
 - Exact terminal result replay is accepted; stale attempts, superseded commits,
   and conflicting terminal payloads are rejected.
 - Findings, result metadata, publication state, and audit events are persisted
@@ -138,7 +147,7 @@ Private-repository execution remains explicitly marked for safe-mode handling.
 - Artifact downloads use a separate signing key and short-lived, run-bound
   URLs.
 
-## Execution-plane limitation
+## Execution-plane decision
 
 The current `github-actions` mode obtains an installation token for the App
 installation that received the pull request, then dispatches a workflow in the
@@ -150,15 +159,18 @@ zero-configuration multi-tenant Marketplace execution plane because a customer
 installation token cannot dispatch a workflow in an unrelated
 BoardReadyOps-owned installation.
 
-A public launch must use one of these reviewed designs:
+ADR-0009 accepts a control-plane queue with short-lived leases:
 
-1. a managed execution service that does not cross GitHub installation token
-   boundaries;
-2. a customer-owned runner workflow in the same installation scope; or
-3. a separately authenticated dispatch service with explicit tenant isolation.
+1. BoardReadyOps-managed workers become the future public Marketplace default.
+2. A source broker uses an exact-repository, contents-read installation token
+   without exposing the token to worker processes.
+3. Customer self-hosted workers use the same claim, heartbeat, lease, artifact,
+   and result contracts under installation/repository eligibility filters.
+4. GitHub Actions dispatch remains an explicitly selected, same-installation
+   compatibility mode.
 
 The public App must not request broader repository, organization, or account
-permissions to bypass this architectural boundary.
+permissions to bypass the installation boundary.
 
 ## Public-launch completion criteria
 
@@ -166,8 +178,10 @@ The GitHub App is ready for public Marketplace distribution only when:
 
 - the external production/public App settings match the least-privilege profile;
 - broad development permissions and unrelated webhook subscriptions are removed;
-- the chosen multi-tenant execution-plane design is implemented and threat
-  modeled;
+- the ADR-0009 managed execution and source-broker design is implemented and
+  threat modeled;
+- two unrelated installations pass claim, source, artifact, result, and tenant
+  isolation tests;
 - installation, repository lifecycle, pull request, Check Run, runner callback,
   and optional comment flows pass end to end with the reduced permissions; and
 - issue #88 records the final settings review and validation evidence.
