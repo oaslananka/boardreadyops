@@ -6,10 +6,11 @@ import { cloudDatabaseModels, cloudDatabaseSchemaVersion } from "../../../packag
 const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
-  it("publishes the audit-log schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(5);
+  it("publishes the runner-result schema version and models", () => {
+    expect(cloudDatabaseSchemaVersion).toBe(6);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("AuditEvent");
+    expect(cloudDatabaseModels).toContain("ReleaseRunResult");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
@@ -21,7 +22,26 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0003_runner_registrations.sql",
       "0004_audit_logs.sql",
       "0005_release_run_execution_attempts.sql",
+      "0006_release_run_results.sql",
     ]);
+  });
+
+  it("stores versioned runner results and publication state", async () => {
+    const sql = await readFile(join(migrationsDir, "0006_release_run_results.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists release_run_results");
+    expect(sql).toContain("contract_version integer not null");
+    expect(sql).toContain("metrics jsonb not null");
+    expect(sql).toContain("report_links jsonb not null");
+    expect(sql).toContain("payload jsonb not null");
+    expect(sql).toContain("pg_column_size(payload) <= 2097152");
+    expect(sql).toContain("github_check_published_at timestamptz");
+    expect(sql).toContain("github_comment_published_at timestamptz");
+    expect(sql).toContain("last_publication_error text");
+    expect(sql).toContain("release_run_results_execution_attempt_id_idx");
+    expect(sql).toContain("create or replace function boardreadyops_reject_audit_event_mutation()");
+    expect(sql).toContain("tg_op = 'DELETE' and pg_trigger_depth() > 1");
+    expect(sql).toContain("audit_events is append-only");
   });
 
   it("binds release results to execution attempts and terminal digests", async () => {

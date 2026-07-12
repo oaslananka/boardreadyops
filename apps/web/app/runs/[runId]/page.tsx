@@ -64,6 +64,12 @@ export default async function RunPage({ params }: RunPageProps) {
             </dd>
           </div>
           <div>
+            <dt>Conclusion</dt>
+            <dd>
+              <StatusPill value={run.conclusion} />
+            </dd>
+          </div>
+          <div>
             <dt>Repository</dt>
             <dd>{run.repository}</dd>
           </div>
@@ -120,6 +126,10 @@ export default async function RunPage({ params }: RunPageProps) {
             <dd>{run.githubCheckRunId ? <code>{run.githubCheckRunId}</code> : "—"}</dd>
           </div>
           <div>
+            <dt>Result contract</dt>
+            <dd>{run.resultContractVersion ? `v${run.resultContractVersion}` : "—"}</dd>
+          </div>
+          <div>
             <dt>BoardReadyOps</dt>
             <dd>{run.boardReadyOpsVersion ?? "—"}</dd>
           </div>
@@ -128,6 +138,54 @@ export default async function RunPage({ params }: RunPageProps) {
             <dd>{run.kicadVersion ?? "—"}</dd>
           </div>
         </dl>
+      </section>
+
+      <section className="panel">
+        <h2>Publication</h2>
+        <dl className="grid-list">
+          <div>
+            <dt>Last attempt</dt>
+            <dd>{formatRunDate(run.lastPublicationAttemptAt)}</dd>
+          </div>
+          <div>
+            <dt>GitHub check</dt>
+            <dd>{formatRunDate(run.githubCheckPublishedAt)}</dd>
+          </div>
+          <div>
+            <dt>PR comment</dt>
+            <dd>{formatRunDate(run.githubCommentPublishedAt)}</dd>
+          </div>
+        </dl>
+        {run.lastPublicationError ? <p role="alert">Last publication error: {run.lastPublicationError}</p> : null}
+      </section>
+
+      <section className="panel">
+        <h2>Metrics and reports</h2>
+        {Object.keys(run.metrics).length === 0 ? (
+          <p>No metrics were reported for this run.</p>
+        ) : (
+          <dl className="grid-list">
+            {Object.entries(run.metrics)
+              .sort(([left], [right]) => left.localeCompare(right))
+              .map(([name, value]) => (
+                <div key={name}>
+                  <dt>{name}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+          </dl>
+        )}
+        {run.reportLinks.length === 0 ? (
+          <p>No report links were attached to this run.</p>
+        ) : (
+          <ul className="stack-list">
+            {run.reportLinks.map((report) => (
+              <li key={`${report.label}:${report.url}`}>
+                <a href={report.url}>{report.label}</a>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="panel">

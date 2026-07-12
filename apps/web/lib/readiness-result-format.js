@@ -90,6 +90,12 @@ function topFindings(findings, limit = 5) {
     .slice(0, limit);
 }
 
+function metricEntries(metrics, limit = 8) {
+  return Object.entries(metrics ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, limit);
+}
+
 function detailsLine(detailsUrl) {
   return detailsUrl ? `\n\nOpen the hosted run dashboard: ${detailsUrl}` : "";
 }
@@ -112,15 +118,40 @@ function findingLine(finding) {
   return `- **${sanitizeInline(finding.severity)}** ${code(finding.ruleId)}${location}: ${sanitizeInline(finding.message)}`;
 }
 
+function markdownLinkLabel(value) {
+  return sanitizeInline(value).replace(/[[\]]/g, "\\$&");
+}
+
+function markdownLinkUrl(value) {
+  return encodeURI(String(value)).replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
+function reportLinkLine(link) {
+  return `- [${markdownLinkLabel(link.label)}](${markdownLinkUrl(link.url)})`;
+}
+
 export function buildReadinessCheckOutput(input) {
   const findings = input.findings ?? [];
+  const artifacts = input.artifacts ?? [];
+  const reports = input.reportLinks ?? [];
+  const metrics = input.metrics ?? {};
   const title = `${decisionEmoji(input.decision, input.status)} BoardReadyOps release readiness: ${decisionLabel(input.decision)}`;
   const lines = [
     `**Status:** ${statusLabel(input.status)}`,
     `**Decision:** ${decisionLabel(input.decision)}`,
     `**Findings:** ${findings.length}`,
+    `**Artifacts:** ${artifacts.length}`,
+    `**Reports:** ${reports.length}`,
     `**Severity summary:** ${severitySummary(findings)}`,
   ];
+
+  const visibleMetrics = metricEntries(metrics, 5);
+  if (visibleMetrics.length > 0) {
+    lines.push("", "### Metrics");
+    for (const [name, value] of visibleMetrics) {
+      lines.push(`- ${code(name)}: ${value}`);
+    }
+  }
 
   const visibleFindings = topFindings(findings);
   if (visibleFindings.length > 0) {
@@ -134,6 +165,13 @@ export function buildReadinessCheckOutput(input) {
     lines.push(`- …and ${findings.length - visibleFindings.length} more findings.`);
   }
 
+  if (reports.length > 0) {
+    lines.push("", "### Reports");
+    for (const report of reports.slice(0, 10)) {
+      lines.push(reportLinkLine(report));
+    }
+  }
+
   return {
     title,
     summary: `${lines.join("\n")}${detailsLine(input.detailsUrl)}`,
@@ -142,6 +180,9 @@ export function buildReadinessCheckOutput(input) {
 
 export function buildReadinessPrComment(input) {
   const findings = input.findings ?? [];
+  const artifacts = input.artifacts ?? [];
+  const reports = input.reportLinks ?? [];
+  const metrics = input.metrics ?? {};
   const lines = [
     `## ${decisionEmoji(input.decision, input.status)} BoardReadyOps release readiness`,
     "",
@@ -150,8 +191,18 @@ export function buildReadinessPrComment(input) {
     `| Status | ${statusLabel(input.status)} |`,
     `| Decision | ${decisionLabel(input.decision)} |`,
     `| Findings | ${findings.length} |`,
+    `| Artifacts | ${artifacts.length} |`,
+    `| Reports | ${reports.length} |`,
     `| Severity summary | ${severitySummary(findings)} |`,
   ];
+
+  const visibleMetrics = metricEntries(metrics);
+  if (visibleMetrics.length > 0) {
+    lines.push("", "### Metrics", "");
+    for (const [name, value] of visibleMetrics) {
+      lines.push(`- ${code(name)}: ${value}`);
+    }
+  }
 
   const visibleFindings = topFindings(findings, 10);
   if (visibleFindings.length > 0) {
@@ -163,6 +214,13 @@ export function buildReadinessPrComment(input) {
 
   if (findings.length > visibleFindings.length) {
     lines.push(`- …and ${findings.length - visibleFindings.length} more findings.`);
+  }
+
+  if (reports.length > 0) {
+    lines.push("", "### Reports", "");
+    for (const report of reports) {
+      lines.push(reportLinkLine(report));
+    }
   }
 
   if (input.detailsUrl) {

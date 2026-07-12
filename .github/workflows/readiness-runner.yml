@@ -131,17 +131,19 @@ jobs:
 
           status="completed"
           decision="pass"
+          conclusion="success"
 
           if [ "$READINESS_OUTCOME" != "success" ]; then
             status="failed"
             decision="error"
+            conclusion="failure"
           fi
 
           if [ -n "$EXECUTION_ATTEMPT_ID" ]; then
-            payload="{\"executionAttemptId\":\"$EXECUTION_ATTEMPT_ID\",\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
+            payload="{\"version\":1,\"executionAttemptId\":\"$EXECUTION_ATTEMPT_ID\",\"status\":\"$status\",\"conclusion\":\"$conclusion\",\"decision\":\"$decision\",\"findings\":[],\"artifacts\":[],\"metrics\":{},\"reportLinks\":[]}"
             audience="boardreadyops-cloud:${RUN_ID}:${EXECUTION_ATTEMPT_ID}"
           else
-            payload="{\"status\":\"$status\",\"decision\":\"$decision\",\"findings\":[]}"
+            payload="{\"version\":1,\"status\":\"$status\",\"conclusion\":\"$conclusion\",\"decision\":\"$decision\",\"findings\":[],\"artifacts\":[],\"metrics\":{},\"reportLinks\":[]}"
             audience="boardreadyops-cloud:${RUN_ID}"
           fi
           encoded_audience="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$audience")"

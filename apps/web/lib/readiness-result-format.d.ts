@@ -5,10 +5,27 @@ export type FindingTemplateInput = {
   path?: string | undefined;
 };
 
+export type ArtifactTemplateInput = {
+  kind: string;
+  name: string;
+  storagePath: string;
+  sha256: string;
+  bytes: number;
+  role: string;
+};
+
+export type ReportLinkTemplateInput = {
+  label: string;
+  url: string;
+};
+
 export type ReadinessResultTemplateInput = {
   status: string;
   decision: string | null;
   findings?: readonly FindingTemplateInput[];
+  artifacts?: readonly ArtifactTemplateInput[];
+  metrics?: Readonly<Record<string, number>>;
+  reportLinks?: readonly ReportLinkTemplateInput[];
   detailsUrl?: string | undefined;
 };
 

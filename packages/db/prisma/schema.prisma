@@ -37,28 +37,29 @@ model Repository {
 }
 
 model ReleaseRun {
-  id                        String     @id @default(uuid())
-  repositoryId              String     @map("repository_id")
-  idempotencyKey            String?    @unique @map("idempotency_key")
-  commitSha                 String     @map("commit_sha")
+  id                        String            @id @default(uuid())
+  repositoryId              String            @map("repository_id")
+  idempotencyKey            String?           @unique @map("idempotency_key")
+  commitSha                 String            @map("commit_sha")
   ref                       String
-  pullRequestNumber         Int?       @map("pull_request_number")
-  triggerKind               String     @map("trigger_kind")
-  status                    String     @default("queued")
+  pullRequestNumber         Int?              @map("pull_request_number")
+  triggerKind               String            @map("trigger_kind")
+  status                    String            @default("queued")
   decision                  String?
-  startedAt                 DateTime   @default(now()) @map("started_at")
-  completedAt               DateTime?  @map("completed_at")
-  durationMs                Int?       @map("duration_ms")
-  boardReadyOpsVersion      String?    @map("board_ready_ops_version")
-  kicadVersion              String?    @map("kicad_version")
-  githubCheckRunId          BigInt?    @map("github_check_run_id")
-  readinessScore            Int?       @map("readiness_score")
-  executionAttemptId        String?    @unique(map: "release_runs_execution_attempt_id_idx") @map("execution_attempt_id")
-  executionAttemptStartedAt DateTime?  @map("execution_attempt_started_at")
-  terminalResultDigest      String?    @map("terminal_result_digest")
-  repository                Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  startedAt                 DateTime          @default(now()) @map("started_at")
+  completedAt               DateTime?         @map("completed_at")
+  durationMs                Int?              @map("duration_ms")
+  boardReadyOpsVersion      String?           @map("board_ready_ops_version")
+  kicadVersion              String?           @map("kicad_version")
+  githubCheckRunId          BigInt?           @map("github_check_run_id")
+  readinessScore            Int?              @map("readiness_score")
+  executionAttemptId        String?           @unique(map: "release_runs_execution_attempt_id_idx") @map("execution_attempt_id")
+  executionAttemptStartedAt DateTime?         @map("execution_attempt_started_at")
+  terminalResultDigest      String?           @map("terminal_result_digest")
+  repository                Repository        @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   findings                  Finding[]
   artifacts                 Artifact[]
+  result                    ReleaseRunResult?
 
   @@index([repositoryId, startedAt])
   @@index([commitSha])
@@ -92,4 +93,26 @@ model Artifact {
   run         ReleaseRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@map("artifacts")
+}
+
+model ReleaseRunResult {
+  runId                    String     @id @map("run_id")
+  executionAttemptId       String?    @unique(map: "release_run_results_execution_attempt_id_idx") @map("execution_attempt_id")
+  contractVersion          Int        @map("contract_version")
+  status                   String
+  conclusion               String
+  decision                 String?
+  metrics                  Json       @default("{}")
+  reportLinks              Json       @default("[]") @map("report_links")
+  payload                  Json
+  resultDigest             String     @map("result_digest")
+  receivedAt               DateTime   @default(now()) @map("received_at")
+  lastPublicationAttemptAt DateTime?  @map("last_publication_attempt_at")
+  githubCheckPublishedAt   DateTime?  @map("github_check_published_at")
+  githubCommentPublishedAt DateTime?  @map("github_comment_published_at")
+  lastPublicationError     String?    @map("last_publication_error")
+  run                      ReleaseRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([receivedAt(sort: Desc), runId(sort: Desc)])
+  @@map("release_run_results")
 }

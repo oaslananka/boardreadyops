@@ -18,6 +18,18 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).not.toContain("BRO_RUNNER_KEY");
   });
 
+  it("publishes the explicit version-one result envelope", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain(String.raw`payload="{\"version\":1`);
+    expect(workflow).toContain(String.raw`\"conclusion\":\"$conclusion\"`);
+    expect(workflow).toContain(String.raw`\"artifacts\":[]`);
+    expect(workflow).toContain(String.raw`\"metrics\":{}`);
+    expect(workflow).toContain(String.raw`\"reportLinks\":[]`);
+    expect(workflow).toContain('conclusion="success"');
+    expect(workflow).toContain('conclusion="failure"');
+  });
+
   it("validates run binding, target shape, and callback destination", async () => {
     const workflow = await readFile(workflowPath, "utf8");
 
