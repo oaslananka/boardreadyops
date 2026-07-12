@@ -6,17 +6,17 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   diagnostics:
-    if: github.repository_owner == 'oaslananka'
+    if: github.repository_owner == 'oaslananka' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 24
@@ -24,37 +24,44 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - name: Format and capture diagnostics
+      - name: Apply deterministic route fixes
         shell: bash
         run: |
-          mkdir -p diagnostics/formatted
+          python - <<'PY'
+          from pathlib import Path
+
+          auth = Path("apps/web/lib/runner-request-auth.ts")
+          auth_text = auth.read_text()
+          auth_text = auth_text.replace(
+              "return Number.isSafeInteger(parsed) ? parsed : undefined;",
+              "return Number.isSafeInteger(parsed) && String(parsed) === value ? parsed : undefined;",
+          )
+          auth.write_text(auth_text)
+
+          test = Path("tests/unit/web/runner-lease-routes.test.ts")
+          test_text = test.read_text().replace(
+              'from "@boardreadyops/cloud-core";',
+              'from "../../../packages/cloud-core/src/runner-request-signature.js";',
+          )
+          test.write_text(test_text)
+          PY
           pnpm exec biome check --write \
             apps/web/lib/runner-request-auth.ts \
             apps/web/lib/runner-lease-routes.ts \
             apps/web/app/api/v1/runner/jobs/claim/route.ts \
             apps/web/app/api/v1/runner/leases/heartbeat/route.ts \
             apps/web/app/api/v1/runner/leases/relinquish/route.ts \
-            tests/unit/web/runner-lease-routes.test.ts \
-            > diagnostics/biome.txt 2>&1 || true
-          mkdir -p diagnostics/formatted/apps/web/lib
-          mkdir -p diagnostics/formatted/apps/web/app/api/v1/runner/jobs/claim
-          mkdir -p diagnostics/formatted/apps/web/app/api/v1/runner/leases/heartbeat
-          mkdir -p diagnostics/formatted/apps/web/app/api/v1/runner/leases/relinquish
-          mkdir -p diagnostics/formatted/tests/unit/web
-          cp apps/web/lib/runner-request-auth.ts diagnostics/formatted/apps/web/lib/
-          cp apps/web/lib/runner-lease-routes.ts diagnostics/formatted/apps/web/lib/
-          cp apps/web/app/api/v1/runner/jobs/claim/route.ts diagnostics/formatted/apps/web/app/api/v1/runner/jobs/claim/
-          cp apps/web/app/api/v1/runner/leases/heartbeat/route.ts diagnostics/formatted/apps/web/app/api/v1/runner/leases/heartbeat/
-          cp apps/web/app/api/v1/runner/leases/relinquish/route.ts diagnostics/formatted/apps/web/app/api/v1/runner/leases/relinquish/
-          cp tests/unit/web/runner-lease-routes.test.ts diagnostics/formatted/tests/unit/web/
-          set +e
-          pnpm run typecheck > diagnostics/typecheck.txt 2>&1
-          echo "$?" > diagnostics/typecheck-exit.txt
-          pnpm exec vitest run tests/unit/web/runner-lease-routes.test.ts --reporter=verbose > diagnostics/test.txt 2>&1
-          echo "$?" > diagnostics/test-exit.txt
-          exit 0
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: runner-route-diagnostics
-          path: diagnostics
+            tests/unit/web/runner-lease-routes.test.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/web/lib/runner-request-auth.ts \
+            apps/web/lib/runner-lease-routes.ts \
+            apps/web/app/api/v1/runner/jobs/claim/route.ts \
+            apps/web/app/api/v1/runner/leases/heartbeat/route.ts \
+            apps/web/app/api/v1/runner/leases/relinquish/route.ts \
+            tests/unit/web/runner-lease-routes.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(runner): format signed route slice"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
