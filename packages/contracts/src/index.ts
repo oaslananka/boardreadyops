@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { runnerLeaseContextSchema } from "./runner-protocol.js";
+
+export * from "./runner-protocol.js";
 
 export const releaseRunStatusSchema = z.enum(["queued", "running", "completed", "timed_out", "failed"]);
 export const releaseDecisionSchema = z.enum(["pass", "fail", "error"]);
@@ -103,5 +106,21 @@ export const releaseRunResultSchema = releaseRunResultBaseSchema
     conclusion: value.conclusion ?? inferredConclusion(value),
   }));
 
+export const runnerTerminalResultRequestSchema = runnerLeaseContextSchema
+  .extend({
+    result: releaseRunResultSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.result.executionAttemptId !== value.executionAttemptId) {
+      context.addIssue({
+        code: "custom",
+        path: ["result", "executionAttemptId"],
+        message: "terminal result must be bound to the leased execution attempt",
+      });
+    }
+  });
+
 export type CreateReleaseRunRequest = z.infer<typeof createReleaseRunRequestSchema>;
 export type ReleaseRunResult = z.infer<typeof releaseRunResultSchema>;
+export type RunnerTerminalResultRequest = z.infer<typeof runnerTerminalResultRequestSchema>;
