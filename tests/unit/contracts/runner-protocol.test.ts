@@ -12,13 +12,19 @@ const attemptId = "22222222-2222-4222-8222-222222222222";
 const leaseId = "33333333-3333-4333-8333-333333333333";
 const leaseToken = "a".repeat(43);
 
-function leaseContext() {
+function leaseBinding() {
   return {
-    protocolVersion: 1 as const,
     runId,
     executionAttemptId: attemptId,
     leaseId,
     leaseToken,
+  };
+}
+
+function leaseContext() {
+  return {
+    protocolVersion: 1 as const,
+    ...leaseBinding(),
   };
 }
 
@@ -54,7 +60,7 @@ describe("runner protocol contracts", () => {
       protocolVersion: 1,
       status: "claimed",
       job: {
-        ...leaseContext(),
+        ...leaseBinding(),
         leaseExpiresAt: "2026-07-12T12:05:00.000Z",
         maximumLeaseExpiresAt: "2026-07-12T12:30:00.000Z",
         sourceMode: "broker",
@@ -73,7 +79,7 @@ describe("runner protocol contracts", () => {
       protocolVersion: 1,
       status: "claimed",
       job: {
-        ...leaseContext(),
+        ...leaseBinding(),
         leaseExpiresAt: "2026-07-12T12:05:00.000Z",
         maximumLeaseExpiresAt: "2026-07-12T12:30:00.000Z",
         sourceMode: "broker",
