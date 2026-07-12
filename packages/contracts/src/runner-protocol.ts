@@ -15,11 +15,7 @@ export const runnerRequestNonceSchema = z.string().min(22).max(128).regex(base64
 export const runnerRequestSignatureSchema = z.string().length(86).regex(base64UrlPattern);
 export const runnerLeaseSecretSchema = z.string().min(43).max(256).regex(base64UrlPattern);
 export const runnerCapabilitySchema = z.string().trim().min(1).max(128).regex(capabilityPattern);
-export const runnerSafeModeReasonSchema = z.enum([
-  "draft-pull-request",
-  "fork-pull-request",
-  "private-repository",
-]);
+export const runnerSafeModeReasonSchema = z.enum(["draft-pull-request", "fork-pull-request", "private-repository"]);
 
 export const runnerSignedRequestEnvelopeSchema = z
   .object({
@@ -177,7 +173,10 @@ export const runnerArtifactDeclarationSchema = z
     name: z.string().trim().min(1).max(256),
     role: z.string().trim().min(1).max(128),
     bytes: z.number().int().nonnegative().max(2_147_483_647),
-    sha256: z.string().regex(/^[0-9a-f]{64}$/u).optional(),
+    sha256: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/u)
+      .optional(),
   })
   .strict();
 
