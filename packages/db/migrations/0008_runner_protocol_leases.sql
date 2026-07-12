@@ -179,14 +179,20 @@ create or replace function boardreadyops_validate_runner_job_lease_scope()
 returns trigger
 language plpgsql
 as $$
+declare
+  scope_changed boolean;
 begin
-  if tg_op = 'INSERT'
-    or new.run_id is distinct from old.run_id
-    or new.execution_attempt_id is distinct from old.execution_attempt_id
-    or new.worker_class is distinct from old.worker_class
-    or new.runner_registration_id is distinct from old.runner_registration_id
-    or new.managed_runner_identity_id is distinct from old.managed_runner_identity_id
-  then
+  if tg_op = 'INSERT' then
+    scope_changed := true;
+  else
+    scope_changed := new.run_id is distinct from old.run_id
+      or new.execution_attempt_id is distinct from old.execution_attempt_id
+      or new.worker_class is distinct from old.worker_class
+      or new.runner_registration_id is distinct from old.runner_registration_id
+      or new.managed_runner_identity_id is distinct from old.managed_runner_identity_id;
+  end if;
+
+  if scope_changed then
     if not exists (
       select 1
       from release_runs
@@ -279,3 +285,37 @@ create index if not exists runner_request_nonces_expiry_idx
 create index if not exists runner_request_nonces_lease_idx
   on runner_request_nonces(runner_job_lease_id, created_at desc, id desc)
   where runner_job_lease_id is not null;
+
+create or replace function boardreadyops_validate_runner_request_nonce_scope()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.runner_job_lease_id is not null and not exists (
+    select 1
+    from runner_job_leases
+    where id = new.runner_job_lease_id
+      and worker_class = new.worker_class
+      and (
+        (
+          new.worker_class = 'self_hosted'
+          and runner_registration_id = new.runner_registration_id
+        )
+        or (
+          new.worker_class = 'managed'
+          and managed_runner_identity_id = new.managed_runner_identity_id
+        )
+      )
+  ) then
+    raise exception 'runner request nonce does not match the lease worker identity'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists runner_request_nonces_validate_scope on runner_request_nonces;
+create trigger runner_request_nonces_validate_scope
+  before insert or update on runner_request_nonces
+  for each row execute function boardreadyops_validate_runner_request_nonce_scope();
