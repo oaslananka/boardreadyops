@@ -118,7 +118,7 @@ async function cleanup(fixture: Fixture): Promise<void> {
   await executor.query("delete from managed_runner_identities where id = $1", [fixture.managedIdentityId]);
 }
 
-function authorizer(fixture: Fixture, now: Date) {
+function authorizer(now: Date) {
   if (!executor) throw new Error("DATABASE_URL is required");
   return createSqlRunnerTerminalResultAuthorizer(executor, { now: () => now });
 }
@@ -148,7 +148,7 @@ describeDatabase("runner terminal-result PostgreSQL authorization", () => {
   it("accepts a current lease, permits exact retry, and rejects nonce reuse with another body", async () => {
     const fixture = await setup("terminal-test-replay");
     const requestAt = at(fixture.base, 10);
-    const store = authorizer(fixture, requestAt);
+    const store = authorizer(requestAt);
     const requestNonce = nonce("terminal-result-replay");
     const firstBody = JSON.stringify({ protocolVersion: 1, result: { status: "completed", decision: "pass" } });
     const changedBody = JSON.stringify({ protocolVersion: 1, result: { status: "failed", decision: "error" } });
@@ -187,7 +187,7 @@ describeDatabase("runner terminal-result PostgreSQL authorization", () => {
 
     try {
       await expect(
-        authorizer(fixture, requestAt).authorize({
+        authorizer(requestAt).authorize({
           ...input(fixture, JSON.stringify({ result: "terminal" }), requestNonce),
           leaseToken: token("wrong-token"),
         }),
@@ -225,7 +225,7 @@ describeDatabase("runner terminal-result PostgreSQL authorization", () => {
       );
 
       await expect(
-        authorizer(fixture, at(fixture.base, 30)).authorize(
+        authorizer(at(fixture.base, 30)).authorize(
           input(fixture, JSON.stringify({ result: "stale" }), nonce("terminal-result-stale")),
         ),
       ).resolves.toEqual({ status: "stale" });
