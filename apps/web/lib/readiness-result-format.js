@@ -119,7 +119,7 @@ function findingLine(finding) {
 }
 
 function markdownLinkLabel(value) {
-  return sanitizeInline(value).replace(/[[\]]/g, "\\$&");
+  return sanitizeInline(value).replace(/\\/g, "\\\\").replace(/[[\]]/g, "\\$&");
 }
 
 function markdownLinkUrl(value) {

@@ -38,7 +38,7 @@ describe("readiness result formatting", () => {
         },
       ],
       metrics: { readinessScore: 72, durationMs: 1234 },
-      reportLinks: [{ label: "HTML [report]", url: "https://reports.example.test/run(123)/index.html" }],
+      reportLinks: [{ label: String.raw`HTML \[report]`, url: "https://reports.example.test/run(123)/index.html" }],
       detailsUrl: "https://boardreadyops.test/runs/run-123",
     });
 
@@ -51,7 +51,7 @@ describe("readiness result formatting", () => {
     expect(output.summary).toContain("**Reports:** 1");
     expect(output.summary).toContain("`durationMs`: 1234");
     expect(output.summary).toContain(
-      String.raw`[HTML \[report\]](https://reports.example.test/run%28123%29/index.html)`,
+      String.raw`[HTML \\\[report\]](https://reports.example.test/run%28123%29/index.html)`,
     );
     expect(output.summary).toContain("Open the hosted run dashboard: https://boardreadyops.test/runs/run-123");
   });
