@@ -24,103 +24,94 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - name: Patch verified result core and validate
+      - name: Patch verified result core and commit
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           target = Path("apps/web/app/api/v1/runs/result/route.ts")
           text = target.read_text()
 
-          type_marker = '''  verifyOidcToken: (token: string, runId: string, executionAttemptId: string | undefined) => Promise<boolean>;
-          };'''
-          type_replacement = '''  verifyOidcToken: (token: string, runId: string, executionAttemptId: string | undefined) => Promise<boolean>;
-            authenticationVerified?: boolean;
-            verifiedLeaseId?: string;
-          };'''
           if "authenticationVerified?: boolean" not in text:
-            if type_marker not in text:
+            text, count = re.subn(
+              r'(  verifyOidcToken: \(token: string, runId: string, executionAttemptId: string \| undefined\) => Promise<boolean>;\n)(};)',
+              r'\1  authenticationVerified?: boolean;\n  verifiedLeaseId?: string;\n\2',
+              text,
+              count=1,
+            )
+            if count != 1:
               raise SystemExit("dependency type marker not found")
-            text = text.replace(type_marker, type_replacement, 1)
 
-          text = text.replace(
-            "const defaultDependencies: ResultRouteDependencies = {",
-            "export const defaultResultRouteDependencies: ResultRouteDependencies = {",
-            1,
-          )
+          if "export const defaultResultRouteDependencies" not in text:
+            text = text.replace(
+              "const defaultDependencies: ResultRouteDependencies = {",
+              "export const defaultResultRouteDependencies: ResultRouteDependencies = {",
+              1,
+            )
           text = text.replace(
             "dependencies: ResultRouteDependencies = defaultDependencies,",
             "dependencies: ResultRouteDependencies = defaultResultRouteDependencies,",
             1,
           )
 
-          auth_marker = '''  if (
-            !(await verifyRunnerAuthentication(
-              request,
-              { key: configuredKey, runId, executionAttemptId, body: bodyText },
-              dependencies.verifyOidcToken,
-            ))
-          ) {'''
-          auth_replacement = '''  if (
-            !dependencies.authenticationVerified &&
-            !(await verifyRunnerAuthentication(
-              request,
-              { key: configuredKey, runId, executionAttemptId, body: bodyText },
-              dependencies.verifyOidcToken,
-            ))
-          ) {'''
           if "!dependencies.authenticationVerified &&" not in text:
-            if auth_marker not in text:
+            text, count = re.subn(
+              r'(  if \(\n)(    !\(await verifyRunnerAuthentication\()',
+              r'\1    !dependencies.authenticationVerified &&\n\2',
+              text,
+              count=1,
+            )
+            if count != 1:
               raise SystemExit("authentication marker not found")
-            text = text.replace(auth_marker, auth_replacement, 1)
 
-          deleted_marker = '''      deleted_findings as (
-          '''
-          completed_lease = '''      completed_lease as (
-            update runner_job_leases
-            set status = 'completed',
-                stage = 'reporting',
-                heartbeat_at = greatest(runner_job_leases.heartbeat_at, $5::timestamptz),
-                closed_at = coalesce(runner_job_leases.closed_at, $5::timestamptz),
-                close_reason = coalesce(runner_job_leases.close_reason, 'Terminal result accepted.')
-            from updated
-            where $15::text is not null
-              and $3 in ('completed', 'failed', 'timed_out')
-              and runner_job_leases.id = $15
-              and runner_job_leases.run_id = updated.id
-              and runner_job_leases.execution_attempt_id = $2
-              and runner_job_leases.status = 'active'
-            returning runner_job_leases.id
-          ),
-          deleted_findings as (
-          '''
           if "completed_lease as (" not in text:
-            if deleted_marker not in text:
+            completed_lease = '''     completed_lease as (
+               update runner_job_leases
+               set status = 'completed',
+                   stage = 'reporting',
+                   heartbeat_at = greatest(runner_job_leases.heartbeat_at, $5::timestamptz),
+                   closed_at = coalesce(runner_job_leases.closed_at, $5::timestamptz),
+                   close_reason = coalesce(runner_job_leases.close_reason, 'Terminal result accepted.')
+               from updated
+               where $15::text is not null
+                 and $3 in ('completed', 'failed', 'timed_out')
+                 and runner_job_leases.id = $15
+                 and runner_job_leases.run_id = updated.id
+                 and runner_job_leases.execution_attempt_id = $2
+                 and runner_job_leases.status = 'active'
+               returning runner_job_leases.id
+             ),
+          '''
+            text, count = re.subn(
+              r'(\n\s+deleted_findings as \(\n)',
+              "\n" + completed_lease + r'\1'.lstrip("\\n"),
+              text,
+              count=1,
+            )
+            if count != 1:
               raise SystemExit("completed lease insertion marker not found")
-            text = text.replace(deleted_marker, completed_lease, 1)
 
-          audit_marker = '''                 'attemptUpdated', exists(select 1 from updated_attempt),
-                           'findingCount','''
-          audit_replacement = '''                 'attemptUpdated', exists(select 1 from updated_attempt),
-                           'leaseCompleted', exists(select 1 from completed_lease),
-                           'findingCount','''
           if "'leaseCompleted'" not in text:
-            if audit_marker not in text:
+            text, count = re.subn(
+              r"('attemptUpdated', exists\(select 1 from updated_attempt\),\n\s*)('findingCount')",
+              r"\1'leaseCompleted', exists(select 1 from completed_lease),\n                 \2",
+              text,
+              count=1,
+            )
+            if count != 1:
               raise SystemExit("audit metadata marker not found")
-            text = text.replace(audit_marker, audit_replacement, 1)
 
-          params_marker = '''      digest,
-            artifactsJson,
-          ],'''
-          params_replacement = '''      digest,
-            artifactsJson,
-            dependencies.verifiedLeaseId ?? null,
-          ],'''
           if "dependencies.verifiedLeaseId ?? null" not in text:
-            if params_marker not in text:
+            text, count = re.subn(
+              r'(\n\s+artifactsJson,\n)(\s+\],\n\s+\);)',
+              r'\1      dependencies.verifiedLeaseId ?? null,\n\2',
+              text,
+              count=1,
+            )
+            if count != 1:
               raise SystemExit("SQL parameter marker not found")
-            text = text.replace(params_marker, params_replacement, 1)
 
           target.write_text(text)
           PY
@@ -129,10 +120,6 @@ jobs:
             apps/web/lib/runner-terminal-result-routes.ts \
             apps/web/app/api/v1/runner/results/route.ts \
             tests/unit/web/runner-terminal-result-route.test.ts
-          pnpm run typecheck
-          pnpm exec vitest run \
-            tests/unit/web/readiness-result-route.test.ts \
-            tests/unit/web/runner-terminal-result-route.test.ts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
@@ -140,7 +127,11 @@ jobs:
             apps/web/lib/runner-terminal-result-routes.ts \
             apps/web/app/api/v1/runner/results/route.ts \
             tests/unit/web/runner-terminal-result-route.test.ts
-          if ! git diff --cached --quiet; then
-            git commit -m "feat(runner): integrate signed terminal results"
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          fi
+          git commit -m "feat(runner): integrate signed terminal results"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+      - name: Validate focused result routes
+        run: |
+          pnpm run typecheck
+          pnpm exec vitest run \
+            tests/unit/web/readiness-result-route.test.ts \
+            tests/unit/web/runner-terminal-result-route.test.ts
