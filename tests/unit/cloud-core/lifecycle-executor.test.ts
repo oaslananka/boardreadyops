@@ -144,6 +144,8 @@ describe("GitHub App lifecycle execution", () => {
     expect(store.markReleaseRunDispatched).toHaveBeenCalledWith({
       runId: "run-row-id",
       executionAttemptId: expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      dispatchedAt: expect.any(String),
+      workflowDispatchId: "dispatch-123",
     });
     expect(store.markReleaseRunSkipped).not.toHaveBeenCalled();
     expect(checks.completeCheckRun).not.toHaveBeenCalled();

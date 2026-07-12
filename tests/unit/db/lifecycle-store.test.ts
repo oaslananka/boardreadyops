@@ -132,7 +132,10 @@ describe("SQL GitHub App lifecycle store", () => {
 
     expect(result).toMatchObject({ runId: "run-row-id", status: "queued" });
     expect(calls).toHaveLength(2);
+    expect(calls[0]?.sql).toContain("with superseded_runs as");
     expect(calls[0]?.sql).toContain("set status = 'superseded'");
+    expect(calls[0]?.sql).toContain("update release_run_attempts");
+    expect(calls[0]?.sql).toContain("'newer_commit'");
     expect(calls[0]?.sql).toContain("release_runs.status in ('queued', 'dispatched', 'running')");
     expect(calls[0]?.params).toEqual([1283305324, 42, "0123456789abcdef", "2026-07-04T00:00:00.000Z"]);
     expect(calls[1]?.sql).toContain("insert into release_runs");
@@ -186,17 +189,28 @@ describe("SQL GitHub App lifecycle store", () => {
         startedAt: "2026-07-11T15:00:00.000Z",
       }),
     ).resolves.toBe(true);
-    await store.markReleaseRunDispatched({ runId: "run-row-id", executionAttemptId });
+    await store.markReleaseRunDispatched({
+      runId: "run-row-id",
+      executionAttemptId,
+      dispatchedAt: "2026-07-11T15:00:01.000Z",
+      workflowDispatchId: "dispatch-123",
+    });
 
     expect(calls).toHaveLength(2);
-    expect(calls[0]?.sql).toContain("execution_attempt_id = $2");
-    expect(calls[0]?.sql).toContain("execution_attempt_started_at = $3::timestamptz");
+    expect(calls[0]?.sql).toContain("insert into release_run_attempts");
+    expect(calls[0]?.sql).toContain("attempt_number");
+    expect(calls[0]?.sql).toContain("'dispatching'");
+    expect(calls[0]?.sql).toContain("'dispatch_replaced'");
+    expect(calls[0]?.sql).toContain("execution_attempt_id = inserted_attempt.id");
     expect(calls[0]?.sql).toContain("status = 'queued'");
     expect(calls[0]?.params).toEqual(["run-row-id", executionAttemptId, "2026-07-11T15:00:00.000Z"]);
+    expect(calls[1]?.sql).toContain("update release_run_attempts");
     expect(calls[1]?.sql).toContain("set status = 'dispatched'");
+    expect(calls[1]?.sql).toContain("github_workflow_dispatch_id");
+    expect(calls[1]?.sql).toContain("release_runs.execution_attempt_id = release_run_attempts.id");
+    expect(calls[1]?.sql).toContain("release_runs.status = 'queued'");
     expect(calls[1]?.sql).not.toContain("decision");
-    expect(calls[1]?.sql).toContain("execution_attempt_id = $2");
-    expect(calls[1]?.params).toEqual(["run-row-id", executionAttemptId]);
+    expect(calls[1]?.params).toEqual(["run-row-id", executionAttemptId, "2026-07-11T15:00:01.000Z", "dispatch-123"]);
   });
 
   it("terminalizes safe-mode skips as completed and neutral", async () => {

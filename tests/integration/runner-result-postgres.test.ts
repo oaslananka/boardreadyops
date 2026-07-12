@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { handleResultRequest, type ResultRouteDependencies } from "../../apps/web/app/api/v1/runs/result/route.js";
+import { createSqlGitHubAppLifecycleStore } from "../../packages/db/src/lifecycle-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 
 const connectionString = process.env.DATABASE_URL;
@@ -83,6 +84,12 @@ beforeAll(async () => {
        execution_attempt_id, execution_attempt_started_at, started_at
      ) values ($1, $2, $3, 'refs/pull/42/head', 'pr', 'running', $4, $5::timestamptz, $5::timestamptz)`,
     [runId, repositoryId, "0123456789abcdef0123456789abcdef01234567", attemptId, "2026-07-12T11:59:58.750Z"],
+  );
+  await executor.query(
+    `insert into release_run_attempts (
+       id, run_id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at, started_at
+     ) values ($1, $2, 1, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
+    [attemptId, runId, "2026-07-12T11:59:58.750Z"],
   );
 });
 
@@ -177,5 +184,106 @@ describeDatabase("runner result PostgreSQL integration", () => {
       ),
     );
     expect(remainingRows).toEqual([{ installations: 0, repositories: 0, runs: 0, audit_events: 0 }]);
+  });
+  it("records retry attempts separately and supersedes the active attempt with a newer commit", async () => {
+    if (!executor) throw new Error("DATABASE_URL is required");
+    const lifecycleInstallationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const lifecycleRepositoryId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    await executor.query(
+      `insert into installations (id, github_installation_id, account_login, account_type)
+       values ($1, 54321, 'octo-org', 'Organization')`,
+      [lifecycleInstallationId],
+    );
+    await executor.query(
+      `insert into repositories (id, installation_id, github_repo_id, owner, name, default_branch)
+       values ($1, $2, 98765, 'octo-org', 'hardware-board', 'main')`,
+      [lifecycleRepositoryId, lifecycleInstallationId],
+    );
+    const firstRunId = "55555555-5555-4555-8555-555555555555";
+    const secondRunId = "66666666-6666-4666-8666-666666666666";
+    const logicalRunIds = [firstRunId, secondRunId];
+    const attemptOne = "77777777-7777-4777-8777-777777777777";
+    const attemptTwo = "88888888-8888-4888-8888-888888888888";
+    const ids = [...logicalRunIds];
+    const enqueueTimes = ["2026-07-12T12:10:00.000Z", "2026-07-12T12:10:04.000Z"];
+    const store = createSqlGitHubAppLifecycleStore(executor, {
+      id: () => ids.shift() ?? "99999999-9999-4999-8999-999999999999",
+      now: () => new Date(enqueueTimes.shift() ?? "2026-07-12T12:10:04.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const action = {
+      type: "release_run.enqueue" as const,
+      installation: { id: 54321, accountLogin: "octo-org", accountType: "Organization" },
+      repository: {
+        id: 98765,
+        owner: "octo-org",
+        name: "hardware-board",
+        fullName: "octo-org/hardware-board",
+        private: false,
+        defaultBranch: "main",
+      },
+      pullRequestNumber: 77,
+      ref: "feature/attempt-history",
+      commitSha: "1111111111111111111111111111111111111111",
+      triggerKind: "pr" as const,
+    };
+
+    const first = await store.enqueueReleaseRun(action);
+    expect(first.runId).toBe(firstRunId);
+    await expect(
+      store.bindReleaseRunExecutionAttempt({
+        runId: firstRunId,
+        executionAttemptId: attemptOne,
+        startedAt: "2026-07-12T12:10:01.000Z",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      store.bindReleaseRunExecutionAttempt({
+        runId: firstRunId,
+        executionAttemptId: attemptTwo,
+        startedAt: "2026-07-12T12:10:02.000Z",
+      }),
+    ).resolves.toBe(true);
+    await store.markReleaseRunDispatched({
+      runId: firstRunId,
+      executionAttemptId: attemptTwo,
+      dispatchedAt: "2026-07-12T12:10:03.000Z",
+      workflowDispatchId: "dispatch-2",
+    });
+
+    const second = await store.enqueueReleaseRun({
+      ...action,
+      commitSha: "2222222222222222222222222222222222222222",
+    });
+    expect(second.runId).toBe(secondRunId);
+
+    const attempts = (await executor.query(
+      `select attempt_number, status, completed_at, github_workflow_dispatch_id, failure_class
+       from release_run_attempts
+       where run_id = $1
+       order by attempt_number`,
+      [firstRunId],
+    )) as { rows: readonly Record<string, unknown>[] };
+    expect(attempts.rows).toEqual([
+      expect.objectContaining({
+        attempt_number: 1,
+        status: "failed",
+        completed_at: new Date("2026-07-12T12:10:02.000Z"),
+        github_workflow_dispatch_id: null,
+        failure_class: "dispatch_replaced",
+      }),
+      expect.objectContaining({
+        attempt_number: 2,
+        status: "superseded",
+        completed_at: new Date("2026-07-12T12:10:04.000Z"),
+        github_workflow_dispatch_id: "dispatch-2",
+        failure_class: "newer_commit",
+      }),
+    ]);
+    const superseded = (await executor.query(`select status from release_runs where id = $1`, [firstRunId])) as {
+      rows: readonly Record<string, unknown>[];
+    };
+    expect(superseded.rows).toEqual([{ status: "superseded" }]);
+    await executor.query("delete from installations where id = $1", [lifecycleInstallationId]);
   });
 });

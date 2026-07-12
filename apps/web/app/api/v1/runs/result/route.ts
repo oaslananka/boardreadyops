@@ -390,6 +390,9 @@ export async function handleResultRequest(
               execution_attempt_id,
               terminal_result_digest,
               completed_at,
+              (select release_run_attempts.status
+               from release_run_attempts
+               where release_run_attempts.id = release_runs.execution_attempt_id) as attempt_status,
               (select release_run_results.result_digest
                from release_run_results
                where release_run_results.run_id = release_runs.id) as persisted_result_digest
@@ -402,6 +405,7 @@ export async function handleResultRequest(
               case
                 when existing.status = 'superseded' then 'superseded'
                 when existing.execution_attempt_id is distinct from $2 then 'stale_attempt'
+                when existing.attempt_status in ('cancelled', 'timed_out', 'stale', 'superseded') then 'stale_attempt'
                 when existing.status in ('completed', 'failed', 'timed_out') then
                   case
                     when $3 in ('completed', 'failed', 'timed_out')
@@ -446,6 +450,36 @@ export async function handleResultRequest(
                  release_runs.repository_id,
                  release_runs.pull_request_number,
                  release_runs.completed_at
+     ),
+     updated_attempt as (
+       update release_run_attempts
+       set status = case $3
+             when 'queued' then 'dispatching'
+             when 'running' then 'in_progress'
+             else $3
+           end,
+           started_at = case
+             when $3 in ('running', 'completed', 'failed', 'timed_out')
+               then coalesce(release_run_attempts.started_at, $5::timestamptz)
+             else release_run_attempts.started_at
+           end,
+           heartbeat_at = $5::timestamptz,
+           completed_at = case
+             when $3 in ('completed', 'failed', 'timed_out')
+               then coalesce(release_run_attempts.completed_at, $5::timestamptz)
+             else release_run_attempts.completed_at
+           end,
+           result_digest = case
+             when $3 in ('completed', 'failed', 'timed_out') then $13
+             else release_run_attempts.result_digest
+           end
+       from updated
+       where release_run_attempts.id = $2
+         and release_run_attempts.run_id = updated.id
+         and release_run_attempts.status in (
+           'queued', 'dispatching', 'dispatched', 'in_progress', 'uploading_artifacts', 'reporting'
+         )
+       returning release_run_attempts.id
      ),
      deleted_findings as (
        delete from findings
@@ -570,6 +604,8 @@ export async function handleResultRequest(
                 'status', $3,
                 'conclusion', $9,
                 'resultDigest', $13,
+                'executionAttemptId', $2,
+                'attemptUpdated', exists(select 1 from updated_attempt),
                 'findingCount', (select count(*) from inserted_findings),
                 'artifactCount', (select count(*) from inserted_artifacts),
                 'metricCount', (select count(*) from jsonb_object_keys($10::jsonb)),
@@ -590,6 +626,7 @@ export async function handleResultRequest(
             coalesce(updated.completed_at, classified.completed_at) as completed_at,
             (select count(*) from inserted_findings) as inserted_finding_count,
             (select count(*) from inserted_artifacts) as inserted_artifact_count,
+            (select count(*) from updated_attempt) as updated_attempt_count,
             (select count(*) from persisted_audit) as persisted_audit_count
      from classified
      left join updated on updated.id = classified.id

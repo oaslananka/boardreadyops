@@ -103,6 +103,42 @@ describe("run dashboard data", () => {
           },
         ],
       },
+      {
+        rows: [
+          {
+            id: "attempt-2",
+            attempt_number: 2,
+            status: "completed",
+            created_at: startedAt,
+            dispatch_requested_at: startedAt,
+            dispatched_at: startedAt,
+            started_at: startedAt,
+            heartbeat_at: completedAt,
+            completed_at: completedAt,
+            retry_after_at: null,
+            github_workflow_dispatch_id: "dispatch-456",
+            failure_class: null,
+            failure_message: null,
+            result_digest: "b".repeat(64),
+          },
+          {
+            id: "attempt-1",
+            attempt_number: 1,
+            status: "failed",
+            created_at: startedAt,
+            dispatch_requested_at: startedAt,
+            dispatched_at: null,
+            started_at: null,
+            heartbeat_at: null,
+            completed_at: startedAt,
+            retry_after_at: null,
+            github_workflow_dispatch_id: null,
+            failure_class: "dispatch_replaced",
+            failure_message: "A newer dispatch attempt replaced this uncompleted attempt.",
+            result_digest: null,
+          },
+        ],
+      },
     ]);
 
     const result = await lookupRunDashboard("run-123", executor, {
@@ -165,16 +201,53 @@ describe("run dashboard data", () => {
             downloadUrl: "https://boardreadyops.test/download/run-123/artifact-456",
           },
         ],
+        attempts: [
+          {
+            id: "attempt-2",
+            attemptNumber: 2,
+            status: "completed",
+            createdAt: "2026-07-10T17:00:00.000Z",
+            dispatchRequestedAt: "2026-07-10T17:00:00.000Z",
+            dispatchedAt: "2026-07-10T17:00:00.000Z",
+            startedAt: "2026-07-10T17:00:00.000Z",
+            heartbeatAt: "2026-07-10T17:00:02.500Z",
+            completedAt: "2026-07-10T17:00:02.500Z",
+            retryAfterAt: undefined,
+            workflowDispatchId: "dispatch-456",
+            failureClass: undefined,
+            failureMessage: undefined,
+            resultDigest: "b".repeat(64),
+          },
+          {
+            id: "attempt-1",
+            attemptNumber: 1,
+            status: "failed",
+            createdAt: "2026-07-10T17:00:00.000Z",
+            dispatchRequestedAt: "2026-07-10T17:00:00.000Z",
+            dispatchedAt: undefined,
+            startedAt: undefined,
+            heartbeatAt: undefined,
+            completedAt: "2026-07-10T17:00:00.000Z",
+            retryAfterAt: undefined,
+            workflowDispatchId: undefined,
+            failureClass: "dispatch_replaced",
+            failureMessage: "A newer dispatch attempt replaced this uncompleted attempt.",
+            resultDigest: undefined,
+          },
+        ],
       },
     });
 
     const runSql = String(query.mock.calls[0]?.[0]);
     const artifactSql = String(query.mock.calls[2]?.[0]);
+    const attemptSql = String(query.mock.calls[3]?.[0]);
     expect(runSql).not.toContain("installations");
     expect(runSql).not.toContain("account_login");
     expect(runSql).toContain("left join release_run_results");
     expect(artifactSql).toContain("select id, kind");
     expect(artifactSql).not.toContain("storage_path");
+    expect(attemptSql).toContain("from release_run_attempts");
+    expect(attemptSql).toContain("order by attempt_number desc");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
   });
 });
