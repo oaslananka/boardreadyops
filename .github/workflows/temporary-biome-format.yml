@@ -1,9 +1,9 @@
 name: temporary-biome-format
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/runner-transactional-lease-store
+      - main
 
 permissions:
   contents: read
