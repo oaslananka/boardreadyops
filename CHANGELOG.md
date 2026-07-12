@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.9.0](https://github.com/oaslananka/boardreadyops/compare/v1.8.4...v1.9.0) (2026-07-12)
+
+
+### Features
+
+* **core:** persist versioned runner results ([#144](https://github.com/oaslananka/boardreadyops/issues/144)) ([8f8b6b9](https://github.com/oaslananka/boardreadyops/commit/8f8b6b94f377a510bf836e7d547bb73c61f9139b))
+
 ## [1.8.4](https://github.com/oaslananka/boardreadyops/compare/v1.8.3...v1.8.4) (2026-07-11)
 
 
