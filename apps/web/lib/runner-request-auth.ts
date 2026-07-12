@@ -12,22 +12,22 @@ export const runnerProtocolHeaderNames = {
   signature: "x-boardreadyops-runner-signature",
 } as const;
 
-export type RunnerRequestIdentity =
+type RunnerRequestIdentity =
   | { workerClass: "managed"; managedRunnerIdentityId: string }
   | { workerClass: "self_hosted"; runnerRegistrationId: string };
 
-export type RunnerRequestSignatureContext = {
+type RunnerRequestSignatureContext = {
   runId?: string;
   executionAttemptId?: string;
   leaseId?: string;
 };
 
-export type AuthenticatedRunnerRequest = {
+type AuthenticatedRunnerRequest = {
   envelope: RunnerSignedRequestEnvelope;
   identity: RunnerRequestIdentity;
 };
 
-export type AuthenticateRunnerRequestInput = {
+type AuthenticateRunnerRequestInput = {
   request: Request;
   body: string;
   executor: SqlQueryExecutor;
@@ -56,7 +56,7 @@ function numericHeader(headers: Headers, name: string): number | undefined {
   return Number.isSafeInteger(parsed) && String(parsed) === value ? parsed : undefined;
 }
 
-export function parseRunnerSignedRequestEnvelope(headers: Headers): RunnerSignedRequestEnvelope | undefined {
+function parseRunnerSignedRequestEnvelope(headers: Headers): RunnerSignedRequestEnvelope | undefined {
   const protocolVersion = numericHeader(headers, runnerProtocolHeaderNames.protocolVersion);
   const timestamp = numericHeader(headers, runnerProtocolHeaderNames.timestamp);
   const parsed = runnerSignedRequestEnvelopeSchema.safeParse({
