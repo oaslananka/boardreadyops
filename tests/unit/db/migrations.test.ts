@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(11);
+    expect(cloudDatabaseSchemaVersion).toBe(12);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
@@ -33,6 +33,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0009_runner_lease_deferred_scope.sql",
       "0010_runner_lease_heartbeat_qualification.sql",
       "0011_runner_artifact_upload_capabilities.sql",
+      "0012_runner_terminal_result_authorization.sql",
     ]);
   });
 
@@ -142,6 +143,19 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("runner_job_leases.status = 'active'");
     expect(sql).toContain("security invoker");
     expect(sql).not.toContain("upload_token text");
+  });
+
+  it("authorizes signed terminal results with body-bound nonce replay protection in schema v12", async () => {
+    const sql = await readFile(join(migrationsDir, "0012_runner_terminal_result_authorization.sql"), "utf8");
+
+    expect(sql).toContain("add column if not exists request_digest text");
+    expect(sql).toContain("runner_request_nonces_request_digest_valid");
+    expect(sql).toContain("boardreadyops_authorize_runner_terminal_result");
+    expect(sql).toContain("runner_job_leases.lease_token_digest = p_lease_token_digest");
+    expect(sql).toContain("release_runs.execution_attempt_id = runner_job_leases.execution_attempt_id");
+    expect(sql).toContain("persisted_request_digest = p_request_digest");
+    expect(sql).toContain("return 'conflicting_replay'");
+    expect(sql).toContain("security invoker");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
