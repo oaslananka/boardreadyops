@@ -7,10 +7,7 @@ import {
 } from "@boardreadyops/contracts";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import {
-  createSqlRunnerArtifactStore,
-  type RunnerArtifactStore,
-} from "@boardreadyops/db/runner-artifact-store";
+import { createSqlRunnerArtifactStore, type RunnerArtifactStore } from "@boardreadyops/db/runner-artifact-store";
 import { safeLocalArtifactPath } from "./artifact-downloads.js";
 import { authenticateRunnerRequest } from "./runner-request-auth.js";
 
@@ -42,7 +39,9 @@ function jsonResponse(value: unknown, status = 200): Response {
   });
 }
 
-function configuredQueryExecutor(environment: Readonly<Record<string, string | undefined>>): SqlQueryExecutor | undefined {
+function configuredQueryExecutor(
+  environment: Readonly<Record<string, string | undefined>>,
+): SqlQueryExecutor | undefined {
   const connectionString = environment.DATABASE_URL;
   if (!connectionString) return undefined;
   return createPgQueryExecutor({
@@ -94,6 +93,16 @@ function publicUploadUrl(
     return url.toString();
   } catch {
     return undefined;
+  }
+}
+
+function hasHttpsPublicBaseUrl(environment: Readonly<Record<string, string | undefined>>): boolean {
+  const baseUrl = environment.BOARDREADYOPS_PUBLIC_URL ?? environment.NEXT_PUBLIC_APP_URL;
+  if (!baseUrl) return false;
+  try {
+    return new URL(baseUrl).protocol === "https:";
+  } catch {
+    return false;
   }
 }
 
@@ -277,12 +286,15 @@ export async function handleRunnerArtifactUploadRequest(
   const begun = await store.beginUpload({ artifactId, uploadToken }).catch(() => undefined);
   if (!begun) return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
   if (begun.status === "expired") return jsonResponse({ ok: false, error: "artifact upload capability expired" }, 410);
-  if (begun.status === "replayed") return jsonResponse({ ok: false, error: "artifact upload capability was already used" }, 409);
+  if (begun.status === "replayed")
+    return jsonResponse({ ok: false, error: "artifact upload capability was already used" }, 409);
   if (begun.status === "stale") return jsonResponse({ ok: false, error: "artifact upload capability is invalid" }, 403);
 
   const target = await localArtifactTarget(storageRoot, begun.storagePath);
   if (!target) {
-    await store.failUpload({ artifactId, uploadToken, reason: "Artifact storage path is unavailable." }).catch(() => undefined);
+    await store
+      .failUpload({ artifactId, uploadToken, reason: "Artifact storage path is unavailable." })
+      .catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact storage path is unavailable" }, 503);
   }
 
@@ -310,7 +322,9 @@ export async function handleRunnerArtifactUploadRequest(
     await removeFile(target.temporaryPath);
   } catch {
     await removeFile(target.temporaryPath);
-    await store.failUpload({ artifactId, uploadToken, reason: "Artifact destination already exists or is unavailable." }).catch(() => undefined);
+    await store
+      .failUpload({ artifactId, uploadToken, reason: "Artifact destination already exists or is unavailable." })
+      .catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact destination is unavailable" }, 409);
   }
 
@@ -319,7 +333,9 @@ export async function handleRunnerArtifactUploadRequest(
     .catch(() => undefined);
   if (!completed) {
     await removeFile(target.finalPath);
-    await store.failUpload({ artifactId, uploadToken, reason: "Artifact metadata persistence failed." }).catch(() => undefined);
+    await store
+      .failUpload({ artifactId, uploadToken, reason: "Artifact metadata persistence failed." })
+      .catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
   }
   if (completed.status !== "accepted" && completed.status !== "replayed") {
