@@ -4,6 +4,18 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.10.0](https://github.com/oaslananka/boardreadyops/compare/v1.9.0...v1.10.0) (2026-07-12)
+
+
+### Features
+
+* **core:** track release run attempts ([#146](https://github.com/oaslananka/boardreadyops/issues/146)) ([83d5d21](https://github.com/oaslananka/boardreadyops/commit/83d5d216f9706e77a9e8a78bc5195e59c52df6e6))
+
+
+### Bug Fixes
+
+* **core:** tolerate unavailable readiness comments ([#148](https://github.com/oaslananka/boardreadyops/issues/148)) ([f3cc4ec](https://github.com/oaslananka/boardreadyops/commit/f3cc4ec32eaa18618af0565199740852ab6c6d43))
+
 ## [1.9.0](https://github.com/oaslananka/boardreadyops/compare/v1.8.4...v1.9.0) (2026-07-12)
 
 
