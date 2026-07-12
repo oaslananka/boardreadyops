@@ -159,6 +159,13 @@ function fixedStore(input: {
 
 async function cleanupTenant(tenant: TenantFixture, managedIdentityId?: string): Promise<void> {
   if (!executor) return;
+  await executor.query(
+    `delete from runner_job_leases
+     where runner_registration_id in (
+       select id from runner_registrations where installation_id = $1
+     )`,
+    [tenant.installationId],
+  );
   await executor.query("delete from installations where id = $1", [tenant.installationId]);
   if (managedIdentityId) {
     await executor.query("delete from managed_runner_identities where id = $1", [managedIdentityId]);
