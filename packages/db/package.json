@@ -25,6 +25,11 @@
       "types": "./src/pg-executor.ts",
       "import": "./src/pg-executor.ts",
       "default": "./src/pg-executor.ts"
+    },
+    "./runner-lease-store": {
+      "types": "./src/runner-lease-store.ts",
+      "import": "./src/runner-lease-store.ts",
+      "default": "./src/runner-lease-store.ts"
     }
   },
   "devDependencies": {
