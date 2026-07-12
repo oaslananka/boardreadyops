@@ -551,7 +551,7 @@ describe("readiness result route authentication and publication", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it("persists the result and requests a replay when the PR comment cannot be published", async () => {
+  it("persists the result and reports a non-blocking warning when the PR comment cannot be published", async () => {
     const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
     query
       .mockResolvedValueOnce({
@@ -573,12 +573,11 @@ describe("readiness result route authentication and publication", () => {
 
     const response = await handleResultRequest(resultRequest({ body }), dependencies);
 
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(202);
     await expect(response.json()).resolves.toMatchObject({
-      ok: false,
-      persisted: true,
-      error: "runner result was persisted but GitHub publication is incomplete",
-      publicationErrors: [expect.stringContaining("GitHub pull request comment")],
+      ok: true,
+      status: "accepted",
+      publicationWarnings: [expect.stringContaining("GitHub pull request comment")],
       checkRunUpdated: true,
       pullRequestCommentCreated: false,
     });
@@ -586,6 +585,38 @@ describe("readiness result route authentication and publication", () => {
     const [publicationSql, publicationParams] = query.mock.calls[1] as [string, unknown[]];
     expect(publicationSql).toContain("last_publication_error = $5");
     expect(publicationParams[4]).toContain("status 403");
+    expect(publicationParams[5]).toBe("runner.result.publication_failed");
+  });
+
+  it("requests a replay when the required check run cannot be published", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            github_installation_id: 12345,
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+    completeCheckRun.mockRejectedValueOnce(new Error("GitHub check-run completion failed with status 503"));
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      persisted: true,
+      publicationErrors: [expect.stringContaining("GitHub check run")],
+      checkRunUpdated: false,
+    });
+    const [, publicationParams] = query.mock.calls[1] as [string, unknown[]];
+    expect(publicationParams[4]).toContain("status 503");
     expect(publicationParams[5]).toBe("runner.result.publication_failed");
   });
 
