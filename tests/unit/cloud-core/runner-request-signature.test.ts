@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import vector from "../../fixtures/runner-request-signature-v1.json" with { type: "json" };
 import {
   canonicalRunnerRequest,
   normalizeRunnerRequestPath,
   signRunnerRequest,
   verifyRunnerRequestSignature,
 } from "../../../packages/cloud-core/src/runner-request-signature.js";
+import vector from "../../fixtures/runner-request-signature-v1.json" with { type: "json" };
 
 function vectorRequest() {
   return {
