@@ -119,11 +119,18 @@ function findingLine(finding) {
 }
 
 function markdownLinkLabel(value) {
-  return sanitizeInline(value).replace(/\\/g, "\\\\").replace(/[[\]]/g, "\\$&");
+  let escaped = "";
+  for (const character of sanitizeInline(value)) {
+    if (character === "\\" || character === "[" || character === "]") {
+      escaped += "\\";
+    }
+    escaped += character;
+  }
+  return escaped;
 }
 
 function markdownLinkUrl(value) {
-  return encodeURI(String(value)).replace(/\(/g, "%28").replace(/\)/g, "%29");
+  return encodeURI(String(value)).replaceAll("(", "%28").replaceAll(")", "%29");
 }
 
 function reportLinkLine(link) {
