@@ -43,7 +43,7 @@ export type ClaimedRunnerJob = {
   };
   safeMode: {
     enabled: boolean;
-    reasons: readonly "private-repository"[];
+    reasons: readonly ("private-repository")[];
   };
 };
 
@@ -53,7 +53,12 @@ export type ClaimRunnerJobResult =
   | { status: "replayed" }
   | { status: "rejected"; reason: "invalid_request" | "stale_request" };
 
-export type RunnerLeaseStage = "claimed" | "preparing_source" | "reporting" | "running" | "uploading_artifacts";
+export type RunnerLeaseStage =
+  | "claimed"
+  | "preparing_source"
+  | "reporting"
+  | "running"
+  | "uploading_artifacts";
 
 export type RunnerLeaseMutationContext = RunnerWorkerIdentity &
   RunnerSignedMutation & {
@@ -131,7 +136,9 @@ function isoColumn(row: Record<string, unknown> | undefined, key: string): strin
 
 function positiveInteger(value: number | undefined, fallback: number, name: string): number {
   const selected = value ?? fallback;
-  if (!Number.isSafeInteger(selected) || selected <= 0) throw new Error(`${name} must be a positive integer`);
+  if (!Number.isSafeInteger(selected) || selected <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
   return selected;
 }
 
@@ -172,7 +179,9 @@ function validLeaseContext(input: RunnerLeaseMutationContext): boolean {
 
 function normalizedCapabilities(capabilities: readonly string[] | undefined): string[] | undefined {
   const normalized = Array.from(new Set(capabilities ?? [])).sort();
-  if (normalized.length > 64 || normalized.some((capability) => !capabilityPattern.test(capability))) return undefined;
+  if (normalized.length > 64 || normalized.some((capability) => !capabilityPattern.test(capability))) {
+    return undefined;
+  }
   return normalized;
 }
 
@@ -202,9 +211,10 @@ export function createSqlRunnerLeaseStore(
   }
 
   async function expireLeasesAt(at: Date): Promise<number> {
-    const result = await executor.query("select boardreadyops_expire_runner_leases($1::timestamptz) as expired_count", [
-      at.toISOString(),
-    ]);
+    const result = await executor.query(
+      "select boardreadyops_expire_runner_leases($1::timestamptz) as expired_count",
+      [at.toISOString()],
+    );
     return numberColumn(rows(result)[0], "expired_count") ?? 0;
   }
 
@@ -320,7 +330,9 @@ export function createSqlRunnerLeaseStore(
         return { status: "stale" };
       }
       if (!leaseStages.has(input.stage)) return { status: "stale" };
-      if (input.progressPercent !== undefined && !Number.isInteger(input.progressPercent)) return { status: "stale" };
+      if (input.progressPercent !== undefined && !Number.isInteger(input.progressPercent)) {
+        return { status: "stale" };
+      }
       if (input.progressPercent !== undefined && (input.progressPercent < 0 || input.progressPercent > 100)) {
         return { status: "stale" };
       }
@@ -366,7 +378,9 @@ export function createSqlRunnerLeaseStore(
       if (outcome === "active") {
         const leaseExpiresAt = isoColumn(row, "expires_at");
         const maximumLeaseExpiresAt = isoColumn(row, "maximum_expires_at");
-        if (!leaseExpiresAt || !maximumLeaseExpiresAt) throw new Error("lease heartbeat returned invalid expiry data");
+        if (!leaseExpiresAt || !maximumLeaseExpiresAt) {
+          throw new Error("lease heartbeat returned invalid expiry data");
+        }
         return { status: "active", leaseExpiresAt, maximumLeaseExpiresAt };
       }
       if (outcome === "completed" || outcome === "expired" || outcome === "replayed" || outcome === "revoked") {
