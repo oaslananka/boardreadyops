@@ -1,144 +1,173 @@
-# RFC: BoardReadyOps GitHub App Architecture
+# RFC: BoardReadyOps GitHub App architecture
 
-**Status:** Proposed
-**Issue:** [#303](https://github.com/oaslananka/boardreadyops/issues/303)
-**Related:** [ADR-0008 — Vercel control plane](adr/0008-vercel-control-plane.md)
+**Status:** Implemented for the current single-owner deployment; public
+Marketplace execution remains incomplete.
 
----
+**Security review:** [GitHub App permissions and webhook subscriptions](../security/github-app-permissions.md)
+
+**Tracking issue:** [#88](https://github.com/oaslananka/boardreadyops/issues/88)
 
 ## Summary
 
-This RFC describes the architecture for a native BoardReadyOps GitHub App that runs release checks on every pull request without requiring users to add a GitHub Actions workflow. The App handles the full lifecycle: webhook → check run → analysis → PR comment → evidence link.
+The BoardReadyOps GitHub App receives installation and pull request webhooks,
+creates a native Check Run, dispatches work to an execution plane, accepts a
+signed runner result, and completes the Check Run with a link to the hosted run
+dashboard.
 
----
+The current production implementation is intentionally narrower than the early
+proposal:
 
-## GitHub App vs. GitHub Action
+- the `pull_request` webhook is the only manually selected repository event;
+- `installation` and `installation_repositories` are received automatically;
+- Check Runs are the authoritative GitHub result surface;
+- a top-level pull request summary comment is optional and non-blocking;
+- commit statuses are not used; and
+- `check_suite` and `check_run` re-request events are not currently handled.
 
-| Concern | GitHub Action (existing) | GitHub App (new) |
-|---|---|---|
-| Installation | User adds `.github/workflows/boardreadyops.yml` | User installs App from GitHub Marketplace |
-| KiCad runner | User provides runner (or uses container action) | App triggers a workflow dispatch on the user's repo or uses a managed runner |
-| Result display | Workflow annotations + PR comment | Native GitHub Check Run UI + PR comment |
-| Evidence link | Workflow artifact URL | Hosted dashboard link |
-| Auth | `GITHUB_TOKEN` from the workflow | GitHub App installation token |
+## GitHub App and GitHub Action roles
 
-The App complements the Action; it does not replace it. Teams that want full control keep using the Action. Teams that want zero-config use the App.
+| Concern | GitHub Action | GitHub App control plane |
+| --- | --- | --- |
+| Installation | Repository adds a workflow | Repository owner installs the App |
+| Trigger | Workflow event | Signed GitHub App webhook |
+| Execution | Job-scoped runner token | Configured execution plane |
+| Result display | Workflow annotations and artifacts | Native Check Run and hosted dashboard |
+| Authentication | `GITHUB_TOKEN` and optional OIDC | Installation token, webhook HMAC, and runner OIDC |
 
----
+The App complements the Action. It does not grant its installation token to the
+runner and does not use broad repository permissions as a substitute for a
+proper execution-plane trust boundary.
 
-## Required GitHub Permissions
+## Required permissions
 
-The GitHub App requests these permissions:
+The authoritative permission matrix is maintained in
+[GitHub App permissions and webhook subscriptions](../security/github-app-permissions.md).
+
+For the current GitHub Actions dispatch profile, the minimum repository
+permissions are:
 
 | Permission | Level | Reason |
-|---|---|---|
-| `checks` | Write | Create and update check runs |
-| `contents` | Read | Clone the repository to run checks |
-| `pull_requests` | Write | Post PR review comments with finding summaries |
-| `actions` | Write (optional) | Trigger workflow dispatch for KiCad generation jobs |
-| `statuses` | Write | Update commit statuses (fallback if checks API unavailable) |
-| `metadata` | Read | Required by GitHub for all Apps |
+| --- | --- | --- |
+| Metadata | Read | GitHub-required repository and installation context |
+| Pull requests | Read | Receive `pull_request` events |
+| Checks | Read and write | Create, start, and complete Check Runs |
+| Actions | Read and write | Dispatch the configured runner workflow |
 
-No user data beyond repository contents is read.
+Pull request summary comments require either Pull requests write or Issues
+write. They are not required for the readiness decision and must not expand the
+public App's permission surface unless the feature is intentionally enabled.
 
----
+No organization or account permissions are required by the shipped control
+plane.
 
-## Webhook Events
+## Webhook events
 
-The App subscribes to:
+The service accepts:
 
-| Event | Action(s) | Handler |
-|---|---|---|
-| `check_suite` | `requested`, `rerequested` | Create a check run and enqueue a job |
-| `check_run` | `rerequested` | Re-run the specific check |
-| `pull_request` | `opened`, `synchronize`, `reopened` | Trigger a new check suite |
-| `installation` | `created`, `deleted` | Create or delete installation record |
-| `installation_repositories` | `added`, `removed` | Update repo subscription list |
+| Event | Action(s) | Result |
+| --- | --- | --- |
+| `ping` | n/a | Verify webhook connectivity |
+| `installation` | lifecycle actions including create and delete | Upsert or remove installation and repository records |
+| `installation_repositories` | `added`, `removed` | Update the installation repository set |
+| `pull_request` | `opened`, `reopened`, `synchronize`, `ready_for_review` | Enqueue a release run |
 
----
+Other pull request actions are accepted as no-ops. Unsupported event types are
+rejected by the normalizer and are not part of the subscription profile.
 
-## Check Run Lifecycle
+## Check Run lifecycle
 
+```text
+pull request event
+        |
+        v
+verify webhook HMAC and normalize payload
+        |
+        v
+persist installation/repository/run state
+        |
+        v
+create Check Run (queued)
+        |
+        v
+dispatch execution attempt
+        |
+        v
+mark Check Run in progress
+        |
+        v
+runner posts authenticated, versioned result
+        |
+        v
+persist result/findings/artifacts atomically
+        |
+        v
+complete Check Run and link hosted dashboard
+        |
+        v
+optionally upsert top-level PR summary comment
 ```
-PR opened / commit pushed
-        │
-        ▼
-  check_suite.requested webhook
-        │
-        ▼
-  Handler creates check run (status: queued)
-        │
-        ▼
-  Job dispatched to execution plane
-  (GitHub Actions workflow_dispatch or managed runner)
-        │
-        ▼
-  Runner clones repo, runs boardreadyops
-        │
-        ▼
-  Runner POSTs result to API: /api/v1/runs/{id}/result
-        │
-        ▼
-  API updates check run (status: completed)
-  outcome: success / failure / neutral
-        │
-        ▼
-  API posts PR review comment with finding summary
-  and link to hosted dashboard
-```
 
----
+Check Run publication is required. If it cannot be completed, the callback
+returns a retriable error after persisting the result. Pull request comment
+publication is optional: failures are retained in publication audit state but
+do not turn a successful runner callback into a failure.
 
-## PR Comment Strategy
+## Pull request safety modes
 
-A single top-level PR comment is created (or updated) per check cycle. The comment includes:
+The webhook normalizer records whether a pull request is:
 
-1. **Decision badge** — ALLOWED / BLOCKED (with color-coded icon)
-2. **Finding summary** — counts per severity, top 5 blocking findings inline
-3. **Evidence link** — link to the hosted dashboard for this run
-4. **Handoff status** — whether a handoff package was created
+- a draft;
+- from a fork; or
+- in a private repository.
 
-The comment is updated (not duplicated) on subsequent pushes to the same PR. A comment is not posted for passing runs with no findings (configurable).
+The execution dispatch includes the normalized safety mode and reasons. Draft
+and fork pull requests are not dispatched by the current lifecycle executor.
+Private-repository execution remains explicitly marked for safe-mode handling.
 
----
+## Authentication and storage boundaries
 
-## Webhook Verification and Security
+- Every incoming webhook is verified with HMAC-SHA256 before JSON processing.
+- GitHub App installation tokens are created on demand, expire according to
+  GitHub policy, and are not persisted.
+- Runner callbacks use GitHub Actions OIDC bound to the logical run and current
+  execution-attempt ID in hardened production mode.
+- Exact terminal result replay is accepted; stale attempts, superseded commits,
+  and conflicting terminal payloads are rejected.
+- Findings, result metadata, publication state, and audit events are persisted
+  in PostgreSQL.
+- Artifact downloads use a separate signing key and short-lived, run-bound
+  URLs.
 
-- All incoming webhook payloads are verified with `HMAC-SHA256` using the App webhook secret before any processing begins.
-- The webhook handler returns `200 OK` immediately and processes the job asynchronously to avoid GitHub's 10-second timeout.
-- Installation-scoped access tokens (not user OAuth) are used. Tokens expire in 1 hour and are not stored.
-- Private repository contents are never stored beyond the run duration. Only structured metadata (findings, decision, manifest summary) is persisted in the database.
-- Artifact binary content is stored only when the user explicitly enables evidence bundle storage; it is scoped to the installation and protected by signed URLs.
+## Execution-plane limitation
 
----
+The current `github-actions` mode obtains an installation token for the App
+installation that received the pull request, then dispatches a workflow in the
+configured runner repository. That token can access only repositories granted
+to the same installation.
 
-## MVP Flow (Step by Step)
+This is valid for the current single-owner deployment. It is not a complete
+zero-configuration multi-tenant Marketplace execution plane because a customer
+installation token cannot dispatch a workflow in an unrelated
+BoardReadyOps-owned installation.
 
-1. User installs BoardReadyOps App on their GitHub organization.
-2. User opens a PR on a repository with a KiCad project.
-3. GitHub sends `pull_request.opened` → App receives webhook → verifies HMAC → creates check run (`queued`).
-4. App sends `workflow_dispatch` to a pre-configured BoardReadyOps runner workflow, passing the commit SHA and run ID.
-5. Runner workflow: checks out the repo, runs `boardreadyops check .`, POSTs JSON result to `POST /api/v1/runs/{id}/result` with an installation token.
-6. API updates check run to `completed` with `success` or `failure` outcome and a summary of blocking findings.
-7. API posts PR review comment with decision badge and top findings.
-8. Check run links to the dashboard page for this run.
+A public launch must use one of these reviewed designs:
 
----
+1. a managed execution service that does not cross GitHub installation token
+   boundaries;
+2. a customer-owned runner workflow in the same installation scope; or
+3. a separately authenticated dispatch service with explicit tenant isolation.
 
-## Failure and Retry Behavior
+The public App must not request broader repository, organization, or account
+permissions to bypass this architectural boundary.
 
-- GitHub retries failed webhook deliveries with exponential back-off for 72 hours.
-- The webhook handler is idempotent: re-processing the same `check_suite.requested` event creates a new run if no run exists for that SHA, otherwise it is a no-op.
-- If the execution plane fails (runner timeout, KiCad crash), the handler updates the check run to `failure` with an actionable error message after a configurable timeout (default: 10 minutes).
-- Manual re-run via the GitHub UI triggers `check_run.rerequested` which starts a fresh run.
+## Public-launch completion criteria
 
----
+The GitHub App is ready for public Marketplace distribution only when:
 
-## Dashboard and Evidence Links
-
-Each check run links to:
-
-- `https://boardreadyops.dev/r/{owner}/{repo}/{run-id}` — run dashboard page
-- `https://boardreadyops.dev/r/{owner}/{repo}/{run-id}/evidence` — evidence bundle download (signed URL, short TTL)
-
-These URLs are embedded in the check run `details_url` and in the PR comment.
+- the external production/public App settings match the least-privilege profile;
+- broad development permissions and unrelated webhook subscriptions are removed;
+- the chosen multi-tenant execution-plane design is implemented and threat
+  modeled;
+- installation, repository lifecycle, pull request, Check Run, runner callback,
+  and optional comment flows pass end to end with the reduced permissions; and
+- issue #88 records the final settings review and validation evidence.

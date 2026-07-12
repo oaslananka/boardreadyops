@@ -120,6 +120,7 @@ nav:
           - Threat Model: security/threat-model.md
           - Release Integrity: security/release-integrity.md
           - Input Validation: security/input-validation.md
+          - GitHub App Permissions: security/github-app-permissions.md
           - Assurance Case: security/assurance-case.md
           - Scorecard: security/scorecard.md
       - Governance: governance.md
