@@ -1,5 +1,4 @@
 import { generateKeyPairSync } from "node:crypto";
-import { signRunnerRequest } from "@boardreadyops/cloud-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleRunnerClaimRequest,
@@ -8,6 +7,7 @@ import {
   type RunnerLeaseRouteDependencies,
 } from "../../../apps/web/lib/runner-lease-routes.js";
 import { runnerProtocolHeaderNames } from "../../../apps/web/lib/runner-request-auth.js";
+import { signRunnerRequest } from "../../../packages/cloud-core/src/runner-request-signature.js";
 
 const managedRunnerId = "e81ec5a4-c6d0-4d87-a520-f7ab922ba183";
 const selfHostedRunnerId = "2cbe8033-9e45-4e3e-83c7-d680fd2f7b35";

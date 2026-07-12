@@ -1,8 +1,5 @@
 import { verifyRunnerRequestSignature } from "@boardreadyops/cloud-core";
-import {
-  type RunnerSignedRequestEnvelope,
-  runnerSignedRequestEnvelopeSchema,
-} from "@boardreadyops/contracts";
+import { type RunnerSignedRequestEnvelope, runnerSignedRequestEnvelopeSchema } from "@boardreadyops/contracts";
 import type { SqlQueryExecutor, SqlQueryResult } from "@boardreadyops/db/lifecycle-store";
 
 export const runnerProtocolHeaderNames = {
@@ -56,7 +53,7 @@ function numericHeader(headers: Headers, name: string): number | undefined {
   const value = headers.get(name);
   if (value === null || !/^\d+$/u.test(value)) return undefined;
   const parsed = Number(value);
-  return Number.isSafeInteger(parsed) ? parsed : undefined;
+  return Number.isSafeInteger(parsed) && String(parsed) === value ? parsed : undefined;
 }
 
 export function parseRunnerSignedRequestEnvelope(headers: Headers): RunnerSignedRequestEnvelope | undefined {

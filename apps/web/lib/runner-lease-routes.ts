@@ -158,7 +158,10 @@ export async function handleRunnerClaimRequest(
     return jsonResponse(
       {
         ok: false,
-        error: result.reason === "stale_request" ? "runner claim request is outside the clock tolerance" : "invalid runner claim request",
+        error:
+          result.reason === "stale_request"
+            ? "runner claim request is outside the clock tolerance"
+            : "invalid runner claim request",
       },
       result.reason === "stale_request" ? 401 : 400,
     );
