@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(8);
+    expect(cloudDatabaseSchemaVersion).toBe(10);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
@@ -29,6 +29,8 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0006_release_run_results.sql",
       "0007_release_run_attempts.sql",
       "0008_runner_protocol_leases.sql",
+      "0009_runner_lease_deferred_scope.sql",
+      "0010_runner_lease_heartbeat_qualification.sql",
     ]);
   });
 
@@ -95,6 +97,33 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("runner_request_nonces_managed_unique_idx");
     expect(sql).not.toContain("lease_token text");
     expect(sql).not.toContain("request_nonce text");
+  });
+
+  it("defers current-attempt lease validation and installs ordered lease operations", async () => {
+    const sql = await readFile(join(migrationsDir, "0009_runner_lease_deferred_scope.sql"), "utf8");
+
+    expect(sql).toContain("drop trigger if exists runner_job_leases_validate_scope");
+    expect(sql).toContain("create constraint trigger runner_job_leases_validate_scope");
+    expect(sql).toContain("after insert or update on runner_job_leases");
+    expect(sql).toContain("deferrable initially deferred");
+    expect(sql).toContain("boardreadyops_validate_runner_job_lease_scope()");
+    expect(sql).toContain("boardreadyops_expire_runner_leases");
+    expect(sql).toContain("boardreadyops_claim_runner_job");
+    expect(sql).toContain("boardreadyops_heartbeat_runner_lease");
+    expect(sql).toContain("boardreadyops_relinquish_runner_lease");
+    expect(sql).toContain("security invoker");
+    expect(sql).toContain("for update of release_runs skip locked");
+    expect(sql).not.toContain("before insert");
+  });
+
+  it("qualifies heartbeat lease columns in schema v10", async () => {
+    const sql = await readFile(join(migrationsDir, "0010_runner_lease_heartbeat_qualification.sql"), "utf8");
+
+    expect(sql).toContain("create or replace function boardreadyops_heartbeat_runner_lease");
+    expect(sql).toContain("least(runner_job_leases.maximum_expires_at, p_extension_expires_at)");
+    expect(sql).toContain("runner_job_leases.progress_percent");
+    expect(sql).toContain("runner_job_leases.last_message");
+    expect(sql).toContain("security invoker");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
