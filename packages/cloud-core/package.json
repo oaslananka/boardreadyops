@@ -18,6 +18,11 @@
       "types": "./src/lifecycle-executor.ts",
       "import": "./src/lifecycle-executor.ts",
       "default": "./src/lifecycle-executor.ts"
+    },
+    "./runner-request-signature": {
+      "types": "./src/runner-request-signature.ts",
+      "import": "./src/runner-request-signature.ts",
+      "default": "./src/runner-request-signature.ts"
     }
   },
   "scripts": {

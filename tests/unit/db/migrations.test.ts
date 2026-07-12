@@ -6,9 +6,12 @@ import { cloudDatabaseModels, cloudDatabaseSchemaVersion } from "../../../packag
 const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
-  it("publishes the runner-result schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(7);
+  it("publishes the runner-protocol schema version and models", () => {
+    expect(cloudDatabaseSchemaVersion).toBe(8);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
+    expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
+    expect(cloudDatabaseModels).toContain("RunnerJobLease");
+    expect(cloudDatabaseModels).toContain("RunnerRequestNonce");
     expect(cloudDatabaseModels).toContain("AuditEvent");
     expect(cloudDatabaseModels).toContain("ReleaseRunResult");
     expect(cloudDatabaseModels).toContain("ReleaseRunAttempt");
@@ -25,6 +28,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0005_release_run_execution_attempts.sql",
       "0006_release_run_results.sql",
       "0007_release_run_attempts.sql",
+      "0008_runner_protocol_leases.sql",
     ]);
   });
 
@@ -68,6 +72,29 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("release_run_attempts_active_idx");
     expect(sql).toContain("insert into release_run_attempts");
     expect(sql).toContain("where release_runs.execution_attempt_id is not null");
+  });
+
+  it("stores managed identities, attempt leases, and replay nonces", async () => {
+    const sql = await readFile(join(migrationsDir, "0008_runner_protocol_leases.sql"), "utf8");
+
+    expect(sql).toContain("add column if not exists signing_algorithm text not null default 'ed25519'");
+    expect(sql).toContain("add column if not exists public_key text");
+    expect(sql).toContain("runner_registrations_active_verification_key_valid");
+    expect(sql).toContain("create table if not exists managed_runner_identities");
+    expect(sql).toContain("create table if not exists runner_job_leases");
+    expect(sql).toContain("lease_token_digest text not null");
+    expect(sql).toContain("runner_job_leases_attempt_fk");
+    expect(sql).toContain("runner_job_leases_worker_identity_valid");
+    expect(sql).toContain("runner_job_leases_one_active_attempt_idx");
+    expect(sql).toContain("boardreadyops_validate_runner_job_lease_scope");
+    expect(sql).toContain("runner lease must target the current release-run attempt");
+    expect(sql).toContain("self-hosted runner does not belong to the release-run installation");
+    expect(sql).toContain("create table if not exists runner_request_nonces");
+    expect(sql).toContain("nonce_digest text not null");
+    expect(sql).toContain("runner_request_nonces_self_hosted_unique_idx");
+    expect(sql).toContain("runner_request_nonces_managed_unique_idx");
+    expect(sql).not.toContain("lease_token text");
+    expect(sql).not.toContain("request_nonce text");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
