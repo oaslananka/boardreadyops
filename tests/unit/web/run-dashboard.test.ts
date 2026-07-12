@@ -56,6 +56,14 @@ describe("run dashboard data", () => {
             kicad_version: "10.0",
             github_check_run_id: 9876543210n,
             readiness_score: 98,
+            contract_version: 1,
+            conclusion: "success",
+            metrics: { durationMs: 2500, readinessScore: 98 },
+            report_links: [{ label: "HTML report", url: "https://reports.example.test/run-123" }],
+            last_publication_attempt_at: completedAt,
+            github_check_published_at: completedAt,
+            github_comment_published_at: uploadedAt,
+            last_publication_error: null,
             owner: "octo-org",
             name: "hardware-board",
           },
@@ -118,6 +126,14 @@ describe("run dashboard data", () => {
         kicadVersion: "10.0",
         githubCheckRunId: "9876543210",
         readinessScore: 98,
+        resultContractVersion: 1,
+        conclusion: "success",
+        metrics: { durationMs: 2500, readinessScore: 98 },
+        reportLinks: [{ label: "HTML report", url: "https://reports.example.test/run-123" }],
+        lastPublicationAttemptAt: "2026-07-10T17:00:02.500Z",
+        githubCheckPublishedAt: "2026-07-10T17:00:02.500Z",
+        githubCommentPublishedAt: "2026-07-10T17:00:03.000Z",
+        lastPublicationError: undefined,
         repository: "octo-org/hardware-board",
         findings: [
           {
@@ -156,6 +172,7 @@ describe("run dashboard data", () => {
     const artifactSql = String(query.mock.calls[2]?.[0]);
     expect(runSql).not.toContain("installations");
     expect(runSql).not.toContain("account_login");
+    expect(runSql).toContain("left join release_run_results");
     expect(artifactSql).toContain("select id, kind");
     expect(artifactSql).not.toContain("storage_path");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");

@@ -27,6 +27,18 @@ describe("readiness result formatting", () => {
       status: "completed",
       decision: "fail",
       findings,
+      artifacts: [
+        {
+          kind: "html-report",
+          name: "report.html",
+          storagePath: "run-123/report.html",
+          sha256: "a".repeat(64),
+          bytes: 100,
+          role: "primary",
+        },
+      ],
+      metrics: { readinessScore: 72, durationMs: 1234 },
+      reportLinks: [{ label: String.raw`HTML \[report]`, url: "https://reports.example.test/run(123)/index.html" }],
       detailsUrl: "https://boardreadyops.test/runs/run-123",
     });
 
@@ -35,6 +47,12 @@ describe("readiness result formatting", () => {
     expect(output.summary.indexOf("high.rule")).toBeLessThan(output.summary.indexOf("low.rule"));
     expect(output.summary).toContain("Unsafe   table content");
     expect(output.summary).not.toContain("Unsafe | table\ncontent");
+    expect(output.summary).toContain("**Artifacts:** 1");
+    expect(output.summary).toContain("**Reports:** 1");
+    expect(output.summary).toContain("`durationMs`: 1234");
+    expect(output.summary).toContain(
+      String.raw`[HTML \\\[report\]](https://reports.example.test/run%28123%29/index.html)`,
+    );
     expect(output.summary).toContain("Open the hosted run dashboard: https://boardreadyops.test/runs/run-123");
   });
 
@@ -49,12 +67,16 @@ describe("readiness result formatting", () => {
       status: "completed",
       decision: "fail",
       findings: manyFindings,
+      metrics: { readinessScore: 55 },
+      reportLinks: [{ label: "JSON report", url: "https://reports.example.test/run-123/report.json" }],
       detailsUrl: "https://boardreadyops.test/runs/run-123",
     });
 
     expect(comment).toContain("<!-- boardreadyops:release-readiness -->");
     expect(comment).toContain("[Open hosted run dashboard](https://boardreadyops.test/runs/run-123)");
     expect(comment).toContain("- …and 2 more findings.");
+    expect(comment).toContain("### Metrics");
+    expect(comment).toContain("[JSON report](https://reports.example.test/run-123/report.json)");
     expect(comment.indexOf("rule-11")).toBeLessThan(comment.indexOf("rule-00"));
   });
 });

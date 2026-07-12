@@ -20,9 +20,22 @@ type RunDetail = {
   kicadVersion: string | undefined;
   githubCheckRunId: string | undefined;
   readinessScore: number | undefined;
+  resultContractVersion: number | undefined;
+  conclusion: string | undefined;
+  metrics: Readonly<Record<string, number>>;
+  reportLinks: ReportLinkDetail[];
+  lastPublicationAttemptAt: string | undefined;
+  githubCheckPublishedAt: string | undefined;
+  githubCommentPublishedAt: string | undefined;
+  lastPublicationError: string | undefined;
   repository: string;
   findings: FindingDetail[];
   artifacts: ArtifactDetail[];
+};
+
+type ReportLinkDetail = {
+  label: string;
+  url: string;
 };
 
 type FindingDetail = {
@@ -95,6 +108,35 @@ function numberValue(row: Record<string, unknown>, key: string): number | undefi
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function metricsValue(row: Record<string, unknown>, key: string): Readonly<Record<string, number>> {
+  const value = row[key];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]),
+    ),
+  );
+}
+
+function reportLinksValue(row: Record<string, unknown>, key: string): ReportLinkDetail[] {
+  const value = row[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      return [];
+    }
+    const label = (entry as Record<string, unknown>).label;
+    const url = (entry as Record<string, unknown>).url;
+    return typeof label === "string" && typeof url === "string" ? [{ label, url }] : [];
+  });
+}
+
 function requiredString(row: Record<string, unknown>, key: string): string {
   return stringValue(row, key) ?? "";
 }
@@ -158,10 +200,19 @@ export async function lookupRunDashboard(
        release_runs.kicad_version,
        release_runs.github_check_run_id,
        release_runs.readiness_score,
+       release_run_results.contract_version,
+       release_run_results.conclusion,
+       release_run_results.metrics,
+       release_run_results.report_links,
+       release_run_results.last_publication_attempt_at,
+       release_run_results.github_check_published_at,
+       release_run_results.github_comment_published_at,
+       release_run_results.last_publication_error,
        repositories.owner,
        repositories.name
      from release_runs
      join repositories on repositories.id = release_runs.repository_id
+     left join release_run_results on release_run_results.run_id = release_runs.id
      where release_runs.id = $1`,
     [runId],
   );
@@ -231,6 +282,14 @@ export async function lookupRunDashboard(
       kicadVersion: stringValue(runRow, "kicad_version"),
       githubCheckRunId: stringValue(runRow, "github_check_run_id"),
       readinessScore: numberValue(runRow, "readiness_score"),
+      resultContractVersion: numberValue(runRow, "contract_version"),
+      conclusion: stringValue(runRow, "conclusion"),
+      metrics: metricsValue(runRow, "metrics"),
+      reportLinks: reportLinksValue(runRow, "report_links"),
+      lastPublicationAttemptAt: stringValue(runRow, "last_publication_attempt_at"),
+      githubCheckPublishedAt: stringValue(runRow, "github_check_published_at"),
+      githubCommentPublishedAt: stringValue(runRow, "github_comment_published_at"),
+      lastPublicationError: stringValue(runRow, "last_publication_error"),
       repository: `${requiredString(runRow, "owner")}/${requiredString(runRow, "name")}`,
       findings,
       artifacts,

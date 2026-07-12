@@ -43,6 +43,16 @@ type Workflow = {
 
 type WorkflowJob = {
   name?: string;
+  env?: Record<string, string>;
+  services?: Record<
+    string,
+    {
+      image?: string;
+      env?: Record<string, string>;
+      ports?: Array<string | number>;
+      options?: string;
+    }
+  >;
   strategy?: {
     matrix?: {
       include?: Array<Record<string, string | number>>;
@@ -371,6 +381,7 @@ describe("compatibility matrix", () => {
     const integration = workflow.jobs?.["test-int"];
     const crossPlatform = workflow.jobs?.["cross-platform-paths"];
     const lintRuns = (workflow.jobs?.lint?.steps ?? []).map((step) => step.run ?? "").join("\n");
+    const integrationRuns = (integration?.steps ?? []).map((step) => step.run ?? "").join("\n");
 
     const kicadExpression = "${" + "{ matrix.kicad-version }}";
     const nodeExpression = "${" + "{ matrix.node-version }}";
@@ -387,6 +398,19 @@ describe("compatibility matrix", () => {
         "node-version": 24,
       },
     ]);
+    expect(integration?.env?.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test");
+    expect(integration?.services?.postgres).toMatchObject({
+      image: "postgres:16-alpine",
+      env: {
+        POSTGRES_USER: "boardreadyops",
+        POSTGRES_DB: "boardreadyops_test",
+        POSTGRES_HOST_AUTH_METHOD: "trust",
+      },
+      ports: ["5432:5432"],
+    });
+    expect(integration?.services?.postgres?.options).toContain("pg_isready -U boardreadyops -d boardreadyops_test");
+    expect(integrationRuns).toContain("pnpm --filter @boardreadyops/db db:migrate");
+    expect(integrationRuns).toContain("pnpm run test:int");
     expect(config.kicad.tested).toEqual(["10.0"]);
     expect(config.kicad.eol).toEqual(["9.0"]);
     expect(config.kicad.latestVerified).toBe("10.0.4");

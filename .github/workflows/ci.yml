@@ -182,6 +182,22 @@ jobs:
     name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: boardreadyops
+          POSTGRES_DB: boardreadyops_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boardreadyops -d boardreadyops_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -215,6 +231,8 @@ jobs:
             exit 1
           fi
       - run: pnpm install --frozen-lockfile
+      - name: Apply cloud migrations
+        run: pnpm --filter @boardreadyops/db db:migrate
       - run: pnpm run test:int
 
   cross-platform-paths:

@@ -143,6 +143,13 @@ describe("readiness result route authentication and publication", () => {
       runId: "run-123",
       checkRunUpdated: true,
       pullRequestCommentCreated: true,
+      result: {
+        version: 1,
+        conclusion: "success",
+        artifacts: [],
+        metrics: {},
+        reportLinks: [],
+      },
     });
     expect(completeCheckRun).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -186,9 +193,23 @@ describe("readiness result route authentication and publication", () => {
     expect(secondParams[6]).toBe(firstParams[6]);
   });
 
-  it("persists the run result and replacement findings in one atomic statement", async () => {
+  it("persists the versioned result, findings, artifacts, and audit event in one atomic statement", async () => {
+    const metrics = { durationMs: 1234, readinessScore: 72 };
+    const reportLinks = [{ label: "HTML report", url: "https://reports.example.test/run-123/index.html" }];
+    const artifacts = [
+      {
+        kind: "html-report",
+        name: "boardreadyops-report.html",
+        storagePath: "run-123/reports/boardreadyops-report.html",
+        sha256: "a".repeat(64),
+        bytes: 4096,
+        role: "primary",
+      },
+    ];
     const body = JSON.stringify({
+      version: 1,
       status: "completed",
+      conclusion: "failure",
       decision: "fail",
       findings: [
         {
@@ -203,6 +224,9 @@ describe("readiness result route authentication and publication", () => {
           message: "Two tracks remain unrouted.",
         },
       ],
+      artifacts,
+      metrics,
+      reportLinks,
     });
     query.mockResolvedValueOnce({
       rows: [
@@ -220,11 +244,18 @@ describe("readiness result route authentication and publication", () => {
     const response = await handleResultRequest(resultRequest({ body }), dependencies);
 
     expect(response.status).toBe(202);
-    expect(query).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledTimes(2);
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("deleted_findings as");
     expect(sql).toContain("inserted_findings as");
+    expect(sql).toContain("deleted_artifacts as");
+    expect(sql).toContain("inserted_artifacts as");
+    expect(sql).toContain("insert into release_run_results");
+    expect(sql).toContain("runner.result.persisted");
+    expect(sql).toContain("jsonb_object_keys($10::jsonb)");
+    expect(sql).not.toContain("jsonb_object_length");
     expect(sql).toContain("jsonb_to_recordset($6::jsonb)");
+    expect(sql).toContain("jsonb_to_recordset($14::jsonb)");
     expect(sql).toContain("coalesce(release_runs.completed_at");
     expect(sql).toContain("release_runs.terminal_result_digest");
     expect(sql).toMatch(/coalesce\(\s+release_runs\.duration_ms/u);
@@ -250,6 +281,29 @@ describe("readiness result route authentication and publication", () => {
       ]),
     ]);
     expect(params[6]).toMatch(/^[0-9a-f]{64}$/u);
+    expect(params[7]).toBe(1);
+    expect(params[8]).toBe("failure");
+    expect(params[9]).toBe(JSON.stringify(metrics));
+    expect(params[10]).toBe(JSON.stringify(reportLinks));
+    expect(params[11]).toContain('"version":1');
+    expect(params[12]).toBe(params[6]);
+    expect(params[13]).toBe(
+      JSON.stringify([
+        {
+          kind: "html-report",
+          name: "boardreadyops-report.html",
+          storage_path: "run-123/reports/boardreadyops-report.html",
+          sha256: "a".repeat(64),
+          bytes: 4096,
+          role: "primary",
+        },
+      ]),
+    );
+
+    const [publicationSql, publicationParams] = query.mock.calls[1] as [string, unknown[]];
+    expect(publicationSql).toContain("update release_run_results");
+    expect(publicationParams[5]).toBe("runner.result.publication_succeeded");
+    expect(publicationParams.slice(0, 5)).toEqual(["run-123", "2026-07-10T18:00:00.000Z", false, false, null]);
   });
 
   it("rejects a superseded run without replacing findings or publishing stale GitHub output", async () => {
@@ -348,6 +402,49 @@ describe("readiness result route authentication and publication", () => {
     const [sql] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("existing.terminal_result_digest = $7");
     expect(sql).toContain("then 'replayed'");
+  });
+
+  it("treats an exact non-terminal callback as an idempotent replay", async () => {
+    const body = JSON.stringify({
+      version: 1,
+      status: "running",
+      conclusion: "neutral",
+      decision: null,
+      findings: [],
+      artifacts: [],
+      metrics: { progressPercent: 50 },
+      reportLinks: [],
+    });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          persistence_outcome: "replayed",
+          id: "run-123",
+          github_check_run_id: 987,
+          pull_request_number: 42,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "replayed",
+      runId: "run-123",
+      result: { version: 1, status: "running", conclusion: "neutral" },
+    });
+    expect(query).toHaveBeenCalledOnce();
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("persisted_result_digest");
+    expect(sql).toContain("existing.persisted_result_digest = $13");
+    expect(params[12]).toMatch(/^[0-9a-f]{64}$/u);
+    expect(completeCheckRun).not.toHaveBeenCalled();
+    expect(createPullRequestComment).not.toHaveBeenCalled();
   });
 
   it("rejects a conflicting terminal replay without changing GitHub output", async () => {
@@ -451,7 +548,7 @@ describe("readiness result route authentication and publication", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it("accepts the result when the optional PR comment cannot be published", async () => {
+  it("persists the result and requests a replay when the PR comment cannot be published", async () => {
     const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
     query
       .mockResolvedValueOnce({
@@ -473,13 +570,97 @@ describe("readiness result route authentication and publication", () => {
 
     const response = await handleResultRequest(resultRequest({ body }), dependencies);
 
-    expect(response.status).toBe(202);
+    expect(response.status).toBe(502);
     await expect(response.json()).resolves.toMatchObject({
-      ok: true,
+      ok: false,
+      persisted: true,
+      error: "runner result was persisted but GitHub publication is incomplete",
+      publicationErrors: [expect.stringContaining("GitHub pull request comment")],
       checkRunUpdated: true,
       pullRequestCommentCreated: false,
     });
     expect(completeCheckRun).toHaveBeenCalledOnce();
+    const [publicationSql, publicationParams] = query.mock.calls[1] as [string, unknown[]];
+    expect(publicationSql).toContain("last_publication_error = $5");
+    expect(publicationParams[4]).toContain("status 403");
+    expect(publicationParams[5]).toBe("runner.result.publication_failed");
+  });
+
+  it("rejects a conclusion that conflicts with status and decision", async () => {
+    const body = JSON.stringify({
+      version: 1,
+      status: "completed",
+      conclusion: "success",
+      decision: "fail",
+      findings: [],
+      artifacts: [],
+      metrics: {},
+      reportLinks: [],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "invalid runner result" });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("rejects artifact traversal paths and non-HTTPS report links", async () => {
+    const body = JSON.stringify({
+      version: 1,
+      status: "completed",
+      conclusion: "success",
+      decision: "pass",
+      findings: [],
+      artifacts: [
+        {
+          kind: "report",
+          name: "report.html",
+          storagePath: "../secrets/report.html",
+          sha256: "b".repeat(64),
+          bytes: 10,
+          role: "primary",
+        },
+      ],
+      metrics: {},
+      reportLinks: [{ label: "Report", url: "http://reports.example.test/report.html" }],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(400);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized declared payload before authentication", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    const request = resultRequest({ body });
+    request.headers.set("content-length", String(1024 * 1024 + 1));
+
+    const response = await handleResultRequest(request, dependencies);
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "runner result payload is too large" });
+    expect(verifyOidcToken).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized actual payload before authentication", async () => {
+    const callbackUrl = new URL("https://boardreadyops.test/api/v1/runs/result");
+    callbackUrl.searchParams.set("run_id", "run-123");
+    callbackUrl.searchParams.set("attempt_id", executionAttemptId);
+    const request = new Request(callbackUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "x".repeat(1024 * 1024 + 1),
+    });
+
+    const response = await handleResultRequest(request, dependencies);
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "runner result payload is too large" });
+    expect(verifyOidcToken).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("rejects stale signed callbacks before touching the database", async () => {

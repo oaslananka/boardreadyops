@@ -30,6 +30,7 @@ const resultKeyHeaderName = "x-boardreadyops-runner-key";
 const resultSignatureHeaderName = "x-boardreadyops-runner-signature";
 const resultTimestampHeaderName = "x-boardreadyops-runner-timestamp";
 const signatureToleranceSeconds = 10 * 60;
+const maximumResultBodyBytes = 1024 * 1024;
 const lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 function rows(result: unknown): QueryRow[] {
@@ -168,34 +169,115 @@ function parseJson(input: string): unknown {
   }
 }
 
-function terminalResultDigest(result: ReleaseRunResult): string | undefined {
-  if (!terminalStatus(result.status)) {
-    return undefined;
+function byCanonicalJson<T>(left: T, right: T): number {
+  const leftKey = JSON.stringify(left);
+  const rightKey = JSON.stringify(right);
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+}
+
+function normalizedResultForDigest(result: ReleaseRunResult): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {
+    executionAttemptId: result.executionAttemptId ?? null,
+    status: result.status,
+    decision: result.decision,
+    findings: result.findings
+      .map((finding) => ({
+        ruleId: finding.ruleId,
+        severity: finding.severity,
+        message: finding.message,
+        path: finding.path ?? null,
+      }))
+      .sort(byCanonicalJson),
+  };
+
+  if (result.artifacts.length > 0) normalized.artifacts = [...result.artifacts].sort(byCanonicalJson);
+  if (Object.keys(result.metrics).length > 0) {
+    normalized.metrics = Object.fromEntries(Object.entries(result.metrics).sort(([a], [b]) => a.localeCompare(b)));
   }
+  if (result.reportLinks.length > 0) normalized.reportLinks = [...result.reportLinks].sort(byCanonicalJson);
 
-  const findings = result.findings
-    .map((finding) => ({
-      ruleId: finding.ruleId,
-      severity: finding.severity,
-      message: finding.message,
-      path: finding.path ?? null,
-    }))
-    .sort((left, right) => {
-      const leftKey = JSON.stringify(left);
-      const rightKey = JSON.stringify(right);
-      return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
-    });
+  return normalized;
+}
 
+function resultDigest(result: ReleaseRunResult): string {
   return createHash("sha256")
-    .update(
-      JSON.stringify({
-        executionAttemptId: result.executionAttemptId ?? null,
-        status: result.status,
-        decision: result.decision,
-        findings,
-      }),
-    )
+    .update(JSON.stringify(normalizedResultForDigest(result)))
     .digest("hex");
+}
+
+function publicationErrorMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).slice(0, 2000);
+}
+
+async function recordPublicationState(
+  executor: ResultQueryExecutor,
+  input: {
+    runId: string;
+    completedAt: string;
+    checkRunUpdated: boolean;
+    pullRequestCommentCreated: boolean;
+    errors: readonly string[];
+  },
+): Promise<void> {
+  const publicationError = input.errors.length > 0 ? input.errors.join("; ").slice(0, 4000) : null;
+  await executor.query(
+    `with target as (
+       select release_runs.id,
+              release_runs.repository_id,
+              repositories.installation_id
+       from release_runs
+       join repositories on repositories.id = release_runs.repository_id
+       where release_runs.id = $1
+     ),
+     updated_result as (
+       update release_run_results
+       set last_publication_attempt_at = $2::timestamptz,
+           github_check_published_at = case
+             when $3 then coalesce(github_check_published_at, $2::timestamptz)
+             else github_check_published_at
+           end,
+           github_comment_published_at = case
+             when $4 then coalesce(github_comment_published_at, $2::timestamptz)
+             else github_comment_published_at
+           end,
+           last_publication_error = $5
+       from target
+       where release_run_results.run_id = target.id
+       returning release_run_results.run_id
+     )
+     insert into audit_events (
+       installation_id,
+       event_type,
+       actor_type,
+       subject_type,
+       subject_id,
+       repository_id,
+       release_run_id,
+       metadata
+     )
+     select target.installation_id,
+            $6,
+            'system',
+            'release_run',
+            target.id,
+            target.repository_id,
+            target.id,
+            jsonb_build_object(
+              'checkRunUpdated', $3,
+              'pullRequestCommentCreated', $4,
+              'error', $5
+            )
+     from target
+     join updated_result on updated_result.run_id = target.id`,
+    [
+      input.runId,
+      input.completedAt,
+      input.checkRunUpdated,
+      input.pullRequestCommentCreated,
+      publicationError,
+      publicationError === null ? "runner.result.publication_succeeded" : "runner.result.publication_failed",
+    ],
+  );
 }
 
 const defaultDependencies: ResultRouteDependencies = {
@@ -224,7 +306,19 @@ export async function handleResultRequest(
     return Response.json({ ok: false, error: "attempt_id query parameter must be a valid UUID" }, { status: 400 });
   }
 
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    const declaredBytes = Number(contentLength);
+    if (Number.isFinite(declaredBytes) && declaredBytes > maximumResultBodyBytes) {
+      return Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 });
+    }
+  }
+
   const bodyText = await request.text();
+  if (Buffer.byteLength(bodyText, "utf8") > maximumResultBodyBytes) {
+    return Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 });
+  }
+
   const configuredKey = configuredSecretValue({
     valueName: resultKeyEnvName,
     fileName: resultKeyFileEnvName,
@@ -263,7 +357,8 @@ export async function handleResultRequest(
   }
 
   const completedAt = dependencies.now().toISOString();
-  const resultDigest = terminalResultDigest(parsed.data) ?? null;
+  const digest = resultDigest(parsed.data);
+  const terminalDigest = terminalStatus(parsed.data.status) ? digest : null;
   const findingsJson = JSON.stringify(
     parsed.data.findings.map((finding) => ({
       rule_id: finding.ruleId,
@@ -272,6 +367,19 @@ export async function handleResultRequest(
       path: finding.path ?? null,
     })),
   );
+  const artifactsJson = JSON.stringify(
+    parsed.data.artifacts.map((artifact) => ({
+      kind: artifact.kind,
+      name: artifact.name,
+      storage_path: artifact.storagePath,
+      sha256: artifact.sha256,
+      bytes: artifact.bytes,
+      role: artifact.role,
+    })),
+  );
+  const metricsJson = JSON.stringify(parsed.data.metrics);
+  const reportLinksJson = JSON.stringify(parsed.data.reportLinks);
+  const payloadJson = JSON.stringify(parsed.data);
   const updateResult = await executor.query(
     `with existing as materialized (
        select id,
@@ -281,7 +389,10 @@ export async function handleResultRequest(
               pull_request_number,
               execution_attempt_id,
               terminal_result_digest,
-              completed_at
+              completed_at,
+              (select release_run_results.result_digest
+               from release_run_results
+               where release_run_results.run_id = release_runs.id) as persisted_result_digest
        from release_runs
        where id = $1
        for update
@@ -298,6 +409,7 @@ export async function handleResultRequest(
                     then 'replayed'
                     else 'conflicting_terminal_result'
                   end
+                when existing.persisted_result_digest = $13 then 'replayed'
                 else 'accepted'
               end as persistence_outcome
        from existing
@@ -341,9 +453,15 @@ export async function handleResultRequest(
        where findings.run_id = updated.id
        returning findings.run_id
      ),
-     cleared_findings as (
-       select count(*) as deleted_count
-       from deleted_findings
+     deleted_artifacts as (
+       delete from artifacts
+       using updated
+       where artifacts.run_id = updated.id
+       returning artifacts.run_id
+     ),
+     cleared_children as (
+       select (select count(*) from deleted_findings) as deleted_finding_count,
+              (select count(*) from deleted_artifacts) as deleted_artifact_count
      ),
      inserted_findings as (
        insert into findings (run_id, rule_id, severity, message, path)
@@ -353,13 +471,113 @@ export async function handleResultRequest(
               finding.message,
               finding.path
        from updated
-       cross join cleared_findings
+       cross join cleared_children
        cross join jsonb_to_recordset($6::jsonb) as finding(
          rule_id text,
          severity text,
          message text,
          path text
        )
+       returning id
+     ),
+     inserted_artifacts as (
+       insert into artifacts (run_id, kind, name, storage_path, sha256, bytes, role)
+       select updated.id,
+              artifact.kind,
+              artifact.name,
+              artifact.storage_path,
+              artifact.sha256,
+              artifact.bytes,
+              artifact.role
+       from updated
+       cross join cleared_children
+       cross join jsonb_to_recordset($14::jsonb) as artifact(
+         kind text,
+         name text,
+         storage_path text,
+         sha256 text,
+         bytes integer,
+         role text
+       )
+       returning id
+     ),
+     upserted_result as (
+       insert into release_run_results (
+         run_id,
+         execution_attempt_id,
+         contract_version,
+         status,
+         conclusion,
+         decision,
+         metrics,
+         report_links,
+         payload,
+         result_digest,
+         received_at
+       )
+       select updated.id,
+              $2,
+              $8,
+              $3,
+              $9,
+              $4,
+              $10::jsonb,
+              $11::jsonb,
+              $12::jsonb,
+              $13,
+              $5::timestamptz
+       from updated
+       cross join cleared_children
+       on conflict (run_id) do update
+       set execution_attempt_id = excluded.execution_attempt_id,
+           contract_version = excluded.contract_version,
+           status = excluded.status,
+           conclusion = excluded.conclusion,
+           decision = excluded.decision,
+           metrics = excluded.metrics,
+           report_links = excluded.report_links,
+           payload = excluded.payload,
+           result_digest = excluded.result_digest,
+           received_at = excluded.received_at,
+           last_publication_attempt_at = null,
+           github_check_published_at = null,
+           github_comment_published_at = null,
+           last_publication_error = null
+       returning run_id
+     ),
+     persisted_audit as (
+       insert into audit_events (
+         installation_id,
+         event_type,
+         actor_type,
+         actor_id,
+         subject_type,
+         subject_id,
+         repository_id,
+         release_run_id,
+         metadata
+       )
+       select repositories.installation_id,
+              'runner.result.persisted',
+              'runner',
+              $2,
+              'release_run',
+              updated.id,
+              updated.repository_id,
+              updated.id,
+              jsonb_build_object(
+                'contractVersion', $8,
+                'status', $3,
+                'conclusion', $9,
+                'resultDigest', $13,
+                'findingCount', (select count(*) from inserted_findings),
+                'artifactCount', (select count(*) from inserted_artifacts),
+                'metricCount', (select count(*) from jsonb_object_keys($10::jsonb)),
+                'reportLinkCount', jsonb_array_length($11::jsonb)
+              )
+       from updated
+       join repositories on repositories.id = updated.repository_id
+       join upserted_result on upserted_result.run_id = updated.id
        returning id
      )
      select classified.persistence_outcome,
@@ -370,7 +588,9 @@ export async function handleResultRequest(
             repositories.name,
             installations.github_installation_id,
             coalesce(updated.completed_at, classified.completed_at) as completed_at,
-            (select count(*) from inserted_findings) as inserted_finding_count
+            (select count(*) from inserted_findings) as inserted_finding_count,
+            (select count(*) from inserted_artifacts) as inserted_artifact_count,
+            (select count(*) from persisted_audit) as persisted_audit_count
      from classified
      left join updated on updated.id = classified.id
      join repositories on repositories.id = classified.repository_id
@@ -382,7 +602,14 @@ export async function handleResultRequest(
       parsed.data.decision,
       completedAt,
       findingsJson,
-      resultDigest,
+      terminalDigest,
+      parsed.data.version,
+      parsed.data.conclusion,
+      metricsJson,
+      reportLinksJson,
+      payloadJson,
+      digest,
+      artifactsJson,
     ],
   );
   const row = rows(updateResult)[0];
@@ -423,46 +650,76 @@ export async function handleResultRequest(
     const repositoryName = stringCell(row, "name");
     const runDetailsUrl = dependencies.detailsUrl(runId);
     const checkOutput = buildReadinessCheckOutput({ ...parsed.data, detailsUrl: runDetailsUrl });
+    const publicationErrors: string[] = [];
+    let publicationConfigurationError = false;
 
     if (githubCheckRunId) {
       if (!checkRunClient?.completeCheckRun || !installationId || !repositoryOwner || !repositoryName) {
-        return Response.json({ ok: false, error: "GitHub check-run completion is not configured" }, { status: 503 });
+        publicationErrors.push("GitHub check-run completion is not configured");
+        publicationConfigurationError = true;
+      } else {
+        try {
+          await checkRunClient.completeCheckRun({
+            installationId,
+            repositoryOwner,
+            repositoryName,
+            checkRunId: githubCheckRunId,
+            runId,
+            conclusion: checkConclusion(parsed.data.status, parsed.data.decision),
+            title: checkOutput.title,
+            summary: checkOutput.summary,
+            completedAt: publicationCompletedAt,
+          });
+          checkRunUpdated = true;
+        } catch (error) {
+          publicationErrors.push(`GitHub check run: ${publicationErrorMessage(error)}`);
+        }
       }
-
-      await checkRunClient.completeCheckRun({
-        installationId,
-        repositoryOwner,
-        repositoryName,
-        checkRunId: githubCheckRunId,
-        runId,
-        conclusion: checkConclusion(parsed.data.status, parsed.data.decision),
-        title: checkOutput.title,
-        summary: checkOutput.summary,
-        completedAt: publicationCompletedAt,
-      });
-      checkRunUpdated = true;
     }
 
     const pullRequestNumber = numberCell(row, "pull_request_number");
-    if (
-      pullRequestNumber &&
-      checkRunClient?.createPullRequestComment &&
-      installationId &&
-      repositoryOwner &&
-      repositoryName
-    ) {
-      try {
-        await checkRunClient.createPullRequestComment({
-          installationId,
-          repositoryOwner,
-          repositoryName,
-          pullRequestNumber,
-          body: buildReadinessPrComment({ ...parsed.data, detailsUrl: runDetailsUrl }),
-        });
-        pullRequestCommentCreated = true;
-      } catch {
-        // PR comments are optional; the check run remains the authoritative result.
+    if (pullRequestNumber) {
+      if (!checkRunClient?.createPullRequestComment || !installationId || !repositoryOwner || !repositoryName) {
+        publicationErrors.push("GitHub pull-request comment publication is not configured");
+        publicationConfigurationError = true;
+      } else {
+        try {
+          await checkRunClient.createPullRequestComment({
+            installationId,
+            repositoryOwner,
+            repositoryName,
+            pullRequestNumber,
+            body: buildReadinessPrComment({ ...parsed.data, detailsUrl: runDetailsUrl }),
+          });
+          pullRequestCommentCreated = true;
+        } catch (error) {
+          publicationErrors.push(`GitHub pull request comment: ${publicationErrorMessage(error)}`);
+        }
       }
+    }
+
+    await recordPublicationState(executor, {
+      runId,
+      completedAt: publicationCompletedAt,
+      checkRunUpdated,
+      pullRequestCommentCreated,
+      errors: publicationErrors,
+    });
+
+    if (publicationErrors.length > 0) {
+      return Response.json(
+        {
+          ok: false,
+          persisted: true,
+          error: "runner result was persisted but GitHub publication is incomplete",
+          publicationErrors,
+          runId,
+          executionAttemptId,
+          checkRunUpdated,
+          pullRequestCommentCreated,
+        },
+        { status: publicationConfigurationError ? 503 : 502 },
+      );
     }
   }
 
