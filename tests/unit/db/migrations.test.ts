@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(8);
+    expect(cloudDatabaseSchemaVersion).toBe(9);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
@@ -29,6 +29,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0006_release_run_results.sql",
       "0007_release_run_attempts.sql",
       "0008_runner_protocol_leases.sql",
+      "0009_runner_lease_deferred_scope.sql",
     ]);
   });
 
@@ -95,6 +96,17 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("runner_request_nonces_managed_unique_idx");
     expect(sql).not.toContain("lease_token text");
     expect(sql).not.toContain("request_nonce text");
+  });
+
+  it("defers current-attempt lease validation until the claim transaction completes", async () => {
+    const sql = await readFile(join(migrationsDir, "0009_runner_lease_deferred_scope.sql"), "utf8");
+
+    expect(sql).toContain("drop trigger if exists runner_job_leases_validate_scope");
+    expect(sql).toContain("create constraint trigger runner_job_leases_validate_scope");
+    expect(sql).toContain("after insert or update on runner_job_leases");
+    expect(sql).toContain("deferrable initially deferred");
+    expect(sql).toContain("boardreadyops_validate_runner_job_lease_scope()");
+    expect(sql).not.toContain("before insert");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
