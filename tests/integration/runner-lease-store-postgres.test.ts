@@ -187,7 +187,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
     try {
       const base = {
         workerClass: "managed" as const,
-        managedRunnerIdentityId,
+        managedRunnerIdentityId: managedIdentityId,
         requestTimestamp: requestTimestamp(now),
         capabilities: ["kicad:10"],
       };
@@ -233,7 +233,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
           maximumLeaseDurationSeconds: 300,
         }).claimJob({
           workerClass: "managed",
-          managedRunnerIdentityId,
+          managedRunnerIdentityId: managedIdentityId,
           requestTimestamp: requestTimestamp(claimedAt),
           requestNonce: nonce("expiry-one"),
           capabilities: ["kicad:10"],
@@ -249,7 +249,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
           maximumLeaseDurationSeconds: 300,
         }).claimJob({
           workerClass: "managed",
-          managedRunnerIdentityId,
+          managedRunnerIdentityId: managedIdentityId,
           requestTimestamp: requestTimestamp(recoveredAt),
           requestNonce: nonce("expiry-two"),
           capabilities: ["kicad:10"],
