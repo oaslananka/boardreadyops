@@ -142,8 +142,10 @@ function fixedStore(input: {
     now: () => new Date(input.now),
     id: () => ids.shift() ?? randomUUID(),
     leaseToken: () => tokens.shift() ?? token(randomUUID()),
-    leaseDurationSeconds: input.leaseDurationSeconds,
-    maximumLeaseDurationSeconds: input.maximumLeaseDurationSeconds,
+    ...(input.leaseDurationSeconds === undefined ? {} : { leaseDurationSeconds: input.leaseDurationSeconds }),
+    ...(input.maximumLeaseDurationSeconds === undefined
+      ? {}
+      : { maximumLeaseDurationSeconds: input.maximumLeaseDurationSeconds }),
   });
 }
 
@@ -162,8 +164,8 @@ function claimed(result: ClaimRunnerJobResult) {
 
 afterAll(async () => {
   if (!executor) return;
-  await executor.query("delete from managed_runner_identities where name like 'managed-lease-test-%'");
   await executor.query("delete from installations where account_login like 'lease-lease-test-%'");
+  await executor.query("delete from managed_runner_identities where name like 'managed-lease-test-%'");
 });
 
 describeDatabase("runner lease PostgreSQL store", () => {
