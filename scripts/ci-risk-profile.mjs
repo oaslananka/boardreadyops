@@ -46,6 +46,12 @@ const ACTION_PATTERNS = [
   /^tests\/unit\/action\//,
 ];
 const KICAD_PATTERNS = [/^src\/kicad\//, /^tests\/(unit|integration)\/kicad\//, /^tests\/fixtures\/projects\//];
+const INTEGRATION_PATTERNS = [
+  /^tests\/integration\//,
+  /^packages\/(contracts|cloud-core|db)\//,
+  /^apps\/web\//,
+  /^\.github\/workflows\/ci\.ya?ml$/,
+];
 const RULE_PATTERNS = [
   /^src\/rules\//,
   /^tests\/unit\/rules\//,
@@ -113,6 +119,7 @@ export function classifyChangedFiles(files, options = {}) {
   const buildChanged = forceFull || changedFiles.some((file) => matchesAny(file, BUILD_PATTERNS));
   const actionChanged = forceFull || changedFiles.some((file) => matchesAny(file, ACTION_PATTERNS));
   const kicadChanged = forceFull || changedFiles.some((file) => matchesAny(file, KICAD_PATTERNS));
+  const integrationChanged = forceFull || changedFiles.some((file) => matchesAny(file, INTEGRATION_PATTERNS));
   const ruleChanged = forceFull || changedFiles.some((file) => matchesAny(file, RULE_PATTERNS));
   const parserModelChanged = forceFull || changedFiles.some((file) => matchesAny(file, PARSER_MODEL_PATTERNS));
   const securityChanged = forceFull || changedFiles.some((file) => matchesAny(file, SECURITY_PATTERNS));
@@ -151,7 +158,7 @@ export function classifyChangedFiles(files, options = {}) {
     needs_typecheck: codeChanged || workflowChanged || dependencyChanged,
     needs_unit: codeChanged || dependencyChanged,
     needs_unit_matrix: forceFull || pathSensitiveChanged || dependencyChanged || workflowChanged,
-    needs_integration: forceFull || kicadChanged || dependencyChanged,
+    needs_integration: forceFull || integrationChanged || kicadChanged || dependencyChanged,
     needs_cross_platform: forceFull || pathSensitiveChanged || dependencyChanged,
     needs_action_smoke: forceFull || actionChanged || packageChanged,
     needs_accessibility: forceFull || reportChanged || docsChanged,

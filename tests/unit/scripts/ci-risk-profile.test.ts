@@ -46,6 +46,20 @@ describe("ci-risk-profile", () => {
     expect(profile.needs_mutation).toBe(false);
   });
 
+  it("runs integration gates for cloud persistence, web callbacks, and integration tests", () => {
+    for (const file of [
+      "packages/db/migrations/0006_release_run_results.sql",
+      "packages/contracts/src/index.ts",
+      "packages/cloud-core/src/lifecycle-executor.ts",
+      "apps/web/app/api/v1/runs/result/route.ts",
+      "tests/integration/runner-result-postgres.test.ts",
+      ".github/workflows/ci.yml",
+    ]) {
+      const profile = classifyChangedFiles([file], { eventName: "pull_request" });
+      expect(profile.needs_integration, file).toBe(true);
+    }
+  });
+
   it("runs the coverage gate when only tests change", () => {
     const profile = classifyChangedFiles(["tests/unit/report/html.test.ts"], { eventName: "pull_request" });
     expect(profile.needs_coverage).toBe(true);
