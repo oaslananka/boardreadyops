@@ -25,10 +25,7 @@ begin
   ) then
     alter table runner_registrations
       add constraint runner_registrations_public_key_valid
-      check (
-        public_key is null
-        or (char_length(public_key) between 32 and 16384 and position(chr(0) in public_key) = 0)
-      );
+      check (public_key is null or char_length(public_key) between 32 and 16384);
   end if;
 
   if not exists (
@@ -68,7 +65,7 @@ create table if not exists managed_runner_identities (
   constraint managed_runner_identities_signing_algorithm_valid
     check (signing_algorithm = 'ed25519'),
   constraint managed_runner_identities_public_key_valid
-    check (char_length(public_key) between 32 and 16384 and position(chr(0) in public_key) = 0),
+    check (char_length(public_key) between 32 and 16384),
   constraint managed_runner_identities_fingerprint_valid
     check (public_key_fingerprint ~ '^[0-9a-f]{64}$'),
   constraint managed_runner_identities_capabilities_valid
