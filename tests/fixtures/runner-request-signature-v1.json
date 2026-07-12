@@ -1,0 +1,16 @@
+{
+  "description": "BoardReadyOps runner request signature protocol v1 Ed25519 vector",
+  "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f\n-----END PRIVATE KEY-----\n",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=\n-----END PUBLIC KEY-----\n",
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/runner/jobs/claim?z=last&scope=hardware%20team&scope=pcb",
+    "timestamp": 1783850400,
+    "nonce": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8",
+    "workerClass": "self_hosted",
+    "runnerId": "11111111-1111-4111-8111-111111111111"
+  },
+  "body": "{\"protocolVersion\":1,\"workerClass\":\"self_hosted\",\"capabilities\":[\"kicad:10\",\"node:24\"]}",
+  "expectedCanonical": "boardreadyops-runner-request-v1\nPOST\n/api/v1/runner/jobs/claim?scope=hardware%20team&scope=pcb&z=last\n1783850400\nICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8\nself_hosted\n11111111-1111-4111-8111-111111111111\n\n\n\ne9a1499fcad7892cdc1bbf1f5e61b587054e24152cfb755e4787d03877698161",
+  "expectedSignature": "V5reMO_oSj36Irp6RkcLhXqqtBV_Jd-gvIdNPOObn7wg73NX7LNNceTMev9_h56G6zdQnRJ2UgtxkfNj71CtDQ"
+}
