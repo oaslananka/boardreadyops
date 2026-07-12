@@ -174,15 +174,27 @@ export function createSqlGitHubAppLifecycleStore(
       }
 
       await executor.query(
-        `update release_runs
+        `with superseded_runs as (
+           update release_runs
+           set status = 'superseded',
+               completed_at = coalesce(completed_at, $4::timestamptz)
+           from repositories
+           where release_runs.repository_id = repositories.id
+             and repositories.github_repo_id = $1
+             and release_runs.pull_request_number = $2
+             and release_runs.commit_sha <> $3
+             and release_runs.status in ('queued', 'dispatched', 'running')
+           returning release_runs.id
+         )
+         update release_run_attempts
          set status = 'superseded',
-             completed_at = coalesce(completed_at, $4::timestamptz)
-         from repositories
-         where release_runs.repository_id = repositories.id
-           and repositories.github_repo_id = $1
-           and release_runs.pull_request_number = $2
-           and release_runs.commit_sha <> $3
-           and release_runs.status in ('queued', 'dispatched', 'running')`,
+             completed_at = coalesce(completed_at, $4::timestamptz),
+             failure_class = coalesce(failure_class, 'newer_commit'),
+             failure_message = coalesce(failure_message, 'A newer commit superseded this execution attempt.')
+         where release_run_attempts.run_id in (select id from superseded_runs)
+           and release_run_attempts.status in (
+             'queued', 'dispatching', 'dispatched', 'in_progress', 'uploading_artifacts', 'reporting'
+           )`,
         [action.repository.id, action.pullRequestNumber, action.commitSha, iso(now)],
       );
 
@@ -246,12 +258,48 @@ export function createSqlGitHubAppLifecycleStore(
 
     async bindReleaseRunExecutionAttempt(input) {
       const result = await executor.query(
-        `update release_runs
-         set execution_attempt_id = $2,
+        `with target as materialized (
+           select release_runs.id, release_runs.execution_attempt_id
+           from release_runs
+           where release_runs.id = $1
+             and release_runs.status = 'queued'
+           for update
+         ),
+         failed_previous as (
+           update release_run_attempts
+           set status = 'failed',
+               completed_at = coalesce(completed_at, $3::timestamptz),
+               failure_class = coalesce(failure_class, 'dispatch_replaced'),
+               failure_message = coalesce(
+                 failure_message,
+                 'A newer dispatch attempt replaced this uncompleted attempt.'
+               )
+           from target
+           where release_run_attempts.id = target.execution_attempt_id
+             and release_run_attempts.status in ('queued', 'dispatching')
+           returning release_run_attempts.id
+         ),
+         numbered as (
+           select target.id as run_id,
+                  coalesce(max(release_run_attempts.attempt_number), 0) + 1 as attempt_number
+           from target
+           left join release_run_attempts on release_run_attempts.run_id = target.id
+           group by target.id
+         ),
+         inserted_attempt as (
+           insert into release_run_attempts (
+             id, run_id, attempt_number, status, created_at, dispatch_requested_at
+           )
+           select $2, numbered.run_id, numbered.attempt_number, 'dispatching', $3::timestamptz, $3::timestamptz
+           from numbered
+           returning id, run_id
+         )
+         update release_runs
+         set execution_attempt_id = inserted_attempt.id,
              execution_attempt_started_at = $3::timestamptz
-         where id = $1
-           and status = 'queued'
-         returning id`,
+         from inserted_attempt
+         where release_runs.id = inserted_attempt.run_id
+         returning release_runs.id`,
         [input.runId, input.executionAttemptId, input.startedAt],
       );
 
@@ -260,12 +308,27 @@ export function createSqlGitHubAppLifecycleStore(
 
     async markReleaseRunDispatched(input) {
       await executor.query(
-        `update release_runs
+        `with updated_attempt as (
+           update release_run_attempts
+           set status = 'dispatched',
+               dispatched_at = coalesce(release_run_attempts.dispatched_at, $3::timestamptz),
+               github_workflow_dispatch_id = coalesce(release_run_attempts.github_workflow_dispatch_id, $4)
+           from release_runs
+           where release_run_attempts.id = $2
+             and release_run_attempts.run_id = $1
+             and release_run_attempts.status = 'dispatching'
+             and release_runs.id = release_run_attempts.run_id
+             and release_runs.execution_attempt_id = release_run_attempts.id
+             and release_runs.status = 'queued'
+           returning release_run_attempts.id, release_run_attempts.run_id
+         )
+         update release_runs
          set status = 'dispatched'
-         where id = $1
-           and execution_attempt_id = $2
-           and status = 'queued'`,
-        [input.runId, input.executionAttemptId],
+         from updated_attempt
+         where release_runs.id = updated_attempt.run_id
+           and release_runs.execution_attempt_id = updated_attempt.id
+           and release_runs.status = 'queued'`,
+        [input.runId, input.executionAttemptId, input.dispatchedAt, input.workflowDispatchId ?? null],
       );
     },
 

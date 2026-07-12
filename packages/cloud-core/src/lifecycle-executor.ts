@@ -24,6 +24,8 @@ export type BindReleaseRunExecutionAttemptInput = {
 export type MarkReleaseRunDispatchedInput = {
   runId: string;
   executionAttemptId: string;
+  dispatchedAt: string;
+  workflowDispatchId?: string;
 };
 
 export type MarkReleaseRunSkippedInput = {
@@ -220,14 +222,19 @@ async function executeReleaseRun(
     return;
   }
 
-  await workflowDispatchClient.dispatchReleaseRunWorkflow({
+  const dispatch = await workflowDispatchClient.dispatchReleaseRunWorkflow({
     action,
     runId: releaseRun.runId,
     idempotencyKey: releaseRun.idempotencyKey,
     githubCheckRunId: checkRunId,
     executionAttemptId,
   });
-  await store.markReleaseRunDispatched({ runId: releaseRun.runId, executionAttemptId });
+  await store.markReleaseRunDispatched({
+    runId: releaseRun.runId,
+    executionAttemptId,
+    dispatchedAt: new Date().toISOString(),
+    ...(dispatch.workflowDispatchId === undefined ? {} : { workflowDispatchId: dispatch.workflowDispatchId }),
+  });
   result.workflowDispatchesCreated += 1;
 }
 

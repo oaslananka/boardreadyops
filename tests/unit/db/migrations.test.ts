@@ -7,10 +7,11 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-result schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(6);
+    expect(cloudDatabaseSchemaVersion).toBe(7);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("AuditEvent");
     expect(cloudDatabaseModels).toContain("ReleaseRunResult");
+    expect(cloudDatabaseModels).toContain("ReleaseRunAttempt");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
@@ -23,6 +24,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0004_audit_logs.sql",
       "0005_release_run_execution_attempts.sql",
       "0006_release_run_results.sql",
+      "0007_release_run_attempts.sql",
     ]);
   });
 
@@ -52,6 +54,20 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("terminal_result_digest text");
     expect(sql).toContain("release_runs_execution_attempt_id_idx");
     expect(sql).toContain("release_runs_terminal_result_digest_valid");
+  });
+
+  it("tracks execution attempts separately from logical release runs", async () => {
+    const sql = await readFile(join(migrationsDir, "0007_release_run_attempts.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists release_run_attempts");
+    expect(sql).toContain("attempt_number integer not null");
+    expect(sql).toContain("github_workflow_dispatch_id text");
+    expect(sql).toContain("release_run_attempts_status_valid");
+    expect(sql).toContain("release_run_attempts_completion_valid");
+    expect(sql).toContain("release_run_attempts_run_number_idx");
+    expect(sql).toContain("release_run_attempts_active_idx");
+    expect(sql).toContain("insert into release_run_attempts");
+    expect(sql).toContain("where release_runs.execution_attempt_id is not null");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {

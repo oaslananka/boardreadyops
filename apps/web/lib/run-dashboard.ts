@@ -31,6 +31,7 @@ type RunDetail = {
   repository: string;
   findings: FindingDetail[];
   artifacts: ArtifactDetail[];
+  attempts: AttemptDetail[];
 };
 
 type ReportLinkDetail = {
@@ -56,6 +57,23 @@ type ArtifactDetail = {
   role: string;
   uploadedAt: string;
   downloadUrl: string | undefined;
+};
+
+type AttemptDetail = {
+  id: string;
+  attemptNumber: number;
+  status: string;
+  createdAt: string;
+  dispatchRequestedAt: string | undefined;
+  dispatchedAt: string | undefined;
+  startedAt: string | undefined;
+  heartbeatAt: string | undefined;
+  completedAt: string | undefined;
+  retryAfterAt: string | undefined;
+  workflowDispatchId: string | undefined;
+  failureClass: string | undefined;
+  failureMessage: string | undefined;
+  resultDigest: string | undefined;
 };
 
 export type RunLookupResult = { state: "not-configured" } | { state: "not-found" } | { state: "found"; run: RunDetail };
@@ -222,7 +240,7 @@ export async function lookupRunDashboard(
     return { state: "not-found" };
   }
 
-  const [findingsResult, artifactsResult] = await Promise.all([
+  const [findingsResult, artifactsResult, attemptsResult] = await Promise.all([
     executor.query(
       `select rule_id, severity, message, path, kind, waived_at
        from findings
@@ -234,6 +252,15 @@ export async function lookupRunDashboard(
        from artifacts
        where run_id = $1
        order by uploaded_at desc`,
+      [runId],
+    ),
+    executor.query(
+      `select id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at,
+              started_at, heartbeat_at, completed_at, retry_after_at,
+              github_workflow_dispatch_id, failure_class, failure_message, result_digest
+       from release_run_attempts
+       where run_id = $1
+       order by attempt_number desc`,
       [runId],
     ),
   ]);
@@ -265,6 +292,25 @@ export async function lookupRunDashboard(
     };
   });
 
+  const attempts = rows(attemptsResult).map(
+    (row): AttemptDetail => ({
+      id: requiredString(row, "id"),
+      attemptNumber: numberValue(row, "attempt_number") ?? 0,
+      status: requiredString(row, "status"),
+      createdAt: requiredString(row, "created_at"),
+      dispatchRequestedAt: stringValue(row, "dispatch_requested_at"),
+      dispatchedAt: stringValue(row, "dispatched_at"),
+      startedAt: stringValue(row, "started_at"),
+      heartbeatAt: stringValue(row, "heartbeat_at"),
+      completedAt: stringValue(row, "completed_at"),
+      retryAfterAt: stringValue(row, "retry_after_at"),
+      workflowDispatchId: stringValue(row, "github_workflow_dispatch_id"),
+      failureClass: stringValue(row, "failure_class"),
+      failureMessage: stringValue(row, "failure_message"),
+      resultDigest: stringValue(row, "result_digest"),
+    }),
+  );
+
   return {
     state: "found",
     run: {
@@ -293,6 +339,7 @@ export async function lookupRunDashboard(
       repository: `${requiredString(runRow, "owner")}/${requiredString(runRow, "name")}`,
       findings,
       artifacts,
+      attempts,
     },
   };
 }

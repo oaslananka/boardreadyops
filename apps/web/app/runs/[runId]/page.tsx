@@ -141,6 +141,38 @@ export default async function RunPage({ params }: RunPageProps) {
       </section>
 
       <section className="panel">
+        <h2>Execution attempts</h2>
+        {run.attempts.length === 0 ? (
+          <p>No execution attempt has been assigned to this run.</p>
+        ) : (
+          <ol className="stack-list">
+            {run.attempts.map((attempt) => (
+              <li key={attempt.id}>
+                <div>
+                  <strong>Attempt {attempt.attemptNumber}</strong> <StatusPill value={attempt.status} />
+                </div>
+                <p>
+                  Requested {formatRunDate(attempt.dispatchRequestedAt ?? attempt.createdAt)} · dispatched{" "}
+                  {formatRunDate(attempt.dispatchedAt)} · completed {formatRunDate(attempt.completedAt)}
+                </p>
+                {attempt.workflowDispatchId ? (
+                  <p>
+                    Workflow dispatch: <code>{attempt.workflowDispatchId}</code>
+                  </p>
+                ) : null}
+                {attempt.failureClass || attempt.failureMessage ? (
+                  <p role="alert">
+                    {attempt.failureClass ? `${attempt.failureClass}: ` : ""}
+                    {attempt.failureMessage ?? "Attempt failed."}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <section className="panel">
         <h2>Publication</h2>
         <dl className="grid-list">
           <div>

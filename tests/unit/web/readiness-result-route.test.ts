@@ -250,6 +250,9 @@ describe("readiness result route authentication and publication", () => {
     expect(sql).toContain("inserted_findings as");
     expect(sql).toContain("deleted_artifacts as");
     expect(sql).toContain("inserted_artifacts as");
+    expect(sql).toContain("updated_attempt as");
+    expect(sql).toContain("update release_run_attempts");
+    expect(sql).toContain("'in_progress'");
     expect(sql).toContain("insert into release_run_results");
     expect(sql).toContain("runner.result.persisted");
     expect(sql).toContain("jsonb_object_keys($10::jsonb)");
