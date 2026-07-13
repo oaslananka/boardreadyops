@@ -16,6 +16,15 @@ narrowest meaningful test and pass the repository gate before merge.
 | Mutation | `corepack pnpm run mutation` | Test strength for core/rule/parser paths. |
 | Accessibility | `corepack pnpm run test:a11y` | HTML and docs accessibility coverage. |
 
+## Integration isolation
+
+Integration test files run without file-level parallelism. PostgreSQL suites
+share one ephemeral database and exercise a server-authoritative global claim
+queue, so parallel files can claim or clean up another file's fixture data.
+Keep `--no-file-parallelism` on `test:int` until every database-backed file has
+an isolated database or schema. Tests within each file retain their normal
+ordering and concurrency semantics.
+
 ## Required evidence in PRs
 
 Every pull request should list command results in the PR body. Public contract
