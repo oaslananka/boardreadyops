@@ -1,4 +1,4 @@
-name: temporary-runner-activation-diagnostics
+name: temporary-runner-activation-format
 
 on:
   pull_request:
@@ -6,17 +6,17 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnostics:
-    if: github.repository_owner == 'oaslananka'
+  format:
+    if: github.repository_owner == 'oaslananka' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.ref }}
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 24
@@ -24,23 +24,28 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - name: Capture activation diagnostics
+      - name: Format activation files
         shell: bash
         run: |
-          mkdir -p diagnostics
-          set +e
-          pnpm run lint > diagnostics/lint.txt 2>&1
-          echo "$?" > diagnostics/lint-exit.txt
-          pnpm run typecheck > diagnostics/typecheck.txt 2>&1
-          echo "$?" > diagnostics/typecheck-exit.txt
+          pnpm exec biome check --write \
+            packages/contracts/src/runner-protocol.ts \
+            tests/unit/contracts/runner-protocol.test.ts \
+            apps/web/lib/runner-registration-activation-route.ts \
+            apps/web/app/api/v1/runner/registrations/activate/route.ts \
+            tests/unit/web/runner-registration-activation-route.test.ts
+          pnpm run typecheck
           pnpm exec vitest run \
             tests/unit/contracts/runner-protocol.test.ts \
-            tests/unit/web/runner-registration-activation-route.test.ts \
-            --reporter=verbose > diagnostics/test.txt 2>&1
-          echo "$?" > diagnostics/test-exit.txt
-          exit 0
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: runner-activation-diagnostics
-          path: diagnostics
+            tests/unit/web/runner-registration-activation-route.test.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            packages/contracts/src/runner-protocol.ts \
+            tests/unit/contracts/runner-protocol.test.ts \
+            apps/web/lib/runner-registration-activation-route.ts \
+            apps/web/app/api/v1/runner/registrations/activate/route.ts \
+            tests/unit/web/runner-registration-activation-route.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style: format runner activation files"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
