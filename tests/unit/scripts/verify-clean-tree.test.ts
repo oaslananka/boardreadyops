@@ -60,6 +60,10 @@ async function createRepository() {
   const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-clean-tree-"));
   roots.push(root);
   runGit(root, ["init", "--quiet"]);
+  const hooksPath = path.join(root, ".git", "test-hooks");
+  await mkdir(hooksPath, { recursive: true });
+  runGit(root, ["config", "core.hooksPath", hooksPath]);
+  runGit(root, ["config", "commit.gpgSign", "false"]);
   runGit(root, ["config", "user.email", "tests@example.com"]);
   runGit(root, ["config", "user.name", "BoardReadyOps Tests"]);
 
@@ -96,12 +100,21 @@ function runVerifier(root: string) {
   return spawnSync(process.execPath, [scriptPath], {
     cwd: root,
     encoding: "utf8",
+    env: isolatedGitEnvironment(),
   });
 }
 
 function runGit(root: string, args: string[]) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", env: isolatedGitEnvironment() });
   if (result.status !== 0) {
     throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
   }
+}
+
+function isolatedGitEnvironment() {
+  const env = { ...process.env };
+  for (const name of Object.keys(env)) {
+    if (name.startsWith("GIT_")) delete env[name];
+  }
+  return env;
 }
