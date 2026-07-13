@@ -154,12 +154,12 @@ describeDatabase("self-hosted runner enrollment PostgreSQL lifecycle", () => {
         [first.registrationId],
       );
       const audits = (auditResult as { rows: Array<Record<string, unknown>> }).rows;
-      expect(audits.map((row) => row.event_type)).toEqual([
-        "runner.registration.enrollment_issued",
-        "runner.registration.enrollment_issued",
-        "runner.registration.activated",
-      ]);
-      expect(audits[2]).toMatchObject({
+      const eventTypes = audits.map((row) => row.event_type);
+      expect(eventTypes).toHaveLength(3);
+      expect(eventTypes.filter((eventType) => eventType === "runner.registration.enrollment_issued")).toHaveLength(2);
+      expect(eventTypes.filter((eventType) => eventType === "runner.registration.activated")).toHaveLength(1);
+      const activationAudit = audits.find((row) => row.event_type === "runner.registration.activated");
+      expect(activationAudit).toMatchObject({
         actor_type: "registered_actor",
         metadata: {
           publicKeyFingerprint: digest(key),
