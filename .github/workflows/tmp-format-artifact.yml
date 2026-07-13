@@ -6,16 +6,18 @@ on:
       - feat/runner-routing-policy
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   format:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'chore/format-runner-routing-policy'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          persist-credentials: false
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 24
@@ -23,24 +25,18 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - name: Apply repository formatter
-        run: pnpm run lint:fix
-      - name: Verify lint after formatting
-        run: pnpm run lint
-      - name: Capture formatted files
+      - name: Apply and verify repository formatter
         run: |
           set -euo pipefail
-          mkdir -p format-output/packages/db/src
-          mkdir -p format-output/tests/integration
-          mkdir -p format-output/tests/unit/db
-          cp packages/db/src/index.ts format-output/packages/db/src/index.ts
-          cp tests/integration/runner-lease-store-postgres.test.ts format-output/tests/integration/runner-lease-store-postgres.test.ts
-          cp tests/integration/runner-routing-policy-postgres.test.ts format-output/tests/integration/runner-routing-policy-postgres.test.ts
-          cp tests/unit/db/migrations.test.ts format-output/tests/unit/db/migrations.test.ts
-          git diff -- packages/db/src/index.ts tests/integration/runner-lease-store-postgres.test.ts tests/integration/runner-routing-policy-postgres.test.ts tests/unit/db/migrations.test.ts > format-output/biome.patch
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: runner-routing-biome-formatted
-          path: format-output
-          if-no-files-found: error
-          retention-days: 7
+          pnpm run lint:fix
+          pnpm run lint
+      - name: Commit formatted feature files and remove finalizer
+        run: |
+          set -euo pipefail
+          rm .github/workflows/tmp-format-artifact.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/integration/runner-routing-policy-postgres.test.ts .github/workflows/tmp-format-artifact.yml
+          git diff --cached --quiet && { echo 'No formatting changes to commit.'; exit 1; }
+          git commit -m "style(test): format runner routing policy coverage"
+          git push origin HEAD:${{ github.head_ref }}
