@@ -1,0 +1,146 @@
+name: tmp-release-1-12-audit
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Verify public release channels
+        env:
+          VERSION: "1.12.0"
+          RELEASE_COMMIT: "b9c22382638724778d0fa8bcbaab2c47665f5f67"
+        run: |
+          set -euo pipefail
+          mkdir -p audit-output
+          exec > >(tee audit-output/release-audit.txt) 2>&1
+
+          retry() {
+            local attempts="$1"
+            local delay="$2"
+            shift 2
+            local attempt
+            for attempt in $(seq 1 "${attempts}"); do
+              echo "attempt ${attempt}/${attempts}: $*"
+              if "$@"; then
+                return 0
+              fi
+              sleep "${delay}"
+            done
+            return 1
+          }
+
+          npm_ready() {
+            test "$(npm view "boardreadyops@${VERSION}" version 2>/dev/null)" = "${VERSION}" &&
+              test "$(npm view boardreadyops dist-tags.latest 2>/dev/null)" = "${VERSION}"
+          }
+
+          release_ready() {
+            curl --fail --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/oaslananka/boardreadyops/releases/tags/v${VERSION}" \
+              -o audit-output/github-release.json &&
+              test "$(jq -r '.target_commitish' audit-output/github-release.json)" = "${RELEASE_COMMIT}" &&
+              test "$(jq -r '.draft' audit-output/github-release.json)" = "false" &&
+              test "$(jq -r '.prerelease' audit-output/github-release.json)" = "false" &&
+              test "$(jq '.assets | length' audit-output/github-release.json)" -eq 7
+          }
+
+          inspect_image() {
+            local reference="$1"
+            local output="$2"
+            docker buildx imagetools inspect "${reference}" >"${output}" 2>"${output}.err"
+          }
+
+          echo "BoardReadyOps public release audit"
+          echo "version=${VERSION}"
+          echo "expected_commit=${RELEASE_COMMIT}"
+
+          echo
+          echo "== npm metadata and tarball smoke =="
+          retry 20 15 npm_ready
+          npm view "boardreadyops@${VERSION}" version dist-tags.latest dist.integrity dist.shasum engines bin --json \
+            | tee audit-output/npm-metadata.json
+          work="$(mktemp -d)"
+          (
+            cd "${work}"
+            npm pack "boardreadyops@${VERSION}" --silent > tarball-name.txt
+            tar -xzf "$(cat tarball-name.txt)"
+            cli_version="$(node package/dist/cli/index.cjs --version)"
+            echo "npm_cli_version=${cli_version}"
+            test "${cli_version}" = "${VERSION}"
+          )
+
+          echo
+          echo "== GitHub Release assets and Linux binary =="
+          retry 20 15 release_ready
+          jq '{tag_name,target_commitish,draft,prerelease,published_at,assets:[.assets[]|{name,size,digest}]}' \
+            audit-output/github-release.json
+          assets="$(jq -r '.assets[].name' audit-output/github-release.json | sort)"
+          for required in \
+            SHA256SUMS \
+            boardreadyops-linux-arm64 \
+            boardreadyops-linux-x64 \
+            boardreadyops-macos-arm64 \
+            boardreadyops-macos-x64 \
+            boardreadyops-win-x64.exe \
+            sbom.cyclonedx.json; do
+            grep -Fxq "${required}" <<<"${assets}"
+          done
+          sums_url="$(jq -r '.assets[] | select(.name == "SHA256SUMS") | .browser_download_url' audit-output/github-release.json)"
+          linux_url="$(jq -r '.assets[] | select(.name == "boardreadyops-linux-x64") | .browser_download_url' audit-output/github-release.json)"
+          curl --fail --location --silent --show-error "${sums_url}" -o audit-output/SHA256SUMS
+          curl --fail --location --silent --show-error "${linux_url}" -o audit-output/boardreadyops-linux-x64
+          (
+            cd audit-output
+            grep '  boardreadyops-linux-x64$' SHA256SUMS | sha256sum --check --strict -
+            chmod +x boardreadyops-linux-x64
+            binary_version="$(./boardreadyops-linux-x64 --version)"
+            echo "linux_binary_version=${binary_version}"
+            test "${binary_version}" = "${VERSION}"
+          )
+
+          echo
+          echo "== GHCR anonymous manifests and runtime =="
+          image="ghcr.io/oaslananka/boardreadyops-full"
+          retry 20 15 inspect_image "${image}:v${VERSION}" audit-output/ghcr-exact.txt
+          retry 20 15 inspect_image "${image}:v1" audit-output/ghcr-v1.txt
+          retry 20 15 inspect_image "${image}:latest" audit-output/ghcr-latest.txt
+          exact="$(awk '/^Digest:/ {print $2; exit}' audit-output/ghcr-exact.txt)"
+          major="$(awk '/^Digest:/ {print $2; exit}' audit-output/ghcr-v1.txt)"
+          latest="$(awk '/^Digest:/ {print $2; exit}' audit-output/ghcr-latest.txt)"
+          echo "v${VERSION}=${exact}"
+          echo "v1=${major}"
+          echo "latest=${latest}"
+          test -n "${exact}"
+          test "${exact}" = "${major}"
+          test "${exact}" = "${latest}"
+          grep -q 'linux/amd64' audit-output/ghcr-exact.txt
+          grep -q 'linux/arm64' audit-output/ghcr-exact.txt
+          container_version="$(docker run --rm --entrypoint boardreadyops "${image}:v${VERSION}" --version)"
+          echo "container_cli_version=${container_version}"
+          test "${container_version}" = "${VERSION}"
+
+          echo
+          echo "PUBLIC_RELEASE_AUDIT=PASS"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: release-1.12.0-audit
+          path: audit-output
+          if-no-files-found: error
+          retention-days: 7
