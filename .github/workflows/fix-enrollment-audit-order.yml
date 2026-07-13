@@ -1,0 +1,71 @@
+name: fix-enrollment-audit-order
+
+on:
+  push:
+    branches:
+      - fix/stable-enrollment-audit-order
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile
+      - name: Replace nondeterministic audit ordering assertion
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/integration/runner-registration-enrollment-postgres.test.ts')
+          text = path.read_text()
+          old = '''      expect(audits.map((row) => row.event_type)).toEqual([
+                "runner.registration.enrollment_issued",
+                "runner.registration.enrollment_issued",
+                "runner.registration.activated",
+              ]);
+              expect(audits[2]).toMatchObject({
+                actor_type: "registered_actor",
+                metadata: {
+                  publicKeyFingerprint: digest(key),
+                  capabilityCount: 2,
+                },
+              });'''
+          new = '''      const eventTypes = audits.map((row) => row.event_type);
+              expect(eventTypes).toHaveLength(3);
+              expect(
+                eventTypes.filter((eventType) => eventType === "runner.registration.enrollment_issued"),
+              ).toHaveLength(2);
+              expect(eventTypes.filter((eventType) => eventType === "runner.registration.activated")).toHaveLength(1);
+              const activationAudit = audits.find((row) => row.event_type === "runner.registration.activated");
+              expect(activationAudit).toMatchObject({
+                actor_type: "registered_actor",
+                metadata: {
+                  publicKeyFingerprint: digest(key),
+                  capabilityCount: 2,
+                },
+              });'''
+          if old not in text:
+              raise SystemExit('expected audit assertion block not found')
+          path.write_text(text.replace(old, new))
+          PY
+          pnpm exec biome check --write tests/integration/runner-registration-enrollment-postgres.test.ts
+      - name: Commit fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/integration/runner-registration-enrollment-postgres.test.ts
+          git commit -m "test(db): avoid nondeterministic audit UUID ordering"
+          git push
