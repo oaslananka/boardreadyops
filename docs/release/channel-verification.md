@@ -5,47 +5,52 @@ BoardReadyOps consumption channels. It is intentionally separate from the normal
 release process so every unsupported public channel has a concrete follow-up
 issue before completion is claimed.
 
-> **Current status:** The latest public release is `boardreadyops@1.4.6` on npm
-> and the `v1.4.6` GitHub Release. On 2026-06-19, npm clean-consumer install,
-> Linux x64 binary checksum/runtime smoke, release asset publication, and
-> anonymous GHCR `v1`/`latest` manifest access were re-verified. The historical
+> **Current status:** The latest public release is `boardreadyops@1.11.0` on npm
+> and the `v1.11.0` GitHub Release. On 2026-07-13, npm metadata and a
+> clean tarball CLI smoke, GitHub Release asset publication, and anonymous
+> GHCR `v1.11.0`/`v1`/`latest` manifest access were verified. The historical
 > `v1.1.0` audit remains below for traceability.
 
-## Current Release Verification (2026-06-19)
+## Current Release Verification (2026-07-13)
 
 | Field | Value |
 | --- | --- |
-| Public release | `v1.4.6` |
-| Release tag commit | `288e2da378a3a80e7591dd410d0fcba6a2b46330` |
-| npm package | `boardreadyops@1.4.6` |
-| npm integrity | `sha512-U1yULYjsEKaQ0YV1ztfq2xoRmc5TXkZzME40RWOrDNtuP92qo6/i4H3X17FWCirno1r2rCgXeTryDERhR/c7/w==` |
-| npm shasum | `4f79a9d9c74a522f1f0e0b1c62d211cc386bb6ec` |
-| npm engines | `^22.0.0 || ^24.0.0` |
-| GitHub Release assets | Present: Linux x64, Linux arm64, macOS x64, macOS arm64, Windows x64, `SHA256SUMS`, and `sbom.cyclonedx.json` |
-| `SHA256SUMS` digest | `sha256:d042f60c219cc241ff67d004b605d62cf6301364d927555e9eeff140c3a601bf` |
-| `sbom.cyclonedx.json` digest | `sha256:0bed369fc08218093fa1258df59cbd736d96e4b16d74de8af688b48c33d8b783` |
-| Anonymous GHCR `v1`/`latest` digest | `sha256:03eea649a1968e67fdb91f9c53e97e040bee3ca481f2b5ec79a8b8b3a11f299a` |
-| GHCR exact and alias tags | `v1.4.6`, `v1`, and `latest` all resolve to OCI index digest `sha256:03eea649a1968e67fdb91f9c53e97e040bee3ca481f2b5ec79a8b8b3a11f299a` after workflow run `27791461239`. |
+| Public release | `v1.11.0` |
+| Release tag commit | `bc2030e5bc1cb5b97c1f81a758e7fbc81aa5e259` |
+| npm package | `boardreadyops@1.11.0` (`latest`) |
+| npm integrity | `sha512-TdTUCmOJUDX3lscppU5lDjsum03PhIAfspbhzpEuaXFfCUCtNfhY8vGhKbf62KfWDsfFg7QRgEl8Jz9vOk6O1A==` |
+| npm shasum | `00c4485fe7892eab19594103a38321ca66ec2e75` |
+| npm engines | `^22.14.0 || ^24.0.0` |
+| GitHub Release | Published 2026-07-13; non-draft and non-prerelease |
+| GitHub Release assets | Seven assets: five platform binaries, `SHA256SUMS`, and `sbom.cyclonedx.json` |
+| `SHA256SUMS` digest | `sha256:685ad6cf9fb5a0453b346273093b8211c3364791e50ed26d23f749590c639b55` |
+| `sbom.cyclonedx.json` digest | `sha256:b2e3bc436ab8dc437492d6ab2647bc366a792985e0215a16d7d23dab9ffdc49c` |
+| Anonymous GHCR index | `sha256:ed4901307bf42bd548de8ca1c8c329f56300bd8eadffc20a6e61cc0b5b9f8e2b` |
+| GHCR exact and aliases | `v1.11.0`, `v1`, and `latest` resolve to the same OCI index digest |
+| GHCR platforms | `linux/amd64` (`sha256:5d6689feff0fdf986510756c1956bd83731362af751dba59167c235f5cbcb268`) and `linux/arm64` (`sha256:df3f6ee89625f5d045ec25f3ee50db1ada3d7d2d5fec674bcf128a0e74d5e330`) |
+| Audit evidence | Temporary public-channel workflow run `29259565432` |
 
 ### Current Pass/Follow-up Matrix
 
 | Channel | Result | Evidence | Follow-up |
 | --- | --- | --- | --- |
-| npm clean install | Pass | A temporary-prefix install of `boardreadyops@1.4.6` reported CLI version `1.4.6`, produced a valid `doctor --format json` report, and generated JSON, SARIF, Markdown, HTML, and JUnit outputs from `check . --fail-on never`. | None |
-| Linux x64 release binary | Pass | The `v1.4.6` Linux x64 binary was downloaded with `SHA256SUMS`; checksum validation passed and the binary returned `1.4.6`. | None |
-| GitHub Release binary assets | Pass | `v1.4.6` contains seven uploaded assets: five platform binaries, `SHA256SUMS`, and `sbom.cyclonedx.json`. | None |
-| Homebrew formula | Pass for formula data | `Formula/boardreadyops.rb` points at `v1.4.6` macOS/Linux assets and uses checksums from the release `SHA256SUMS`. Publishing an external tap remains a maintainer process. | Tap publication |
-| GHCR major aliases | Pass | Anonymous OCI index inspection with a clean Docker config succeeded for `ghcr.io/oaslananka/boardreadyops-full:v1` and `latest`, both at digest `sha256:03eea649a1968e67fdb91f9c53e97e040bee3ca481f2b5ec79a8b8b3a11f299a`. | Record `v1.4.6` exact-tag digest after run `27791461239` completes. |
+| npm metadata and tarball smoke | Pass | Registry version and `latest` were `1.11.0`; the public tarball extracted successfully and `node package/dist/cli/index.cjs --version` returned `1.11.0`. | None |
+| GitHub Release assets | Pass | `v1.11.0` targets the release commit and exposes exactly seven expected assets with GitHub-provided SHA-256 digests. | None |
+| GHCR exact and alias tags | Pass | Anonymous `docker buildx imagetools inspect` succeeded for `v1.11.0`, `v1`, and `latest`; all resolved to the same multi-architecture OCI index. | None |
+| Standalone binary runtime smoke | Not run in this audit | Release binary checksums and asset digests are recorded, but binaries were not executed by this audit. | Run separately when a clean-host binary runtime recheck is required. |
+| Homebrew external tap | Not reverified | This audit did not inspect or publish an external tap. | Maintainer process. |
 
 ### Current Release Artifact List
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `boardreadyops-linux-x64` | `13099f85d5dffe812ce8d3d04516f37b5d3881d189348afc1517a3d894d2c6f8` |
-| `boardreadyops-linux-arm64` | `0db9f99abdb4aae748fc2df640091ca4c9d6f9fe9460b699c00b33f500eacc1a` |
-| `boardreadyops-macos-x64` | `110f644b813146f65d85259bc83efdd510323d71ea299fadc548f8100af2c671` |
-| `boardreadyops-macos-arm64` | `7e450e8763bcae98414cd648d556a069f8865b065d8bd07a2ecff4e9793986bd` |
-| `boardreadyops-win-x64.exe` | `bb1ab2c1ca98b4789f754d0bcefdec30ac648dcb392db9a6e91d99d13ce28404` |
+| `boardreadyops-linux-x64` | `ac8baee7602f8f0a33079af60597643dfb3638d9f30012d798cb37631c53ae1e` |
+| `boardreadyops-linux-arm64` | `7b64e2d38530852e5b187f5a6bd1685ce9d7c051eb5518d45677ab9e275e2bcd` |
+| `boardreadyops-macos-x64` | `e61b8c94477a6464282b9e1109708d7e14368cca0aa088e18cb6ff79c94f59ff` |
+| `boardreadyops-macos-arm64` | `2ae3908de88e4b54266431e461f31dd7260e7781464aa811498f72db47a11d47` |
+| `boardreadyops-win-x64.exe` | `1ae71f61693a8f65c2f77a41655e083da67c519d5149bf7410a8c7b6a23ab693` |
+| `SHA256SUMS` | `685ad6cf9fb5a0453b346273093b8211c3364791e50ed26d23f749590c639b55` |
+| `sbom.cyclonedx.json` | `b2e3bc436ab8dc437492d6ab2647bc366a792985e0215a16d7d23dab9ffdc49c` |
 
 ## Historical Audit Target
 
@@ -150,7 +155,10 @@ artifact: boardreadyops-full-cyclonedx
 
 ## Completion Rule
 
-npm, release binaries, `SHA256SUMS`, SBOM, Homebrew formula checksum data,
-and anonymous GHCR manifest access for `v1.4.6`, `v1`, and `latest` are
-verified as of 2026-06-19. All three tags resolve to `sha256:03eea649a1968e67fdb91f9c53e97e040bee3ca481f2b5ec79a8b8b3a11f299a`. The `kicad-plugin/`
-directory was retired from main in commit `68e21df`.
+npm metadata and clean-tarball CLI smoke, GitHub Release asset publication
+and digests, and anonymous GHCR manifest access for `v1.11.0`, `v1`, and
+`latest` are verified as of 2026-07-13. All three image tags resolve to
+`sha256:ed4901307bf42bd548de8ca1c8c329f56300bd8eadffc20a6e61cc0b5b9f8e2b`.
+Standalone binary runtime and external Homebrew tap checks were not rerun in
+this audit and must not be inferred from the channel results above. The
+`kicad-plugin/` directory was retired from main in commit `68e21df`.
