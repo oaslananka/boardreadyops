@@ -8,6 +8,21 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.11.0](https://github.com/oaslananka/boardreadyops/compare/v1.10.0...v1.11.0) (2026-07-13)
+
+
+### Features
+
+* **runner:** add artifact capability and upload routes ([#160](https://github.com/oaslananka/boardreadyops/issues/160)) ([3ea6e42](https://github.com/oaslananka/boardreadyops/commit/3ea6e42e1dd9aac28cfd214db6a2a2dbd25d6b42))
+* **runner:** add artifact upload capability store ([#159](https://github.com/oaslananka/boardreadyops/issues/159)) ([921c4b0](https://github.com/oaslananka/boardreadyops/commit/921c4b088279c87efb9c9b8c0a1d84679103b54e))
+* **runner:** add self-hosted activation endpoint ([#164](https://github.com/oaslananka/boardreadyops/issues/164)) ([72c1e8c](https://github.com/oaslananka/boardreadyops/commit/72c1e8ca7f7a44af47ec8bbfa6b04c0e16ad7fc8))
+* **runner:** add self-hosted enrollment store ([#163](https://github.com/oaslananka/boardreadyops/issues/163)) ([7cfaadf](https://github.com/oaslananka/boardreadyops/commit/7cfaadf1b9c82ec6cbcc490e97de2e24e2e2cc37))
+* **runner:** add signed claim and lease routes ([#158](https://github.com/oaslananka/boardreadyops/issues/158)) ([3c99ecf](https://github.com/oaslananka/boardreadyops/commit/3c99ecf82365034c6a8d31f0d1bdde7013872714))
+* **runner:** add signed lease protocol foundation ([#155](https://github.com/oaslananka/boardreadyops/issues/155)) ([5ecae92](https://github.com/oaslananka/boardreadyops/commit/5ecae92472d806dd1328a80d75c205aa01c2e2a9))
+* **runner:** add signed terminal result route ([#162](https://github.com/oaslananka/boardreadyops/issues/162)) ([c26a459](https://github.com/oaslananka/boardreadyops/commit/c26a459230afeb262af64aaf81b440044d845640))
+* **runner:** add transactional lease store ([#157](https://github.com/oaslananka/boardreadyops/issues/157)) ([e520dda](https://github.com/oaslananka/boardreadyops/commit/e520dda52807f97dc5a301d6624d34bcb4af1e24))
+* **runner:** authorize signed terminal results ([#161](https://github.com/oaslananka/boardreadyops/issues/161)) ([94b0e5f](https://github.com/oaslananka/boardreadyops/commit/94b0e5fa2365db14c996331ca9da81567682f98f))
+
 ## [1.10.0](https://github.com/oaslananka/boardreadyops/compare/v1.9.0...v1.10.0) (2026-07-12)
 
 
