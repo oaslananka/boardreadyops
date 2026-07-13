@@ -7,8 +7,9 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(12);
+    expect(cloudDatabaseSchemaVersion).toBe(13);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
+    expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
     expect(cloudDatabaseModels).toContain("RunnerRequestNonce");
@@ -34,6 +35,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0010_runner_lease_heartbeat_qualification.sql",
       "0011_runner_artifact_upload_capabilities.sql",
       "0012_runner_terminal_result_authorization.sql",
+      "0013_runner_registration_enrollments.sql",
     ]);
   });
 
@@ -156,6 +158,20 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("persisted_request_digest = p_request_digest");
     expect(sql).toContain("return 'conflicting_replay'");
     expect(sql).toContain("security invoker");
+  });
+
+  it("stores digest-only one-time runner enrollments in schema v13", async () => {
+    const sql = await readFile(join(migrationsDir, "0013_runner_registration_enrollments.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists runner_registration_enrollments");
+    expect(sql).toContain("token_digest text not null unique");
+    expect(sql).toContain("runner_registration_enrollments_one_active_idx");
+    expect(sql).toContain("boardreadyops_issue_runner_registration_enrollment");
+    expect(sql).toContain("boardreadyops_activate_runner_registration");
+    expect(sql).toContain("runner.registration.enrollment_issued");
+    expect(sql).toContain("runner.registration.activated");
+    expect(sql).toContain("security invoker");
+    expect(sql).not.toContain("enrollment_token text");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
