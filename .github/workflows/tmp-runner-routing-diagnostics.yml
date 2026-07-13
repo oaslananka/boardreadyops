@@ -49,11 +49,10 @@ jobs:
 
           path = Path("tests/integration/runner-routing-policy-postgres.test.ts")
           text = path.read_text()
-          before = '''  for (const tenant of tenants) {
-            await executor.query("delete from installations where id = $1", [tenant.installationId]);
-          }
-          '''
-          after = '''  for (const tenant of tenants) {
+          function_start = text.index("async function cleanup(")
+          loop_start = text.index("  for (const tenant of tenants) {", function_start)
+          loop_end = text.index("  for (const identityId of managedIdentityIds) {", loop_start)
+          replacement = """  for (const tenant of tenants) {
             await executor.query(
               `delete from runner_job_leases
                where run_id in (
@@ -66,10 +65,8 @@ jobs:
             );
             await executor.query("delete from installations where id = $1", [tenant.installationId]);
           }
-          '''
-          if before not in text:
-              raise SystemExit("expected cleanup block was not found")
-          path.write_text(text.replace(before, after))
+          """
+          path.write_text(text[:loop_start] + replacement + text[loop_end:])
           PY
           pnpm run lint:fix
       - name: Apply migrations
