@@ -18,6 +18,50 @@ Use `boardreadyops run --gate release` to select a configured gate from `boardre
 
 Use `--format json` with `run` or `check` when another tool should consume diagnostics from stdout. The JSON contract is described in [reports/json.md](reports/json.md) and validated by `schemas/findings.schema.json`. Human logs and annotations are written to stderr, so stdout remains parseable JSON even when the command exits nonzero for findings, configuration, or required-environment failures.
 
+## Self-hosted runner operations
+
+`boardreadyops runner` provides the customer-worker lifecycle for the self-hosted execution plane.
+
+A trusted control-plane administrator issues a one-time enrollment token directly to a root-only file:
+
+```bash
+boardreadyops runner issue-enrollment \
+  --database-url-file /run/secrets/boardreadyops-database-url \
+  --installation-id 11111111-1111-4111-8111-111111111111 \
+  --name factory-runner-01 \
+  --scope repository \
+  --repository octo-org/private-board \
+  --token-output /secure-transfer/factory-runner-01.token
+```
+
+The customer host activates an Ed25519 identity without sending the generated private key to the control plane:
+
+```bash
+boardreadyops runner activate \
+  --url https://boardreadyops.example.com \
+  --enrollment-token-file /secure-transfer/factory-runner-01.token \
+  --identity-dir /var/lib/boardreadyops-runner/identity \
+  --capability kicad:10 \
+  --capability linux-x64
+```
+
+Process one queue item during commissioning, or run the polling service continuously:
+
+```bash
+boardreadyops runner once \
+  --identity /var/lib/boardreadyops-runner/identity/runner.json \
+  --workspace-root /var/lib/boardreadyops-runner/workspaces
+
+boardreadyops runner serve \
+  --identity /var/lib/boardreadyops-runner/identity/runner.json \
+  --workspace-root /var/lib/boardreadyops-runner/workspaces \
+  --heartbeat-seconds 30 \
+  --poll-seconds 15 \
+  --format json
+```
+
+The worker accepts only `customer_checkout` assignments, fetches the exact server-assigned SHA with customer-controlled Git credentials or a local mirror, uploads only generated reports, and removes the temporary workspace by default. See [Self-hosted runner mode](deployment/self-hosted-runner.md) for the trust boundary, permissions, network policy, service configuration, private-repository evidence, updates, and rollback.
+
 ## Agent planning
 
 `boardreadyops plan [path]` emits an agent-ready JSON remediation plan. It runs the validation pipeline and converts each finding into an action with evidence, a fix strategy, a safe-auto-fix flag, and commands an agent should run after changing files. Use it when a coding agent, EDA agent, review bot, or release workflow needs deterministic next steps without scraping human-oriented reports. See [Agent Planning Output](agent-planning.md).

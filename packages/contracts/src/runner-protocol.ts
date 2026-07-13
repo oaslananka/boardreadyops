@@ -187,9 +187,28 @@ export const runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema
   })
   .strict();
 
+function validArtifactStoragePath(value: string): boolean {
+  const segments = value.split("/");
+  return (
+    !value.startsWith("/") &&
+    !value.includes("\\") &&
+    Array.from(value).every((character) => {
+      const code = character.codePointAt(0) ?? 0;
+      return code >= 32 && code !== 127;
+    }) &&
+    segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+  );
+}
+
 export const runnerArtifactUploadCapabilitySchema = z
   .object({
     artifactId: runnerIdentifierSchema,
+    storagePath: z
+      .string()
+      .trim()
+      .min(1)
+      .max(1024)
+      .refine(validArtifactStoragePath, "artifact storage path must remain relative to the configured artifact root"),
     uploadUrl: z
       .string()
       .url()
@@ -235,6 +254,7 @@ export const runnerMutationResponseSchema = z
 export type RunnerWorkerClass = z.infer<typeof runnerWorkerClassSchema>;
 export type RunnerSignedRequestEnvelope = z.infer<typeof runnerSignedRequestEnvelopeSchema>;
 export type RunnerClaimRequest = z.infer<typeof runnerClaimRequestSchema>;
+export type RunnerClaimedJob = z.infer<typeof runnerClaimedJobSchema>;
 export type RunnerClaimResponse = z.infer<typeof runnerClaimResponseSchema>;
 export type RunnerLeaseContext = z.infer<typeof runnerLeaseContextSchema>;
 export type RunnerLeaseHeartbeatRequest = z.infer<typeof runnerLeaseHeartbeatRequestSchema>;

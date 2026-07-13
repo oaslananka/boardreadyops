@@ -254,6 +254,7 @@ export async function handleRunnerArtifactCapabilityRequest(
       if (!uploadUrl) throw new Error("HTTPS public URL is not configured");
       return {
         artifactId: upload.artifactId,
+        storagePath: upload.storagePath,
         uploadUrl,
         expiresAt: upload.expiresAt,
         maximumBytes: upload.maximumBytes,

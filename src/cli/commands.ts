@@ -1,4 +1,4 @@
-import type { Command } from "commander";
+import { type Command, InvalidArgumentError } from "commander";
 import {
   type BaselineCliOptions,
   captureBaselineCommand,
@@ -30,6 +30,16 @@ import {
   releaseVerifyCommand,
 } from "./commands/release.js";
 import { addCommonOptions, type CommonCliOptions, runCommand } from "./commands/run.js";
+import {
+  type RunnerActivateCliOptions,
+  type RunnerIssueEnrollmentCliOptions,
+  type RunnerOutputFormat,
+  type RunnerWorkCliOptions,
+  runnerActivateCommand,
+  runnerIssueEnrollmentCommand,
+  runnerOnceCommand,
+  runnerServeCommand,
+} from "./commands/runner.js";
 import { type SbomCliOptions, sbomCommand } from "./commands/sbom.js";
 import { schemaCommand } from "./commands/schema.js";
 import { vendorExplainCommand, vendorListCommand } from "./commands/vendor.js";
@@ -225,6 +235,54 @@ export function registerAllCommands(
       process.exitCode = await initCommand(process.cwd(), options, streams);
     });
 
+  const runner = program.command("runner").description("operate a customer-controlled self-hosted worker");
+  runner
+    .command("issue-enrollment")
+    .description("issue a one-time runner enrollment token from a control-plane database")
+    .requiredOption("--database-url-file <path>", "root-readable file containing the PostgreSQL URL")
+    .requiredOption("--installation-id <uuid>", "tenant installation UUID")
+    .requiredOption("--name <name>", "unique runner registration name")
+    .requiredOption("--token-output <path>", "new root-only file for the one-time enrollment token")
+    .option("--scope <scope>", "installation, organization, or repository", runnerEnrollmentScope, "installation")
+    .option("--repository <owner/name>", "allowed repository for repository scope", collectOption, [])
+    .option("--ttl-seconds <seconds>", "token lifetime up to one hour", runnerTtlSeconds)
+    .option("--format <format>", "text or json", runnerOutputFormat, "text")
+    .action(async (options: RunnerIssueEnrollmentCliOptions) => {
+      process.exitCode = await runnerIssueEnrollmentCommand(options, streams);
+    });
+  runner
+    .command("activate")
+    .description("activate a runner identity using a one-time enrollment token file")
+    .requiredOption("--url <url>", "BoardReadyOps control-plane origin")
+    .requiredOption("--enrollment-token-file <path>", "root-readable file containing the one-time token")
+    .option("--identity-dir <path>", "directory for the runner identity and Ed25519 keypair")
+    .option("--capability <value>", "runner capability selector", collectOption, [])
+    .option("--label <value>", "runner claim label", collectOption, [])
+    .option("--format <format>", "text or json", runnerOutputFormat, "text")
+    .action(async (options: RunnerActivateCliOptions) => {
+      process.exitCode = await runnerActivateCommand(options, streams);
+    });
+  const addRunnerWorkOptions = (command: Command): Command =>
+    command
+      .option("--identity <path>", "runner identity JSON file")
+      .option("--workspace-root <path>", "private root for ephemeral source workspaces")
+      .option("--repository-mirror-root <path>", "customer-controlled bare repository mirror root")
+      .option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30)
+      .option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15)
+      .option("--no-require-kicad", "allow execution without kicad-cli")
+      .option("--keep-workspace", "retain the checked-out workspace after completion")
+      .option("--format <format>", "text or json", runnerOutputFormat, "text");
+  addRunnerWorkOptions(runner.command("once").description("claim and process at most one runner job")).action(
+    async (options: RunnerWorkCliOptions) => {
+      process.exitCode = await runnerOnceCommand(options, streams);
+    },
+  );
+  addRunnerWorkOptions(runner.command("serve").description("poll continuously and process runner jobs")).action(
+    async (options: RunnerWorkCliOptions) => {
+      process.exitCode = await runnerServeCommand(options, streams);
+    },
+  );
+
   const baseline = program.command("baseline").description("capture and maintain finding baselines");
   addBaselineOptions(baseline.command("capture").argument("[path]", "directory to scan")).action(
     async (pathInput: string | undefined, options: BaselineCliOptions) => {
@@ -251,4 +309,40 @@ export function registerAllCommands(
       process.exitCode = await pruneBaselineCommand(pathInput, options, streams);
     },
   );
+}
+
+function runnerSeconds(value: string): number {
+  if (!/^[1-9]\d*$/u.test(value)) {
+    throw new InvalidArgumentError("Runner interval must be a positive integer.");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > 300) {
+    throw new InvalidArgumentError("Runner interval must not exceed 300 seconds.");
+  }
+  return parsed;
+}
+
+function runnerOutputFormat(value: string): RunnerOutputFormat {
+  if (value !== "text" && value !== "json") {
+    throw new InvalidArgumentError("Runner format must be text or json.");
+  }
+  return value;
+}
+
+function runnerTtlSeconds(value: string): number {
+  if (!/^[1-9]\d*$/u.test(value)) {
+    throw new InvalidArgumentError("Runner token TTL must be a positive integer.");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > 3600) {
+    throw new InvalidArgumentError("Runner token TTL must not exceed 3600 seconds.");
+  }
+  return parsed;
+}
+
+function runnerEnrollmentScope(value: string): "installation" | "organization" | "repository" {
+  if (value !== "installation" && value !== "organization" && value !== "repository") {
+    throw new InvalidArgumentError("Runner enrollment scope must be installation, organization, or repository.");
+  }
+  return value;
 }

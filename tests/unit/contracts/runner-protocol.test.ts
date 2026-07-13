@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   runnerArtifactCapabilityRequestSchema,
+  runnerArtifactCapabilityResponseSchema,
   runnerClaimRequestSchema,
   runnerClaimResponseSchema,
   runnerLeaseHeartbeatRequestSchema,
@@ -135,6 +136,36 @@ describe("runner protocol contracts", () => {
         status: "activated",
         registrationId: "44444444-4444-4444-8444-444444444444",
         installationId: "55555555-5555-4555-8555-555555555555",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts only HTTPS artifact capabilities with safe relative storage paths", () => {
+    const base = {
+      protocolVersion: 1,
+      uploads: [
+        {
+          artifactId: "44444444-4444-4444-8444-444444444444",
+          storagePath: `${runId}/${attemptId}/report.json`,
+          uploadUrl: "https://control.example/upload?cap=token",
+          expiresAt: "2026-07-12T12:05:00.000Z",
+          maximumBytes: 4096,
+        },
+      ],
+    };
+    expect(runnerArtifactCapabilityResponseSchema.safeParse(base).success).toBe(true);
+    for (const storagePath of ["/absolute/report.json", "../escape.json", "run//report.json", "run\\report.json"]) {
+      expect(
+        runnerArtifactCapabilityResponseSchema.safeParse({
+          ...base,
+          uploads: [{ ...base.uploads[0], storagePath }],
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      runnerArtifactCapabilityResponseSchema.safeParse({
+        ...base,
+        uploads: [{ ...base.uploads[0], uploadUrl: "http://control.example/upload" }],
       }).success,
     ).toBe(false);
   });

@@ -32,6 +32,11 @@ const failUpload = vi.fn();
 const store = { issueCapabilities, beginUpload, completeUpload, failUpload };
 let storageRoot: string | undefined;
 
+function requireStorageRoot(): string {
+  if (!storageRoot) throw new Error("storage root is not initialized");
+  return storageRoot;
+}
+
 function dependencies(environment: Readonly<Record<string, string | undefined>>): RunnerArtifactRouteDependencies {
   return {
     environment,
@@ -128,6 +133,7 @@ describe("runner artifact transport routes", () => {
       uploads: [
         {
           artifactId,
+          storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
           uploadToken,
           expiresAt: "2026-07-12T20:02:00.000Z",
           maximumBytes: 5,
@@ -147,6 +153,7 @@ describe("runner artifact transport routes", () => {
       uploads: [
         {
           artifactId,
+          storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
           uploadUrl: `https://cloud.boardreadyops.example/api/v1/runner/artifacts/${artifactId}/upload?cap=${uploadToken}`,
           expiresAt: "2026-07-12T20:02:00.000Z",
           maximumBytes: 5,
@@ -216,7 +223,7 @@ describe("runner artifact transport routes", () => {
       bytes: 5,
       sha256,
     });
-    const finalPath = path.join(storageRoot!, runId, attemptId, `${artifactId}.bin`);
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
     await expect(readFile(finalPath, "utf8")).resolves.toBe(content);
     expect(completeUpload).toHaveBeenCalledWith({ artifactId, uploadToken, sha256, bytes: 5 });
     expect(failUpload).not.toHaveBeenCalled();
@@ -245,7 +252,7 @@ describe("runner artifact transport routes", () => {
       uploadToken,
       reason: "artifact payload exceeds its declared size",
     });
-    const finalPath = path.join(storageRoot!, runId, attemptId, `${artifactId}.bin`);
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
     await expect(readFile(finalPath)).rejects.toMatchObject({ code: "ENOENT" });
     expect(completeUpload).not.toHaveBeenCalled();
   });
@@ -274,7 +281,7 @@ describe("runner artifact transport routes", () => {
       uploadToken,
       reason: "Artifact SHA-256 does not match its declaration.",
     });
-    const finalPath = path.join(storageRoot!, runId, attemptId, `${artifactId}.bin`);
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
     await expect(readFile(finalPath)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
