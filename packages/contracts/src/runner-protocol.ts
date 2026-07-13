@@ -14,6 +14,7 @@ export const runnerRequestTimestampSchema = z.number().int().nonnegative().max(9
 export const runnerRequestNonceSchema = z.string().min(22).max(128).regex(base64UrlPattern);
 export const runnerRequestSignatureSchema = z.string().length(86).regex(base64UrlPattern);
 export const runnerLeaseSecretSchema = z.string().min(43).max(256).regex(base64UrlPattern);
+export const runnerEnrollmentTokenSchema = z.string().min(43).max(256).regex(base64UrlPattern);
 export const runnerCapabilitySchema = z.string().trim().min(1).max(128).regex(capabilityPattern);
 export const runnerSafeModeReasonSchema = z.enum(["draft-pull-request", "fork-pull-request", "private-repository"]);
 
@@ -206,6 +207,24 @@ export const runnerArtifactCapabilityResponseSchema = z
   })
   .strict();
 
+export const runnerRegistrationActivationRequestSchema = z
+  .object({
+    protocolVersion: runnerProtocolVersionSchema,
+    enrollmentToken: runnerEnrollmentTokenSchema,
+    algorithm: runnerSigningAlgorithmSchema,
+    publicKey: z.string().trim().min(32).max(16_384),
+    capabilities: z.array(runnerCapabilitySchema).max(64).default([]),
+  })
+  .strict();
+
+export const runnerRegistrationActivationResponseSchema = z
+  .object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: z.enum(["activated", "replayed"]),
+    registrationId: runnerIdentifierSchema,
+  })
+  .strict();
+
 export const runnerMutationResponseSchema = z
   .object({
     protocolVersion: runnerProtocolVersionSchema,
@@ -222,3 +241,5 @@ export type RunnerLeaseHeartbeatRequest = z.infer<typeof runnerLeaseHeartbeatReq
 export type RunnerLeaseRelinquishRequest = z.infer<typeof runnerLeaseRelinquishRequestSchema>;
 export type RunnerArtifactCapabilityRequest = z.infer<typeof runnerArtifactCapabilityRequestSchema>;
 export type RunnerArtifactCapabilityResponse = z.infer<typeof runnerArtifactCapabilityResponseSchema>;
+export type RunnerRegistrationActivationRequest = z.infer<typeof runnerRegistrationActivationRequestSchema>;
+export type RunnerRegistrationActivationResponse = z.infer<typeof runnerRegistrationActivationResponseSchema>;
