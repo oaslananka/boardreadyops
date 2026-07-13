@@ -36,6 +36,11 @@
       "import": "./src/runner-lease-store.ts",
       "default": "./src/runner-lease-store.ts"
     },
+    "./runner-registration-enrollment-store": {
+      "types": "./src/runner-registration-enrollment-store.ts",
+      "import": "./src/runner-registration-enrollment-store.ts",
+      "default": "./src/runner-registration-enrollment-store.ts"
+    },
     "./runner-terminal-result-store": {
       "types": "./src/runner-terminal-result-store.ts",
       "import": "./src/runner-terminal-result-store.ts",
