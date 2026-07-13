@@ -1,0 +1,110 @@
+name: tmp-release-1-11-audit
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Verify public release channels
+        env:
+          VERSION: "1.11.0"
+          RELEASE_COMMIT: "bc2030e5bc1cb5b97c1f81a758e7fbc81aa5e259"
+        run: |
+          set -euo pipefail
+          mkdir -p audit-output
+          report="audit-output/release-audit.txt"
+          exec > >(tee "${report}") 2>&1
+
+          echo "BoardReadyOps public release audit"
+          echo "version=${VERSION}"
+          echo "expected_commit=${RELEASE_COMMIT}"
+          echo
+
+          echo "== npm metadata =="
+          npm view "boardreadyops@${VERSION}" version dist-tags.latest dist.integrity dist.shasum engines bin --json \
+            | tee audit-output/npm-metadata.json
+          test "$(npm view "boardreadyops@${VERSION}" version)" = "${VERSION}"
+          test "$(npm view boardreadyops dist-tags.latest)" = "${VERSION}"
+
+          echo
+          echo "== npm clean tarball smoke =="
+          work="$(mktemp -d)"
+          (
+            cd "${work}"
+            npm pack "boardreadyops@${VERSION}" --silent > tarball-name.txt
+            tar -xzf "$(cat tarball-name.txt)"
+            cli_version="$(node package/dist/cli/index.cjs --version)"
+            echo "cli_version=${cli_version}"
+            test "${cli_version}" = "${VERSION}"
+          )
+
+          echo
+          echo "== GitHub Release =="
+          curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/oaslananka/boardreadyops/releases/tags/v${VERSION}" \
+            | tee audit-output/github-release.json >/dev/null
+          jq '{tag_name,target_commitish,draft,prerelease,published_at,assets:[.assets[].name]}' \
+            audit-output/github-release.json
+          test "$(jq -r '.tag_name' audit-output/github-release.json)" = "v${VERSION}"
+          test "$(jq -r '.draft' audit-output/github-release.json)" = "false"
+          test "$(jq -r '.prerelease' audit-output/github-release.json)" = "false"
+          assets="$(jq -r '.assets[].name' audit-output/github-release.json | sort)"
+          for required in \
+            SHA256SUMS \
+            boardreadyops-linux-arm64 \
+            boardreadyops-linux-x64 \
+            boardreadyops-macos-arm64 \
+            boardreadyops-macos-x64 \
+            boardreadyops-win-x64.exe \
+            sbom.cyclonedx.json; do
+            grep -Fxq "${required}" <<<"${assets}"
+          done
+          test "$(jq '.assets | length' audit-output/github-release.json)" -eq 7
+
+          sums_url="$(jq -r '.assets[] | select(.name == "SHA256SUMS") | .browser_download_url' audit-output/github-release.json)"
+          curl --fail --location --silent --show-error "${sums_url}" -o audit-output/SHA256SUMS
+          echo "SHA256SUMS:"
+          cat audit-output/SHA256SUMS
+          test "$(wc -l < audit-output/SHA256SUMS)" -eq 5
+
+          echo
+          echo "== GHCR anonymous manifests =="
+          image="ghcr.io/oaslananka/boardreadyops-full"
+          exact="$(docker buildx imagetools inspect "${image}:v${VERSION}" | awk '/^Digest:/ {print $2; exit}')"
+          major="$(docker buildx imagetools inspect "${image}:v1" | awk '/^Digest:/ {print $2; exit}')"
+          latest="$(docker buildx imagetools inspect "${image}:latest" | awk '/^Digest:/ {print $2; exit}')"
+          echo "v${VERSION}=${exact}"
+          echo "v1=${major}"
+          echo "latest=${latest}"
+          test -n "${exact}"
+          test "${exact}" = "${major}"
+          test "${exact}" = "${latest}"
+          docker buildx imagetools inspect "${image}:v${VERSION}" | tee audit-output/ghcr-inspect.txt
+          grep -q 'linux/amd64' audit-output/ghcr-inspect.txt
+          grep -q 'linux/arm64' audit-output/ghcr-inspect.txt
+
+          echo
+          echo "PUBLIC_RELEASE_AUDIT=PASS"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: release-1.11.0-audit
+          path: audit-output
+          if-no-files-found: error
+          retention-days: 7
