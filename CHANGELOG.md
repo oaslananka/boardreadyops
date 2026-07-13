@@ -4,6 +4,14 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.12.1](https://github.com/oaslananka/boardreadyops/compare/v1.12.0...v1.12.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* **ci:** restore clean web Docker builds ([#179](https://github.com/oaslananka/boardreadyops/issues/179)) ([0bfb14e](https://github.com/oaslananka/boardreadyops/commit/0bfb14e62d72976eb780395de1081f1f96b2cb47))
+* **ci:** restore Sonar main quality gate ([#177](https://github.com/oaslananka/boardreadyops/issues/177)) ([31299d0](https://github.com/oaslananka/boardreadyops/commit/31299d070d4260d33762f66bca50337d66ba948e))
+
 ## [1.12.0](https://github.com/oaslananka/boardreadyops/compare/v1.11.0...v1.12.0) (2026-07-13)
 
 
