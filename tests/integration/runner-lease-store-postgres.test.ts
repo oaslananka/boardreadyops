@@ -83,6 +83,21 @@ async function createQueuedRun(tenant: TenantFixture, startedAt: string): Promis
   return runId;
 }
 
+async function setExecutionPolicy(
+  tenant: TenantFixture,
+  mode: "disabled" | "managed_only" | "self_hosted_preferred" | "self_hosted_required",
+  repositoryId: string | null = null,
+  offlineAfterSeconds = 300,
+): Promise<void> {
+  if (!executor) throw new Error("DATABASE_URL is required");
+  await executor.query(
+    `insert into runner_execution_policies (
+       installation_id, repository_id, mode, self_hosted_offline_after_seconds
+     ) values ($1, $2, $3, $4)`,
+    [tenant.installationId, repositoryId, mode, offlineAfterSeconds],
+  );
+}
+
 async function createManagedIdentity(label: string, now: string, capabilities = ["kicad:10"]): Promise<string> {
   if (!executor) throw new Error("DATABASE_URL is required");
   const identityId = randomUUID();
@@ -302,6 +317,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
     const relinquishedAt = testTime(1250);
     const tenant = await createTenant("lease-test-self-hosted");
     const runId = await createQueuedRun(tenant, claimedAt);
+    await setExecutionPolicy(tenant, "self_hosted_required");
     const runnerId = await createSelfHostedRunner(tenant, "lease-test-self-hosted", claimedAt, [
       `${tenant.owner}/${tenant.name}`,
     ]);
@@ -397,6 +413,7 @@ describeDatabase("runner lease PostgreSQL store", () => {
     const tenantA = await createTenant("lease-test-tenant-a", false);
     const tenantB = await createTenant("lease-test-tenant-b", false);
     const runB = await createQueuedRun(tenantB, now);
+    await setExecutionPolicy(tenantB, "self_hosted_required");
     const runnerA = await createSelfHostedRunner(tenantA, "lease-test-tenant-a", now, []);
 
     try {

@@ -7,9 +7,10 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(13);
+    expect(cloudDatabaseSchemaVersion).toBe(14);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
+    expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
     expect(cloudDatabaseModels).toContain("ManagedRunnerIdentity");
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
     expect(cloudDatabaseModels).toContain("RunnerRequestNonce");
@@ -36,6 +37,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0011_runner_artifact_upload_capabilities.sql",
       "0012_runner_terminal_result_authorization.sql",
       "0013_runner_registration_enrollments.sql",
+      "0014_runner_execution_routing_policies.sql",
     ]);
   });
 
@@ -172,6 +174,24 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("runner.registration.activated");
     expect(sql).toContain("security invoker");
     expect(sql).not.toContain("enrollment_token text");
+  });
+
+  it("stores tenant-scoped execution routing policies in schema v14", async () => {
+    const sql = await readFile(join(migrationsDir, "0014_runner_execution_routing_policies.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists runner_execution_policies");
+    expect(sql).toContain("runner_execution_policies_repository_scope_fk");
+    expect(sql).toContain("managed_only");
+    expect(sql).toContain("self_hosted_required");
+    expect(sql).toContain("self_hosted_preferred");
+    expect(sql).toContain("disabled");
+    expect(sql).toContain("boardreadyops_effective_runner_policy");
+    expect(sql).toContain("policy_source");
+    expect(sql).toContain("no_eligible_self_hosted_runner_online");
+    expect(sql).toContain("routingPolicyMode");
+    expect(sql).toContain("routingPolicySource");
+    expect(sql).toContain("for update of release_runs skip locked");
+    expect(sql).toContain("security invoker");
   });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
