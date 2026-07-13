@@ -4,6 +4,8 @@ import {
   runnerClaimRequestSchema,
   runnerClaimResponseSchema,
   runnerLeaseHeartbeatRequestSchema,
+  runnerRegistrationActivationRequestSchema,
+  runnerRegistrationActivationResponseSchema,
   runnerTerminalResultRequestSchema,
 } from "../../../packages/contracts/src/index.js";
 
@@ -93,6 +95,48 @@ describe("runner protocol contracts", () => {
       },
     });
     expect(forkBroker.success).toBe(false);
+  });
+
+  it("keeps activation token-authenticated and rejects caller-selected tenant identity", () => {
+    const enrollmentToken = "e".repeat(43);
+    const publicKey = `-----BEGIN PUBLIC KEY-----\n${"A".repeat(44)}\n-----END PUBLIC KEY-----`;
+
+    expect(
+      runnerRegistrationActivationRequestSchema.parse({
+        protocolVersion: 1,
+        enrollmentToken,
+        algorithm: "ed25519",
+        publicKey,
+        capabilities: ["kicad:10", "docker"],
+      }),
+    ).toEqual({
+      protocolVersion: 1,
+      enrollmentToken,
+      algorithm: "ed25519",
+      publicKey,
+      capabilities: ["kicad:10", "docker"],
+    });
+
+    expect(
+      runnerRegistrationActivationRequestSchema.safeParse({
+        protocolVersion: 1,
+        enrollmentToken,
+        algorithm: "ed25519",
+        publicKey,
+        capabilities: [],
+        installationId: "11111111-1111-4111-8111-111111111111",
+        registrationId: "22222222-2222-4222-8222-222222222222",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      runnerRegistrationActivationResponseSchema.safeParse({
+        protocolVersion: 1,
+        status: "activated",
+        registrationId: "44444444-4444-4444-8444-444444444444",
+        installationId: "55555555-5555-4555-8555-555555555555",
+      }).success,
+    ).toBe(false);
   });
 
   it("binds heartbeat, artifact, and terminal result messages to one lease attempt", () => {
