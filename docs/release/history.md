@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.12.0](https://github.com/oaslananka/boardreadyops/compare/v1.11.0...v1.12.0) (2026-07-13)
+
+
+### Features
+
+* **runner:** add execution routing policy ([#171](https://github.com/oaslananka/boardreadyops/issues/171)) ([3bcea5f](https://github.com/oaslananka/boardreadyops/commit/3bcea5fab7ead4703180f389341d36a63c04cb16))
+
 ## [1.11.0](https://github.com/oaslananka/boardreadyops/compare/v1.10.0...v1.11.0) (2026-07-13)
 
 
