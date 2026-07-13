@@ -30,7 +30,7 @@ function activationBody(overrides: Record<string, unknown> = {}): Record<string,
   };
 }
 
-function activationRequest(input: { body?: string; headers?: HeadersInit } = {}): Request {
+function activationRequest(input: { body?: string; headers?: Record<string, string> } = {}): Request {
   return new Request("https://boardreadyops.test/api/v1/runner/registrations/activate", {
     method: "POST",
     headers: {
@@ -132,10 +132,7 @@ describe("self-hosted runner registration activation route", () => {
   });
 
   it("rejects malformed JSON and non-canonical declared content lengths", async () => {
-    const malformed = await handleRunnerRegistrationActivationRequest(
-      activationRequest({ body: "{" }),
-      dependencies,
-    );
+    const malformed = await handleRunnerRegistrationActivationRequest(activationRequest({ body: "{" }), dependencies);
     expect(malformed.status).toBe(400);
 
     const nonCanonicalLength = await handleRunnerRegistrationActivationRequest(
@@ -164,10 +161,7 @@ describe("self-hosted runner registration activation route", () => {
       ...dependencies,
       queryExecutor: () => undefined,
     };
-    const unconfigured = await handleRunnerRegistrationActivationRequest(
-      activationRequest(),
-      unavailableDependencies,
-    );
+    const unconfigured = await handleRunnerRegistrationActivationRequest(activationRequest(), unavailableDependencies);
     expect(unconfigured.status).toBe(503);
 
     activateRegistration.mockRejectedValue(new Error(`database failure for ${enrollmentToken}`));
