@@ -174,6 +174,16 @@ async function selfHostedClaim(now: string, runnerId: string, seed: string) {
 async function cleanup(tenants: readonly TenantFixture[], managedIdentityIds: readonly string[]): Promise<void> {
   if (!executor) return;
   for (const tenant of tenants) {
+    await executor.query(
+      `delete from runner_job_leases
+     where run_id in (
+       select release_runs.id
+       from release_runs
+       join repositories on repositories.id = release_runs.repository_id
+       where repositories.installation_id = $1
+     )`,
+      [tenant.installationId],
+    );
     await executor.query("delete from installations where id = $1", [tenant.installationId]);
   }
   for (const identityId of managedIdentityIds) {
