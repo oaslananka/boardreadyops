@@ -177,21 +177,22 @@ describe("BoardReadyOps Cloud migrations", () => {
   });
 
   it("stores tenant-scoped execution routing policies in schema v14", async () => {
-  const sql = await readFile(join(migrationsDir, "0014_runner_execution_routing_policies.sql"), "utf8");
+    const sql = await readFile(join(migrationsDir, "0014_runner_execution_routing_policies.sql"), "utf8");
 
-  expect(sql).toContain("create table if not exists runner_execution_policies");
-  expect(sql).toContain("runner_execution_policies_repository_scope_fk");
-  expect(sql).toContain("managed_only");
-  expect(sql).toContain("self_hosted_required");
-  expect(sql).toContain("self_hosted_preferred");
-  expect(sql).toContain("boardreadyops_effective_runner_policy");
-  expect(sql).toContain("policy_source");
-  expect(sql).toContain("no_eligible_self_hosted_runner_online");
-  expect(sql).toContain("routingPolicyMode");
-  expect(sql).toContain("routingPolicySource");
-  expect(sql).toContain("for update of release_runs skip locked");
-  expect(sql).toContain("security invoker");
-});
+    expect(sql).toContain("create table if not exists runner_execution_policies");
+    expect(sql).toContain("runner_execution_policies_repository_scope_fk");
+    expect(sql).toContain("managed_only");
+    expect(sql).toContain("self_hosted_required");
+    expect(sql).toContain("self_hosted_preferred");
+    expect(sql).toContain("disabled");
+    expect(sql).toContain("boardreadyops_effective_runner_policy");
+    expect(sql).toContain("policy_source");
+    expect(sql).toContain("no_eligible_self_hosted_runner_online");
+    expect(sql).toContain("routingPolicyMode");
+    expect(sql).toContain("routingPolicySource");
+    expect(sql).toContain("for update of release_runs skip locked");
+    expect(sql).toContain("security invoker");
+  });
 
   it("keeps the release-run lifecycle index migration idempotent", async () => {
     const sql = await readFile(join(migrationsDir, "0002_release_run_lifecycle.sql"), "utf8");
