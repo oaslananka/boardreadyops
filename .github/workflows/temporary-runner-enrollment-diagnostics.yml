@@ -1,0 +1,41 @@
+name: temporary-runner-enrollment-diagnostics
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    if: github.repository_owner == 'oaslananka'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile
+      - name: Capture lint diagnostics
+        shell: bash
+        run: |
+          mkdir -p diagnostics
+          set +e
+          pnpm run lint > diagnostics/lint.txt 2>&1
+          echo "$?" > diagnostics/lint-exit.txt
+          pnpm run typecheck > diagnostics/typecheck.txt 2>&1
+          echo "$?" > diagnostics/typecheck-exit.txt
+          exit 0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: runner-enrollment-diagnostics
+          path: diagnostics
