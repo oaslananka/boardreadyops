@@ -62,6 +62,7 @@ jobs:
           jq '{tag_name,target_commitish,draft,prerelease,published_at,assets:[.assets[].name]}' \
             audit-output/github-release.json
           test "$(jq -r '.tag_name' audit-output/github-release.json)" = "v${VERSION}"
+          test "$(jq -r '.target_commitish' audit-output/github-release.json)" = "${RELEASE_COMMIT}"
           test "$(jq -r '.draft' audit-output/github-release.json)" = "false"
           test "$(jq -r '.prerelease' audit-output/github-release.json)" = "false"
           assets="$(jq -r '.assets[].name' audit-output/github-release.json | sort)"
@@ -86,18 +87,38 @@ jobs:
           echo
           echo "== GHCR anonymous manifests =="
           image="ghcr.io/oaslananka/boardreadyops-full"
-          exact="$(docker buildx imagetools inspect "${image}:v${VERSION}" | awk '/^Digest:/ {print $2; exit}')"
-          major="$(docker buildx imagetools inspect "${image}:v1" | awk '/^Digest:/ {print $2; exit}')"
-          latest="$(docker buildx imagetools inspect "${image}:latest" | awk '/^Digest:/ {print $2; exit}')"
+          inspect_image() {
+            local reference="$1"
+            local output="$2"
+            local errors="$3"
+            local attempt
+            for attempt in 1 2 3 4 5; do
+              echo "inspect ${reference}: attempt ${attempt}/5"
+              if docker buildx imagetools inspect "${reference}" >"${output}" 2>"${errors}"; then
+                cat "${output}"
+                return 0
+              fi
+              cat "${errors}"
+              sleep 10
+            done
+            return 1
+          }
+
+          inspect_image "${image}:v${VERSION}" audit-output/ghcr-exact.txt audit-output/ghcr-exact.err
+          inspect_image "${image}:v1" audit-output/ghcr-v1.txt audit-output/ghcr-v1.err
+          inspect_image "${image}:latest" audit-output/ghcr-latest.txt audit-output/ghcr-latest.err
+
+          exact="$(awk '/^Digest:/ {print $2; exit}' audit-output/ghcr-exact.txt)"
+          major="$(awk '/^Digest:/ {print $2; exit}' audit-output/ghcr-v1.txt)"
+          latest="$(awk '/^Digest:/ {print $2; exit}' audit-output/ghcr-latest.txt)"
           echo "v${VERSION}=${exact}"
           echo "v1=${major}"
           echo "latest=${latest}"
           test -n "${exact}"
           test "${exact}" = "${major}"
           test "${exact}" = "${latest}"
-          docker buildx imagetools inspect "${image}:v${VERSION}" | tee audit-output/ghcr-inspect.txt
-          grep -q 'linux/amd64' audit-output/ghcr-inspect.txt
-          grep -q 'linux/arm64' audit-output/ghcr-inspect.txt
+          grep -q 'linux/amd64' audit-output/ghcr-exact.txt
+          grep -q 'linux/arm64' audit-output/ghcr-exact.txt
 
           echo
           echo "PUBLIC_RELEASE_AUDIT=PASS"
