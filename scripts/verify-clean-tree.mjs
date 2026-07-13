@@ -112,7 +112,7 @@ function scanBannedLanguage() {
 }
 
 function hasTrackedPath(entry) {
-  const result = spawnSync("git", ["ls-files", "--cached", "--", entry], { encoding: "utf8" });
+  const result = spawnSync("git", ["ls-files", "--cached", "--", entry], { encoding: "utf8" }); // NOSONAR -- git and its arguments are fixed; trusted developer/CI PATH resolution is intentional.
   return result.status === 0 && result.stdout.trim() !== "";
 }
 
@@ -156,5 +156,5 @@ function normalize(file) {
 }
 
 function readText(file) {
-  return spawnSync("git", ["show", `:${normalize(file)}`], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).stdout;
+  return spawnSync("git", ["show", `:${normalize(file)}`], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).stdout; // NOSONAR -- git is fixed and the path is normalized from tracked repository entries.
 }

@@ -81,7 +81,7 @@ function identityMatchesWorkerClass(identity: RunnerWorkerIdentity, workerClass:
 }
 
 function eligibilityCapabilities(capabilities: readonly string[], labels: readonly string[]): string[] | undefined {
-  const values = Array.from(new Set([...capabilities, ...labels])).sort();
+  const values = Array.from(new Set([...capabilities, ...labels])).sort((left, right) => left.localeCompare(right));
   return values.length <= 64 ? values : undefined;
 }
 

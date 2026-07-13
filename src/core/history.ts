@@ -185,7 +185,9 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
 
   const artifactHealth: ArtifactHealthDataPoint[] = runs.map((run) => ({
     generatedAt: run.generatedAt,
-    presentKinds: [...new Set(run.fabrication.outputs.map((output) => output.kind))].sort(),
+    presentKinds: [...new Set(run.fabrication.outputs.map((output) => output.kind))].sort((left, right) =>
+      left.localeCompare(right),
+    ),
   }));
 
   return {

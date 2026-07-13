@@ -175,7 +175,7 @@ export async function verifyManifestCoverage(bundleDir: string): Promise<Release
   const uncovered = allFiles
     .filter((file) => !SKIP.has(path.basename(file)) && !covered.has(file))
     .map((file) => path.relative(outputDir, file).split(path.sep).join("/"))
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
   return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
 }
 
