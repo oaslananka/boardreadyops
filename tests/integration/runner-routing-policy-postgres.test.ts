@@ -247,9 +247,7 @@ describeDatabase("runner execution routing policy", () => {
     const runId = await createQueuedRun(tenant, freshAt);
     await setPolicy(tenant, "self_hosted_preferred", null, 300);
     const managedIdentityId = await createManagedIdentity("preferred-fallback", freshAt);
-    await createSelfHostedRunner(tenant, "preferred-fallback", freshAt, [
-      `${tenant.owner}/${tenant.name}`,
-    ]);
+    await createSelfHostedRunner(tenant, "preferred-fallback", freshAt, [`${tenant.owner}/${tenant.name}`]);
 
     try {
       expect(await managedClaim(freshAt, managedIdentityId, "preferred-fresh")).toEqual({
