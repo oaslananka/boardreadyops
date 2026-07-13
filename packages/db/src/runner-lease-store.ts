@@ -173,7 +173,7 @@ function validLeaseContext(input: RunnerLeaseMutationContext): boolean {
 }
 
 function normalizedCapabilities(capabilities: readonly string[] | undefined): string[] | undefined {
-  const normalized = Array.from(new Set(capabilities ?? [])).sort();
+  const normalized = Array.from(new Set(capabilities ?? [])).sort((left, right) => left.localeCompare(right));
   if (normalized.length > 64 || normalized.some((capability) => !capabilityPattern.test(capability))) {
     return undefined;
   }
