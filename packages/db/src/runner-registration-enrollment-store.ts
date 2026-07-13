@@ -108,12 +108,7 @@ export function createSqlRunnerRegistrationEnrollmentStore(
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
   const enrollmentToken = options.enrollmentToken ?? (() => randomBytes(32).toString("base64url"));
-  const enrollmentTtlSeconds = positiveInteger(
-    options.enrollmentTtlSeconds,
-    15 * 60,
-    "enrollmentTtlSeconds",
-    60 * 60,
-  );
+  const enrollmentTtlSeconds = positiveInteger(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
 
   return {
     async issueEnrollment(input) {

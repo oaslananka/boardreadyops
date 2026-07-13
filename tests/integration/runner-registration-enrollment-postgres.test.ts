@@ -201,9 +201,10 @@ describeDatabase("self-hosted runner enrollment PostgreSQL lifecycle", () => {
         }),
       ).resolves.toMatchObject({ status: "stale", registrationId: issued.registrationId, installationId });
 
-      const registrationResult = await executor.query("select status, public_key from runner_registrations where id = $1", [
-        issued.registrationId,
-      ]);
+      const registrationResult = await executor.query(
+        "select status, public_key from runner_registrations where id = $1",
+        [issued.registrationId],
+      );
       expect((registrationResult as { rows: Array<Record<string, unknown>> }).rows[0]).toEqual({
         status: "pending",
         public_key: null,
