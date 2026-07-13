@@ -41,7 +41,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
-    "test:int": "vitest run tests/integration",
+    "test:int": "vitest run tests/integration --no-file-parallelism",
     "test:action": "pnpm run build && vitest run tests/action",
     "test:a11y": "vitest run tests/unit/report/html.test.ts tests/unit/scripts/check-docs-a11y.test.ts && pnpm run docs:a11y",
     "test:property": "vitest run tests/property",
