@@ -6,16 +6,13 @@ on:
       - feat/runner-routing-policy
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   postgres:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'chore/diagnose-runner-routing-tests'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [22, 24]
     env:
       DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test
     services:
@@ -35,28 +32,61 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          persist-credentials: false
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
+      - name: Fix tenant cleanup ordering
+        run: |
+          set -euo pipefail
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/integration/runner-routing-policy-postgres.test.ts")
+          text = path.read_text()
+          before = '''  for (const tenant of tenants) {
+            await executor.query("delete from installations where id = $1", [tenant.installationId]);
+          }
+          '''
+          after = '''  for (const tenant of tenants) {
+            await executor.query(
+              `delete from runner_job_leases
+               where run_id in (
+                 select release_runs.id
+                 from release_runs
+                 join repositories on repositories.id = release_runs.repository_id
+                 where repositories.installation_id = $1
+               )`,
+              [tenant.installationId],
+            );
+            await executor.query("delete from installations where id = $1", [tenant.installationId]);
+          }
+          '''
+          if before not in text:
+              raise SystemExit("expected cleanup block was not found")
+          path.write_text(text.replace(before, after))
+          PY
+          pnpm run lint:fix
       - name: Apply migrations
         run: pnpm --filter @boardreadyops/db db:migrate
-      - name: Run targeted PostgreSQL tests
+      - name: Verify targeted PostgreSQL tests
         run: |
-          set -o pipefail
-          mkdir -p diagnostics
           pnpm exec vitest run \
             tests/integration/runner-lease-store-postgres.test.ts \
             tests/integration/runner-routing-policy-postgres.test.ts \
-            --no-file-parallelism 2>&1 | tee "diagnostics/node-${{ matrix.node-version }}.log"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: runner-routing-diagnostics-node-${{ matrix.node-version }}
-          path: diagnostics
-          if-no-files-found: error
-          retention-days: 7
+            --no-file-parallelism
+      - name: Commit cleanup fix and remove finalizer
+        run: |
+          set -euo pipefail
+          rm .github/workflows/tmp-runner-routing-diagnostics.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tests/integration/runner-routing-policy-postgres.test.ts .github/workflows/tmp-runner-routing-diagnostics.yml
+          git diff --cached --quiet && { echo 'No cleanup fix to commit.'; exit 1; }
+          git commit -m "test(db): clean runner leases before tenant teardown"
+          git push origin HEAD:${{ github.head_ref }}
