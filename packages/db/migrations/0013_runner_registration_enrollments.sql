@@ -53,17 +53,17 @@ declare
   v_rotated boolean := false;
 begin
   if p_expires_at <= p_now or not exists (
-    select 1 from installations where id = p_installation_id
+    select 1 from installations as installation where installation.id = p_installation_id
   ) then
     return query select 'stale'::text, null::text, null::timestamptz;
     return;
   end if;
 
-  select *
+  select registration.*
   into v_registration
-  from runner_registrations
-  where installation_id = p_installation_id
-    and name = p_name
+  from runner_registrations as registration
+  where registration.installation_id = p_installation_id
+    and registration.name = p_name
   for update;
 
   if not found then
@@ -86,11 +86,11 @@ begin
     )
     on conflict (installation_id, name) do nothing;
 
-    select *
+    select registration.*
     into v_registration
-    from runner_registrations
-    where installation_id = p_installation_id
-      and name = p_name
+    from runner_registrations as registration
+    where registration.installation_id = p_installation_id
+      and registration.name = p_name
     for update;
   end if;
 
@@ -104,16 +104,16 @@ begin
     return;
   end if;
 
-  update runner_registrations
+  update runner_registrations as registration
   set scope = p_scope,
       allowed_repositories = p_allowed_repositories
-  where id = v_registration.id;
+  where registration.id = v_registration.id;
 
-  update runner_registration_enrollments
+  update runner_registration_enrollments as enrollment
   set revoked_at = p_now
-  where runner_registration_id = v_registration.id
-    and consumed_at is null
-    and revoked_at is null;
+  where enrollment.runner_registration_id = v_registration.id
+    and enrollment.consumed_at is null
+    and enrollment.revoked_at is null;
   v_rotated := found;
 
   insert into runner_registration_enrollments (
@@ -177,10 +177,10 @@ declare
   v_enrollment runner_registration_enrollments%rowtype;
   v_registration runner_registrations%rowtype;
 begin
-  select *
+  select enrollment.*
   into v_enrollment
-  from runner_registration_enrollments
-  where token_digest = p_token_digest
+  from runner_registration_enrollments as enrollment
+  where enrollment.token_digest = p_token_digest
   for update;
 
   if v_enrollment.id is null then
@@ -188,11 +188,11 @@ begin
     return;
   end if;
 
-  select *
+  select registration.*
   into v_registration
-  from runner_registrations
-  where id = v_enrollment.runner_registration_id
-    and installation_id = v_enrollment.installation_id
+  from runner_registrations as registration
+  where registration.id = v_enrollment.runner_registration_id
+    and registration.installation_id = v_enrollment.installation_id
   for update;
 
   if v_registration.id is null then
@@ -226,16 +226,16 @@ begin
 
   if exists (
     select 1
-    from runner_registrations
-    where installation_id = v_registration.installation_id
-      and public_key_fingerprint = p_public_key_fingerprint
-      and id <> v_registration.id
+    from runner_registrations as registration
+    where registration.installation_id = v_registration.installation_id
+      and registration.public_key_fingerprint = p_public_key_fingerprint
+      and registration.id <> v_registration.id
   ) then
     return query select 'conflict'::text, v_registration.id, v_registration.installation_id;
     return;
   end if;
 
-  update runner_registrations
+  update runner_registrations as registration
   set signing_algorithm = 'ed25519',
       public_key = p_public_key,
       public_key_fingerprint = p_public_key_fingerprint,
@@ -244,18 +244,18 @@ begin
       activated_at = p_now,
       last_heartbeat_at = p_now,
       disabled_at = null
-  where id = v_registration.id;
+  where registration.id = v_registration.id;
 
-  update runner_registration_enrollments
+  update runner_registration_enrollments as enrollment
   set consumed_at = p_now
-  where id = v_enrollment.id;
+  where enrollment.id = v_enrollment.id;
 
-  update runner_registration_enrollments
+  update runner_registration_enrollments as enrollment
   set revoked_at = p_now
-  where runner_registration_id = v_registration.id
-    and id <> v_enrollment.id
-    and consumed_at is null
-    and revoked_at is null;
+  where enrollment.runner_registration_id = v_registration.id
+    and enrollment.id <> v_enrollment.id
+    and enrollment.consumed_at is null
+    and enrollment.revoked_at is null;
 
   insert into audit_events (
     installation_id,
