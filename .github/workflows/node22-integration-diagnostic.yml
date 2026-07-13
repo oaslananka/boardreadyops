@@ -1,6 +1,7 @@
 name: node22-integration-diagnostic
 
 on:
+  pull_request:
   push:
     branches:
       - diagnostic/node22-integration-main-20260713
