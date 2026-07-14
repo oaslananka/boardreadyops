@@ -2,7 +2,12 @@ const nextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
-  transpilePackages: ["@boardreadyops/cloud-core", "@boardreadyops/contracts", "@boardreadyops/db"],
+  transpilePackages: [
+    "@boardreadyops/cloud-core",
+    "@boardreadyops/contracts",
+    "@boardreadyops/db",
+    "@octokit/auth-app",
+  ],
   webpack(config) {
     config.resolve.extensionAlias = {
       ...config.resolve.extensionAlias,
