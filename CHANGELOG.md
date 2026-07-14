@@ -4,6 +4,18 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.13.0](https://github.com/oaslananka/boardreadyops/compare/v1.12.1...v1.13.0) (2026-07-14)
+
+
+### Features
+
+* **cli:** add customer self-hosted runner loop ([#180](https://github.com/oaslananka/boardreadyops/issues/180)) ([68307be](https://github.com/oaslananka/boardreadyops/commit/68307be80c174247302c61df4fd386bd0335ccdc))
+
+
+### Bug Fixes
+
+* **ci:** verify standalone web runtime ([#181](https://github.com/oaslananka/boardreadyops/issues/181)) ([6a273f0](https://github.com/oaslananka/boardreadyops/commit/6a273f062a16fa6ddada898bed34381172e12c55))
+
 ## [1.12.1](https://github.com/oaslananka/boardreadyops/compare/v1.12.0...v1.12.1) (2026-07-13)
 
 
