@@ -1,4 +1,5 @@
-const modName = "@octokit/" + "a" + "u" + "t" + "h-app";
+import { createAppAuth } from "@octokit/auth-app";
+
 const e = () => globalThis["p" + "rocess"]?.["e" + "nv"] ?? {};
 const ev = (name) => e()[name];
 const api = () => ev("GITHUB" + "_API_BASE_URL") ?? "https://api.github.com";
@@ -35,11 +36,9 @@ async function runtimeAccess(installationId) {
   const id = appId();
   const material = keyText();
   if (!id || !material) throw new Error("runtime setup missing");
-  const mod = await import(modName);
-  const make = mod["create" + "App" + "A" + "u" + "t" + "h"];
   const cfg = { appId: id, installationId };
   cfg["pri" + "vate" + "Key"] = material;
-  const maker = make(cfg);
+  const maker = createAppAuth(cfg);
   const result = await maker({ type: "installation" });
   return result["to" + "ken"];
 }
