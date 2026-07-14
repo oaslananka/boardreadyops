@@ -365,7 +365,7 @@ jobs:
       - run: corepack install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - run: pnpm --filter @boardreadyops/web build
+      - run: pnpm run cloud:build
 
   verify-dist:
     needs:
