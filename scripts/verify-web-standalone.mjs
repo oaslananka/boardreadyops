@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { cp, lstat, mkdir, mkdtemp, readdir, readlink, rm, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -12,7 +12,7 @@ const webRoot = join(repositoryRoot, "apps", "web");
 const standaloneSource = join(webRoot, ".next", "standalone");
 const staticSource = join(webRoot, ".next", "static");
 const publicSource = join(webRoot, "public");
-const secret = "boardreadyops-standalone-smoke-secret";
+const secret = randomBytes(32).toString("hex");
 const payload = JSON.stringify({ zen: "standalone-runtime-ready" });
 
 async function pathExists(path) {
@@ -214,7 +214,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   process.stderr.write(`${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
   process.exitCode = 1;
-});
+}
