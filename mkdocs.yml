@@ -112,6 +112,9 @@ nav:
       - Policy Engine: release/policy-engine.md
       - Waivers: release/waivers.md
   - Operations:
+      - Deployment:
+          - Cloud Control Plane: deployment/self-hosted.md
+          - Customer Self-hosted Runner: deployment/self-hosted-runner.md
       - Testing: testing.md
       - Accessibility: accessibility.md
       - Branch Protection: branch-protection.md

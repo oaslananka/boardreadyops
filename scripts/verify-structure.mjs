@@ -11,7 +11,7 @@ const violations = [];
 const allowedLayers = new Map([
   ["action", new Set(["action", "core", "report", "util"])],
   ["bom", new Set(["bom", "util"])],
-  ["cli", new Set(["cli", "core", "generated", "i18n", "kicad", "release", "report", "util", "vendor"])],
+  ["cli", new Set(["cli", "core", "generated", "i18n", "kicad", "release", "report", "runner", "util", "vendor"])],
   ["core", new Set(["core", "generated", "notifiers", "rules", "util", "vendor"])],
   ["generated", new Set(["generated"])],
   ["firmware", new Set(["firmware", "util"])],
@@ -21,6 +21,7 @@ const allowedLayers = new Map([
   ["pinmap", new Set(["bom", "pinmap", "util"])],
   ["release", new Set(["core", "generated", "release", "report", "util"])],
   ["report", new Set(["core", "i18n", "report", "util"])],
+  ["runner", new Set(["runner"])],
   ["rules", new Set(["bom", "core", "firmware", "kicad", "pinmap", "rules", "util", "vendor"])],
   ["types", new Set(["types"])],
   ["util", new Set(["util"])],

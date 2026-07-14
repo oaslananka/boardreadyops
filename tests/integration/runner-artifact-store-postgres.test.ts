@@ -9,6 +9,11 @@ const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
 let githubIdentifier = 980_000_000;
 
+function requireExecutor() {
+  if (!executor) throw new Error("DATABASE_URL is required");
+  return executor;
+}
+
 function rows(result: unknown): Record<string, unknown>[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
   const value = (result as { rows?: unknown }).rows;
@@ -164,7 +169,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
     const uploadToken = token("complete");
     const sha256 = fingerprint("artifact-content");
     const issueAt = at(fixture.base, 10);
-    const issueStore = createSqlRunnerArtifactStore(executor!, {
+    const issueStore = createSqlRunnerArtifactStore(requireExecutor(), {
       now: () => issueAt,
       id: () => artifactId,
       uploadToken: () => uploadToken,
@@ -189,6 +194,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
         uploads: [
           {
             artifactId,
+            storagePath: `${fixture.runId}/${fixture.attemptId}/${artifactId}.bin`,
             uploadToken,
             expiresAt: at(fixture.base, 120).toISOString(),
             maximumBytes: 42,
@@ -198,7 +204,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       await expect(issueStore.issueCapabilities(input)).resolves.toEqual({ status: "replayed" });
 
       const pending = rows(
-        await executor!.query(
+        await requireExecutor().query(
           `select status, upload_token_digest, storage_path
            from runner_artifact_upload_capabilities
            where artifact_id = $1`,
@@ -212,7 +218,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       expect(pending?.upload_token_digest).toBe(fingerprint(uploadToken));
       expect(pending?.upload_token_digest).not.toBe(uploadToken);
 
-      const beginStore = createSqlRunnerArtifactStore(executor!, { now: () => at(fixture.base, 20) });
+      const beginStore = createSqlRunnerArtifactStore(requireExecutor(), { now: () => at(fixture.base, 20) });
       const begun = await beginStore.beginUpload({ artifactId, uploadToken });
       expect(begun).toEqual({
         status: "accepted",
@@ -226,7 +232,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       });
       await expect(beginStore.beginUpload({ artifactId, uploadToken })).resolves.toEqual({ status: "replayed" });
 
-      const completeStore = createSqlRunnerArtifactStore(executor!, { now: () => at(fixture.base, 30) });
+      const completeStore = createSqlRunnerArtifactStore(requireExecutor(), { now: () => at(fixture.base, 30) });
       await expect(completeStore.completeUpload({ artifactId, uploadToken, sha256, bytes: 42 })).resolves.toEqual({
         status: "accepted",
       });
@@ -235,7 +241,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       });
 
       const artifactRows = rows(
-        await executor!.query(
+        await requireExecutor().query(
           `select id, run_id, kind, name, role, bytes, sha256, storage_path
            from artifacts where id = $1`,
           [artifactId],
@@ -263,7 +269,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
     const artifactId = randomUUID();
     const uploadToken = token("mismatch");
     const issueAt = at(fixture.base, 10);
-    const store = createSqlRunnerArtifactStore(executor!, {
+    const store = createSqlRunnerArtifactStore(requireExecutor(), {
       now: () => issueAt,
       id: () => artifactId,
       uploadToken: () => uploadToken,
@@ -282,12 +288,12 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
         artifacts: [{ kind: "bom", name: "bom.csv", role: "manufacturing", bytes: 100 }],
       });
       expect(issued.status).toBe("accepted");
-      await createSqlRunnerArtifactStore(executor!, { now: () => at(fixture.base, 20) }).beginUpload({
+      await createSqlRunnerArtifactStore(requireExecutor(), { now: () => at(fixture.base, 20) }).beginUpload({
         artifactId,
         uploadToken,
       });
       await expect(
-        createSqlRunnerArtifactStore(executor!, { now: () => at(fixture.base, 30) }).completeUpload({
+        createSqlRunnerArtifactStore(requireExecutor(), { now: () => at(fixture.base, 30) }).completeUpload({
           artifactId,
           uploadToken,
           sha256: fingerprint("wrong-size"),
@@ -296,7 +302,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       ).resolves.toEqual({ status: "rejected" });
 
       const state = rows(
-        await executor!.query(
+        await requireExecutor().query(
           `select status, failure_reason,
              (select count(*)::int from artifacts where id = $1) as artifact_count
            from runner_artifact_upload_capabilities where artifact_id = $1`,
@@ -314,7 +320,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
     const artifactId = randomUUID();
     const uploadToken = token("stale");
     const issueAt = at(fixture.base, 10);
-    const store = createSqlRunnerArtifactStore(executor!, {
+    const store = createSqlRunnerArtifactStore(requireExecutor(), {
       now: () => issueAt,
       id: () => artifactId,
       uploadToken: () => uploadToken,
@@ -335,13 +341,13 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       expect(issued.status).toBe("accepted");
 
       const replacementAttemptId = randomUUID();
-      await executor!.query(
+      await requireExecutor().query(
         `insert into release_run_attempts (
            id, run_id, attempt_number, status, created_at, started_at, heartbeat_at
          ) values ($1, $2, 2, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
         [replacementAttemptId, fixture.runId, at(fixture.base, 20).toISOString()],
       );
-      await executor!.query(
+      await requireExecutor().query(
         `update release_runs
          set execution_attempt_id = $1, execution_attempt_started_at = $2::timestamptz, status = 'running'
          where id = $3`,
@@ -349,13 +355,13 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       );
 
       await expect(
-        createSqlRunnerArtifactStore(executor!, { now: () => at(fixture.base, 30) }).beginUpload({
+        createSqlRunnerArtifactStore(requireExecutor(), { now: () => at(fixture.base, 30) }).beginUpload({
           artifactId,
           uploadToken,
         }),
       ).resolves.toEqual({ status: "stale" });
       const state = rows(
-        await executor!.query(
+        await requireExecutor().query(
           `select status, failure_reason from runner_artifact_upload_capabilities where artifact_id = $1`,
           [artifactId],
         ),

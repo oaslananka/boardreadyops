@@ -1,5 +1,7 @@
 # Self-hosted BoardReadyOps Cloud deployment
 
+Customer-operated execution workers are deployed separately from the control plane. See [Self-hosted runner mode](self-hosted-runner.md) for enrollment, source-boundary, service, network, and rollback procedures.
+
 This guide describes the self-hosted deployment target for `boardreadyops.oaslananka.dev` on `ops-vps-02`.
 
 ## Target topology

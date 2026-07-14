@@ -3231,8 +3231,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path60) {
-      let input = path60;
+    function removeDotSegments(path66) {
+      let input = path66;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3484,8 +3484,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path60, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path60 && path60 !== "/" ? path60 : void 0;
+        const [path66, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path66 && path66 !== "/" ? path66 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -7719,7 +7719,7 @@ var require_dist = __commonJS({
 var require_resolve_from = __commonJS({
   "node_modules/resolve-from/index.js"(exports2, module2) {
     "use strict";
-    var path60 = require("path");
+    var path66 = require("path");
     var Module = require("module");
     var fs23 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
@@ -7733,14 +7733,14 @@ var require_resolve_from = __commonJS({
         fromDir = fs23.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
-          fromDir = path60.resolve(fromDir);
+          fromDir = path66.resolve(fromDir);
         } else if (silent) {
           return null;
         } else {
           throw err;
         }
       }
-      const fromFile = path60.join(fromDir, "noop.js");
+      const fromFile = path66.join(fromDir, "noop.js");
       const resolveFileName = () => Module._resolveFilename(moduleId, {
         id: fromFile,
         filename: fromFile,
@@ -7812,7 +7812,7 @@ var require_parent_module = __commonJS({
 var require_import_fresh = __commonJS({
   "node_modules/import-fresh/index.js"(exports2, module2) {
     "use strict";
-    var path60 = require("path");
+    var path66 = require("path");
     var resolveFrom = require_resolve_from();
     var parentModule = require_parent_module();
     module2.exports = (moduleId) => {
@@ -7820,7 +7820,7 @@ var require_import_fresh = __commonJS({
         throw new TypeError("Expected a string");
       }
       const parentPath = parentModule(__filename);
-      const cwd = parentPath ? path60.dirname(parentPath) : __dirname;
+      const cwd = parentPath ? path66.dirname(parentPath) : __dirname;
       const filePath = resolveFrom(cwd, moduleId);
       const oldModule = require.cache[filePath];
       if (oldModule && oldModule.parent) {
@@ -11823,7 +11823,7 @@ ${error51.message}`;
         return typescript.sys.fileExists(fileName);
       });
       if (filePath !== void 0) {
-        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path60) => typescript.sys.readFile(path60));
+        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path66) => typescript.sys.readFile(path66));
         if (error51) {
           throw new Error(`Error in ${filePath}: ${error51.messageText.toString()}`);
         }
@@ -11946,42 +11946,42 @@ var require_defaults2 = __commonJS({
 var require_env_paths = __commonJS({
   "node_modules/env-paths/index.js"(exports2, module2) {
     "use strict";
-    var path60 = require("path");
-    var os4 = require("os");
-    var homedir = os4.homedir();
-    var tmpdir = os4.tmpdir();
+    var path66 = require("path");
+    var os7 = require("os");
+    var homedir = os7.homedir();
+    var tmpdir = os7.tmpdir();
     var { env } = process;
     var macos = (name) => {
-      const library = path60.join(homedir, "Library");
+      const library = path66.join(homedir, "Library");
       return {
-        data: path60.join(library, "Application Support", name),
-        config: path60.join(library, "Preferences", name),
-        cache: path60.join(library, "Caches", name),
-        log: path60.join(library, "Logs", name),
-        temp: path60.join(tmpdir, name)
+        data: path66.join(library, "Application Support", name),
+        config: path66.join(library, "Preferences", name),
+        cache: path66.join(library, "Caches", name),
+        log: path66.join(library, "Logs", name),
+        temp: path66.join(tmpdir, name)
       };
     };
     var windows = (name) => {
-      const appData = env.APPDATA || path60.join(homedir, "AppData", "Roaming");
-      const localAppData = env.LOCALAPPDATA || path60.join(homedir, "AppData", "Local");
+      const appData = env.APPDATA || path66.join(homedir, "AppData", "Roaming");
+      const localAppData = env.LOCALAPPDATA || path66.join(homedir, "AppData", "Local");
       return {
         // Data/config/cache/log are invented by me as Windows isn't opinionated about this
-        data: path60.join(localAppData, name, "Data"),
-        config: path60.join(appData, name, "Config"),
-        cache: path60.join(localAppData, name, "Cache"),
-        log: path60.join(localAppData, name, "Log"),
-        temp: path60.join(tmpdir, name)
+        data: path66.join(localAppData, name, "Data"),
+        config: path66.join(appData, name, "Config"),
+        cache: path66.join(localAppData, name, "Cache"),
+        log: path66.join(localAppData, name, "Log"),
+        temp: path66.join(tmpdir, name)
       };
     };
     var linux = (name) => {
-      const username = path60.basename(homedir);
+      const username = path66.basename(homedir);
       return {
-        data: path60.join(env.XDG_DATA_HOME || path60.join(homedir, ".local", "share"), name),
-        config: path60.join(env.XDG_CONFIG_HOME || path60.join(homedir, ".config"), name),
-        cache: path60.join(env.XDG_CACHE_HOME || path60.join(homedir, ".cache"), name),
+        data: path66.join(env.XDG_DATA_HOME || path66.join(homedir, ".local", "share"), name),
+        config: path66.join(env.XDG_CONFIG_HOME || path66.join(homedir, ".config"), name),
+        cache: path66.join(env.XDG_CACHE_HOME || path66.join(homedir, ".cache"), name),
         // https://wiki.debian.org/XDGBaseDirectorySpecification#state
-        log: path60.join(env.XDG_STATE_HOME || path60.join(homedir, ".local", "state"), name),
-        temp: path60.join(tmpdir, username, name)
+        log: path66.join(env.XDG_STATE_HOME || path66.join(homedir, ".local", "state"), name),
+        temp: path66.join(tmpdir, username, name)
       };
     };
     var envPaths = (name, options) => {
@@ -12062,11 +12062,11 @@ var require_util2 = __commonJS({
       map2.set(key, result);
       return result;
     }
-    function getPropertyByPath(source, path60) {
-      if (typeof path60 === "string" && Object.prototype.hasOwnProperty.call(source, path60)) {
-        return source[path60];
+    function getPropertyByPath(source, path66) {
+      if (typeof path66 === "string" && Object.prototype.hasOwnProperty.call(source, path66)) {
+        return source[path66];
       }
-      const parsedPath = typeof path60 === "string" ? path60.split(".") : path60;
+      const parsedPath = typeof path66 === "string" ? path66.split(".") : path66;
       return parsedPath.reduce((previous, key) => {
         if (previous === void 0) {
           return previous;
@@ -12077,10 +12077,10 @@ var require_util2 = __commonJS({
     function removeUndefinedValuesFromObject(options) {
       return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== void 0));
     }
-    async function isDirectory(path60) {
+    async function isDirectory(path66) {
       try {
-        const stat = await fs_1.promises.stat(path60);
-        return stat.isDirectory();
+        const stat3 = await fs_1.promises.stat(path66);
+        return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -12088,10 +12088,10 @@ var require_util2 = __commonJS({
         throw e;
       }
     }
-    function isDirectorySync(path60) {
+    function isDirectorySync(path66) {
       try {
-        const stat = fs_1.default.statSync(path60);
-        return stat.isDirectory();
+        const stat3 = fs_1.default.statSync(path66);
+        return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
           return false;
@@ -12188,7 +12188,7 @@ var require_ExplorerBase = __commonJS({
           const idx = importStack.indexOf(fullPath);
           if (idx !== -1) {
             throw new Error(`Circular import detected:
-${[...importStack, fullPath].map((path60, i) => `${i + 1}. ${path60}`).join("\n")} (same as ${idx + 1}.)`);
+${[...importStack, fullPath].map((path66, i) => `${i + 1}. ${path66}`).join("\n")} (same as ${idx + 1}.)`);
           }
         }
       }
@@ -12375,9 +12375,9 @@ var require_Explorer = __commonJS({
           throw error51;
         }
       }
-      async #fileExists(path60) {
+      async #fileExists(path66) {
         try {
-          await promises_1.default.stat(path60);
+          await promises_1.default.stat(path66);
           return true;
         } catch (e) {
           return false;
@@ -12537,9 +12537,9 @@ var require_ExplorerSync = __commonJS({
           throw error51;
         }
       }
-      #fileExists(path60) {
+      #fileExists(path66) {
         try {
-          fs_1.default.statSync(path60);
+          fs_1.default.statSync(path66);
           return true;
         } catch (e) {
           return false;
@@ -12665,7 +12665,7 @@ var require_dist2 = __commonJS({
       };
     }
     function getResolvedSearchPlaces(moduleName, toolDefinedSearchPlaces, userConfiguredOptions) {
-      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path60) => path60.replace("{name}", moduleName));
+      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path66) => path66.replace("{name}", moduleName));
       if (userConfiguredOptions.mergeSearchPlaces) {
         return [...userConfiguredSearchPlaces ?? [], ...toolDefinedSearchPlaces];
       }
@@ -12831,9 +12831,9 @@ var require_path = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.convertPosixPathToPattern = exports2.convertWindowsPathToPattern = exports2.convertPathToPattern = exports2.escapePosixPath = exports2.escapeWindowsPath = exports2.escape = exports2.removeLeadingDotSegment = exports2.makeAbsolute = exports2.unixify = void 0;
-    var os4 = require("os");
-    var path60 = require("path");
-    var IS_WINDOWS_PLATFORM = os4.platform() === "win32";
+    var os7 = require("os");
+    var path66 = require("path");
+    var IS_WINDOWS_PLATFORM = os7.platform() === "win32";
     var LEADING_DOT_SEGMENT_CHARACTERS_COUNT = 2;
     var POSIX_UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()*?[\]{|}]|^!|[!+@](?=\()|\\(?![!()*+?@[\]{|}]))/g;
     var WINDOWS_UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()[\]{}]|^!|[!+@](?=\())/g;
@@ -12844,7 +12844,7 @@ var require_path = __commonJS({
     }
     exports2.unixify = unixify;
     function makeAbsolute(cwd, filepath) {
-      return path60.resolve(cwd, filepath);
+      return path66.resolve(cwd, filepath);
     }
     exports2.makeAbsolute = makeAbsolute;
     function removeLeadingDotSegment(entry) {
@@ -14141,7 +14141,7 @@ var require_braces = __commonJS({
 var require_constants2 = __commonJS({
   "node_modules/picomatch/lib/constants.js"(exports2, module2) {
     "use strict";
-    var path60 = require("path");
+    var path66 = require("path");
     var WIN_SLASH = "\\\\/";
     var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
     var DEFAULT_MAX_EXTGLOB_RECURSION = 0;
@@ -14315,7 +14315,7 @@ var require_constants2 = __commonJS({
       /* | */
       CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
       /* \uFEFF */
-      SEP: path60.sep,
+      SEP: path66.sep,
       /**
        * Create EXTGLOB_CHARS
        */
@@ -14342,7 +14342,7 @@ var require_constants2 = __commonJS({
 var require_utils3 = __commonJS({
   "node_modules/picomatch/lib/utils.js"(exports2) {
     "use strict";
-    var path60 = require("path");
+    var path66 = require("path");
     var win32 = process.platform === "win32";
     var {
       REGEX_BACKSLASH,
@@ -14371,7 +14371,7 @@ var require_utils3 = __commonJS({
       if (options && typeof options.windows === "boolean") {
         return options.windows;
       }
-      return win32 === true || path60.sep === "\\";
+      return win32 === true || path66.sep === "\\";
     };
     exports2.escapeLast = (input, char, lastIdx) => {
       const idx = input.lastIndexOf(char, lastIdx);
@@ -15735,7 +15735,7 @@ var require_parse2 = __commonJS({
 var require_picomatch = __commonJS({
   "node_modules/picomatch/lib/picomatch.js"(exports2, module2) {
     "use strict";
-    var path60 = require("path");
+    var path66 = require("path");
     var scan2 = require_scan();
     var parse5 = require_parse2();
     var utils = require_utils3();
@@ -15820,7 +15820,7 @@ var require_picomatch = __commonJS({
     };
     picomatch.matchBase = (input, glob, options, posix = utils.isWindows(options)) => {
       const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
-      return regex.test(path60.basename(input));
+      return regex.test(path66.basename(input));
     };
     picomatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
     picomatch.parse = (pattern, options) => {
@@ -16047,7 +16047,7 @@ var require_pattern2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.isAbsolute = exports2.partitionAbsoluteAndRelative = exports2.removeDuplicateSlashes = exports2.matchAny = exports2.convertPatternsToRe = exports2.makeRe = exports2.getPatternParts = exports2.expandBraceExpansion = exports2.expandPatternsWithBraceExpansion = exports2.isAffectDepthOfReadingPattern = exports2.endsWithSlashGlobStar = exports2.hasGlobStar = exports2.getBaseDirectory = exports2.isPatternRelatedToParentDirectory = exports2.getPatternsOutsideCurrentDirectory = exports2.getPatternsInsideCurrentDirectory = exports2.getPositivePatterns = exports2.getNegativePatterns = exports2.isPositivePattern = exports2.isNegativePattern = exports2.convertToNegativePattern = exports2.convertToPositivePattern = exports2.isDynamicPattern = exports2.isStaticPattern = void 0;
-    var path60 = require("path");
+    var path66 = require("path");
     var globParent = require_glob_parent();
     var micromatch = require_micromatch();
     var GLOBSTAR = "**";
@@ -16142,7 +16142,7 @@ var require_pattern2 = __commonJS({
     }
     exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
     function isAffectDepthOfReadingPattern(pattern) {
-      const basename = path60.basename(pattern);
+      const basename = path66.basename(pattern);
       return endsWithSlashGlobStar(pattern) || isStaticPattern(basename);
     }
     exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
@@ -16200,7 +16200,7 @@ var require_pattern2 = __commonJS({
     }
     exports2.partitionAbsoluteAndRelative = partitionAbsoluteAndRelative;
     function isAbsolute(pattern) {
-      return path60.isAbsolute(pattern);
+      return path66.isAbsolute(pattern);
     }
     exports2.isAbsolute = isAbsolute;
   }
@@ -16377,8 +16377,8 @@ var require_utils4 = __commonJS({
     exports2.errno = errno;
     var fs23 = require_fs();
     exports2.fs = fs23;
-    var path60 = require_path();
-    exports2.path = path60;
+    var path66 = require_path();
+    exports2.path = path66;
     var pattern = require_pattern2();
     exports2.pattern = pattern;
     var stream = require_stream();
@@ -16490,29 +16490,29 @@ var require_async = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
-    function read(path60, settings, callback) {
-      settings.fs.lstat(path60, (lstatError, lstat) => {
+    function read(path66, settings, callback) {
+      settings.fs.lstat(path66, (lstatError, lstat2) => {
         if (lstatError !== null) {
           callFailureCallback(callback, lstatError);
           return;
         }
-        if (!lstat.isSymbolicLink() || !settings.followSymbolicLink) {
-          callSuccessCallback(callback, lstat);
+        if (!lstat2.isSymbolicLink() || !settings.followSymbolicLink) {
+          callSuccessCallback(callback, lstat2);
           return;
         }
-        settings.fs.stat(path60, (statError, stat) => {
+        settings.fs.stat(path66, (statError, stat3) => {
           if (statError !== null) {
             if (settings.throwErrorOnBrokenSymbolicLink) {
               callFailureCallback(callback, statError);
               return;
             }
-            callSuccessCallback(callback, lstat);
+            callSuccessCallback(callback, lstat2);
             return;
           }
           if (settings.markSymbolicLink) {
-            stat.isSymbolicLink = () => true;
+            stat3.isSymbolicLink = () => true;
           }
-          callSuccessCallback(callback, stat);
+          callSuccessCallback(callback, stat3);
         });
       });
     }
@@ -16532,20 +16532,20 @@ var require_sync = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
-    function read(path60, settings) {
-      const lstat = settings.fs.lstatSync(path60);
-      if (!lstat.isSymbolicLink() || !settings.followSymbolicLink) {
-        return lstat;
+    function read(path66, settings) {
+      const lstat2 = settings.fs.lstatSync(path66);
+      if (!lstat2.isSymbolicLink() || !settings.followSymbolicLink) {
+        return lstat2;
       }
       try {
-        const stat = settings.fs.statSync(path60);
+        const stat3 = settings.fs.statSync(path66);
         if (settings.markSymbolicLink) {
-          stat.isSymbolicLink = () => true;
+          stat3.isSymbolicLink = () => true;
         }
-        return stat;
+        return stat3;
       } catch (error51) {
         if (!settings.throwErrorOnBrokenSymbolicLink) {
-          return lstat;
+          return lstat2;
         }
         throw error51;
       }
@@ -16609,17 +16609,17 @@ var require_out = __commonJS({
     var sync = require_sync();
     var settings_1 = require_settings();
     exports2.Settings = settings_1.default;
-    function stat(path60, optionsOrSettingsOrCallback, callback) {
+    function stat3(path66, optionsOrSettingsOrCallback, callback) {
       if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path60, getSettings(), optionsOrSettingsOrCallback);
+        async.read(path66, getSettings(), optionsOrSettingsOrCallback);
         return;
       }
-      async.read(path60, getSettings(optionsOrSettingsOrCallback), callback);
+      async.read(path66, getSettings(optionsOrSettingsOrCallback), callback);
     }
-    exports2.stat = stat;
-    function statSync(path60, optionsOrSettings) {
+    exports2.stat = stat3;
+    function statSync(path66, optionsOrSettings) {
       const settings = getSettings(optionsOrSettings);
-      return sync.read(path60, settings);
+      return sync.read(path66, settings);
     }
     exports2.statSync = statSync;
     function getSettings(settingsOrOptions = {}) {
@@ -16835,16 +16835,16 @@ var require_async2 = __commonJS({
           return;
         }
         const tasks = names.map((name) => {
-          const path60 = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
+          const path66 = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
           return (done) => {
-            fsStat.stat(path60, settings.fsStatSettings, (error51, stats) => {
+            fsStat.stat(path66, settings.fsStatSettings, (error51, stats) => {
               if (error51 !== null) {
                 done(error51);
                 return;
               }
               const entry = {
                 name,
-                path: path60,
+                path: path66,
                 dirent: utils.fs.createDirentFromStats(name, stats)
               };
               if (settings.stats) {
@@ -16962,7 +16962,7 @@ var require_settings2 = __commonJS({
   "node_modules/@nodelib/fs.scandir/out/settings.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path60 = require("path");
+    var path66 = require("path");
     var fsStat = require_out();
     var fs23 = require_fs4();
     var Settings = class {
@@ -16970,7 +16970,7 @@ var require_settings2 = __commonJS({
         this._options = _options;
         this.followSymbolicLinks = this._getValue(this._options.followSymbolicLinks, false);
         this.fs = fs23.createFileSystemAdapter(this._options.fs);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path60.sep);
+        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path66.sep);
         this.stats = this._getValue(this._options.stats, false);
         this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
         this.fsStatSettings = new fsStat.Settings({
@@ -16997,17 +16997,17 @@ var require_out2 = __commonJS({
     var sync = require_sync2();
     var settings_1 = require_settings2();
     exports2.Settings = settings_1.default;
-    function scandir(path60, optionsOrSettingsOrCallback, callback) {
+    function scandir(path66, optionsOrSettingsOrCallback, callback) {
       if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path60, getSettings(), optionsOrSettingsOrCallback);
+        async.read(path66, getSettings(), optionsOrSettingsOrCallback);
         return;
       }
-      async.read(path60, getSettings(optionsOrSettingsOrCallback), callback);
+      async.read(path66, getSettings(optionsOrSettingsOrCallback), callback);
     }
     exports2.scandir = scandir;
-    function scandirSync(path60, optionsOrSettings) {
+    function scandirSync(path66, optionsOrSettings) {
       const settings = getSettings(optionsOrSettings);
-      return sync.read(path60, settings);
+      return sync.read(path66, settings);
     }
     exports2.scandirSync = scandirSync;
     function getSettings(settingsOrOptions = {}) {
@@ -17654,7 +17654,7 @@ var require_settings3 = __commonJS({
   "node_modules/@nodelib/fs.walk/out/settings.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path60 = require("path");
+    var path66 = require("path");
     var fsScandir = require_out2();
     var Settings = class {
       constructor(_options = {}) {
@@ -17664,7 +17664,7 @@ var require_settings3 = __commonJS({
         this.deepFilter = this._getValue(this._options.deepFilter, null);
         this.entryFilter = this._getValue(this._options.entryFilter, null);
         this.errorFilter = this._getValue(this._options.errorFilter, null);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path60.sep);
+        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path66.sep);
         this.fsScandirSettings = new fsScandir.Settings({
           followSymbolicLinks: this._options.followSymbolicLinks,
           fs: this._options.fs,
@@ -17726,7 +17726,7 @@ var require_reader2 = __commonJS({
   "node_modules/fast-glob/out/readers/reader.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path60 = require("path");
+    var path66 = require("path");
     var fsStat = require_out();
     var utils = require_utils4();
     var Reader = class {
@@ -17739,7 +17739,7 @@ var require_reader2 = __commonJS({
         });
       }
       _getFullEntryPath(filepath) {
-        return path60.resolve(this._settings.cwd, filepath);
+        return path66.resolve(this._settings.cwd, filepath);
       }
       _makeEntry(stats, pattern) {
         const entry = {
@@ -18155,7 +18155,7 @@ var require_provider = __commonJS({
   "node_modules/fast-glob/out/providers/provider.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path60 = require("path");
+    var path66 = require("path");
     var deep_1 = require_deep();
     var entry_1 = require_entry();
     var error_1 = require_error();
@@ -18169,7 +18169,7 @@ var require_provider = __commonJS({
         this.entryTransformer = new entry_2.default(this._settings);
       }
       _getRootDirectory(task) {
-        return path60.resolve(this._settings.cwd, task.base);
+        return path66.resolve(this._settings.cwd, task.base);
       }
       _getReaderOptions(task) {
         const basePath = task.base === "." ? "" : task.base;
@@ -18351,8 +18351,8 @@ var require_settings4 = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.DEFAULT_FILE_SYSTEM_ADAPTER = void 0;
     var fs23 = require("fs");
-    var os4 = require("os");
-    var CPU_COUNT = Math.max(os4.cpus().length, 1);
+    var os7 = require("os");
+    var CPU_COUNT = Math.max(os7.cpus().length, 1);
     exports2.DEFAULT_FILE_SYSTEM_ADAPTER = {
       lstat: fs23.lstat,
       lstatSync: fs23.lstatSync,
@@ -18511,7 +18511,7 @@ __export(index_exports, {
   runCli: () => runCli
 });
 module.exports = __toCommonJS(index_exports);
-var import_node_path60 = __toESM(require("node:path"), 1);
+var import_node_path66 = __toESM(require("node:path"), 1);
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -21624,9 +21624,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path60) {
-    if (path60 === void 0) return this._executableDir;
-    this._executableDir = path60;
+  executableDir(path66) {
+    if (path66 === void 0) return this._executableDir;
+    this._executableDir = path66;
     return this;
   }
   /**
@@ -25886,7 +25886,7 @@ var import_node_path7 = __toESM(require("node:path"), 1);
 
 // src/util/delimited.ts
 function parseDelimitedRows(text, delimiter) {
-  const rows = [];
+  const rows2 = [];
   let row = [];
   let cell = "";
   let quoted = false;
@@ -25911,7 +25911,7 @@ function parseDelimitedRows(text, delimiter) {
       cell = "";
     } else if (char === "\n") {
       row.push(cell.replace(/\r$/, ""));
-      rows.push(row);
+      rows2.push(row);
       row = [];
       cell = "";
     } else {
@@ -25920,9 +25920,9 @@ function parseDelimitedRows(text, delimiter) {
   }
   if (cell.length > 0 || row.length > 0 || !text.endsWith("\n")) {
     row.push(cell.replace(/\r$/, ""));
-    rows.push(row);
+    rows2.push(row);
   }
-  return rows;
+  return rows2;
 }
 
 // src/bom/identity.ts
@@ -25946,9 +25946,9 @@ var aliases = {
   lifecycle: ["lifecycle", "status", "availability"],
   compliance: ["compliance", "rohs", "reach", "rohs status", "rohs/reach", "environmental"]
 };
-function normalizeBomRows(rows, sourcePath2) {
+function normalizeBomRows(rows2, sourcePath2) {
   const output = [];
-  for (const [index, raw] of rows.entries()) {
+  for (const [index, raw] of rows2.entries()) {
     const normalized = normalizedMap(raw);
     const referenceValue = getFieldWithSource(normalized, aliases.reference);
     if (!referenceValue) {
@@ -26041,9 +26041,9 @@ async function loadBom(file2) {
   return normalizeBomRows(parseDelimited(text, delimiter), file2);
 }
 function parseDelimited(text, delimiter = ",") {
-  const rows = parseDelimitedRows(text, delimiter);
-  const header = rows.shift()?.map((cell) => cell.trim()) ?? [];
-  return rows.filter((row) => row.some((cell) => cell.trim() !== "")).map((row) => Object.fromEntries(header.map((key, index) => [key, row[index]?.trim() ?? ""])));
+  const rows2 = parseDelimitedRows(text, delimiter);
+  const header = rows2.shift()?.map((cell) => cell.trim()) ?? [];
+  return rows2.filter((row) => row.some((cell) => cell.trim() !== "")).map((row) => Object.fromEntries(header.map((key, index) => [key, row[index]?.trim() ?? ""])));
 }
 
 // src/kicad/parsers/project-files.ts
@@ -27061,9 +27061,9 @@ var lifecycleRule = rule(
       return [];
     }
     const { bomRows, schematicRows } = await loadBomContext(context);
-    const rows = bomRows.length > 0 ? bomRows : schematicRows;
+    const rows2 = bomRows.length > 0 ? bomRows : schematicRows;
     const database = await loadLifecycleDatabase(context.root, configFor(context, "bom.lifecycle").db);
-    return rows.flatMap((row) => lifecycleFindings(row, database.get(row.mpn ?? ""), context));
+    return rows2.flatMap((row) => lifecycleFindings(row, database.get(row.mpn ?? ""), context));
   }
 );
 async function loadLifecycleDatabase(root, configured) {
@@ -27125,8 +27125,8 @@ var missingMpnRule = rule(
     }
     const config2 = configFor(context, "bom.missing-mpn");
     const { bomRows, schematicRows } = await loadBomContext(context);
-    const rows = bomRows.length > 0 ? bomRows : schematicRows;
-    return rows.filter((row) => !row.dnp && !refIgnored(row.reference, config2["ignore-refs"]) && !row.mpn).map(
+    const rows2 = bomRows.length > 0 ? bomRows : schematicRows;
+    return rows2.filter((row) => !row.dnp && !refIgnored(row.reference, config2["ignore-refs"]) && !row.mpn).map(
       (row) => finding(context, {
         ruleId: "bom.missing-mpn",
         severity: configuredSeverity(context, "bom.missing-mpn", "high"),
@@ -27458,14 +27458,14 @@ var variantConsistencyRule = rule(
         if (!parsedVariant || !configuredVariant.bom) {
           continue;
         }
-        const rows = await loadBom(import_node_path10.default.resolve(context.root, configuredVariant.bom));
+        const rows2 = await loadBom(import_node_path10.default.resolve(context.root, configuredVariant.bom));
         const activeDnp = new Set(
           activeVariantDnpRefs(
             parsedVariant,
-            rows.map((row) => row.reference)
+            rows2.map((row) => row.reference)
           )
         );
-        for (const row of rows) {
+        for (const row of rows2) {
           if (!row.dnp && activeDnp.has(row.reference)) {
             output.push(
               finding(context, {
@@ -28489,10 +28489,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path60) {
-  if (!path60)
+function getElementAtPath(obj, path66) {
+  if (!path66)
     return obj;
-  return path60.reduce((acc, key) => acc?.[key], obj);
+  return path66.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -28901,11 +28901,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path60, issues) {
+function prefixIssues(path66, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path60);
+    iss.path.unshift(path66);
     return iss;
   });
 }
@@ -29052,16 +29052,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError2(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path60 = []) => {
+  const processError = (error52, path66 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path60, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path66, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path60, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path60, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
       } else {
-        const fullpath = [...path60, ...issue2.path];
+        const fullpath = [...path66, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -29088,17 +29088,17 @@ function formatError2(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path60 = []) => {
+  const processError = (error52, path66 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path60, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path66, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path60, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path60, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
       } else {
-        const fullpath = [...path60, ...issue2.path];
+        const fullpath = [...path66, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -29130,8 +29130,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path60 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path60) {
+  const path66 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path66) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -41823,13 +41823,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path60 = ref.slice(1).split("/").filter(Boolean);
-  if (path60.length === 0) {
+  const path66 = ref.slice(1).split("/").filter(Boolean);
+  if (path66.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path60[0] === defsKey) {
-    const key = path60[1];
+  if (path66[0] === defsKey) {
+    const key = path66[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -42683,10 +42683,10 @@ var import_node_path19 = __toESM(require("node:path"), 1);
 
 // src/pinmap/resolvers/csv.ts
 async function readCsvPinmap(file2) {
-  const rows = parseDelimited(await readTextFile(file2), ",");
+  const rows2 = parseDelimited(await readTextFile(file2), ",");
   return {
     version: 1,
-    pins: rows.map((row) => ({
+    pins: rows2.map((row) => ({
       designator: row.designator ?? row.Designator ?? row.ref ?? row.Ref ?? "",
       pin: row.pin ?? row.Pin ?? "",
       net: row.net ?? row.Net ?? "",
@@ -42825,8 +42825,8 @@ function addAll(target, source) {
 }
 async function fileExists(file2) {
   try {
-    const stat = await import_promises9.default.stat(file2);
-    return stat.isFile();
+    const stat3 = await import_promises9.default.stat(file2);
+    return stat3.isFile();
   } catch {
     return false;
   }
@@ -45353,24 +45353,24 @@ async function resolveBomPaths(root, options, config2) {
 }
 async function loadBomRows(paths) {
   const loadedPaths = [];
-  const rows = [];
+  const rows2 = [];
   for (const bomPath of paths) {
     try {
-      rows.push(...await loadBom(bomPath));
+      rows2.push(...await loadBom(bomPath));
       loadedPaths.push(bomPath);
     } catch {
     }
   }
-  return { paths: loadedPaths, rows };
+  return { paths: loadedPaths, rows: rows2 };
 }
 async function loadSchematicRows(root, projects) {
-  const rows = [];
+  const rows2 = [];
   for (const project of projects) {
     for (const schematic of project.schematicFiles) {
-      rows.push(...(await parseSchematic(import_node_path38.default.resolve(root, schematic))).components);
+      rows2.push(...(await parseSchematic(import_node_path38.default.resolve(root, schematic))).components);
     }
   }
-  return rows;
+  return rows2;
 }
 function snapshotBomRow(root, row) {
   return {
@@ -45415,13 +45415,13 @@ async function hashFile(file2) {
   }
   return hash2.digest("hex");
 }
-async function outputFromRows(kind, rows) {
+async function outputFromRows(kind, rows2) {
   return {
     kind,
-    files: rows.length === 0 ? [] : [
+    files: rows2.length === 0 ? [] : [
       {
         path: "schematic",
-        digest: import_node_crypto4.default.createHash("sha256").update(JSON.stringify(rows)).digest("hex")
+        digest: import_node_crypto4.default.createHash("sha256").update(JSON.stringify(rows2)).digest("hex")
       }
     ]
   };
@@ -45505,8 +45505,8 @@ async function discoverProjects(root, explicitProject) {
 async function explicitProjectFiles(root, explicitProject) {
   const target = import_node_path39.default.resolve(root, normalizePathInput(explicitProject));
   try {
-    const stat = await import_promises12.default.stat(target);
-    if (stat.isDirectory()) {
+    const stat3 = await import_promises12.default.stat(target);
+    if (stat3.isDirectory()) {
       const files = await globFiles(target, ["**/*.kicad_pro"]);
       return files.map((file2) => import_node_path39.default.resolve(file2));
     }
@@ -48270,7 +48270,7 @@ function renderWaiversSection(waivers, locale) {
   if (waivers.active.length === 0 && waivers.expired.length === 0) {
     return "";
   }
-  const rows = [...waivers.active, ...waivers.expired].map((waiver) => {
+  const rows2 = [...waivers.active, ...waivers.expired].map((waiver) => {
     const state = waiverState(waiver);
     return `<tr>
             <td data-label="${attr(t("report.waivers.rule", {}, locale))}"><code>${escapeHtml2(waiver.rule)}</code></td>
@@ -48298,7 +48298,7 @@ function renderWaiversSection(waivers, locale) {
   )}</th><th scope="col">${escapeHtml2(t("report.waivers.state", {}, locale))}</th></tr>
         </thead>
         <tbody>
-          ${rows}
+          ${rows2}
         </tbody>
       </table>
     </section>`;
@@ -48366,7 +48366,7 @@ function renderReadinessEvidence(readiness, locale) {
     required: t("report.readiness.required", {}, locale),
     recommended: t("report.readiness.recommended", {}, locale)
   };
-  const rows = readiness.evidence.map(
+  const rows2 = readiness.evidence.map(
     (entry) => `<tr>
             <td data-label="${attr(t("report.readiness.output", {}, locale))}"><code>${escapeHtml2(entry.output)}</code></td>
             <td data-label="${attr(t("report.readiness.importance", {}, locale))}">${escapeHtml2(importanceLabel[entry.importance])}</td>
@@ -48383,7 +48383,7 @@ function renderReadinessEvidence(readiness, locale) {
   )}</th><th scope="col">${escapeHtml2(t("report.readiness.evidenceStatus", {}, locale))}</th></tr>
         </thead>
         <tbody>
-          ${rows}
+          ${rows2}
         </tbody>
       </table>`;
 }
@@ -48404,7 +48404,7 @@ function renderBomDiff(bom, locale) {
   )}</th><th scope="col">${escapeHtml2(t("report.current", {}, locale))}</th><th scope="col">${escapeHtml2(
     t("report.status", {}, locale)
   )}</th></tr>`;
-  const rows = bom.rows.map(
+  const rows2 = bom.rows.map(
     (row) => `<tr>
             <td data-label="${attr(t("report.ref", {}, locale))}"><code>${escapeHtml2(row.reference)}</code></td>
             <td data-label="${attr(t("report.previous", {}, locale))}">${escapeHtml2(row.previous || "\u2014")}</td>
@@ -48419,7 +48419,7 @@ function renderBomDiff(bom, locale) {
           ${headers}
         </thead>
         <tbody>
-          ${rows}
+          ${rows2}
         </tbody>
       </table>${truncated}`;
 }
@@ -48430,7 +48430,7 @@ function renderOutputDiff(outputs, locale) {
   const headers = `<tr><th scope="col">${escapeHtml2(t("report.diff.output", {}, locale))}</th><th scope="col">${escapeHtml2(
     t("report.status", {}, locale)
   )}</th><th scope="col">${escapeHtml2(t("report.diff.changes", {}, locale))}</th></tr>`;
-  const rows = outputs.map(
+  const rows2 = outputs.map(
     (output) => `<tr>
             <td data-label="${attr(t("report.diff.output", {}, locale))}"><code>${escapeHtml2(output.kind)}</code></td>
             <td data-label="${attr(t("report.status", {}, locale))}">${diffStatusBadge(output.status, locale)}</td>
@@ -48445,7 +48445,7 @@ function renderOutputDiff(outputs, locale) {
           ${headers}
         </thead>
         <tbody>
-          ${rows}
+          ${rows2}
         </tbody>
       </table>`;
 }
@@ -49968,13 +49968,13 @@ var import_node_path49 = __toESM(require("node:path"), 1);
 // src/cli/fix-bom.ts
 function parseDelimitedDocument(text, file2) {
   const delimiter = file2.toLowerCase().endsWith(".tsv") ? "	" : ",";
-  const rows = parseDelimitedRows(text, delimiter);
-  const header = rows.shift()?.map((cell) => cell.trim()) ?? [];
+  const rows2 = parseDelimitedRows(text, delimiter);
+  const header = rows2.shift()?.map((cell) => cell.trim()) ?? [];
   const width = header.length;
   return {
     delimiter,
     header,
-    rows: rows.filter((row) => row.some((cell) => cell.trim() !== "")).map((row) => Array.from({ length: Math.max(width, row.length) }, (_, index) => row[index]?.trim() ?? ""))
+    rows: rows2.filter((row) => row.some((cell) => cell.trim() !== "")).map((row) => Array.from({ length: Math.max(width, row.length) }, (_, index) => row[index]?.trim() ?? ""))
   };
 }
 function writeDelimitedDocument(document) {
@@ -51095,8 +51095,8 @@ async function collectStepArtifacts(outputDir, absoluteOutput, step) {
   const artifacts = [];
   for (const file2 of files) {
     const relativePath = toPosix(import_node_path51.default.relative(outputDir, file2));
-    const digest = await fileDigest(file2);
-    artifacts.push({ path: relativePath, kind: step.artifactKind, ...digest });
+    const digest2 = await fileDigest(file2);
+    artifacts.push({ path: relativePath, kind: step.artifactKind, ...digest2 });
   }
   return artifacts;
 }
@@ -51660,7 +51660,7 @@ function diffBom(previous, current, maxRows) {
   const previousRows = new Map(previous.map((row) => [bomRowKey(row), row]));
   const currentRows = new Map(current.map((row) => [bomRowKey(row), row]));
   const rowKeys = [.../* @__PURE__ */ new Set([...previousRows.keys(), ...currentRows.keys()])].sort((a, b) => a.localeCompare(b));
-  const rows = rowKeys.map((rowKey) => {
+  const rows2 = rowKeys.map((rowKey) => {
     const prior = previousRows.get(rowKey);
     const next = currentRows.get(rowKey);
     const previousText = prior ? describeBomRow(prior) : "";
@@ -51672,10 +51672,10 @@ function diffBom(previous, current, maxRows) {
       status: bomStatus(prior, next)
     };
   });
-  rows.sort(compareBomDiffRows);
+  rows2.sort(compareBomDiffRows);
   return {
-    rows: rows.slice(0, Math.max(0, maxRows)),
-    truncated: rows.length > maxRows
+    rows: rows2.slice(0, Math.max(0, maxRows)),
+    truncated: rows2.length > maxRows
   };
 }
 function diffOutputs(previous, current) {
@@ -51935,8 +51935,8 @@ async function writeReport(outputDir, relativePath, content) {
   const target = import_node_path56.default.join(outputDir, relativePath);
   await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
   await import_promises19.default.writeFile(target, content, "utf8");
-  const digest = await fileDigest2(target);
-  return { path: relativePath, kind: "report", ...digest };
+  const digest2 = await fileDigest2(target);
+  return { path: relativePath, kind: "report", ...digest2 };
 }
 async function copyManufacturingArtifacts(root, outputDir) {
   const files = await discoverManufacturingArtifacts(root);
@@ -51947,8 +51947,8 @@ async function copyManufacturingArtifacts(root, outputDir) {
     const target = import_node_path56.default.join(outputDir, targetRelative);
     await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
     await import_promises19.default.copyFile(source, target);
-    const digest = await fileDigest2(target);
-    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest });
+    const digest2 = await fileDigest2(target);
+    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest2 });
   }
   return artifacts;
 }
@@ -51967,12 +51967,12 @@ async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
     const target = import_node_path56.default.join(outputDir, targetRelative);
     await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
     await import_promises19.default.copyFile(source, target);
-    const digest = await fileDigest2(target);
+    const digest2 = await fileDigest2(target);
     artifacts.push({
       path: targetRelative,
       sourcePath: normalizeRelative(root, source),
       kind: "generated",
-      ...digest
+      ...digest2
     });
   }
   return artifacts;
@@ -52244,8 +52244,8 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   if (signature.algorithm !== "ed25519") {
     return { ok: false, errors: [`unsupported signature algorithm: ${signature.algorithm}`] };
   }
-  const digest = (0, import_node_crypto8.createHash)("sha256").update(bytes).digest("hex");
-  if (signature.manifestDigest && signature.manifestDigest !== digest) {
+  const digest2 = (0, import_node_crypto8.createHash)("sha256").update(bytes).digest("hex");
+  if (signature.manifestDigest && signature.manifestDigest !== digest2) {
     errors.push("manifest digest in signature does not match manifest contents");
   }
   let publicKey;
@@ -52674,8 +52674,8 @@ async function releaseHandoffCommand(pathInput, options, streams) {
     const target = import_node_path58.default.join(outputDir, file2.target);
     await import_promises21.default.mkdir(import_node_path58.default.dirname(target), { recursive: true });
     await import_promises21.default.copyFile(import_node_path58.default.resolve(root, file2.source), target);
-    const digest = await sha256File(target);
-    manifestFiles.push({ ...file2, ...digest });
+    const digest2 = await sha256File(target);
+    manifestFiles.push({ ...file2, ...digest2 });
   }
   const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
   const manifest = buildHandoffManifest(summary, plan, manifestFiles, generatedAt);
@@ -52798,8 +52798,1906 @@ async function gitState(root) {
   }
 }
 
-// src/cli/commands/sbom.ts
+// src/cli/commands/runner.ts
+var import_node_path64 = __toESM(require("node:path"), 1);
+
+// packages/db/src/runner-enrollment-admin.ts
+var import_node_child_process4 = require("node:child_process");
+var import_node_crypto10 = require("node:crypto");
+var import_promises22 = require("node:fs/promises");
+var import_node_os4 = __toESM(require("node:os"), 1);
 var import_node_path59 = __toESM(require("node:path"), 1);
+
+// packages/db/src/runner-registration-enrollment-store.ts
+var import_node_crypto9 = require("node:crypto");
+var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
+var repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
+function rows(result) {
+  if (typeof result !== "object" || result === null || !("rows" in result)) return [];
+  const value = result.rows;
+  return Array.isArray(value) ? value : [];
+}
+function stringColumn(row, key) {
+  const value = row?.[key];
+  return typeof value === "string" ? value : void 0;
+}
+function isoColumn(row, key) {
+  const value = row?.[key];
+  if (value instanceof Date && !Number.isNaN(value.valueOf())) return value.toISOString();
+  if (typeof value !== "string") return void 0;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.valueOf()) ? void 0 : parsed.toISOString();
+}
+function digest(value) {
+  return (0, import_node_crypto9.createHash)("sha256").update(value, "utf8").digest("hex");
+}
+function positiveInteger3(value, fallback, name, maximum) {
+  const selected = value ?? fallback;
+  if (!Number.isSafeInteger(selected) || selected <= 0 || selected > maximum) {
+    throw new Error(`${name} must be a positive integer no greater than ${maximum}`);
+  }
+  return selected;
+}
+function normalizeUniqueStrings(values, options) {
+  if (values.length > options.maximumCount) return void 0;
+  const normalized = values.map((value) => value.trim());
+  if (normalized.some(
+    (value) => value.length < 1 || value.length > options.maximumLength || options.pattern !== void 0 && !options.pattern.test(value)
+  )) {
+    return void 0;
+  }
+  return [...new Set(normalized)].sort((left, right) => left.localeCompare(right));
+}
+function validSecret(value) {
+  return value.length >= 43 && value.length <= 256 && base64UrlPattern.test(value);
+}
+function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
+  const now = options.now ?? (() => /* @__PURE__ */ new Date());
+  const id = options.id ?? import_node_crypto9.randomUUID;
+  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto9.randomBytes)(32).toString("base64url"));
+  const enrollmentTtlSeconds = positiveInteger3(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
+  return {
+    async issueEnrollment(input) {
+      const at = now();
+      const name = input.name.trim();
+      const allowedRepositories = normalizeUniqueStrings(input.allowedRepositories, {
+        maximumCount: 256,
+        maximumLength: 256,
+        pattern: repositoryPattern
+      });
+      if (!uuidPattern.test(input.installationId) || name.length < 1 || name.length > 120 || !["installation", "organization", "repository"].includes(input.scope) || allowedRepositories === void 0 || input.scope === "repository" && allowedRepositories.length < 1) {
+        return { status: "stale" };
+      }
+      const registrationId = id();
+      const enrollmentId = id();
+      const token = enrollmentToken();
+      if (!uuidPattern.test(registrationId) || !uuidPattern.test(enrollmentId) || !validSecret(token)) {
+        throw new Error("runner registration enrollment generator returned an invalid value");
+      }
+      const expiresAt = new Date(at.valueOf() + enrollmentTtlSeconds * 1e3);
+      const result = await executor.query(
+        `select * from boardreadyops_issue_runner_registration_enrollment(
+           $1::timestamptz,
+           $2,
+           $3,
+           $4,
+           $5,
+           $6,
+           $7::text[],
+           $8,
+           $9::timestamptz
+         )`,
+        [
+          at.toISOString(),
+          input.installationId,
+          registrationId,
+          enrollmentId,
+          name,
+          input.scope,
+          allowedRepositories,
+          digest(token),
+          expiresAt.toISOString()
+        ]
+      );
+      const row = rows(result)[0];
+      const outcome = stringColumn(row, "outcome");
+      const returnedRegistrationId = stringColumn(row, "registration_id");
+      if (outcome !== "accepted") {
+        return {
+          status: outcome === "conflict" ? "conflict" : "stale",
+          ...returnedRegistrationId === void 0 ? {} : { registrationId: returnedRegistrationId }
+        };
+      }
+      const effectiveExpiresAt = isoColumn(row, "effective_expires_at");
+      if (!returnedRegistrationId || !effectiveExpiresAt) {
+        throw new Error("runner registration enrollment issuance returned incomplete metadata");
+      }
+      return {
+        status: "accepted",
+        registrationId: returnedRegistrationId,
+        enrollmentToken: token,
+        expiresAt: effectiveExpiresAt
+      };
+    },
+    async activateRegistration(input) {
+      const at = now();
+      const publicKey = input.publicKey.trim();
+      const capabilities = normalizeUniqueStrings(input.capabilities, {
+        maximumCount: 64,
+        maximumLength: 128
+      });
+      if (!validSecret(input.enrollmentToken) || publicKey.length < 32 || publicKey.length > 16384 || !capabilities) {
+        return { status: "stale" };
+      }
+      const result = await executor.query(
+        `select * from boardreadyops_activate_runner_registration(
+           $1::timestamptz,
+           $2,
+           $3,
+           $4,
+           $5::jsonb
+         )`,
+        [at.toISOString(), digest(input.enrollmentToken), publicKey, digest(publicKey), JSON.stringify(capabilities)]
+      );
+      const row = rows(result)[0];
+      const outcome = stringColumn(row, "outcome");
+      const registrationId = stringColumn(row, "registration_id");
+      const installationId = stringColumn(row, "installation_id");
+      if ((outcome === "accepted" || outcome === "replayed") && registrationId && installationId) {
+        return { status: outcome, registrationId, installationId };
+      }
+      return {
+        status: outcome === "conflict" ? "conflict" : "stale",
+        ...registrationId === void 0 ? {} : { registrationId },
+        ...installationId === void 0 ? {} : { installationId }
+      };
+    }
+  };
+}
+
+// packages/db/src/runner-enrollment-admin.ts
+var maximumPsqlOutputBytes = 1024 * 1024;
+var defaultDependencies = {
+  query: executePsqlQuery,
+  token: () => (0, import_node_crypto10.randomBytes)(32).toString("base64url")
+};
+async function issueRunnerEnrollment(options, overrides = {}) {
+  const dependencies = { ...defaultDependencies, ...overrides };
+  const databaseUrlFile = import_node_path59.default.resolve(options.databaseUrlFile);
+  const tokenOutputFile = import_node_path59.default.resolve(options.tokenOutputFile);
+  await assertPrivateFile(databaseUrlFile, "database URL file");
+  await prepareTokenOutput(tokenOutputFile);
+  const databaseUrl = (await (0, import_promises22.readFile)(databaseUrlFile, "utf8")).trim();
+  validateDatabaseUrl(databaseUrl);
+  const enrollmentToken = dependencies.token();
+  validateEnrollmentToken(enrollmentToken);
+  await writeSecretFile(tokenOutputFile, enrollmentToken);
+  let accepted = false;
+  try {
+    const executor = {
+      query: async (sql, params = []) => await dependencies.query(databaseUrl, sql, params)
+    };
+    const result = await createSqlRunnerRegistrationEnrollmentStore(executor, {
+      ...options.ttlSeconds === void 0 ? {} : { enrollmentTtlSeconds: options.ttlSeconds },
+      enrollmentToken: () => enrollmentToken
+    }).issueEnrollment({
+      installationId: options.installationId,
+      name: options.name,
+      scope: options.scope,
+      allowedRepositories: options.allowedRepositories
+    });
+    if (result.status !== "accepted") {
+      let message = "runner enrollment request was rejected as invalid or stale";
+      if (result.status === "conflict") {
+        const registrationSuffix = result.registrationId ? ` (${result.registrationId})` : "";
+        message = `an active runner registration already uses this name or scope${registrationSuffix}`;
+      }
+      throw new Error(message);
+    }
+    if (result.enrollmentToken !== enrollmentToken) {
+      throw new Error("runner enrollment store returned unexpected token material");
+    }
+    accepted = true;
+    return {
+      registrationId: result.registrationId,
+      expiresAt: result.expiresAt,
+      tokenOutputFile
+    };
+  } finally {
+    if (!accepted) await (0, import_promises22.unlink)(tokenOutputFile).catch(() => void 0);
+  }
+}
+async function executePsqlQuery(databaseUrl, sql, params) {
+  if (!sql.includes("boardreadyops_issue_runner_registration_enrollment") || params.length !== 9) {
+    throw new Error("runner enrollment administration received an unsupported database query");
+  }
+  const connection = parseDatabaseConnection(databaseUrl);
+  const secretDirectory = await (0, import_promises22.mkdtemp)(import_node_path59.default.join(import_node_os4.default.tmpdir(), "boardreadyops-psql-"));
+  const passwordFile = import_node_path59.default.join(secretDirectory, "pgpass");
+  try {
+    if (process.platform !== "win32") await (0, import_promises22.chmod)(secretDirectory, 448);
+    await (0, import_promises22.writeFile)(
+      passwordFile,
+      `${pgpassField(connection.host)}:${pgpassField(connection.port)}:${pgpassField(connection.database)}:${pgpassField(connection.user)}:${pgpassField(connection.password)}
+`,
+      {
+        encoding: "utf8",
+        mode: 384,
+        flag: "wx"
+      }
+    );
+    if (process.platform !== "win32") await (0, import_promises22.chmod)(passwordFile, 384);
+    const variables = psqlVariables(params);
+    const result = await runPsql({
+      environment: {
+        ...process.env,
+        PGHOST: connection.host,
+        PGPORT: connection.port,
+        PGUSER: connection.user,
+        PGDATABASE: connection.database,
+        PGPASSFILE: passwordFile,
+        ...connection.environment
+      },
+      variables
+    });
+    let row;
+    try {
+      row = JSON.parse(result.stdout.trim());
+    } catch {
+      throw new Error("psql returned invalid runner enrollment metadata");
+    }
+    if (typeof row !== "object" || row === null || Array.isArray(row)) {
+      throw new Error("psql returned incomplete runner enrollment metadata");
+    }
+    return { rows: [row] };
+  } finally {
+    await (0, import_promises22.rm)(secretDirectory, { recursive: true, force: true });
+  }
+}
+async function runPsql(input) {
+  const args = ["--no-psqlrc", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1"];
+  for (const [name, value] of Object.entries(input.variables)) args.push(`--set=${name}=${value}`);
+  const statement = `
+with issued as (
+  select * from boardreadyops_issue_runner_registration_enrollment(
+    :'issued_at'::timestamptz,
+    :'installation_id',
+    :'registration_id',
+    :'enrollment_id',
+    :'registration_name',
+    :'registration_scope',
+    array(select jsonb_array_elements_text(:'allowed_repositories'::jsonb)),
+    :'token_digest',
+    :'expires_at'::timestamptz
+  )
+)
+select json_build_object(
+  'outcome', outcome,
+  'registration_id', registration_id,
+  'effective_expires_at', effective_expires_at
+)::text
+from issued;
+`;
+  return await new Promise((resolve, reject) => {
+    const environment = fixedPsqlEnvironment(input.environment);
+    const child = spawnPsql(args, environment);
+    let stdout = "";
+    let stderr = "";
+    let bytes = 0;
+    let exceeded = false;
+    const collect3 = (current, chunk) => {
+      bytes += Buffer.byteLength(chunk, "utf8");
+      if (bytes > maximumPsqlOutputBytes) {
+        exceeded = true;
+        child.kill("SIGKILL");
+        return current;
+      }
+      return `${current}${chunk}`;
+    };
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout = collect3(stdout, chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr = collect3(stderr, chunk);
+    });
+    child.once("error", (error51) => reject(new Error(`failed to start psql: ${error51.message}`)));
+    child.once("close", (code, signal) => {
+      if (exceeded) {
+        reject(new Error(`psql output exceeded ${maximumPsqlOutputBytes} bytes`));
+        return;
+      }
+      if (code !== 0) {
+        const detail = sanitizedPsqlError(stderr || stdout);
+        const termination = signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`;
+        const detailSuffix = detail ? `: ${detail}` : "";
+        reject(new Error(`psql runner enrollment query failed with ${termination}${detailSuffix}`));
+        return;
+      }
+      resolve({ stdout, stderr });
+    });
+    child.stdin.end(statement);
+  });
+}
+function fixedPsqlEnvironment(environment) {
+  return {
+    ...environment,
+    PATH: "/usr/bin:/bin"
+  };
+}
+function spawnPsql(args, environment) {
+  if (process.platform !== "linux") {
+    throw new Error("runner enrollment administration is supported only on Linux control-plane hosts");
+  }
+  return (0, import_node_child_process4.spawn)("/usr/bin/psql", args, {
+    env: environment,
+    stdio: "pipe",
+    windowsHide: true
+  });
+}
+function psqlVariables(params) {
+  const [issuedAt, installationId, registrationId, enrollmentId, name, scope, repositories, digest2, expiresAt] = params;
+  if (typeof issuedAt !== "string" || typeof installationId !== "string" || typeof registrationId !== "string" || typeof enrollmentId !== "string" || typeof name !== "string" || typeof scope !== "string" || !Array.isArray(repositories) || repositories.some((repository) => typeof repository !== "string") || typeof digest2 !== "string" || typeof expiresAt !== "string") {
+    throw new Error("runner enrollment database parameters were invalid");
+  }
+  return {
+    issued_at: issuedAt,
+    installation_id: installationId,
+    registration_id: registrationId,
+    enrollment_id: enrollmentId,
+    registration_name: name,
+    registration_scope: scope,
+    allowed_repositories: JSON.stringify(repositories),
+    token_digest: digest2,
+    expires_at: expiresAt
+  };
+}
+function parseDatabaseConnection(value) {
+  const url2 = validateDatabaseUrl(value);
+  const environment = {};
+  const supportedParameters = {
+    sslmode: "PGSSLMODE",
+    sslrootcert: "PGSSLROOTCERT",
+    sslcert: "PGSSLCERT",
+    sslkey: "PGSSLKEY",
+    connect_timeout: "PGCONNECT_TIMEOUT",
+    application_name: "PGAPPNAME"
+  };
+  for (const [name, parameter] of url2.searchParams) {
+    const environmentName = supportedParameters[name];
+    if (!environmentName) throw new Error(`database URL uses unsupported query parameter: ${name}`);
+    environment[environmentName] = parameter;
+  }
+  return {
+    host: url2.hostname,
+    port: url2.port || "5432",
+    user: decodeURIComponent(url2.username),
+    password: decodeURIComponent(url2.password),
+    database: decodeURIComponent(url2.pathname.slice(1)),
+    environment
+  };
+}
+function validateDatabaseUrl(value) {
+  let url2;
+  try {
+    url2 = new URL(value);
+  } catch {
+    throw new Error("database URL file does not contain a valid URL");
+  }
+  if (url2.protocol !== "postgres:" && url2.protocol !== "postgresql:") {
+    throw new Error("database URL must use postgres or postgresql scheme");
+  }
+  if (!url2.hostname || !url2.username || !url2.pathname || url2.pathname === "/") {
+    throw new Error("database URL must identify a database host, user, and name");
+  }
+  if (url2.hash) throw new Error("database URL cannot include a fragment");
+  return url2;
+}
+function pgpassField(value) {
+  const backslash = String.fromCharCode(92);
+  return value.replaceAll(backslash, backslash.repeat(2)).replaceAll(":", `${backslash}:`);
+}
+function sanitizedPsqlError(value) {
+  return Array.from(value.trim(), (character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code < 32 || code === 127 ? " " : character;
+  }).join("").slice(0, 1e3);
+}
+function validateEnrollmentToken(value) {
+  if (value.length < 43 || value.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(value)) {
+    throw new Error("runner enrollment token generator returned an invalid token");
+  }
+}
+async function prepareTokenOutput(filePath) {
+  if (await (0, import_promises22.stat)(filePath).catch(() => void 0)) {
+    throw new Error(`refusing to overwrite an existing enrollment token file: ${filePath}`);
+  }
+  const directory = import_node_path59.default.dirname(filePath);
+  const existing = await (0, import_promises22.stat)(directory).catch(() => void 0);
+  if (existing && !existing.isDirectory()) {
+    throw new Error(`enrollment token output parent is not a directory: ${directory}`);
+  }
+  if (!existing) await (0, import_promises22.mkdir)(directory, { recursive: true, mode: 448 });
+  if (process.platform !== "win32") await (0, import_promises22.chmod)(directory, 448);
+}
+async function writeSecretFile(filePath, enrollmentToken) {
+  await (0, import_promises22.writeFile)(filePath, `${enrollmentToken}
+`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 384
+  });
+  if (process.platform !== "win32") await (0, import_promises22.chmod)(filePath, 384);
+}
+async function assertPrivateFile(filePath, label) {
+  const info = await (0, import_promises22.stat)(filePath).catch(() => void 0);
+  if (!info?.isFile()) throw new Error(`${label} does not exist or is not a regular file`);
+  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
+    throw new Error(`${label} must not be readable or writable by group or other users`);
+  }
+}
+
+// src/runner/identity.ts
+var import_node_crypto13 = require("node:crypto");
+var import_promises24 = require("node:fs/promises");
+var import_node_os5 = __toESM(require("node:os"), 1);
+var import_node_path60 = __toESM(require("node:path"), 1);
+
+// packages/contracts/src/runner-protocol.ts
+var lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var base64UrlPattern2 = /^[A-Za-z0-9_-]+$/u;
+var capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
+var githubOwnerPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
+var githubRepositoryPattern = /^[A-Za-z0-9_.-]{1,100}$/u;
+var runnerProtocolVersionSchema = external_exports.literal(1);
+var runnerWorkerClassSchema = external_exports.enum(["managed", "self_hosted"]);
+var runnerSigningAlgorithmSchema = external_exports.literal("ed25519");
+var runnerIdentifierSchema = external_exports.string().regex(lowercaseUuidPattern, "identifier must be a lowercase UUID");
+var runnerRequestTimestampSchema = external_exports.number().int().nonnegative().max(9999999999);
+var runnerRequestNonceSchema = external_exports.string().min(22).max(128).regex(base64UrlPattern2);
+var runnerRequestSignatureSchema = external_exports.string().length(86).regex(base64UrlPattern2);
+var runnerLeaseSecretSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
+var runnerEnrollmentTokenSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
+var runnerCapabilitySchema = external_exports.string().trim().min(1).max(128).regex(capabilityPattern);
+var runnerSafeModeReasonSchema = external_exports.enum(["draft-pull-request", "fork-pull-request", "private-repository"]);
+var runnerSignedRequestEnvelopeSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  algorithm: runnerSigningAlgorithmSchema,
+  workerClass: runnerWorkerClassSchema,
+  runnerId: runnerIdentifierSchema,
+  timestamp: runnerRequestTimestampSchema,
+  nonce: runnerRequestNonceSchema,
+  signature: runnerRequestSignatureSchema
+}).strict();
+var runnerClaimRequestSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  workerClass: runnerWorkerClassSchema,
+  capabilities: external_exports.array(runnerCapabilitySchema).max(64).default([]),
+  labels: external_exports.array(runnerCapabilitySchema).max(32).default([])
+}).strict();
+var runnerRepositoryDescriptorSchema = external_exports.object({
+  owner: external_exports.string().regex(githubOwnerPattern),
+  name: external_exports.string().regex(githubRepositoryPattern),
+  commitSha: external_exports.string().regex(/^[0-9a-f]{40}$/u),
+  private: external_exports.boolean()
+}).strict();
+var runnerSafeModeSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  reasons: external_exports.array(runnerSafeModeReasonSchema).max(3)
+}).strict().superRefine((value, context) => {
+  if (value.enabled && value.reasons.length === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["reasons"],
+      message: "safe mode requires at least one reason"
+    });
+  }
+  if (!value.enabled && value.reasons.length > 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["reasons"],
+      message: "safe-mode reasons require safe mode to be enabled"
+    });
+  }
+});
+var runnerClaimedJobSchema = external_exports.object({
+  leaseId: runnerIdentifierSchema,
+  leaseToken: runnerLeaseSecretSchema,
+  runId: runnerIdentifierSchema,
+  executionAttemptId: runnerIdentifierSchema,
+  leaseExpiresAt: external_exports.string().datetime({ offset: true }),
+  maximumLeaseExpiresAt: external_exports.string().datetime({ offset: true }),
+  sourceMode: external_exports.enum(["broker", "customer_checkout"]),
+  repository: runnerRepositoryDescriptorSchema,
+  safeMode: runnerSafeModeSchema
+}).strict().superRefine((value, context) => {
+  if (Date.parse(value.leaseExpiresAt) > Date.parse(value.maximumLeaseExpiresAt)) {
+    context.addIssue({
+      code: "custom",
+      path: ["leaseExpiresAt"],
+      message: "lease expiry cannot exceed the maximum lease expiry"
+    });
+  }
+  if (value.sourceMode === "broker" && value.safeMode.reasons.includes("fork-pull-request")) {
+    context.addIssue({
+      code: "custom",
+      path: ["sourceMode"],
+      message: "broker source mode cannot be assigned to fork pull requests"
+    });
+  }
+});
+var runnerClaimResponseSchema = external_exports.discriminatedUnion("status", [
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.literal("empty"),
+    retryAfterSeconds: external_exports.number().int().min(1).max(300)
+  }).strict(),
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.literal("claimed"),
+    job: runnerClaimedJobSchema
+  }).strict()
+]);
+var runnerLeaseContextSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  runId: runnerIdentifierSchema,
+  executionAttemptId: runnerIdentifierSchema,
+  leaseId: runnerIdentifierSchema,
+  leaseToken: runnerLeaseSecretSchema
+}).strict();
+var runnerLeaseStageSchema = external_exports.enum([
+  "claimed",
+  "preparing_source",
+  "running",
+  "uploading_artifacts",
+  "reporting"
+]);
+var runnerLeaseHeartbeatRequestSchema = runnerLeaseContextSchema.extend({
+  stage: runnerLeaseStageSchema,
+  progressPercent: external_exports.number().int().min(0).max(100).optional(),
+  message: external_exports.string().trim().min(1).max(500).optional()
+}).strict();
+var runnerLeaseHeartbeatResponseSchema = external_exports.union([
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.literal("active"),
+    leaseExpiresAt: external_exports.string().datetime({ offset: true }),
+    maximumLeaseExpiresAt: external_exports.string().datetime({ offset: true })
+  }).strict(),
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.enum(["expired", "revoked", "completed", "stale"])
+  }).strict()
+]);
+var runnerLeaseRelinquishRequestSchema = runnerLeaseContextSchema.extend({
+  reason: external_exports.enum(["shutdown", "capacity", "operator", "job_error"]),
+  message: external_exports.string().trim().min(1).max(1e3).optional()
+}).strict();
+var runnerArtifactDeclarationSchema = external_exports.object({
+  kind: external_exports.string().trim().min(1).max(128),
+  name: external_exports.string().trim().min(1).max(256),
+  role: external_exports.string().trim().min(1).max(128),
+  bytes: external_exports.number().int().nonnegative().max(2147483647),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional()
+}).strict();
+var runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema.extend({
+  artifacts: external_exports.array(runnerArtifactDeclarationSchema).min(1).max(100)
+}).strict();
+function validArtifactStoragePath(value) {
+  const segments = value.split("/");
+  return !value.startsWith("/") && !value.includes("\\") && Array.from(value).every((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code >= 32 && code !== 127;
+  }) && segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+}
+var runnerArtifactUploadCapabilitySchema = external_exports.object({
+  artifactId: runnerIdentifierSchema,
+  storagePath: external_exports.string().trim().min(1).max(1024).refine(validArtifactStoragePath, "artifact storage path must remain relative to the configured artifact root"),
+  uploadUrl: external_exports.string().url().max(4096).refine((value) => new URL(value).protocol === "https:", "upload URL must use HTTPS"),
+  expiresAt: external_exports.string().datetime({ offset: true }),
+  maximumBytes: external_exports.number().int().nonnegative().max(2147483647)
+}).strict();
+var runnerArtifactCapabilityResponseSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  uploads: external_exports.array(runnerArtifactUploadCapabilitySchema).min(1).max(100)
+}).strict();
+var runnerRegistrationActivationRequestSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  enrollmentToken: runnerEnrollmentTokenSchema,
+  algorithm: runnerSigningAlgorithmSchema,
+  publicKey: external_exports.string().trim().min(32).max(16384),
+  capabilities: external_exports.array(runnerCapabilitySchema).max(64).default([])
+}).strict();
+var runnerRegistrationActivationResponseSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  status: external_exports.enum(["activated", "replayed"]),
+  registrationId: runnerIdentifierSchema
+}).strict();
+var runnerMutationResponseSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  status: external_exports.enum(["accepted", "replayed"])
+}).strict();
+
+// packages/contracts/src/index.ts
+var releaseRunStatusSchema = external_exports.enum(["queued", "running", "completed", "timed_out", "failed"]);
+var releaseDecisionSchema = external_exports.enum(["pass", "fail", "error"]);
+var releaseRunConclusionSchema = external_exports.enum(["success", "failure", "neutral", "timed_out"]);
+var triggerKindSchema = external_exports.enum(["push", "pr", "manual", "workflow_dispatch"]);
+var findingSeveritySchema = external_exports.enum(["error", "high", "medium", "low", "info"]);
+var createReleaseRunRequestSchema = external_exports.object({
+  repositoryId: external_exports.string().min(1),
+  commitSha: external_exports.string().min(7).max(64),
+  ref: external_exports.string().min(1),
+  pullRequestNumber: external_exports.number().int().positive().optional(),
+  triggerKind: triggerKindSchema
+});
+var findingSchema = external_exports.object({
+  ruleId: external_exports.string().min(1).max(256),
+  severity: findingSeveritySchema,
+  message: external_exports.string().min(1).max(4e3),
+  path: external_exports.string().min(1).max(1024).optional()
+});
+var artifactStoragePathSchema = external_exports.string().min(1).max(1024).refine(
+  (value) => !value.includes("\0") && !value.startsWith("/") && !value.startsWith("\\") && !/^[A-Za-z]:[\\/]/u.test(value) && !value.split(/[\\/]/u).includes(".."),
+  "artifact storagePath must be a relative path within the configured artifact root"
+);
+var releaseRunArtifactSchema = external_exports.object({
+  kind: external_exports.string().trim().min(1).max(128),
+  name: external_exports.string().trim().min(1).max(256),
+  storagePath: artifactStoragePathSchema,
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u),
+  bytes: external_exports.number().int().nonnegative().max(2147483647),
+  role: external_exports.string().trim().min(1).max(128)
+});
+var releaseRunReportLinkSchema = external_exports.object({
+  label: external_exports.string().trim().min(1).max(160),
+  url: external_exports.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "report link must use HTTPS")
+});
+var releaseRunMetricsSchema = external_exports.record(external_exports.string().trim().min(1).max(128), external_exports.number().finite()).refine((value) => Object.keys(value).length <= 100, "metrics must contain at most 100 entries");
+function inferredConclusion(input) {
+  if (input.status === "timed_out") {
+    return "timed_out";
+  }
+  if (input.status === "completed" && input.decision === "pass") {
+    return "success";
+  }
+  if (input.status === "failed" || input.decision === "fail" || input.decision === "error") {
+    return "failure";
+  }
+  return "neutral";
+}
+var releaseRunResultBaseSchema = external_exports.object({
+  version: external_exports.literal(1).default(1),
+  executionAttemptId: external_exports.string().uuid().optional(),
+  status: releaseRunStatusSchema,
+  conclusion: releaseRunConclusionSchema.optional(),
+  decision: releaseDecisionSchema.nullable(),
+  findings: external_exports.array(findingSchema).max(500).default([]),
+  artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
+  metrics: releaseRunMetricsSchema.default({}),
+  reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([])
+}).strict();
+var releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context) => {
+  const expected = inferredConclusion(value);
+  if (value.conclusion !== void 0 && value.conclusion !== expected) {
+    context.addIssue({
+      code: "custom",
+      path: ["conclusion"],
+      message: `conclusion must be ${expected} for the supplied status and decision`
+    });
+  }
+}).transform((value) => ({
+  ...value,
+  conclusion: value.conclusion ?? inferredConclusion(value)
+}));
+var runnerTerminalResultRequestSchema = runnerLeaseContextSchema.extend({
+  result: releaseRunResultSchema
+}).strict().superRefine((value, context) => {
+  if (value.result.executionAttemptId !== value.executionAttemptId) {
+    context.addIssue({
+      code: "custom",
+      path: ["result", "executionAttemptId"],
+      message: "terminal result must be bound to the leased execution attempt"
+    });
+  }
+});
+
+// src/runner/client.ts
+var import_node_crypto12 = require("node:crypto");
+var import_promises23 = require("node:fs/promises");
+
+// packages/cloud-core/src/runner-request-signature.ts
+var import_node_crypto11 = require("node:crypto");
+var canonicalPrefix = "boardreadyops-runner-request-v1";
+var canonicalBaseUrl = "https://boardreadyops.invalid";
+var lowercaseUuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+function encodeQueryComponent(value) {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/gu,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+function assertLowercaseUuid(name, value) {
+  if (value === void 0) {
+    return "";
+  }
+  if (!lowercaseUuidPattern2.test(value)) {
+    throw new Error(`${name} must be a lowercase UUID`);
+  }
+  return value;
+}
+function assertNonce(value) {
+  if (value.length < 22 || value.length > 128 || !base64UrlPattern3.test(value)) {
+    throw new Error("runner request nonce must be 22-128 base64url characters");
+  }
+  return value;
+}
+function runnerRequestBodyDigest(body) {
+  return (0, import_node_crypto11.createHash)("sha256").update(body).digest("hex");
+}
+function normalizeRunnerRequestPath(path66) {
+  if (!path66.startsWith("/") || path66.startsWith("//") || path66.includes("#") || path66.includes("\\")) {
+    throw new Error("runner request path must be an absolute application path without a fragment");
+  }
+  const rawPath = path66.split("?", 1)[0] ?? path66;
+  if (/%2f|%5c/iu.test(rawPath)) {
+    throw new Error("runner request path cannot contain encoded path separators");
+  }
+  for (const segment of rawPath.split("/")) {
+    let decoded;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      throw new Error("runner request path contains invalid percent encoding");
+    }
+    if (decoded === "." || decoded === "..") {
+      throw new Error("runner request path cannot contain dot segments");
+    }
+  }
+  const url2 = new URL(path66, canonicalBaseUrl);
+  if (url2.origin !== canonicalBaseUrl) {
+    throw new Error("runner request path must remain within the application origin");
+  }
+  const query = [...url2.searchParams.entries()].sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+    const keyOrder = compareText(leftKey, rightKey);
+    return keyOrder === 0 ? compareText(leftValue, rightValue) : keyOrder;
+  }).map(([key, value]) => `${encodeQueryComponent(key)}=${encodeQueryComponent(value)}`).join("&");
+  return query.length === 0 ? url2.pathname : `${url2.pathname}?${query}`;
+}
+function canonicalRunnerRequest(input) {
+  const method = input.method.toUpperCase();
+  if (!/^[A-Z]+$/u.test(method)) {
+    throw new Error("runner request method must contain only ASCII letters");
+  }
+  if (!Number.isSafeInteger(input.timestamp) || input.timestamp < 0 || input.timestamp > 9999999999) {
+    throw new Error("runner request timestamp must be a non-negative integer in seconds");
+  }
+  if (input.workerClass !== "managed" && input.workerClass !== "self_hosted") {
+    throw new Error("unsupported runner worker class");
+  }
+  return [
+    canonicalPrefix,
+    method,
+    normalizeRunnerRequestPath(input.path),
+    String(input.timestamp),
+    assertNonce(input.nonce),
+    input.workerClass,
+    assertLowercaseUuid("runnerId", input.runnerId),
+    assertLowercaseUuid("runId", input.runId),
+    assertLowercaseUuid("executionAttemptId", input.executionAttemptId),
+    assertLowercaseUuid("leaseId", input.leaseId),
+    runnerRequestBodyDigest(input.body)
+  ].join("\n");
+}
+function signRunnerRequest(input) {
+  return (0, import_node_crypto11.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
+}
+
+// src/runner/client.ts
+var responseBodyLimitBytes = 1024 * 1024;
+var runnerProtocolHeaderNames = {
+  protocolVersion: "x-boardreadyops-runner-protocol-version",
+  algorithm: "x-boardreadyops-runner-algorithm",
+  workerClass: "x-boardreadyops-runner-worker-class",
+  runnerId: "x-boardreadyops-runner-id",
+  timestamp: "x-boardreadyops-runner-timestamp",
+  nonce: "x-boardreadyops-runner-nonce",
+  signature: "x-boardreadyops-runner-signature"
+};
+var RunnerControlPlaneError = class extends Error {
+  status;
+  responseBody;
+  constructor(message, status, responseBody) {
+    super(message);
+    this.name = "RunnerControlPlaneError";
+    this.status = status;
+    this.responseBody = responseBody;
+  }
+};
+var RunnerControlPlaneClient = class {
+  baseUrl;
+  runnerId;
+  privateKey;
+  fetchImpl;
+  now;
+  nonce;
+  requestTimeoutMs;
+  constructor(options) {
+    this.baseUrl = normalizeControlPlaneUrl(options.baseUrl);
+    this.runnerId = options.runnerId;
+    this.privateKey = options.privateKey;
+    this.fetchImpl = options.fetch ?? fetch;
+    this.now = options.now ?? (() => /* @__PURE__ */ new Date());
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto12.randomBytes)(24).toString("base64url"));
+    this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
+  }
+  async claim(input) {
+    return runnerClaimResponseSchema.parse(await this.signedJson("/api/v1/runner/jobs/claim", input));
+  }
+  async heartbeat(input) {
+    return runnerLeaseHeartbeatResponseSchema.parse(
+      await this.signedJson("/api/v1/runner/leases/heartbeat", input, leaseContext(input))
+    );
+  }
+  async relinquish(input) {
+    return runnerMutationResponseSchema.parse(
+      await this.signedJson("/api/v1/runner/leases/relinquish", input, leaseContext(input))
+    );
+  }
+  async issueArtifactCapabilities(input) {
+    return runnerArtifactCapabilityResponseSchema.parse(
+      await this.signedJson("/api/v1/runner/artifacts/capabilities", input, leaseContext(input))
+    );
+  }
+  async publishTerminalResult(input) {
+    return await this.signedJson("/api/v1/runner/results", input, leaseContext(input));
+  }
+  async uploadArtifact(uploadUrl, filePath, maximumBytes) {
+    const url2 = normalizeUploadUrl(uploadUrl);
+    const content = await (0, import_promises23.readFile)(filePath);
+    if (content.byteLength !== maximumBytes) {
+      throw new Error(`artifact size changed before upload: expected ${maximumBytes}, received ${content.byteLength}`);
+    }
+    const response = await this.fetchImpl(url2, {
+      method: "PUT",
+      redirect: "error",
+      headers: {
+        "content-type": "application/octet-stream",
+        "content-length": String(content.byteLength)
+      },
+      body: content,
+      signal: AbortSignal.timeout(this.requestTimeoutMs)
+    });
+    const body = await boundedResponseText(response);
+    if (!response.ok) {
+      throw new RunnerControlPlaneError(`artifact upload failed with HTTP ${response.status}`, response.status, body);
+    }
+  }
+  async signedJson(path66, value, context = {}) {
+    const target = new URL(path66, this.baseUrl);
+    if (target.origin !== this.baseUrl.origin) {
+      throw new Error("runner request path escaped the configured control-plane origin");
+    }
+    const body = JSON.stringify(value);
+    const timestamp = Math.floor(this.now().valueOf() / 1e3);
+    const nonce = this.nonce();
+    const canonicalPath = `${target.pathname}${target.search}`;
+    const signature = signRunnerRequest({
+      method: "POST",
+      path: canonicalPath,
+      timestamp,
+      nonce,
+      workerClass: "self_hosted",
+      runnerId: this.runnerId,
+      body,
+      privateKey: this.privateKey,
+      ...context
+    });
+    const response = await this.fetchImpl(target, {
+      method: "POST",
+      redirect: "error",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(Buffer.byteLength(body, "utf8")),
+        [runnerProtocolHeaderNames.protocolVersion]: "1",
+        [runnerProtocolHeaderNames.algorithm]: "ed25519",
+        [runnerProtocolHeaderNames.workerClass]: "self_hosted",
+        [runnerProtocolHeaderNames.runnerId]: this.runnerId,
+        [runnerProtocolHeaderNames.timestamp]: String(timestamp),
+        [runnerProtocolHeaderNames.nonce]: nonce,
+        [runnerProtocolHeaderNames.signature]: signature
+      },
+      body,
+      signal: AbortSignal.timeout(this.requestTimeoutMs)
+    });
+    const responseBody = await boundedResponseText(response);
+    if (!response.ok) {
+      throw new RunnerControlPlaneError(
+        `runner control-plane request failed with HTTP ${response.status}`,
+        response.status,
+        responseBody
+      );
+    }
+    if (responseBody.length === 0) return {};
+    try {
+      return JSON.parse(responseBody);
+    } catch {
+      throw new RunnerControlPlaneError(
+        "runner control-plane response was not valid JSON",
+        response.status,
+        responseBody
+      );
+    }
+  }
+};
+async function activateRunner(input) {
+  const baseUrl = normalizeControlPlaneUrl(input.baseUrl);
+  const fetchImpl = input.fetch ?? fetch;
+  const requestTimeoutMs = positiveInteger4(input.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
+  const body = JSON.stringify({
+    protocolVersion: 1,
+    enrollmentToken: input.enrollmentToken,
+    algorithm: "ed25519",
+    publicKey: input.publicKey,
+    capabilities: [...input.capabilities]
+  });
+  const response = await fetchImpl(new URL("/api/v1/runner/registrations/activate", baseUrl), {
+    method: "POST",
+    redirect: "error",
+    headers: {
+      "content-type": "application/json",
+      "content-length": String(Buffer.byteLength(body, "utf8"))
+    },
+    body,
+    signal: AbortSignal.timeout(requestTimeoutMs)
+  });
+  const responseBody = await boundedResponseText(response);
+  if (!response.ok) {
+    throw new RunnerControlPlaneError(
+      `runner activation failed with HTTP ${response.status}`,
+      response.status,
+      responseBody
+    );
+  }
+  try {
+    return runnerRegistrationActivationResponseSchema.parse(JSON.parse(responseBody));
+  } catch {
+    throw new RunnerControlPlaneError("runner activation response was invalid", response.status, responseBody);
+  }
+}
+async function loadRunnerPrivateKey(filePath) {
+  return (0, import_node_crypto12.createPrivateKey)(await (0, import_promises23.readFile)(filePath, "utf8"));
+}
+function normalizeControlPlaneUrl(value) {
+  let url2;
+  try {
+    url2 = new URL(value);
+  } catch {
+    throw new Error("runner control-plane URL is invalid");
+  }
+  if (url2.username || url2.password || url2.search || url2.hash) {
+    throw new Error("runner control-plane URL cannot include credentials, a query, or a fragment");
+  }
+  if (url2.pathname !== "/" && url2.pathname !== "") {
+    throw new Error("runner control-plane URL must be an origin without a path");
+  }
+  if (url2.protocol !== "https:" && !(url2.protocol === "http:" && isLoopbackHost(url2.hostname))) {
+    throw new Error("runner control-plane URL must use HTTPS; HTTP is allowed only for loopback testing");
+  }
+  url2.pathname = "/";
+  return url2;
+}
+function normalizeUploadUrl(value) {
+  let url2;
+  try {
+    url2 = new URL(value);
+  } catch {
+    throw new Error("artifact upload URL is invalid");
+  }
+  if (url2.username || url2.password || url2.hash || url2.protocol !== "https:") {
+    throw new Error("artifact upload URL must be credential-free HTTPS");
+  }
+  return url2;
+}
+function isLoopbackHost(hostname3) {
+  return hostname3 === "localhost" || hostname3 === "127.0.0.1" || hostname3 === "[::1]" || hostname3 === "::1";
+}
+function leaseContext(input) {
+  return {
+    runId: input.runId,
+    executionAttemptId: input.executionAttemptId,
+    leaseId: input.leaseId
+  };
+}
+async function boundedResponseText(response) {
+  const declaredLength = response.headers.get("content-length");
+  if (declaredLength && /^\d+$/u.test(declaredLength) && Number(declaredLength) > responseBodyLimitBytes) {
+    throw new Error("runner control-plane response exceeded the maximum permitted size");
+  }
+  const body = await response.text();
+  if (Buffer.byteLength(body, "utf8") > responseBodyLimitBytes) {
+    throw new Error("runner control-plane response exceeded the maximum permitted size");
+  }
+  return body;
+}
+function positiveInteger4(value, name) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+// src/runner/identity.ts
+var privateKeyName = "runner-private-key.pem";
+var publicKeyName = "runner-public-key.pem";
+var identityFileName = "runner.json";
+function defaultRunnerIdentityDirectory() {
+  return import_node_path60.default.join(import_node_os5.default.homedir(), ".config", "boardreadyops", "runner");
+}
+async function activateRunnerIdentity(options) {
+  const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
+  const enrollmentTokenFile = import_node_path60.default.resolve(options.enrollmentTokenFile);
+  await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
+  const enrollmentToken = (await (0, import_promises24.readFile)(enrollmentTokenFile, "utf8")).trim();
+  if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
+    throw new Error("runner enrollment token file does not contain a valid enrollment token");
+  }
+  const capabilities = normalizeCapabilities(options.capabilities ?? []);
+  const labels = normalizeCapabilities(options.labels ?? []);
+  const identityDirectory = import_node_path60.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
+  await prepareIdentityDirectory(identityDirectory);
+  const identityFile = import_node_path60.default.join(identityDirectory, identityFileName);
+  const privateKeyFile = import_node_path60.default.join(identityDirectory, privateKeyName);
+  const publicKeyFile = import_node_path60.default.join(identityDirectory, publicKeyName);
+  await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
+  const generated = (0, import_node_crypto13.generateKeyPairSync)("ed25519");
+  const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const activated = await activateRunner({
+    baseUrl: controlPlaneUrl,
+    enrollmentToken,
+    publicKey,
+    capabilities,
+    ...options.fetch === void 0 ? {} : { fetch: options.fetch }
+  });
+  const activatedAt = (options.now ?? (() => /* @__PURE__ */ new Date()))().toISOString();
+  const identity = {
+    version: 1,
+    controlPlaneUrl,
+    runnerId: activated.registrationId,
+    workerClass: "self_hosted",
+    privateKeyFile: privateKeyName,
+    publicKeyFile: publicKeyName,
+    capabilities,
+    labels,
+    activatedAt
+  };
+  const written = [];
+  try {
+    await writeExclusive(privateKeyFile, privateKey, 384);
+    written.push(privateKeyFile);
+    await writeExclusive(publicKeyFile, publicKey, 384);
+    written.push(publicKeyFile);
+    await writeExclusive(identityFile, `${JSON.stringify(identity, null, 2)}
+`, 384);
+    written.push(identityFile);
+  } catch (error51) {
+    await Promise.all(written.map((file2) => (0, import_promises24.unlink)(file2).catch(() => void 0)));
+    throw error51;
+  }
+  return {
+    identityFile,
+    privateKeyFile,
+    publicKeyFile,
+    runnerId: activated.registrationId,
+    status: activated.status
+  };
+}
+async function loadRunnerIdentity(identityFileInput) {
+  const identityFile = import_node_path60.default.resolve(identityFileInput);
+  await assertPrivateDirectory(import_node_path60.default.dirname(identityFile), "runner identity directory");
+  await assertPrivateFile2(identityFile, "runner identity file");
+  let value;
+  try {
+    value = JSON.parse(await (0, import_promises24.readFile)(identityFile, "utf8"));
+  } catch {
+    throw new Error("runner identity file is not valid JSON");
+  }
+  const identity = parseIdentity(value);
+  const directory = import_node_path60.default.dirname(identityFile);
+  const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
+  const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
+  await assertPrivateFile2(privateKeyPath, "runner private key file");
+  await assertPrivateFile2(publicKeyPath, "runner public key file");
+  await loadRunnerPrivateKey(privateKeyPath);
+  return {
+    ...identity,
+    identityFile,
+    privateKeyPath,
+    publicKeyPath
+  };
+}
+function parseIdentity(value) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("runner identity file must contain an object");
+  }
+  const record2 = value;
+  if (record2.version !== 1 || record2.workerClass !== "self_hosted") {
+    throw new Error("runner identity file has an unsupported version or worker class");
+  }
+  const runnerId = runnerIdentifierSchema.safeParse(record2.runnerId);
+  if (!runnerId.success) throw new Error("runner identity file contains an invalid runner id");
+  const controlPlaneUrl = typeof record2.controlPlaneUrl === "string" ? normalizeControlPlaneUrl(record2.controlPlaneUrl).origin : void 0;
+  if (!controlPlaneUrl) throw new Error("runner identity file contains an invalid control-plane URL");
+  const privateKeyFile = relativeFile(record2.privateKeyFile, "privateKeyFile");
+  const publicKeyFile = relativeFile(record2.publicKeyFile, "publicKeyFile");
+  const capabilities = normalizeCapabilities(arrayOfStrings(record2.capabilities, "capabilities"));
+  const labels = normalizeCapabilities(arrayOfStrings(record2.labels, "labels"));
+  if (typeof record2.activatedAt !== "string" || Number.isNaN(Date.parse(record2.activatedAt))) {
+    throw new TypeError("runner identity file contains an invalid activation timestamp");
+  }
+  return {
+    version: 1,
+    controlPlaneUrl,
+    runnerId: runnerId.data,
+    workerClass: "self_hosted",
+    privateKeyFile,
+    publicKeyFile,
+    capabilities,
+    labels,
+    activatedAt: new Date(record2.activatedAt).toISOString()
+  };
+}
+function arrayOfStrings(value, name) {
+  if (!Array.isArray(value) || value.some((item2) => typeof item2 !== "string")) {
+    throw new Error(`runner identity ${name} must be an array of strings`);
+  }
+  return value;
+}
+function normalizeCapabilities(values) {
+  const normalized = Array.from(new Set(values.map((value) => runnerCapabilitySchema.parse(value)))).sort(
+    (left, right) => left.localeCompare(right)
+  );
+  if (normalized.length > 64) throw new Error("runner identity may declare at most 64 capabilities or labels");
+  return normalized;
+}
+function relativeFile(value, name) {
+  if (typeof value !== "string" || value.length < 1 || import_node_path60.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
+    throw new Error(`runner identity ${name} must be a relative file within the identity directory`);
+  }
+  return value;
+}
+function resolveIdentityChild(directory, relative, name) {
+  const resolved = import_node_path60.default.resolve(directory, relative);
+  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path60.default.sep}`)) {
+    throw new Error(`runner identity ${name} escapes the identity directory`);
+  }
+  return resolved;
+}
+async function prepareIdentityDirectory(directory) {
+  const existing = await (0, import_promises24.lstat)(directory).catch(() => void 0);
+  if (existing && (existing.isSymbolicLink() || !existing.isDirectory())) {
+    throw new Error(`runner identity directory is not a directory: ${directory}`);
+  }
+  if (!existing) {
+    await (0, import_promises24.mkdir)(directory, { recursive: true, mode: 448 });
+  }
+  if (process.platform !== "win32") await (0, import_promises24.chmod)(directory, 448);
+}
+async function assertPrivateDirectory(directory, label) {
+  const info = await (0, import_promises24.lstat)(directory).catch(() => void 0);
+  if (!info?.isDirectory() || info.isSymbolicLink()) {
+    throw new Error(`${label} does not exist or is not a regular directory`);
+  }
+  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
+    throw new Error(`${label} must not be accessible by group or other users`);
+  }
+}
+async function assertPrivateFile2(filePath, label) {
+  const info = await (0, import_promises24.lstat)(filePath).catch(() => void 0);
+  if (!info?.isFile() || info.isSymbolicLink()) throw new Error(`${label} does not exist or is not a regular file`);
+  if (process.platform !== "win32" && (info.mode & 63) !== 0) {
+    throw new Error(`${label} must not be readable or writable by group or other users`);
+  }
+}
+async function assertTargetsDoNotExist(files) {
+  for (const file2 of files) {
+    if (await (0, import_promises24.lstat)(file2).catch(() => void 0)) {
+      throw new Error(`refusing to overwrite existing runner identity material: ${file2}`);
+    }
+  }
+}
+async function writeExclusive(filePath, content, mode) {
+  await (0, import_promises24.writeFile)(filePath, content, { encoding: "utf8", flag: "wx", mode });
+  if (process.platform !== "win32") await (0, import_promises24.chmod)(filePath, mode);
+}
+
+// src/runner/worker.ts
+var import_promises26 = require("node:fs/promises");
+var import_node_os6 = __toESM(require("node:os"), 1);
+var import_node_path62 = __toESM(require("node:path"), 1);
+
+// src/runner/source.ts
+var import_node_child_process5 = require("node:child_process");
+var import_promises25 = require("node:fs/promises");
+var import_node_path61 = __toESM(require("node:path"), 1);
+var maximumCommandOutputBytes = 1024 * 1024;
+async function checkoutRunnerSource(options) {
+  if (options.job.sourceMode !== "customer_checkout") {
+    throw new Error("self-hosted runners accept only customer_checkout source assignments");
+  }
+  const workspaceRoot = import_node_path61.default.resolve(options.workspaceRoot);
+  await (0, import_promises25.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
+  if (process.platform !== "win32") await (0, import_promises25.chmod)(workspaceRoot, 448);
+  const workspace = await (0, import_promises25.mkdtemp)(import_node_path61.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  if (process.platform !== "win32") await (0, import_promises25.chmod)(workspace, 448);
+  const execute = options.execute ?? executeRunnerCommand;
+  const environment = sanitizedGitEnvironment(process.env);
+  const repository = repositoryRemote(options.job, options.repositoryMirrorRoot);
+  const git = async (args) => await execute("git", ["-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", ...args], {
+    cwd: workspace,
+    env: environment
+  });
+  try {
+    await git(["init", "--quiet"]);
+    await git(["remote", "add", "origin", repository]);
+    await git(["fetch", "--quiet", "--no-tags", "--depth=1", "origin", options.job.repository.commitSha]);
+    await git(["checkout", "--quiet", "--detach", "FETCH_HEAD"]);
+    const resolved = (await git(["rev-parse", "HEAD"])).stdout.trim();
+    if (resolved !== options.job.repository.commitSha) {
+      throw new Error(`checked-out commit did not match the assigned commit: ${resolved}`);
+    }
+    await git(["remote", "remove", "origin"]);
+    return workspace;
+  } catch (error51) {
+    await (0, import_promises25.rm)(workspace, { recursive: true, force: true });
+    throw error51;
+  }
+}
+async function executeRunnerCommand(command, args, options) {
+  return await new Promise((resolve, reject) => {
+    const child = (0, import_node_child_process5.spawn)(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    let outputBytes = 0;
+    let outputExceeded = false;
+    const collect3 = (current, chunk) => {
+      outputBytes += Buffer.byteLength(chunk, "utf8");
+      if (outputBytes > maximumCommandOutputBytes) {
+        outputExceeded = true;
+        child.kill("SIGKILL");
+        return current;
+      }
+      return `${current}${chunk}`;
+    };
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout = collect3(stdout, chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr = collect3(stderr, chunk);
+    });
+    child.once("error", reject);
+    child.once("close", (code, signal) => {
+      const result = { stdout, stderr };
+      if (outputExceeded) {
+        reject(new Error(`${command} output exceeded ${maximumCommandOutputBytes} bytes`));
+        return;
+      }
+      if (code !== 0) {
+        const detail = result.stderr.trim() || result.stdout.trim();
+        const termination = signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`;
+        const detailSuffix = detail ? `: ${detail}` : "";
+        reject(new Error(`${command} ${args.join(" ")} failed with ${termination}${detailSuffix}`));
+        return;
+      }
+      resolve(result);
+    });
+  });
+}
+function repositoryRemote(job, repositoryMirrorRoot) {
+  if (!repositoryMirrorRoot) {
+    return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
+  }
+  const root = import_node_path61.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path61.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path61.default.sep}`)) {
+    throw new Error("repository mirror path escaped the configured mirror root");
+  }
+  return candidate;
+}
+function sanitizedGitEnvironment(environment) {
+  const sanitized = { ...environment, GIT_TERMINAL_PROMPT: "0" };
+  for (const name of [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_PREFIX"
+  ]) {
+    delete sanitized[name];
+  }
+  return sanitized;
+}
+
+// src/runner/worker.ts
+var defaultDependencies2 = {
+  loadIdentity: loadRunnerIdentity,
+  loadPrivateKey: loadRunnerPrivateKey,
+  createClient: (identity, privateKey) => new RunnerControlPlaneClient({
+    baseUrl: identity.controlPlaneUrl,
+    runnerId: identity.runnerId,
+    privateKey
+  }),
+  checkoutSource: checkoutRunnerSource,
+  executePipeline: async () => {
+    throw new Error("runner execution pipeline adapter is not configured");
+  },
+  removeWorkspace: async (workspace) => await (0, import_promises26.rm)(workspace, { recursive: true, force: true }),
+  sleep: abortableSleep,
+  log: () => void 0
+};
+function defaultRunnerWorkspaceRoot() {
+  return import_node_path62.default.join(import_node_os6.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
+}
+async function runRunnerWorkerOnce(options, overrides = {}) {
+  const dependencies = { ...defaultDependencies2, ...overrides };
+  const identity = await dependencies.loadIdentity(options.identityFile);
+  const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
+  const client = dependencies.createClient(identity, privateKey);
+  const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
+  const workspaceRoot = import_node_path62.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  const claim = await client.claim({
+    protocolVersion: 1,
+    workerClass: "self_hosted",
+    capabilities: identity.capabilities,
+    labels: identity.labels
+  });
+  if (claim.status === "empty") {
+    dependencies.log("runner.claim.empty", { retry_after_seconds: claim.retryAfterSeconds });
+    return { status: "empty", retryAfterSeconds: claim.retryAfterSeconds };
+  }
+  const job = claim.job;
+  dependencies.log("runner.claim.accepted", {
+    run_id: job.runId,
+    execution_attempt_id: job.executionAttemptId,
+    repository: `${job.repository.owner}/${job.repository.name}`,
+    private: job.repository.private,
+    source_mode: job.sourceMode
+  });
+  if (job.sourceMode !== "customer_checkout") {
+    await bestEffortRelinquish(
+      client,
+      job,
+      "job_error",
+      "Self-hosted runner refused a non-customer checkout assignment."
+    );
+    throw new Error("self-hosted runner received a source assignment that would cross the managed source boundary");
+  }
+  if (options.signal?.aborted) {
+    await bestEffortRelinquish(client, job, "shutdown", "Runner stopped before source checkout.");
+    throw new Error("runner shutdown requested before job execution");
+  }
+  let workspace;
+  let terminalPublished = false;
+  const heartbeat = createHeartbeatController(client, job, heartbeatSeconds, dependencies.log);
+  try {
+    heartbeat.setStage("preparing_source");
+    await heartbeat.pulse();
+    workspace = await dependencies.checkoutSource({
+      job,
+      workspaceRoot,
+      ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: options.repositoryMirrorRoot }
+    });
+    if (options.signal?.aborted) throw new RunnerShutdownError();
+    heartbeat.setStage("running");
+    await heartbeat.pulse();
+    heartbeat.start();
+    const execution = await dependencies.executePipeline(workspace, job, {
+      requireKicad: options.requireKicad ?? true
+    });
+    if (options.signal?.aborted) throw new RunnerShutdownError();
+    heartbeat.assertLeaseActive();
+    heartbeat.setStage("uploading_artifacts");
+    await heartbeat.pulse();
+    const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
+    heartbeat.assertLeaseActive();
+    heartbeat.setStage("reporting");
+    await heartbeat.pulse();
+    const result = terminalResultFromExecution(job, execution, uploadedArtifacts);
+    const request = {
+      protocolVersion: 1,
+      runId: job.runId,
+      executionAttemptId: job.executionAttemptId,
+      leaseId: job.leaseId,
+      leaseToken: job.leaseToken,
+      result
+    };
+    await client.publishTerminalResult(request);
+    terminalPublished = true;
+    dependencies.log("runner.result.published", {
+      run_id: job.runId,
+      execution_attempt_id: job.executionAttemptId,
+      decision: result.decision,
+      artifacts: result.artifacts.length,
+      findings: result.findings.length
+    });
+    return {
+      status: "completed",
+      runId: job.runId,
+      executionAttemptId: job.executionAttemptId,
+      decision: result.decision ?? "error"
+    };
+  } catch (error51) {
+    if (!terminalPublished) {
+      const reason = error51 instanceof RunnerShutdownError ? "shutdown" : "job_error";
+      await bestEffortRelinquish(client, job, reason, sanitizedErrorMessage(error51));
+    }
+    throw error51;
+  } finally {
+    await heartbeat.stop();
+    if (workspace && options.keepWorkspace !== true) {
+      await dependencies.removeWorkspace(workspace);
+    }
+  }
+}
+async function serveRunnerWorker(options, overrides = {}) {
+  const dependencies = { ...defaultDependencies2, ...overrides };
+  const pollSeconds = boundedSeconds(options.pollSeconds ?? 15, "pollSeconds", 1, 300);
+  await dependencies.loadIdentity(options.identityFile);
+  while (!options.signal?.aborted) {
+    try {
+      const result = await runRunnerWorkerOnce(options, dependencies);
+      if (result.status === "empty") {
+        await dependencies.sleep(Math.max(pollSeconds, result.retryAfterSeconds) * 1e3, options.signal);
+      }
+    } catch (error51) {
+      if (options.signal?.aborted || error51 instanceof RunnerShutdownError) return;
+      dependencies.log("runner.loop.error", { error: sanitizedErrorMessage(error51) });
+      await dependencies.sleep(pollSeconds * 1e3, options.signal).catch(() => void 0);
+    }
+  }
+}
+function createHeartbeatController(client, job, heartbeatSeconds, log) {
+  let stage = "claimed";
+  let timer;
+  let inFlight = Promise.resolve();
+  let leaseLost;
+  const pulse = async () => {
+    inFlight = inFlight.then(async () => {
+      if (leaseLost) return;
+      try {
+        const response = await client.heartbeat({
+          protocolVersion: 1,
+          runId: job.runId,
+          executionAttemptId: job.executionAttemptId,
+          leaseId: job.leaseId,
+          leaseToken: job.leaseToken,
+          stage
+        });
+        if (response.status !== "active") {
+          leaseLost = response.status;
+          log("runner.lease.closed", { run_id: job.runId, status: response.status });
+        }
+      } catch (error51) {
+        log("runner.heartbeat.error", { run_id: job.runId, error: sanitizedErrorMessage(error51) });
+      }
+    });
+    await inFlight;
+  };
+  return {
+    setStage(value) {
+      stage = value;
+    },
+    pulse,
+    start() {
+      if (timer) return;
+      timer = setInterval(() => void pulse(), heartbeatSeconds * 1e3);
+      timer.unref?.();
+    },
+    assertLeaseActive() {
+      if (leaseLost) throw new Error(`runner lease is no longer active: ${leaseLost}`);
+    },
+    async stop() {
+      if (timer) clearInterval(timer);
+      timer = void 0;
+      await inFlight;
+    }
+  };
+}
+async function publishArtifacts(client, job, artifacts) {
+  if (artifacts.length === 0) return [];
+  const request = {
+    protocolVersion: 1,
+    runId: job.runId,
+    executionAttemptId: job.executionAttemptId,
+    leaseId: job.leaseId,
+    leaseToken: job.leaseToken,
+    artifacts: artifacts.map((artifact) => ({
+      kind: artifact.kind,
+      name: artifact.name,
+      role: artifact.role,
+      bytes: artifact.bytes,
+      sha256: artifact.sha256
+    }))
+  };
+  const capabilities = await client.issueArtifactCapabilities(request);
+  if (capabilities.uploads.length !== artifacts.length) {
+    throw new Error("artifact capability response did not match the artifact declaration count");
+  }
+  const published = [];
+  for (const [index, artifact] of artifacts.entries()) {
+    const capability = capabilities.uploads[index];
+    if (capability?.maximumBytes !== artifact.bytes) {
+      throw new Error("artifact capability did not match the declared artifact size");
+    }
+    await client.uploadArtifact(capability.uploadUrl, artifact.filePath, capability.maximumBytes);
+    published.push({
+      kind: artifact.kind,
+      name: artifact.name,
+      role: artifact.role,
+      bytes: artifact.bytes,
+      sha256: artifact.sha256,
+      storagePath: capability.storagePath
+    });
+  }
+  return published;
+}
+function terminalResultFromExecution(job, execution, artifacts) {
+  const completed = execution.exitCode === 0 || execution.exitCode === 1;
+  const decision = decisionFromExitCode(execution.exitCode);
+  const findings = execution.report ? execution.report.findings.slice(0, 500).map((finding2) => ({
+    ruleId: finding2.ruleId.slice(0, 256),
+    severity: finding2.severity === "critical" ? "error" : finding2.severity,
+    message: finding2.message.slice(0, 4e3),
+    ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {}
+  })) : [
+    {
+      ruleId: "runner.execution",
+      severity: "error",
+      message: `BoardReadyOps runner exited with code ${execution.exitCode} before producing a result report.`
+    }
+  ];
+  const summary = execution.report?.summary;
+  return releaseRunResultSchema.parse({
+    version: 1,
+    executionAttemptId: job.executionAttemptId,
+    status: completed ? "completed" : "failed",
+    decision,
+    findings,
+    artifacts,
+    metrics: {
+      exit_code: execution.exitCode,
+      findings_total: summary?.total ?? findings.length,
+      findings_critical: summary?.critical ?? 0,
+      findings_high: summary?.high ?? 0,
+      findings_medium: summary?.medium ?? 0,
+      findings_low: summary?.low ?? 0,
+      findings_info: summary?.info ?? 0
+    },
+    reportLinks: []
+  });
+}
+async function bestEffortRelinquish(client, job, reason, message) {
+  await client.relinquish({
+    protocolVersion: 1,
+    runId: job.runId,
+    executionAttemptId: job.executionAttemptId,
+    leaseId: job.leaseId,
+    leaseToken: job.leaseToken,
+    reason,
+    message: message.slice(0, 1e3)
+  }).catch(() => void 0);
+}
+function boundedSeconds(value, name, minimum, maximum) {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer from ${minimum} through ${maximum}`);
+  }
+  return value;
+}
+function decisionFromExitCode(exitCode) {
+  if (exitCode === 0) return "pass";
+  if (exitCode === 1) return "fail";
+  return "error";
+}
+function sanitizedErrorMessage(error51) {
+  const message = error51 instanceof Error ? error51.message : String(error51);
+  const sanitized = Array.from(message, (character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code < 32 || code === 127 ? " " : character;
+  }).join("");
+  return sanitized.slice(0, 1e3) || "Runner job failed.";
+}
+async function abortableSleep(milliseconds, signal) {
+  if (signal?.aborted) throw new RunnerShutdownError();
+  await new Promise((resolve, reject) => {
+    const cleanup = () => signal?.removeEventListener("abort", abort);
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, milliseconds);
+    const abort = () => {
+      clearTimeout(timer);
+      cleanup();
+      reject(new RunnerShutdownError());
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
+}
+var RunnerShutdownError = class extends Error {
+  constructor() {
+    super("runner shutdown requested");
+    this.name = "RunnerShutdownError";
+  }
+};
+
+// src/cli/runner-pipeline.ts
+var import_node_crypto14 = require("node:crypto");
+var import_promises27 = require("node:fs/promises");
+var import_node_path63 = __toESM(require("node:path"), 1);
+var import_node_stream = require("node:stream");
+async function executeRunnerPipeline(workspace, job, options) {
+  const relativeOutputDirectory = import_node_path63.default.join(".boardreadyops-runner", job.executionAttemptId);
+  const outputDirectory2 = import_node_path63.default.join(workspace, relativeOutputDirectory);
+  await (0, import_promises27.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
+  const targets = [
+    {
+      kind: "report/json",
+      name: "boardreadyops-result.json",
+      role: "primary",
+      relative: import_node_path63.default.join(relativeOutputDirectory, "result.json")
+    },
+    {
+      kind: "report/sarif",
+      name: "boardreadyops-result.sarif",
+      role: "sarif",
+      relative: import_node_path63.default.join(relativeOutputDirectory, "result.sarif")
+    },
+    {
+      kind: "report/markdown",
+      name: "boardreadyops-result.md",
+      role: "summary",
+      relative: import_node_path63.default.join(relativeOutputDirectory, "result.md")
+    }
+  ];
+  const output = new import_node_stream.Writable({ write: (_chunk, _encoding, callback) => callback() });
+  const exitCode = await runCommand(
+    workspace,
+    {
+      mode: "enforce",
+      requireKicad: options.requireKicad,
+      failOn: "high",
+      json: targets[0].relative,
+      sarif: targets[1].relative,
+      markdown: targets[2].relative,
+      annotations: false,
+      quiet: true,
+      color: "never",
+      logLevel: "silent"
+    },
+    { stdout: output, stderr: output },
+    "runner"
+  );
+  const report = await readRunReport(import_node_path63.default.join(workspace, targets[0].relative));
+  const runnerReport = report ? {
+    summary: {
+      total: report.summary.total,
+      critical: report.summary.critical,
+      high: report.summary.high,
+      medium: report.summary.medium,
+      low: report.summary.low,
+      info: report.summary.info
+    },
+    findings: report.findings.map((finding2) => ({
+      ruleId: finding2.ruleId,
+      severity: finding2.severity,
+      message: finding2.message,
+      resource: {
+        ...finding2.resource.path === void 0 ? {} : { path: finding2.resource.path }
+      }
+    }))
+  } : void 0;
+  const artifacts = [];
+  for (const target of targets) {
+    const filePath = import_node_path63.default.join(workspace, target.relative);
+    const artifact = await runnerArtifact(filePath, target.kind, target.name, target.role).catch(() => void 0);
+    if (artifact) artifacts.push(artifact);
+  }
+  return {
+    exitCode,
+    ...runnerReport === void 0 ? {} : { report: runnerReport },
+    artifacts
+  };
+}
+async function runnerArtifact(filePath, kind, name, role) {
+  const info = await (0, import_promises27.stat)(filePath);
+  if (!info.isFile() || info.size > 2147483647) throw new Error(`runner artifact is invalid: ${filePath}`);
+  const content = await (0, import_promises27.readFile)(filePath);
+  return {
+    kind,
+    name,
+    role,
+    filePath,
+    bytes: content.byteLength,
+    sha256: (0, import_node_crypto14.createHash)("sha256").update(content).digest("hex")
+  };
+}
+async function readRunReport(filePath) {
+  try {
+    const value = JSON.parse(await (0, import_promises27.readFile)(filePath, "utf8"));
+    return value.schemaVersion === 1 && value.tool?.name === "boardreadyops" && Array.isArray(value.findings) ? value : void 0;
+  } catch {
+    return void 0;
+  }
+}
+
+// src/cli/commands/runner.ts
+async function runnerIssueEnrollmentCommand(options, streams) {
+  try {
+    const issued = await issueRunnerEnrollment({
+      databaseUrlFile: import_node_path64.default.resolve(options.databaseUrlFile),
+      installationId: options.installationId,
+      name: options.name,
+      scope: options.scope,
+      allowedRepositories: options.repository ?? [],
+      tokenOutputFile: import_node_path64.default.resolve(options.tokenOutput),
+      ...options.ttlSeconds === void 0 ? {} : { ttlSeconds: options.ttlSeconds }
+    });
+    writeRunnerOutput(
+      streams.stdout,
+      options.format,
+      {
+        status: "accepted",
+        registrationId: issued.registrationId,
+        expiresAt: issued.expiresAt,
+        tokenOutputFile: issued.tokenOutputFile
+      },
+      `Enrollment ${issued.registrationId} expires at ${issued.expiresAt}; token written to ${issued.tokenOutputFile}.`
+    );
+    return 0;
+  } catch (error51) {
+    streams.stderr.write(`Runner enrollment issuance failed: ${safeMessage(error51)}
+`);
+    return 4;
+  }
+}
+async function runnerActivateCommand(options, streams) {
+  try {
+    const activated = await activateRunnerIdentity({
+      controlPlaneUrl: options.url,
+      enrollmentTokenFile: import_node_path64.default.resolve(options.enrollmentTokenFile),
+      identityDirectory: import_node_path64.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
+      capabilities: options.capability ?? [],
+      labels: options.label ?? []
+    });
+    writeRunnerOutput(
+      streams.stdout,
+      options.format,
+      {
+        status: activated.status,
+        runnerId: activated.runnerId,
+        identityFile: activated.identityFile,
+        privateKeyFile: activated.privateKeyFile,
+        publicKeyFile: activated.publicKeyFile
+      },
+      `Runner ${activated.runnerId} ${activated.status}; identity written to ${activated.identityFile}.`
+    );
+    return 0;
+  } catch (error51) {
+    streams.stderr.write(`Runner activation failed: ${safeMessage(error51)}
+`);
+    return 4;
+  }
+}
+async function runnerOnceCommand(options, streams) {
+  try {
+    const result = await runRunnerWorkerOnce(workerOptions(options), {
+      executePipeline: executeRunnerPipeline,
+      log: createRunnerLogger(streams.stderr, options.format)
+    });
+    writeRunnerOutput(
+      streams.stdout,
+      options.format,
+      result,
+      result.status === "empty" ? `No runner job was available; retry after ${result.retryAfterSeconds}s.` : `Runner completed ${result.runId}/${result.executionAttemptId} with decision ${result.decision}.`
+    );
+    return 0;
+  } catch (error51) {
+    streams.stderr.write(`Runner job failed: ${safeMessage(error51)}
+`);
+    return 4;
+  }
+}
+async function runnerServeCommand(options, streams) {
+  const abort = new AbortController();
+  const stop = () => abort.abort();
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
+  try {
+    writeRunnerOutput(
+      streams.stdout,
+      options.format,
+      { status: "started", identityFile: identityPath(options), workspaceRoot: workspacePath(options) },
+      `Runner service started with identity ${identityPath(options)}.`
+    );
+    await serveRunnerWorker(
+      {
+        ...workerOptions(options),
+        signal: abort.signal
+      },
+      {
+        executePipeline: executeRunnerPipeline,
+        log: createRunnerLogger(streams.stderr, options.format)
+      }
+    );
+    writeRunnerOutput(streams.stdout, options.format, { status: "stopped" }, "Runner service stopped.");
+    return 0;
+  } catch (error51) {
+    streams.stderr.write(`Runner service failed: ${safeMessage(error51)}
+`);
+    return 4;
+  } finally {
+    process.off("SIGINT", stop);
+    process.off("SIGTERM", stop);
+  }
+}
+function workerOptions(options) {
+  return {
+    identityFile: identityPath(options),
+    workspaceRoot: workspacePath(options),
+    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path64.default.resolve(options.repositoryMirrorRoot) },
+    ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },
+    ...options.pollSeconds === void 0 ? {} : { pollSeconds: options.pollSeconds },
+    requireKicad: options.requireKicad ?? true,
+    keepWorkspace: options.keepWorkspace ?? false
+  };
+}
+function identityPath(options) {
+  return import_node_path64.default.resolve(options.identity ?? import_node_path64.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
+}
+function workspacePath(options) {
+  return import_node_path64.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+}
+function createRunnerLogger(stream, format) {
+  return (event, fields = {}) => {
+    if (format === "json") {
+      stream.write(`${JSON.stringify({ ts: (/* @__PURE__ */ new Date()).toISOString(), event, ...fields })}
+`);
+      return;
+    }
+    const detail = Object.keys(fields).length === 0 ? "" : ` ${JSON.stringify(fields)}`;
+    stream.write(`[runner] ${event}${detail}
+`);
+  };
+}
+function writeRunnerOutput(stream, format, value, text) {
+  stream.write(format === "json" ? `${JSON.stringify(value)}
+` : `${text}
+`);
+}
+function safeMessage(error51) {
+  const message = error51 instanceof Error ? error51.message : String(error51);
+  return Array.from(message, (character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code < 32 || code === 127 ? " " : character;
+  }).join("").slice(0, 1e3);
+}
+
+// src/cli/commands/sbom.ts
+var import_node_path65 = __toESM(require("node:path"), 1);
 
 // src/report/hbom.ts
 function formatHbom(result) {
@@ -52922,7 +54820,7 @@ async function sbomCommand(pathInput, options, streams) {
     return 2;
   }
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path59.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path65.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     for (const error51 of loaded.errors) {
@@ -52956,7 +54854,7 @@ async function writeHbom(root, output, content, stdout) {
     stdout.write(content);
     return;
   }
-  await writeTextFile(import_node_path59.default.resolve(root, normalizePathInput(output)), content);
+  await writeTextFile(import_node_path65.default.resolve(root, normalizePathInput(output)), content);
 }
 
 // schemas/agent-plan.schema.json
@@ -54481,6 +56379,24 @@ function registerAllCommands(program2, streams) {
   program2.command("init").option("-i, --interactive", "prompt for configuration details").option("--profile <profile>", "configuration profile: basic, ci, manufacturing, strict", "basic").option("--workflow <type>", "generate GitHub Actions workflow (github)").option("--output <path>", "output directory for generated files").option("--force", "overwrite existing files").action(async (options) => {
     process.exitCode = await initCommand(process.cwd(), options, streams);
   });
+  const runner = program2.command("runner").description("operate a customer-controlled self-hosted worker");
+  runner.command("issue-enrollment").description("issue a one-time runner enrollment token from a control-plane database").requiredOption("--database-url-file <path>", "root-readable file containing the PostgreSQL URL").requiredOption("--installation-id <uuid>", "tenant installation UUID").requiredOption("--name <name>", "unique runner registration name").requiredOption("--token-output <path>", "new root-only file for the one-time enrollment token").option("--scope <scope>", "installation, organization, or repository", runnerEnrollmentScope, "installation").option("--repository <owner/name>", "allowed repository for repository scope", collectOption, []).option("--ttl-seconds <seconds>", "token lifetime up to one hour", runnerTtlSeconds).option("--format <format>", "text or json", runnerOutputFormat, "text").action(async (options) => {
+    process.exitCode = await runnerIssueEnrollmentCommand(options, streams);
+  });
+  runner.command("activate").description("activate a runner identity using a one-time enrollment token file").requiredOption("--url <url>", "BoardReadyOps control-plane origin").requiredOption("--enrollment-token-file <path>", "root-readable file containing the one-time token").option("--identity-dir <path>", "directory for the runner identity and Ed25519 keypair").option("--capability <value>", "runner capability selector", collectOption, []).option("--label <value>", "runner claim label", collectOption, []).option("--format <format>", "text or json", runnerOutputFormat, "text").action(async (options) => {
+    process.exitCode = await runnerActivateCommand(options, streams);
+  });
+  const addRunnerWorkOptions = (command) => command.option("--identity <path>", "runner identity JSON file").option("--workspace-root <path>", "private root for ephemeral source workspaces").option("--repository-mirror-root <path>", "customer-controlled bare repository mirror root").option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30).option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15).option("--no-require-kicad", "allow execution without kicad-cli").option("--keep-workspace", "retain the checked-out workspace after completion").option("--format <format>", "text or json", runnerOutputFormat, "text");
+  addRunnerWorkOptions(runner.command("once").description("claim and process at most one runner job")).action(
+    async (options) => {
+      process.exitCode = await runnerOnceCommand(options, streams);
+    }
+  );
+  addRunnerWorkOptions(runner.command("serve").description("poll continuously and process runner jobs")).action(
+    async (options) => {
+      process.exitCode = await runnerServeCommand(options, streams);
+    }
+  );
   const baseline = program2.command("baseline").description("capture and maintain finding baselines");
   addBaselineOptions(baseline.command("capture").argument("[path]", "directory to scan")).action(
     async (pathInput, options) => {
@@ -54507,6 +56423,38 @@ function registerAllCommands(program2, streams) {
       process.exitCode = await pruneBaselineCommand(pathInput, options, streams);
     }
   );
+}
+function runnerSeconds(value) {
+  if (!/^[1-9]\d*$/u.test(value)) {
+    throw new InvalidArgumentError("Runner interval must be a positive integer.");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > 300) {
+    throw new InvalidArgumentError("Runner interval must not exceed 300 seconds.");
+  }
+  return parsed;
+}
+function runnerOutputFormat(value) {
+  if (value !== "text" && value !== "json") {
+    throw new InvalidArgumentError("Runner format must be text or json.");
+  }
+  return value;
+}
+function runnerTtlSeconds(value) {
+  if (!/^[1-9]\d*$/u.test(value)) {
+    throw new InvalidArgumentError("Runner token TTL must be a positive integer.");
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed > 3600) {
+    throw new InvalidArgumentError("Runner token TTL must not exceed 3600 seconds.");
+  }
+  return parsed;
+}
+function runnerEnrollmentScope(value) {
+  if (value !== "installation" && value !== "organization" && value !== "repository") {
+    throw new InvalidArgumentError("Runner enrollment scope must be installation, organization, or repository.");
+  }
+  return value;
 }
 
 // src/cli/index.ts
@@ -54549,6 +56497,7 @@ function rewriteDefaultCommand(argv) {
     "generate",
     "init",
     "baseline",
+    "runner",
     "help"
   ]);
   const first = argv[0];
@@ -54564,7 +56513,7 @@ function isCommanderDisplay(error51) {
   return error51 instanceof Error && "code" in error51 && (error51.code === "commander.helpDisplayed" || error51.code === "commander.version");
 }
 var cliEntry = process.argv.at(1);
-var cliEntryName = cliEntry ? import_node_path60.default.basename(cliEntry) : "";
+var cliEntryName = cliEntry ? import_node_path66.default.basename(cliEntry) : "";
 if (cliEntry && !process.env.VITEST && (cliEntryName === "boardreadyops" || cliEntryName === "index.ts" || cliEntryName === "index.js" || cliEntryName === "index.cjs")) {
   void runCli(process.argv.slice(2)).then((code) => {
     process.exitCode = code;

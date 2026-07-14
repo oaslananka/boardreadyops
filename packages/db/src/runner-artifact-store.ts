@@ -16,6 +16,7 @@ export type IssueRunnerArtifactCapabilitiesInput = RunnerLeaseMutationContext & 
 
 export type IssuedRunnerArtifactCapability = {
   artifactId: string;
+  storagePath: string;
   uploadToken: string;
   expiresAt: string;
   maximumBytes: number;
@@ -286,6 +287,7 @@ export function createSqlRunnerArtifactStore(
         status: "accepted",
         uploads: generated.map((entry) => ({
           artifactId: entry.artifactId,
+          storagePath: entry.storagePath,
           uploadToken: entry.token,
           expiresAt: expiryByArtifactId.get(entry.artifactId) ?? expiresAt.toISOString(),
           maximumBytes: entry.declaration.bytes,
