@@ -46,10 +46,17 @@ Do not run the worker as `root`. Run untrusted repositories in a dedicated VM or
 
 This step runs on a trusted Linux control-plane administration host with database access and the PostgreSQL client installed at `/usr/bin/psql`. The PostgreSQL URL and generated token are read from and written to files, never command-line arguments or stdout.
 
+For the self-hosted cloud deployment, derive the administrative URL from the existing root-only runtime environment without printing credentials:
+
+```bash
+sudo BOARDREADYOPS_ADMIN_DATABASE_HOST=postgres.internal \
+  pnpm run cloud:provision:admin-db-url
+```
+
+The command follows `BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE` (including a symlink to a private regular file), requires the resolved file to have no group/other permissions, percent-encodes the PostgreSQL credentials, and atomically writes `/var/lib/boardreadyops-admin/database-url` with mode `0600`. Set `BOARDREADYOPS_ADMIN_DATABASE_HOST` to a database endpoint reachable from the administration host; the default is `bro-postgres`. The secret value is never written to stdout or command arguments. An external secret manager may instead provision the same root-only URL file directly.
+
 ```bash
 install -d -m 0700 /var/lib/boardreadyops-admin/runner-enrollments
-install -m 0600 /run/secrets/boardreadyops-database-url \
-  /var/lib/boardreadyops-admin/database-url
 
 boardreadyops runner issue-enrollment \
   --database-url-file /var/lib/boardreadyops-admin/database-url \

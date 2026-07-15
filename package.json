@@ -87,7 +87,8 @@
     "cloud:build": "pnpm --filter @boardreadyops/web build && pnpm run verify:web-standalone",
     "verify:web-standalone": "node scripts/verify-web-standalone.mjs",
     "cloud:dev": "pnpm --filter @boardreadyops/web dev",
-    "cloud:deploy:self-hosted": "node scripts/deploy-cloud.mjs"
+    "cloud:deploy:self-hosted": "node scripts/deploy-cloud.mjs",
+    "cloud:provision:admin-db-url": "node scripts/provision-admin-database-url.mjs"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [
