@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync, statSync } from "node:fs";
 import type { GitHubAppLifecycleStore } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { releaseRunIdempotencyKey } from "@boardreadyops/cloud-core/lifecycle-executor";
 
@@ -22,6 +23,9 @@ export type SqlLifecycleStoreOptions = {
 };
 
 export const releaseRepositoryRolloutEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES";
+export const releaseRepositoryRolloutFileEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE";
+
+const maximumReleaseRepositoryRolloutFileBytes = 64 * 1024;
 
 type Environment = Record<string, string | undefined>;
 
@@ -75,7 +79,23 @@ export function parseReleaseRepositoryRolloutPolicy(input: string | undefined): 
   return { repositories };
 }
 
-function releaseRepositoryRolloutPolicyFromEnvironment(env: Environment): ReleaseRepositoryRolloutPolicy {
+function releaseRepositoryRolloutFile(path: string): string | undefined {
+  try {
+    const stats = statSync(path);
+    if (!stats.isFile() || stats.size > maximumReleaseRepositoryRolloutFileBytes) {
+      return undefined;
+    }
+    return readFileSync(path, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+export function releaseRepositoryRolloutPolicyFromEnvironment(env: Environment): ReleaseRepositoryRolloutPolicy {
+  const configuredFile = env[releaseRepositoryRolloutFileEnvName]?.trim();
+  if (configuredFile) {
+    return parseReleaseRepositoryRolloutPolicy(releaseRepositoryRolloutFile(configuredFile));
+  }
   return parseReleaseRepositoryRolloutPolicy(env[releaseRepositoryRolloutEnvName]);
 }
 

@@ -1,3 +1,4 @@
+# Root-relative configuration used by the GitHub-hosted cloud readiness workflow.
 version: 1
 projects:
   - path: examples/golden-demo/fixed
