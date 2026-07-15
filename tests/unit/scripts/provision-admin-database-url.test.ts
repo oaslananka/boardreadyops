@@ -59,7 +59,7 @@ describe("provision-admin-database-url", () => {
     ).toBe("postgresql://board%40ready:p%40ss%3A%2F%3F%23%5B%5D@bro-postgres:5432/board%20ready");
   });
 
-  it("writes an atomic root-only administrative URL file", () => {
+  it.skipIf(process.platform === "win32")("writes an atomic root-only administrative URL file", () => {
     const root = mkdtempSync(join(tmpdir(), "boardreadyops-admin-url-"));
     const runtimeEnvFile = join(root, "runtime-env");
     const outputFile = join(root, "admin", "database-url");
@@ -86,7 +86,7 @@ describe("provision-admin-database-url", () => {
     expect(statSync(join(root, "admin")).mode & 0o777).toBe(0o700);
   });
 
-  it("rejects a runtime environment file with broad permissions", () => {
+  it.skipIf(process.platform === "win32")("rejects a runtime environment file with broad permissions", () => {
     const root = mkdtempSync(join(tmpdir(), "boardreadyops-admin-url-public-"));
     const runtimeEnvFile = join(root, "runtime-env");
     const outputFile = join(root, "admin", "database-url");
