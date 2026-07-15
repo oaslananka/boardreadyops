@@ -7,9 +7,8 @@ on:
         required: true
         type: string
       execution_attempt_id:
-        required: false
+        required: true
         type: string
-        default: ""
       target:
         required: true
         type: string
@@ -32,16 +31,54 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: boardreadyops-cloud-${{ inputs.run_id }}
+  cancel-in-progress: false
+
 jobs:
-  prepare:
+  readiness:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Prepare runner
-        id: readiness
+      - name: Validate dispatch binding
+        id: validate
         env:
+          RUN_ID: ${{ inputs.run_id }}
+          EXECUTION_ATTEMPT_ID: ${{ inputs.execution_attempt_id }}
+          TARGET: ${{ inputs.target }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          RESULT_URL: ${{ inputs.result_url }}
+          CLOUD_ORIGIN: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN || 'https://boardreadyops.oaslananka.dev' }}
           SAFE_MODE: ${{ inputs.safe_mode }}
           SAFE_MODE_REASONS: ${{ inputs.safe_mode_reasons }}
         run: |
+          if ! [[ "$RUN_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+            echo "run_id must be a lowercase UUID" >&2
+            exit 1
+          fi
+          if ! [[ "$EXECUTION_ATTEMPT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+            echo "execution_attempt_id must be a lowercase UUID" >&2
+            exit 1
+          fi
+          if [ "$TARGET" != "$GITHUB_REPOSITORY" ]; then
+            echo "target must match the repository that owns this workflow" >&2
+            exit 1
+          fi
+          if ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "head_sha must be a full lowercase commit SHA" >&2
+            exit 1
+          fi
+
+          if ! [[ "$CLOUD_ORIGIN" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]]; then
+            echo "BOARDREADYOPS_CLOUD_ORIGIN must be an HTTPS origin" >&2
+            exit 1
+          fi
+          expected_url="${CLOUD_ORIGIN}/api/v1/runs/github-actions-result?run_id=${RUN_ID}&attempt_id=${EXECUTION_ATTEMPT_ID}"
+          if [ "$RESULT_URL" != "$expected_url" ]; then
+            echo "result_url must target the BoardReadyOps GitHub Actions callback for this run" >&2
+            exit 1
+          fi
+
           case "$SAFE_MODE" in
             true|false) ;;
             *)
@@ -49,18 +86,15 @@ jobs:
               exit 1
               ;;
           esac
-
           if [ "$SAFE_MODE" = "false" ] && [ -n "$SAFE_MODE_REASONS" ]; then
             echo "safe_mode_reasons requires safe_mode=true" >&2
             exit 1
           fi
-
           if [ "$SAFE_MODE" = "true" ]; then
             if [ -z "$SAFE_MODE_REASONS" ]; then
               echo "safe_mode=true requires at least one reason" >&2
               exit 1
             fi
-
             declare -A seen_reasons=()
             IFS=',' read -r -a reasons <<< "$SAFE_MODE_REASONS"
             for reason in "${reasons[@]}"; do
@@ -71,7 +105,6 @@ jobs:
                   exit 1
                   ;;
               esac
-
               if [ -n "${seen_reasons[$reason]:-}" ]; then
                 echo "duplicate safe-mode reason: $reason" >&2
                 exit 1
@@ -80,85 +113,150 @@ jobs:
             done
           fi
 
-          echo "runner-ready safe_mode=$SAFE_MODE"
+      - name: Check out exact target commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.head_sha }}
+          persist-credentials: false
 
-      - name: Publish runner result
-        if: always()
+      - name: Verify exact target commit
         env:
-          RESULT_URL: ${{ inputs.result_url }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          if [ "$actual_sha" != "$HEAD_SHA" ]; then
+            echo "checkout SHA mismatch: expected $HEAD_SHA, got $actual_sha" >&2
+            exit 1
+          fi
+
+      - name: Install KiCad 10
+        run: |
+          sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
+          sudo apt-get update -qq
+          sudo apt-get install --yes kicad
+          version="$(kicad-cli version)"
+          case "$version" in
+            10.0.*) ;;
+            *)
+              echo "Expected KiCad 10.0.*, got $version" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Run BoardReadyOps
+        id: readiness
+        continue-on-error: true
+        uses: oaslananka/boardreadyops@155afd28bbbadf7d11723629b4f71675288a9e02 # v1.13.0
+        with:
+          config: boardreadyops.yml
+          mode: enforce
+          require-kicad: "true"
+          fail-on: high
+          sarif: boardreadyops.sarif.json
+          json: boardreadyops.findings.json
+          markdown: boardreadyops.report.md
+          upload-sarif: "false"
+          upload-artifacts: "true"
+          comment-pr: "false"
+
+      - name: Publish OIDC-authenticated cloud result
+        if: always() && steps.validate.outcome == 'success'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
           RUN_ID: ${{ inputs.run_id }}
           EXECUTION_ATTEMPT_ID: ${{ inputs.execution_attempt_id }}
-          TARGET: ${{ inputs.target }}
-          HEAD_SHA: ${{ inputs.head_sha }}
+          RESULT_URL: ${{ inputs.result_url }}
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
-        run: |
-          if ! [[ "$RUN_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
-            echo "run_id must be a lowercase UUID" >&2
-            exit 1
-          fi
+        with:
+          script: |
+            const fs = require("node:fs");
+            const runId = process.env.RUN_ID;
+            const executionAttemptId = process.env.EXECUTION_ATTEMPT_ID;
+            const resultUrl = process.env.RESULT_URL;
+            const readinessOutcome = process.env.READINESS_OUTCOME;
+            const reportPath = "boardreadyops.findings.json";
 
-          if [ -n "$EXECUTION_ATTEMPT_ID" ]; then
-            if ! [[ "$EXECUTION_ATTEMPT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
-              echo "execution_attempt_id must be a lowercase UUID" >&2
-              exit 1
-            fi
-            expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${RUN_ID}&attempt_id=${EXECUTION_ATTEMPT_ID}"
-          else
-            expected_url="https://boardreadyops.oaslananka.dev/api/v1/runs/result?run_id=${RUN_ID}"
-          fi
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+            } catch {
+              report = undefined;
+            }
 
-          if [ "$RESULT_URL" != "$expected_url" ]; then
-            echo "result_url must target the BoardReadyOps production callback for this run" >&2
-            exit 1
-          fi
+            const reportAvailable =
+              report?.schemaVersion === 1 &&
+              typeof report.summary === "object" &&
+              report.summary !== null &&
+              Array.isArray(report.findings);
+            const policyFailed = reportAvailable && report.summary.failed === true;
+            const operationalFailure = !reportAvailable || (readinessOutcome !== "success" && !policyFailed);
+            const rawFindings = reportAvailable ? report.findings : [];
+            const severity = (value) => value === "critical" ? "error" :
+              ["error", "high", "medium", "low", "info"].includes(value) ? value : "error";
+            const boundedText = (value, fallback, maximum) => {
+              const normalized = String(value ?? fallback).trim() || fallback;
+              return normalized.slice(0, maximum);
+            };
+            const finiteMetric = (value, fallback = 0) => {
+              const numeric = Number(value);
+              return Number.isFinite(numeric) ? numeric : fallback;
+            };
+            const findings = rawFindings.slice(0, 500).map((finding) => ({
+              ruleId: boundedText(finding.ruleId, "boardreadyops.unknown", 256),
+              severity: severity(finding.severity),
+              message: boundedText(finding.message, "BoardReadyOps reported an unspecified finding.", 4000),
+              ...(typeof finding.resource?.path === "string" && finding.resource.path.trim().length > 0
+                ? { path: boundedText(finding.resource.path, "unknown", 1024) }
+                : {}),
+            }));
+            const summary = reportAvailable ? report.summary : {};
+            const actionsRunUrl =
+              `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const reportLinks = actionsRunUrl.startsWith("https://")
+              ? [{ label: "GitHub Actions run", url: actionsRunUrl.slice(0, 2048) }]
+              : [];
+            const payload = {
+              version: 1,
+              executionAttemptId,
+              status: operationalFailure ? "failed" : "completed",
+              conclusion: operationalFailure || policyFailed ? "failure" : "success",
+              decision: operationalFailure ? "error" : policyFailed ? "fail" : "pass",
+              findings,
+              artifacts: [],
+              metrics: {
+                findings_total: finiteMetric(summary.total, findings.length),
+                findings_critical: finiteMetric(summary.critical),
+                findings_high: finiteMetric(summary.high),
+                findings_medium: finiteMetric(summary.medium),
+                findings_low: finiteMetric(summary.low),
+                findings_info: finiteMetric(summary.info),
+              },
+              reportLinks,
+            };
+            while (Buffer.byteLength(JSON.stringify(payload), "utf8") > 900 * 1024 && findings.length > 0) {
+              findings.pop();
+            }
+            payload.metrics.findings_transmitted = findings.length;
 
-          if ! [[ "$TARGET" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || [[ "$TARGET" == *..* ]]; then
-            echo "target must be a valid GitHub owner/repository name" >&2
-            exit 1
-          fi
-
-          target_owner="${TARGET%%/*}"
-          target_repository="${TARGET#*/}"
-          if [ "${#target_owner}" -gt 39 ] || [ "${#target_repository}" -gt 100 ]; then
-            echo "target owner or repository name exceeds GitHub limits" >&2
-            exit 1
-          fi
-
-          if ! [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "head_sha must be a full lowercase commit SHA" >&2
-            exit 1
-          fi
-
-          status="completed"
-          decision="pass"
-          conclusion="success"
-
-          if [ "$READINESS_OUTCOME" != "success" ]; then
-            status="failed"
-            decision="error"
-            conclusion="failure"
-          fi
-
-          if [ -n "$EXECUTION_ATTEMPT_ID" ]; then
-            payload="{\"version\":1,\"executionAttemptId\":\"$EXECUTION_ATTEMPT_ID\",\"status\":\"$status\",\"conclusion\":\"$conclusion\",\"decision\":\"$decision\",\"findings\":[],\"artifacts\":[],\"metrics\":{},\"reportLinks\":[]}"
-            audience="boardreadyops-cloud:${RUN_ID}:${EXECUTION_ATTEMPT_ID}"
-          else
-            payload="{\"version\":1,\"status\":\"$status\",\"conclusion\":\"$conclusion\",\"decision\":\"$decision\",\"findings\":[],\"artifacts\":[],\"metrics\":{},\"reportLinks\":[]}"
-            audience="boardreadyops-cloud:${RUN_ID}"
-          fi
-          encoded_audience="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$audience")"
-          oidc_response="$(curl --fail --silent --show-error \
-            --header "authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${encoded_audience}")"
-          oidc_token="$(printf '%s' "$oidc_response" | python3 -c 'import json, sys; print(json.load(sys.stdin)["value"])')"
-
-          if [ -z "$oidc_token" ]; then
-            echo "GitHub OIDC token request returned an empty token" >&2
-            exit 1
-          fi
-
-          curl --fail --silent --show-error \
-            --request POST "$RESULT_URL" \
-            --header "authorization: Bearer $oidc_token" \
-            --header "content-type: application/json" \
-            --data "$payload"
+            const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}`;
+            const oidcToken = await core.getIDToken(audience);
+            let response;
+            for (let attempt = 1; attempt <= 3; attempt += 1) {
+              response = await fetch(resultUrl, {
+                method: "POST",
+                headers: {
+                  authorization: `Bearer ${oidcToken}`,
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify(payload),
+              });
+              if (response.ok) break;
+              if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+            }
+            if (!response?.ok) {
+              const responseText = response ? (await response.text()).slice(0, 512) : "no response";
+              throw new Error(`BoardReadyOps Cloud callback failed: HTTP ${response?.status ?? "unknown"}: ${responseText}`);
+            }
+            if (operationalFailure || policyFailed) {
+              core.setFailed(policyFailed ? "BoardReadyOps found blocking readiness findings." : "BoardReadyOps execution failed or did not produce a valid report.");
+            }

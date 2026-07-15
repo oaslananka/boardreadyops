@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createRunnerClient, runnerDispatchInputs, safeModeInputs } from "../../../apps/web/lib/runner-client.js";
 import type { EnqueueReleaseRunInput } from "../../../packages/cloud-core/src/lifecycle-executor.js";
 
@@ -12,6 +12,7 @@ const action: EnqueueReleaseRunInput = {
     name: "hardware-board",
     fullName: "octo-org/hardware-board",
     private: true,
+    defaultBranch: "main",
   },
   pullRequestNumber: 42,
   ref: "feature/ready",
@@ -39,7 +40,7 @@ describe("runner workflow dispatch binding", () => {
         target: "octo-org/hardware-board",
         head_sha: "0123456789abcdef",
         result_url:
-          "https://boardreadyops.test/api/v1/runs/result?run_id=5dc4193b-5c7e-4df8-b86f-e4d3266fc22d&attempt_id=7559e99b-4998-4e02-a94a-7a7a4686ae11",
+          "https://boardreadyops.test/api/v1/runs/github-actions-result?run_id=5dc4193b-5c7e-4df8-b86f-e4d3266fc22d&attempt_id=7559e99b-4998-4e02-a94a-7a7a4686ae11",
         safe_mode: "false",
         safe_mode_reasons: "",
       });
@@ -108,6 +109,27 @@ describe("runner workflow safe-mode inputs", () => {
 });
 
 describe("runner workflow dispatch client", () => {
+  it("fails before GitHub authentication when the target default branch is unavailable", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      await expect(
+        createRunnerClient().dispatchReleaseRunWorkflow({
+          action: {
+            ...action,
+            repository: { ...action.repository, defaultBranch: undefined },
+          },
+          runId: "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d",
+          idempotencyKey: "98765:42:0123456789abcdef",
+          githubCheckRunId: 555,
+          executionAttemptId: "7559e99b-4998-4e02-a94a-7a7a4686ae11",
+        }),
+      ).rejects.toThrow("target repository default branch is required");
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it("authenticates the GitHub App and dispatches the bound workflow before marking the check running", async () => {
     const { privateKey } = generateKeyPairSync("rsa", {
       modulusLength: 2048,
@@ -118,9 +140,7 @@ describe("runner workflow dispatch client", () => {
       GITHUB_APP_ID: process.env.GITHUB_APP_ID,
       GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY,
       GITHUB_API_BASE_URL: process.env.GITHUB_API_BASE_URL,
-      BOARDREADYOPS_DISPATCH_REPOSITORY: process.env.BOARDREADYOPS_DISPATCH_REPOSITORY,
       BOARDREADYOPS_DISPATCH_WORKFLOW: process.env.BOARDREADYOPS_DISPATCH_WORKFLOW,
-      BOARDREADYOPS_DISPATCH_REF: process.env.BOARDREADYOPS_DISPATCH_REF,
       BOARDREADYOPS_PUBLIC_URL: process.env.BOARDREADYOPS_PUBLIC_URL,
     };
     const originalFetch = globalThis.fetch;
@@ -129,9 +149,7 @@ describe("runner workflow dispatch client", () => {
     process.env.GITHUB_APP_ID = "123";
     process.env.GITHUB_APP_PRIVATE_KEY = privateKey;
     process.env.GITHUB_API_BASE_URL = "https://github.test";
-    process.env.BOARDREADYOPS_DISPATCH_REPOSITORY = "runner-org/runner-repo";
     process.env.BOARDREADYOPS_DISPATCH_WORKFLOW = "readiness-runner.yml";
-    process.env.BOARDREADYOPS_DISPATCH_REF = "main";
     process.env.BOARDREADYOPS_PUBLIC_URL = "https://boardreadyops.test";
 
     globalThis.fetch = async (input, init) => {
@@ -154,7 +172,7 @@ describe("runner workflow dispatch client", () => {
       }
 
       if (
-        url === "https://github.test/repos/runner-org/runner-repo/actions/workflows/readiness-runner.yml/dispatches"
+        url === "https://github.test/repos/octo-org/hardware-board/actions/workflows/readiness-runner.yml/dispatches"
       ) {
         return new Response(null, { status: 204 });
       }
@@ -177,7 +195,7 @@ describe("runner workflow dispatch client", () => {
         }),
       ).resolves.toEqual({
         workflowDispatchId:
-          "runner-org/runner-repo/readiness-runner.yml/5dc4193b-5c7e-4df8-b86f-e4d3266fc22d/7559e99b-4998-4e02-a94a-7a7a4686ae11",
+          "octo-org/hardware-board/readiness-runner.yml/5dc4193b-5c7e-4df8-b86f-e4d3266fc22d/7559e99b-4998-4e02-a94a-7a7a4686ae11",
       });
 
       expect(requests).toHaveLength(3);
@@ -188,7 +206,7 @@ describe("runner workflow dispatch client", () => {
       expect(requests[0]?.headers.get("authorization")).toMatch(/^bearer /u);
 
       expect(requests[1]).toMatchObject({
-        url: "https://github.test/repos/runner-org/runner-repo/actions/workflows/readiness-runner.yml/dispatches",
+        url: "https://github.test/repos/octo-org/hardware-board/actions/workflows/readiness-runner.yml/dispatches",
         method: "POST",
       });
       expect(requests[1]?.headers.get("authorization")).toBe("Bearer installation-token");
@@ -200,7 +218,7 @@ describe("runner workflow dispatch client", () => {
           target: "octo-org/hardware-board",
           head_sha: "0123456789abcdef",
           result_url:
-            "https://boardreadyops.test/api/v1/runs/result?run_id=5dc4193b-5c7e-4df8-b86f-e4d3266fc22d&attempt_id=7559e99b-4998-4e02-a94a-7a7a4686ae11",
+            "https://boardreadyops.test/api/v1/runs/github-actions-result?run_id=5dc4193b-5c7e-4df8-b86f-e4d3266fc22d&attempt_id=7559e99b-4998-4e02-a94a-7a7a4686ae11",
           safe_mode: "false",
           safe_mode_reasons: "",
         },

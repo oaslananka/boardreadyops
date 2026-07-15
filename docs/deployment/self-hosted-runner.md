@@ -4,6 +4,8 @@ Issue: #41
 
 A BoardReadyOps self-hosted runner executes hardware-readiness jobs on infrastructure controlled by the customer. The hosted control plane owns tenant authorization, queueing, leases, Check Runs, findings, and artifact metadata. The customer runner owns source checkout, KiCad execution, temporary workspaces, and the credentials required to read private repositories.
 
+This is an optional enterprise/customer-controlled execution mode. The hosted default is target-repository GitHub Actions as defined in [GitHub Actions execution mode](github-actions-execution.md). `ops-vps-03` or another BoardReadyOps-operated worker is not required for the default hosted service.
+
 ## Security boundary
 
 The self-hosted path is intentionally asymmetric:

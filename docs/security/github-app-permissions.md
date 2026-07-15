@@ -25,11 +25,11 @@ APIs.
 
 ## Minimum repository permissions
 
-### Current single-owner GitHub Actions runner profile
+### Target-repository GitHub Actions profile
 
-Use this profile for the existing self-hosted production deployment, where the
-App installation can access both the analyzed repository and the repository
-that contains the dispatch workflow.
+Use this profile for the default hosted deployment. The dispatch workflow lives
+in the same repository that produced the pull request webhook, so the App never
+uses an installation token across repository or installation boundaries.
 
 | Permission | Level | Required for |
 | --- | --- | --- |
@@ -118,7 +118,7 @@ Unless a future feature has a reviewed permission rationale, keep these set to
 No access:
 
 - Administration
-- Contents, until the ADR-0009 managed source broker ships
+- Contents
 - Commit statuses
 - Deployments
 - Environments
@@ -129,7 +129,7 @@ No access:
 - Repository hooks
 - Repository secrets and variables
 - Security events and alert APIs
-- Workflows, except the `Actions` permission required for the current dispatch mode
+- Workflows; the repository `Actions` permission is the only workflow-dispatch permission required
 - all organization permissions
 - all account permissions
 
@@ -140,20 +140,16 @@ current compatibility mode.
 
 ## Execution-plane boundary
 
-The current `github-actions` mode obtains a token for the installation that
-received the pull request webhook, then dispatches a workflow in the configured
-runner repository. An installation token cannot cross installation ownership
-or repository access boundaries.
+The `github-actions` mode obtains a token for the installation that received the
+pull request webhook and dispatches `.github/workflows/readiness-runner.yml` in
+that exact repository. The workflow uses its job-scoped `GITHUB_TOKEN` for an
+exact-SHA checkout and GitHub OIDC for the result callback. Source, workflow
+logs, and Actions artifacts remain in the target repository.
 
-ADR-0009 chooses a control-plane queue with short-lived job leases,
-BoardReadyOps-managed workers for the future public default, and the same
-lease/result protocol for customer self-hosted workers. Managed source access is
-brokered with an exact-repository, contents-read installation token that is not
-exposed to workers.
-
-The existing GitHub Actions mode remains a same-installation compatibility mode.
-Do not broaden the public GitHub App's permissions to work around the dispatch
-boundary.
+ADR-0010 makes this target-repository workflow the hosted default. ADR-0009's
+lease protocol remains available for explicitly selected customer self-hosted
+execution. Do not configure a central public runner repository, broaden the App
+to Contents write, or use a shared VPS worker to bypass the repository boundary.
 
 ## Production change procedure
 
@@ -180,9 +176,8 @@ reduced production/public App:
 - pull request `opened`, `reopened`, `synchronize`, and `ready_for_review`;
 - Check Run creation, transition to in-progress, and completion;
 - exact runner-result replay behavior;
-- GitHub Actions dispatch only when that compatibility mode is enabled;
-- managed source-broker access and exact-commit verification only when managed
-  execution is enabled;
+- target-repository GitHub Actions dispatch only when that mode is enabled;
+- exact-SHA checkout and run/attempt-bound OIDC callback from the target workflow;
 - self-hosted claim isolation only when customer runners are enabled;
 - pull request comment creation and update only when comment write permission is
   intentionally enabled; and
