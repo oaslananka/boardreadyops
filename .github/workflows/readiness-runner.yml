@@ -148,6 +148,7 @@ jobs:
         continue-on-error: true
         uses: oaslananka/boardreadyops@155afd28bbbadf7d11723629b4f71675288a9e02 # v1.13.0
         with:
+          project: ${{ vars.BOARDREADYOPS_PROJECT || '' }}
           config: boardreadyops.yml
           mode: enforce
           require-kicad: "true"
