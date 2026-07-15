@@ -23,6 +23,7 @@ export const defaultDeployOptions = {
   runtimeEnvFile: "/opt/boardreadyops-cloud/runtime-env",
   runnerResultKeyFile: "",
   artifactSigningKeyFile: "",
+  releaseRepositoriesFile: "",
   requireGithubOidc: false,
   artifactVolume: "boardreadyops_artifacts",
   network: "boardreadyops-cloud",
@@ -65,6 +66,11 @@ export function readDeployOptions(env = process.env) {
       env,
       "BOARDREADYOPS_CLOUD_ARTIFACT_SIGNING_KEY_FILE",
       defaultDeployOptions.artifactSigningKeyFile,
+    ),
+    releaseRepositoriesFile: envValue(
+      env,
+      "BOARDREADYOPS_CLOUD_RELEASE_REPOSITORIES_FILE",
+      defaultDeployOptions.releaseRepositoriesFile,
     ),
     requireGithubOidc: envFlag(env, "BOARDREADYOPS_CLOUD_REQUIRE_GITHUB_OIDC"),
     artifactVolume: envValue(env, "BOARDREADYOPS_CLOUD_ARTIFACT_VOLUME", defaultDeployOptions.artifactVolume),
@@ -207,6 +213,15 @@ export function runtimeContainerArgs({ name, image, publish, networkAlias, resta
       `type=bind,src=${options.artifactSigningKeyFile},dst=/run/keys/b,readonly`,
       "--env",
       "ARTIFACT_DOWNLOAD_SIGNING_KEY_FILE=/run/keys/b",
+    );
+  }
+
+  if (options.releaseRepositoriesFile) {
+    args.push(
+      "--mount",
+      `type=bind,src=${options.releaseRepositoriesFile},dst=/run/policies/repositories,readonly`,
+      "--env",
+      "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE=/run/policies/repositories",
     );
   }
 

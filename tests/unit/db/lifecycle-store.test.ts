@@ -1,8 +1,13 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createSqlGitHubAppLifecycleStore,
   parseReleaseRepositoryRolloutPolicy,
   releaseRepositoryRolloutEnvName,
+  releaseRepositoryRolloutFileEnvName,
+  releaseRepositoryRolloutPolicyFromEnvironment,
   type SqlQueryExecutor,
 } from "../../../packages/db/src/lifecycle-store.js";
 
@@ -48,8 +53,36 @@ function recordingExecutor() {
 }
 
 describe("SQL GitHub App lifecycle store", () => {
-  it("documents the environment variable used for rollout opt-in", () => {
+  it("documents the environment variables used for rollout opt-in", () => {
     expect(releaseRepositoryRolloutEnvName).toBe("BOARDREADYOPS_RELEASE_REPOSITORIES");
+    expect(releaseRepositoryRolloutFileEnvName).toBe("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE");
+  });
+
+  it("loads rollout repositories from a bounded policy file and gives it precedence", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-rollout-policy-"));
+    const policyFile = path.join(directory, "repositories");
+    try {
+      await writeFile(policyFile, "oaslananka/boardreadyops\noaslananka/boardreadyops-private-acceptance\n");
+      expect(
+        releaseRepositoryRolloutPolicyFromEnvironment({
+          [releaseRepositoryRolloutEnvName]: "octo-org/ignored",
+          [releaseRepositoryRolloutFileEnvName]: policyFile,
+        }),
+      ).toEqual({
+        repositories: ["oaslananka/boardreadyops", "oaslananka/boardreadyops-private-acceptance"],
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when a configured rollout policy file cannot be read", () => {
+    expect(
+      releaseRepositoryRolloutPolicyFromEnvironment({
+        [releaseRepositoryRolloutEnvName]: "all",
+        [releaseRepositoryRolloutFileEnvName]: "/missing/boardreadyops-rollout-policy",
+      }),
+    ).toEqual({ repositories: [] });
   });
 
   it("parses explicit release repository rollout lists", () => {
