@@ -1,11 +1,13 @@
 # RFC: BoardReadyOps GitHub App architecture
 
-**Status:** Implemented for the current single-owner deployment; public
-Marketplace execution remains incomplete.
+**Status:** Target-repository GitHub Actions is the hosted default; customer
+self-hosted execution remains optional.
 
 **Security review:** [GitHub App permissions and webhook subscriptions](../security/github-app-permissions.md)
 
-**Execution decision:** [ADR-0009 — Managed, lease-based execution plane](adr/0009-managed-execution-plane.md)
+**Execution decision:** [ADR-0010 — Target-repository GitHub Actions execution](adr/0010-target-repository-github-actions-execution.md)
+
+**Optional self-hosted protocol:** [ADR-0009 — Managed, lease-based execution plane](adr/0009-managed-execution-plane.md)
 
 **Tracking issue:** [#88](https://github.com/oaslananka/boardreadyops/issues/88)
 
@@ -32,13 +34,13 @@ proposal:
 | --- | --- | --- |
 | Installation | Repository adds a workflow | Repository owner installs the App |
 | Trigger | Workflow event | Signed GitHub App webhook |
-| Execution | Job-scoped runner token | Configured execution plane |
+| Execution | Target repository GitHub-hosted runner | Dispatch and result coordination |
 | Result display | Workflow annotations and artifacts | Native Check Run and hosted dashboard |
 | Authentication | `GITHUB_TOKEN` and optional OIDC | Installation token, webhook HMAC, and runner identity |
 
-The App complements the Action. It does not grant its installation token to the
-runner and does not use broad repository permissions as a substitute for a
-proper execution-plane trust boundary.
+The App complements the Action. It dispatches a reviewed workflow in the target
+repository and never grants its installation token to the runner. The workflow
+uses its own job-scoped token for exact-SHA checkout and OIDC for the callback.
 
 ## Required permissions
 
@@ -149,28 +151,23 @@ Private-repository execution remains explicitly marked for safe-mode handling.
 
 ## Execution-plane decision
 
-The current `github-actions` mode obtains an installation token for the App
-installation that received the pull request, then dispatches a workflow in the
-configured runner repository. That token can access only repositories granted
-to the same installation.
+The hosted default is a workflow stored in the repository being analyzed. The
+App installation token dispatches that workflow on the repository's persisted
+default branch. The workflow checks out the exact assigned SHA, runs KiCad and
+BoardReadyOps on a GitHub-hosted runner, retains logs and artifacts in the
+repository, and sends normalized results through a run/attempt-bound OIDC
+callback.
 
-This is valid for the current single-owner deployment. It is not a complete
-zero-configuration multi-tenant Marketplace execution plane because a customer
-installation token cannot dispatch a workflow in an unrelated
-BoardReadyOps-owned installation.
+This removes the cross-installation problem of a central runner repository and
+removes the operational dependency on a BoardReadyOps-operated KiCad VPS. It is
+not zero-file onboarding: the repository owner must review and add
+`.github/workflows/readiness-runner.yml` before dispatch can succeed. That trade
+is preferred over granting the App Contents write.
 
-ADR-0009 accepts a control-plane queue with short-lived leases:
-
-1. BoardReadyOps-managed workers become the future public Marketplace default.
-2. A source broker uses an exact-repository, contents-read installation token
-   without exposing the token to worker processes.
-3. Customer self-hosted workers use the same claim, heartbeat, lease, artifact,
-   and result contracts under installation/repository eligibility filters.
-4. GitHub Actions dispatch remains an explicitly selected, same-installation
-   compatibility mode.
-
+ADR-0009's signed lease and customer-checkout protocol remains available for an
+explicit enterprise self-hosted mode. It is not required by the hosted default.
 The public App must not request broader repository, organization, or account
-permissions to bypass the installation boundary.
+permissions to avoid the target-repository workflow boundary.
 
 ## Public-launch completion criteria
 
@@ -178,10 +175,9 @@ The GitHub App is ready for public Marketplace distribution only when:
 
 - the external production/public App settings match the least-privilege profile;
 - broad development permissions and unrelated webhook subscriptions are removed;
-- the ADR-0009 managed execution and source-broker design is implemented and
-  threat modeled;
-- two unrelated installations pass claim, source, artifact, result, and tenant
-  isolation tests;
+- target repositories install the reviewed dispatch workflow on their default branches;
+- unrelated public and private installations pass dispatch, exact-SHA checkout,
+  OIDC callback, result, and tenant-isolation tests;
 - installation, repository lifecycle, pull request, Check Run, runner callback,
   and optional comment flows pass end to end with the reduced permissions; and
 - issue #88 records the final settings review and validation evidence.

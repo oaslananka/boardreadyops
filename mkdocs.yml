@@ -114,6 +114,7 @@ nav:
   - Operations:
       - Deployment:
           - Cloud Control Plane: deployment/self-hosted.md
+          - GitHub Actions Execution: deployment/github-actions-execution.md
           - Customer Self-hosted Runner: deployment/self-hosted-runner.md
       - Testing: testing.md
       - Accessibility: accessibility.md
@@ -178,3 +179,4 @@ nav:
               - "0007: Docs Toolchain Lifecycle": architecture/adr/0007-docs-toolchain-lifecycle.md
               - "0008: Vercel Control Plane": architecture/adr/0008-vercel-control-plane.md
               - "0009: Managed Execution Plane": architecture/adr/0009-managed-execution-plane.md
+              - "0010: Target-repository GitHub Actions": architecture/adr/0010-target-repository-github-actions-execution.md

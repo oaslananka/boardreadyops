@@ -1,6 +1,6 @@
 # ADR-0009 — Managed, lease-based execution plane
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0010 for the hosted default; retained for the optional customer self-hosted lease protocol
 **Date:** 2026-07-12
 **Issue:** [#149](https://github.com/oaslananka/boardreadyops/issues/149)
 **Related:** [#41](https://github.com/oaslananka/boardreadyops/issues/41), [#88](https://github.com/oaslananka/boardreadyops/issues/88)
@@ -35,14 +35,16 @@ A public GitHub App requires an execution plane that:
 
 ## Decision
 
-Use a **control-plane queue with short-lived, lease-based job assignment**.
-BoardReadyOps-managed workers are the default execution plane for the future
-public Marketplace App. Customer self-hosted workers use the same claim,
-heartbeat, lease, artifact, and result contracts with stricter
-installation/repository eligibility filters.
+The original decision selected a **control-plane queue with short-lived,
+lease-based job assignment** and a BoardReadyOps-managed worker default.
+ADR-0010 supersedes that hosted-default portion. Customer self-hosted workers
+continue to use the claim, heartbeat, lease, artifact, and result contracts in
+this ADR with installation/repository eligibility filters.
 
-The existing GitHub Actions dispatch mode remains a compatibility mode for
-same-installation deployments. It is not the public multi-tenant default.
+Target-repository GitHub Actions
+is now the hosted multi-tenant default. The signed lease, registration,
+heartbeat, artifact-capability, and terminal-result design in this ADR remains
+accepted for explicitly selected customer self-hosted execution.
 
 ## Trust boundaries
 

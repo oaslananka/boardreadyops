@@ -67,8 +67,9 @@ function claimsAreTrusted(payload, expectations, nowSeconds) {
         : `boardreadyops-cloud:${expectations.runId}`,
     ) &&
     stringClaim(payload, "repository") === expectations.repository &&
+    (expectations.repositoryId === undefined || stringClaim(payload, "repository_id") === expectations.repositoryId) &&
     stringClaim(payload, "workflow_ref") === expectations.workflowRef &&
-    stringClaim(payload, "ref") === "refs/heads/main" &&
+    stringClaim(payload, "ref") === expectations.ref &&
     stringClaim(payload, "event_name") === "workflow_dispatch" &&
     stringClaim(payload, "runner_environment") === "github-hosted"
   );
@@ -110,7 +111,9 @@ export async function verifyGitHubActionsOidcToken(
     runId,
     executionAttemptId,
     repository = defaultRepository,
+    repositoryId,
     workflowRef = defaultWorkflowRef,
+    ref = "refs/heads/main",
     fetchImpl = globalThis.fetch,
     now = Date.now,
   },
@@ -135,7 +138,11 @@ export async function verifyGitHubActionsOidcToken(
     header.typ !== "JWT" ||
     typeof header.kid !== "string" ||
     header.kid.length === 0 ||
-    !claimsAreTrusted(payload, { runId, executionAttemptId, repository, workflowRef }, Math.floor(now() / 1000))
+    !claimsAreTrusted(
+      payload,
+      { runId, executionAttemptId, repository, repositoryId, workflowRef, ref },
+      Math.floor(now() / 1000),
+    )
   ) {
     return false;
   }

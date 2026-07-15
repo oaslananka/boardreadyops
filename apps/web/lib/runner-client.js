@@ -1,4 +1,5 @@
 import { createAppAuth } from "@octokit/auth-app";
+import { configuredGitHubActionsWorkflow } from "./github-actions-workflow.js";
 
 const e = () => globalThis["p" + "rocess"]?.["e" + "nv"] ?? {};
 const ev = (name) => e()[name];
@@ -6,11 +7,13 @@ const api = () => ev("GITHUB" + "_API_BASE_URL") ?? "https://api.github.com";
 const appId = () => ev("GITHUB" + "_APP_ID");
 const keyText = () => ev("GITHUB" + "_APP_" + "PRI" + "VATE" + "_KEY")?.replace(/\\n/g, "\n");
 
-function repoTarget(owner) {
-  const configured = ev("BOARDREADYOPS" + "_DISPATCH_REPOSITORY") ?? `${owner}/boardreadyops`;
-  const [repoOwner, repoName] = configured.split("/");
-  if (!repoOwner || !repoName) throw new Error("invalid runner repository");
-  return { owner: repoOwner, name: repoName };
+function repoTarget(action) {
+  const owner = action.repository.owner;
+  const name = action.repository.name;
+  if (!owner || !name || action.repository.fullName !== `${owner}/${name}`) {
+    throw new Error("invalid target repository");
+  }
+  return { owner, name };
 }
 
 function resultUrl(runId, executionAttemptId) {
@@ -20,7 +23,7 @@ function resultUrl(runId, executionAttemptId) {
     throw new Error("public app URL is required to receive runner results");
   }
 
-  return `${baseUrl.replace(/\/$/, "")}/api/v1/runs/result?run_id=${encodeURIComponent(runId)}&attempt_id=${encodeURIComponent(executionAttemptId)}`;
+  return `${baseUrl.replace(/\/$/, "")}/api/v1/runs/github-actions-result?run_id=${encodeURIComponent(runId)}&attempt_id=${encodeURIComponent(executionAttemptId)}`;
 }
 
 function requestHeaders(rt) {
@@ -103,10 +106,12 @@ export function runnerDispatchInputs(input) {
 export function createRunnerClient() {
   return {
     async dispatchReleaseRunWorkflow(input) {
+      const repo = repoTarget(input.action);
+      const workflow = configuredGitHubActionsWorkflow(e());
+      if (!workflow) throw new Error("invalid GitHub Actions workflow configuration");
+      const ref = input.action.repository.defaultBranch;
+      if (!ref) throw new Error("target repository default branch is required");
       const rt = await runtimeAccess(input.action.installation.id);
-      const repo = repoTarget(input.action.repository.owner);
-      const workflow = ev("BOARDREADYOPS" + "_DISPATCH_WORKFLOW") ?? "readiness-runner.yml";
-      const ref = ev("BOARDREADYOPS" + "_DISPATCH_REF") ?? "main";
       const response = await fetch(
         `${api()}/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(
           repo.name,

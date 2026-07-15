@@ -8,6 +8,7 @@ import {
 const runId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
 const executionAttemptId = "7559e99b-4998-4e02-a94a-7a7a4686ae11";
 const repository = "oaslananka/boardreadyops";
+const repositoryId = "987654321";
 const workflowRef = `${repository}/.github/workflows/readiness-runner.yml@refs/heads/main`;
 const nowMs = Date.UTC(2026, 6, 10, 20, 30, 0);
 const nowSeconds = Math.floor(nowMs / 1000);
@@ -33,6 +34,7 @@ function token(
       aud: `boardreadyops-cloud:${runId}:${executionAttemptId}`,
       sub: `repo:${repository}:ref:refs/heads/main`,
       repository,
+      repository_id: repositoryId,
       workflow_ref: workflowRef,
       ref: "refs/heads/main",
       event_name: "workflow_dispatch",
@@ -70,6 +72,7 @@ describe("GitHub Actions OIDC verification", () => {
       verifyGitHubActionsOidcToken(token(), {
         runId,
         executionAttemptId,
+        repositoryId,
         fetchImpl,
         now: () => nowMs,
       }),
@@ -96,6 +99,7 @@ describe("GitHub Actions OIDC verification", () => {
     ["audience", { aud: "boardreadyops-cloud:another-run" }],
     ["issuer", { iss: "https://attacker.example" }],
     ["repository", { repository: "attacker/example" }],
+    ["repository ID", { repository_id: "111111111" }],
     ["workflow", { workflow_ref: `${repository}/.github/workflows/other.yml@refs/heads/main` }],
     ["ref", { ref: "refs/heads/feature" }],
     ["event", { event_name: "pull_request" }],
@@ -107,6 +111,7 @@ describe("GitHub Actions OIDC verification", () => {
       verifyGitHubActionsOidcToken(token(payloadOverrides), {
         runId,
         executionAttemptId,
+        repositoryId,
         fetchImpl,
         now: () => nowMs,
       }),
