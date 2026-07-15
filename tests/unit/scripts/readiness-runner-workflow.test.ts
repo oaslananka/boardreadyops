@@ -14,6 +14,7 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain('actual_sha="$(git rev-parse HEAD)"');
     expect(workflow).toContain("ppa:kicad/kicad-10.0-releases");
     expect(workflow).toContain('require-kicad: "true"');
+    expect(workflow).toContain("project: $" + "{{ vars.BOARDREADYOPS_PROJECT || '' }}");
     expect(workflow).toContain("uses: oaslananka/boardreadyops@155afd28bbbadf7d11723629b4f71675288a9e02");
     expect(workflow).not.toContain("runner-ready");
   });
