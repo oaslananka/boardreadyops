@@ -1,4 +1,4 @@
-export type CloudPersistenceMode = "postgres" | "memory";
+type CloudPersistenceMode = "postgres" | "memory";
 
 export type CloudRuntimeConfigurationErrorCode =
   | "invalid-persistence-mode"
