@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { type ReleaseRunResult, releaseRunResultSchema } from "@boardreadyops/contracts";
+import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { verifyGitHubActionsOidcToken } from "../../../../../lib/github-actions-oidc.js";
 import {
@@ -13,7 +14,7 @@ export const runtime = "nodejs";
 
 type QueryRow = Record<string, unknown>;
 type CheckConclusion = "failure" | "neutral" | "success" | "timed_out";
-type ResultQueryExecutor = ReturnType<typeof createPgQueryExecutor>;
+type ResultQueryExecutor = SqlQueryExecutor;
 type GitHubAppCheckRunClient = NonNullable<ReturnType<typeof createGitHubAppCheckRunClient>>;
 
 export type ResultRouteDependencies = {

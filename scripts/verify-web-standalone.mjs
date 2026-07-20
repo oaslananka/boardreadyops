@@ -13,6 +13,8 @@ const webRoot = join(repositoryRoot, "apps", "web");
 const standaloneSource = join(webRoot, ".next", "standalone");
 const staticSource = join(webRoot, ".next", "static");
 const publicSource = join(webRoot, "public");
+const workerSource = join(webRoot, ".next", "worker.mjs");
+const migrationSource = join(webRoot, ".next", "migrate.mjs");
 const secret = randomBytes(32).toString("hex");
 const payload = JSON.stringify({ zen: "standalone-runtime-ready" });
 
@@ -118,6 +120,12 @@ async function main() {
   const serverSource = join(standaloneSource, "apps", "web", "server.js");
   if (!(await pathExists(serverSource))) {
     throw new Error("Web standalone output is missing. Run `pnpm --filter @boardreadyops/web build` first.");
+  }
+  if (!(await pathExists(workerSource))) {
+    throw new Error("Control-plane worker bundle is missing from the web build output.");
+  }
+  if (!(await pathExists(migrationSource))) {
+    throw new Error("Cloud migration bundle is missing from the web build output.");
   }
 
   const temporaryRoot = await mkdtemp(join(tmpdir(), "boardreadyops-web-standalone-"));

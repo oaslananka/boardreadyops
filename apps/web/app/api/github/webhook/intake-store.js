@@ -1,23 +1,22 @@
-import { createNoopGitHubAppLifecycleStore } from "@boardreadyops/cloud-core/lifecycle-executor";
-import { createSqlGitHubAppLifecycleStore } from "@boardreadyops/db/lifecycle-store";
+import {
+  createMemoryControlPlaneJobStore,
+  createSqlControlPlaneJobStore,
+} from "@boardreadyops/db/control-plane-job-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 
 let cachedStore;
 
-export function getGitHubAppLifecycleStore() {
-  if (cachedStore) {
-    return cachedStore;
-  }
+export function getControlPlaneJobStore() {
+  if (cachedStore) return cachedStore;
 
   const configuration = resolveCloudPersistenceConfiguration();
-
   if (configuration.mode === "memory") {
-    cachedStore = createNoopGitHubAppLifecycleStore();
+    cachedStore = createMemoryControlPlaneJobStore();
     return cachedStore;
   }
 
-  cachedStore = createSqlGitHubAppLifecycleStore(
+  cachedStore = createSqlControlPlaneJobStore(
     createPgQueryExecutor({
       connectionString: configuration.databaseUrl,
       max: Number(process.env.DATABASE_POOL_MAX ?? 5),
@@ -26,6 +25,10 @@ export function getGitHubAppLifecycleStore() {
   return cachedStore;
 }
 
-export function resetGitHubAppLifecycleStoreForTests() {
+export function resetControlPlaneJobStoreForTests() {
   cachedStore = undefined;
+}
+
+export function setControlPlaneJobStoreForTests(store) {
+  cachedStore = store;
 }

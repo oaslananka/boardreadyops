@@ -92,6 +92,12 @@ pull request event
 verify webhook HMAC and normalize payload
         |
         v
+atomically persist webhook inbox + durable job, return HTTP 202
+        |
+        v
+control-plane worker claims the leased job
+        |
+        v
 persist installation/repository/run state
         |
         v
@@ -136,6 +142,10 @@ Private-repository execution remains explicitly marked for safe-mode handling.
 ## Authentication and storage boundaries
 
 - Every incoming webhook is verified with HMAC-SHA256 before JSON processing.
+- Accepted lifecycle deliveries are deduplicated by provider and GitHub delivery ID.
+- Raw webhook bodies and signatures are not stored; only bounded routing metadata, a SHA-256 digest, and normalized lifecycle actions enter the durable inbox.
+- The HTTP request never performs GitHub API calls or workflow dispatch. A separately deployable worker claims PostgreSQL jobs with expiring leases and bounded retries.
+- Normalized lifecycle actions are erased after successful processing. Terminal routing metadata expires after 30 days and is deleted in bounded, lease-safe cleanup batches.
 - GitHub App installation tokens are created on demand, expire according to
   GitHub policy, and are not persisted.
 - GitHub Actions callbacks use OIDC bound to the logical run and current

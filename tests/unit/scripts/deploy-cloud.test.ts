@@ -5,6 +5,7 @@ import {
   dockerTagFromRevision,
   readDeployOptions,
   runtimeContainerArgs,
+  workerContainerArgs,
 } from "../../../scripts/deploy-cloud.mjs";
 
 describe("deploy-cloud", () => {
@@ -17,6 +18,7 @@ describe("deploy-cloud", () => {
     expect(
       readDeployOptions({
         BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY: "example/cloud",
+        BOARDREADYOPS_CLOUD_WORKER_CONTAINER: "example-worker",
         BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE: "/run/secrets/cloud.env",
         BOARDREADYOPS_CLOUD_RUNNER_RESULT_KEY_FILE: "/run/secrets/runner-key",
         BOARDREADYOPS_CLOUD_ARTIFACT_SIGNING_KEY_FILE: "/run/secrets/artifact-key",
@@ -28,6 +30,7 @@ describe("deploy-cloud", () => {
       }),
     ).toMatchObject({
       imageRepository: "example/cloud",
+      workerContainer: "example-worker",
       runtimeEnvFile: "/run/secrets/cloud.env",
       runnerResultKeyFile: "/run/secrets/runner-key",
       artifactSigningKeyFile: "/run/secrets/artifact-key",
@@ -98,5 +101,28 @@ describe("deploy-cloud", () => {
       "com.boardreadyops.deployment.revision=abc123",
       "boardreadyops-web-runtime:abc123",
     ]);
+  });
+  it("builds an independently health-checked worker container", () => {
+    const options = {
+      ...defaultDeployOptions,
+      runtimeEnvFile: "/opt/cloud/runtime-env",
+      releaseRepositoriesFile: "/opt/cloud/repositories",
+      network: "cloud-network",
+    };
+
+    const args = workerContainerArgs({
+      name: "bro-worker",
+      image: "boardreadyops-web-runtime:abc123",
+      restart: "unless-stopped",
+      revision: "abc123",
+      options,
+    });
+
+    expect(args).toContain("--health-cmd");
+    expect(args.join(" ")).toContain("127.0.0.1:3001/health/ready");
+    expect(args).toContain("type=bind,src=/opt/cloud/runtime-env,dst=/run/app-env,readonly");
+    expect(args).toContain("type=bind,src=/opt/cloud/repositories,dst=/run/policies/repositories,readonly");
+    expect(args.slice(-3)).toEqual(["boardreadyops-web-runtime:abc123", "node", "worker.mjs"]);
+    expect(args).not.toContain("-p");
   });
 });
