@@ -165,6 +165,67 @@ describe("readiness result route authentication and publication", () => {
     expect(createPullRequestComment).toHaveBeenCalledWith(expect.objectContaining({ pullRequestNumber: 42 }));
   });
 
+  it("publishes at-risk passing results as a neutral GitHub check with the warning template", async () => {
+    const body = JSON.stringify({
+      status: "completed",
+      decision: "pass",
+      findings: [{ ruleId: "bom.lifecycle", severity: "medium", message: "Lifecycle status needs review." }],
+      readiness: {
+        score: 84,
+        status: "at-risk",
+        blocking: 0,
+        nonBlocking: 1,
+        missingRequired: [],
+        missingRecommended: ["assembly-drawing"],
+        warnings: ["Recommended output assembly-drawing is missing."],
+      },
+      waivers: {
+        active: [
+          {
+            rule: "bom.lifecycle",
+            owner: "hardware-team",
+            reason: "Approved for prototype lot.",
+            expires: "2026-08-31",
+            stale: false,
+            expired: false,
+            matched: 1,
+          },
+        ],
+        expired: [],
+      },
+    });
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            github_installation_id: 12345,
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(202);
+    expect(completeCheckRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conclusion: "neutral",
+        title: "⚠️ BoardReadyOps: Review warnings",
+        summary: expect.stringContaining("### Active waivers"),
+      }),
+    );
+    expect(createPullRequestComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("## ⚠️ BoardReadyOps: Review warnings"),
+      }),
+    );
+  });
+
   it("computes the same terminal digest regardless of finding order", async () => {
     const firstBody = JSON.stringify({
       status: "completed",

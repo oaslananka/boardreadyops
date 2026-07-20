@@ -49,6 +49,8 @@ type RunnerExecutionReport = {
     low: number;
     info: number;
   };
+  readiness?: NonNullable<ReleaseRunResult["readiness"]>;
+  waivers?: NonNullable<ReleaseRunResult["waivers"]>;
   findings: Array<{
     ruleId: string;
     severity: "critical" | "high" | "medium" | "low" | "info";
@@ -375,7 +377,10 @@ function terminalResultFromExecution(
       findings_medium: summary?.medium ?? 0,
       findings_low: summary?.low ?? 0,
       findings_info: summary?.info ?? 0,
+      ...(execution.report?.readiness ? { readiness_score: execution.report.readiness.score } : {}),
     },
+    ...(execution.report?.readiness ? { readiness: execution.report.readiness } : {}),
+    ...(execution.report?.waivers ? { waivers: execution.report.waivers } : {}),
     reportLinks: [],
   });
 }

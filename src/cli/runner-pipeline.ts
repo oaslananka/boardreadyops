@@ -64,6 +64,20 @@ export async function executeRunnerPipeline(
           low: report.summary.low,
           info: report.summary.info,
         },
+        ...(report.readiness
+          ? {
+              readiness: {
+                score: report.readiness.score,
+                status: report.readiness.status,
+                blocking: report.readiness.blocking,
+                nonBlocking: report.readiness.nonBlocking,
+                missingRequired: report.readiness.missingRequired,
+                missingRecommended: report.readiness.missingRecommended,
+                warnings: report.readiness.warnings,
+              },
+            }
+          : {}),
+        ...(report.waivers ? { waivers: report.waivers } : {}),
         findings: report.findings.map((finding) => ({
           ruleId: finding.ruleId,
           severity: finding.severity,

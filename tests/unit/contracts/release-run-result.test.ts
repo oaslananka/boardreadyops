@@ -49,6 +49,40 @@ describe("release run result contract", () => {
     expect(result.reportLinks[0]?.url).toMatch(/^https:/u);
   });
 
+  it("accepts bounded readiness and waiver context for product-quality GitHub output", () => {
+    const result = releaseRunResultSchema.parse({
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      readiness: {
+        score: 84,
+        status: "at-risk",
+        blocking: 0,
+        nonBlocking: 1,
+        missingRequired: [],
+        missingRecommended: ["assembly-drawing"],
+        warnings: ["Recommended output assembly-drawing is missing."],
+      },
+      waivers: {
+        active: [
+          {
+            rule: "bom.lifecycle",
+            owner: "hardware-team",
+            reason: "Approved for prototype lot.",
+            expires: "2026-08-31",
+            stale: false,
+            expired: false,
+            matched: 1,
+          },
+        ],
+        expired: [],
+      },
+    });
+
+    expect(result.readiness).toMatchObject({ score: 84, status: "at-risk" });
+    expect(result.waivers?.active).toHaveLength(1);
+  });
+
   it("rejects metric maps that exceed the bounded contract", () => {
     const metrics = Object.fromEntries(Array.from({ length: 101 }, (_, index) => [`metric-${index}`, index]));
 
