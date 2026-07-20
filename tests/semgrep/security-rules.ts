@@ -31,10 +31,10 @@ execFile("git", ["status", "--short"]);
 spawn("git", ["status", "--short"], { shell: false });
 
 // ruleid: boardreadyops.security.no-disabled-tls-verification
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // lgtm[js/disabling-certificate-validation]
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 // ruleid: boardreadyops.security.no-disabled-tls-verification
-new https.Agent({ rejectUnauthorized: false }); // lgtm[js/disabling-certificate-validation]
+new https.Agent({ rejectUnauthorized: false });
 
 // ok: boardreadyops.security.no-disabled-tls-verification
 new https.Agent({ rejectUnauthorized: true });

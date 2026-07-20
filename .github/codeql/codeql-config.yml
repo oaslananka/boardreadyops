@@ -1,0 +1,4 @@
+name: BoardReadyOps CodeQL configuration
+
+paths-ignore:
+  - tests/semgrep/**

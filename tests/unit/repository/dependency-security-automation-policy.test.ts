@@ -102,6 +102,15 @@ describe("dependency and local security automation policy", () => {
     expect(workflow).toContain("github/codeql-action/upload-sarif@");
   });
 
+  it("keeps intentional Semgrep fixtures out of CodeQL production analysis", () => {
+    const workflow = readText(".github/workflows/security.yml");
+    const codeqlConfig = readText(".github/codeql/codeql-config.yml");
+
+    expect(workflow).toContain("config-file: ./.github/codeql/codeql-config.yml");
+    expect(codeqlConfig).toContain("paths-ignore:");
+    expect(codeqlConfig).toContain("- tests/semgrep/**");
+  });
+
   it("documents Snyk authentication and Sonar Connected Mode", () => {
     const guide = readText("docs/development/security-tooling.md");
     expect(guide).toContain("snyk auth");
