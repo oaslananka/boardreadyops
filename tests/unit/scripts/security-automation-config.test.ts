@@ -34,6 +34,8 @@ describe("dependency and security automation configuration", () => {
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("renovatebot/github-action@30643683e37198214c159ca0bff17fbf7e46efba");
     expect(workflow).toContain("renovate-version: 43.272.4");
+    expect(workflow).toContain("pnpm run renovate:validate");
+    expect(workflow).not.toContain("npx ");
     expect(workflow).toContain("RENOVATE_REPOSITORIES: '[\"oaslananka/boardreadyops\"]'");
     expect(workflow).toContain("token: $" + "{{ secrets.GH_AUTH_TOKEN }}");
     expect(workflow).not.toContain("pull_request_target");
@@ -66,16 +68,18 @@ describe("dependency and security automation configuration", () => {
     const huskyPrePush = await repositoryFile(".husky/pre-push");
     const securityWorkflow = await repositoryFile(".github/workflows/security.yml");
 
-    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk@1.1306.1 test --all-projects");
+    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--config.ignore-scripts=true");
+    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk@1.1306.1");
+    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk test --all-projects");
+    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--severity-threshold=high");
     expect(preCommit).toContain("id: snyk-oss");
     expect(preCommit).toContain("stages: [pre-push]");
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
 
-    expect(securityWorkflow).toContain("snyk/actions/setup@8e119fbb6c251787721d34ba683ed48eba792766");
-    expect(securityWorkflow).toContain("snyk-version: 1.1306.1");
+    expect(securityWorkflow).toContain("pnpm install --frozen-lockfile --ignore-scripts");
+    expect(securityWorkflow).toContain("pnpm run security:snyk:oss --sarif-file-output=snyk.sarif");
+    expect(securityWorkflow).not.toContain("snyk/actions/setup@");
     expect(securityWorkflow).toContain("secrets.SNYK_TOKEN || secrets.SYNK_PAT_TOKEN");
-    expect(securityWorkflow).toContain("snyk test --all-projects");
-    expect(securityWorkflow).toContain("--severity-threshold=high");
     expect(securityWorkflow).toContain("snyk.sarif");
   });
 

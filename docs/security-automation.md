@@ -52,7 +52,7 @@ The project-specific rule set is intentionally small and high-confidence. Broade
 
 ## Snyk CI
 
-The `security / snyk` job runs only on trusted repository events so secrets are never exposed to fork pull requests. It installs Snyk CLI `1.1306.1`, scans every detected workspace project, includes development dependencies, and blocks high or critical open-source findings.
+The `security / snyk` job runs only on trusted repository events so secrets are never exposed to fork pull requests. It resolves the exact Snyk CLI `1.1306.1` package with lifecycle scripts disabled, scans every detected workspace project, includes development dependencies, and blocks high or critical open-source findings.
 
 The preferred repository secret is `SNYK_TOKEN`. The workflow temporarily supports the existing misspelled `SYNK_PAT_TOKEN` secret so migration can occur without an outage. After `SNYK_TOKEN` is configured and a successful workflow run is observed, delete `SYNK_PAT_TOKEN`.
 

@@ -42,8 +42,10 @@ jobs:
         with:
           node-version: "24.18.0"
           package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
       - name: Validate Renovate configuration
-        run: npx --yes --package=renovate@${RENOVATE_VERSION} renovate-config-validator renovate.json
+        run: pnpm run renovate:validate
 
   renovate:
     name: renovate / run
