@@ -127,6 +127,7 @@ nav:
           - GitHub App Permissions: security/github-app-permissions.md
           - Assurance Case: security/assurance-case.md
           - Scorecard: security/scorecard.md
+          - Security Automation: security-automation.md
       - Governance: governance.md
       - Repository Maturity:
           - Maturity Report: repo-maturity-report.md
@@ -157,6 +158,7 @@ nav:
           - Testing Policy: development/testing-policy.md
           - Release Process: development/release-process.md
           - Dependency Management: development/dependency-management.md
+          - Dependency Automation: dependency-automation.md
           - Commit Conventions: development/commit-conventions.md
           - Writing Rules: development/writing-rules.md
           - Tooling: development/tooling.md

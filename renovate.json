@@ -5,17 +5,24 @@
     "security:openssf-scorecard",
     ":dependencyDashboard",
     ":semanticCommits",
-    ":separatePatchReleases",
-    "group:allNonMajor"
+    ":separatePatchReleases"
   ],
-  "timezone": "Europe/Istanbul",
-  "dependencyDashboardTitle": "Dependency Dashboard",
   "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose"],
-  "ignorePaths": ["**/.next/**", "**/node_modules/**", "dist/**", "tmp/**"],
+  "timezone": "Europe/Istanbul",
+  "schedule": ["after 5am and before 8am every weekday"],
+  "minimumReleaseAge": "7 days",
+  "dependencyDashboardTitle": "Dependency Dashboard",
+  "ignorePaths": ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**", "tmp/**"],
   "labels": ["dependencies"],
-  "prHourlyLimit": 5,
-  "prConcurrentLimit": 10,
-  "rangeStrategy": "auto",
+  "rangeStrategy": "replace",
+  "pinDigests": true,
+  "rebaseWhen": "conflicted",
+  "prCreation": "not-pending",
+  "internalChecksFilter": "strict",
+  "prHourlyLimit": 3,
+  "prConcurrentLimit": 8,
+  "branchConcurrentLimit": 10,
+  "postUpdateOptions": ["pnpmDedupe"],
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 6am on monday"],
@@ -25,7 +32,9 @@
     {
       "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
       "matchDepTypes": ["devDependencies"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "minimumReleaseAge": "7 days",
+      "groupName": "developer tooling (non-major)",
       "addLabels": ["automerge"]
     },
     {
@@ -38,18 +47,37 @@
     {
       "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
       "matchPackageNames": ["/^@types\\//"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "minimumReleaseAge": "7 days",
+      "groupName": "type definitions (non-major)",
       "addLabels": ["types", "automerge"]
     },
     {
-      "description": "Require explicit dependency dashboard approval for major upgrades.",
+      "description": "Require manual review for core runtime and GitHub integration dependencies.",
+      "matchPackageNames": [
+        "next",
+        "react",
+        "react-dom",
+        "@octokit/auth-app",
+        "@octokit/rest",
+        "jose",
+        "pg",
+        "@actions/core",
+        "@actions/github",
+        "@actions/exec"
+      ],
+      "automerge": false,
+      "addLabels": ["manual-review"]
+    },
+    {
+      "description": "Require explicit Dependency Dashboard approval for major upgrades.",
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true,
       "automerge": false,
       "addLabels": ["breaking-change", "manual-review"]
     },
     {
-      "description": "Keep supply-chain surface updates visible and manually reviewed.",
+      "description": "Keep GitHub Actions and container updates visible and manually reviewed.",
       "matchManagers": ["github-actions", "dockerfile", "docker-compose"],
       "pinDigests": true,
       "automerge": false,

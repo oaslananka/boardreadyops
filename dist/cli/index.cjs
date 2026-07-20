@@ -3771,6 +3771,7 @@ var require_fast_uri = __commonJS({
       return uriTokens.join("");
     }
     var URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
+    var AUTHORITY_PREFIX = /^(?:[^#/:?]+:)?\/\/([^/?#]*)/;
     function getParseError(parsed, matches) {
       if (matches[2] !== void 0 && parsed.path && parsed.path[0] !== "/") {
         return 'URI path must start with "/" when authority is present.';
@@ -3799,6 +3800,11 @@ var require_fast_uri = __commonJS({
         } else {
           uri = "//" + uri;
         }
+      }
+      const authorityMatch = uri.match(AUTHORITY_PREFIX);
+      if (authorityMatch !== null && authorityMatch[1].indexOf("\\") !== -1) {
+        parsed.error = "URI authority must not contain a literal backslash.";
+        malformedAuthorityOrPort = true;
       }
       const matches = uri.match(URI_PARSE);
       if (matches) {
@@ -3843,7 +3849,7 @@ var require_fast_uri = __commonJS({
         if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
           if (parsed.host && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
             try {
-              parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
+              parsed.host = new URL("http://" + parsed.host).hostname;
             } catch (e) {
               parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
             }
@@ -9141,7 +9147,7 @@ var require_int = __commonJS({
             if (ch !== "0" && ch !== "1") return false;
             hasDigits = true;
           }
-          return hasDigits && Number.isFinite(parseYamlInteger2(data));
+          return hasDigits && isFinite(parseYamlInteger2(data));
         }
         if (ch === "x") {
           index++;
@@ -9149,7 +9155,7 @@ var require_int = __commonJS({
             if (!isHexCode(data.charCodeAt(index))) return false;
             hasDigits = true;
           }
-          return hasDigits && Number.isFinite(parseYamlInteger2(data));
+          return hasDigits && isFinite(parseYamlInteger2(data));
         }
         if (ch === "o") {
           index++;
@@ -9157,7 +9163,7 @@ var require_int = __commonJS({
             if (!isOctCode(data.charCodeAt(index))) return false;
             hasDigits = true;
           }
-          return hasDigits && Number.isFinite(parseYamlInteger2(data));
+          return hasDigits && isFinite(parseYamlInteger2(data));
         }
       }
       for (; index < max; index++) {
@@ -9167,7 +9173,7 @@ var require_int = __commonJS({
         hasDigits = true;
       }
       if (!hasDigits) return false;
-      return Number.isFinite(parseYamlInteger2(data));
+      return isFinite(parseYamlInteger2(data));
     }
     function parseYamlInteger2(data) {
       let value = data;
@@ -9240,7 +9246,7 @@ var require_float = __commonJS({
       if (!YAML_FLOAT_PATTERN2.test(data)) {
         return false;
       }
-      if (Number.isFinite(parseFloat(data, 10))) {
+      if (isFinite(parseFloat(data, 10))) {
         return true;
       }
       return YAML_FLOAT_SPECIAL_PATTERN2.test(data);
@@ -9764,7 +9770,7 @@ var require_loader = __commonJS({
       this.json = options["json"] || false;
       this.listener = options["listener"] || null;
       this.maxDepth = typeof options["maxDepth"] === "number" ? options["maxDepth"] : 100;
-      this.maxMergeSeqLength = typeof options["maxMergeSeqLength"] === "number" ? options["maxMergeSeqLength"] : 20;
+      this.maxTotalMergeKeys = typeof options["maxTotalMergeKeys"] === "number" ? options["maxTotalMergeKeys"] : 1e4;
       this.implicitTypes = this.schema.compiledImplicit;
       this.typeMap = this.schema.compiledTypeMap;
       this.length = input.length;
@@ -9773,6 +9779,7 @@ var require_loader = __commonJS({
       this.lineStart = 0;
       this.lineIndent = 0;
       this.depth = 0;
+      this.totalMergeKeys = 0;
       this.firstTabInLine = -1;
       this.documents = [];
       this.anchorMapTransactions = [];
@@ -9932,6 +9939,9 @@ var require_loader = __commonJS({
       const sourceKeys = Object.keys(source);
       for (let index = 0, quantity = sourceKeys.length; index < quantity; index += 1) {
         const key = sourceKeys[index];
+        if (state.maxTotalMergeKeys !== -1 && ++state.totalMergeKeys > state.maxTotalMergeKeys) {
+          throwError2(state, "merge keys exceeded maxTotalMergeKeys (" + state.maxTotalMergeKeys + ")");
+        }
         if (!_hasOwnProperty.call(destination, key)) {
           setProperty(destination, key, source[key]);
           overridableKeys[key] = true;
@@ -9959,15 +9969,8 @@ var require_loader = __commonJS({
       }
       if (keyTag === "tag:yaml.org,2002:merge") {
         if (Array.isArray(valueNode)) {
-          if (valueNode.length > state.maxMergeSeqLength) {
-            throwError2(state, "merge sequence length exceeded maxMergeSeqLength (" + state.maxMergeSeqLength + ")");
-          }
-          const seen = /* @__PURE__ */ new Set();
           for (let index = 0, quantity = valueNode.length; index < quantity; index += 1) {
-            const src = valueNode[index];
-            if (seen.has(src)) continue;
-            seen.add(src);
-            mergeMappings(state, _result, src, overridableKeys);
+            mergeMappings(state, _result, valueNode[index], overridableKeys);
           }
         } else {
           mergeMappings(state, _result, valueNode, overridableKeys);
@@ -22446,7 +22449,7 @@ var intCoreTag = defineScalarTag("tag:yaml.org,2002:int", {
     ..."0123456789"
   ],
   resolve: resolveYamlInteger$2,
-  identify: (object2) => Object.prototype.toString.call(object2) === "[object Number]" && object2 % 1 === 0 && !Object.is(object2, -0),
+  identify: (object2) => Number.isInteger(object2) && !Object.is(object2, -0) && object2.toString(10).indexOf("e") < 0,
   represent: (object2) => object2.toString(10)
 });
 var YAML_INTEGER_IMPLICIT_PATTERN = /* @__PURE__ */ new RegExp("^-?(?:0|[1-9][0-9]*)$");
@@ -22474,7 +22477,7 @@ var intJsonTag = defineScalarTag("tag:yaml.org,2002:int", {
   implicit: true,
   implicitFirstChars: ["-", ..."0123456789"],
   resolve: resolveYamlInteger$1,
-  identify: (object2) => Object.prototype.toString.call(object2) === "[object Number]" && object2 % 1 === 0 && !Object.is(object2, -0),
+  identify: (object2) => Number.isInteger(object2) && !Object.is(object2, -0) && object2.toString(10).indexOf("e") < 0,
   represent: (object2) => object2.toString(10)
 });
 var YAML_INTEGER_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?0x[0-9a-fA-F_]+|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+|[-+]?(?:0|[1-9][0-9_]*))$");
@@ -22508,7 +22511,7 @@ var intYaml11Tag = defineScalarTag("tag:yaml.org,2002:int", {
     ..."0123456789"
   ],
   resolve: resolveYamlInteger,
-  identify: (object2) => Object.prototype.toString.call(object2) === "[object Number]" && object2 % 1 === 0 && !Object.is(object2, -0),
+  identify: (object2) => Number.isInteger(object2) && !Object.is(object2, -0) && object2.toString(10).indexOf("e") < 0,
   represent: (object2) => object2.toString(10)
 });
 var YAML_FLOAT_PATTERN$1 = /* @__PURE__ */ new RegExp("^(?:[-+]?[0-9]+(?:\\.[0-9]*)?(?:[eE][-+]?[0-9]+)?|[-+]?\\.[0-9]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
@@ -22541,7 +22544,7 @@ var floatCoreTag = defineScalarTag("tag:yaml.org,2002:float", {
     ..."0123456789"
   ],
   resolve: resolveYamlFloat$2,
-  identify: (object2) => Object.prototype.toString.call(object2) === "[object Number]" && (object2 % 1 !== 0 || Object.is(object2, -0)),
+  identify: (object2) => typeof object2 === "number" && (!Number.isInteger(object2) || Object.is(object2, -0) || object2.toString(10).indexOf("e") >= 0),
   represent: representYamlFloat$2
 });
 var YAML_FLOAT_IMPLICIT_PATTERN = /* @__PURE__ */ new RegExp("^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]*)?(?:[eE][-+]?[0-9]+)?$");
@@ -22574,7 +22577,7 @@ var floatJsonTag = defineScalarTag("tag:yaml.org,2002:float", {
   implicit: true,
   implicitFirstChars: ["-", ..."0123456789"],
   resolve: resolveYamlFloat$1,
-  identify: (object2) => Object.prototype.toString.call(object2) === "[object Number]" && (object2 % 1 !== 0 || Object.is(object2, -0)),
+  identify: (object2) => typeof object2 === "number" && (!Number.isInteger(object2) || Object.is(object2, -0) || object2.toString(10).indexOf("e") >= 0),
   represent: representYamlFloat$1
 });
 var YAML_FLOAT_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?(?:(?:[0-9][0-9_]*)?\\.[0-9_]*)(?:[eE][-+][0-9]+)?|[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]*|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
@@ -22611,7 +22614,7 @@ var floatYaml11Tag = defineScalarTag("tag:yaml.org,2002:float", {
     ..."0123456789"
   ],
   resolve: resolveYamlFloat,
-  identify: (object2) => Object.prototype.toString.call(object2) === "[object Number]" && (object2 % 1 !== 0 || Object.is(object2, -0)),
+  identify: (object2) => typeof object2 === "number" && (!Number.isInteger(object2) || Object.is(object2, -0) || object2.toString(10).indexOf("e") >= 0),
   represent: representYamlFloat
 });
 var mergeTag = defineScalarTag("tag:yaml.org,2002:merge", {
@@ -23298,7 +23301,8 @@ var DEFAULT_CONSTRUCTOR_OPTIONS = {
   filename: "",
   schema: CORE_SCHEMA,
   json: false,
-  maxMergeSeqLength: 20
+  maxTotalMergeKeys: 1e4,
+  maxAliases: -1
 };
 function eventPosition$1(event) {
   if ("tagStart" in event && event.tagStart !== NO_RANGE$2) return event.tagStart;
@@ -23386,6 +23390,7 @@ function isMappingTag(tag) {
 }
 function mergeKeys(state, frame, source, sourceTag) {
   for (const sourceKey of sourceTag.keys(source)) {
+    if (state.maxTotalMergeKeys !== -1 && ++state.totalMergeKeys > state.maxTotalMergeKeys) throwError$1(state, `merge keys exceeded maxTotalMergeKeys (${state.maxTotalMergeKeys})`);
     if (frame.tag.has(frame.value, sourceKey)) continue;
     const err = frame.tag.addPair(frame.value, sourceKey, sourceTag.get(source, sourceKey));
     if (err) throwError$1(state, err);
@@ -23395,14 +23400,8 @@ function mergeKeys(state, frame, source, sourceTag) {
 function mergeSource(state, frame, source, sourceTag) {
   state.position = frame.keyPosition;
   if (isMappingTag(sourceTag)) mergeKeys(state, frame, source, sourceTag);
-  else if (sourceTag.nodeKind === "sequence" && Array.isArray(source)) {
-    const seen = /* @__PURE__ */ new Set();
-    for (const element of source) {
-      if (seen.has(element)) continue;
-      seen.add(element);
-      mergeKeys(state, frame, element, frame.tag);
-    }
-  } else throwError$1(state, "cannot merge mappings; the provided source object is unacceptable");
+  else if (sourceTag.nodeKind === "sequence" && Array.isArray(source)) for (const element of source) mergeKeys(state, frame, element, frame.tag);
+  else throwError$1(state, "cannot merge mappings; the provided source object is unacceptable");
 }
 function addMappingValue(state, frame, key, value, tag) {
   state.position = frame.keyPosition;
@@ -23423,7 +23422,6 @@ function addValue(state, value, tag) {
   } else if (frame.kind === "sequence") {
     if (frame.merge) {
       if (!isMappingTag(tag)) throwError$1(state, "cannot merge mappings; the provided source object is unacceptable");
-      if (frame.index >= state.maxMergeSeqLength) throwError$1(state, `merge sequence length exceeded maxMergeSeqLength (${state.maxMergeSeqLength})`);
     }
     const err = frame.tag.addItem(frame.value, value, frame.index++);
     if (err) throwError$1(state, err);
@@ -23460,7 +23458,9 @@ function constructFromEvents(events, options) {
     position: 0,
     frames: [],
     anchors: /* @__PURE__ */ new Map(),
-    tagHandlers: /* @__PURE__ */ Object.create(null)
+    tagHandlers: /* @__PURE__ */ Object.create(null),
+    totalMergeKeys: 0,
+    aliasCount: 0
   };
   while (state.eventIndex < state.events.length) {
     const event = state.events[state.eventIndex++];
@@ -23468,6 +23468,7 @@ function constructFromEvents(events, options) {
     switch (event.type) {
       case 1:
         state.anchors = /* @__PURE__ */ new Map();
+        state.aliasCount = 0;
         state.tagHandlers = /* @__PURE__ */ Object.create(null);
         for (const directive of event.directives) if (directive.kind === "tag") state.tagHandlers[directive.handle] = directive.prefix;
         state.frames.push({
@@ -23518,6 +23519,7 @@ function constructFromEvents(events, options) {
         break;
       }
       case 5: {
+        if (state.maxAliases !== -1 && ++state.aliasCount > state.maxAliases) throwError$1(state, `aliases exceeded maxAliases (${state.maxAliases})`);
         const name = state.source.slice(event.anchorStart, event.anchorEnd);
         const anchor = state.anchors.get(name);
         if (!anchor) throwError$1(state, `unidentified alias "${name}"`);

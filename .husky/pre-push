@@ -1,1 +1,8 @@
 pnpm run typecheck && pnpm run test:unit && pnpm run verify:dist
+
+if ! command -v pre-commit >/dev/null 2>&1; then
+  echo "pre-commit 4.6.0+ is required; install it with: python -m pip install 'pre-commit>=4.6.0,<5'" >&2
+  exit 1
+fi
+
+pre-commit run --hook-stage pre-push --all-files

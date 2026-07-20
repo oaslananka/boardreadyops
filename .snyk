@@ -1,0 +1,7 @@
+version: v1.25.0
+ignore:
+  SNYK-JS-EXTRACTZIP-17660777:
+    - '*':
+        reason: No upstream patched release is available; the dependency is development-only and Puppeteer install scripts are disabled by the pnpm allowBuilds policy.
+        expires: 2026-08-31T00:00:00.000Z
+patch: {}

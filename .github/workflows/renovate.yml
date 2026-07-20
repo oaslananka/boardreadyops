@@ -1,0 +1,72 @@
+name: renovate
+
+on:
+  pull_request:
+    paths:
+      - renovate.json
+      - .github/workflows/renovate.yml
+      - docs/dependency-automation.md
+      - tests/unit/scripts/security-automation-config.test.ts
+  push:
+    branches: [main]
+    paths:
+      - renovate.json
+      - .github/workflows/renovate.yml
+      - docs/dependency-automation.md
+      - tests/unit/scripts/security-automation-config.test.ts
+  schedule:
+    - cron: "17 3 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  RENOVATE_VERSION: 43.272.4
+
+jobs:
+  validate:
+    name: renovate / validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24.18.0"
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - name: Validate Renovate configuration
+        run: pnpm run renovate:validate
+
+  renovate:
+    name: renovate / run
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      LOG_LEVEL: info
+      RENOVATE_AUTODISCOVER: "false"
+      RENOVATE_ONBOARDING: "false"
+      RENOVATE_PLATFORM: github
+      RENOVATE_REPOSITORIES: '["oaslananka/boardreadyops"]'
+      RENOVATE_REQUIRE_CONFIG: required
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Run Renovate
+        uses: renovatebot/github-action@30643683e37198214c159ca0bff17fbf7e46efba
+        with:
+          token: ${{ secrets.GH_AUTH_TOKEN }}
+          configurationFile: renovate.json
+          renovate-version: 43.272.4
