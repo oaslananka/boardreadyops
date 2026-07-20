@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(14);
+    expect(cloudDatabaseSchemaVersion).toBe(15);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -18,6 +18,8 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("AuditEvent");
     expect(cloudDatabaseModels).toContain("ReleaseRunResult");
     expect(cloudDatabaseModels).toContain("ReleaseRunAttempt");
+    expect(cloudDatabaseModels).toContain("WebhookInbox");
+    expect(cloudDatabaseModels).toContain("ControlPlaneJob");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
@@ -38,6 +40,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0012_runner_terminal_result_authorization.sql",
       "0013_runner_registration_enrollments.sql",
       "0014_runner_execution_routing_policies.sql",
+      "0015_control_plane_webhook_jobs.sql",
     ]);
   });
 
@@ -174,6 +177,23 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("runner.registration.activated");
     expect(sql).toContain("security invoker");
     expect(sql).not.toContain("enrollment_token text");
+  });
+
+  it("stores durable webhook inbox and lease-based control-plane jobs in schema v15", async () => {
+    const sql = await readFile(join(migrationsDir, "0015_control_plane_webhook_jobs.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists webhook_inbox");
+    expect(sql).toContain("unique (provider, delivery_id)");
+    expect(sql).toContain("create table if not exists control_plane_jobs");
+    expect(sql).toContain("boardreadyops_accept_github_webhook");
+    expect(sql).toContain("boardreadyops_claim_control_plane_jobs");
+    expect(sql).toContain("for update skip locked");
+    expect(sql).toContain("boardreadyops_complete_control_plane_job");
+    expect(sql).toContain("boardreadyops_fail_control_plane_job");
+    expect(sql).toContain("normalized_actions = '[]'::jsonb");
+    expect(sql).toContain("boardreadyops_purge_expired_webhook_inbox");
+    expect(sql).toContain("retention_until <= p_now");
+    expect(sql).toContain("security invoker");
   });
 
   it("stores tenant-scoped execution routing policies in schema v14", async () => {

@@ -1,13 +1,13 @@
 # BoardReadyOps Cloud — Dashboard Data and Artifact Storage Model
 
-**Issue:** [#305](https://github.com/oaslananka/boardreadyops/issues/305)
-**Related:** [ADR-0008 — Vercel control plane](adr/0008-vercel-control-plane.md), [GitHub App RFC](github-app-rfc.md)
+**Issue:** [#187](https://github.com/oaslananka/boardreadyops/issues/187)
+**Related:** [#188](https://github.com/oaslananka/boardreadyops/issues/188), [#189](https://github.com/oaslananka/boardreadyops/issues/189), [ADR-0008 — Vercel control plane](adr/0008-vercel-control-plane.md), [GitHub App RFC](github-app-rfc.md)
 
 ---
 
 ## Overview
 
-This document defines the minimum data model required for the hosted BoardReadyOps dashboard and API. It is intentionally schema-first to guide implementation without prematurely committing to ORM details.
+This document describes the hosted BoardReadyOps dashboard, API, and control-plane persistence model. PostgreSQL SQL migrations under `packages/db/migrations` are authoritative; application stores use parameterized SQL against that versioned schema.
 
 All tables are scoped to a GitHub App `installation_id`. Cross-installation data access is not permitted.
 
@@ -150,6 +150,15 @@ interface Policy {
 
 ---
 
+
+### WebhookInbox
+
+A minimized, durable record of one verified provider delivery. `(provider, deliveryId)` is unique. It stores routing metadata, the raw-body SHA-256 digest, and bounded normalized lifecycle actions; it never stores webhook signatures, authorization headers, or raw request bodies.
+
+### ControlPlaneJob
+
+A lease-based job referencing exactly one `WebhookInbox` record. Jobs carry an explicit type and payload version, priority, availability time, bounded attempt count, lease owner/expiry, and terminal error metadata. Workers claim available rows using `FOR UPDATE SKIP LOCKED`; expired leases become retryable or dead-lettered at the configured attempt limit.
+
 ## Private Artifact Access
 
 Artifacts for private repositories are stored with a non-guessable path prefix and are never served from a public URL.
@@ -182,7 +191,7 @@ No artifact binary content passes through the API server on download.
 
 The data model is designed to be database-agnostic (no PostgreSQL-specific types in the schema above). Migration considerations:
 
-- **Schema versioning**: use a `schema_version` table and Prisma migrations from day 1.
+- **Schema versioning**: additive SQL migrations are recorded in `cloud_schema_migrations`; schema version 15 introduces the durable webhook inbox and control-plane jobs.
 - **Multi-region**: findings and artifacts are append-only; replication to read replicas is straightforward.
 - **Tenant isolation**: all queries filter by `installationId`; adding row-level security (RLS) in PostgreSQL does not require schema changes.
 - **Artifact store swap**: `storagePath` is internal. Switching from Vercel Blob to R2 or S3 requires a data migration script but no schema change.

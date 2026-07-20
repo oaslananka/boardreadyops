@@ -1,6 +1,7 @@
 export interface DeployOptions {
   readonly appName: string;
   readonly container: string;
+  readonly workerContainer: string;
   readonly healthUrl: string;
   readonly canaryHealthUrl: string;
   readonly imageRepository: string;
@@ -29,9 +30,24 @@ export interface RuntimeContainerArgsInput {
   readonly options: DeployOptions;
 }
 
+export interface MigrationContainerArgsInput {
+  readonly image: string;
+  readonly options: DeployOptions;
+}
+
+export interface WorkerContainerArgsInput {
+  readonly name: string;
+  readonly image: string;
+  readonly restart: string;
+  readonly revision: string;
+  readonly options: DeployOptions;
+}
+
 export const defaultDeployOptions: DeployOptions;
 
 export function readDeployOptions(env?: Readonly<Record<string, string | undefined>>): DeployOptions;
 export function dockerTagFromRevision(revision: string): string;
 export function runtimeContainerArgs(input: RuntimeContainerArgsInput): string[];
+export function migrationContainerArgs(input: MigrationContainerArgsInput): string[];
+export function workerContainerArgs(input: WorkerContainerArgsInput): string[];
 export function deployCloud(options?: DeployOptions): Promise<void>;

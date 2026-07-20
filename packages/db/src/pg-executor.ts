@@ -9,7 +9,9 @@ export type PgLifecycleExecutorOptions = {
   ssl?: boolean | { rejectUnauthorized?: boolean };
 };
 
-export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): SqlQueryExecutor {
+export type PgQueryExecutor = SqlQueryExecutor & { close(): Promise<void> };
+
+export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): PgQueryExecutor {
   const pool = new Pool({
     connectionString: options.connectionString,
     max: options.max ?? 5,
@@ -19,6 +21,9 @@ export function createPgQueryExecutor(options: PgLifecycleExecutorOptions): SqlQ
   return {
     async query(sql, params = []) {
       return await pool.query(sql, [...params]);
+    },
+    async close() {
+      await pool.end();
     },
   };
 }
