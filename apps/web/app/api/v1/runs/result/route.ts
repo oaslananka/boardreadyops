@@ -77,17 +77,34 @@ function terminalStatus(status: string): boolean {
   return status === "completed" || status === "failed" || status === "timed_out";
 }
 
-function checkConclusion(status: string, decision: string | null): CheckConclusion {
-  if (status === "timed_out") {
+function checkConclusion(result: {
+  status: string;
+  decision: string | null;
+  readiness?: { status: string; warnings: readonly string[] } | undefined;
+  waivers?: { active: readonly unknown[]; expired: readonly unknown[] } | undefined;
+  findings?: readonly { severity: string }[] | undefined;
+}): CheckConclusion {
+  if (result.status === "timed_out") {
     return "timed_out";
   }
 
-  if (status === "completed" && decision === "pass") {
-    return "success";
+  if (
+    result.status === "failed" ||
+    result.decision === "fail" ||
+    result.decision === "error" ||
+    result.readiness?.status === "blocked"
+  ) {
+    return "failure";
   }
 
-  if (status === "failed" || decision === "fail" || decision === "error") {
-    return "failure";
+  if (result.status === "completed" && result.decision === "pass") {
+    const hasWarnings =
+      result.readiness?.status === "at-risk" ||
+      (result.readiness?.warnings.length ?? 0) > 0 ||
+      (result.waivers?.active.length ?? 0) > 0 ||
+      (result.waivers?.expired.length ?? 0) > 0 ||
+      (result.findings?.some((finding) => ["medium", "low", "info"].includes(finding.severity)) ?? false);
+    return hasWarnings ? "neutral" : "success";
   }
 
   return "neutral";
@@ -725,7 +742,7 @@ export async function handleResultRequest(
             repositoryName,
             checkRunId: githubCheckRunId,
             runId,
-            conclusion: checkConclusion(parsed.data.status, parsed.data.decision),
+            conclusion: checkConclusion(parsed.data),
             title: checkOutput.title,
             summary: checkOutput.summary,
             completedAt: publicationCompletedAt,

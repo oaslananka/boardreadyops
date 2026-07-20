@@ -19,6 +19,26 @@ export type ReportLinkTemplateInput = {
   url: string;
 };
 
+export type ReadinessTemplateInput = {
+  score: number;
+  status: "ready" | "at-risk" | "blocked" | string;
+  blocking: number;
+  nonBlocking: number;
+  missingRequired: readonly string[];
+  missingRecommended: readonly string[];
+  warnings: readonly string[];
+};
+
+export type WaiverTemplateInput = {
+  rule: string;
+  owner: string;
+  reason: string;
+  expires?: string | undefined;
+  stale: boolean;
+  expired: boolean;
+  matched: number;
+};
+
 export type ReadinessResultTemplateInput = {
   status: string;
   decision: string | null;
@@ -26,6 +46,13 @@ export type ReadinessResultTemplateInput = {
   artifacts?: readonly ArtifactTemplateInput[];
   metrics?: Readonly<Record<string, number>>;
   reportLinks?: readonly ReportLinkTemplateInput[];
+  readiness?: ReadinessTemplateInput | undefined;
+  waivers?:
+    | {
+        active: readonly WaiverTemplateInput[];
+        expired: readonly WaiverTemplateInput[];
+      }
+    | undefined;
   detailsUrl?: string | undefined;
 };
 
