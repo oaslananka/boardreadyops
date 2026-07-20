@@ -1,6 +1,10 @@
 import { verifyGitHubWebhook } from "@boardreadyops/cloud-core";
 import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
-import { executeGitHubAppLifecycleActions } from "@boardreadyops/cloud-core/lifecycle-executor";
+import {
+  emptyGitHubAppLifecycleExecutionResult,
+  executeGitHubAppLifecycleActions,
+} from "@boardreadyops/cloud-core/lifecycle-executor";
+import { CloudRuntimeConfigurationError } from "../../../../lib/cloud-runtime-config.js";
 import { createGitHubAppCheckRunClient } from "../../../../lib/github-app-check-run-client.js";
 import { createRunnerClient } from "../../../../lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "../../../../lib/runner-mode.js";
@@ -50,10 +54,44 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const runner = runnerModeSummary();
+
+  if (lifecycle.actions.length === 0) {
+    return Response.json(
+      {
+        ok: true,
+        status: "accepted",
+        event,
+        delivery,
+        action: lifecycle.action,
+        runner,
+        lifecycleActions: lifecycle.actions,
+        execution: emptyGitHubAppLifecycleExecutionResult,
+      },
+      { status: 202 },
+    );
+  }
+
+  let lifecycleStore: ReturnType<typeof getGitHubAppLifecycleStore>;
+  try {
+    lifecycleStore = getGitHubAppLifecycleStore();
+  } catch (error) {
+    if (error instanceof CloudRuntimeConfigurationError) {
+      return Response.json(
+        {
+          ok: false,
+          error: "cloud persistence is not configured",
+          code: error.code,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
+
   const workflowDispatchClient = runnerWorkflowDispatchClient(runner, createRunnerClient);
   const execution = await executeGitHubAppLifecycleActions(
     lifecycle.actions,
-    getGitHubAppLifecycleStore(),
+    lifecycleStore,
     createGitHubAppCheckRunClient(),
     workflowDispatchClient,
   );

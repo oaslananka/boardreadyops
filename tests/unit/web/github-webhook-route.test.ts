@@ -6,6 +6,7 @@ import { createGitHubSignatureHeader } from "../../../packages/cloud-core/src/in
 const trackedEnvironmentNames = [
   "GITHUB_WEBHOOK_SECRET",
   "DATABASE_URL",
+  "BOARDREADYOPS_PERSISTENCE_MODE",
   "BOARDREADYOPS_RUNNER_MODE",
   "BOARDREADYOPS_SELF_HOSTED_RUNNER_LABEL",
   "BOARDREADYOPS_SELF_HOSTED_RUNNER_REQUIRE_SAFE_MODE",
@@ -69,6 +70,7 @@ describe("GitHub webhook route lifecycle persistence", () => {
   it("executes normalized lifecycle actions through the configured store", async () => {
     process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
     delete process.env.DATABASE_URL;
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
     delete process.env.BOARDREADYOPS_RUNNER_MODE;
 
     const response = await POST(signedGitHubRequest("installation", installationPayload()));
@@ -95,6 +97,7 @@ describe("GitHub webhook route lifecycle persistence", () => {
   it("reports an invalid runner mode as disabled rather than failing open", async () => {
     process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
     delete process.env.DATABASE_URL;
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
     process.env.BOARDREADYOPS_RUNNER_MODE = "automatic";
 
     const response = await POST(signedGitHubRequest("installation", installationPayload()));
@@ -108,6 +111,39 @@ describe("GitHub webhook route lifecycle persistence", () => {
         configurationError: "invalid-runner-mode",
         dispatch: "none",
       },
+    });
+  });
+
+  it("acknowledges ping events without requiring persistence", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    delete process.env.BOARDREADYOPS_PERSISTENCE_MODE;
+
+    const response = await POST(signedGitHubRequest("ping", { zen: "pong" }));
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "accepted",
+      event: "ping",
+      delivery: "delivery-123",
+      lifecycleActions: [],
+      execution: { total: 0 },
+    });
+  });
+
+  it("fails closed when PostgreSQL persistence is not configured", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    delete process.env.BOARDREADYOPS_PERSISTENCE_MODE;
+
+    const response = await POST(signedGitHubRequest("installation", installationPayload()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "cloud persistence is not configured",
+      code: "missing-database-url",
     });
   });
 
