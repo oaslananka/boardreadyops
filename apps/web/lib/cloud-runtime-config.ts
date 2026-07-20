@@ -31,7 +31,7 @@ export function resolveCloudPersistenceConfiguration(
     );
   }
 
-  const mode: CloudPersistenceMode = configuredMode ?? "postgres";
+  const mode: CloudPersistenceMode = configuredMode === "memory" ? "memory" : "postgres";
 
   if (mode === "memory") {
     if (environment.NODE_ENV !== "test") {
