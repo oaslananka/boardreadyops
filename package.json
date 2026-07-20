@@ -88,7 +88,8 @@
     "verify:web-standalone": "node scripts/verify-web-standalone.mjs",
     "cloud:dev": "pnpm --filter @boardreadyops/web dev",
     "cloud:deploy:self-hosted": "node scripts/deploy-cloud.mjs",
-    "cloud:provision:admin-db-url": "node scripts/provision-admin-database-url.mjs"
+    "cloud:provision:admin-db-url": "node scripts/provision-admin-database-url.mjs",
+    "renovate:validate": "pnpm dlx --package=renovate@43.272.4 renovate-config-validator renovate.json"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [

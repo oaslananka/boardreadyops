@@ -73,7 +73,7 @@ describe("dependency and local security automation policy", () => {
       `pnpm dlx snyk@${SNYK_VERSION} test --all-projects --severity-threshold=high`,
     );
     expect(packageJson.scripts?.["renovate:validate"]).toBe(
-      `pnpm dlx renovate@${RENOVATE_VERSION} renovate-config-validator renovate.json`,
+      `pnpm dlx --package=renovate@${RENOVATE_VERSION} renovate-config-validator renovate.json`,
     );
   });
 

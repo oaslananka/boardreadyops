@@ -5,17 +5,25 @@
     "security:openssf-scorecard",
     ":dependencyDashboard",
     ":semanticCommits",
-    ":separatePatchReleases",
-    "group:allNonMajor"
+    ":separatePatchReleases"
   ],
   "timezone": "Europe/Istanbul",
+  "dependencyDashboard": true,
   "dependencyDashboardTitle": "Dependency Dashboard",
+  "platformAutomerge": false,
+  "schedule": ["after 2am and before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "prCreation": "not-pending",
+  "internalChecksFilter": "strict",
+  "rebaseWhen": "behind-base-branch",
   "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose"],
-  "ignorePaths": ["**/.next/**", "**/node_modules/**", "dist/**", "tmp/**"],
+  "ignorePaths": ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**", "tmp/**"],
   "labels": ["dependencies"],
-  "prHourlyLimit": 5,
-  "prConcurrentLimit": 10,
+  "prHourlyLimit": 3,
+  "prConcurrentLimit": 6,
   "rangeStrategy": "auto",
+  "pinDigests": true,
+  "postUpdateOptions": ["pnpmDedupe"],
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 6am on monday"],
@@ -29,17 +37,46 @@
       "addLabels": ["automerge"]
     },
     {
-      "description": "Treat TypeScript compiler updates as manual because they can change type-checking behavior.",
-      "matchPackageNames": ["typescript"],
+      "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
+      "matchPackageNames": ["/^@types\\//"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "addLabels": ["types", "automerge"]
+    },
+    {
+      "description": "Coordinate TypeScript and type tooling updates.",
+      "matchPackageNames": ["typescript", "tsx", "ts-node", "/^@types\\//"],
+      "groupName": "TypeScript and type tooling",
       "minimumReleaseAge": "7 days",
       "automerge": false,
       "addLabels": ["manual-review"]
     },
     {
-      "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
-      "matchPackageNames": ["/^@types\\//"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "addLabels": ["types", "automerge"]
+      "description": "Coordinate Vitest test tooling updates.",
+      "matchPackageNames": ["vitest", "/^@vitest\\//"],
+      "groupName": "Vitest test tooling"
+    },
+    {
+      "description": "Coordinate Next.js and React runtime updates with manual review.",
+      "matchPackageNames": ["next", "react", "react-dom", "/^@types\\/react/"],
+      "groupName": "Next.js and React",
+      "minimumReleaseAge": "7 days",
+      "automerge": false,
+      "addLabels": ["manual-review"]
+    },
+    {
+      "description": "Coordinate Prisma and PostgreSQL tooling updates with manual review.",
+      "matchPackageNames": ["prisma", "@prisma/client", "pg", "@types/pg"],
+      "groupName": "Prisma and PostgreSQL tooling",
+      "minimumReleaseAge": "7 days",
+      "automerge": false,
+      "addLabels": ["manual-review"]
+    },
+    {
+      "description": "Keep pnpm toolchain updates manual.",
+      "matchPackageNames": ["pnpm"],
+      "minimumReleaseAge": "7 days",
+      "automerge": false,
+      "addLabels": ["manual-review"]
     },
     {
       "description": "Require explicit dependency dashboard approval for major upgrades.",
@@ -47,6 +84,12 @@
       "dependencyDashboardApproval": true,
       "automerge": false,
       "addLabels": ["breaking-change", "manual-review"]
+    },
+    {
+      "description": "Never automerge unstable zero-major dependencies.",
+      "matchCurrentVersion": "/^0\\./",
+      "automerge": false,
+      "addLabels": ["manual-review"]
     },
     {
       "description": "Keep supply-chain surface updates visible and manually reviewed.",
@@ -58,6 +101,7 @@
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
+    "schedule": ["at any time"],
     "labels": ["security", "dependencies"]
   },
   "osvVulnerabilityAlerts": true
