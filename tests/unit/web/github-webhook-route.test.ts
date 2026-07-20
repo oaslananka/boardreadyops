@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resetGitHubAppLifecycleStoreForTests } from "../../../apps/web/app/api/github/webhook/lifecycle-store.js";
+import {
+  resetControlPlaneJobStoreForTests,
+  setControlPlaneJobStoreForTests,
+} from "../../../apps/web/app/api/github/webhook/intake-store.js";
 import { POST } from "../../../apps/web/app/api/github/webhook/route.js";
+import { resetWebhookRateLimitForTests } from "../../../apps/web/lib/webhook-rate-limit.js";
 import { createGitHubSignatureHeader } from "../../../packages/cloud-core/src/index.js";
 
 const trackedEnvironmentNames = [
@@ -10,6 +14,7 @@ const trackedEnvironmentNames = [
   "BOARDREADYOPS_RUNNER_MODE",
   "BOARDREADYOPS_SELF_HOSTED_RUNNER_LABEL",
   "BOARDREADYOPS_SELF_HOSTED_RUNNER_REQUIRE_SAFE_MODE",
+  "BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE",
 ] as const;
 const originalEnvironment = new Map(trackedEnvironmentNames.map((name) => [name, process.env[name]]));
 
@@ -21,6 +26,19 @@ function signedGitHubRequest(event: string, payload: unknown, secret = "test-sec
     headers: {
       "content-type": "application/json",
       "x-github-delivery": "delivery-123",
+      "x-github-event": event,
+      "x-hub-signature-256": createGitHubSignatureHeader(body, secret),
+    },
+    body,
+  });
+}
+
+function signedBodyRequest(event: string, body: string, secret = "test-secret", delivery = "delivery-123"): Request {
+  return new Request("https://boardreadyops.test/api/github/webhook", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-github-delivery": delivery,
       "x-github-event": event,
       "x-hub-signature-256": createGitHubSignatureHeader(body, secret),
     },
@@ -63,11 +81,12 @@ afterEach(() => {
     }
   }
 
-  resetGitHubAppLifecycleStoreForTests();
+  resetControlPlaneJobStoreForTests();
+  resetWebhookRateLimitForTests();
 });
 
 describe("GitHub webhook route lifecycle persistence", () => {
-  it("executes normalized lifecycle actions through the configured store", async () => {
+  it("durably accepts normalized lifecycle actions without executing them in the request", async () => {
     process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
     delete process.env.DATABASE_URL;
     process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
@@ -86,12 +105,117 @@ describe("GitHub webhook route lifecycle persistence", () => {
         configurationValid: true,
         dispatch: "github-actions",
       },
+      intake: {
+        outcome: "accepted",
+        queued: true,
+      },
       execution: {
-        total: 2,
-        installationsUpserted: 1,
-        repositoriesUpserted: 1,
+        total: 0,
       },
     });
+  });
+
+  it("accepts a repeated delivery idempotently without creating another job", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+
+    const first = await POST(signedGitHubRequest("installation", installationPayload()));
+    const second = await POST(signedGitHubRequest("installation", installationPayload()));
+
+    expect(first.status).toBe(202);
+    expect(second.status).toBe(202);
+    await expect(first.json()).resolves.toMatchObject({ intake: { outcome: "accepted", queued: true } });
+    await expect(second.json()).resolves.toMatchObject({ intake: { outcome: "duplicate", queued: false } });
+  });
+
+  it("does not persist a delivery with an invalid signature", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+    const body = JSON.stringify(installationPayload());
+
+    const invalid = await POST(signedBodyRequest("installation", body, "wrong-secret", "delivery-invalid"));
+    const valid = await POST(signedBodyRequest("installation", body, "test-secret", "delivery-invalid"));
+
+    expect(invalid.status).toBe(401);
+    await expect(valid.json()).resolves.toMatchObject({ intake: { outcome: "accepted", queued: true } });
+  });
+
+  it("does not reserve a delivery id for malformed signed JSON", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+
+    const malformed = await POST(signedBodyRequest("installation", "{not-json"));
+    const valid = await POST(signedGitHubRequest("installation", installationPayload()));
+
+    expect(malformed.status).toBe(400);
+    await expect(valid.json()).resolves.toMatchObject({ intake: { outcome: "accepted", queued: true } });
+  });
+
+  it("returns service unavailable without acknowledging a persistence outage", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+    setControlPlaneJobStoreForTests({
+      acceptGitHubWebhook: async () => {
+        throw new Error("database unavailable");
+      },
+      claimJobs: async () => [],
+      completeJob: async () => "stale",
+      failJob: async () => "stale",
+      purgeExpired: async () => 0,
+      collectMetrics: async () => ({
+        availableJobs: 0,
+        leasedJobs: 0,
+        deadLetterJobs: 0,
+        duplicateDeliveries: 0,
+        oldestUnprocessedAgeSeconds: 0,
+      }),
+    });
+
+    const response = await POST(signedGitHubRequest("installation", installationPayload()));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "webhook could not be durably accepted",
+    });
+  });
+
+  it("rejects an oversized payload before persistence", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+    const request = new Request("https://boardreadyops.test/api/github/webhook", {
+      method: "POST",
+      headers: {
+        "content-length": String(2 * 1024 * 1024 + 1),
+        "x-github-delivery": "delivery-large",
+        "x-github-event": "installation",
+        "x-hub-signature-256": "sha256=invalid",
+      },
+      body: "small",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "webhook payload is too large" });
+  });
+
+  it("rate limits distinct verified deliveries while allowing GitHub to retry", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+    process.env.BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE = "1";
+    const body = JSON.stringify(installationPayload());
+
+    const first = await POST(signedBodyRequest("installation", body, "test-secret", "delivery-rate-1"));
+    const retry = await POST(signedBodyRequest("installation", body, "test-secret", "delivery-rate-1"));
+    const limited = await POST(signedBodyRequest("installation", body, "test-secret", "delivery-rate-2"));
+
+    expect(first.status).toBe(202);
+    expect(retry.status).toBe(202);
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
   });
 
   it("reports an invalid runner mode as disabled rather than failing open", async () => {

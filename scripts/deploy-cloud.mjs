@@ -17,6 +17,7 @@ function logError(message) {
 export const defaultDeployOptions = {
   appName: "boardreadyops-cloud",
   container: "bro-web",
+  workerContainer: "bro-worker",
   healthUrl: "https://boardreadyops.oaslananka.dev/api/health",
   canaryHealthUrl: "http://127.0.0.1:3004/api/health",
   imageRepository: "boardreadyops-web-runtime",
@@ -53,6 +54,7 @@ export function readDeployOptions(env = process.env) {
   return {
     appName: envValue(env, "BOARDREADYOPS_CLOUD_APP_NAME", defaultDeployOptions.appName),
     container: envValue(env, "BOARDREADYOPS_CLOUD_CONTAINER", defaultDeployOptions.container),
+    workerContainer: envValue(env, "BOARDREADYOPS_CLOUD_WORKER_CONTAINER", defaultDeployOptions.workerContainer),
     healthUrl: envValue(env, "BOARDREADYOPS_CLOUD_HEALTH_URL", defaultDeployOptions.healthUrl),
     canaryHealthUrl: envValue(env, "BOARDREADYOPS_CLOUD_CANARY_HEALTH_URL", defaultDeployOptions.canaryHealthUrl),
     imageRepository: envValue(env, "BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY", defaultDeployOptions.imageRepository),
@@ -180,21 +182,28 @@ async function waitForContainerHealth(container, options) {
   throw new Error(`${container} did not become healthy before the deployment timeout`);
 }
 
+function appendReleaseRepositoriesArgs(args, options) {
+  if (!options.releaseRepositoriesFile) return;
+  args.push(
+    "--mount",
+    `type=bind,src=${options.releaseRepositoriesFile},dst=/run/policies/repositories,readonly`,
+    "--env",
+    "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE=/run/policies/repositories",
+  );
+}
+
+function daemonContainerArgs(name, restart, network) {
+  return ["run", "-d", "--name", name, "--restart", restart, "--network", network];
+}
+
 export function runtimeContainerArgs({ name, image, publish, networkAlias, restart, revision, options }) {
-  const args = [
-    "run",
-    "-d",
-    "--name",
-    name,
-    "--restart",
-    restart,
-    "--network",
-    options.network,
+  const args = daemonContainerArgs(name, restart, options.network);
+  args.push(
     "--network-alias",
     networkAlias,
     "--mount",
     `type=bind,src=${options.runtimeEnvFile},dst=/run/app-env,readonly`,
-  ];
+  );
 
   if (options.runnerResultKeyFile) {
     args.push(
@@ -216,14 +225,7 @@ export function runtimeContainerArgs({ name, image, publish, networkAlias, resta
     );
   }
 
-  if (options.releaseRepositoriesFile) {
-    args.push(
-      "--mount",
-      `type=bind,src=${options.releaseRepositoriesFile},dst=/run/policies/repositories,readonly`,
-      "--env",
-      "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE=/run/policies/repositories",
-    );
-  }
+  appendReleaseRepositoriesArgs(args, options);
 
   if (options.requireGithubOidc) {
     args.push("--env", "BOARDREADYOPS_REQUIRE_GITHUB_OIDC=1");
@@ -241,6 +243,64 @@ export function runtimeContainerArgs({ name, image, publish, networkAlias, resta
   return args;
 }
 
+function containerExists(name, options) {
+  if (options.dryRun) return true;
+  return Boolean(
+    run("docker", ["inspect", "--format", "{{.Id}}", name], options, {
+      capture: true,
+      allowFailure: true,
+      quiet: true,
+    }),
+  );
+}
+
+export function migrationContainerArgs({ image, options }) {
+  return [
+    "run",
+    "--rm",
+    "--network",
+    options.network,
+    "--mount",
+    `type=bind,src=${options.runtimeEnvFile},dst=/run/app-env,readonly`,
+    image,
+    "node",
+    "migrate.mjs",
+  ];
+}
+
+export function workerContainerArgs({ name, image, restart, revision, options }) {
+  const args = daemonContainerArgs(name, restart, options.network);
+  args.push(
+    "--network-alias",
+    "worker",
+    "--mount",
+    `type=bind,src=${options.runtimeEnvFile},dst=/run/app-env,readonly`,
+  );
+
+  appendReleaseRepositoriesArgs(args, options);
+
+  args.push(
+    "--env",
+    "BOARDREADYOPS_WORKER_HEALTH_PORT=3001",
+    "--health-cmd",
+    `node -e "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))"`,
+    "--health-interval",
+    "15s",
+    "--health-timeout",
+    "5s",
+    "--health-start-period",
+    "20s",
+    "--health-retries",
+    "4",
+    "--label",
+    `com.boardreadyops.deployment.revision=${revision}`,
+    image,
+    "node",
+    "worker.mjs",
+  );
+  return args;
+}
+
 export async function deployCloud(options = readDeployOptions()) {
   const revision =
     options.revision || (options.dryRun ? "dry-run" : run("git", ["rev-parse", "HEAD"], options, { capture: true }));
@@ -253,6 +313,7 @@ export async function deployCloud(options = readDeployOptions()) {
   const rollbackImage = `${options.imageRepository}:rollback-${stamp}`;
   const canaryContainer = `${options.container}-canary-${shortRevision}`;
   const previousContainer = `${options.container}-previous-${stamp}`;
+  const previousWorkerContainer = `${options.workerContainer}-previous-${stamp}`;
 
   if (!options.skipInstall) {
     run("pnpm", ["install", "--frozen-lockfile"], options);
@@ -279,6 +340,8 @@ export async function deployCloud(options = readDeployOptions()) {
     ],
     options,
   );
+
+  run("docker", migrationContainerArgs({ image, options }), options);
 
   run("docker", ["rm", "-f", canaryContainer], options, { allowFailure: true, quiet: true });
 
@@ -308,6 +371,8 @@ export async function deployCloud(options = readDeployOptions()) {
     ? "current-image-id"
     : run("docker", ["inspect", "--format", "{{.Image}}", options.container], options, { capture: true });
 
+  const hadPreviousWorker = containerExists(options.workerContainer, options);
+
   run("docker", ["image", "tag", currentImageId, rollbackImage], options);
   run("docker", ["rename", options.container, previousContainer], options);
   run("docker", ["update", "--restart=no", previousContainer], options);
@@ -331,9 +396,33 @@ export async function deployCloud(options = readDeployOptions()) {
     if (!options.dryRun) {
       await waitForHttpHealth(options.healthUrl, options);
     }
+
+    if (hadPreviousWorker) {
+      run("docker", ["rename", options.workerContainer, previousWorkerContainer], options);
+      run("docker", ["update", "--restart=no", previousWorkerContainer], options);
+      run("docker", ["stop", "--timeout", "30", previousWorkerContainer], options);
+    }
+    run(
+      "docker",
+      workerContainerArgs({
+        name: options.workerContainer,
+        image,
+        restart: "unless-stopped",
+        revision,
+        options,
+      }),
+      options,
+    );
+    await waitForContainerHealth(options.workerContainer, options);
   } catch (error) {
     logError(error instanceof Error ? error.message : String(error));
     logError(`Deployment failed; restoring ${previousContainer}.`);
+    run("docker", ["rm", "-f", options.workerContainer], options, { allowFailure: true, quiet: true });
+    if (hadPreviousWorker) {
+      run("docker", ["rename", previousWorkerContainer, options.workerContainer], options);
+      run("docker", ["update", "--restart=unless-stopped", options.workerContainer], options);
+      run("docker", ["start", options.workerContainer], options);
+    }
     run("docker", ["rm", "-f", options.container], options, { allowFailure: true, quiet: true });
     run("docker", ["rename", previousContainer, options.container], options);
     run("docker", ["update", "--restart=unless-stopped", options.container], options);
@@ -345,6 +434,9 @@ export async function deployCloud(options = readDeployOptions()) {
   }
 
   run("docker", ["rm", previousContainer], options);
+  if (hadPreviousWorker) {
+    run("docker", ["rm", previousWorkerContainer], options);
+  }
   log(`${options.appName} deployment completed successfully at revision ${revision}.`);
   log(`Rollback image retained as ${rollbackImage}.`);
 }

@@ -1,4 +1,4 @@
-export const cloudDatabaseSchemaVersion = 14;
+export const cloudDatabaseSchemaVersion = 15;
 
 export const cloudDatabaseModels = [
   "Installation",
@@ -16,6 +16,8 @@ export const cloudDatabaseModels = [
   "AuditEvent",
   "ReleaseRunResult",
   "ReleaseRunAttempt",
+  "WebhookInbox",
+  "ControlPlaneJob",
 ] as const;
 
 export type CloudDatabaseModel = (typeof cloudDatabaseModels)[number];

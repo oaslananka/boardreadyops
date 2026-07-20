@@ -12,6 +12,8 @@ Cloudflare DNS
   -> ops-vps-02 / 46.101.195.208
   -> Caddy on the boardreadyops-cloud Docker network
   -> immutable BoardReadyOps web image on web:3000
+  -> durable PostgreSQL webhook inbox and control-plane jobs
+  -> independent BoardReadyOps worker image on worker:3001
   -> PostgreSQL, Redis, and a persistent artifact volume
 ```
 
@@ -41,7 +43,9 @@ Keep the live Caddy bind mount under `/opt/boardreadyops-cloud`; do not bind it 
 
 ## Host requirements
 
-Install Docker Engine and the Docker Compose v2 plugin on the VPS. The web image includes a native Docker healthcheck. PostgreSQL and Redis healthchecks are also defined in `deploy/docker-compose.yml`.
+Install Docker Engine and the Docker Compose v2 plugin on the VPS. The web and control-plane worker processes have independent healthchecks. PostgreSQL and Redis healthchecks are also defined in `deploy/docker-compose.yml`.
+
+The webhook endpoint never performs GitHub Check Run creation or workflow dispatch inline. It verifies and normalizes the request, atomically stores one `webhook_inbox` row and one `control_plane_jobs` row, and returns HTTP 202. The worker claims jobs with PostgreSQL leases and bounded retries. This keeps accepted deliveries recoverable across web or worker restarts. Web intake logs expose only outcome and request-to-accept latency; the worker periodically emits aggregate available, leased, dead-letter, duplicate, and oldest-unprocessed-age metrics without repository, installation, delivery, or payload fields. Successful processing immediately replaces normalized actions with an empty array. Terminal inbox metadata is retained for 30 days by default and then removed in bounded worker cleanup batches; dead-letter actions remain available only until that retention deadline. Verified deliveries are guarded by a configurable per-installation, per-process rate window (`BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE`, default 1200); retries with the same GitHub delivery ID are exempt so idempotent acknowledgement remains available.
 
 ## First Compose deployment
 
@@ -55,12 +59,15 @@ export BOARDREADYOPS_IMAGE_TAG="$BOARDREADYOPS_GIT_SHA"
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
 ```
 
-The build writes the commit SHA, package version, and build timestamp into standard OCI image labels.
+The build writes the commit SHA, package version, and build timestamp into standard OCI image labels. Compose runs the additive SQL migrations once, then starts the web and worker services from the same immutable image. The worker exposes readiness only inside the Compose network on port 3001.
 
 ## Health check
 
 ```bash
 curl -fsS https://boardreadyops.oaslananka.dev/api/health
+
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml exec worker \
+  node -e "fetch('http://127.0.0.1:3001/health/ready').then(async r=>{console.log(await r.text());process.exit(r.ok?0:1)})"
 ```
 
 Expected response:
@@ -95,13 +102,14 @@ The deploy script performs these steps:
 1. Installs dependencies with `pnpm install --frozen-lockfile` unless explicitly skipped.
 2. Builds an immutable web image tagged with the current Git commit.
 3. Adds OCI revision, version, and build-date labels to the image.
-4. Starts a temporary canary container on `127.0.0.1:3004`.
-5. Requires both the image-native Docker healthcheck and the canary HTTP health endpoint to pass.
-6. Tags the current live image as a timestamped rollback image.
-7. Stops the old container and starts the new image as `bro-web` with `restart=unless-stopped`.
-8. Verifies the public HTTPS health endpoint.
-9. Restores the previous container automatically if the new deployment fails.
-10. Removes the previous container after success while retaining its rollback image.
+4. Applies pending additive PostgreSQL migrations from the immutable image.
+5. Starts a temporary web canary on `127.0.0.1:3004`.
+6. Requires both the image-native Docker healthcheck and the canary HTTP health endpoint to pass.
+7. Tags the current live image as a timestamped rollback image.
+8. Replaces `bro-web`, verifies the public HTTPS endpoint, then replaces `bro-worker`.
+9. Requires the worker's database-backed readiness check to pass.
+10. Restores both previous containers automatically if either process fails deployment.
+11. Removes previous containers after success while retaining the rollback image.
 
 The deploy no longer copies `.next` into a running container. Each release is an immutable Docker image tied to one Git revision.
 
@@ -109,6 +117,7 @@ Supported environment overrides:
 
 ```text
 BOARDREADYOPS_CLOUD_CONTAINER=bro-web
+BOARDREADYOPS_CLOUD_WORKER_CONTAINER=bro-worker
 BOARDREADYOPS_CLOUD_HEALTH_URL=https://boardreadyops.oaslananka.dev/api/health
 BOARDREADYOPS_CLOUD_CANARY_HEALTH_URL=http://127.0.0.1:3004/api/health
 BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY=boardreadyops-web-runtime
@@ -152,7 +161,7 @@ The artifact signer does not fall back to `SESSION_SECRET`. URLs are bound to th
 
 The self-hosted cloud control plane stores GitHub App installations, repositories, release runs, findings, and artifacts in PostgreSQL.
 
-Apply migrations from the production worktree after `DATABASE_URL` is configured:
+Compose and `pnpm run cloud:deploy:self-hosted` apply pending migrations before replacing live processes. For an explicit administrative run after `DATABASE_URL` is configured:
 
 ```bash
 cd /opt/repos/boardreadyops-prod

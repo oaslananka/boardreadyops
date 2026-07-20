@@ -13,7 +13,7 @@ services:
       web:
         condition: service_healthy
 
-  web:
+  migrate:
     image: boardreadyops-web-runtime:${BOARDREADYOPS_IMAGE_TAG:-latest}
     build:
       context: ..
@@ -22,6 +22,18 @@ services:
         BUILD_DATE: ${BOARDREADYOPS_BUILD_DATE:-unknown}
         VCS_REF: ${BOARDREADYOPS_GIT_SHA:-unknown}
         VERSION: ${BOARDREADYOPS_VERSION:-dev}
+    restart: "no"
+    command: ["node", "migrate.mjs"]
+    env_file:
+      - ${BOARDREADYOPS_ENV_FILE:-./.env}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    image: boardreadyops-web-runtime:${BOARDREADYOPS_IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - ${BOARDREADYOPS_ENV_FILE:-./.env}
@@ -34,10 +46,35 @@ services:
     volumes:
       - boardreadyops_artifacts:/data/artifacts
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  worker:
+    image: boardreadyops-web-runtime:${BOARDREADYOPS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["node", "worker.mjs"]
+    env_file:
+      - ${BOARDREADYOPS_ENV_FILE:-./.env}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-boardreadyops}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-boardreadyops}
+      BOARDREADYOPS_WORKER_HEALTH_PORT: 3001
+    expose:
+      - "3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
 
   postgres:
     image: postgres:17-alpine

@@ -45,6 +45,11 @@
       "types": "./src/runner-terminal-result-store.ts",
       "import": "./src/runner-terminal-result-store.ts",
       "default": "./src/runner-terminal-result-store.ts"
+    },
+    "./control-plane-job-store": {
+      "types": "./src/control-plane-job-store.ts",
+      "import": "./src/control-plane-job-store.ts",
+      "default": "./src/control-plane-job-store.ts"
     }
   },
   "devDependencies": {

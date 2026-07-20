@@ -22693,17 +22693,37 @@ var seqTag = defineSequenceTag("tag:yaml.org,2002:seq", {
   },
   identify: Array.isArray
 });
+function isPlainObject(data) {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) return false;
+  const prototype = Object.getPrototypeOf(data);
+  return prototype === null || prototype === Object.prototype;
+}
+function pick(object2, keys) {
+  const result = {};
+  for (const key of keys) if (object2[key] !== void 0) result[key] = object2[key];
+  return result;
+}
 var omapTag = defineSequenceTag("tag:yaml.org,2002:omap", {
-  create: () => [],
-  addItem: (container, item2) => {
-    if (Object.prototype.toString.call(item2) !== "[object Object]") return "cannot resolve an ordered map item";
-    const object2 = item2;
-    const itemKeys = Object.keys(object2);
-    if (itemKeys.length !== 1) return "cannot resolve an ordered map item";
-    for (const existing of container) if (Object.prototype.hasOwnProperty.call(existing, itemKeys[0])) return "cannot resolve an ordered map item";
-    container.push(object2);
+  create: () => ({
+    list: [],
+    seen: /* @__PURE__ */ new Set()
+  }),
+  addItem: (carrier, item2) => {
+    let key;
+    if (item2 instanceof Map) {
+      if (item2.size !== 1) return "cannot resolve an ordered map item";
+      key = item2.keys().next().value;
+    } else if (isPlainObject(item2)) {
+      const itemKeys = Object.keys(item2);
+      if (itemKeys.length !== 1) return "cannot resolve an ordered map item";
+      key = itemKeys[0];
+    } else return "cannot resolve an ordered map item";
+    if (carrier.seen.has(key)) return "duplicate key in ordered map";
+    carrier.seen.add(key);
+    carrier.list.push(item2);
     return "";
-  }
+  },
+  finalize: (carrier) => carrier.list
 });
 var pairsTag = defineSequenceTag("tag:yaml.org,2002:pairs", {
   create: () => [],
@@ -22721,16 +22741,6 @@ var pairsTag = defineSequenceTag("tag:yaml.org,2002:pairs", {
     return "";
   }
 });
-function isPlainObject(data) {
-  if (data === null || typeof data !== "object" || Array.isArray(data)) return false;
-  const prototype = Object.getPrototypeOf(data);
-  return prototype === null || prototype === Object.prototype;
-}
-function pick(object2, keys) {
-  const result = {};
-  for (const key of keys) if (object2[key] !== void 0) result[key] = object2[key];
-  return result;
-}
 var mapTag = defineMappingTag("tag:yaml.org,2002:map", {
   create: () => ({}),
   identify: isPlainObject,

@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --webpack -H 0.0.0.0 -p 3000",
-    "build": "next build --webpack",
+    "build": "next build --webpack && node ../../scripts/build-control-plane-worker.mjs",
     "start": "next start -H 0.0.0.0 -p 3000",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "worker": "node .next/worker.mjs"
   },
   "dependencies": {
     "next": "16.2.10",

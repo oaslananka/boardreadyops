@@ -73,7 +73,7 @@ describe("dependency and security automation configuration", () => {
     const workspace = await repositoryFile("pnpm-workspace.yaml");
     const snykPolicy = await repositoryFile(".snyk");
 
-    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.0");
+    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.1");
     expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--config.ignore-scripts=true");
     expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk@1.1306.1");
     expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk test --all-projects");
