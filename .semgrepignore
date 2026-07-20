@@ -1,0 +1,12 @@
+.git/
+.next/
+node_modules/
+dist/
+coverage/
+htmlcov/
+site/
+tmp/
+reports/
+sbom.cyclonedx.json
+tests/fixtures/
+tests/semgrep/

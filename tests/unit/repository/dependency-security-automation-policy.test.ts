@@ -77,6 +77,10 @@ describe("dependency and local security automation policy", () => {
     );
   });
 
+  it("keeps the Semgrep test configuration synchronized with production rules", () => {
+    expect(readText("tests/semgrep/security-rules.yml")).toBe(readText(".semgrep.yml"));
+  });
+
   it("installs staged Semgrep and pre-push Snyk hooks", () => {
     const config = readText(".pre-commit-config.yaml");
     expect(config).toContain("default_install_hook_types:");

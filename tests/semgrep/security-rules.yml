@@ -1,0 +1,54 @@
+rules:
+  - id: boardreadyops.security.no-dynamic-code-execution
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Dynamic code execution is forbidden; use an explicit parser or dispatcher.
+    metadata:
+      category: security
+      technology: [javascript, typescript]
+      confidence: HIGH
+      cwe: CWE-95
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: Function(...)
+
+  - id: boardreadyops.security.no-shell-child-process
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Shell-backed child processes are forbidden; use execFile or spawn with an argument array and shell disabled.
+    metadata:
+      category: security
+      technology: [nodejs]
+      confidence: HIGH
+      cwe: CWE-78
+    pattern-either:
+      - patterns:
+          - pattern-inside: |
+              import { exec } from "node:child_process";
+              ...
+          - pattern: exec(...)
+      - patterns:
+          - pattern-inside: |
+              import { exec } from "child_process";
+              ...
+          - pattern: exec(...)
+      - pattern: spawn("sh", ["-c", ...], ...)
+      - pattern: spawn("bash", ["-c", ...], ...)
+      - pattern: spawn("cmd.exe", ["/c", ...], ...)
+      - pattern: |
+          spawn(..., ..., { ..., shell: true, ... })
+
+  - id: boardreadyops.security.no-disabled-tls-verification
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: TLS certificate verification must not be disabled.
+    metadata:
+      category: security
+      technology: [nodejs]
+      confidence: HIGH
+      cwe: CWE-295
+    pattern-either:
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+      - pattern: |
+          new $AGENT({ ..., rejectUnauthorized: false, ... })
