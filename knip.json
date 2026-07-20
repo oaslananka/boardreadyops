@@ -9,10 +9,11 @@
         "src/core/errors.ts",
         "scripts/*.mjs",
         "tests/**/*.test.ts",
-        "tests/benchmark/**/*.ts"
+        "tests/benchmark/**/*.ts",
+        "tests/semgrep/**/*.ts"
       ],
       "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.mjs"]
     }
   },
-  "ignoreBinaries": ["mkdocs", "psql"]
+  "ignoreBinaries": ["mkdocs", "psql", "semgrep"]
 }
