@@ -10,7 +10,7 @@ export const reportCss = `:root {
       --border: #e2e8f0;
       --accent: #2563eb;
       --accent-hover: #1d4ed8;
-      
+
       --critical: #dc2626;
       --critical-bg: #fef2f2;
       --high: #d97706;
@@ -24,7 +24,7 @@ export const reportCss = `:root {
 
       --pass: #16a34a;
       --pass-bg: #f0fdf4;
-      
+
       --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
       --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
       --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);

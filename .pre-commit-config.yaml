@@ -7,13 +7,17 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
       - id: end-of-file-fixer
       - id: check-yaml
+        exclude: ^tests/fixtures/projects/firmware-contract-(?:zephyr|esp-idf)/invalid-contract\.yml$
       - id: check-json
       - id: check-case-conflict
+        exclude: ^\.github/(?:PULL_REQUEST_TEMPLATE|pull_request_template)\.md$
       - id: check-added-large-files
         args: ["--maxkb=1024"]
       - id: detect-private-key
+        exclude: ^tests/(?:fixtures/runner-request-signature-v1\.json|unit/runner/identity\.test\.ts)$
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
