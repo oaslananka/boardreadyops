@@ -10,6 +10,7 @@
   "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose"],
   "timezone": "Europe/Istanbul",
   "schedule": ["after 5am and before 8am every weekday"],
+  "minimumReleaseAge": "7 days",
   "dependencyDashboardTitle": "Dependency Dashboard",
   "ignorePaths": ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**", "tmp/**"],
   "labels": ["dependencies"],
@@ -32,7 +33,7 @@
       "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "minimumReleaseAge": "3 days",
+      "minimumReleaseAge": "7 days",
       "groupName": "developer tooling (non-major)",
       "addLabels": ["automerge"]
     },
@@ -47,7 +48,7 @@
       "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
       "matchPackageNames": ["/^@types\\//"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "minimumReleaseAge": "3 days",
+      "minimumReleaseAge": "7 days",
       "groupName": "type definitions (non-major)",
       "addLabels": ["types", "automerge"]
     },

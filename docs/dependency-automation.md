@@ -17,7 +17,7 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 - GitHub repository security alerts and security update PRs remain enabled in repository security settings.
 - Major upgrades require Dependency Dashboard approval and manual review.
 - Core runtime, GitHub integration, GitHub Actions, Dockerfile, and Docker Compose updates require manual review.
-- Low-risk development dependency and `@types/*` minor/patch updates wait at least three days, receive the `automerge` label, and may be squash-merged by Mergify after all required checks pass.
+- Low-risk development dependency and `@types/*` minor/patch updates wait at least seven days, receive the `automerge` label, and may be squash-merged by Mergify after all required checks pass.
 - TypeScript compiler updates wait at least seven days and always require manual review.
 - GitHub Actions and container references remain digest-pinned.
 

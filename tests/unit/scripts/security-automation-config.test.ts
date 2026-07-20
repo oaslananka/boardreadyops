@@ -20,6 +20,8 @@ describe("dependency and security automation configuration", () => {
     );
     expect(renovate.timezone).toBe("Europe/Istanbul");
     expect(renovate.schedule).toEqual(["after 5am and before 8am every weekday"]);
+    expect(renovate.minimumReleaseAge).toBe("7 days");
+    expect(await repositoryFile("renovate.json")).not.toContain("3 days");
     expect(renovate.pinDigests).toBe(true);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
     expect(renovate.ignorePaths).toEqual(
