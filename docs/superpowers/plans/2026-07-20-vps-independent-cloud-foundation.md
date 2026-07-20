@@ -4,15 +4,27 @@
 
 **Goal:** Make BoardReadyOps Cloud fail closed when required persistence is unavailable and expose dependency-free liveness plus PostgreSQL-backed readiness endpoints before the Cloudflare/Neon migration.
 
-**Architecture:** Add one focused runtime-configuration module and one focused readiness service under `apps/web/lib`. Keep route handlers thin: liveness is dependency-free, readiness delegates to the service, and the GitHub webhook converts configuration failures into stable HTTP 503 responses. PostgreSQL remains the only deployed persistence mode; an explicit in-memory mode is allowed only when `NODE_ENV=test`.
+**Architecture:** Add one focused runtime-configuration module and one focused readiness service under `apps/web/lib`. Keep route handlers thin: liveness is dependency-free, readiness delegates to the service, and the GitHub webhook converts configuration failures into stable HTTP 503 responses. PostgreSQL remains the only deployed persistence mode; an explicit in-memory mode is allowed only when `NODE_ENV` is `test` or `development`.
 
 **Tech Stack:** TypeScript, Next.js 16 route handlers, Node.js runtime, PostgreSQL via the existing `@boardreadyops/db/pg-executor`, Vitest 4.
+
+## Implementation Reconciliation
+
+This plan has been executed. The approved design document remains the source of truth where early plan examples differ from the final implementation. The completed implementation uses these exact decisions:
+
+- `BOARDREADYOPS_PERSISTENCE_MODE=memory` is accepted only in `test` or `development`; production always rejects it.
+- Liveness responses use `{ "ok": true, "service": "boardreadyops-cloud", "check": "liveness" }`.
+- Successful readiness responses include `check: "readiness"` and `checks.configuration/database: "pass"`.
+- Failed readiness responses include `check: "readiness"` and a stable public reason without raw dependency errors.
+- The default readiness PostgreSQL executor is cached per connection string so health polling does not create a new pool on every request.
+- The webhook route imports the typed configuration error directly; `lifecycle-store.d.ts` did not require modification.
+- Repository-approved `core` commit scope is used instead of the invalid illustrative `cloud` scope in early commit examples.
 
 ## Global Constraints
 
 - Production must never silently select a no-op lifecycle store.
 - `postgres` is the deployed persistence mode and requires `DATABASE_URL`.
-- `memory` is valid only when `NODE_ENV=test` and must be selected explicitly with `BOARDREADYOPS_PERSISTENCE_MODE=memory`.
+- `memory` is valid only when `NODE_ENV` is `test` or `development` and must be selected explicitly with `BOARDREADYOPS_PERSISTENCE_MODE=memory`.
 - `/api/health/live` must not touch PostgreSQL or any external service.
 - `/api/health/ready` must verify required configuration and execute `select 1` with a 2,000 ms timeout.
 - Readiness and webhook errors must expose stable reason codes without secrets, raw SQL errors, stack traces, connection strings, or hostnames.
