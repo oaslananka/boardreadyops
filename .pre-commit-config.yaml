@@ -1,3 +1,7 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -6,8 +10,46 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
       - id: detect-private-key
+
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
       - id: gitleaks
+        stages: [pre-commit]
+
+  - repo: https://github.com/semgrep/pre-commit
+    rev: v1.170.0
+    hooks:
+      - id: semgrep
+        name: Semgrep staged source scan
+        args: ["--config=.semgrep.yml", "--error", "--metrics=off"]
+        files: ^(apps|packages|scripts|src)/.*\.(?:[cm]?[jt]sx?)$
+        stages: [pre-commit]
+
+  - repo: local
+    hooks:
+      - id: biome-staged
+        name: Biome staged-file checks
+        entry: pnpm exec biome check --no-errors-on-unmatched
+        language: system
+        files: \.(?:[cm]?[jt]sx?|jsonc?|ya?ml|md)$
+        exclude: ^tests/semgrep/
+        stages: [pre-commit]
+
+      - id: semgrep-full
+        name: Semgrep full repository validation and scan
+        entry: pnpm security:semgrep:prepush
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: snyk-oss
+        name: Snyk Open Source high-severity scan
+        entry: pnpm security:snyk:oss
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

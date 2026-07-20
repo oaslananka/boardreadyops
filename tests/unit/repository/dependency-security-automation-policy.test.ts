@@ -68,7 +68,7 @@ describe("dependency and local security automation policy", () => {
     expect(packageJson.scripts?.["security:semgrep"]).toBe(
       "semgrep scan --config .semgrep.yml --error --metrics=off .",
     );
-    expect(packageJson.scripts?.["security:semgrep:test"]).toBe("semgrep --test --config .semgrep.yml tests/semgrep");
+    expect(packageJson.scripts?.["security:semgrep:test"]).toBe("semgrep --test tests/semgrep");
     expect(packageJson.scripts?.["security:snyk:oss"]).toBe(
       `pnpm dlx snyk@${SNYK_VERSION} test --all-projects --severity-threshold=high`,
     );
@@ -98,7 +98,7 @@ describe("dependency and local security automation policy", () => {
     expect(workflow).toContain(`renovate@${RENOVATE_VERSION}`);
     expect(workflow).toContain(`semgrep==${SEMGREP_VERSION}`);
     expect(workflow).toContain("semgrep --validate --config .semgrep.yml");
-    expect(workflow).toContain("semgrep --test --config .semgrep.yml tests/semgrep");
+    expect(workflow).toContain("semgrep --test tests/semgrep");
     expect(workflow).toContain("github/codeql-action/upload-sarif@");
   });
 
