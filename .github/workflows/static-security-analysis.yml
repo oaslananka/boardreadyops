@@ -1,0 +1,84 @@
+name: static-security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_VERSION: "24"
+  RENOVATE_VERSION: "43.272.4"
+  SEMGREP_VERSION: "1.170.0"
+
+jobs:
+  policy:
+    name: static-security / policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run tests/unit/repository/dependency-security-automation-policy.test.ts
+      - name: Validate Renovate configuration
+        run: pnpm dlx --package=renovate@43.272.4 renovate-config-validator renovate.json
+
+  semgrep:
+    name: static-security / semgrep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          enable-cache: false
+      - name: Validate Semgrep rules
+        run: uvx --from semgrep==1.170.0 semgrep --validate --config .semgrep.yml
+      - name: Test Semgrep rules
+        run: uvx --from semgrep==1.170.0 semgrep --test tests/semgrep
+      - name: Scan repository
+        run: >-
+          uvx --from semgrep==1.170.0 semgrep scan
+          --config .semgrep.yml
+          --error
+          --metrics=off
+          --sarif
+          --output semgrep.sarif
+          .
+      - name: Upload Semgrep SARIF
+        if: >-
+          always() &&
+          hashFiles('semgrep.sarif') != '' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep-boardreadyops
