@@ -53468,6 +53468,30 @@ var releaseRunReportLinkSchema = external_exports.object({
   url: external_exports.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "report link must use HTTPS")
 });
 var releaseRunMetricsSchema = external_exports.record(external_exports.string().trim().min(1).max(128), external_exports.number().finite()).refine((value) => Object.keys(value).length <= 100, "metrics must contain at most 100 entries");
+var releaseRunReadinessSchema = external_exports.object({
+  score: external_exports.number().int().min(0).max(100),
+  status: external_exports.enum(["ready", "at-risk", "blocked"]),
+  blocking: external_exports.number().int().nonnegative().max(1e4),
+  nonBlocking: external_exports.number().int().nonnegative().max(1e4),
+  missingRequired: external_exports.array(external_exports.string().trim().min(1).max(256)).max(100).default([]),
+  missingRecommended: external_exports.array(external_exports.string().trim().min(1).max(256)).max(100).default([]),
+  warnings: external_exports.array(external_exports.string().trim().min(1).max(1e3)).max(100).default([])
+}).strict();
+var releaseRunWaiverSchema = external_exports.object({
+  rule: external_exports.string().trim().min(1).max(256),
+  owner: external_exports.string().trim().min(1).max(256),
+  reason: external_exports.string().trim().min(1).max(2e3),
+  expires: external_exports.iso.date().optional(),
+  approvedBy: external_exports.string().trim().min(1).max(256).optional(),
+  evidence: external_exports.string().trim().min(1).max(2048).optional(),
+  stale: external_exports.boolean(),
+  expired: external_exports.boolean(),
+  matched: external_exports.number().int().nonnegative().max(1e4)
+}).strict();
+var releaseRunWaiversSchema = external_exports.object({
+  active: external_exports.array(releaseRunWaiverSchema).max(100).default([]),
+  expired: external_exports.array(releaseRunWaiverSchema).max(100).default([])
+}).strict();
 function inferredConclusion(input) {
   if (input.status === "timed_out") {
     return "timed_out";
@@ -53489,7 +53513,9 @@ var releaseRunResultBaseSchema = external_exports.object({
   findings: external_exports.array(findingSchema).max(500).default([]),
   artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
   metrics: releaseRunMetricsSchema.default({}),
-  reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([])
+  reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([]),
+  readiness: releaseRunReadinessSchema.optional(),
+  waivers: releaseRunWaiversSchema.optional()
 }).strict();
 var releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context) => {
   const expected = inferredConclusion(value);
@@ -54398,8 +54424,11 @@ function terminalResultFromExecution(job, execution, artifacts) {
       findings_high: summary?.high ?? 0,
       findings_medium: summary?.medium ?? 0,
       findings_low: summary?.low ?? 0,
-      findings_info: summary?.info ?? 0
+      findings_info: summary?.info ?? 0,
+      ...execution.report?.readiness ? { readiness_score: execution.report.readiness.score } : {}
     },
+    ...execution.report?.readiness ? { readiness: execution.report.readiness } : {},
+    ...execution.report?.waivers ? { waivers: execution.report.waivers } : {},
     reportLinks: []
   });
 }
@@ -54513,6 +54542,18 @@ async function executeRunnerPipeline(workspace, job, options) {
       low: report.summary.low,
       info: report.summary.info
     },
+    ...report.readiness ? {
+      readiness: {
+        score: report.readiness.score,
+        status: report.readiness.status,
+        blocking: report.readiness.blocking,
+        nonBlocking: report.readiness.nonBlocking,
+        missingRequired: report.readiness.missingRequired,
+        missingRecommended: report.readiness.missingRecommended,
+        warnings: report.readiness.warnings
+      }
+    } : {},
+    ...report.waivers ? { waivers: report.waivers } : {},
     findings: report.findings.map((finding2) => ({
       ruleId: finding2.ruleId,
       severity: finding2.severity,

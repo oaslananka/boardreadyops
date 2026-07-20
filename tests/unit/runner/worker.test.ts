@@ -155,6 +155,29 @@ describe("runRunnerWorkerOnce", () => {
           low: 0,
           info: 0,
         },
+        readiness: {
+          score: 84,
+          status: "at-risk",
+          blocking: 0,
+          nonBlocking: 1,
+          missingRequired: [],
+          missingRecommended: ["assembly-drawing"],
+          warnings: ["Recommended output assembly-drawing is missing."],
+        },
+        waivers: {
+          active: [
+            {
+              rule: "design.review",
+              owner: "hardware-team",
+              reason: "Approved for prototype lot.",
+              expires: "2026-08-31",
+              stale: false,
+              expired: false,
+              matched: 1,
+            },
+          ],
+          expired: [],
+        },
         findings: [
           {
             ruleId: "design.review",
@@ -233,6 +256,9 @@ describe("runRunnerWorkerOnce", () => {
           },
         ],
         findings: [{ ruleId: "design.review", severity: "medium", path: "board.kicad_pcb" }],
+        readiness: { score: 84, status: "at-risk", blocking: 0, nonBlocking: 1 },
+        waivers: { active: [expect.objectContaining({ rule: "design.review", matched: 1 })], expired: [] },
+        metrics: expect.objectContaining({ readiness_score: 84 }),
       },
     });
     expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
@@ -277,6 +303,7 @@ describe("runRunnerWorkerOnce", () => {
       "report/markdown",
     ]);
     expect(terminal?.result.artifacts?.some((artifact) => artifact.kind.includes("source"))).toBe(false);
+    expect(terminal?.result.readiness).toMatchObject({ score: 100, status: "ready" });
   });
 
   it("rejects broker source mode and relinquishes before checkout", async () => {

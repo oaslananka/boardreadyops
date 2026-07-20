@@ -60,6 +60,39 @@ export const releaseRunMetricsSchema = z
   .record(z.string().trim().min(1).max(128), z.number().finite())
   .refine((value) => Object.keys(value).length <= 100, "metrics must contain at most 100 entries");
 
+export const releaseRunReadinessSchema = z
+  .object({
+    score: z.number().int().min(0).max(100),
+    status: z.enum(["ready", "at-risk", "blocked"]),
+    blocking: z.number().int().nonnegative().max(10_000),
+    nonBlocking: z.number().int().nonnegative().max(10_000),
+    missingRequired: z.array(z.string().trim().min(1).max(256)).max(100).default([]),
+    missingRecommended: z.array(z.string().trim().min(1).max(256)).max(100).default([]),
+    warnings: z.array(z.string().trim().min(1).max(1000)).max(100).default([]),
+  })
+  .strict();
+
+export const releaseRunWaiverSchema = z
+  .object({
+    rule: z.string().trim().min(1).max(256),
+    owner: z.string().trim().min(1).max(256),
+    reason: z.string().trim().min(1).max(2000),
+    expires: z.iso.date().optional(),
+    approvedBy: z.string().trim().min(1).max(256).optional(),
+    evidence: z.string().trim().min(1).max(2048).optional(),
+    stale: z.boolean(),
+    expired: z.boolean(),
+    matched: z.number().int().nonnegative().max(10_000),
+  })
+  .strict();
+
+export const releaseRunWaiversSchema = z
+  .object({
+    active: z.array(releaseRunWaiverSchema).max(100).default([]),
+    expired: z.array(releaseRunWaiverSchema).max(100).default([]),
+  })
+  .strict();
+
 function inferredConclusion(input: {
   status: z.infer<typeof releaseRunStatusSchema>;
   decision: z.infer<typeof releaseDecisionSchema> | null;
@@ -87,6 +120,8 @@ const releaseRunResultBaseSchema = z
     artifacts: z.array(releaseRunArtifactSchema).max(100).default([]),
     metrics: releaseRunMetricsSchema.default({}),
     reportLinks: z.array(releaseRunReportLinkSchema).max(20).default([]),
+    readiness: releaseRunReadinessSchema.optional(),
+    waivers: releaseRunWaiversSchema.optional(),
   })
   .strict();
 
