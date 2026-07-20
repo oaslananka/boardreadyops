@@ -57,7 +57,7 @@ A finding should normally be fixed in production code. Narrow a rule only when a
 The Snyk CLI version is pinned in package scripts. Authenticate without writing a token to the repository:
 
 ```bash
-pnpm dlx snyk@1.1306.1 auth
+pnpm --config.ignore-scripts=true --package=snyk@1.1306.1 dlx snyk auth
 # Equivalent installed-CLI form:
 snyk auth
 ```

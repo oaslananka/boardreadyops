@@ -70,10 +70,10 @@ describe("dependency and local security automation policy", () => {
     );
     expect(packageJson.scripts?.["security:semgrep:test"]).toBe("semgrep --test tests/semgrep");
     expect(packageJson.scripts?.["security:snyk:oss"]).toBe(
-      `pnpm dlx snyk@${SNYK_VERSION} test --all-projects --severity-threshold=high`,
+      `pnpm --config.ignore-scripts=true --package=snyk@${SNYK_VERSION} dlx snyk test --all-projects --dev --strict-out-of-sync=true --severity-threshold=high`,
     );
     expect(packageJson.scripts?.["renovate:validate"]).toBe(
-      `pnpm dlx --package=renovate@${RENOVATE_VERSION} renovate-config-validator renovate.json`,
+      `pnpm --config.ignore-scripts=true --package=renovate@${RENOVATE_VERSION} dlx renovate-config-validator renovate.json`,
     );
   });
 

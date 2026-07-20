@@ -40,10 +40,10 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm vitest run tests/unit/repository/dependency-security-automation-policy.test.ts
       - name: Validate Renovate configuration
-        run: pnpm dlx --package=renovate@43.272.4 renovate-config-validator renovate.json
+        run: pnpm --config.ignore-scripts=true --package=renovate@43.272.4 dlx renovate-config-validator renovate.json
 
   semgrep:
     name: static-security / semgrep
@@ -61,12 +61,12 @@ jobs:
         with:
           enable-cache: false
       - name: Validate Semgrep rules
-        run: uvx --from semgrep==1.170.0 semgrep --validate --config .semgrep.yml
+        run: uvx --no-build --from semgrep==1.170.0 semgrep --validate --config .semgrep.yml
       - name: Test Semgrep rules
-        run: uvx --from semgrep==1.170.0 semgrep --test tests/semgrep
+        run: uvx --no-build --from semgrep==1.170.0 semgrep --test tests/semgrep
       - name: Scan repository
         run: >-
-          uvx --from semgrep==1.170.0 semgrep scan
+          uvx --no-build --from semgrep==1.170.0 semgrep scan
           --config .semgrep.yml
           --error
           --metrics=off
