@@ -80,6 +80,8 @@
     "sbom": "node scripts/generate-sbom.mjs",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run knip && pnpm run compatibility:check && pnpm run build && pnpm run verify:dist && pnpm run verify:version && pnpm run verify:marketplace && pnpm run test:unit && pnpm run test:property && pnpm run test:snapshot && pnpm run test:action && pnpm run test:a11y && pnpm run coverage && pnpm run verify:structure && pnpm run gc && pnpm run docs && pnpm run security",
     "security": "pnpm audit --audit-level moderate && pnpm run licenses:check && pnpm run notice:check && pnpm run check:reuse",
+    "security:snyk:oss": "pnpm dlx snyk@1.1306.1 test --all-projects --dev --strict-out-of-sync=true --severity-threshold=high",
+    "renovate:validate": "pnpm --package=renovate@43.272.4 dlx renovate-config-validator renovate.json",
     "generated:check": "pnpm run notice:check && pnpm run compatibility:check",
     "verify:release-channels": "node scripts/verify-release-channels.mjs",
     "verify:release": "pnpm run verify && pnpm run verify:release-channels && pnpm run verify:clean-tree",

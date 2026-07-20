@@ -1,3 +1,6 @@
+minimum_pre_commit_version: "4.6.0"
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -5,9 +8,32 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        exclude: ^tests/fixtures/projects/firmware-contract-(?:esp-idf|zephyr)/invalid-contract\.yml$
       - id: check-json
       - id: detect-private-key
+        exclude: ^(?:tests/unit/runner/identity\.test\.ts|tests/fixtures/runner-request-signature-v1\.json)$
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
       - id: gitleaks
+  - repo: https://github.com/semgrep/semgrep
+    rev: v1.170.0
+    hooks:
+      - id: semgrep
+        name: Semgrep project security rules
+        entry: semgrep scan
+        args:
+          - --config=.semgrep.yml
+          - --error
+          - --metrics=off
+          - --quiet
+        types: [text]
+        files: \.(?:[cm]?js|jsx|ts|tsx)$
+  - repo: local
+    hooks:
+      - id: snyk-oss
+        name: Snyk Open Source workspace scan
+        entry: corepack pnpm security:snyk:oss
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

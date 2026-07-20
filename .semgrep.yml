@@ -1,0 +1,35 @@
+rules:
+  - id: boardreadyops-no-node-shell-exec
+    message: Use execFile/spawn with an argument array instead of invoking a shell command string.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    pattern-either:
+      - patterns:
+          - pattern-inside: |
+              import { ..., exec, ... } from "node:child_process";
+              ...
+          - pattern: exec($COMMAND, ...)
+      - patterns:
+          - pattern-inside: |
+              import { ..., execSync, ... } from "node:child_process";
+              ...
+          - pattern: execSync($COMMAND, ...)
+      - patterns:
+          - pattern-inside: |
+              import * as $CHILD_PROCESS from "node:child_process";
+              ...
+          - pattern: $CHILD_PROCESS.exec($COMMAND, ...)
+      - patterns:
+          - pattern-inside: |
+              import * as $CHILD_PROCESS from "node:child_process";
+              ...
+          - pattern: $CHILD_PROCESS.execSync($COMMAND, ...)
+    paths:
+      exclude:
+        - /tests/**
+        - /**/node_modules/**
+        - /**/dist/**
+        - /**/coverage/**
+        - /apps/web/.next/**
