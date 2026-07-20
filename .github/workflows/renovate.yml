@@ -65,7 +65,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Run Renovate
-        uses: renovatebot/github-action@30643683e37198214c159ca0bff17fbf7e46efba
+        uses: renovatebot/github-action@3064367f740a1a91cca218698a63902689cce200
         with:
           token: ${{ secrets.GH_AUTH_TOKEN }}
           configurationFile: renovate.json
