@@ -1,6 +1,9 @@
 import { verifyGitHubWebhook } from "@boardreadyops/cloud-core";
 import { normalizeGitHubAppWebhook } from "@boardreadyops/cloud-core/lifecycle";
-import { executeGitHubAppLifecycleActions } from "@boardreadyops/cloud-core/lifecycle-executor";
+import {
+  emptyGitHubAppLifecycleExecutionResult,
+  executeGitHubAppLifecycleActions,
+} from "@boardreadyops/cloud-core/lifecycle-executor";
 import { CloudRuntimeConfigurationError } from "../../../../lib/cloud-runtime-config.js";
 import { createGitHubAppCheckRunClient } from "../../../../lib/github-app-check-run-client.js";
 import { createRunnerClient } from "../../../../lib/runner-client.js";
@@ -50,6 +53,24 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  const runner = runnerModeSummary();
+
+  if (lifecycle.actions.length === 0) {
+    return Response.json(
+      {
+        ok: true,
+        status: "accepted",
+        event,
+        delivery,
+        action: lifecycle.action,
+        runner,
+        lifecycleActions: lifecycle.actions,
+        execution: emptyGitHubAppLifecycleExecutionResult,
+      },
+      { status: 202 },
+    );
+  }
+
   let lifecycleStore: ReturnType<typeof getGitHubAppLifecycleStore>;
   try {
     lifecycleStore = getGitHubAppLifecycleStore();
@@ -67,7 +88,6 @@ export async function POST(request: Request): Promise<Response> {
     throw error;
   }
 
-  const runner = runnerModeSummary();
   const workflowDispatchClient = runnerWorkflowDispatchClient(runner, createRunnerClient);
   const execution = await executeGitHubAppLifecycleActions(
     lifecycle.actions,

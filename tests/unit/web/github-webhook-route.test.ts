@@ -114,6 +114,24 @@ describe("GitHub webhook route lifecycle persistence", () => {
     });
   });
 
+  it("acknowledges ping events without requiring persistence", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    delete process.env.DATABASE_URL;
+    delete process.env.BOARDREADYOPS_PERSISTENCE_MODE;
+
+    const response = await POST(signedGitHubRequest("ping", { zen: "pong" }));
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "accepted",
+      event: "ping",
+      delivery: "delivery-123",
+      lifecycleActions: [],
+      execution: { total: 0 },
+    });
+  });
+
   it("fails closed when PostgreSQL persistence is not configured", async () => {
     process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
     delete process.env.DATABASE_URL;

@@ -1,8 +1,5 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import {
-  CloudRuntimeConfigurationError,
-  resolveCloudPersistenceConfiguration,
-} from "./cloud-runtime-config.js";
+import { CloudRuntimeConfigurationError, resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
 
 const service = "boardreadyops-cloud" as const;
 const defaultTimeoutMs = 2_000;
@@ -61,11 +58,7 @@ function defaultPostgresQuery(databaseUrl: string): Query {
 }
 
 export async function checkCloudReadiness(
-  options: {
-    environment?: NodeJS.ProcessEnv;
-    query?: Query;
-    timeoutMs?: number;
-  } = {},
+  options: { environment?: NodeJS.ProcessEnv; query?: Query; timeoutMs?: number } = {},
 ): Promise<CloudReadinessResult> {
   const environment = options.environment ?? process.env;
   const missing = missingRequiredConfiguration(environment);
@@ -80,7 +73,7 @@ export async function checkCloudReadiness(
     };
   }
 
-  let configuration;
+  let configuration: ReturnType<typeof resolveCloudPersistenceConfiguration>;
   try {
     configuration = resolveCloudPersistenceConfiguration(environment);
   } catch (error) {

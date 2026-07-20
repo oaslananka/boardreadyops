@@ -15,9 +15,7 @@ export class CloudRuntimeConfigurationError extends Error {
   }
 }
 
-export type CloudPersistenceConfiguration =
-  | { mode: "postgres"; databaseUrl: string }
-  | { mode: "memory" };
+export type CloudPersistenceConfiguration = { mode: "postgres"; databaseUrl: string } | { mode: "memory" };
 
 export function resolveCloudPersistenceConfiguration(
   environment: NodeJS.ProcessEnv = process.env,
