@@ -32,10 +32,10 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 ## Last verification
 
 - On July 20, 2026, Renovate `43.272.4` completed a full dry-run under Node.js `24.18.0`.
-- The repository reported `activated`, `enabled`, and `onboarded`.
-- Renovate discovered 269 dependencies across npm, GitHub Actions, Dockerfiles, and Docker Compose.
-- The dry-run confirmed that Renovate would create or update the `Dependency Dashboard` without writing repository state.
-- The first non-dry scheduled/manual workflow run must be observed after this workflow reaches `main`.
+- The repository reported `activated`, `enabled`, and `onboarded`, and Renovate discovered 269 dependencies across npm, GitHub Actions, Dockerfiles, and Docker Compose.
+- After the workflow reached `main`, manual workflow run `29767533207` completed both `renovate / validate` and `renovate / run` successfully.
+- The authenticated run created Dependency Dashboard issue `#196` and populated pending-approval, awaiting-schedule, status-check, abandoned-dependency, and detected-dependency sections.
+- No update branches or pull requests were created outside the configured schedule or approval policy.
 
 ## Operations
 
