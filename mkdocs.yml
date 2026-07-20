@@ -157,9 +157,11 @@ nav:
           - Testing Policy: development/testing-policy.md
           - Release Process: development/release-process.md
           - Dependency Management: development/dependency-management.md
+          - Dependency Automation: dependency-automation.md
           - Commit Conventions: development/commit-conventions.md
           - Writing Rules: development/writing-rules.md
           - Tooling: development/tooling.md
+          - Security Tooling: development/security-tooling.md
           - CI Policy: development/ci-policy.md
           - Debugging: development/debugging.md
       - Architecture:

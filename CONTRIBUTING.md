@@ -37,6 +37,17 @@ corepack pnpm run typecheck
 corepack pnpm run test:unit
 ```
 
+Install the repository's local security hooks before pushing changes:
+
+```bash
+python3 -m venv .venv-pre-commit
+.venv-pre-commit/bin/python -m pip install pre-commit==4.6.0
+.venv-pre-commit/bin/pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+Semgrep, Snyk, and SonarQube for IDE Connected Mode setup is documented in
+[docs/development/security-tooling.md](docs/development/security-tooling.md).
+
 Generated Action and CLI bundles are committed. Source changes that affect the
 CLI, Action, reports, generated docs, package metadata, or public schemas must
 regenerate and verify the matching outputs:

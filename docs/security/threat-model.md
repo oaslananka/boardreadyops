@@ -35,7 +35,15 @@ inside GitHub Actions.
 | Tampered release asset | Unsafe install or CI use | Checksums, SBOM, provenance/attestation docs. | Strengthen reproducible-build verification. |
 | Unsafe manufacturer handoff | Bad board order or assembly failure | Rule checks, vendor profiles, readiness scoring, evidence bundles. | Vendor profile drift review process. |
 | Path traversal via inputs | File overwrite/read outside workspace | Action input path confinement and utility path helpers. | Continue fuzz/property tests for path normalization. |
-| Dependency compromise | Build or runtime compromise | Lockfile, audits, OSV, dependency review, pinned actions. | Review major updates manually. |
+| Dependency compromise | Build or runtime compromise | Renovate stability policy, lockfile, Snyk, audits, OSV, dependency review, pinned actions. | Verify Renovate onboarding and review major/unstable updates manually. |
+
+## Development-time security controls
+
+- Repository-owned Semgrep rules provide token-free staged and full-source checks.
+- Snyk Open Source runs before pushes and in the existing cloud integration; credentials remain outside the repository.
+- SonarQube Cloud is the authoritative pull-request quality gate, while SonarQube for IDE Connected Mode provides local issue feedback.
+- Renovate is the sole routine dependency updater and applies release-age, grouping, digest-pinning, and manual-review policy.
+- Gitleaks, CodeQL, OSV, Dependency Review, SBOM, Socket, and OpenSSF Scorecard remain independent defense layers.
 
 ## Assumptions
 

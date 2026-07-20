@@ -48,6 +48,10 @@ The repository policy test also verifies critical manager, scheduling, grouping,
 
 ## Operational verification
 
-As of July 20, 2026, the Renovate GitHub App appears in repository check suites, but no Dependency Dashboard, Renovate pull request, or `renovate/*` branch was found. After this configuration is merged, a repository owner must verify onboarding in **GitHub → Settings → GitHub Apps → Renovate → Configure**, confirm this repository is selected, and request a rescan/onboarding run when the App UI offers it.
+As of July 20, 2026, the Renovate GitHub App appears in repository check suites. An authenticated Renovate 43.272.4 full dry-run processed `oaslananka/boardreadyops` successfully and reported that it would ensure the Dependency Dashboard. This proves repository access and configuration loading without creating branches, issues, or pull requests.
 
-Successful onboarding is proven by a `Dependency Dashboard` issue or Renovate pull request. Record the result and date in this section after verification. No personal access token should be committed or used by repository scripts.
+No live Dependency Dashboard, Renovate pull request, or `renovate/*` branch existed at verification time. The next non-dry GitHub App run should create or update the Dashboard. If it does not, a repository owner should open **GitHub → Settings → GitHub Apps → Renovate → Configure**, confirm this repository is selected, and request a rescan when the App UI offers it.
+
+The required `automerge`, `manual-review`, `breaking-change`, `supply-chain`, `types`, and `lockfile-maintenance` labels were verified in GitHub on July 20, 2026.
+
+Successful live onboarding is proven by a `Dependency Dashboard` issue or Renovate pull request. Record that result and date here after the first non-dry run. No personal access token should be committed or used by repository scripts.
