@@ -71,7 +71,7 @@ describe("dependency and security automation configuration", () => {
     expect(preCommit).toContain("stages: [pre-push]");
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
 
-    expect(securityWorkflow).toContain("snyk/actions/setup@b98d498629f1c8fe1db27a2d329ecd5eaffc1482");
+    expect(securityWorkflow).toContain("snyk/actions/setup@8e119fbb6c251787721d34ba683ed48eba792766");
     expect(securityWorkflow).toContain("snyk-version: 1.1306.1");
     expect(securityWorkflow).toContain("secrets.SNYK_TOKEN || secrets.SYNK_PAT_TOKEN");
     expect(securityWorkflow).toContain("snyk test --all-projects");

@@ -149,7 +149,7 @@ jobs:
             exit 1
           fi
       - name: Install pinned Snyk CLI
-        uses: snyk/actions/setup@b98d498629f1c8fe1db27a2d329ecd5eaffc1482
+        uses: snyk/actions/setup@8e119fbb6c251787721d34ba683ed48eba792766
         with:
           snyk-version: 1.1306.1
       - name: Test all pnpm workspace projects
