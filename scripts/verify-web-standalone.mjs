@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { createHmac, randomBytes } from "node:crypto";
-import { cp, lstat, mkdir, mkdtemp, readdir, readlink, rm, stat } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, readlink, rm, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { copyDirectoryPortable } from "./lib/portable-copy.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webRoot = join(repositoryRoot, "apps", "web");
@@ -126,18 +127,13 @@ async function main() {
   let stderr = "";
 
   try {
-    await cp(standaloneSource, isolatedRoot, { recursive: true, dereference: false, verbatimSymlinks: true });
+    await copyDirectoryPortable(standaloneSource, isolatedRoot);
     await ensureSymlinksContained(isolatedRoot);
     await mkdir(join(isolatedRoot, "apps", "web", ".next"), { recursive: true });
-    await cp(staticSource, join(isolatedRoot, "apps", "web", ".next", "static"), {
-      recursive: true,
-      dereference: false,
-      verbatimSymlinks: true,
-    });
+    await copyDirectoryPortable(staticSource, join(isolatedRoot, "apps", "web", ".next", "static"));
     if (await pathExists(publicSource)) {
-      await cp(publicSource, join(isolatedRoot, "apps", "web", "public"), {
-        recursive: true,
-        dereference: true,
+      await copyDirectoryPortable(publicSource, join(isolatedRoot, "apps", "web", "public"), {
+        dereferenceSymlinks: true,
       });
     }
 
