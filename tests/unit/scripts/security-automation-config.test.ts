@@ -34,7 +34,7 @@ describe("dependency and security automation configuration", () => {
 
     expect(workflow).toContain("schedule:");
     expect(workflow).toContain("workflow_dispatch:");
-    expect(workflow).toContain("renovatebot/github-action@30643683e37198214c159ca0bff17fbf7e46efba");
+    expect(workflow).toContain("renovatebot/github-action@3064367f740a1a91cca218698a63902689cce200");
     expect(workflow).toContain("renovate-version: 43.272.4");
     expect(workflow).toContain("pnpm run renovate:validate");
     expect(workflow).not.toContain("npx ");
