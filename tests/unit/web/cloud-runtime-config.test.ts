@@ -32,10 +32,19 @@ describe("cloud runtime persistence configuration", () => {
     ).toEqual({ mode: "memory" });
   });
 
-  it("rejects memory persistence outside tests", () => {
-    expect(() =>
+  it("allows explicitly selected memory persistence in local development", () => {
+    expect(
       resolveCloudPersistenceConfiguration({
         NODE_ENV: "development",
+        BOARDREADYOPS_PERSISTENCE_MODE: "memory",
+      }),
+    ).toEqual({ mode: "memory" });
+  });
+
+  it("rejects memory persistence in production", () => {
+    expect(() =>
+      resolveCloudPersistenceConfiguration({
+        NODE_ENV: "production",
         BOARDREADYOPS_PERSISTENCE_MODE: "memory",
       }),
     ).toThrowError(expect.objectContaining({ code: "memory-persistence-not-allowed" }));

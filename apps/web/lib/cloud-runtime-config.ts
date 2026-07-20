@@ -34,10 +34,10 @@ export function resolveCloudPersistenceConfiguration(
   const mode: CloudPersistenceMode = configuredMode === "memory" ? "memory" : "postgres";
 
   if (mode === "memory") {
-    if (environment.NODE_ENV !== "test") {
+    if (environment.NODE_ENV !== "test" && environment.NODE_ENV !== "development") {
       throw new CloudRuntimeConfigurationError(
         "memory-persistence-not-allowed",
-        "memory persistence is allowed only when NODE_ENV=test",
+        "memory persistence is allowed only in test or development environments",
       );
     }
 
