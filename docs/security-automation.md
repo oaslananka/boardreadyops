@@ -34,7 +34,7 @@ The `snyk-oss` hook executes the pinned Snyk CLI against all detected pnpm works
 Authenticate locally with either:
 
 ```bash
-corepack pnpm dlx snyk@1.1306.1 auth
+corepack pnpm --config.ignore-scripts=true --package=snyk@1.1306.1 dlx snyk auth
 ```
 
 or an externally supplied `SNYK_TOKEN`. Credentials must never be written to repository files.
@@ -52,9 +52,11 @@ The project-specific rule set is intentionally small and high-confidence. Broade
 
 ## Snyk CI
 
-The `security / snyk` job runs only on trusted repository events so secrets are never exposed to fork pull requests. It resolves the exact Snyk CLI `1.1306.1` package with lifecycle scripts disabled, scans every detected workspace project, includes development dependencies, and blocks high or critical open-source findings.
+The `security / snyk` job runs only on trusted repository events so secrets are never exposed to fork pull requests. It resolves the exact Snyk CLI `1.1306.1` package with lifecycle scripts disabled, scans every detected pnpm workspace project, includes development dependencies, and blocks high or critical open-source findings.
 
 The preferred repository secret is `SNYK_TOKEN`. The workflow temporarily supports the existing misspelled `SYNK_PAT_TOKEN` secret so migration can occur without an outage. After `SNYK_TOKEN` is configured and a successful workflow run is observed, delete `SYNK_PAT_TOKEN`.
+
+The pnpm workspace policy forces known vulnerable transitive releases to patched versions. The Snyk command excludes `requirements.txt` manifests because Python documentation dependencies are pinned separately and covered by the existing OSV job. `.snyk` contains exactly one temporary exception for `SNYK-JS-EXTRACTZIP-17660777`: the dependency is development-only, Puppeteer install scripts are disabled, no upstream patched release is available, and the exception expires on August 31, 2026.
 
 ## SonarQube Cloud
 

@@ -63,15 +63,29 @@ describe("dependency and security automation configuration", () => {
   it("runs a pinned Snyk CLI in the Husky pre-push chain and trusted CI contexts", async () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as {
       scripts?: Record<string, string>;
+      devDependencies?: Record<string, string>;
     };
     const preCommit = await repositoryFile(".pre-commit-config.yaml");
     const huskyPrePush = await repositoryFile(".husky/pre-push");
     const securityWorkflow = await repositoryFile(".github/workflows/security.yml");
+    const workspace = await repositoryFile("pnpm-workspace.yaml");
+    const snykPolicy = await repositoryFile(".snyk");
 
+    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.0");
     expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--config.ignore-scripts=true");
     expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk@1.1306.1");
     expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk test --all-projects");
     expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--severity-threshold=high");
+    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--exclude=requirements.txt");
+    expect(workspace).toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
+    expect(workspace).toContain("brace-expansion@>=5 <5.0.7: 5.0.7");
+    expect(workspace).toContain("fast-uri@>=3 <3.1.4: 3.1.4");
+    expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.0");
+    expect(workspace).toContain("linkify-it@>=5 <5.0.2: 5.0.2");
+    expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.1");
+    expect(snykPolicy).toContain("SNYK-JS-EXTRACTZIP-17660777");
+    expect(snykPolicy).toContain("expires: 2026-08-31T00:00:00.000Z");
+    expect(snykPolicy.match(/SNYK-/gu)).toHaveLength(1);
     expect(preCommit).toContain("id: snyk-oss");
     expect(preCommit).toContain("stages: [pre-push]");
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
