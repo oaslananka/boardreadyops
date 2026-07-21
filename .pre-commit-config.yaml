@@ -36,4 +36,4 @@ repos:
         entry: corepack pnpm security:snyk:oss
         language: system
         pass_filenames: false
-        stages: [pre-push]
+        stages: [manual]

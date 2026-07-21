@@ -247,6 +247,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `extract-zip@2.0.1`
   - Description: unzip a zip file into a directory using 100% javascript
   - Homepage: https://github.com/maxogden/extract-zip#readme
+- `terser@5.49.0`
+  - Description: JavaScript parser, mangler/compressor and beautifier toolkit for ES6+
+  - Homepage: https://terser.org
 
 ## BSD-3-Clause
 
@@ -259,7 +262,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `devtools-protocol@0.0.1608973`, `devtools-protocol@0.0.1638949`
   - Description: The Chrome DevTools Protocol JSON
   - Homepage: https://github.com/ChromeDevTools/devtools-protocol#readme
-- `fast-uri@3.1.2`
+- `fast-uri@3.1.4`
   - Description: Dependency-free RFC 3986 URI toolbox
   - Homepage: https://github.com/fastify/fast-uri
 - `ieee754@1.2.1`
@@ -566,6 +569,8 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@bcoe/v8-coverage@1.0.2`
   - Description: Helper functions for V8 coverage files.
   - Homepage: https://github.com/bcoe/v8-coverage#readme
+- `@codecov/bundler-plugin-core@2.0.1`
+  - Description: Official Codecov Bundler Plugin Core
 - `@commitlint/cli@21.1.0`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
@@ -687,6 +692,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@jridgewell/resolve-uri@3.1.2`
   - Description: Resolve a URI relative to an optional base URI
   - Homepage: https://github.com/jridgewell/resolve-uri#readme
+- `@jridgewell/source-map@0.3.11`
+  - Description: Packages @jridgewell/trace-mapping and @jridgewell/gen-mapping into the familiar source-map API
+  - Homepage: https://github.com/jridgewell/sourcemaps/tree/main/packages/source-map
 - `@jridgewell/sourcemap-codec@1.5.5`
   - Description: Encode/decode sourcemap mappings
   - Homepage: https://github.com/jridgewell/sourcemaps/tree/main/packages/sourcemap-codec
@@ -890,6 +898,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `abort-controller@3.0.0`
   - Description: An implementation of WHATWG AbortController interface.
   - Homepage: https://github.com/mysticatea/abort-controller#readme
+- `acorn@8.17.0`
+  - Description: ECMAScript parser
+  - Homepage: https://github.com/acornjs/acorn
 - `agent-base@7.1.4`
   - Description: Turn a function into an `http.Agent` instance
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
@@ -956,7 +967,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `bottleneck@2.19.5`
   - Description: Distributed task scheduler and rate limiter
   - Homepage: https://github.com/SGrondin/bottleneck#readme
-- `brace-expansion@2.1.0`, `brace-expansion@5.0.6`
+- `brace-expansion@2.1.2`, `brace-expansion@5.0.7`
   - Description: Brace expansion as known from sh/bash
   - Homepage: https://github.com/juliangruber/brace-expansion#readme
 - `braces@3.0.3`
@@ -971,6 +982,8 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `buffer-crc32@0.2.13`, `buffer-crc32@1.0.0`
   - Description: A pure javascript CRC32 algorithm that plays nice with binary data
   - Homepage: https://github.com/brianloveswords/buffer-crc32
+- `buffer-from@1.1.2`
+  - Homepage: https://github.com/LinusU/buffer-from#readme
 - `buffer-image-size@0.6.4`
   - Description: get dimensions of any image buffer
   - Homepage: https://github.com/evidentpoint/buffer-image-size#readme
@@ -989,7 +1002,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `chai@6.2.2`
   - Description: BDD/TDD assertion library for node.js and the browser. Test framework agnostic.
   - Homepage: http://chaijs.com
-- `chalk@5.6.2`
+- `chalk@4.1.2`, `chalk@5.6.2`
   - Description: Terminal string styling done right
   - Homepage: https://github.com/chalk/chalk#readme
 - `chardet@2.1.1`
@@ -1019,7 +1032,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `color-name@1.1.4`
   - Description: A list of color names and its values
   - Homepage: https://github.com/colorjs/color-name
-- `commander@14.0.3`, `commander@15.0.0`
+- `commander@2.20.3`, `commander@14.0.3`, `commander@15.0.0`
   - Description: the complete solution for node.js command-line programs
   - Homepage: https://github.com/tj/commander.js#readme
 - `compare-func@2.0.0`
@@ -1331,7 +1344,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `js-tokens@4.0.0`, `js-tokens@10.0.0`
   - Description: Tiny JavaScript tokenizer.
   - Homepage: https://github.com/lydell/js-tokens#readme
-- `js-yaml@4.2.0`, `js-yaml@5.1.0`
+- `js-yaml@4.3.0`, `js-yaml@5.2.1`
   - Description: YAML 1.2 parser and serializer
   - Homepage: https://github.com/nodeca/js-yaml#readme
 - `jsesc@3.1.0`
@@ -1367,7 +1380,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `lines-and-columns@1.2.4`
   - Description: Maps lines and columns to character offsets and back.
   - Homepage: https://github.com/eventualbuddha/lines-and-columns#readme
-- `linkify-it@5.0.1`
+- `linkify-it@5.0.2`
   - Description: Links recognition library with FULL unicode support
   - Homepage: https://github.com/markdown-it/linkify-it#readme
 - `lint-staged@17.0.8`
@@ -1681,6 +1694,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `socks-proxy-agent@8.0.5`
   - Description: A SOCKS proxy `http.Agent` implementation for HTTP and HTTPS
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
+- `source-map-support@0.5.21`
+  - Description: Fixes stack traces for files with source maps
+  - Homepage: https://github.com/evanw/node-source-map-support#readme
 - `sqlstring@2.3.3`
   - Description: Simple SQL escape and format for MySQL
   - Homepage: https://github.com/mysqljs/sqlstring#readme
@@ -1782,6 +1798,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `universal-github-app-jwt@2.2.2`
   - Description: Calculate GitHub App bearer tokens for Node & modern browsers
   - Homepage: https://github.com/gr2m/universal-github-app-jwt#readme
+- `unplugin@1.16.1`
+  - Description: Unified plugin system for build tools
+  - Homepage: https://github.com/unjs/unplugin#readme
 - `unzip-stream@0.3.4`
   - Description: Process zip files using streaming API
   - Homepage: https://github.com/mhr3/unzip-stream#readme
@@ -1800,6 +1819,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `vitest@4.1.9`
   - Description: Next generation testing framework powered by Vite
   - Homepage: https://vitest.dev
+- `webpack-virtual-modules@0.6.2`
+  - Description: Webpack Virtual Modules
+  - Homepage: https://github.com/sysgears/webpack-virtual-modules#readme
 - `whatwg-mimetype@3.0.0`
   - Description: Parses, serializes, and manipulates MIME types, according to the WHATWG MIME Sniffing Standard
   - Homepage: https://github.com/jsdom/whatwg-mimetype#readme
@@ -1809,7 +1831,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `wrap-ansi@7.0.0`, `wrap-ansi@9.0.2`, `wrap-ansi@10.0.0`
   - Description: Wordwrap a string with ANSI escape codes
   - Homepage: https://github.com/chalk/wrap-ansi#readme
-- `ws@8.21.0`
+- `ws@8.21.1`
   - Description: Simple to use, blazing fast and thoroughly tested websocket client and server for Node.js
   - Homepage: https://github.com/websockets/ws
 - `xtend@4.0.2`

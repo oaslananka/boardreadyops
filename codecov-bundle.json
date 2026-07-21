@@ -1,0 +1,6 @@
+{
+  "gitService": "github",
+  "telemetry": false,
+  "retryCount": 3,
+  "ignorePatterns": ["*.map"]
+}

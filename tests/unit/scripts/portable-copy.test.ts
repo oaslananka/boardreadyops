@@ -13,7 +13,7 @@ afterEach(async () => {
 describe("portable directory copy", () => {
   it.skipIf(process.platform === "win32")(
     "copies setgid source trees without applying special permission bits",
-    async () => {
+    async ({ skip }) => {
       const source = await mkdtemp(path.join(process.cwd(), ".portable-copy-source-"));
       temporaryRoots.push(source);
       await chmod(source, 0o2700).catch(() => undefined);
@@ -25,7 +25,8 @@ describe("portable directory copy", () => {
       temporaryRoots.push(destinationParent);
       const destination = path.join(destinationParent, "runtime");
 
-      expect((await stat(source)).mode & 0o2000).toBe(0o2000);
+      const sourceMode = (await stat(source)).mode;
+      skip((sourceMode & 0o2000) !== 0o2000, "filesystem does not permit setgid directories");
 
       await copyDirectoryPortable(source, destination);
 

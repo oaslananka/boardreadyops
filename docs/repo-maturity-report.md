@@ -1,7 +1,7 @@
 # Repository Maturity Report
 
-Audit date: 2026-07-02  
-Repository: `oaslananka/boardreadyops`  
+Audit date: 2026-07-02
+Repository: `oaslananka/boardreadyops`
 Mode: audit plus low-risk implementation pull request
 
 ## Executive summary

@@ -365,7 +365,13 @@ jobs:
       - run: corepack install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - run: pnpm run cloud:build
+      - name: Build cloud application
+        run: pnpm run cloud:build
+      - name: Upload Codecov bundle analysis
+        continue-on-error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: pnpm run codecov:bundle
 
   verify-dist:
     needs:
@@ -405,7 +411,7 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run coverage
+      - run: pnpm run coverage:ci
       - name: Upload coverage report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
@@ -413,12 +419,34 @@ jobs:
           name: coverage-report
           path: coverage/
           if-no-files-found: warn
+      - name: Validate Codecov configuration
+        if: ${{ !cancelled() }}
+        run: >-
+          curl --fail-with-body --silent --show-error
+          --retry 3 --retry-all-errors
+          --data-binary @codecov.yml
+          https://codecov.io/validate
       - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
+          disable_search: true
           files: coverage/lcov.info
           fail_ci_if_error: false
           flags: unit
+          name: boardreadyops-unit-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          disable_search: true
+          files: coverage/test-results.junit.xml
+          fail_ci_if_error: false
+          flags: unit
+          name: boardreadyops-unit-tests
+          report_type: test_results
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   mutation:
     needs: risk-profile
