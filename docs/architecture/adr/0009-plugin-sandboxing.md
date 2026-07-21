@@ -6,7 +6,7 @@ Proposed
 
 ## Context
 
-BoardReadyOps has a plugin architecture that allows external teams to define custom rules, report formats, and adapters. 
+BoardReadyOps has a plugin architecture that allows external teams to define custom rules, report formats, and adapters.
 Currently, the plugin loader (`src/core/plugin-loader.ts`) validates that loaded plugins request permissions (`PluginPermission = "fs:read" | "fs:write" | "network" | "process" | "kicad-cli"`), and checks them against the user's `boardreadyops.yml` configuration (`pluginPermissions`).
 
 However, this is only a **declaration-level check**. Once Node.js loads a plugin via `import()`, the plugin runs with the full privileges of the host Node.js process. A buggy or malicious plugin could bypass these checks and execute arbitrary file system access, network calls, or launch external processes.
@@ -31,12 +31,12 @@ flowchart TD
     B -->|3. Evaluate Permissions| D[Capability Mapper]
     D -->|4. Inject Allowed Proxies| C
     C -->|5. Run Plugin Code| E[Plugin Rule execution]
-    
+
     subgraph Isolated Sandbox Context
         C
         E
     end
-    
+
     subgraph Capability Wrappers
         D -->|fs:read| F[Virtual FS Reader]
         D -->|kicad-cli| G[kicad-cli Subprocess Wrapper]
@@ -80,7 +80,7 @@ export function executeInSandbox(code: string, capabilities: Record<string, any>
     },
     ...capabilities
   };
-  
+
   const context = vm.createContext(sandbox);
   // Freeze prototype chains to prevent prototype pollution escapes
   // Execute code

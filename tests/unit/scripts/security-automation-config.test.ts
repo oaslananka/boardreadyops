@@ -62,7 +62,7 @@ describe("dependency and security automation configuration", () => {
     expect(securityWorkflow).toContain("semgrep.sarif");
   });
 
-  it("runs a pinned Snyk CLI in the Husky pre-push chain and trusted CI contexts", async () => {
+  it("keeps the pinned Snyk CLI manual locally and active in trusted CI contexts", async () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as {
       scripts?: Record<string, string>;
       devDependencies?: Record<string, string>;
@@ -89,7 +89,8 @@ describe("dependency and security automation configuration", () => {
     expect(snykPolicy).toContain("expires: 2026-08-31T00:00:00.000Z");
     expect(snykPolicy.match(/SNYK-/gu)).toHaveLength(1);
     expect(preCommit).toContain("id: snyk-oss");
-    expect(preCommit).toContain("stages: [pre-push]");
+    expect(preCommit).toContain("stages: [manual]");
+    expect(preCommit).not.toContain("stages: [pre-push]");
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
 
     expect(securityWorkflow).toContain("pnpm install --frozen-lockfile --ignore-scripts");

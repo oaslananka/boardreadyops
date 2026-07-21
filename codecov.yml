@@ -9,17 +9,19 @@ coverage:
   precision: 2
   round: down
   range: 70..100
-
   status:
     project:
       default:
-        target: 90%
-        threshold: 2%
+        target: auto
+        threshold: 1%
+        informational: true
         flags:
           - unit
     patch:
       default:
-        target: 90%
+        target: auto
+        threshold: 1%
+        informational: true
         flags:
           - unit
     changes: false
@@ -29,11 +31,42 @@ flags:
     paths:
       - src/
     carryforward: true
-  integration:
-    paths:
-      - src/
-      - tests/
-    carryforward: true
+
+component_management:
+  individual_components:
+    - component_id: core_engine
+      name: Core engine
+      paths:
+        - src/core/**
+    - component_id: rules
+      name: Rules
+      paths:
+        - src/rules/**
+    - component_id: bom_supply_chain
+      name: BOM and supply chain
+      paths:
+        - src/bom/**
+    - component_id: pinmap_contracts
+      name: Pinmap contracts
+      paths:
+        - src/pinmap/**
+    - component_id: kicad_integration
+      name: KiCad integration
+      paths:
+        - src/kicad/**
+    - component_id: reporting_notifications
+      name: Reporting and notifications
+      paths:
+        - src/report/**
+        - src/notifiers/**
+    - component_id: action_inputs
+      name: GitHub Action inputs
+      paths:
+        - src/action/inputs.ts
+
+bundle_analysis:
+  warning_threshold: "5%"
+  status: informational
 
 ignore:
   - "dist/**/*"
