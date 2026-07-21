@@ -83,7 +83,7 @@ describe("dependency and security automation configuration", () => {
     expect(securityDocs).not.toContain("intentionally pre-push");
   });
 
-  it("keeps the pinned Snyk CLI manual locally and active in trusted CI contexts", async () => {
+  it("uses OSV-Scanner as the tokenless dependency vulnerability gate", async () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as {
       scripts?: Record<string, string>;
       devDependencies?: Record<string, string>;
@@ -91,34 +91,45 @@ describe("dependency and security automation configuration", () => {
     const preCommit = await repositoryFile(".pre-commit-config.yaml");
     const huskyPrePush = await repositoryFile(".husky/pre-push");
     const securityWorkflow = await repositoryFile(".github/workflows/security.yml");
+    const osvWorkflow = await repositoryFile(".github/workflows/osv.yml");
+    const securityDocs = await repositoryFile("docs/security-automation.md");
     const workspace = await repositoryFile("pnpm-workspace.yaml");
-    const snykPolicy = await repositoryFile(".snyk");
 
     expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.1");
-    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--config.ignore-scripts=true");
-    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk@1.1306.1");
-    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("snyk test --all-projects");
-    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--severity-threshold=high");
-    expect(packageJson.scripts?.["security:snyk:oss"]).toContain("--exclude=requirements.txt");
+    expect(packageJson.scripts?.["security:snyk:oss"]).toBeUndefined();
     expect(workspace).toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
     expect(workspace).toContain("brace-expansion@>=5 <5.0.7: 5.0.7");
     expect(workspace).toContain("fast-uri@>=3 <3.1.4: 3.1.4");
     expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.0");
     expect(workspace).toContain("linkify-it@>=5 <5.0.2: 5.0.2");
     expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.1");
-    expect(snykPolicy).toContain("SNYK-JS-EXTRACTZIP-17660777");
-    expect(snykPolicy).toContain("expires: 2026-08-31T00:00:00.000Z");
-    expect(snykPolicy.match(/SNYK-/gu)).toHaveLength(1);
-    expect(preCommit).toContain("id: snyk-oss");
+
+    expect(preCommit).toContain("repo: https://github.com/google/osv-scanner");
+    expect(preCommit).toContain("rev: v2.3.8");
+    expect(preCommit).toContain("id: osv-scanner");
     expect(preCommit).toContain("stages: [manual]");
-    expect(preCommit).not.toContain("stages: [pre-push]");
+    expect(preCommit).not.toMatch(/snyk|synk/iu);
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
 
-    expect(securityWorkflow).toContain("pnpm install --frozen-lockfile --ignore-scripts");
-    expect(securityWorkflow).toContain("pnpm run security:snyk:oss --sarif-file-output=snyk.sarif");
-    expect(securityWorkflow).not.toContain("snyk/actions/setup@");
-    expect(securityWorkflow).toContain("secrets.SNYK_TOKEN || secrets.SYNK_PAT_TOKEN");
-    expect(securityWorkflow).toContain("snyk.sarif");
+    expect(securityWorkflow).not.toMatch(/snyk|synk/iu);
+    expect(osvWorkflow).toContain("pull_request:");
+    expect(osvWorkflow).toContain("push:");
+    expect(osvWorkflow).toContain("schedule:");
+    expect(osvWorkflow).toContain("workflow_dispatch:");
+    expect(osvWorkflow).toContain("security-events: write");
+    expect(osvWorkflow).toContain(
+      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
+    );
+    expect(osvWorkflow).toContain(
+      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
+    );
+    expect(osvWorkflow).toContain("fail-on-vuln: true");
+    expect(osvWorkflow).not.toMatch(/SNYK_TOKEN|SYNK_PAT_TOKEN/u);
+
+    expect(securityDocs).toContain("OSV-Scanner v2.3.8");
+    expect(securityDocs).toContain("No account, API token, or hosted scan quota is required");
+    expect(securityDocs).not.toMatch(/snyk|synk/iu);
+    await expect(repositoryFile(".snyk")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("keeps SonarQube Cloud in Automatic Analysis mode without a competing CI scanner", async () => {
@@ -134,6 +145,7 @@ describe("dependency and security automation configuration", () => {
       "docs.yml",
       "lint-fast.yml",
       "mutation-nightly.yml",
+      "osv.yml",
       "provenance.yml",
       "publish-npm.yml",
       "readiness-runner.yml",
