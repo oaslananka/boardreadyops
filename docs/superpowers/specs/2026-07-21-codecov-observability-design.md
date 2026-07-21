@@ -1,62 +1,67 @@
 # Codecov Observability Integration Design
 
 Date: 2026-07-21
-Status: approved by delegated implementation request
+Status: approved and implementation-validated
 
 ## Context
 
-BoardReadyOps already uploads a single Vitest LCOV report from the `coverage-gate` job and has a repository-level `codecov.yml`. The current setup does not upload test-result telemetry, does not analyze the production Next.js bundles, defines an unused `integration` coverage flag, and does not validate `codecov.yml` before upload.
+BoardReadyOps already uploads one Vitest LCOV report from `ci / coverage-gate` and enforces strict local coverage thresholds. The repository did not upload test-result telemetry, validate `codecov.yml`, expose useful coverage components, or analyze the production web bundle.
 
-The repository is public, uses a pinned Codecov Action v7 commit, runs Vitest 4, and builds the web control plane with Next.js 16 in Webpack mode.
+The repository is public, uses a full-SHA-pinned Codecov Action v7 commit, runs Vitest 4, and builds the web control plane with Next.js 16 in Webpack mode.
 
 ## Considered approaches
 
-### 1. YAML-only hardening
+### YAML-only hardening
 
 Only update status thresholds, comments, and components.
 
-Trade-off: minimal dependency and CI impact, but it leaves failed-test reporting and production bundle regressions invisible.
+Trade-off: minimal dependency and CI impact, but failed-test reporting and production bundle regressions remain invisible.
 
-### 2. Focused Codecov observability integration — selected
+### Focused Codecov observability integration — selected
 
-Keep one coverage run, add a JUnit reporter to that same run, upload the JUnit report through the existing pinned Codecov Action, configure the official Next.js Webpack bundle plugin for the production build, and improve repository YAML with components and validation.
+Keep one coverage run, add JUnit output to that run, upload coverage and test results separately through the existing pinned Codecov Action, analyze the built browser assets after the production Next.js build, and improve repository YAML with components and validation.
 
-Trade-off: one small development dependency and two additional upload operations, without duplicating test execution.
+Trade-off: one framework-independent development dependency and additional advisory uploads without duplicating test execution.
 
-### 3. Full matrix and per-package uploads
+### Full matrix and per-package uploads
 
 Upload coverage and test results from every operating-system and Node.js matrix entry with separate flags.
 
-Trade-off: maximal analytics, but substantially more CI time, duplicate reports, noisy status checks, and unnecessary Codecov usage for the current project scale.
+Trade-off: maximal analytics, but substantially more CI time, duplicate reports, noisy statuses, and unnecessary Codecov usage for the current project scale.
 
 ## Selected design
 
 ### Coverage and Test Analytics
 
-- Keep `coverage/lcov.info` as the authoritative coverage report.
-- Add a CI-only coverage script that runs the existing test selection once with Vitest's default, GitHub Actions, and JUnit reporters.
-- Write the JUnit output to `coverage/test-results.junit.xml`.
-- Upload coverage and test results with separate invocations of the already pinned `codecov/codecov-action` commit.
-- Use `report_type: test_results` for the JUnit upload instead of the deprecated `codecov/test-results-action`.
-- Run both upload steps under `if: ${{ !cancelled() }}` so failed-test telemetry is still sent after a test failure.
-- Keep Codecov upload failures non-blocking because the repository already has local coverage thresholds as the authoritative CI gate.
+- Keep `coverage/lcov.info` as the authoritative Codecov coverage report.
+- Add a CI-only runner that executes the existing coverage selection once.
+- Use Vitest's default and JUnit reporters everywhere.
+- Add Vitest's GitHub Actions reporter only when `GITHUB_ACTIONS=true` so local runs remain readable.
+- Write JUnit output to `coverage/test-results.junit.xml`.
+- Upload coverage and test results with separate invocations of the pinned `codecov/codecov-action` commit.
+- Use `report_type: test_results` for the JUnit upload.
+- Run both upload steps under `if: ${{ !cancelled() }}` so failed-test telemetry can still be sent.
+- Keep upload failures non-blocking because repository-local thresholds remain authoritative.
 
 ### JavaScript Bundle Analysis
 
-- Add `@codecov/nextjs-webpack-plugin` to `apps/web` as a pinned development dependency.
-- Register the plugin at the end of the Next.js Webpack plugin list.
-- Enable uploads only when running in GitHub Actions.
+The initial Next.js-specific plugin was rejected during implementation because `@codecov/nextjs-webpack-plugin@2.0.1` declares peer support only for Next.js 14 and 15, while BoardReadyOps uses Next.js 16.2.10.
+
+- Use the official `@codecov/bundle-analyzer@2.0.1` package instead.
+- Run it after a successful production build against `apps/web/.next/static`.
 - Use bundle name `boardreadyops-web`.
-- Use `CODECOV_TOKEN` when available and configure `gitService: "github"` so public/fork builds can use tokenless upload behavior.
-- Disable plugin telemetry.
-- Keep Codecov bundle status informational with a 5% warning threshold until a stable baseline is established.
+- Pass `CODECOV_TOKEN` only when available.
+- Configure `gitService: "github"` so public and fork builds can use tokenless upload behavior.
+- Disable analyzer telemetry and ignore source maps.
+- Keep bundle status informational with a 5% warning threshold.
 - Preserve the repository's existing local bundle-size budget as the blocking control.
 
 ### Repository YAML
 
-- Keep the existing overall project and patch coverage requirements.
-- Keep only the `unit` flag because it is the only coverage flag currently uploaded.
-- Add components for the coverage-bearing domains:
+- Set project and patch targets to `auto` with a 1% threshold.
+- Keep both statuses informational to avoid duplicating the local coverage gate and SonarQube Cloud reporting.
+- Keep only the `unit` flag because it is the only flag uploaded.
+- Add components for:
   - core engine
   - rules
   - BOM and supply-chain logic
@@ -64,35 +69,36 @@ Trade-off: maximal analytics, but substantially more CI time, duplicate reports,
   - KiCad integration
   - reporting and notifications
   - GitHub Action inputs
-- Components will appear in the PR comment but will not create additional required commit statuses.
-- Add bundle-analysis configuration as informational.
+- Do not create component-level required status checks.
 - Preserve ignored generated bundles under `dist/**`.
 
 ### Validation and regression tests
 
-- Validate `codecov.yml` against Codecov's official validation endpoint before uploads.
+- Validate `codecov.yml` against `https://codecov.io/validate` before uploads.
 - Add repository tests that assert:
-  - JUnit output is generated by the CI coverage script.
-  - coverage and test-result uploads use the pinned Codecov Action.
-  - test-result uploads use `report_type: test_results` and run after non-cancelled failures.
-  - bundle analysis is configured only for GitHub Actions production builds.
-  - the unused integration flag is removed.
-  - component and informational bundle policies remain present.
-- Run targeted tests, lint, typecheck, dependency checks, production web build, bundle verification, and the full relevant CI suite before merge.
+  - reporter selection changes only inside GitHub Actions;
+  - LCOV and JUnit uploads use the pinned Codecov Action;
+  - JUnit uploads use `report_type: test_results` and non-cancelled execution;
+  - optional bundle authentication omits the token argument when unavailable;
+  - the framework-independent analyzer scans the production client assets;
+  - the incompatible Next.js-specific plugin is absent;
+  - the unused integration flag is removed;
+  - component and informational policies remain present.
+- Verify the production build and analyzer with a dry run before merge.
 
 ## Security and reliability
 
-- No new long-lived secret is required for public repository builds.
-- Fork pull requests remain compatible through tokenless bundle upload behavior.
-- The existing Codecov action and all GitHub Actions remain pinned to immutable commits.
-- The plugin is disabled outside GitHub Actions, preventing accidental uploads from local development and self-hosted deployment builds.
-- Codecov remains advisory; local Vitest thresholds and local bundle-size budgets remain the authoritative merge gates.
+- No new long-lived secret is required; the existing `CODECOV_TOKEN` is reused for internal builds.
+- Fork pull requests remain compatible through tokenless upload behavior.
+- The Codecov Action remains pinned to an immutable commit.
+- The analyzer runs only as an explicit post-build CI step, not during local or deployment builds.
+- Codecov remains advisory; local Vitest thresholds and bundle-size budgets remain the merge gates.
 
 ## Acceptance criteria
 
-1. One test execution produces both LCOV and JUnit reports.
-2. Failed tests can be reported to Codecov Test Analytics even when the coverage command exits non-zero.
-3. The production Next.js build emits Codecov bundle analysis in GitHub Actions without affecting local builds.
-4. Codecov PR comments expose meaningful BoardReadyOps components without adding a large status-check matrix.
-5. `codecov.yml` is validated before report upload.
-6. Existing coverage, build, security, and cross-platform checks remain green.
+1. One test execution can produce both LCOV and JUnit reports.
+2. Failed tests are represented in the JUnit file and can be uploaded after a non-cancelled failure.
+3. The production Next.js client assets produce a valid Codecov bundle report without a Next.js peer dependency conflict.
+4. Codecov PR comments expose meaningful components without creating a status matrix.
+5. `codecov.yml` validates through Codecov's official endpoint.
+6. Existing build, type, test, security, and distribution controls remain green.
