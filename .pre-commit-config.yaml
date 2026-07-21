@@ -29,6 +29,17 @@ repos:
           - --quiet
         types: [text]
         files: \.(?:[cm]?js|jsx|ts|tsx)$
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.27.0
+    hooks:
+      - id: zizmor
+        args:
+          - --no-progress
+          - --min-severity=medium
   - repo: local
     hooks:
       - id: snyk-oss
