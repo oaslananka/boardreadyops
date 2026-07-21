@@ -23,27 +23,32 @@ Do not run `pre-commit install`; `scripts/prepare.mjs` configures `.husky` as th
 - Gitleaks for committed-secret detection;
 - Semgrep `v1.170.0` with the project rule set in `.semgrep.yml`;
 - actionlint v1.7.12 for GitHub Actions syntax and semantic validation;
-- zizmor v1.27.0 for GitHub Actions security analysis at medium severity and above.
+- zizmor v1.27.0 for GitHub Actions security analysis at medium severity and above;
+- OSV-Scanner v2.3.8 as an explicit manual dependency vulnerability scan.
 
 The Semgrep hook examines staged JavaScript and TypeScript files and rejects shell-command-string execution through Node's `child_process` APIs. actionlint and zizmor examine changed workflow YAML files. Full CI runs both workflow linters over every workflow even when a local hook is explicitly bypassed.
 
-## Pre-push checks
+## Manual dependency scan
 
-`.husky/pre-push` retains the repository typecheck, unit-test, and distribution verification gates, then runs the pre-push stage for all files.
-
-The authenticated `snyk-oss` hook is manual rather than part of commit or push because it needs network access and credentials. Run it before dependency or release-sensitive changes with:
+Dependency scanning is manual locally because it refreshes vulnerability data from the network. Run it before dependency, release, or lockfile-sensitive changes with:
 
 ```bash
-pre-commit run --hook-stage manual snyk-oss --all-files
+pre-commit run --hook-stage manual osv-scanner --all-files
 ```
 
-Authenticate locally with either:
+The pinned hook recursively scans supported manifests and lockfiles from the repository root. No account, API token, or hosted scan quota is required. Findings are matched against the open OSV vulnerability database.
 
-```bash
-corepack pnpm --config.ignore-scripts=true --package=snyk@1.1306.1 dlx snyk auth
-```
+## OSV CI
 
-or an externally supplied `SNYK_TOKEN`. Credentials must never be written to repository files.
+`.github/workflows/osv.yml` owns dependency vulnerability enforcement:
+
+1. pull requests run the official differential reusable workflow and fail when the proposed change introduces a vulnerability;
+2. pushes to `main`, weekly schedules, and manual dispatches run a complete recursive source scan;
+3. the official reusable workflows publish SARIF to GitHub Code Scanning;
+4. both modes use OSV-Scanner v2.3.8 through an immutable full commit SHA;
+5. all jobs operate with read-only repository access plus the minimum `security-events: write` permission required for SARIF.
+
+The workflow is path-filtered for package manifests, lockfiles, workspace configuration, Python requirement files, and its own workflow definition. Scheduled scans still detect newly disclosed vulnerabilities even when dependencies have not changed.
 
 ## Semgrep CI
 
@@ -56,13 +61,19 @@ The `security / semgrep` job:
 
 The project-specific rule set is intentionally small and high-confidence. Broader community results are visible in SARIF without making existing advisory findings indistinguishable from newly introduced project-policy violations.
 
-## Snyk CI
+## Complementary security ownership
 
-The `security / snyk` job runs only on trusted repository events so secrets are never exposed to fork pull requests. It resolves the exact Snyk CLI `1.1306.1` package with lifecycle scripts disabled, scans every detected pnpm workspace project, includes development dependencies, and blocks high or critical open-source findings.
+The security stack intentionally gives each category a primary owner:
 
-The preferred repository secret is `SNYK_TOKEN`. The workflow temporarily supports the existing misspelled `SYNK_PAT_TOKEN` secret so migration can occur without an outage. After `SNYK_TOKEN` is configured and a successful workflow run is observed, delete `SYNK_PAT_TOKEN`.
+- OSV-Scanner: dependency and lockfile vulnerabilities;
+- GitHub Dependency Review: newly introduced vulnerable dependencies in pull requests;
+- CodeQL and Semgrep: source-code security analysis;
+- Gitleaks and GitHub push protection: secrets;
+- Trivy: scheduled filesystem, container, and infrastructure-as-code coverage;
+- OpenSSF Scorecard: repository supply-chain posture;
+- the SBOM job: CycloneDX dependency inventory.
 
-The pnpm workspace policy forces known vulnerable transitive releases to patched versions. The Snyk command excludes `requirements.txt` manifests because Python documentation dependencies are pinned separately and covered by the existing OSV job. `.snyk` contains exactly one temporary exception for `SNYK-JS-EXTRACTZIP-17660777`: the dependency is development-only, Puppeteer install scripts are disabled, no upstream patched release is available, and the exception expires on August 31, 2026.
+This avoids adding multiple hosted scanners that report the same dependency findings while preserving independent coverage for source code, secrets, workflow configuration, containers, and supply-chain controls.
 
 ## SonarQube Cloud
 
@@ -75,6 +86,7 @@ Developers who need local Sonar feedback should use SonarQube for IDE Connected 
 ## Failure handling
 
 - Semgrep project-rule findings fail local commit and hosted security checks.
-- Snyk high/critical findings fail the explicit local manual scan and hosted security checks.
-- Missing or invalid Snyk authentication is a visible manual/CI failure and never prints the token.
+- OSV pull-request scans fail when a change introduces a known vulnerability.
+- OSV complete scans fail when any supported manifest or lockfile resolves to a known vulnerability.
+- Gitleaks, dependency review, CodeQL, Trivy, and repository policy checks retain their existing enforcement behavior.
 - Sonar status is reported by the SonarQube Cloud integration rather than a repository scanner workflow.
