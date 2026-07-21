@@ -8,6 +8,28 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.14.0](https://github.com/oaslananka/boardreadyops/compare/v1.13.0...v1.14.0) (2026-07-21)
+
+
+### Features
+
+* **ci:** add dependency and security automation ([#193](https://github.com/oaslananka/boardreadyops/issues/193)) ([63e259e](https://github.com/oaslananka/boardreadyops/commit/63e259e9da820f859575ec3f56eadb44c9c9e356))
+* **ci:** expand Codecov observability ([#201](https://github.com/oaslananka/boardreadyops/issues/201)) ([ae27422](https://github.com/oaslananka/boardreadyops/commit/ae27422d6e551e3464630524a25146e92c325589))
+* **ci:** provision admin database URL ([#183](https://github.com/oaslananka/boardreadyops/issues/183)) ([b5c9ab3](https://github.com/oaslananka/boardreadyops/commit/b5c9ab39a3be495c389fa2baad6cc9e92419b5ff))
+* **ci:** run readiness in target repositories ([843d0ca](https://github.com/oaslananka/boardreadyops/commit/843d0ca63a1e318e5119e7d573197a931782363a))
+* **ci:** standardize workflow security linting ([#202](https://github.com/oaslananka/boardreadyops/issues/202)) ([a073226](https://github.com/oaslananka/boardreadyops/commit/a073226d796c1da0c270310e100538068972b8bb))
+* **core:** durably accept GitHub webhooks ([#198](https://github.com/oaslananka/boardreadyops/issues/198)) ([cd1f6a9](https://github.com/oaslananka/boardreadyops/commit/cd1f6a980d242fb6215e49ec434f8dad92562f4b))
+* **core:** establish VPS-independent cloud runtime foundation ([#192](https://github.com/oaslananka/boardreadyops/issues/192)) ([ac58985](https://github.com/oaslananka/boardreadyops/commit/ac58985941e8d8d56bab0f51d296d7ea20f63038))
+* **report:** improve PR readiness output ([#200](https://github.com/oaslananka/boardreadyops/issues/200)) ([6909e6b](https://github.com/oaslananka/boardreadyops/commit/6909e6bf7c66b2196c11e6b19bc7f9011ee80043))
+
+
+### Bug Fixes
+
+* **ci:** enable repository config scoping ([27e40cf](https://github.com/oaslananka/boardreadyops/commit/27e40cfc02e5d25f6d52a85d022ee531177fab33))
+* **ci:** enable repository project scoping ([6c1fc5c](https://github.com/oaslananka/boardreadyops/commit/6c1fc5c5a81ca9e0a63375b643f4a72f7aabf705))
+* **ci:** pin resolvable Renovate action ([#195](https://github.com/oaslananka/boardreadyops/issues/195)) ([b75e4c1](https://github.com/oaslananka/boardreadyops/commit/b75e4c12f0de0c5c81e0c6da24e5a6be553faa13))
+* **ci:** support rollout policy files ([#186](https://github.com/oaslananka/boardreadyops/issues/186)) ([6c2a7b2](https://github.com/oaslananka/boardreadyops/commit/6c2a7b2377d2eab8a809f5315b9e535d5a5c3898))
+
 ## [1.13.0](https://github.com/oaslananka/boardreadyops/compare/v1.12.1...v1.13.0) (2026-07-14)
 
 
