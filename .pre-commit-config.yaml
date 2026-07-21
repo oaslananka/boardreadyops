@@ -40,11 +40,17 @@ repos:
         args:
           - --no-progress
           - --min-severity=medium
-  - repo: local
+  - repo: https://github.com/google/osv-scanner
+    rev: v2.3.8
     hooks:
-      - id: snyk-oss
-        name: Snyk Open Source workspace scan
-        entry: corepack pnpm security:snyk:oss
-        language: system
+      - id: osv-scanner
+        name: OSV dependency vulnerability scan
+        args:
+          - scan
+          - source
+          - --format=vertical
+          - --verbosity=error
+          - --recursive
+          - .
         pass_filenames: false
         stages: [manual]
