@@ -1,7 +1,7 @@
 # VPS-Independent Cloud Foundation Design
 
-**Date:** 2026-07-20  
-**Status:** Approved direction; implementation pending  
+**Date:** 2026-07-20
+**Status:** Approved direction; implementation pending
 **Scope:** First migration increment for BoardReadyOps Cloud
 
 ## Context
