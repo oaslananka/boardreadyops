@@ -106,8 +106,10 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: false
-      - name: Run zizmor advisory scan
-        run: uvx --from zizmor==1.25.2 zizmor .github/workflows --min-severity medium
+      - name: Run workflow security linters
+        run: |
+          uvx --from pre-commit==4.6.0 pre-commit run actionlint --all-files
+          uvx --from pre-commit==4.6.0 pre-commit run zizmor --all-files
 
   typecheck:
     needs: risk-profile

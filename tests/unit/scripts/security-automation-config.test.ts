@@ -62,6 +62,26 @@ describe("dependency and security automation configuration", () => {
     expect(securityWorkflow).toContain("semgrep.sarif");
   });
 
+  it("pins actionlint and zizmor consistently in local hooks and CI", async () => {
+    const preCommit = await repositoryFile(".pre-commit-config.yaml");
+    const ciWorkflow = await repositoryFile(".github/workflows/ci.yml");
+    const securityDocs = await repositoryFile("docs/security-automation.md");
+
+    expect(preCommit).toContain("repo: https://github.com/rhysd/actionlint");
+    expect(preCommit).toContain("rev: v1.7.12");
+    expect(preCommit).toContain("id: actionlint");
+    expect(preCommit).toContain("repo: https://github.com/zizmorcore/zizmor-pre-commit");
+    expect(preCommit).toContain("rev: v1.27.0");
+    expect(preCommit).toContain("--min-severity=medium");
+
+    expect(ciWorkflow).toContain("pre-commit run actionlint --all-files");
+    expect(ciWorkflow).toContain("pre-commit run zizmor --all-files");
+    expect(ciWorkflow).not.toContain("zizmor==1.25.2");
+    expect(securityDocs).toContain("actionlint v1.7.12");
+    expect(securityDocs).toContain("zizmor v1.27.0");
+    expect(securityDocs).not.toContain("intentionally pre-push");
+  });
+
   it("keeps the pinned Snyk CLI manual locally and active in trusted CI contexts", async () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as {
       scripts?: Record<string, string>;
