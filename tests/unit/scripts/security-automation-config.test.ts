@@ -74,6 +74,7 @@ describe("dependency and security automation configuration", () => {
     expect(preCommit).toContain("rev: v1.27.0");
     expect(preCommit).toContain("--min-severity=medium");
 
+    expect(ciWorkflow.match(/uvx --no-build --from pre-commit==4\.6\.0/gu) ?? []).toHaveLength(2);
     expect(ciWorkflow).toContain("pre-commit run actionlint --all-files");
     expect(ciWorkflow).toContain("pre-commit run zizmor --all-files");
     expect(ciWorkflow).not.toContain("zizmor==1.25.2");

@@ -108,8 +108,8 @@ jobs:
           enable-cache: false
       - name: Run workflow security linters
         run: |
-          uvx --from pre-commit==4.6.0 pre-commit run actionlint --all-files
-          uvx --from pre-commit==4.6.0 pre-commit run zizmor --all-files
+          uvx --no-build --from pre-commit==4.6.0 pre-commit run actionlint --all-files
+          uvx --no-build --from pre-commit==4.6.0 pre-commit run zizmor --all-files
 
   typecheck:
     needs: risk-profile
