@@ -21,15 +21,21 @@ Do not run `pre-commit install`; `scripts/prepare.mjs` configures `.husky` as th
 
 - general file-integrity hooks;
 - Gitleaks for committed-secret detection;
-- Semgrep `v1.170.0` with the project rule set in `.semgrep.yml`.
+- Semgrep `v1.170.0` with the project rule set in `.semgrep.yml`;
+- actionlint v1.7.12 for GitHub Actions syntax and semantic validation;
+- zizmor v1.27.0 for GitHub Actions security analysis at medium severity and above.
 
-The Semgrep hook examines staged JavaScript and TypeScript files and rejects shell-command-string execution through Node's `child_process` APIs. Full CI still runs when a local hook is explicitly bypassed.
+The Semgrep hook examines staged JavaScript and TypeScript files and rejects shell-command-string execution through Node's `child_process` APIs. actionlint and zizmor examine changed workflow YAML files. Full CI runs both workflow linters over every workflow even when a local hook is explicitly bypassed.
 
 ## Pre-push checks
 
 `.husky/pre-push` retains the repository typecheck, unit-test, and distribution verification gates, then runs the pre-push stage for all files.
 
-The `snyk-oss` hook executes the pinned Snyk CLI against all detected pnpm workspace projects and includes development dependencies. It is intentionally pre-push rather than pre-commit because it needs network access and authentication.
+The authenticated `snyk-oss` hook is manual rather than part of commit or push because it needs network access and credentials. Run it before dependency or release-sensitive changes with:
+
+```bash
+pre-commit run --hook-stage manual snyk-oss --all-files
+```
 
 Authenticate locally with either:
 
@@ -69,6 +75,6 @@ Developers who need local Sonar feedback should use SonarQube for IDE Connected 
 ## Failure handling
 
 - Semgrep project-rule findings fail local commit and hosted security checks.
-- Snyk high/critical findings fail local push and hosted security checks.
-- Missing or invalid Snyk authentication is a visible failure and never prints the token.
+- Snyk high/critical findings fail the explicit local manual scan and hosted security checks.
+- Missing or invalid Snyk authentication is a visible manual/CI failure and never prints the token.
 - Sonar status is reported by the SonarQube Cloud integration rather than a repository scanner workflow.
