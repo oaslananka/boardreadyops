@@ -33,17 +33,10 @@ export type ControlPlaneOutboxWorkerDependencies = {
 export type ProcessControlPlaneOutboxEffectResult = {
   outboxId: string;
   effectType: ClaimedControlPlaneOutboxEffect["effectType"];
-  status:
-    | "check_run_conflict"
-    | "completed"
-    | "dead_letter"
-    | "reconciliation_required"
-    | "retry"
-    | "stale";
+  status: "check_run_conflict" | "completed" | "dead_letter" | "reconciliation_required" | "retry" | "stale";
 };
 
-const credentialPattern =
-  /\b(authorization|password|private[_-]?key|secret|token)\s*[=:]\s*[^\s,;]+/giu;
+const credentialPattern = /\b(authorization|password|private[_-]?key|secret|token)\s*[=:]\s*[^\s,;]+/giu;
 
 function errorDetails(error: unknown): {
   errorClass: string;
@@ -69,30 +62,21 @@ function errorDetails(error: unknown): {
 }
 
 function checkRunCreateEffect(effect: ClaimedControlPlaneOutboxEffect) {
-  if (
-    effect.effectType !== "github.check_run.create" ||
-    effect.payload.type !== "github.check_run.create"
-  ) {
+  if (effect.effectType !== "github.check_run.create" || effect.payload.type !== "github.check_run.create") {
     throw new Error("expected a Check Run creation effect");
   }
   return effect.payload;
 }
 
 function workflowDispatchEffect(effect: ClaimedControlPlaneOutboxEffect) {
-  if (
-    effect.effectType !== "github.workflow.dispatch" ||
-    effect.payload.type !== "github.workflow.dispatch"
-  ) {
+  if (effect.effectType !== "github.workflow.dispatch" || effect.payload.type !== "github.workflow.dispatch") {
     throw new Error("expected a workflow dispatch effect");
   }
   return effect.payload;
 }
 
 function checkRunCompleteEffect(effect: ClaimedControlPlaneOutboxEffect) {
-  if (
-    effect.effectType !== "github.check_run.complete" ||
-    effect.payload.type !== "github.check_run.complete"
-  ) {
+  if (effect.effectType !== "github.check_run.complete" || effect.payload.type !== "github.check_run.complete") {
     throw new Error("expected a Check Run completion effect");
   }
   return effect.payload;
@@ -115,8 +99,7 @@ async function processCheckRunCreate(
   const id = dependencies.id ?? randomUUID;
   const safeMode = requiresCompletionEffect(payload.action);
   const plansNextEffect = safeMode || dependencies.dispatchMode === "github-actions";
-  const executionAttemptId =
-    !safeMode && dependencies.dispatchMode === "github-actions" ? id() : undefined;
+  const executionAttemptId = !safeMode && dependencies.dispatchMode === "github-actions" ? id() : undefined;
   const nextOutboxId = plansNextEffect ? id() : undefined;
   const transition = await dependencies.outbox.completeCheckRunCreateEffect({
     effect,
