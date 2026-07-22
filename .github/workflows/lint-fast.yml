@@ -27,9 +27,18 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
+      - name: Produce exact formatted store diagnostic
+        run: pnpm exec biome format --write packages/db/src/control-plane-outbox-store.ts
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: formatted-outbox-store
+          path: packages/db/src/control-plane-outbox-store.ts
       - id: lint
         continue-on-error: true
-        run: pnpm run lint 2>&1 | tee lint-report.txt
+        run: |
+          set -o pipefail
+          (pnpm exec biome check . --max-diagnostics=100 && pnpm run i18n:check) 2>&1 | tee lint-report.txt
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
