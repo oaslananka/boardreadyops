@@ -90,7 +90,7 @@ describe("control-plane worker", () => {
           pullRequestNumber: 7,
           ref: "refs/pull/7/head",
           commitSha: "a".repeat(40),
-          triggerKind: "pull_request",
+          triggerKind: "pr",
         },
       ],
     };
