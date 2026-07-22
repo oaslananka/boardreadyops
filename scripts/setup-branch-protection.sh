@@ -2,7 +2,14 @@
 set -euo pipefail
 
 repo="${1:-oaslananka/boardreadyops}"
-branch="${2:-main}"
+ruleset_name="${2:-main}"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ruleset_file="${root}/.github/rulesets/main.json"
+
+if [[ "${ruleset_name}" != "main" ]]; then
+  printf 'This helper manages only the committed main ruleset.\n' >&2
+  exit 2
+fi
 
 export MSYS2_ARG_CONV_EXCL="*"
 export MSYS_NO_PATHCONV=1
@@ -23,70 +30,23 @@ gh_input_path() {
   fi
 }
 
-payload="$(mktemp)"
-cat >"${payload}" <<'JSON'
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": [
-      "ci / risk-profile",
-      "ci / lint",
-      "ci / typecheck",
-      "ci / test-unit",
-      "ci / build",
-      "ci / verify-dist",
-      "ci / security"
-    ]
-  },
-  "enforce_admins": true,
-  "required_pull_request_reviews": {
-    "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": false,
-    "required_approving_review_count": 0
-  },
-  "restrictions": null,
-  "required_linear_history": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false
-}
-JSON
-owner_type="$("${gh_bin}" api "repos/${repo}" --jq ".owner.type" 2>/dev/null || printf 'User')"
-if [[ "${owner_type}" == "Organization" ]]; then
-  python - "${payload}" <<'PY'
-import json
-import sys
+ruleset_id="$(
+  "${gh_bin}" api "repos/${repo}/rulesets" \
+    --jq '.[] | select(.name == "main" and .target == "branch") | .id' | head -n 1
+)"
+input_path="$(gh_input_path "${ruleset_file}")"
 
-path = sys.argv[1]
-with open(path, encoding="utf-8") as handle:
-    payload = json.load(handle)
-payload["required_pull_request_reviews"]["bypass_pull_request_allowances"] = {
-    "apps": ["release-please", "renovate", "github-actions"]
-}
-with open(path, "w", encoding="utf-8") as handle:
-    json.dump(payload, handle)
-PY
+if [[ -n "${ruleset_id}" ]]; then
+  "${gh_bin}" api --method PUT "repos/${repo}/rulesets/${ruleset_id}" --input "${input_path}" >/dev/null
+else
+  "${gh_bin}" api --method POST "repos/${repo}/rulesets" --input "${input_path}" >/dev/null
 fi
-payload_input="$(gh_input_path "${payload}")"
-
-if ! "${gh_bin}" api --method PUT "repos/${repo}/branches/${branch}/protection" --input "${payload_input}"; then
-  python - "${payload}" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-with open(path, encoding="utf-8") as handle:
-    payload = json.load(handle)
-payload["required_pull_request_reviews"].pop("bypass_pull_request_allowances", None)
-with open(path, "w", encoding="utf-8") as handle:
-    json.dump(payload, handle)
-PY
-  "${gh_bin}" api --method PUT "repos/${repo}/branches/${branch}/protection" --input "${payload_input}"
-fi
-
-"${gh_bin}" api --method POST "repos/${repo}/branches/${branch}/protection/required_signatures" >/dev/null
 
 "${gh_bin}" api --method PATCH "repos/${repo}" \
   --field delete_branch_on_merge=true \
   --field allow_squash_merge=true \
   --field allow_merge_commit=false \
-  --field allow_rebase_merge=false
+  --field allow_rebase_merge=false >/dev/null
+
+"${gh_bin}" api "repos/${repo}/rulesets" \
+  --jq '.[] | select(.name == "main" and .target == "branch") | {id, name, enforcement, target}'
