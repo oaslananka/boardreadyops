@@ -4,6 +4,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
+      "!.boardreadyops",
       "!dist",
       "!coverage",
       "!coverage-report",

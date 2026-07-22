@@ -84,6 +84,7 @@ describe("reproducible contributor toolchain", () => {
     expect(security).toContain(`semgrep==${config.validation.semgrep}`);
     expect(security).toContain(`GITLEAKS_VERSION: ${config.validation.gitleaks}`);
     expect(await repositoryFile("apps/web/Dockerfile")).toContain(`FROM node:${config.node.preferred}-slim`);
+    expect(JSON.parse(await repositoryFile("biome.json")).files.includes).toContain("!.boardreadyops");
   });
 
   it("keeps bootstrap writes inside the repository toolchain directory", async () => {
