@@ -45,7 +45,9 @@ export function verifyControlPlaneWorkerBoundary(metafile) {
 
 async function main() {
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
-  const metadataPath = process.argv[2] ? join(process.cwd(), process.argv[2]) : join(root, "apps/web/.next/worker-meta.json");
+  const metadataPath = process.argv[2]
+    ? join(process.cwd(), process.argv[2])
+    : join(root, "apps/web/.next/worker-meta.json");
   const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
   verifyControlPlaneWorkerBoundary(metadata);
   process.stdout.write(`${JSON.stringify({ event: "worker.boundary_verified", metadataPath })}\n`);

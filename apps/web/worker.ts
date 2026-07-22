@@ -56,12 +56,7 @@ function log(level: "error" | "info" | "warn", event: string, fields: Record<str
 const workerId = (process.env.BOARDREADYOPS_WORKER_ID?.trim() || `${hostname()}-${process.pid}`).slice(0, 128);
 const concurrency = integerEnvironment("BOARDREADYOPS_WORKER_CONCURRENCY", 4, 1, 32);
 const outboxConcurrency = integerEnvironment("BOARDREADYOPS_OUTBOX_CONCURRENCY", 4, 1, 32);
-const installationConcurrency = integerEnvironment(
-  "BOARDREADYOPS_WORKER_INSTALLATION_CONCURRENCY",
-  4,
-  1,
-  32,
-);
+const installationConcurrency = integerEnvironment("BOARDREADYOPS_WORKER_INSTALLATION_CONCURRENCY", 4, 1, 32);
 const repositoryConcurrency = integerEnvironment("BOARDREADYOPS_WORKER_REPOSITORY_CONCURRENCY", 2, 1, 32);
 const pollMilliseconds = integerEnvironment("BOARDREADYOPS_WORKER_POLL_MS", 1000, 100, 60_000);
 const outboxPollMilliseconds = integerEnvironment("BOARDREADYOPS_OUTBOX_POLL_MS", 500, 100, 60_000);
