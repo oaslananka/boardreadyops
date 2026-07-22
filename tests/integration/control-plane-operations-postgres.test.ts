@@ -173,10 +173,7 @@ describeDatabase("control-plane PostgreSQL reconciliation operations", () => {
       operationId,
       actorId: "operator-a",
     };
-    const results = await Promise.all([
-      store.replayDeadLetter(replayInput),
-      store.replayDeadLetter(replayInput),
-    ]);
+    const results = await Promise.all([store.replayDeadLetter(replayInput), store.replayDeadLetter(replayInput)]);
     expect(results.map((result) => result.outcome).sort()).toEqual(["already_applied", "replayed"]);
     const auditEventIds = new Set(results.map((result) => result.auditEventId));
     expect(auditEventIds.size).toBe(1);
