@@ -57,6 +57,7 @@ describe("main branch governance ruleset", () => {
     };
     const statusChecks = ruleset.rules.find((rule): rule is StatusChecksRule => rule.type === "required_status_checks");
 
+    expect(ruleset.rules.some((rule) => rule.type === "required_signatures")).toBe(true);
     expect(statusChecks?.parameters.strict_required_status_checks_policy).toBe(true);
     expect(statusChecks?.parameters.required_status_checks.map(({ context }) => context)).toEqual([
       "ci / risk-profile",
@@ -117,6 +118,7 @@ describe("main branch governance ruleset", () => {
     for (const document of [governance, detailedGovernance]) {
       const normalized = document.replace(/\s+/g, " ");
       expect(normalized).toContain("one independent approving review");
+      expect(normalized).toContain("signed commits");
       expect(normalized).toContain("PR-only emergency bypass");
       expect(normalized).toContain("retrospective review");
     }
