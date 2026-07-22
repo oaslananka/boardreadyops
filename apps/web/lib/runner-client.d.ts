@@ -27,5 +27,4 @@ export type DurableRunnerClient = {
 
 export declare function safeModeInputs(action: EnqueueReleaseRunInput): RunnerSafeModeInputs;
 export declare function runnerDispatchInputs(input: DispatchReleaseRunWorkflowInput): RunnerDispatchInputs;
-export declare function workflowDispatchDeliveryIsUncertain(error: unknown): boolean;
 export declare function createRunnerClient(): DurableRunnerClient;
