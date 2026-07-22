@@ -2,16 +2,6 @@ from pathlib import Path
 
 source = Path("packages/db/src/control-plane-operations-store.ts")
 text = source.read_text()
-old_constants = '''const credentialAssignmentKeyPatterns = [
-  "authorization",
-  "cookie",
-  "credential",
-  "password",
-  "private[_-]?key",
-  "secret",
-  "token",
-] as const;
-'''
 new_constants = '''const credentialAssignmentKeys = [
   "authorization",
   "cookie",
@@ -23,13 +13,6 @@ new_constants = '''const credentialAssignmentKeys = [
   "secret",
   "token",
 ] as const;
-'''
-old_function = '''function redactCredentialAssignments(value: string): string {
-  return credentialAssignmentKeyPatterns.reduce((redacted, keyPattern) => {
-    const assignmentPattern = new RegExp(`\\b${keyPattern}\\s*[=:]\\s*(?:"[^"]*"|'[^']*'|[^\\s,;]+)`, "giu");
-    return redacted.replace(assignmentPattern, "credential=[REDACTED]");
-  }, value);
-}
 '''
 new_function = '''function isIdentifierCharacter(value: string | undefined): boolean {
   if (!value) return false;
@@ -97,15 +80,15 @@ function redactCredentialAssignment(value: string, key: string): string {
 function redactCredentialAssignments(value: string): string {
   return credentialAssignmentKeys.reduce(redactCredentialAssignment, value);
 }
+
 '''
-for old, new, label in [
-    (old_constants, new_constants, "credential keys"),
-    (old_function, new_function, "credential parser"),
-]:
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(f"{label}: expected one match, found {count}")
-    text = text.replace(old, new, 1)
+
+constants_start = text.index("const credentialAssignmentKeyPatterns = [")
+constants_end = text.index("] as const;", constants_start) + len("] as const;")
+text = text[:constants_start] + new_constants.rstrip("\n") + text[constants_end:]
+function_start = text.index("function redactCredentialAssignments(")
+function_end = text.index("function boundedFailure(", function_start)
+text = text[:function_start] + new_function + text[function_end:]
 source.write_text(text)
 
 test = Path("tests/unit/db/control-plane-operations-store.test.ts")
