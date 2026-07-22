@@ -57,7 +57,6 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
 
       const runId = id();
       const outboxId = id();
-      const outboxIdempotencyKey = `github.check_run.create:${runId}`;
       const payload = {
         version: 1 as const,
         type: "github.check_run.create" as const,
@@ -77,8 +76,7 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
            $8,
            $9,
            $10,
-           $11,
-           $12::jsonb
+           $11::jsonb
          )`,
         [
           action.repository.id,
@@ -91,7 +89,6 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
           runId,
           idempotencyKey,
           outboxId,
-          outboxIdempotencyKey,
           JSON.stringify(payload),
         ],
       );
