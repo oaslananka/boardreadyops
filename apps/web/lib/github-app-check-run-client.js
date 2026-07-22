@@ -81,19 +81,14 @@ function existingReadinessComment(comments) {
     return undefined;
   }
 
-  return comments.find(
-    (comment) =>
-      typeof comment?.body === "string" && comment.body.includes(readinessCommentMarker),
-  );
+  return comments.find((comment) => typeof comment?.body === "string" && comment.body.includes(readinessCommentMarker));
 }
 
 function existingReadinessCheckRun(result, runId) {
   const checkRuns = Array.isArray(result?.check_runs) ? result.check_runs : [];
   return checkRuns.find(
     (checkRun) =>
-      checkRun?.name === readinessCheckName &&
-      checkRun?.external_id === runId &&
-      typeof checkRun?.id === "number",
+      checkRun?.name === readinessCheckName && checkRun?.external_id === runId && typeof checkRun?.id === "number",
   );
 }
 
@@ -119,12 +114,7 @@ export async function ensurePullRequestCheckRun(input) {
   const action = input.input.action;
   const existing = await readJson(
     await request(
-      commitCheckRunsEndpoint(
-        input.apiBaseUrl,
-        action.repository.owner,
-        action.repository.name,
-        action.commitSha,
-      ),
+      commitCheckRunsEndpoint(input.apiBaseUrl, action.repository.owner, action.repository.name, action.commitSha),
       { method: "GET", headers },
     ),
     "GitHub check run lookup",
@@ -136,18 +126,11 @@ export async function ensurePullRequestCheckRun(input) {
   }
 
   const created = await readJson(
-    await request(
-      checkRunCollectionEndpoint(
-        input.apiBaseUrl,
-        action.repository.owner,
-        action.repository.name,
-      ),
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(checkRunCreationBody(input.input)),
-      },
-    ),
+    await request(checkRunCollectionEndpoint(input.apiBaseUrl, action.repository.owner, action.repository.name), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(checkRunCreationBody(input.input)),
+    }),
     "GitHub check run creation",
   );
 
@@ -178,19 +161,11 @@ export async function upsertReadinessComment(input) {
 
   if (existing?.id) {
     await readJson(
-      await request(
-        issueCommentEndpoint(
-          input.apiBaseUrl,
-          input.repositoryOwner,
-          input.repositoryName,
-          existing.id,
-        ),
-        {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({ body: input.body }),
-        },
-      ),
+      await request(issueCommentEndpoint(input.apiBaseUrl, input.repositoryOwner, input.repositoryName, existing.id), {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ body: input.body }),
+      }),
       "GitHub pull request comment update",
     );
     return;
@@ -255,19 +230,11 @@ export function createGitHubAppCheckRunClient() {
       }
 
       await readJson(
-        await fetch(
-          checkRunEndpoint(
-            apiBaseUrl,
-            input.repositoryOwner,
-            input.repositoryName,
-            input.checkRunId,
-          ),
-          {
-            method: "PATCH",
-            headers: requestHeaders(token),
-            body: JSON.stringify(body),
-          },
-        ),
+        await fetch(checkRunEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, input.checkRunId), {
+          method: "PATCH",
+          headers: requestHeaders(token),
+          body: JSON.stringify(body),
+        }),
         "GitHub check run completion",
       );
     },
