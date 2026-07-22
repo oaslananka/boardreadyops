@@ -163,12 +163,12 @@ export function createRunnerClient() {
         throw uncertainDeliveryError(error, "workflow dispatch succeeded but the Check Run update was not confirmed");
       }
 
-      const workflowRunUrl =
-        typeof result.html_url === "string"
-          ? result.html_url
-          : typeof result.run_url === "string"
-            ? result.run_url
-            : undefined;
+      let workflowRunUrl;
+      if (typeof result.html_url === "string") {
+        workflowRunUrl = result.html_url;
+      } else if (typeof result.run_url === "string") {
+        workflowRunUrl = result.run_url;
+      }
 
       return {
         workflowDispatchId: String(result.workflow_run_id),
