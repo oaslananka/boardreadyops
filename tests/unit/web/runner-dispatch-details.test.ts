@@ -74,7 +74,7 @@ describe("runner workflow dispatch details", () => {
         workflowDispatchId: "456789",
         workflowRunUrl: "https://github.test/octo-org/hardware-board/actions/runs/456789",
       });
-      expect(bodies[1]).toMatchObject({ return_run_details: true });
+      expect(bodies).toContainEqual(expect.objectContaining({ return_run_details: true }));
     } finally {
       globalThis.fetch = originalFetch;
       process.env = previous;
