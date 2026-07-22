@@ -111,9 +111,6 @@ describe("control-plane outbox store", () => {
     const executor: SqlQueryExecutor = {
       async query(sql, params = []) {
         calls.push({ sql, params });
-        if (sql.includes("select attempt_count")) {
-          return { rows: [{ attempt_count: 2 }] };
-        }
         return { rows: [{ outcome: "reconciliation_required" }] };
       },
     };
@@ -125,15 +122,16 @@ describe("control-plane outbox store", () => {
       store.failEffect({
         outboxId: "outbox-1",
         workerId: "worker-1",
+        attemptCount: 2,
         errorClass: "NetworkError",
         errorMessage: `authorization=Bearer-${"x".repeat(1200)}`,
         deliveryUncertain: true,
       }),
     ).resolves.toBe("reconciliation_required");
-    expect(calls[1]?.sql).toContain("boardreadyops_fail_control_plane_outbox");
-    expect(String(calls[1]?.params[5])).not.toContain("authorization=");
-    expect(String(calls[1]?.params[5]).length).toBeLessThanOrEqual(1000);
-    expect(calls[1]?.params[6]).toBe(true);
+    expect(calls[0]?.sql).toContain("boardreadyops_fail_control_plane_outbox");
+    expect(String(calls[0]?.params[5])).not.toContain("authorization=");
+    expect(String(calls[0]?.params[5]).length).toBeLessThanOrEqual(1000);
+    expect(calls[0]?.params[6]).toBe(true);
   });
 
   it("collects queue and reconciliation metrics without tenant dimensions", async () => {
