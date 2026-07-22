@@ -28,8 +28,8 @@ export type ScopedConcurrencyGate = {
 };
 
 type ActionContext = {
-  installationId?: number;
-  repositoryId?: number;
+  installationId?: number | string;
+  repositoryId?: number | string;
   repository?: string;
 };
 
@@ -71,9 +71,11 @@ function outboxAction(effect: ClaimedControlPlaneOutboxEffect): GitHubAppLifecyc
 function checkRunCompletionContext(effect: ClaimedControlPlaneOutboxEffect): ActionContext {
   if (effect.payload.type !== "github.check_run.complete") return {};
   const { installationId, repositoryOwner, repositoryName } = effect.payload.input;
+  const repository = `${repositoryOwner}/${repositoryName}`;
   return {
-    installationId: typeof installationId === "number" ? installationId : undefined,
-    repository: `${repositoryOwner}/${repositoryName}`,
+    installationId,
+    repositoryId: repository,
+    repository,
   };
 }
 
@@ -86,7 +88,8 @@ export function jobCorrelation(job: ClaimedControlPlaneJob): WorkerCorrelation {
 }
 
 export function outboxCorrelation(effect: ClaimedControlPlaneOutboxEffect): WorkerCorrelation {
-  const context = outboxAction(effect) ? actionContext(outboxAction(effect)) : checkRunCompletionContext(effect);
+  const action = outboxAction(effect);
+  const context = action ? actionContext(action) : checkRunCompletionContext(effect);
   return {
     ...context,
     ...(effect.releaseRunId ? { releaseRunId: effect.releaseRunId } : {}),
