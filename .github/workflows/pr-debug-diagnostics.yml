@@ -12,6 +12,30 @@ permissions:
   contents: read
 
 jobs:
+  source-snapshot:
+    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: source-snapshot
+          path: |
+            apps/web/lib/control-plane-outbox-worker.ts
+            apps/web/lib/github-app-check-run-client.js
+            apps/web/lib/runner-client.js
+            apps/web/worker.ts
+            packages/db/src/control-plane-outbox-store.ts
+            tests/unit/web/control-plane-outbox-worker.test.ts
+            tests/unit/web/control-plane-worker.test.ts
+            tests/unit/web/github-app-check-run-client.test.ts
+            tests/unit/web/readiness-result-route.test.ts
+            tests/unit/web/runner-client.test.ts
+            tests/unit/web/runner-dispatch-details.test.ts
+
   typecheck-report:
     if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     runs-on: ubuntu-24.04
