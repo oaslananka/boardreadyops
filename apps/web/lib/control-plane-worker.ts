@@ -1,17 +1,13 @@
 import {
-  executeGitHubAppLifecycleActions,
-  type GitHubAppCheckRunClient,
-  type GitHubAppLifecycleStore,
-  type GitHubAppWorkflowDispatchClient,
-} from "@boardreadyops/cloud-core/lifecycle-executor";
+  type GitHubAppDurableLifecycleStore,
+  planGitHubAppLifecycleActions,
+} from "@boardreadyops/cloud-core/durable-lifecycle-planner";
 import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 
 export type ControlPlaneWorkerDependencies = {
   workerId: string;
   jobs: ControlPlaneJobStore;
-  lifecycle: GitHubAppLifecycleStore;
-  checkRuns?: GitHubAppCheckRunClient;
-  workflowDispatch?: GitHubAppWorkflowDispatchClient;
+  lifecycle: GitHubAppDurableLifecycleStore;
 };
 
 export type ProcessControlPlaneJobResult = {
@@ -40,12 +36,7 @@ export async function processControlPlaneJob(
   dependencies: ControlPlaneWorkerDependencies,
 ): Promise<ProcessControlPlaneJobResult> {
   try {
-    await executeGitHubAppLifecycleActions(
-      job.actions,
-      dependencies.lifecycle,
-      dependencies.checkRuns,
-      dependencies.workflowDispatch,
-    );
+    await planGitHubAppLifecycleActions(job.actions, dependencies.lifecycle);
     const status = await dependencies.jobs.completeJob({
       jobId: job.jobId,
       workerId: dependencies.workerId,

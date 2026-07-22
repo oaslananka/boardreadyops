@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(17);
+    expect(cloudDatabaseSchemaVersion).toBe(18);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -44,6 +44,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0015_control_plane_webhook_jobs.sql",
       "0016_control_plane_transactional_outbox.sql",
       "0017_release_run_outbox_producer.sql",
+      "0018_control_plane_outbox_transitions.sql",
     ]);
   });
 

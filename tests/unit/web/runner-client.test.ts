@@ -116,7 +116,13 @@ describe("runner workflow dispatch client", () => {
         createRunnerClient().dispatchReleaseRunWorkflow({
           action: {
             ...action,
-            repository: { ...action.repository, defaultBranch: undefined },
+            repository: {
+              id: action.repository.id,
+              owner: action.repository.owner,
+              name: action.repository.name,
+              fullName: action.repository.fullName,
+              private: action.repository.private,
+            },
           },
           runId: "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d",
           idempotencyKey: "98765:42:0123456789abcdef",
@@ -174,7 +180,10 @@ describe("runner workflow dispatch client", () => {
       if (
         url === "https://github.test/repos/octo-org/hardware-board/actions/workflows/readiness-runner.yml/dispatches"
       ) {
-        return new Response(null, { status: 204 });
+        return Response.json({
+          workflow_run_id: 456789,
+          html_url: "https://github.test/octo-org/hardware-board/actions/runs/456789",
+        });
       }
 
       if (url === "https://github.test/repos/octo-org/hardware-board/check-runs/555") {
@@ -194,8 +203,8 @@ describe("runner workflow dispatch client", () => {
           executionAttemptId: "7559e99b-4998-4e02-a94a-7a7a4686ae11",
         }),
       ).resolves.toEqual({
-        workflowDispatchId:
-          "octo-org/hardware-board/readiness-runner.yml/5dc4193b-5c7e-4df8-b86f-e4d3266fc22d/7559e99b-4998-4e02-a94a-7a7a4686ae11",
+        workflowDispatchId: "456789",
+        workflowRunUrl: "https://github.test/octo-org/hardware-board/actions/runs/456789",
       });
 
       expect(requests).toHaveLength(3);
@@ -222,6 +231,7 @@ describe("runner workflow dispatch client", () => {
           safe_mode: "false",
           safe_mode_reasons: "",
         },
+        return_run_details: true,
       });
 
       expect(requests[2]).toMatchObject({

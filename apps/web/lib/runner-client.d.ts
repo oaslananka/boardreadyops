@@ -8,8 +8,6 @@ export type RunnerSafeModeInputs = {
   safe_mode_reasons: string;
 };
 
-export declare function safeModeInputs(action: EnqueueReleaseRunInput): RunnerSafeModeInputs;
-
 export type RunnerDispatchInputs = RunnerSafeModeInputs & {
   run_id: string;
   execution_attempt_id: string;
@@ -18,7 +16,15 @@ export type RunnerDispatchInputs = RunnerSafeModeInputs & {
   result_url: string;
 };
 
-export declare function runnerDispatchInputs(input: DispatchReleaseRunWorkflowInput): RunnerDispatchInputs;
+export type WorkflowDispatchResult = {
+  workflowDispatchId: string;
+  workflowRunUrl?: string;
+};
 
-// biome-ignore lint/suspicious/noExplicitAny: Runtime JS client implements the cloud-core lifecycle interface.
-export declare function createRunnerClient(): any;
+export type DurableRunnerClient = {
+  dispatchReleaseRunWorkflow(input: DispatchReleaseRunWorkflowInput): Promise<WorkflowDispatchResult>;
+};
+
+export declare function safeModeInputs(action: EnqueueReleaseRunInput): RunnerSafeModeInputs;
+export declare function runnerDispatchInputs(input: DispatchReleaseRunWorkflowInput): RunnerDispatchInputs;
+export declare function createRunnerClient(): DurableRunnerClient;

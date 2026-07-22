@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { processControlPlaneJob } from "../../../apps/web/lib/control-plane-worker.js";
-import type { GitHubAppLifecycleStore } from "../../../packages/cloud-core/src/lifecycle-executor.js";
+import type { GitHubAppDurableLifecycleStore } from "../../../packages/cloud-core/src/durable-lifecycle-planner.js";
 import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "../../../packages/db/src/control-plane-job-store.js";
 
-function lifecycleStore(): GitHubAppLifecycleStore {
+function lifecycleStore(): GitHubAppDurableLifecycleStore {
   return {
     upsertInstallation: vi.fn(async () => undefined),
     deleteInstallation: vi.fn(async () => undefined),
     upsertRepository: vi.fn(async () => undefined),
     removeRepository: vi.fn(async () => undefined),
-    enqueueReleaseRun: vi.fn(async () => ({ idempotencyKey: "key" })),
-    attachGitHubCheckRun: vi.fn(async () => undefined),
-    bindReleaseRunExecutionAttempt: vi.fn(async () => false),
-    markReleaseRunDispatched: vi.fn(async () => undefined),
-    markReleaseRunSkipped: vi.fn(async () => undefined),
+    enqueueReleaseRunWithOutbox: vi.fn(async () => ({
+      idempotencyKey: "key",
+      runId: "run-1",
+      outboxId: "outbox-1",
+    })),
   };
 }
 
@@ -53,7 +53,7 @@ const job: ClaimedControlPlaneJob = {
 };
 
 describe("control-plane worker", () => {
-  it("completes a durable job only after lifecycle actions finish", async () => {
+  it("completes a durable job only after database lifecycle planning finishes", async () => {
     const lifecycle = lifecycleStore();
     const jobs = jobStore();
 
@@ -69,7 +69,40 @@ describe("control-plane worker", () => {
     expect(jobs.failJob).not.toHaveBeenCalled();
   });
 
-  it("requeues a failed job with a bounded redacted error", async () => {
+  it("plans release-run and outbox state without a direct GitHub client", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const releaseJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "pull_request",
+      actions: [
+        {
+          type: "release_run.enqueue",
+          installation: { id: 123 },
+          repository: {
+            id: 456,
+            owner: "octo",
+            name: "board",
+            fullName: "octo/board",
+            private: false,
+            defaultBranch: "main",
+          },
+          pullRequestNumber: 7,
+          ref: "refs/pull/7/head",
+          commitSha: "a".repeat(40),
+          triggerKind: "pr",
+        },
+      ],
+    };
+
+    await expect(processControlPlaneJob(releaseJob, { workerId: "worker-1", jobs, lifecycle })).resolves.toMatchObject({
+      status: "completed",
+    });
+    expect(lifecycle.enqueueReleaseRunWithOutbox).toHaveBeenCalledOnce();
+    expect(jobs.completeJob).toHaveBeenCalledOnce();
+  });
+
+  it("requeues a failed database plan with a bounded redacted error", async () => {
     const lifecycle = lifecycleStore();
     vi.mocked(lifecycle.upsertInstallation).mockRejectedValue(new Error(`secret=${"x".repeat(1200)}`));
     const jobs = jobStore();

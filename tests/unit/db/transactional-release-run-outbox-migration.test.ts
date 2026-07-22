@@ -6,8 +6,8 @@ import { cloudDatabaseSchemaVersion } from "../../../packages/db/src/index.js";
 const migrationPath = join(process.cwd(), "packages/db/migrations/0017_release_run_outbox_producer.sql");
 
 describe("transactional release-run outbox producer migration", () => {
-  it("publishes schema version 17", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(17);
+  it("remains available from schema version 17 onward", () => {
+    expect(cloudDatabaseSchemaVersion).toBeGreaterThanOrEqual(17);
   });
 
   it("atomically creates release-run state and a Check Run effect", async () => {
