@@ -37,7 +37,8 @@ describe("runner workflow dispatch details", () => {
     process.env.BOARDREADYOPS_PUBLIC_URL = "https://boardreadyops.test";
 
     globalThis.fetch = async (input, init) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       if (typeof init?.body === "string") bodies.push(JSON.parse(init.body));
       if (url === "https://api.github.com/app/installations/12345/access_tokens") {
         return Response.json(
