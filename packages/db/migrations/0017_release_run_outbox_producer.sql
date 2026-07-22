@@ -9,7 +9,6 @@ create or replace function boardreadyops_enqueue_release_run_with_outbox(
   p_run_id text,
   p_release_idempotency_key text,
   p_outbox_id text,
-  p_outbox_idempotency_key text,
   p_outbox_payload jsonb
 )
 returns table(
@@ -26,6 +25,8 @@ declare
   v_run_status text;
   v_check_run_id bigint;
   v_outbox_id text;
+  v_outbox_idempotency_key text;
+  v_outbox_payload jsonb;
 begin
   with superseded_runs as (
     update release_runs
@@ -91,6 +92,9 @@ begin
     return;
   end if;
 
+  v_outbox_idempotency_key := 'github.check_run.create:' || v_run_id;
+  v_outbox_payload := jsonb_set(p_outbox_payload, '{runId}', to_jsonb(v_run_id), true);
+
   if v_check_run_id is null then
     insert into control_plane_outbox (
       id,
@@ -110,8 +114,8 @@ begin
       v_run_id,
       'github.check_run.create',
       1,
-      p_outbox_idempotency_key,
-      p_outbox_payload,
+      v_outbox_idempotency_key,
+      v_outbox_payload,
       50,
       'available',
       p_now,
@@ -126,7 +130,7 @@ begin
     select control_plane_outbox.id
       into v_outbox_id
       from control_plane_outbox
-     where control_plane_outbox.idempotency_key = p_outbox_idempotency_key;
+     where control_plane_outbox.idempotency_key = v_outbox_idempotency_key;
   end if;
 
   return query
