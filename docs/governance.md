@@ -46,6 +46,7 @@ follow the same review policy.
 `main` is protected by `.github/rulesets/main.json`, which is the repository
 source of truth. The active baseline requires:
 
+- signed commits with a GitHub-verified signature;
 - one independent approving review;
 - stale approvals dismissed after reviewable pushes;
 - all review conversations resolved;

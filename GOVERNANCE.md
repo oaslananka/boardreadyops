@@ -93,8 +93,8 @@ Required policy:
 ## Branch Protection
 
 The committed repository ruleset at `.github/rulesets/main.json` is the source
-of truth for `main`. It requires one approval, stale-approval dismissal,
-resolved review conversations, strict stable status checks, linear history, and
+of truth for `main`. It requires signed commits, one approval, stale-approval dismissal, resolved
+review conversations, strict stable status checks, linear history, and
 squash-only merging. The admin bypass is limited to pull requests.
 
 Apply or update the ruleset from an authenticated administrator context:
