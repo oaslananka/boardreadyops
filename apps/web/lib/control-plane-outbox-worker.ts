@@ -101,8 +101,8 @@ async function processCheckRunCreate(
   const id = dependencies.id ?? randomUUID;
   const safeMode = requiresCompletionEffect(payload.action);
   const plansNextEffect = safeMode || dependencies.dispatchMode === "github-actions";
-  const nextOutboxId = plansNextEffect ? id() : undefined;
   const executionAttemptId = !safeMode && dependencies.dispatchMode === "github-actions" ? id() : undefined;
+  const nextOutboxId = plansNextEffect ? id() : undefined;
   const transition = await dependencies.outbox.completeCheckRunCreateEffect({
     effect,
     workerId: dependencies.workerId,
@@ -169,10 +169,6 @@ export async function processControlPlaneOutboxEffect(
       case "github.check_run.complete":
         status = await processCheckRunComplete(effect, dependencies);
         break;
-      default: {
-        const exhaustive: never = effect.effectType;
-        throw new Error(`Unsupported control-plane outbox effect: ${exhaustive}`);
-      }
     }
     return { outboxId: effect.outboxId, effectType: effect.effectType, status };
   } catch (error) {
