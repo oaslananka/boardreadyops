@@ -496,8 +496,9 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run notice
       - run: pnpm run security
+      - name: Assert compliance checks did not mutate the checkout
+        run: git diff --exit-code
 
   sbom:
     needs: risk-profile

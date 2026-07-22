@@ -23,6 +23,11 @@
   "prConcurrentLimit": 8,
   "branchConcurrentLimit": 10,
   "postUpdateOptions": ["pnpmDedupe"],
+  "postUpgradeTasks": {
+    "commands": ["corepack pnpm run notice"],
+    "fileFilters": ["NOTICE"],
+    "executionMode": "branch"
+  },
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 6am on monday"],
