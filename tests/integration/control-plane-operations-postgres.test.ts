@@ -166,24 +166,21 @@ describeDatabase("control-plane PostgreSQL reconciliation operations", () => {
     ]);
 
     const operationId = randomUUID();
-    const first = await store.replayDeadLetter({
+    const replayInput = {
       installationId: tenant.installationId,
-      itemType: "job",
+      itemType: "job" as const,
       itemId: jobId,
       operationId,
       actorId: "operator-a",
-    });
-    expect(first).toMatchObject({ outcome: "replayed" });
-    expect(first.auditEventId).toBeTruthy();
-    await expect(
-      store.replayDeadLetter({
-        installationId: tenant.installationId,
-        itemType: "job",
-        itemId: jobId,
-        operationId,
-        actorId: "operator-a",
-      }),
-    ).resolves.toEqual({ outcome: "already_applied", auditEventId: first.auditEventId });
+    };
+    const results = await Promise.all([
+      store.replayDeadLetter(replayInput),
+      store.replayDeadLetter(replayInput),
+    ]);
+    expect(results.map((result) => result.outcome).sort()).toEqual(["already_applied", "replayed"]);
+    const auditEventIds = new Set(results.map((result) => result.auditEventId));
+    expect(auditEventIds.size).toBe(1);
+    expect([...auditEventIds][0]).toBeTruthy();
 
     const state = rows(
       await database().query("select status, attempt_count from control_plane_jobs where id = $1", [jobId]),
