@@ -1,4 +1,7 @@
-import type { GitHubAppCheckRunClient } from "@boardreadyops/cloud-core/lifecycle-executor";
+import type {
+  CreatePullRequestCheckRunInput,
+  GitHubAppCheckRunClient,
+} from "@boardreadyops/cloud-core/lifecycle-executor";
 
 type PullRequestCommentInput = {
   installationId: number | string;
@@ -8,7 +11,14 @@ type PullRequestCommentInput = {
   body: string;
 };
 
-type ReadinessCommentRequest = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+type GitHubRequest = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+export type EnsurePullRequestCheckRunInput = {
+  apiBaseUrl: string;
+  token: string;
+  input: CreatePullRequestCheckRunInput;
+  request?: GitHubRequest;
+};
 
 export type UpsertReadinessCommentInput = {
   apiBaseUrl: string;
@@ -17,14 +27,15 @@ export type UpsertReadinessCommentInput = {
   repositoryName: string;
   pullRequestNumber: number;
   body: string;
-  request?: ReadinessCommentRequest;
+  request?: GitHubRequest;
+};
+
+export type DurableGitHubAppCheckRunClient = GitHubAppCheckRunClient & {
+  ensurePullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
+  createPullRequestComment?(input: PullRequestCommentInput): Promise<void>;
 };
 
 export declare function detailsUrl(runId: string): string | undefined;
+export declare function ensurePullRequestCheckRun(input: EnsurePullRequestCheckRunInput): Promise<{ id: number }>;
 export declare function upsertReadinessComment(input: UpsertReadinessCommentInput): Promise<void>;
-
-export declare function createGitHubAppCheckRunClient():
-  | (GitHubAppCheckRunClient & {
-      createPullRequestComment?(input: PullRequestCommentInput): Promise<void>;
-    })
-  | undefined;
+export declare function createGitHubAppCheckRunClient(): DurableGitHubAppCheckRunClient | undefined;
