@@ -17,7 +17,7 @@ export type WorkerCorrelation = WorkerScope & {
   effectType?: string;
 };
 
-export type ScopedConcurrencySnapshot = {
+type ScopedConcurrencySnapshot = {
   active: number;
   waiting: number;
 };
