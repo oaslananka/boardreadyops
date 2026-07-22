@@ -6,8 +6,8 @@ import { cloudDatabaseModels, cloudDatabaseSchemaVersion } from "../../../packag
 const migrationPath = join(process.cwd(), "packages/db/migrations/0016_control_plane_transactional_outbox.sql");
 
 describe("control-plane transactional outbox migration", () => {
-  it("publishes schema version 16 and the outbox model", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(16);
+  it("publishes the schema v16 foundation and the outbox model", () => {
+    expect(cloudDatabaseSchemaVersion).toBeGreaterThanOrEqual(16);
     expect(cloudDatabaseModels).toContain("ControlPlaneOutbox");
   });
 

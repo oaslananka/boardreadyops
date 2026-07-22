@@ -1,0 +1,76 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  type GitHubAppDurableLifecycleStore,
+  planGitHubAppLifecycleActions,
+} from "../../../packages/cloud-core/src/durable-lifecycle-planner.js";
+
+const releaseAction = {
+  type: "release_run.enqueue" as const,
+  installation: { id: 12345 },
+  repository: {
+    id: 1283305324,
+    owner: "oaslananka",
+    name: "boardreadyops",
+    fullName: "oaslananka/boardreadyops",
+    private: false,
+    defaultBranch: "main",
+  },
+  pullRequestNumber: 42,
+  ref: "feature/ready",
+  commitSha: "0123456789abcdef",
+  triggerKind: "pr" as const,
+};
+
+function store(): GitHubAppDurableLifecycleStore {
+  return {
+    upsertInstallation: vi.fn(async () => undefined),
+    deleteInstallation: vi.fn(async () => undefined),
+    upsertRepository: vi.fn(async () => undefined),
+    removeRepository: vi.fn(async () => undefined),
+    enqueueReleaseRunWithOutbox: vi.fn(async () => ({
+      idempotencyKey: "1283305324:42:0123456789abcdef",
+      runId: "run-row-id",
+      status: "queued",
+      outboxId: "outbox-row-id",
+    })),
+  };
+}
+
+describe("durable lifecycle planner", () => {
+  it("plans release state and an outbox effect without external clients", async () => {
+    const lifecycle = store();
+
+    await expect(planGitHubAppLifecycleActions([releaseAction], lifecycle)).resolves.toEqual({
+      total: 1,
+      installationsUpserted: 0,
+      installationsDeleted: 0,
+      repositoriesUpserted: 0,
+      repositoriesRemoved: 0,
+      releaseRunsPlanned: 1,
+      outboxEffectsPlanned: 1,
+    });
+    expect(lifecycle.enqueueReleaseRunWithOutbox).toHaveBeenCalledWith(releaseAction);
+  });
+
+  it("preserves action order for replay-safe database changes", async () => {
+    const lifecycle = store();
+    const installationAction = {
+      type: "installation.upsert" as const,
+      installation: { id: 12345, accountLogin: "oaslananka", accountType: "User" },
+    };
+    const repositoryAction = {
+      type: "repository.upsert" as const,
+      installation: installationAction.installation,
+      repository: releaseAction.repository,
+    };
+
+    await planGitHubAppLifecycleActions([installationAction, repositoryAction, releaseAction], lifecycle);
+
+    expect(vi.mocked(lifecycle.upsertInstallation).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(lifecycle.upsertRepository).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    expect(vi.mocked(lifecycle.upsertRepository).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(lifecycle.enqueueReleaseRunWithOutbox).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+  });
+});
