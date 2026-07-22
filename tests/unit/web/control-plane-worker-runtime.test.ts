@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   createScopedConcurrencyGate,
@@ -71,6 +72,10 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 async function settle(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
+}
+
+function workerSource(): string {
+  return readFileSync(new URL("../../../apps/web/worker.ts", import.meta.url), "utf8");
 }
 
 describe("control-plane worker runtime", () => {
@@ -167,5 +172,14 @@ describe("control-plane worker runtime", () => {
     third.resolve();
     await Promise.all([secondRun, thirdRun]);
     expect(gate.snapshot()).toEqual({ active: 0, waiting: 0 });
+  });
+
+  it("wires privacy-safe control-plane SLI collection into maintenance", () => {
+    const source = workerSource();
+
+    expect(source).toContain("createSqlControlPlaneOperationsStore");
+    expect(source).toContain("operations.collectSliSnapshot()");
+    expect(source).toContain('"worker.control_plane_sli"');
+    expect(source).toContain('"worker.control_plane_sli_failed"');
   });
 });
