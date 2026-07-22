@@ -77,10 +77,6 @@ function uncertainDeliveryError(error, message) {
   return wrapped;
 }
 
-export function workflowDispatchDeliveryIsUncertain(error) {
-  return typeof error === "object" && error !== null && error.deliveryUncertain === true;
-}
-
 const safeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"];
 const allowedSafeModeReasons = new Set(safeModeReasonOrder);
 
