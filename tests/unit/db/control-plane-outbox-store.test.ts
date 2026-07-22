@@ -86,9 +86,9 @@ describe("control-plane outbox store", () => {
       },
     };
 
-    await expect(
-      createSqlControlPlaneOutboxStore(executor).claimEffects({ workerId: "worker-1" }),
-    ).rejects.toThrow("outbox effect payload did not match its row");
+    await expect(createSqlControlPlaneOutboxStore(executor).claimEffects({ workerId: "worker-1" })).rejects.toThrow(
+      "outbox effect payload did not match its row",
+    );
   });
 
   it("marks network delivery before issuing an external call", async () => {
@@ -101,9 +101,7 @@ describe("control-plane outbox store", () => {
     };
     const store = createSqlControlPlaneOutboxStore(executor);
 
-    await expect(
-      store.markDeliveryStarted({ outboxId: "outbox-1", workerId: "worker-1" }),
-    ).resolves.toBe("started");
+    await expect(store.markDeliveryStarted({ outboxId: "outbox-1", workerId: "worker-1" })).resolves.toBe("started");
   });
 
   it("classifies uncertain delivery without exposing credentials", async () => {

@@ -55,10 +55,7 @@ export type ControlPlaneOutboxMetrics = {
 
 export type ControlPlaneOutboxStore = {
   claimEffects(input: { workerId: string; limit?: number }): Promise<ClaimedControlPlaneOutboxEffect[]>;
-  markDeliveryStarted(input: {
-    outboxId: string;
-    workerId: string;
-  }): Promise<"started" | "stale">;
+  markDeliveryStarted(input: { outboxId: string; workerId: string }): Promise<"started" | "stale">;
   completeEffect(input: {
     outboxId: string;
     workerId: string;
@@ -218,10 +215,7 @@ class SqlControlPlaneOutboxStore implements ControlPlaneOutboxStore {
     return databaseRows(result).map(decodedEffect);
   }
 
-  async markDeliveryStarted(input: {
-    outboxId: string;
-    workerId: string;
-  }): Promise<"started" | "stale"> {
+  async markDeliveryStarted(input: { outboxId: string; workerId: string }): Promise<"started" | "stale"> {
     const result = await this.executor.query(
       "select boardreadyops_mark_control_plane_outbox_delivery_started($1, $2, $3::timestamptz) as outcome",
       [input.outboxId, input.workerId, this.now().toISOString()],

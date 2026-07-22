@@ -3,10 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cloudDatabaseModels, cloudDatabaseSchemaVersion } from "../../../packages/db/src/index.js";
 
-const migrationPath = join(
-  process.cwd(),
-  "packages/db/migrations/0016_control_plane_transactional_outbox.sql",
-);
+const migrationPath = join(process.cwd(), "packages/db/migrations/0016_control_plane_transactional_outbox.sql");
 
 describe("control-plane transactional outbox migration", () => {
   it("publishes schema version 16 and the outbox model", () => {

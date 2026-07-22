@@ -95,16 +95,18 @@ function payload(effectType: ControlPlaneOutboxEffectType, id: string): ControlP
   };
 }
 
-async function insertEffect(input: {
-  effectType?: ControlPlaneOutboxEffectType;
-  status?: "available" | "leased";
-  attemptCount?: number;
-  maxAttempts?: number;
-  leaseOwner?: string;
-  leaseExpiresAt?: Date;
-  deliveryStartedAt?: Date;
-  availableAt?: Date;
-} = {}): Promise<string> {
+async function insertEffect(
+  input: {
+    effectType?: ControlPlaneOutboxEffectType;
+    status?: "available" | "leased";
+    attemptCount?: number;
+    maxAttempts?: number;
+    leaseOwner?: string;
+    leaseExpiresAt?: Date;
+    deliveryStartedAt?: Date;
+    availableAt?: Date;
+  } = {},
+): Promise<string> {
   const id = `${testPrefix}-${randomUUID()}`;
   const effectType = input.effectType ?? "github.check_run.create";
   const status = input.status ?? "available";
@@ -204,9 +206,7 @@ describeDatabase("control-plane PostgreSQL transactional outbox", () => {
       availableAt: leasedAt,
     });
 
-    await expect(
-      store(recoveryAt).claimEffects({ workerId: `${testPrefix}-recovery-worker` }),
-    ).resolves.toEqual([]);
+    await expect(store(recoveryAt).claimEffects({ workerId: `${testPrefix}-recovery-worker` })).resolves.toEqual([]);
     const state = rows(
       await database().query(
         "select status, completed_at is not null as terminal from control_plane_outbox where id = $1",
@@ -257,7 +257,9 @@ describeDatabase("control-plane PostgreSQL transactional outbox", () => {
       await pool.end();
     }
 
-    const result = rows(await database().query("select count(*)::int as count from control_plane_outbox where id = $1", [id]))[0];
+    const result = rows(
+      await database().query("select count(*)::int as count from control_plane_outbox where id = $1", [id]),
+    )[0];
     expect(result).toEqual({ count: 0 });
   });
 });
