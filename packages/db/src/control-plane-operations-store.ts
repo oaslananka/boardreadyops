@@ -187,10 +187,7 @@ function validReasonCode(value: string, label: string): string {
 
 function redactCredentialAssignments(value: string): string {
   return credentialAssignmentKeyPatterns.reduce((redacted, keyPattern) => {
-    const assignmentPattern = new RegExp(
-      `\\b${keyPattern}\\s*[=:]\\s*(?:"[^"]*"|'[^']*'|[^\\s,;]+)`,
-      "giu",
-    );
+    const assignmentPattern = new RegExp(`\\b${keyPattern}\\s*[=:]\\s*(?:"[^"]*"|'[^']*'|[^\\s,;]+)`, "giu");
     return redacted.replace(assignmentPattern, "credential=[REDACTED]");
   }, value);
 }
