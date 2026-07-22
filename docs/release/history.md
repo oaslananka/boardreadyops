@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.18.0](https://github.com/oaslananka/boardreadyops/compare/v1.17.0...v1.18.0) (2026-07-22)
+
+
+### Features
+
+* **db:** add reconciliation operations foundation ([#212](https://github.com/oaslananka/boardreadyops/issues/212)) ([d419695](https://github.com/oaslananka/boardreadyops/commit/d41969572bec0a987eb5c7379cb3504ed0cf5f51))
+
 ## [1.17.0](https://github.com/oaslananka/boardreadyops/compare/v1.16.0...v1.17.0) (2026-07-22)
 
 
