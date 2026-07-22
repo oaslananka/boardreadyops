@@ -55,8 +55,19 @@ const sensitiveKeyFragments = [
   "token",
   "webhookpayload",
 ] as const;
-const credentialAssignmentPattern =
-  /\b(authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu;
+const credentialAssignmentNames = new Set([
+  "authorization",
+  "cookie",
+  "credential",
+  "password",
+  "private_key",
+  "private-key",
+  "secret",
+  "token",
+]);
+const doubleQuotedCredentialPattern = /\b([a-z][a-z_-]*)\s*[=:]\s*"[^"]*"/giu;
+const singleQuotedCredentialPattern = /\b([a-z][a-z_-]*)\s*[=:]\s*'[^']*'/giu;
+const unquotedCredentialPattern = /\b([a-z][a-z_-]*)\s*[=:]\s*[^\s,;]+/giu;
 const bearerPattern = /\bBearer\s+[a-z0-9._~+/=-]+/giu;
 const maximumLogStringLength = 2_000;
 
@@ -137,10 +148,16 @@ function isSensitiveKey(key: string): boolean {
   return sensitiveKeyFragments.some((fragment) => normalized.includes(fragment));
 }
 
+function redactCredentialAssignment(match: string, name: string): string {
+  return credentialAssignmentNames.has(name.toLowerCase()) ? `${name}=[REDACTED]` : match;
+}
+
 function sanitizedString(value: string): string {
   return value
     .replace(bearerPattern, "Bearer [REDACTED]")
-    .replace(credentialAssignmentPattern, "$1=[REDACTED]")
+    .replace(doubleQuotedCredentialPattern, redactCredentialAssignment)
+    .replace(singleQuotedCredentialPattern, redactCredentialAssignment)
+    .replace(unquotedCredentialPattern, redactCredentialAssignment)
     .slice(0, maximumLogStringLength);
 }
 
