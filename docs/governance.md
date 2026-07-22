@@ -27,125 +27,87 @@ Every pull request must:
 
 ## Review And Ownership
 
-`CODEOWNERS` assigns the repository to `@oaslananka`. GitHub requests code owner
-review only when repository settings require it, but CODEOWNERS still documents
-ownership and helps GitHub identify responsible maintainers.
+Every pull request targeting `main` requires one independent approving review
+from a reviewer with write access. A review is no longer valid after a
+reviewable commit changes, and unresolved review conversations block merge.
+Automated analysis is evidence for the reviewer, not a replacement for approval.
 
-The project currently uses a solo-maintainer policy:
+`CODEOWNERS` continues to identify responsible ownership. CODEOWNERS review is
+not required while `@oaslananka` is both the sole code owner and sole maintainer,
+because that setting would not provide an independent reviewer. Re-evaluate it
+when another maintainer or dedicated security owner is onboarded.
 
-- CI is mandatory for every pull request.
-- Human review is best-effort.
-- Public contract changes need explicit validation in the PR body.
-- Security, release, and supply-chain changes should receive maintainer review
-  before merge even when automation is green.
+Release Please, Renovate, Dependabot, GitHub Actions, and other automation have
+no silent review bypass. They may create or update pull requests, which then
+follow the same review policy.
 
 ## Branch Protection Baseline
 
-`main` is protected through the committed ruleset at
-`.github/rulesets/main.json`. The ruleset is the source of truth; it is deployed
-by the maintainer through the GitHub settings UI or API and must be kept in sync
-with the committed file.
+`main` is protected by `.github/rulesets/main.json`, which is the repository
+source of truth. The active baseline requires:
 
-The expected baseline covers:
+- one independent approving review;
+- stale approvals dismissed after reviewable pushes;
+- all review conversations resolved;
+- strict required status checks and an up-to-date branch;
+- squash-only merges and linear history;
+- no force pushes or branch deletion; and
+- a PR-only emergency bypass for the repository administrator role.
 
-- Require pull requests before merge.
-- Require status checks before merge.
-- Require branches to be up to date before merge (`strict_required_status_checks_policy: true`).
-- Require review thread resolution (`required_review_thread_resolution: true`).
-- Require linear history.
-- Disallow force pushes.
-- Disallow branch deletion.
-- Use squash merge as the normal merge path.
-- Delete topic branches after merge.
-
-The committed ruleset requires these status checks:
+The stable required checks are:
 
 | Context | Purpose |
 | --- | --- |
-| `ci / lint` | Code style and formatting |
+| `ci / risk-profile` | Route change-sensitive validation |
+| `ci / lint` | Code style, workflow, and policy validation |
 | `ci / typecheck` | TypeScript type safety |
+| `ci / test-unit` | Deterministic unit regression suite |
 | `ci / build` | Bundle and artifact compilation |
 | `ci / verify-dist` | Committed bundle integrity |
-| `ci / security` | Dependency and supply-chain audit |
-| `ci / test-action` | GitHub Action input/output contract |
-| `ci / coverage-gate` | Coverage threshold enforcement |
-| `lint-fast / lint-fast` | Fast lint pass on focused changes |
-| `self-smoke / self-smoke` | Self-test against repository fixtures |
+| `ci / security` | License, notice, and supply-chain policy |
+| `dependency-review` | Dependency-diff risk review |
 
-The following CI checks are executed on every push and pull request but are not
-required status checks in the ruleset (they run on the `ci` workflow as matrix
-jobs or on separate workflow triggers):
+Conditional matrix, integration, accessibility, coverage, mutation, and
+security-scanner jobs continue to run according to the risk profile or their own
+workflow triggers. They are monitored even when they are not stable required
+contexts.
 
-- `ci / test-unit (ubuntu-latest, Node 22)`
-- `ci / test-unit (ubuntu-latest, Node 24)`
-- `ci / test-unit (windows-2025-vs2026, Node 22)`
-- `ci / test-unit (windows-2025-vs2026, Node 24)`
-- `ci / test-unit (macos-latest, Node 22)`
-- `ci / test-unit (macos-latest, Node 24)`
-- `ci / test-int (KiCad 10.0, Node 24)`
-- `ci / cross-platform-paths (ubuntu-latest)`
-- `ci / cross-platform-paths (macos-latest)`
-- `ci / cross-platform-paths (windows-2025-vs2026)`
-- `ci / accessibility`
-- `ci / mutation`
+## Emergency Bypass
 
-Security-only workflows that are monitored on `main` but excluded from PR
-required checks:
+The only bypass actor is the repository administrator role with
+`bypass_mode: pull_request`. This PR-only emergency bypass preserves the pull
+request and audit trail and cannot be used for a direct push.
 
-- `CodeQL`
-- `gitleaks`
-- `zizmor`
-- `security / dependency-review`
-- `security / codeql`
-- `security / osv`
-- `security / gitleaks`
-- `security / sbom`
+Use it only when no eligible reviewer is available and delay creates a material
+security, release, or availability risk. Before merge:
 
-`security / scorecard advisory` is intentionally advisory because it may be
-skipped on pull requests. The push-only `docs`, `benchmark`, `OpenSSF Scorecard`,
-and `release-please` workflows are monitored on `main` after merge, but they are
-not pull request required checks.
+1. all required checks must be green;
+2. the pull request must carry `manual-review`;
+3. the maintainer must comment with the reason, scope, and rollback plan; and
+4. automation findings and review conversations must be resolved.
 
-### Bypass Actors
-
-The ruleset allows one bypass actor:
-
-| Actor | Type | Mode | Justification |
-| --- | --- | --- | --- |
-| `RepositoryRole` (actor_id 5 – Admin) | `RepositoryRole` | `always` | Repository administrators may bypass rules for emergency fixes, release operations, and dependency automation that require direct push to `main`. This is consistent with a single-maintainer governance model where the maintainer is the only admin. |
-
-The bypass actor file reference lives in `.github/rulesets/main.json` under
-`bypass_actors`. No other actors or teams have bypass privileges.
+A retrospective review is required within two business days. Findings must be
+captured as follow-up issues and linked from the bypassed pull request.
 
 ## Applying And Verifying Protection
 
-The repository uses **repository rulesets** (not classic branch protection). The
-committed ruleset at `.github/rulesets/main.json` is the intended configuration.
-The legacy `scripts/setup-branch-protection.sh` script is preserved for reference
-but applies classic branch protection, which is superseded by the ruleset.
-
-Verify the live ruleset with:
+Apply the committed ruleset and squash-only repository merge settings with:
 
 ```bash
-gh api repos/oaslananka/boardreadyops/rulesets --jq '.[] | select(.name == "main")'
+scripts/setup-branch-protection.sh oaslananka/boardreadyops main
 ```
 
-If the ruleset is not applied or differs from the committed file, apply it
-through the GitHub settings UI or:
+The helper creates or updates the repository ruleset through the GitHub API. It
+does not apply legacy classic branch protection.
+
+Verify the active ruleset with:
 
 ```bash
-gh api --method POST repos/oaslananka/boardreadyops/rulesets --input .github/rulesets/main.json
+gh api repos/oaslananka/boardreadyops/rulesets
+gh api repos/oaslananka/boardreadyops/rulesets/<id>
 ```
 
-## External Settings
-
-The repository code cannot fully represent these GitHub settings:
-
-- Branch protection and rulesets.
-- Required status-check selection.
-- Repository merge method toggles.
-- GitHub Pages deployment settings.
-- Package and release permissions.
-
-Changes to those settings should be recorded in Linear and, when relevant,
-mirrored in docs or scripts so contributors can verify expected behavior.
+Compare approval count, stale-review handling, thread resolution, bypass actors,
+merge methods, and required status contexts against `.github/rulesets/main.json`.
+External settings changes must be represented in the committed ruleset and this
+document in the same pull request.
