@@ -32,12 +32,13 @@ describe("control-plane reconciliation operations migration", () => {
     const sql = await readFile(migrationPath, "utf8");
 
     expect(sql).toContain("create table if not exists control_plane_replay_operations");
+    expect(sql).toContain("primary key (installation_id, operation_id)");
     expect(sql).toContain("boardreadyops_list_control_plane_dead_letters");
     expect(sql).toContain("boardreadyops_replay_control_plane_dead_letter");
     expect(sql).toContain("insert into audit_events");
     expect(sql).toContain("status = 'dead_letter'");
-    expect(sql).toContain("status = 'reconciliation_required'");
-    expect(sql).toContain("return query select 'not_replayable'");
+    expect(sql).toContain("v_status = 'reconciliation_required'");
+    expect(sql).toContain("v_outcome := 'not_replayable'");
   });
 
   it("defines lease-based reconciliation and privacy-safe SLIs", async () => {
