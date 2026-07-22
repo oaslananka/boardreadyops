@@ -115,7 +115,8 @@ export function main() {
   }
 
   if (!result.ok) {
-    throw new Error(`Security merge gate failed:\n${result.failures.map((failure) => `- ${failure}`).join("\n")}`);
+    const failureList = result.failures.map((failure) => `- ${failure}`).join("\n");
+    throw new Error(`Security merge gate failed:\n${failureList}`);
   }
 }
 

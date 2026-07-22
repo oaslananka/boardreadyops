@@ -142,7 +142,7 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run security
       - name: Assert compliance checks did not mutate the checkout
         run: git diff --exit-code
@@ -170,7 +170,7 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run build
       - uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
 
@@ -259,7 +259,7 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run sbom
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
