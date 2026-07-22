@@ -185,7 +185,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `rxjs@7.8.2`
   - Description: Reactive Extensions for modern JavaScript
   - Homepage: https://rxjs.dev
-- `sharp@0.34.5`
+- `sharp@0.35.3`
   - Description: High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP, GIF, AVIF and TIFF images
   - Homepage: https://sharp.pixelplumbing.com
 - `text-decoder@1.2.7`
@@ -627,7 +627,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/git-client#readme
 - `@gerrit0/mini-shiki@3.23.0`
   - Homepage: https://github.com/Gerrit0/mini-shiki#readme
-- `@hono/node-server@1.19.13`
+- `@hono/node-server@2.0.10`
   - Description: Node.js Adapter for Hono
   - Homepage: https://github.com/honojs/node-server
 - `@html-validate/stylish@6.0.0`

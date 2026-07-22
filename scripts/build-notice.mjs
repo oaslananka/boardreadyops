@@ -59,19 +59,40 @@ function readLockfilePlatformPackages(root) {
 const platformPackages = readLockfilePlatformPackages(process.cwd());
 
 export async function main(root = process.cwd(), options = {}) {
-  const report = await readPnpmLicenseReport(root, ["--json"]);
+  const readReport = options.readReport ?? ((reportRoot) => readPnpmLicenseReport(reportRoot, ["--json"]));
+  const report = await readReport(root);
   const notice = renderNotice(report);
   const noticePath = path.join(root, OUTPUT_FILE);
 
   if (options.check) {
     const current = await readFile(noticePath, "utf8");
     if (current !== notice) {
-      throw new Error("NOTICE is out of date. Run `corepack pnpm run notice`.");
+      throw new Error(noticeDriftMessage(current, notice));
     }
     return;
   }
 
   await writeFile(noticePath, notice);
+}
+
+function noticeDriftMessage(current, expected) {
+  const currentEntries = packageEntries(current);
+  const expectedEntries = packageEntries(expected);
+  const expectedSet = new Set(expectedEntries);
+  const currentSet = new Set(currentEntries);
+  const changes = [
+    ...currentEntries.filter((entry) => !expectedSet.has(entry)).map((entry) => `- removed: ${entry}`),
+    ...expectedEntries.filter((entry) => !currentSet.has(entry)).map((entry) => `- added: ${entry}`),
+  ];
+  const details = changes.length > 0 ? `\nChanged package entries:\n${changes.join("\n")}` : "";
+  return `NOTICE is out of date. Run \`corepack pnpm run notice\`.${details}`;
+}
+
+function packageEntries(notice) {
+  return notice
+    .split("\n")
+    .filter((line) => line.startsWith("- `"))
+    .map((line) => line.slice(2));
 }
 
 export function renderNotice(report) {

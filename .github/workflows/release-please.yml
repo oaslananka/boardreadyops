@@ -52,16 +52,16 @@ jobs:
           corepack enable
           corepack install
           pnpm install --frozen-lockfile
-          # Version bump leaves README release-channel references, dist bundles,
-          # and docs/release/history.md stale; regenerate them so the release PR
-          # merges green (ci/verify-version, ci/verify-dist, ci/lint gc check).
+          # Keep generated release and compliance artifacts reviewable on the
+          # release pull request instead of mutating them inside validation jobs.
+          pnpm run notice
           pnpm run release:readme
           pnpm run build
           pnpm run release:history
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -am "chore: regenerate dist and release history for the release"
+            git commit -am "chore: regenerate release and compliance artifacts"
             git push origin "HEAD:${PR_BRANCH}"
           fi
       - name: Dispatch npm publish
