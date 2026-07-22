@@ -48,7 +48,10 @@ const workflowEffect: ClaimedControlPlaneOutboxEffect = {
     version: 1,
     type: "github.workflow.dispatch",
     input: {
-      action: createEffect.payload.type === "github.check_run.create" ? createEffect.payload.action : neverAction(),
+      action:
+        createEffect.payload.type === "github.check_run.create"
+          ? createEffect.payload.action
+          : neverAction(),
       runId: "run-1",
       idempotencyKey: "repo:42:sha",
       githubCheckRunId: 77,
