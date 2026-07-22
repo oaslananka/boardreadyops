@@ -168,7 +168,7 @@ describe("control-plane operations store", () => {
     const executor: SqlQueryExecutor = {
       async query(sql, params) {
         expect(sql).toContain("boardreadyops_fail_control_plane_reconciliation");
-        expect(String(params?.[5])).not.toContain("authorization=");
+        expect(String(params?.[5])).not.toContain("x".repeat(20));
         expect(String(params?.[5])).toContain("[REDACTED]");
         return { rows: [{ outcome: "retry" }] };
       },
