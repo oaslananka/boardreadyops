@@ -27,4 +27,13 @@ jobs:
       - run: corepack enable
       - run: corepack install
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
+      - id: lint
+        continue-on-error: true
+        run: pnpm run lint 2>&1 | tee lint-report.txt
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: lint-report
+          path: lint-report.txt
+      - if: steps.lint.outcome == 'failure'
+        run: exit 1
