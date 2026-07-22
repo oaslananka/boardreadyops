@@ -96,7 +96,7 @@ The migration is additive and forward-compatible. Rollback is application-first;
 
 - Installation scope is mandatory for every operator operation.
 - The store never returns webhook actions or outbox payload JSON.
-- Persisted failure text redacts bearer values and credential assignments with bounded per-key matching.
+- Persisted failure text redacts bearer values and credential assignments with a bounded scanner instead of a complex regular expression.
 - Audit metadata contains only stable reason/outcome identifiers and safe IDs.
 - Reconciliation workers obtain GitHub state through installation credentials in a later slice; no repository token is persisted.
 - Operator endpoints will be added only after the database contracts are complete and tested.
