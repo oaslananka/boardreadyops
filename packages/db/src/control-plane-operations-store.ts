@@ -189,7 +189,7 @@ function validReasonCode(value: string, label: string): string {
 
 function isIdentifierCharacter(value: string | undefined): boolean {
   if (!value) return false;
-  const code = value.toLowerCase().charCodeAt(0);
+  const code = value.toLowerCase().codePointAt(0) ?? -1;
   return (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || value === "_";
 }
 
