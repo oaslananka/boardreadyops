@@ -50,6 +50,11 @@
       "types": "./src/control-plane-job-store.ts",
       "import": "./src/control-plane-job-store.ts",
       "default": "./src/control-plane-job-store.ts"
+    },
+    "./control-plane-outbox-store": {
+      "types": "./src/control-plane-outbox-store.ts",
+      "import": "./src/control-plane-outbox-store.ts",
+      "default": "./src/control-plane-outbox-store.ts"
     }
   },
   "devDependencies": {
