@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { hostname } from "node:os";
 import { type ClaimedControlPlaneJob, createSqlControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
+import { createSqlControlPlaneOperationsStore } from "@boardreadyops/db/control-plane-operations-store";
 import {
   type ClaimedControlPlaneOutboxEffect,
   createSqlControlPlaneOutboxStore,
@@ -81,6 +82,7 @@ const databasePoolMaximum = integerEnvironment(
 );
 const executor = createPgQueryExecutor({ connectionString: databaseUrl, max: databasePoolMaximum });
 const jobs = createSqlControlPlaneJobStore(executor);
+const operations = createSqlControlPlaneOperationsStore(executor);
 const outbox = createSqlControlPlaneOutboxStore(executor);
 const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
 const scopedConcurrency = createScopedConcurrencyGate({
@@ -205,6 +207,13 @@ async function collectQueueMetrics(currentTime: number): Promise<void> {
     });
   } catch (error) {
     log("warn", "worker.metrics_failed", { errorClass: errorClass(error) });
+  }
+
+  try {
+    const snapshot = await operations.collectSliSnapshot();
+    log("info", "worker.control_plane_sli", snapshot);
+  } catch (error) {
+    log("warn", "worker.control_plane_sli_failed", { errorClass: errorClass(error) });
   }
 }
 
