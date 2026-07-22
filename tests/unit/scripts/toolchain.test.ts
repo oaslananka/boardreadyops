@@ -29,6 +29,8 @@ function healthyProbe(overrides: Partial<ToolchainProbe> = {}): ToolchainProbe {
     pythonVersion: "3.13.5",
     mkdocsVersion: "1.6.1",
     preCommitVersion: "4.6.0",
+    uvVersion: "0.11.16",
+    uvVersion: "0.11.16",
     hooksReady: true,
     browserPath: "/repo/.boardreadyops/toolchain/cache/puppeteer/chrome",
     browserExecutable: true,
@@ -98,6 +100,7 @@ describe("reproducible contributor toolchain", () => {
     ).toBe(true);
     const hooks = plan.find((step) => step.command.join(" ").includes("pre-commit install-hooks"));
     expect(hooks?.env).toMatchObject({ GOMAXPROCS: "2", GOFLAGS: "-p=2" });
+    expect(plan.some((step) => step.command.includes(`uv==${config.python.uv}`))).toBe(true);
     expect(plan.some((step) => step.command.join(" ").includes("puppeteer browsers install chrome"))).toBe(true);
   });
 
@@ -115,6 +118,8 @@ describe("reproducible contributor toolchain", () => {
         corepackVersion: undefined,
         pnpmVersion: undefined,
         pythonVersion: "3.10.14",
+        uvVersion: undefined,
+        uvVersion: undefined,
         hooksReady: false,
         browserPath: undefined,
         browserExecutable: false,
@@ -128,6 +133,8 @@ describe("reproducible contributor toolchain", () => {
         expect.objectContaining({ id: "corepack", status: "fail", remediation: expect.stringContaining("Corepack") }),
         expect.objectContaining({ id: "pnpm", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "python", status: "fail", remediation: expect.stringContaining("3.11") }),
+        expect.objectContaining({ id: "uv", status: "fail", remediation: expect.stringContaining("bootstrap") }),
+        expect.objectContaining({ id: "uv", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "hooks", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "browser", status: "fail", remediation: expect.stringContaining("bootstrap") }),
       ]),

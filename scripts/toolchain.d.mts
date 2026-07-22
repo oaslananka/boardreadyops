@@ -17,6 +17,8 @@ export interface ToolchainManifest {
   };
   validation: {
     preCommit: string;
+    uv: string;
+    uv: string;
     actionlint: string;
     semgrep: string;
     gitleaks: string;
@@ -38,6 +40,8 @@ export interface ToolchainPaths {
   venv: string;
   python: string;
   preCommit: string;
+  uv: string;
+  uv: string;
   browserPathFile: string;
   hooksStamp: string;
   envFile: string;
@@ -59,6 +63,8 @@ export interface ToolchainProbe {
   pythonVersion: string | undefined;
   mkdocsVersion: string | undefined;
   preCommitVersion: string | undefined;
+  uvVersion: string | undefined;
+  uvVersion: string | undefined;
   hooksReady: boolean;
   browserPath: string | undefined;
   browserExecutable: boolean;

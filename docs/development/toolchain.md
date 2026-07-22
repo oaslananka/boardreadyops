@@ -13,7 +13,7 @@ corepack pnpm run toolchain:bootstrap
 The bootstrap writes only to these repository-local locations:
 
 - `node_modules/` for JavaScript dependencies;
-- `.boardreadyops/toolchain/venv/` for MkDocs and pre-commit;
+- `.boardreadyops/toolchain/venv/` for uv, MkDocs, and pre-commit;
 - `.boardreadyops/toolchain/cache/pre-commit/` for pinned validation hook environments;
 - `.boardreadyops/toolchain/cache/puppeteer/` for Puppeteer's compatible Chrome build;
 - `.boardreadyops/toolchain/bin/pnpm` as a wrapper around `corepack pnpm`.

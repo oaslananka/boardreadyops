@@ -25,6 +25,8 @@ export function resolveToolchainPaths(repositoryRoot) {
     venv,
     python: path.join(venv, windows ? "Scripts/python.exe" : "bin/python"),
     preCommit: path.join(venv, windows ? "Scripts/pre-commit.exe" : "bin/pre-commit"),
+    uv: path.join(venv, windows ? "Scripts/uv.exe" : "bin/uv"),
+    uv: path.join(venv, windows ? "Scripts/uv.exe" : "bin/uv"),
     browserPathFile: path.join(root, "browser-path"),
     hooksStamp: path.join(root, "hooks-ready.json"),
     envFile: path.join(root, "env.sh"),
@@ -57,6 +59,8 @@ export function buildBootstrapPlan(config, paths) {
         "-r",
         path.join(paths.repositoryRoot, "docs", "requirements.txt"),
         `pre-commit==${config.validation.preCommit}`,
+        `uv==${config.python.uv}`,
+        `uv==${config.python.uv}`,
       ],
     },
     {
@@ -142,6 +146,14 @@ export function evaluateToolchain(config, probe) {
   );
   checks.push(
     check(
+      "uv",
+      probe.uvVersion === config.python.uv,
+      probe.uvVersion ? `uv ${probe.uvVersion}` : "uv not found",
+      "Run the repository-local bootstrap to install the pinned uv release.",
+    ),
+  );
+  checks.push(
+    check(
       "hooks",
       probe.hooksReady,
       probe.hooksReady ? "Pinned validation hooks prepared" : "Pinned validation hooks are not prepared",
@@ -179,6 +191,8 @@ export async function probeToolchain(config, paths) {
     ),
     mkdocsVersion: await pythonModuleVersion(paths.python, "mkdocs", env),
     preCommitVersion: normalizePrefixedVersion(await commandVersion(paths.preCommit, ["--version"], env), "pre-commit"),
+    uvVersion: normalizePrefixedVersion(await commandVersion(paths.uv, ["--version"], env), "uv"),
+    uvVersion: normalizePrefixedVersion(await commandVersion(paths.uv, ["--version"], env), "uv"),
     hooksReady: await hooksStampMatches(config, paths.hooksStamp),
     browserPath,
     browserExecutable: browserPath ? await isExecutable(browserPath) : false,
