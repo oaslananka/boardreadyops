@@ -20,12 +20,11 @@ security invoker
 as $$
 declare
   v_release_run_id text;
-  v_release_run_status text;
   v_next_outbox_id text;
   v_execution_attempt_id text;
 begin
-  select control_plane_outbox.release_run_id, release_runs.status
-    into v_release_run_id, v_release_run_status
+  select control_plane_outbox.release_run_id
+    into v_release_run_id
     from control_plane_outbox
     join release_runs on release_runs.id = control_plane_outbox.release_run_id
    where control_plane_outbox.id = p_outbox_id
@@ -48,6 +47,18 @@ begin
      );
 
   if not found then
+    update control_plane_outbox
+       set status = 'reconciliation_required',
+           lease_owner = null,
+           lease_expires_at = null,
+           completed_at = p_now,
+           external_result = jsonb_build_object('ensuredGitHubCheckRunId', p_github_check_run_id),
+           last_error_class = 'check_run_conflict',
+           last_error_message = 'The persisted Check Run ID differs from the idempotently ensured GitHub Check Run.'
+     where control_plane_outbox.id = p_outbox_id
+       and control_plane_outbox.status = 'leased'
+       and control_plane_outbox.lease_owner = p_worker_id;
+
     return query select 'check_run_conflict'::text, null::text, null::text, null::text;
     return;
   end if;
