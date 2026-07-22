@@ -37,19 +37,26 @@ policy decisions and external GitHub settings.
 
 ## Review Model
 
-All pull requests must pass CI before merge. The repository uses automated review
-signals from CI and configured review tools; human review is best-effort while
-the project has a solo maintainer.
+Every pull request targeting `main` must pass the required CI gates and receive
+one independent approving review from a reviewer with repository write access.
+Approvals are dismissed when reviewable commits change, and all review
+conversations must be resolved before merge. Automated review tools are
+supporting evidence; they do not replace the required human approval.
 
-Best-effort review SLA:
+The repository is currently maintained by one administrator. Normal reviewed
+merges therefore require onboarding another trusted reviewer. The administrator
+role has a PR-only emergency bypass so urgent work can still be merged through a
+visible pull request; it does not permit direct pushes to `main`.
 
-- Security, release, and supply-chain changes: same business day when possible.
-- Public CLI, Action, schema, or report contract changes: within two business
-  days when possible.
-- Documentation-only or test-only changes: as capacity allows after CI is green.
+Use the PR-only emergency bypass only when an eligible reviewer is unavailable
+and delaying the change creates a material security, release, or availability
+risk. The pull request must have green required checks, carry `manual-review`,
+and include a comment explaining the reason and scope. Record a retrospective
+review within two business days and open follow-up issues for any findings.
 
-If a PR changes a public contract, the PR body must identify the contract and the
-validation commands that prove compatibility or intentional breakage.
+Release Please, Renovate, and other automation may create and update pull
+requests, but they do not bypass review. Their pull requests require normal
+approval or the same documented emergency procedure.
 
 ## CODEOWNERS
 
@@ -62,6 +69,9 @@ Policy:
 - Keep exactly one active CODEOWNERS file unless the maintainer intentionally
   changes ownership layout.
 - Include ownership for governance and repository settings files.
+- CODEOWNERS review is not required while the only code owner is also the sole
+  maintainer, because it would not create an independent review path. Revisit
+  this setting when a second maintainer or security owner is added.
 - Do not use CODEOWNERS as a substitute for CI or branch protection.
 
 ## Branch And Merge Policy
@@ -73,7 +83,8 @@ Required policy:
 
 - No force-push to `main`.
 - No deletion of `main`.
-- No direct pushes to `main` except maintainer-approved emergency fixes.
+- No direct pushes to `main`; emergency changes still use a pull request and
+  the documented PR-only bypass.
 - Squash merge is the normal merge method.
 - Delete topic branches after merge.
 - One Linear issue per pull request.
@@ -81,26 +92,22 @@ Required policy:
 
 ## Branch Protection
 
-The expected `main` protection baseline is documented in
-[docs/governance.md](docs/governance.md#branch-protection-baseline). Applying
-branch protection is a repository settings operation owned by the maintainer or
-`oaslananka-ops`; ordinary code agents should document and verify it, not bypass
-the repository policy.
+The committed repository ruleset at `.github/rulesets/main.json` is the source
+of truth for `main`. It requires one approval, stale-approval dismissal,
+resolved review conversations, strict stable status checks, linear history, and
+squash-only merging. The admin bypass is limited to pull requests.
 
-The helper script `scripts/setup-branch-protection.sh` encodes the intended
-classic branch protection rule for `main`. Run it only from an authenticated
-admin context:
+Apply or update the ruleset from an authenticated administrator context:
 
 ```bash
 scripts/setup-branch-protection.sh oaslananka/boardreadyops main
 ```
 
-Verify current protection with:
+Verify the live configuration with:
 
 ```bash
-gh api repos/oaslananka/boardreadyops/branches/main/protection
+gh api repos/oaslananka/boardreadyops/rulesets
 ```
 
-If GitHub returns `Branch not protected`, treat that as an operations follow-up:
-the documentation and script may be correct while the repository setting still
-needs to be applied by the maintainer.
+Ruleset changes must land in the repository before the live setting is updated,
+then the live response must be compared with the committed JSON.

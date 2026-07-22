@@ -19,8 +19,8 @@ human-review gating:
 The workflow fails when the baseline aggregate score or any enforced check score
 is below `9.0`.
 Branch protection is verified separately with `scripts/setup-branch-protection.sh`
-and the repository branch protection API because the default workflow token cannot
-read classic branch protection rules in Scorecard.
+and the repository rulesets API because the default workflow token cannot inspect
+the administrator-managed ruleset configuration in Scorecard.
 
 ## Notes For Enforced Checks
 
@@ -39,8 +39,8 @@ read classic branch protection rules in Scorecard.
 ## Deferred Full-Scan Checks
 
 - `Branch-Protection`: verified by `scripts/setup-branch-protection.sh` and the
-  repository branch protection API outside Scorecard because the default
-  workflow token cannot read classic branch protection rules.
+  repository rulesets API outside Scorecard because the default workflow token
+  cannot inspect the administrator-managed ruleset configuration.
 - `Packaging`: npm publication is triggered from clean `main` when a release tag and GitHub Release are published.
 - `Signed-Releases`: npm provenance and GitHub artifact attestations are handled by the release workflows.
 - `CII-Best-Practices`: external self-certification is not completed by the build agent. The badge can be added after the operator completes the questionnaire.
