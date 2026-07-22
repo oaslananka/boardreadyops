@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.17.0](https://github.com/oaslananka/boardreadyops/compare/v1.16.0...v1.17.0) (2026-07-22)
+
+
+### Features
+
+* **cloud:** harden crash-recoverable worker runtime ([#210](https://github.com/oaslananka/boardreadyops/issues/210)) ([a7a2f41](https://github.com/oaslananka/boardreadyops/commit/a7a2f41aac3da50b0e8c886601607b420fe5e96b)), closes [#189](https://github.com/oaslananka/boardreadyops/issues/189)
+
 ## [1.16.0](https://github.com/oaslananka/boardreadyops/compare/v1.15.0...v1.16.0) (2026-07-22)
 
 
