@@ -276,14 +276,16 @@ begin
        and release_runs.execution_attempt_id = release_run_attempts.id
        and release_runs.status = 'queued'
     returning release_run_attempts.id, release_run_attempts.run_id
+  ),
+  updated_run as (
+    update release_runs
+       set status = 'dispatched'
+      from updated_attempt
+     where release_runs.id = updated_attempt.run_id
+       and release_runs.execution_attempt_id = updated_attempt.id
+       and release_runs.status = 'queued'
+    returning release_runs.id
   )
-  update release_runs
-     set status = 'dispatched'
-    from updated_attempt
-   where release_runs.id = updated_attempt.run_id
-     and release_runs.execution_attempt_id = updated_attempt.id
-     and release_runs.status = 'queued';
-
   update control_plane_outbox
      set status = 'completed',
          lease_owner = null,
@@ -297,9 +299,11 @@ begin
          ),
          last_error_class = null,
          last_error_message = null
+    from updated_run
    where control_plane_outbox.id = p_outbox_id
      and control_plane_outbox.status = 'leased'
-     and control_plane_outbox.lease_owner = p_worker_id;
+     and control_plane_outbox.lease_owner = p_worker_id
+     and updated_run.id = v_release_run_id;
 
   if not found then
     return 'stale';
