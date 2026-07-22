@@ -69,7 +69,7 @@ afterAll(async () => {
 });
 
 describeDatabase("transactional release-run outbox producer", () => {
-  it("creates release state and one Check Run effect atomically and idempotently", async () => {
+  it("converges concurrent replay to one release run and one Check Run effect", async () => {
     const firstStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
       id: idSequence([`run-first-${suffix}`, `outbox-first-${suffix}`]),
       now: () => new Date("2026-07-22T02:00:00.000Z"),
@@ -81,15 +81,15 @@ describeDatabase("transactional release-run outbox producer", () => {
       releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
     });
 
-    const first = await firstStore.enqueueReleaseRunWithOutbox(action("a".repeat(40)));
-    const replay = await secondStore.enqueueReleaseRunWithOutbox(action("a".repeat(40)));
+    const [first, replay] = await Promise.all([
+      firstStore.enqueueReleaseRunWithOutbox(action("a".repeat(40))),
+      secondStore.enqueueReleaseRunWithOutbox(action("a".repeat(40))),
+    ]);
 
-    expect(first).toMatchObject({
-      runId: `run-first-${suffix}`,
-      outboxId: `outbox-first-${suffix}`,
-      status: "queued",
-    });
     expect(replay).toEqual(first);
+    expect(first.status).toBe("queued");
+    expect([`run-first-${suffix}`, `run-replay-${suffix}`]).toContain(first.runId);
+    expect([`outbox-first-${suffix}`, `outbox-replay-${suffix}`]).toContain(first.outboxId);
 
     const state = await database().query(
       `select
