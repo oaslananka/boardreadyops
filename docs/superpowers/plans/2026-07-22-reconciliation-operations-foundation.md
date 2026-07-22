@@ -131,3 +131,7 @@ Describe this as the foundation slice of #190 and do not close the issue yet.
 - [ ] **Step 3: Review bot and agent feedback**
 
 Inspect SonarQube Cloud, Codecov, DeepScan, CodeQL, Semgrep, Gitleaks, OSV, Dependency Review, SBOM, reviews, and inline threads. Resolve every actionable finding before merge.
+
+## Slice boundary
+
+This PR completes the database/store foundation and PostgreSQL verification in Tasks 1–3. Task 4 remains the next convergence-worker slice under issue #190, after these contracts are merged and stable.
