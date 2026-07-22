@@ -1,0 +1,25 @@
+name: operations-test-cleanup
+
+on:
+  push:
+    branches:
+      - cloud/reconciliation-operations-foundation
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: cloud/reconciliation-operations-foundation
+      - run: python3 scripts/patch-operations-test-cleanup.py
+      - run: rm scripts/patch-operations-test-cleanup.py .github/workflows/pr-operations-test-cleanup.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "test(db): isolate reconciliation integration fixtures"
+          git push origin HEAD:cloud/reconciliation-operations-foundation
