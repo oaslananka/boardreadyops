@@ -50,9 +50,9 @@ function commitCheckRunsEndpoint(apiBaseUrl, owner, name, commitSha) {
 }
 
 function checkRunEndpoint(apiBaseUrl, owner, name, checkRunId) {
-  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/check-runs/${encodeURIComponent(
-    String(checkRunId),
-  )}`;
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+    name,
+  )}/check-runs/${encodeURIComponent(String(checkRunId))}`;
 }
 
 function requestHeaders(token) {
@@ -65,15 +65,15 @@ function requestHeaders(token) {
 }
 
 function issueCommentsEndpoint(apiBaseUrl, owner, name, issueNumber) {
-  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/issues/${encodeURIComponent(
-    String(issueNumber),
-  )}/comments`;
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+    name,
+  )}/issues/${encodeURIComponent(String(issueNumber))}/comments`;
 }
 
 function issueCommentEndpoint(apiBaseUrl, owner, name, commentId) {
-  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/issues/comments/${encodeURIComponent(
-    String(commentId),
-  )}`;
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+    name,
+  )}/issues/comments/${encodeURIComponent(String(commentId))}`;
 }
 
 function existingReadinessComment(comments) {
@@ -81,7 +81,10 @@ function existingReadinessComment(comments) {
     return undefined;
   }
 
-  return comments.find((comment) => typeof comment?.body === "string" && comment.body.includes(readinessCommentMarker));
+  return comments.find(
+    (comment) =>
+      typeof comment?.body === "string" && comment.body.includes(readinessCommentMarker),
+  );
 }
 
 function existingReadinessCheckRun(result, runId) {
@@ -133,11 +136,18 @@ export async function ensurePullRequestCheckRun(input) {
   }
 
   const created = await readJson(
-    await request(checkRunCollectionEndpoint(input.apiBaseUrl, action.repository.owner, action.repository.name), {
-      method: "POST",
-      headers,
-      body: JSON.stringify(checkRunCreationBody(input.input)),
-    }),
+    await request(
+      checkRunCollectionEndpoint(
+        input.apiBaseUrl,
+        action.repository.owner,
+        action.repository.name,
+      ),
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(checkRunCreationBody(input.input)),
+      },
+    ),
     "GitHub check run creation",
   );
 
@@ -168,11 +178,19 @@ export async function upsertReadinessComment(input) {
 
   if (existing?.id) {
     await readJson(
-      await request(issueCommentEndpoint(input.apiBaseUrl, input.repositoryOwner, input.repositoryName, existing.id), {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ body: input.body }),
-      }),
+      await request(
+        issueCommentEndpoint(
+          input.apiBaseUrl,
+          input.repositoryOwner,
+          input.repositoryName,
+          existing.id,
+        ),
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ body: input.body }),
+        },
+      ),
       "GitHub pull request comment update",
     );
     return;
@@ -208,7 +226,7 @@ export function createGitHubAppCheckRunClient() {
   }
 
   async function ensure(input) {
-    return await ensurePullRequestCheckRun({
+    return ensurePullRequestCheckRun({
       apiBaseUrl,
       token: await installationToken(input.action.installation.id),
       input,
@@ -237,11 +255,19 @@ export function createGitHubAppCheckRunClient() {
       }
 
       await readJson(
-        await fetch(checkRunEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, input.checkRunId), {
-          method: "PATCH",
-          headers: requestHeaders(token),
-          body: JSON.stringify(body),
-        }),
+        await fetch(
+          checkRunEndpoint(
+            apiBaseUrl,
+            input.repositoryOwner,
+            input.repositoryName,
+            input.checkRunId,
+          ),
+          {
+            method: "PATCH",
+            headers: requestHeaders(token),
+            body: JSON.stringify(body),
+          },
+        ),
         "GitHub check run completion",
       );
     },
