@@ -53,9 +53,30 @@ export type ControlPlaneOutboxMetrics = {
   outboxLagSeconds: number;
 };
 
+export type CheckRunCreateTransitionResult = {
+  outcome: "check_run_conflict" | "completed" | "stale";
+  nextEffectType?: "github.check_run.complete" | "github.workflow.dispatch";
+  nextOutboxId?: string;
+  executionAttemptId?: string;
+};
+
 export type ControlPlaneOutboxStore = {
   claimEffects(input: { workerId: string; limit?: number }): Promise<ClaimedControlPlaneOutboxEffect[]>;
   markDeliveryStarted(input: { outboxId: string; workerId: string }): Promise<"started" | "stale">;
+  completeCheckRunCreateEffect(input: {
+    effect: ClaimedControlPlaneOutboxEffect;
+    workerId: string;
+    githubCheckRunId: number;
+    dispatchMode: "github-actions" | "none";
+    executionAttemptId?: string;
+    nextOutboxId?: string;
+  }): Promise<CheckRunCreateTransitionResult>;
+  completeWorkflowDispatchEffect(input: {
+    effect: ClaimedControlPlaneOutboxEffect;
+    workerId: string;
+    workflowDispatchId: string;
+    workflowRunUrl?: string;
+  }): Promise<"completed" | "stale">;
   completeEffect(input: {
     outboxId: string;
     workerId: string;
@@ -189,6 +210,26 @@ function sanitizedFailure(value: string, maximum: number, fallback: string): str
   return (normalized || fallback).slice(0, maximum);
 }
 
+function checkRunCreatePayload(effect: ClaimedControlPlaneOutboxEffect): CheckRunCreateOutboxPayload {
+  if (effect.effectType !== "github.check_run.create" || effect.payload.type !== "github.check_run.create") {
+    throw new Error("expected a Check Run creation outbox effect");
+  }
+  return effect.payload;
+}
+
+function workflowDispatchPayload(effect: ClaimedControlPlaneOutboxEffect): WorkflowDispatchOutboxPayload {
+  if (effect.effectType !== "github.workflow.dispatch" || effect.payload.type !== "github.workflow.dispatch") {
+    throw new Error("expected a workflow dispatch outbox effect");
+  }
+  return effect.payload;
+}
+
+function safeModeReason(action: EnqueueReleaseRunInput): string | undefined {
+  if (action.pullRequestDraft) return "draft pull request";
+  if (action.pullRequestFromFork) return "fork pull request safe mode";
+  return undefined;
+}
+
 class SqlControlPlaneOutboxStore implements ControlPlaneOutboxStore {
   private readonly now: () => Date;
   private readonly leaseSeconds: number;
@@ -221,6 +262,124 @@ class SqlControlPlaneOutboxStore implements ControlPlaneOutboxStore {
       [input.outboxId, input.workerId, this.now().toISOString()],
     );
     return databaseRows(result)[0]?.text("outcome") === "started" ? "started" : "stale";
+  }
+
+  async completeCheckRunCreateEffect(input: {
+    effect: ClaimedControlPlaneOutboxEffect;
+    workerId: string;
+    githubCheckRunId: number;
+    dispatchMode: "github-actions" | "none";
+    executionAttemptId?: string;
+    nextOutboxId?: string;
+  }): Promise<CheckRunCreateTransitionResult> {
+    const payload = checkRunCreatePayload(input.effect);
+    const completedAt = this.now().toISOString();
+    const skipReason = safeModeReason(payload.action);
+    let nextEffectType: CheckRunCreateTransitionResult["nextEffectType"];
+    let nextIdempotencyKey: string | undefined;
+    let nextPayload: ControlPlaneOutboxPayload | undefined;
+
+    if (skipReason) {
+      if (!input.nextOutboxId) throw new Error("safe-mode completion requires a next outbox ID");
+      nextEffectType = "github.check_run.complete";
+      nextIdempotencyKey = `github.check_run.complete:${payload.runId}:skipped`;
+      nextPayload = {
+        version: 1,
+        type: nextEffectType,
+        input: {
+          installationId: payload.action.installation.id,
+          repositoryOwner: payload.action.repository.owner,
+          repositoryName: payload.action.repository.name,
+          checkRunId: input.githubCheckRunId,
+          runId: payload.runId,
+          conclusion: "neutral",
+          title: "BoardReadyOps release readiness skipped",
+          summary: `Runner dispatch was skipped by BoardReadyOps safe mode: ${skipReason}.`,
+          completedAt,
+        },
+      };
+    } else if (input.dispatchMode === "github-actions") {
+      if (!input.executionAttemptId || !input.nextOutboxId) {
+        throw new Error("workflow dispatch requires an execution attempt and next outbox ID");
+      }
+      nextEffectType = "github.workflow.dispatch";
+      nextIdempotencyKey = `github.workflow.dispatch:${input.executionAttemptId}`;
+      nextPayload = {
+        version: 1,
+        type: nextEffectType,
+        input: {
+          action: payload.action,
+          runId: payload.runId,
+          idempotencyKey: payload.idempotencyKey,
+          githubCheckRunId: input.githubCheckRunId,
+          executionAttemptId: input.executionAttemptId,
+        },
+      };
+    }
+
+    const result = await this.executor.query(
+      `select * from boardreadyops_complete_check_run_create_effect(
+         $1,
+         $2,
+         $3::timestamptz,
+         $4::bigint,
+         $5,
+         $6,
+         $7,
+         $8::jsonb,
+         $9
+       )`,
+      [
+        input.effect.outboxId,
+        input.workerId,
+        completedAt,
+        input.githubCheckRunId,
+        input.nextOutboxId ?? null,
+        nextEffectType ?? null,
+        nextIdempotencyKey ?? null,
+        nextPayload ? JSON.stringify(nextPayload) : null,
+        input.executionAttemptId ?? null,
+      ],
+    );
+    const row = databaseRows(result)[0];
+    const outcome = row?.text("transition_outcome");
+    const persistedNextEffectType = row?.text("next_effect_type");
+    const persistedNextOutboxId = row?.text("next_outbox_id");
+    const persistedExecutionAttemptId = row?.text("execution_attempt_id");
+
+    return {
+      outcome:
+        outcome === "completed" || outcome === "check_run_conflict"
+          ? outcome
+          : "stale",
+      ...(persistedNextEffectType === "github.check_run.complete" || persistedNextEffectType === "github.workflow.dispatch"
+        ? { nextEffectType: persistedNextEffectType }
+        : {}),
+      ...(persistedNextOutboxId ? { nextOutboxId: persistedNextOutboxId } : {}),
+      ...(persistedExecutionAttemptId ? { executionAttemptId: persistedExecutionAttemptId } : {}),
+    };
+  }
+
+  async completeWorkflowDispatchEffect(input: {
+    effect: ClaimedControlPlaneOutboxEffect;
+    workerId: string;
+    workflowDispatchId: string;
+    workflowRunUrl?: string;
+  }): Promise<"completed" | "stale"> {
+    workflowDispatchPayload(input.effect);
+    const result = await this.executor.query(
+      `select boardreadyops_complete_workflow_dispatch_effect(
+         $1, $2, $3::timestamptz, $4, $5
+       ) as outcome`,
+      [
+        input.effect.outboxId,
+        input.workerId,
+        this.now().toISOString(),
+        input.workflowDispatchId,
+        input.workflowRunUrl ?? null,
+      ],
+    );
+    return databaseRows(result)[0]?.text("outcome") === "completed" ? "completed" : "stale";
   }
 
   async completeEffect(input: {
