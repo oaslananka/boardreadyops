@@ -1,9 +1,14 @@
 import { createServer } from "node:http";
 import { hostname } from "node:os";
 import { type ClaimedControlPlaneJob, createSqlControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
-import { createSqlGitHubAppLifecycleStore } from "@boardreadyops/db/lifecycle-store";
+import {
+  type ClaimedControlPlaneOutboxEffect,
+  createSqlControlPlaneOutboxStore,
+} from "@boardreadyops/db/control-plane-outbox-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
 import { processControlPlaneJob } from "./lib/control-plane-worker.js";
+import { processControlPlaneOutboxEffect } from "./lib/control-plane-outbox-worker.js";
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
 import { createRunnerClient } from "./lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mode.js";
@@ -42,7 +47,9 @@ function log(level: "error" | "info" | "warn", event: string, fields: Record<str
 
 const workerId = (process.env.BOARDREADYOPS_WORKER_ID?.trim() || `${hostname()}-${process.pid}`).slice(0, 128);
 const concurrency = integerEnvironment("BOARDREADYOPS_WORKER_CONCURRENCY", 4, 1, 32);
+const outboxConcurrency = integerEnvironment("BOARDREADYOPS_OUTBOX_CONCURRENCY", 4, 1, 32);
 const pollMilliseconds = integerEnvironment("BOARDREADYOPS_WORKER_POLL_MS", 1000, 100, 60_000);
+const outboxPollMilliseconds = integerEnvironment("BOARDREADYOPS_OUTBOX_POLL_MS", 500, 100, 60_000);
 const metricsIntervalMilliseconds = integerEnvironment(
   "BOARDREADYOPS_WORKER_METRICS_INTERVAL_MS",
   30_000,
@@ -56,21 +63,28 @@ const retentionCleanupIntervalMilliseconds = integerEnvironment(
   86_400_000,
 );
 const healthPort = integerEnvironment("BOARDREADYOPS_WORKER_HEALTH_PORT", 3001, 1, 65_535);
-const databasePoolMaximum = integerEnvironment("DATABASE_POOL_MAX", Math.max(5, concurrency + 1), 1, 100);
+const databasePoolMaximum = integerEnvironment(
+  "DATABASE_POOL_MAX",
+  Math.max(8, concurrency + outboxConcurrency + 2),
+  1,
+  100,
+);
 const executor = createPgQueryExecutor({ connectionString: databaseUrl, max: databasePoolMaximum });
 const jobs = createSqlControlPlaneJobStore(executor);
-const lifecycle = createSqlGitHubAppLifecycleStore(executor);
+const outbox = createSqlControlPlaneOutboxStore(executor);
+const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
 const runner = runnerModeSummary();
 const checkRuns = createGitHubAppCheckRunClient();
 const workflowDispatch = runnerWorkflowDispatchClient(runner, createRunnerClient);
+const dispatchMode = runner.mode === "github-actions" ? "github-actions" : "none";
 const controlPlaneConfigurationValid =
-  runner.configurationValid &&
-  (runner.mode === "disabled" || Boolean(checkRuns)) &&
-  (runner.mode !== "github-actions" || Boolean(workflowDispatch));
+  runner.configurationValid && Boolean(checkRuns) && (runner.mode !== "github-actions" || Boolean(workflowDispatch));
 let shuttingDown = false;
 let ready = false;
 let lastPollAt: string | undefined;
+let lastOutboxPollAt: string | undefined;
 let lastSuccessfulJobAt: string | undefined;
+let lastSuccessfulOutboxEffectAt: string | undefined;
 let nextMetricsAt = 0;
 let nextRetentionCleanupAt = 0;
 
@@ -101,7 +115,9 @@ const healthServer = createServer(async (request, response) => {
         databaseReady,
         runnerConfigurationValid: controlPlaneConfigurationValid,
         lastPollAt,
+        lastOutboxPollAt,
         lastSuccessfulJobAt,
+        lastSuccessfulOutboxEffectAt,
       }),
     );
     return;
@@ -133,6 +149,7 @@ async function startHealthServer(): Promise<void> {
   log("info", "worker.started", {
     workerId,
     concurrency,
+    outboxConcurrency,
     healthPort,
     runnerMode: runner.mode,
     configurationValid: controlPlaneConfigurationValid,
@@ -143,7 +160,8 @@ async function collectQueueMetrics(currentTime: number): Promise<void> {
   if (currentTime < nextMetricsAt) return;
   nextMetricsAt = currentTime + metricsIntervalMilliseconds;
   try {
-    log("info", "worker.queue_metrics", await jobs.collectMetrics());
+    const [jobMetrics, outboxMetrics] = await Promise.all([jobs.collectMetrics(), outbox.collectMetrics()]);
+    log("info", "worker.queue_metrics", { ...jobMetrics, ...outboxMetrics });
   } catch (error) {
     log("warn", "worker.metrics_failed", { errorClass: errorClass(error) });
   }
@@ -170,6 +188,16 @@ async function claimAvailableJobs(): Promise<ClaimedControlPlaneJob[]> {
   }
 }
 
+async function claimAvailableOutboxEffects(): Promise<ClaimedControlPlaneOutboxEffect[]> {
+  lastOutboxPollAt = new Date().toISOString();
+  try {
+    return await outbox.claimEffects({ workerId, limit: outboxConcurrency });
+  } catch (error) {
+    log("error", "worker.outbox_claim_failed", { workerId, errorClass: errorClass(error) });
+    return [];
+  }
+}
+
 async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<void> {
   const results = await Promise.all(
     claimed.map((job) =>
@@ -177,8 +205,6 @@ async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<vo
         workerId,
         jobs,
         lifecycle,
-        ...(checkRuns ? { checkRuns } : {}),
-        ...(workflowDispatch ? { workflowDispatch } : {}),
       }),
     ),
   );
@@ -192,30 +218,71 @@ async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<vo
   }
 }
 
-async function runWorkerIteration(): Promise<void> {
-  const currentTime = Date.now();
-  await collectQueueMetrics(currentTime);
-  await purgeExpiredInbox(currentTime);
-  if (!controlPlaneConfigurationValid) {
-    await sleep(pollMilliseconds);
-    return;
+async function processClaimedOutboxEffects(claimed: ClaimedControlPlaneOutboxEffect[]): Promise<void> {
+  if (!checkRuns) return;
+  const results = await Promise.all(
+    claimed.map((effect) =>
+      processControlPlaneOutboxEffect(effect, {
+        workerId,
+        outbox,
+        dispatchMode,
+        checkRuns,
+        ...(workflowDispatch ? { workflowDispatch } : {}),
+      }),
+    ),
+  );
+  for (const result of results) {
+    if (result.status === "completed") lastSuccessfulOutboxEffectAt = new Date().toISOString();
+    log(result.status === "completed" ? "info" : "warn", "worker.outbox_effect_terminal", {
+      workerId,
+      outboxId: result.outboxId,
+      effectType: result.effectType,
+      status: result.status,
+    });
   }
-
-  const claimed = await claimAvailableJobs();
-  if (claimed.length === 0) {
-    await sleep(pollMilliseconds);
-    return;
-  }
-  await processClaimedJobs(claimed);
 }
 
-let activeIteration: Promise<void> = Promise.resolve();
+async function runLifecycleLoop(): Promise<void> {
+  while (!shuttingDown) {
+    if (!controlPlaneConfigurationValid) {
+      await sleep(pollMilliseconds);
+      continue;
+    }
+    const claimed = await claimAvailableJobs();
+    if (claimed.length === 0) {
+      await sleep(pollMilliseconds);
+      continue;
+    }
+    await processClaimedJobs(claimed);
+  }
+}
+
+async function runOutboxLoop(): Promise<void> {
+  while (!shuttingDown) {
+    if (!controlPlaneConfigurationValid) {
+      await sleep(outboxPollMilliseconds);
+      continue;
+    }
+    const claimed = await claimAvailableOutboxEffects();
+    if (claimed.length === 0) {
+      await sleep(outboxPollMilliseconds);
+      continue;
+    }
+    await processClaimedOutboxEffects(claimed);
+  }
+}
+
+async function runMaintenanceLoop(): Promise<void> {
+  while (!shuttingDown) {
+    const currentTime = Date.now();
+    await collectQueueMetrics(currentTime);
+    await purgeExpiredInbox(currentTime);
+    await sleep(1000);
+  }
+}
+
+let activeLoops: Promise<void> = Promise.resolve();
 let shutdownPromise: Promise<void> | undefined;
-
-function trackActiveIteration(iteration: Promise<void>): Promise<void> {
-  activeIteration = iteration;
-  return iteration;
-}
 
 async function closeHealthServer(): Promise<void> {
   if (!healthServer.listening) return;
@@ -231,7 +298,7 @@ function shutdown(signal: string): Promise<void> {
   log("info", "worker.shutdown_started", { workerId, signal });
   shutdownPromise = (async () => {
     await closeHealthServer();
-    await activeIteration;
+    await activeLoops;
     await executor.close();
     log("info", "worker.shutdown_completed", { workerId, signal });
   })();
@@ -254,9 +321,8 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 
 try {
   await startHealthServer();
-  while (!shuttingDown) {
-    await trackActiveIteration(runWorkerIteration());
-  }
+  activeLoops = Promise.all([runLifecycleLoop(), runOutboxLoop(), runMaintenanceLoop()]).then(() => undefined);
+  await activeLoops;
 } catch (error) {
   shuttingDown = true;
   ready = false;
