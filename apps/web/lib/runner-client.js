@@ -5,7 +5,8 @@ const e = () => globalThis["p" + "rocess"]?.["e" + "nv"] ?? {};
 const ev = (name) => e()[name];
 const api = () => ev("GITHUB" + "_API_BASE_URL") ?? "https://api.github.com";
 const appId = () => ev("GITHUB" + "_APP_ID");
-const keyText = () => ev("GITHUB" + "_APP_" + "PRI" + "VATE" + "_KEY")?.replace(/\\n/g, "\n");
+const keyText = () =>
+  ev("GITHUB" + "_APP_" + "PRI" + "VATE" + "_KEY")?.replace(/\\n/g, "\n");
 
 function repoTarget(action) {
   const owner = action.repository.owner;
@@ -23,7 +24,9 @@ function resultUrl(runId, executionAttemptId) {
     throw new Error("public app URL is required to receive runner results");
   }
 
-  return `${baseUrl.replace(/\/$/, "")}/api/v1/runs/github-actions-result?run_id=${encodeURIComponent(runId)}&attempt_id=${encodeURIComponent(executionAttemptId)}`;
+  return `${baseUrl.replace(/\/$/, "")}/api/v1/runs/github-actions-result?run_id=${encodeURIComponent(
+    runId,
+  )}&attempt_id=${encodeURIComponent(executionAttemptId)}`;
 }
 
 function requestHeaders(rt) {
@@ -48,7 +51,9 @@ async function runtimeAccess(installationId) {
 
 async function responseText(response, label) {
   const text = await response.text();
-  if (!response.ok) throw new Error(`${label} failed with status ${response.status}: ${text.slice(0, 256)}`);
+  if (!response.ok) {
+    throw new Error(`${label} failed with status ${response.status}: ${text.slice(0, 256)}`);
+  }
   return text;
 }
 
@@ -84,7 +89,10 @@ export function safeModeInputs(action) {
   const safeMode = action.safeMode;
   const reasons = safeMode?.reasons ?? [];
 
-  if (!Array.isArray(reasons) || reasons.some((reason) => !allowedSafeModeReasons.has(reason))) {
+  if (
+    !Array.isArray(reasons) ||
+    reasons.some((reason) => !allowedSafeModeReasons.has(reason))
+  ) {
     throw new Error("unsupported runner safe-mode reason");
   }
 
@@ -150,10 +158,16 @@ export function createRunnerClient() {
       try {
         result = text ? JSON.parse(text) : {};
       } catch (error) {
-        throw uncertainDeliveryError(error, "runner start returned an unreadable workflow run response");
+        throw uncertainDeliveryError(
+          error,
+          "runner start returned an unreadable workflow run response",
+        );
       }
 
-      if (typeof result.workflow_run_id !== "number" || !Number.isSafeInteger(result.workflow_run_id)) {
+      if (
+        typeof result.workflow_run_id !== "number" ||
+        !Number.isSafeInteger(result.workflow_run_id)
+      ) {
         throw uncertainDeliveryError(
           undefined,
           "runner start response did not include a numeric workflow_run_id",
@@ -163,7 +177,10 @@ export function createRunnerClient() {
       try {
         await markCheckRunning(rt, input);
       } catch (error) {
-        throw uncertainDeliveryError(error, "workflow dispatch succeeded but the Check Run update was not confirmed");
+        throw uncertainDeliveryError(
+          error,
+          "workflow dispatch succeeded but the Check Run update was not confirmed",
+        );
       }
 
       const workflowRunUrl =
