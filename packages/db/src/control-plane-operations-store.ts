@@ -104,8 +104,15 @@ export type ControlPlaneOperationsStoreOptions = {
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const reasonCodePattern = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u;
-const credentialAssignmentPattern =
-  /\b(authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu;
+const credentialAssignmentKeyPatterns = [
+  "authorization",
+  "cookie",
+  "credential",
+  "password",
+  "private[_-]?key",
+  "secret",
+  "token",
+] as const;
 const bearerPattern = /\bBearer\s+[a-z0-9._~+/=-]+/giu;
 const supportedDeadLetterTypes = new Set<ControlPlaneDeadLetterItemType>(["job", "outbox"]);
 const supportedSubjectTypes = new Set<ControlPlaneReconciliationSubjectType>([
@@ -178,10 +185,18 @@ function validReasonCode(value: string, label: string): string {
   return value;
 }
 
+function redactCredentialAssignments(value: string): string {
+  return credentialAssignmentKeyPatterns.reduce((redacted, keyPattern) => {
+    const assignmentPattern = new RegExp(
+      `\\b${keyPattern}\\s*[=:]\\s*(?:"[^"]*"|'[^']*'|[^\\s,;]+)`,
+      "giu",
+    );
+    return redacted.replace(assignmentPattern, "credential=[REDACTED]");
+  }, value);
+}
+
 function boundedFailure(value: string, maximum: number, fallback: string): string {
-  const normalized = value
-    .replace(bearerPattern, "Bearer [REDACTED]")
-    .replace(credentialAssignmentPattern, "$1=[REDACTED]")
+  const normalized = redactCredentialAssignments(value.replace(bearerPattern, "Bearer [REDACTED]"))
     .replace(/[\r\n\t]+/gu, " ")
     .trim();
   return (normalized || fallback).slice(0, maximum);
