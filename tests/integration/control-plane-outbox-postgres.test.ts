@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import pg from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import {
   type ControlPlaneOutboxEffectType,
@@ -8,7 +7,6 @@ import {
 } from "../../packages/db/src/control-plane-outbox-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 
-const { Pool } = pg;
 const connectionString = process.env.DATABASE_URL;
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
@@ -30,7 +28,7 @@ const action = {
   pullRequestNumber: 1,
   pullRequestDraft: false,
   pullRequestFromFork: false,
-  triggerKind: "pull_request" as const,
+  triggerKind: "pr" as const,
 };
 
 function at(offsetSeconds: number): Date {
@@ -238,24 +236,20 @@ describeDatabase("control-plane PostgreSQL transactional outbox", () => {
     ).resolves.toHaveLength(1);
   });
 
-  it("rolls back an outbox write with its surrounding transaction", async () => {
-    if (!connectionString) throw new Error("DATABASE_URL is required");
-    const pool = new Pool({ connectionString, max: 1 });
-    const client = await pool.connect();
+  it("rolls back an outbox write with its surrounding statement", async () => {
     const id = `${testPrefix}-${randomUUID()}`;
-    try {
-      await client.query("begin");
-      await client.query(
-        `insert into control_plane_outbox (
-           id, effect_type, idempotency_key, payload, available_at, created_at
-         ) values ($1, 'github.check_run.create', $2, $3::jsonb, now(), now())`,
+    await expect(
+      database().query(
+        `with inserted as (
+           insert into control_plane_outbox (
+             id, effect_type, idempotency_key, payload, available_at, created_at
+           ) values ($1, 'github.check_run.create', $2, $3::jsonb, now(), now())
+           returning id
+         )
+         select 1 / 0 from inserted`,
         [id, `${testPrefix}:${id}`, JSON.stringify(payload("github.check_run.create", id))],
-      );
-      await client.query("rollback");
-    } finally {
-      client.release();
-      await pool.end();
-    }
+      ),
+    ).rejects.toThrow();
 
     const result = rows(
       await database().query("select count(*)::int as count from control_plane_outbox where id = $1", [id]),
