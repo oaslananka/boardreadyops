@@ -7,10 +7,11 @@ const connectionString = process.env.DATABASE_URL;
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 4 }) : undefined;
 const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
+const numericSuffix = Number.parseInt(suffix.slice(0, 8), 16);
 const installationRowId = `producer-installation-${suffix}`;
 const repositoryRowId = `producer-repository-${suffix}`;
-const githubInstallationId = Number(`7${suffix.slice(0, 8)}`);
-const githubRepositoryId = Number(`8${suffix.slice(0, 8)}`);
+const githubInstallationId = 7_000_000_000 + numericSuffix;
+const githubRepositoryId = 8_000_000_000 + numericSuffix;
 
 function database() {
   if (!executor) throw new Error("DATABASE_URL is required");
