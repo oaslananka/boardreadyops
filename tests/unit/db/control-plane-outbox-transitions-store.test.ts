@@ -70,7 +70,7 @@ describe("control-plane outbox transition store", () => {
         return {
           rows: [
             {
-              outcome: "completed",
+              transition_outcome: "completed",
               next_effect_type: "github.workflow.dispatch",
               next_outbox_id: "outbox-dispatch",
               execution_attempt_id: "attempt-1",
@@ -101,7 +101,7 @@ describe("control-plane outbox transition store", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("boardreadyops_complete_check_run_create_effect");
     expect(calls[0]?.params).toContain("github.workflow.dispatch:attempt-1");
-    expect(String(calls[0]?.params.at(-1))).toContain('"githubCheckRunId":77');
+    expect(String(calls[0]?.params.at(-2))).toContain('"githubCheckRunId":77');
   });
 
   it("records the real GitHub workflow run ID with outbox completion", async () => {
