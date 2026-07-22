@@ -116,7 +116,13 @@ describe("runner workflow dispatch client", () => {
         createRunnerClient().dispatchReleaseRunWorkflow({
           action: {
             ...action,
-            repository: { ...action.repository, defaultBranch: undefined },
+            repository: {
+              id: action.repository.id,
+              owner: action.repository.owner,
+              name: action.repository.name,
+              fullName: action.repository.fullName,
+              private: action.repository.private,
+            },
           },
           runId: "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d",
           idempotencyKey: "98765:42:0123456789abcdef",
