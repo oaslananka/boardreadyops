@@ -75,10 +75,18 @@ const outbox = createSqlControlPlaneOutboxStore(executor);
 const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
 const runner = runnerModeSummary();
 const checkRuns = createGitHubAppCheckRunClient();
+const durableCheckRuns = checkRuns?.ensurePullRequestCheckRun
+  ? {
+      ensurePullRequestCheckRun: checkRuns.ensurePullRequestCheckRun,
+      completeCheckRun: checkRuns.completeCheckRun,
+    }
+  : undefined;
 const workflowDispatch = runnerWorkflowDispatchClient(runner, createRunnerClient);
 const dispatchMode = runner.mode === "github-actions" ? "github-actions" : "none";
 const controlPlaneConfigurationValid =
-  runner.configurationValid && Boolean(checkRuns) && (runner.mode !== "github-actions" || Boolean(workflowDispatch));
+  runner.configurationValid &&
+  Boolean(durableCheckRuns) &&
+  (runner.mode !== "github-actions" || Boolean(workflowDispatch));
 let shuttingDown = false;
 let ready = false;
 let lastPollAt: string | undefined;
@@ -219,14 +227,14 @@ async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<vo
 }
 
 async function processClaimedOutboxEffects(claimed: ClaimedControlPlaneOutboxEffect[]): Promise<void> {
-  if (!checkRuns) return;
+  if (!durableCheckRuns) return;
   const results = await Promise.all(
     claimed.map((effect) =>
       processControlPlaneOutboxEffect(effect, {
         workerId,
         outbox,
         dispatchMode,
-        checkRuns,
+        checkRuns: durableCheckRuns,
         ...(workflowDispatch ? { workflowDispatch } : {}),
       }),
     ),
