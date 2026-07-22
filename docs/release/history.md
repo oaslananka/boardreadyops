@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.15.0](https://github.com/oaslananka/boardreadyops/compare/v1.14.0...v1.15.0) (2026-07-22)
+
+
+### Features
+
+* **security:** adopt tokenless OSV dependency scanning ([#203](https://github.com/oaslananka/boardreadyops/issues/203)) ([8429fe3](https://github.com/oaslananka/boardreadyops/commit/8429fe33006031be6cd8a7fdec2d0f6c041ba255))
+
 ## [1.14.0](https://github.com/oaslananka/boardreadyops/compare/v1.13.0...v1.14.0) (2026-07-21)
 
 
