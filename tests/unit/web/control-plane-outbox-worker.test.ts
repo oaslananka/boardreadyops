@@ -42,7 +42,9 @@ function store() {
     completeCheckRunCreateEffect: vi.fn(async () => ({ outcome: "completed" as const })),
     completeWorkflowDispatchEffect: vi.fn(async () => "completed" as const),
     completeEffect: vi.fn(async () => "completed" as const),
-    failEffect: vi.fn(async () => "retry" as const),
+    failEffect: vi.fn(async (input: { deliveryUncertain?: boolean }) =>
+      input.deliveryUncertain === true ? "reconciliation_required" : "retry",
+    ),
   } as unknown as ControlPlaneOutboxStore;
 }
 
