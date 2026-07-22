@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(15);
+    expect(cloudDatabaseSchemaVersion).toBe(16);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -20,6 +20,7 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("ReleaseRunAttempt");
     expect(cloudDatabaseModels).toContain("WebhookInbox");
     expect(cloudDatabaseModels).toContain("ControlPlaneJob");
+    expect(cloudDatabaseModels).toContain("ControlPlaneOutbox");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
@@ -41,6 +42,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0013_runner_registration_enrollments.sql",
       "0014_runner_execution_routing_policies.sql",
       "0015_control_plane_webhook_jobs.sql",
+      "0016_control_plane_transactional_outbox.sql",
     ]);
   });
 
