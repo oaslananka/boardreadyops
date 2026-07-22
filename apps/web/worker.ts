@@ -297,7 +297,7 @@ async function runMaintenanceLoop(): Promise<void> {
   }
 }
 
-let activeLoops: Promise<void> = Promise.resolve();
+let activeLoops: Promise<unknown> = Promise.resolve();
 let shutdownPromise: Promise<void> | undefined;
 
 async function closeHealthServer(): Promise<void> {
@@ -337,7 +337,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 
 try {
   await startHealthServer();
-  activeLoops = Promise.all([runLifecycleLoop(), runOutboxLoop(), runMaintenanceLoop()]).then(() => undefined);
+  activeLoops = Promise.all([runLifecycleLoop(), runOutboxLoop(), runMaintenanceLoop()]);
   await activeLoops;
 } catch (error) {
   shuttingDown = true;
