@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -32,6 +32,40 @@ export function resolveToolchainPaths(repositoryRoot, cacheRoot = defaultCacheRo
     hooksStamp: path.join(root, "hooks-ready.json"),
     envFile: path.join(root, "env.sh"),
   };
+}
+
+const modeNormalizationExcludes = new Set([".git", ".boardreadyops", "node_modules"]);
+
+export async function normalizeRepositoryModes(repositoryRoot) {
+  let changed = 0;
+  await walkRepositoryDirectories(repositoryRoot, async (directory, info) => {
+    if ((info.mode & 0o2000) === 0) return;
+    await chmod(directory, info.mode & ~0o2000);
+    changed += 1;
+  });
+  return changed;
+}
+
+async function repositoryModesAreNormalized(repositoryRoot) {
+  let normalized = true;
+  await walkRepositoryDirectories(repositoryRoot, async (_directory, info) => {
+    if ((info.mode & 0o2000) !== 0) normalized = false;
+  });
+  return normalized;
+}
+
+async function walkRepositoryDirectories(repositoryRoot, visitor) {
+  async function visit(directory, isRoot = false) {
+    const info = await lstat(directory);
+    await visitor(directory, info);
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (isRoot && modeNormalizationExcludes.has(entry.name)) continue;
+      await visit(path.join(directory, entry.name));
+    }
+  }
+  await visit(repositoryRoot, true);
 }
 
 export function buildBootstrapPlan(config, paths) {
@@ -86,6 +120,16 @@ export function evaluateToolchain(config, probe) {
       ["linux", "darwin", "win32"].includes(probe.platform) && ["x64", "arm64"].includes(probe.architecture),
       `${probe.platform}-${probe.architecture}`,
       "Use Ubuntu 24.04 x64 for the canonical automation environment; macOS and Windows remain supported contributor targets.",
+    ),
+  );
+  checks.push(
+    check(
+      "repository-modes",
+      probe.repositoryModesNormalized,
+      probe.repositoryModesNormalized
+        ? "Repository directory modes normalized"
+        : "Repository contains inherited setgid directories",
+      "Run `node scripts/toolchain.mjs bootstrap` to remove host-inherited setgid bits without changing tracked content.",
     ),
   );
   checks.push(
@@ -174,7 +218,7 @@ export function evaluateToolchain(config, probe) {
 }
 
 export async function probeToolchain(config, paths) {
-  const env = toolchainEnvironment(paths);
+  const env = buildToolchainEnvironment(paths);
   const browserPath = (await readOptional(paths.browserPathFile))?.trim() || undefined;
   return {
     platform: process.platform,
@@ -198,6 +242,7 @@ export async function probeToolchain(config, paths) {
     packageDependenciesInstalled: await exists(
       path.join(paths.repositoryRoot, "node_modules", ".bin", executableName("puppeteer")),
     ),
+    repositoryModesNormalized: await repositoryModesAreNormalized(paths.repositoryRoot),
   };
 }
 
@@ -207,13 +252,17 @@ async function bootstrap(config, paths) {
       "Canonical non-interactive bootstrap currently supports Linux x64 (Ubuntu 24.04). See docs/development/toolchain.md for other platforms.",
     );
   }
+  const normalizedDirectories = await normalizeRepositoryModes(paths.repositoryRoot);
+  if (normalizedDirectories > 0) {
+    process.stdout.write(`==> Normalized ${normalizedDirectories} inherited directory mode(s)\n`);
+  }
   await Promise.all([mkdir(paths.bin, { recursive: true }), mkdir(paths.cache, { recursive: true })]);
   await writePnpmWrapper(paths);
   for (const step of buildBootstrapPlan(config, paths)) {
     process.stdout.write(`==> ${step.name}\n`);
     await run(step.command[0], step.command.slice(1), {
       cwd: step.cwd,
-      env: { ...toolchainEnvironment(paths), ...step.env },
+      env: { ...buildToolchainEnvironment(paths), ...step.env },
     });
   }
   const browserPath = await discoverPuppeteerExecutable(paths);
@@ -234,7 +283,7 @@ async function discoverPuppeteerExecutable(paths) {
   const script = "import('puppeteer').then(async ({default:p})=>process.stdout.write(await p.executablePath()))";
   const result = await capture("corepack", ["pnpm", "exec", "node", "-e", script], {
     cwd: paths.repositoryRoot,
-    env: toolchainEnvironment(paths),
+    env: buildToolchainEnvironment(paths),
   });
   const executable = result.stdout.trim();
   if (!executable || !(await isExecutable(executable))) {
@@ -261,21 +310,23 @@ async function writeEnvironmentFile(paths, browserPath) {
     `export PRE_COMMIT_HOME=${shellQuote(path.join(paths.cache, "pre-commit"))}`,
     `export PUPPETEER_CACHE_DIR=${shellQuote(path.join(paths.cache, "puppeteer"))}`,
     `export PA11Y_CHROME_PATH=${shellQuote(browserPath)}`,
+    `export DATABASE_URL=${shellQuote(process.env.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain")}`,
     `export PATH=${shellQuote(`${paths.bin}:${path.join(paths.venv, "bin")}`)}:"$PATH"`,
     "",
   ];
   await writeFile(paths.envFile, lines.join("\n"));
 }
 
-function toolchainEnvironment(paths) {
+export function buildToolchainEnvironment(paths, baseEnvironment = process.env) {
   const pathEntries = [paths.bin, path.join(paths.venv, process.platform === "win32" ? "Scripts" : "bin")];
   return {
-    ...process.env,
+    ...baseEnvironment,
     BOARDREADYOPS_TOOLCHAIN_ROOT: paths.root,
     VIRTUAL_ENV: paths.venv,
     PRE_COMMIT_HOME: path.join(paths.cache, "pre-commit"),
     PUPPETEER_CACHE_DIR: path.join(paths.cache, "puppeteer"),
-    PATH: `${pathEntries.join(path.delimiter)}${path.delimiter}${process.env.PATH ?? ""}`,
+    DATABASE_URL: baseEnvironment.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain",
+    PATH: `${pathEntries.join(path.delimiter)}${path.delimiter}${baseEnvironment.PATH ?? ""}`,
   };
 }
 
@@ -283,7 +334,8 @@ async function runWithToolchain(paths, command) {
   if (command.length === 0) {
     throw new Error("toolchain run requires a command");
   }
-  const env = toolchainEnvironment(paths);
+  await normalizeRepositoryModes(paths.repositoryRoot);
+  const env = buildToolchainEnvironment(paths);
   const browserPath = (await readOptional(paths.browserPathFile))?.trim();
   if (browserPath) {
     env.PA11Y_CHROME_PATH = browserPath;

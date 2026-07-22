@@ -1,9 +1,11 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildBootstrapPlan,
+  buildToolchainEnvironment,
   evaluateToolchain,
+  normalizeRepositoryModes,
   resolveToolchainPaths,
   type ToolchainManifest,
   type ToolchainProbe,
@@ -34,6 +36,7 @@ function healthyProbe(overrides: Partial<ToolchainProbe> = {}): ToolchainProbe {
     browserPath: "/repo/.boardreadyops/toolchain/cache/puppeteer/chrome",
     browserExecutable: true,
     packageDependenciesInstalled: true,
+    repositoryModesNormalized: true,
     ...overrides,
   };
 }
@@ -85,6 +88,7 @@ describe("reproducible contributor toolchain", () => {
     expect(security).toContain(`GITLEAKS_VERSION: ${config.validation.gitleaks}`);
     expect(await repositoryFile("apps/web/Dockerfile")).toContain(`FROM node:${config.node.preferred}-slim`);
     expect(JSON.parse(await repositoryFile("biome.json")).files.includes).toContain("!.boardreadyops");
+    expect(JSON.parse(await repositoryFile("knip.json")).ignoreBinaries).not.toContain("mkdocs");
   });
 
   it("keeps bootstrap writes inside the repository toolchain directory", async () => {
@@ -103,6 +107,33 @@ describe("reproducible contributor toolchain", () => {
     expect(hooks?.env).toMatchObject({ GOMAXPROCS: "2", GOFLAGS: "-p=2" });
     expect(plan.some((step) => step.command.includes(`uv==${config.python.uv}`))).toBe(true);
     expect(plan.some((step) => step.command.join(" ").includes("puppeteer browsers install chrome"))).toBe(true);
+  });
+
+  it("provides a secretless Prisma configuration default", () => {
+    const paths = resolveToolchainPaths("/repo", "/cache/boardreadyops");
+    const env = buildToolchainEnvironment(paths, { PATH: "/usr/bin" });
+
+    expect(env.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain");
+    expect(env.PATH).toContain(`${paths.bin}${path.delimiter}`);
+
+    const custom = buildToolchainEnvironment(paths, { DATABASE_URL: "postgresql://custom", PATH: "/usr/bin" });
+    expect(custom.DATABASE_URL).toBe("postgresql://custom");
+  });
+
+  it.skipIf(process.platform === "win32")("normalizes inherited setgid directory modes", async () => {
+    const temporaryRoot = await mkdtemp(path.join(root, ".toolchain-mode-test-"));
+    const nested = path.join(temporaryRoot, "fixtures", "fab");
+    await mkdir(nested, { recursive: true });
+
+    try {
+      const inheritedSetgid = (await stat(temporaryRoot)).mode & 0o2000;
+      if (inheritedSetgid === 0) return;
+      await expect(normalizeRepositoryModes(temporaryRoot)).resolves.toBeGreaterThanOrEqual(1);
+      expect((await stat(temporaryRoot)).mode & 0o2000).toBe(0);
+      expect((await stat(nested)).mode & 0o2000).toBe(0);
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
   });
 
   it("passes a complete compatible toolchain", async () => {
@@ -124,12 +155,18 @@ describe("reproducible contributor toolchain", () => {
         browserPath: undefined,
         browserExecutable: false,
         packageDependenciesInstalled: false,
+        repositoryModesNormalized: false,
       }),
     );
 
     expect(result.ok).toBe(false);
     expect(result.checks).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          id: "repository-modes",
+          status: "fail",
+          remediation: expect.stringContaining("bootstrap"),
+        }),
         expect.objectContaining({ id: "corepack", status: "fail", remediation: expect.stringContaining("Corepack") }),
         expect.objectContaining({ id: "pnpm", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "python", status: "fail", remediation: expect.stringContaining("3.11") }),

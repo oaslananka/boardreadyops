@@ -17,9 +17,6 @@ export interface ToolchainManifest {
   };
   validation: {
     preCommit: string;
-    uv: string;
-    uv: string;
-    uv: string;
     actionlint: string;
     semgrep: string;
     gitleaks: string;
@@ -68,6 +65,7 @@ export interface ToolchainProbe {
   browserPath: string | undefined;
   browserExecutable: boolean;
   packageDependenciesInstalled: boolean;
+  repositoryModesNormalized: boolean;
 }
 
 export interface ToolchainCheck {
@@ -83,6 +81,11 @@ export interface ToolchainResult {
 }
 
 export function resolveToolchainPaths(repositoryRoot: string, cacheRoot?: string): ToolchainPaths;
+export function normalizeRepositoryModes(repositoryRoot: string): Promise<number>;
+export function buildToolchainEnvironment(
+  paths: ToolchainPaths,
+  baseEnvironment?: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv;
 export function buildBootstrapPlan(config: ToolchainManifest, paths: ToolchainPaths): BootstrapStep[];
 export function evaluateToolchain(config: ToolchainManifest, probe: ToolchainProbe): ToolchainResult;
 export function loadToolchainManifest(repositoryRoot?: string): Promise<ToolchainManifest>;
