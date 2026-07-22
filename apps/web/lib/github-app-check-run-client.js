@@ -1,5 +1,6 @@
 import { createAppAuth } from "@octokit/auth-app";
 
+const readinessCheckName = "BoardReadyOps / release readiness";
 const readinessCommentMarker = "<!-- boardreadyops:release-readiness -->";
 
 function requiredEnv(name) {
@@ -36,6 +37,18 @@ async function readJson(response, context) {
   return text ? JSON.parse(text) : {};
 }
 
+function checkRunCollectionEndpoint(apiBaseUrl, owner, name) {
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/check-runs`;
+}
+
+function commitCheckRunsEndpoint(apiBaseUrl, owner, name, commitSha) {
+  return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
+    name,
+  )}/commits/${encodeURIComponent(commitSha)}/check-runs?check_name=${encodeURIComponent(
+    readinessCheckName,
+  )}&filter=all&per_page=100`;
+}
+
 function checkRunEndpoint(apiBaseUrl, owner, name, checkRunId) {
   return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/check-runs/${encodeURIComponent(
     String(checkRunId),
@@ -69,6 +82,70 @@ function existingReadinessComment(comments) {
   }
 
   return comments.find((comment) => typeof comment?.body === "string" && comment.body.includes(readinessCommentMarker));
+}
+
+function existingReadinessCheckRun(result, runId) {
+  const checkRuns = Array.isArray(result?.check_runs) ? result.check_runs : [];
+  return checkRuns.find(
+    (checkRun) =>
+      checkRun?.name === readinessCheckName &&
+      checkRun?.external_id === runId &&
+      typeof checkRun?.id === "number",
+  );
+}
+
+function checkRunCreationBody(input) {
+  const body = {
+    name: readinessCheckName,
+    head_sha: input.action.commitSha,
+    status: "queued",
+    external_id: input.runId,
+  };
+  const url = detailsUrl(input.runId);
+
+  if (url) {
+    body.details_url = url;
+  }
+
+  return body;
+}
+
+export async function ensurePullRequestCheckRun(input) {
+  const request = input.request ?? fetch;
+  const headers = requestHeaders(input.token);
+  const action = input.input.action;
+  const existing = await readJson(
+    await request(
+      commitCheckRunsEndpoint(
+        input.apiBaseUrl,
+        action.repository.owner,
+        action.repository.name,
+        action.commitSha,
+      ),
+      { method: "GET", headers },
+    ),
+    "GitHub check run lookup",
+  );
+  const match = existingReadinessCheckRun(existing, input.input.runId);
+
+  if (match) {
+    return { id: match.id };
+  }
+
+  const created = await readJson(
+    await request(checkRunCollectionEndpoint(input.apiBaseUrl, action.repository.owner, action.repository.name), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(checkRunCreationBody(input.input)),
+    }),
+    "GitHub check run creation",
+  );
+
+  if (typeof created.id !== "number") {
+    throw new Error("GitHub check run response did not include a numeric id");
+  }
+
+  return { id: created.id };
 }
 
 export async function upsertReadinessComment(input) {
@@ -130,39 +207,17 @@ export function createGitHubAppCheckRunClient() {
     return installationAuth.token;
   }
 
+  async function ensure(input) {
+    return await ensurePullRequestCheckRun({
+      apiBaseUrl,
+      token: await installationToken(input.action.installation.id),
+      input,
+    });
+  }
+
   return {
-    async createPullRequestCheckRun(input) {
-      const token = await installationToken(input.action.installation.id);
-      const body = {
-        name: "BoardReadyOps / release readiness",
-        head_sha: input.action.commitSha,
-        status: "queued",
-        external_id: input.runId,
-      };
-      const url = detailsUrl(input.runId);
-
-      if (url) {
-        body.details_url = url;
-      }
-
-      const response = await fetch(
-        `${apiBaseUrl}/repos/${encodeURIComponent(input.action.repository.owner)}/${encodeURIComponent(
-          input.action.repository.name,
-        )}/check-runs`,
-        {
-          method: "POST",
-          headers: requestHeaders(token),
-          body: JSON.stringify(body),
-        },
-      );
-      const json = await readJson(response, "GitHub check run creation");
-
-      if (typeof json.id !== "number") {
-        throw new Error("GitHub check run response did not include a numeric id");
-      }
-
-      return { id: json.id };
-    },
+    ensurePullRequestCheckRun: ensure,
+    createPullRequestCheckRun: ensure,
 
     async completeCheckRun(input) {
       const token = await installationToken(input.installationId);
