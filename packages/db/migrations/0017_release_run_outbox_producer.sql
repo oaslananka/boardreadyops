@@ -13,7 +13,7 @@ create or replace function boardreadyops_enqueue_release_run_with_outbox(
 )
 returns table(
   run_id text,
-  idempotency_key text,
+  release_idempotency_key text,
   run_status text,
   outbox_id text
 )
