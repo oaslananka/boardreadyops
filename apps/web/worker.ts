@@ -1,6 +1,9 @@
 import { createServer } from "node:http";
 import { hostname } from "node:os";
-import { type ClaimedControlPlaneJob, createSqlControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
+import {
+  type ClaimedControlPlaneJob,
+  createSqlControlPlaneJobStore,
+} from "@boardreadyops/db/control-plane-job-store";
 import {
   type ClaimedControlPlaneOutboxEffect,
   createSqlControlPlaneOutboxStore,
@@ -16,7 +19,12 @@ import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mo
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL is required for the control-plane worker");
 
-function integerEnvironment(name: string, fallback: number, minimum: number, maximum: number): number {
+function integerEnvironment(
+  name: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
   const raw = process.env[name]?.trim();
   const value = raw ? Number(raw) : fallback;
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
@@ -33,7 +41,11 @@ function errorClass(error: unknown): string {
   return error instanceof Error ? error.name : "UnknownError";
 }
 
-function log(level: "error" | "info" | "warn", event: string, fields: Record<string, unknown> = {}): void {
+function log(
+  level: "error" | "info" | "warn",
+  event: string,
+  fields: Record<string, unknown> = {},
+): void {
   process.stdout.write(
     `${JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -45,7 +57,10 @@ function log(level: "error" | "info" | "warn", event: string, fields: Record<str
   );
 }
 
-const workerId = (process.env.BOARDREADYOPS_WORKER_ID?.trim() || `${hostname()}-${process.pid}`).slice(0, 128);
+const workerId = (process.env.BOARDREADYOPS_WORKER_ID?.trim() || `${hostname()}-${process.pid}`).slice(
+  0,
+  128,
+);
 const concurrency = integerEnvironment("BOARDREADYOPS_WORKER_CONCURRENCY", 4, 1, 32);
 const outboxConcurrency = integerEnvironment("BOARDREADYOPS_OUTBOX_CONCURRENCY", 4, 1, 32);
 const pollMilliseconds = integerEnvironment("BOARDREADYOPS_WORKER_POLL_MS", 1000, 100, 60_000);
@@ -78,7 +93,9 @@ const checkRuns = createGitHubAppCheckRunClient();
 const workflowDispatch = runnerWorkflowDispatchClient(runner, createRunnerClient);
 const dispatchMode = runner.mode === "github-actions" ? "github-actions" : "none";
 const controlPlaneConfigurationValid =
-  runner.configurationValid && Boolean(checkRuns) && (runner.mode !== "github-actions" || Boolean(workflowDispatch));
+  runner.configurationValid &&
+  Boolean(checkRuns) &&
+  (runner.mode !== "github-actions" || Boolean(workflowDispatch));
 let shuttingDown = false;
 let ready = false;
 let lastPollAt: string | undefined;
@@ -160,7 +177,10 @@ async function collectQueueMetrics(currentTime: number): Promise<void> {
   if (currentTime < nextMetricsAt) return;
   nextMetricsAt = currentTime + metricsIntervalMilliseconds;
   try {
-    const [jobMetrics, outboxMetrics] = await Promise.all([jobs.collectMetrics(), outbox.collectMetrics()]);
+    const [jobMetrics, outboxMetrics] = await Promise.all([
+      jobs.collectMetrics(),
+      outbox.collectMetrics(),
+    ]);
     log("info", "worker.queue_metrics", { ...jobMetrics, ...outboxMetrics });
   } catch (error) {
     log("warn", "worker.metrics_failed", { errorClass: errorClass(error) });
@@ -181,7 +201,7 @@ async function purgeExpiredInbox(currentTime: number): Promise<void> {
 async function claimAvailableJobs(): Promise<ClaimedControlPlaneJob[]> {
   lastPollAt = new Date().toISOString();
   try {
-    return await jobs.claimJobs({ workerId, limit: concurrency });
+    return jobs.claimJobs({ workerId, limit: concurrency });
   } catch (error) {
     log("error", "worker.claim_failed", { workerId, errorClass: errorClass(error) });
     return [];
@@ -191,7 +211,7 @@ async function claimAvailableJobs(): Promise<ClaimedControlPlaneJob[]> {
 async function claimAvailableOutboxEffects(): Promise<ClaimedControlPlaneOutboxEffect[]> {
   lastOutboxPollAt = new Date().toISOString();
   try {
-    return await outbox.claimEffects({ workerId, limit: outboxConcurrency });
+    return outbox.claimEffects({ workerId, limit: outboxConcurrency });
   } catch (error) {
     log("error", "worker.outbox_claim_failed", { workerId, errorClass: errorClass(error) });
     return [];
@@ -218,7 +238,9 @@ async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<vo
   }
 }
 
-async function processClaimedOutboxEffects(claimed: ClaimedControlPlaneOutboxEffect[]): Promise<void> {
+async function processClaimedOutboxEffects(
+  claimed: ClaimedControlPlaneOutboxEffect[],
+): Promise<void> {
   if (!checkRuns) return;
   const results = await Promise.all(
     claimed.map((effect) =>
@@ -321,7 +343,9 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
 
 try {
   await startHealthServer();
-  activeLoops = Promise.all([runLifecycleLoop(), runOutboxLoop(), runMaintenanceLoop()]).then(() => undefined);
+  activeLoops = Promise.all([runLifecycleLoop(), runOutboxLoop(), runMaintenanceLoop()]).then(
+    () => undefined,
+  );
   await activeLoops;
 } catch (error) {
   shuttingDown = true;
