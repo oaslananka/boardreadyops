@@ -19,6 +19,11 @@
       "import": "./src/lifecycle-executor.ts",
       "default": "./src/lifecycle-executor.ts"
     },
+    "./durable-lifecycle-planner": {
+      "types": "./src/durable-lifecycle-planner.ts",
+      "import": "./src/durable-lifecycle-planner.ts",
+      "default": "./src/durable-lifecycle-planner.ts"
+    },
     "./runner-request-signature": {
       "types": "./src/runner-request-signature.ts",
       "import": "./src/runner-request-signature.ts",
