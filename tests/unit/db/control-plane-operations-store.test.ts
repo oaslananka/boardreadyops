@@ -169,6 +169,8 @@ describe("control-plane operations store", () => {
       async query(sql, params) {
         expect(sql).toContain("boardreadyops_fail_control_plane_reconciliation");
         expect(String(params?.[5])).not.toContain("x".repeat(20));
+        expect(String(params?.[5])).not.toContain("private-value");
+        expect(String(params?.[5])).not.toContain("session-value");
         expect(String(params?.[5])).toContain("[REDACTED]");
         return { rows: [{ outcome: "retry" }] };
       },
@@ -180,7 +182,7 @@ describe("control-plane operations store", () => {
         workerId: "worker-1",
         attemptCount: 1,
         errorClass: "NetworkError",
-        errorMessage: `authorization=Bearer ${"x".repeat(200)}`,
+        errorMessage: `authorization=Bearer ${"x".repeat(200)} private_key='private-value' cookie=session-value`,
       }),
     ).resolves.toBe("retry");
   });

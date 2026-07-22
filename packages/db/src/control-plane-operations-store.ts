@@ -104,12 +104,14 @@ export type ControlPlaneOperationsStoreOptions = {
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const reasonCodePattern = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u;
-const credentialAssignmentKeyPatterns = [
+const credentialAssignmentKeys = [
   "authorization",
   "cookie",
   "credential",
   "password",
-  "private[_-]?key",
+  "private-key",
+  "private_key",
+  "privatekey",
   "secret",
   "token",
 ] as const;
@@ -185,11 +187,71 @@ function validReasonCode(value: string, label: string): string {
   return value;
 }
 
+function isIdentifierCharacter(value: string | undefined): boolean {
+  if (!value) return false;
+  const code = value.toLowerCase().charCodeAt(0);
+  return (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || value === "_";
+}
+
+function isAssignmentWhitespace(value: string | undefined): boolean {
+  return value === " " || value === "\t" || value === "\r" || value === "\n";
+}
+
+function assignmentValueEnd(value: string, start: number): number {
+  const quote = value[start];
+  if (quote === '"' || quote === "'") {
+    const closingQuote = value.indexOf(quote, start + 1);
+    return closingQuote === -1 ? value.length : closingQuote + 1;
+  }
+
+  let cursor = start;
+  while (
+    cursor < value.length &&
+    !isAssignmentWhitespace(value[cursor]) &&
+    value[cursor] !== "," &&
+    value[cursor] !== ";"
+  ) {
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function redactCredentialAssignment(value: string, key: string): string {
+  const normalized = value.toLowerCase();
+  let searchFrom = 0;
+  let copiedUntil = 0;
+  let redacted = "";
+
+  while (searchFrom < value.length) {
+    const keyIndex = normalized.indexOf(key, searchFrom);
+    if (keyIndex === -1) break;
+
+    const keyEnd = keyIndex + key.length;
+    if (isIdentifierCharacter(normalized[keyIndex - 1]) || isIdentifierCharacter(normalized[keyEnd])) {
+      searchFrom = keyEnd;
+      continue;
+    }
+
+    let cursor = keyEnd;
+    while (isAssignmentWhitespace(value[cursor])) cursor += 1;
+    if (value[cursor] !== "=" && value[cursor] !== ":") {
+      searchFrom = keyEnd;
+      continue;
+    }
+
+    cursor += 1;
+    while (isAssignmentWhitespace(value[cursor])) cursor += 1;
+    const valueEnd = assignmentValueEnd(value, cursor);
+    redacted += `${value.slice(copiedUntil, keyIndex)}credential=[REDACTED]`;
+    copiedUntil = valueEnd;
+    searchFrom = valueEnd;
+  }
+
+  return redacted ? redacted + value.slice(copiedUntil) : value;
+}
+
 function redactCredentialAssignments(value: string): string {
-  return credentialAssignmentKeyPatterns.reduce((redacted, keyPattern) => {
-    const assignmentPattern = new RegExp(`\\b${keyPattern}\\s*[=:]\\s*(?:"[^"]*"|'[^']*'|[^\\s,;]+)`, "giu");
-    return redacted.replace(assignmentPattern, "credential=[REDACTED]");
-  }, value);
+  return credentialAssignmentKeys.reduce(redactCredentialAssignment, value);
 }
 
 function boundedFailure(value: string, maximum: number, fallback: string): string {
