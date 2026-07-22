@@ -4,9 +4,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const forbiddenInputPatterns = [
   /(?:^|\/)src\/kicad\//u,
-  /(?:^|\/)src\/runner\/(?:job-)?executor(?:\.|\/)/u,
-  /(?:^|\/)src\/repository-checkout(?:\.|\/)/u,
-  /(?:^|\/)src\/source-workspace(?:\.|\/)/u,
+  /(?:^|\/)src\/runner\/(?:job-)?executor[./]/u,
+  /(?:^|\/)src\/repository-checkout[./]/u,
+  /(?:^|\/)src\/source-workspace[./]/u,
   /(?:^|\/)packages\/core\/.*(?:checkout|executor|kicad|workspace)/u,
 ];
 const forbiddenImports = new Set(["child_process", "node:child_process"]);
@@ -15,25 +15,33 @@ function normalizedPath(value) {
   return String(value).replaceAll("\\", "/");
 }
 
-export function findControlPlaneWorkerBoundaryViolations(metafile) {
-  const violations = new Set();
-  const inputs = metafile && typeof metafile === "object" && metafile.inputs ? Object.keys(metafile.inputs) : [];
+function inputPaths(metafile) {
+  return Object.keys(metafile?.inputs ?? {});
+}
 
-  for (const input of inputs) {
+function importedPaths(metafile) {
+  return Object.values(metafile?.outputs ?? {}).flatMap((output) =>
+    Array.isArray(output?.imports)
+      ? output.imports.flatMap((imported) => (typeof imported?.path === "string" ? [imported.path] : []))
+      : [],
+  );
+}
+
+function forbiddenInputPaths(metafile) {
+  return inputPaths(metafile).filter((input) => {
     const normalized = normalizedPath(input);
-    if (forbiddenInputPatterns.some((pattern) => pattern.test(normalized))) violations.add(input);
-  }
+    return forbiddenInputPatterns.some((pattern) => pattern.test(normalized));
+  });
+}
 
-  const outputs = metafile && typeof metafile === "object" && metafile.outputs ? Object.values(metafile.outputs) : [];
-  for (const output of outputs) {
-    const imports = output && typeof output === "object" && Array.isArray(output.imports) ? output.imports : [];
-    for (const imported of imports) {
-      const path = imported && typeof imported === "object" ? imported.path : undefined;
-      if (typeof path === "string" && forbiddenImports.has(path)) violations.add(path);
-    }
-  }
+function forbiddenImportedPaths(metafile) {
+  return importedPaths(metafile).filter((path) => forbiddenImports.has(path));
+}
 
-  return [...violations].sort((left, right) => left.localeCompare(right));
+export function findControlPlaneWorkerBoundaryViolations(metafile) {
+  return [...new Set([...forbiddenInputPaths(metafile), ...forbiddenImportedPaths(metafile)])].sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 export function verifyControlPlaneWorkerBoundary(metafile) {
@@ -45,16 +53,16 @@ export function verifyControlPlaneWorkerBoundary(metafile) {
 
 async function main() {
   const root = dirname(dirname(fileURLToPath(import.meta.url)));
-  const metadataPath = process.argv[2]
-    ? join(process.cwd(), process.argv[2])
-    : join(root, "apps/web/.next/worker-meta.json");
+  const metadataPath = join(root, "apps/web/.next/worker-meta.json");
   const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
   verifyControlPlaneWorkerBoundary(metadata);
   process.stdout.write(`${JSON.stringify({ event: "worker.boundary_verified", metadataPath })}\n`);
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(
       `${JSON.stringify({
         event: "worker.boundary_failed",
@@ -63,5 +71,5 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
       })}\n`,
     );
     process.exitCode = 1;
-  });
+  }
 }
