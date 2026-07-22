@@ -10,12 +10,12 @@ A fresh Ubuntu 24.04 x64 host needs Node with Corepack and Python with `venv` su
 corepack pnpm run toolchain:bootstrap
 ```
 
-The bootstrap writes only to these repository-local locations:
+The bootstrap keeps project executables inside the repository and reusable downloads in the current user's XDG cache:
 
 - `node_modules/` for JavaScript dependencies;
 - `.boardreadyops/toolchain/venv/` for uv, MkDocs, and pre-commit;
-- `.boardreadyops/toolchain/cache/pre-commit/` for pinned validation hook environments;
-- `.boardreadyops/toolchain/cache/puppeteer/` for Puppeteer's compatible Chrome build;
+- `${XDG_CACHE_HOME:-~/.cache}/boardreadyops/toolchain-v1/pre-commit/` for reusable pinned validation hook environments;
+- `${XDG_CACHE_HOME:-~/.cache}/boardreadyops/toolchain-v1/puppeteer/` for Puppeteer's compatible Chrome build;
 - `.boardreadyops/toolchain/bin/pnpm` as a wrapper around `corepack pnpm`.
 
 This wrapper prevents nested package scripts from accidentally resolving a broken or unconfigured host-global pnpm shim.
@@ -55,4 +55,4 @@ See [Testing Policy](testing-policy.md) and [Self-hosted deployment](../deployme
 
 The preferred Node release is pinned exactly in `.nvmrc` and workflow `NODE_VERSION` variables. Node 22 remains in compatibility matrices because `package.json` supports `^22.14.0 || ^24.0.0`. Python and validation-tool versions are checked against `toolchain.json` by unit tests.
 
-GitHub-hosted jobs deliberately keep clean dependency installation as the authoritative gate. Local pnpm, pre-commit, Puppeteer, and Next.js caches may be reused because generated bundles, clean-tree checks, and committed-dist verification still rebuild and compare outputs.
+GitHub-hosted jobs deliberately keep clean dependency installation as the authoritative gate. User-scoped pnpm, pre-commit, Puppeteer, and Next.js caches may be reused because generated bundles, clean-tree checks, and committed-dist verification still rebuild and compare outputs.

@@ -2,6 +2,7 @@
 import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import { access, chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -13,19 +14,19 @@ export async function loadToolchainManifest(repositoryRoot = defaultRepositoryRo
   return JSON.parse(await readFile(path.join(repositoryRoot, "toolchain.json"), "utf8"));
 }
 
-export function resolveToolchainPaths(repositoryRoot) {
+export function resolveToolchainPaths(repositoryRoot, cacheRoot = defaultCacheRoot()) {
   const root = path.join(repositoryRoot, ".boardreadyops", "toolchain");
+  const cache = path.join(cacheRoot, "toolchain-v1");
   const venv = path.join(root, "venv");
   const windows = process.platform === "win32";
   return {
     repositoryRoot,
     root,
     bin: path.join(root, "bin"),
-    cache: path.join(root, "cache"),
+    cache,
     venv,
     python: path.join(venv, windows ? "Scripts/python.exe" : "bin/python"),
     preCommit: path.join(venv, windows ? "Scripts/pre-commit.exe" : "bin/pre-commit"),
-    uv: path.join(venv, windows ? "Scripts/uv.exe" : "bin/uv"),
     uv: path.join(venv, windows ? "Scripts/uv.exe" : "bin/uv"),
     browserPathFile: path.join(root, "browser-path"),
     hooksStamp: path.join(root, "hooks-ready.json"),
@@ -59,7 +60,6 @@ export function buildBootstrapPlan(config, paths) {
         "-r",
         path.join(paths.repositoryRoot, "docs", "requirements.txt"),
         `pre-commit==${config.validation.preCommit}`,
-        `uv==${config.python.uv}`,
         `uv==${config.python.uv}`,
       ],
     },
@@ -191,7 +191,6 @@ export async function probeToolchain(config, paths) {
     ),
     mkdocsVersion: await pythonModuleVersion(paths.python, "mkdocs", env),
     preCommitVersion: normalizePrefixedVersion(await commandVersion(paths.preCommit, ["--version"], env), "pre-commit"),
-    uvVersion: normalizePrefixedVersion(await commandVersion(paths.uv, ["--version"], env), "uv"),
     uvVersion: normalizePrefixedVersion(await commandVersion(paths.uv, ["--version"], env), "uv"),
     hooksReady: await hooksStampMatches(config, paths.hooksStamp),
     browserPath,
@@ -371,6 +370,12 @@ function normalizePrefixedVersion(value, prefix) {
   if (!value) return undefined;
   const match = value.match(/\d+(?:\.\d+){1,3}/u);
   return match?.[0] ?? (prefix ? value.replace(prefix, "").trim() : value.trim());
+}
+
+function defaultCacheRoot() {
+  const base =
+    process.env.BOARDREADYOPS_TOOLCHAIN_CACHE_DIR || process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache");
+  return path.join(base, "boardreadyops");
 }
 
 function resolvePythonLauncher() {

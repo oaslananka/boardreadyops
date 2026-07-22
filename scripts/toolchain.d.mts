@@ -19,6 +19,7 @@ export interface ToolchainManifest {
     preCommit: string;
     uv: string;
     uv: string;
+    uv: string;
     actionlint: string;
     semgrep: string;
     gitleaks: string;
@@ -40,7 +41,6 @@ export interface ToolchainPaths {
   venv: string;
   python: string;
   preCommit: string;
-  uv: string;
   uv: string;
   browserPathFile: string;
   hooksStamp: string;
@@ -64,7 +64,6 @@ export interface ToolchainProbe {
   mkdocsVersion: string | undefined;
   preCommitVersion: string | undefined;
   uvVersion: string | undefined;
-  uvVersion: string | undefined;
   hooksReady: boolean;
   browserPath: string | undefined;
   browserExecutable: boolean;
@@ -83,7 +82,7 @@ export interface ToolchainResult {
   checks: ToolchainCheck[];
 }
 
-export function resolveToolchainPaths(repositoryRoot: string): ToolchainPaths;
+export function resolveToolchainPaths(repositoryRoot: string, cacheRoot?: string): ToolchainPaths;
 export function buildBootstrapPlan(config: ToolchainManifest, paths: ToolchainPaths): BootstrapStep[];
 export function evaluateToolchain(config: ToolchainManifest, probe: ToolchainProbe): ToolchainResult;
 export function loadToolchainManifest(repositoryRoot?: string): Promise<ToolchainManifest>;

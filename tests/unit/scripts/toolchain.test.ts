@@ -30,7 +30,6 @@ function healthyProbe(overrides: Partial<ToolchainProbe> = {}): ToolchainProbe {
     mkdocsVersion: "1.6.1",
     preCommitVersion: "4.6.0",
     uvVersion: "0.11.16",
-    uvVersion: "0.11.16",
     hooksReady: true,
     browserPath: "/repo/.boardreadyops/toolchain/cache/puppeteer/chrome",
     browserExecutable: true,
@@ -89,10 +88,11 @@ describe("reproducible contributor toolchain", () => {
 
   it("keeps bootstrap writes inside the repository toolchain directory", async () => {
     const config = await manifest();
-    const paths = resolveToolchainPaths("/repo");
+    const paths = resolveToolchainPaths("/repo", "/cache/boardreadyops");
     const plan = buildBootstrapPlan(config, paths);
 
     expect(paths.root).toBe("/repo/.boardreadyops/toolchain");
+    expect(paths.cache).toBe("/cache/boardreadyops/toolchain-v1");
     expect(plan.every((step) => step.cwd === "/repo" || step.cwd.startsWith(paths.root))).toBe(true);
     expect(plan.flatMap((step) => step.command).join(" ")).not.toMatch(/\bsudo\b|\/usr\/local|corepack enable/u);
     expect(
@@ -119,7 +119,6 @@ describe("reproducible contributor toolchain", () => {
         pnpmVersion: undefined,
         pythonVersion: "3.10.14",
         uvVersion: undefined,
-        uvVersion: undefined,
         hooksReady: false,
         browserPath: undefined,
         browserExecutable: false,
@@ -133,7 +132,6 @@ describe("reproducible contributor toolchain", () => {
         expect.objectContaining({ id: "corepack", status: "fail", remediation: expect.stringContaining("Corepack") }),
         expect.objectContaining({ id: "pnpm", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "python", status: "fail", remediation: expect.stringContaining("3.11") }),
-        expect.objectContaining({ id: "uv", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "uv", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "hooks", status: "fail", remediation: expect.stringContaining("bootstrap") }),
         expect.objectContaining({ id: "browser", status: "fail", remediation: expect.stringContaining("bootstrap") }),
