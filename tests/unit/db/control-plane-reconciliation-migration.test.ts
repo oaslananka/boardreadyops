@@ -25,11 +25,14 @@ describe("control-plane reconciliation operations migration", () => {
     expect(sql).not.toContain("payload jsonb");
   });
 
-  it("defines idempotent audited replay and blocks uncertain dispatch replay", async () => {
+  it("defines serialized audited replay and blocks uncertain dispatch replay", async () => {
     const sql = await readFile(migrationPath, "utf8");
 
     expect(sql).toContain("create table if not exists control_plane_replay_operations");
     expect(sql).toContain("primary key (installation_id, operation_id)");
+    expect(sql).toContain("audit_event_id text references audit_events(id) on delete set null");
+    expect(sql).toContain("pg_advisory_xact_lock");
+    expect(sql).toContain("hashtextextended(p_installation_id || ':' || p_operation_id, 0)");
     expect(sql).toContain("boardreadyops_list_control_plane_dead_letters");
     expect(sql).toContain("boardreadyops_replay_control_plane_dead_letter");
     expect(sql).toContain("insert into audit_events");
