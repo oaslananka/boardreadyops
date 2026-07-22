@@ -13,6 +13,7 @@ Cloudflare DNS
   -> Caddy on the boardreadyops-cloud Docker network
   -> immutable BoardReadyOps web image on web:3000
   -> durable PostgreSQL webhook inbox and control-plane jobs
+  -> PostgreSQL transactional outbox for GitHub side effects
   -> independent BoardReadyOps worker image on worker:3001
   -> PostgreSQL, Redis, and a persistent artifact volume
 ```
@@ -45,7 +46,9 @@ Keep the live Caddy bind mount under `/opt/boardreadyops-cloud`; do not bind it 
 
 Install Docker Engine and the Docker Compose v2 plugin on the VPS. The web and control-plane worker processes have independent healthchecks. PostgreSQL and Redis healthchecks are also defined in `deploy/docker-compose.yml`.
 
-The webhook endpoint never performs GitHub Check Run creation or workflow dispatch inline. It verifies and normalizes the request, atomically stores one `webhook_inbox` row and one `control_plane_jobs` row, and returns HTTP 202. The worker claims jobs with PostgreSQL leases and bounded retries. This keeps accepted deliveries recoverable across web or worker restarts. Web intake logs expose only outcome and request-to-accept latency; the worker periodically emits aggregate available, leased, dead-letter, duplicate, and oldest-unprocessed-age metrics without repository, installation, delivery, or payload fields. Successful processing immediately replaces normalized actions with an empty array. Terminal inbox metadata is retained for 30 days by default and then removed in bounded worker cleanup batches; dead-letter actions remain available only until that retention deadline. Verified deliveries are guarded by a configurable per-installation, per-process rate window (`BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE`, default 1200); retries with the same GitHub delivery ID are exempt so idempotent acknowledgement remains available.
+The webhook endpoint never performs GitHub Check Run creation or workflow dispatch inline. It verifies and normalizes the request, atomically stores one `webhook_inbox` row and one `control_plane_jobs` row, and returns HTTP 202. The lifecycle worker claims jobs with PostgreSQL leases and writes release-run state plus required `control_plane_outbox` records transactionally. An independent outbox loop delivers Check Run and workflow effects, so GitHub API latency does not block unrelated webhook planning. Check Run creation is replay-safe through `external_id = runId`; an uncertain workflow dispatch becomes `reconciliation_required` and is not automatically replayed. See [Transactional outbox](../architecture/transactional-outbox.md) for the state model, reconciliation procedure, metrics, and external-broker triggers.
+
+Web intake logs expose only outcome and request-to-accept latency. The worker periodically emits aggregate available, leased, retrying, dead-letter, reconciliation-required, oldest-age, and outbox-lag metrics without repository, installation, delivery, or payload fields. Successful webhook processing immediately replaces normalized actions with an empty array. Terminal inbox metadata is retained for 30 days by default and then removed in bounded worker cleanup batches; dead-letter actions remain available only until that retention deadline. Verified deliveries are guarded by a configurable per-installation, per-process rate window (`BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE`, default 1200); retries with the same GitHub delivery ID are exempt so idempotent acknowledgement remains available.
 
 ## First Compose deployment
 
@@ -131,6 +134,10 @@ BOARDREADYOPS_CLOUD_SKIP_INSTALL=1
 BOARDREADYOPS_CLOUD_DRY_RUN=1
 BOARDREADYOPS_CLOUD_HEALTH_ATTEMPTS=60
 BOARDREADYOPS_CLOUD_HEALTH_DELAY_MS=1000
+BOARDREADYOPS_WORKER_CONCURRENCY=4
+BOARDREADYOPS_WORKER_POLL_MS=1000
+BOARDREADYOPS_OUTBOX_CONCURRENCY=4
+BOARDREADYOPS_OUTBOX_POLL_MS=500
 ```
 
 For a dry run:
@@ -159,7 +166,7 @@ The artifact signer does not fall back to `SESSION_SECRET`. URLs are bound to th
 
 ## Database bootstrap and migrations
 
-The self-hosted cloud control plane stores GitHub App installations, repositories, release runs, findings, and artifacts in PostgreSQL.
+The self-hosted cloud control plane stores GitHub App installations, repositories, release runs, findings, artifacts, durable webhook jobs, and transactional outbox effects in PostgreSQL.
 
 Compose and `pnpm run cloud:deploy:self-hosted` apply pending migrations before replacing live processes. For an explicit administrative run after `DATABASE_URL` is configured:
 
