@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { processControlPlaneJob } from "../../../apps/web/lib/control-plane-worker.js";
 import type { GitHubAppDurableLifecycleStore } from "../../../packages/cloud-core/src/durable-lifecycle-planner.js";
-import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "../../../packages/db/src/control-plane-job-store.js";
+import type {
+  ClaimedControlPlaneJob,
+  ControlPlaneJobStore,
+} from "../../../packages/db/src/control-plane-job-store.js";
 
 function lifecycleStore(): GitHubAppDurableLifecycleStore {
   return {
@@ -9,7 +12,11 @@ function lifecycleStore(): GitHubAppDurableLifecycleStore {
     deleteInstallation: vi.fn(async () => undefined),
     upsertRepository: vi.fn(async () => undefined),
     removeRepository: vi.fn(async () => undefined),
-    enqueueReleaseRunWithOutbox: vi.fn(async () => ({ idempotencyKey: "key", runId: "run-1", outboxId: "outbox-1" })),
+    enqueueReleaseRunWithOutbox: vi.fn(async () => ({
+      idempotencyKey: "key",
+      runId: "run-1",
+      outboxId: "outbox-1",
+    })),
   };
 }
 
@@ -100,7 +107,9 @@ describe("control-plane worker", () => {
 
   it("requeues a failed database plan with a bounded redacted error", async () => {
     const lifecycle = lifecycleStore();
-    vi.mocked(lifecycle.upsertInstallation).mockRejectedValue(new Error(`secret=${"x".repeat(1200)}`));
+    vi.mocked(lifecycle.upsertInstallation).mockRejectedValue(
+      new Error(`secret=${"x".repeat(1200)}`),
+    );
     const jobs = jobStore();
 
     const result = await processControlPlaneJob(job, {
