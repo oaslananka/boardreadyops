@@ -9,12 +9,12 @@ import type {
   ControlPlaneOutboxStore,
 } from "@boardreadyops/db/control-plane-outbox-store";
 
-export type ControlPlaneOutboxCheckRunClient = {
+type ControlPlaneOutboxCheckRunClient = {
   ensurePullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
   completeCheckRun(input: CompleteGitHubCheckRunInput): Promise<void>;
 };
 
-export type ControlPlaneOutboxWorkflowDispatchClient = {
+type ControlPlaneOutboxWorkflowDispatchClient = {
   dispatchReleaseRunWorkflow(input: DispatchReleaseRunWorkflowInput): Promise<{
     workflowDispatchId: string;
     workflowRunUrl?: string;
