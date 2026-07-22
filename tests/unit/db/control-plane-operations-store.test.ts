@@ -122,7 +122,7 @@ describe("control-plane operations store", () => {
     ]);
   });
 
-  it("decodes privacy-safe service indicators", async () => {
+  it("decodes privacy-safe service indicators from PostgreSQL numeric values", async () => {
     const executor: SqlQueryExecutor = {
       async query(sql, params) {
         expect(sql).toContain("boardreadyops_control_plane_sli_snapshot");
@@ -130,8 +130,8 @@ describe("control-plane operations store", () => {
         return {
           rows: [
             {
-              webhook_acceptance_p95_ms: 120,
-              lifecycle_queue_age_seconds: 8,
+              webhook_acceptance_p95_ms: "120",
+              lifecycle_queue_age_seconds: "8",
               outbox_lag_seconds: 4,
               dispatch_latency_p95_seconds: 12,
               completion_latency_p95_seconds: 180,
@@ -139,8 +139,8 @@ describe("control-plane operations store", () => {
               reconciliation_backlog: 3,
               reconciliation_repairs_24h: 7,
               terminal_failures_24h: 1,
-              terminal_runs_24h: 40,
-              terminal_failure_rate_basis_points: 250,
+              terminal_runs_24h: "40",
+              terminal_failure_rate_basis_points: "250",
             },
           ],
         };
