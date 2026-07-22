@@ -259,9 +259,7 @@ describeDatabase("control-plane PostgreSQL reconciliation operations", () => {
         maximumAttempts: 1,
       }),
     ).resolves.toBe("enqueued");
-    await expect(
-      store.claimReconciliationItems({ workerId: `${testPrefix}-worker`, limit: 1 }),
-    ).resolves.toEqual([
+    await expect(store.claimReconciliationItems({ workerId: `${testPrefix}-worker`, limit: 1 })).resolves.toEqual([
       expect.objectContaining({ reconciliationId, attemptCount: 1, reasonCode: "callback_missing" }),
     ]);
 
