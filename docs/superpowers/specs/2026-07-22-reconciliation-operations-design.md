@@ -90,6 +90,7 @@ The migration is additive and forward-compatible. Rollback is application-first;
 - Migration tests assert constraints, tenant joins, replay guards, audit writes, and absence of payload columns.
 - Unit tests verify row decoding, bounded inputs, reason classification, and exact SQL calls.
 - `tests/integration/control-plane-operations-postgres.test.ts` proves cross-tenant reads and mutations are rejected, concurrent repeated operation IDs are serialized and idempotent, reconciliation-required dispatches cannot be replayed, successful replay is audited once, and final reconciliation leases expire to a stable dead-letter state.
+- Integration cleanup removes both tenant rows and webhook-inbox fixtures so replayed jobs cannot leak into other PostgreSQL test files.
 
 ## Security and privacy
 
