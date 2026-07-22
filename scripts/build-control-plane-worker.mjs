@@ -1,7 +1,8 @@
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { verifyControlPlaneWorkerBoundary } from "./verify-control-plane-worker-boundary.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const outputDirectory = join(root, "apps/web/.next");
@@ -17,11 +18,15 @@ const nodeBundleOptions = {
   logLevel: "info",
 };
 
-await build({
+const workerBuild = await build({
   ...nodeBundleOptions,
   entryPoints: [join(root, "apps/web/worker.ts")],
   outfile: join(outputDirectory, "worker.mjs"),
+  metafile: true,
 });
+const workerMetadataPath = join(outputDirectory, "worker-meta.json");
+await writeFile(workerMetadataPath, `${JSON.stringify(workerBuild.metafile, null, 2)}\n`, "utf8");
+verifyControlPlaneWorkerBoundary(workerBuild.metafile);
 
 const migrationsDirectory = join(root, "packages/db/migrations");
 const migrationFiles = (await readdir(migrationsDirectory)).filter((file) => /^\d+_.+\.sql$/u.test(file)).sort();

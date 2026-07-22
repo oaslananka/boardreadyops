@@ -1,0 +1,75 @@
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const forbiddenInputPatterns = [
+  /(?:^|\/)src\/kicad\//u,
+  /(?:^|\/)src\/runner\/(?:job-)?executor[./]/u,
+  /(?:^|\/)src\/repository-checkout[./]/u,
+  /(?:^|\/)src\/source-workspace[./]/u,
+  /(?:^|\/)packages\/core\/.*(?:checkout|executor|kicad|workspace)/u,
+];
+const forbiddenImports = new Set(["child_process", "node:child_process"]);
+
+function normalizedPath(value) {
+  return String(value).replaceAll("\\", "/");
+}
+
+function inputPaths(metafile) {
+  return Object.keys(metafile?.inputs ?? {});
+}
+
+function importedPaths(metafile) {
+  return Object.values(metafile?.outputs ?? {}).flatMap((output) =>
+    Array.isArray(output?.imports)
+      ? output.imports.flatMap((imported) => (typeof imported?.path === "string" ? [imported.path] : []))
+      : [],
+  );
+}
+
+function forbiddenInputPaths(metafile) {
+  return inputPaths(metafile).filter((input) => {
+    const normalized = normalizedPath(input);
+    return forbiddenInputPatterns.some((pattern) => pattern.test(normalized));
+  });
+}
+
+function forbiddenImportedPaths(metafile) {
+  return importedPaths(metafile).filter((path) => forbiddenImports.has(path));
+}
+
+export function findControlPlaneWorkerBoundaryViolations(metafile) {
+  return [...new Set([...forbiddenInputPaths(metafile), ...forbiddenImportedPaths(metafile)])].sort((left, right) =>
+    left.localeCompare(right),
+  );
+}
+
+export function verifyControlPlaneWorkerBoundary(metafile) {
+  const violations = findControlPlaneWorkerBoundaryViolations(metafile);
+  if (violations.length > 0) {
+    throw new Error(`Control-plane worker bundle crossed the execution boundary: ${violations.join(", ")}`);
+  }
+}
+
+async function main() {
+  const root = dirname(dirname(fileURLToPath(import.meta.url)));
+  const metadataPath = join(root, "apps/web/.next/worker-meta.json");
+  const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+  verifyControlPlaneWorkerBoundary(metadata);
+  process.stdout.write(`${JSON.stringify({ event: "worker.boundary_verified", metadataPath })}\n`);
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(
+      `${JSON.stringify({
+        event: "worker.boundary_failed",
+        errorClass: error instanceof Error ? error.name : "UnknownError",
+        message: error instanceof Error ? error.message.slice(0, 1_000) : "Worker boundary verification failed.",
+      })}\n`,
+    );
+    process.exitCode = 1;
+  }
+}
