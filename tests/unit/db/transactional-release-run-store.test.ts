@@ -52,8 +52,9 @@ describe("transactional release-run outbox store", () => {
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("boardreadyops_enqueue_release_run_with_outbox");
-    expect(calls[0]?.params).toContain("github.check_run.create:run-row-id");
-    expect(String(calls[0]?.params.at(-1))).toContain('"type":"github.check_run.create"');
+    expect(calls[0]?.params).toHaveLength(11);
+    expect(calls[0]?.params[9]).toBe("outbox-row-id");
+    expect(String(calls[0]?.params[10])).toContain('"type":"github.check_run.create"');
   });
 
   it("does not create a run or outbox record outside the rollout policy", async () => {
