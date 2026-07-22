@@ -40,7 +40,7 @@ describe("control-plane transactional outbox migration", () => {
 
     expect(sql).toContain("effect_type = 'github.workflow.dispatch'");
     expect(sql).toContain("delivery_started_at is not null");
-    expect(sql).toContain("status = 'reconciliation_required'");
+    expect(sql).toContain("then 'reconciliation_required'");
     expect(sql).toContain("status <> 'reconciliation_required'");
   });
 });
