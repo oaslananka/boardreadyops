@@ -50,6 +50,38 @@ The webhook endpoint never performs GitHub Check Run creation or workflow dispat
 
 Web intake logs expose only outcome and request-to-accept latency. The worker periodically emits aggregate available, leased, retrying, dead-letter, reconciliation-required, oldest-age, and outbox-lag metrics without payload or finding content. Terminal worker logs include only safe correlation identifiers such as delivery, installation, repository, run, attempt, job, and outbox IDs. All structured fields pass through recursive credential, OIDC, capability, source, and finding redaction before serialization. Successful webhook processing immediately replaces normalized actions with an empty array. Terminal inbox metadata is retained for 30 days by default and then removed in bounded worker cleanup batches; dead-letter actions remain available only until that retention deadline. Verified deliveries are guarded by a configurable per-installation, per-process rate window (`BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE`, default 1200); retries with the same GitHub delivery ID are exempt so idempotent acknowledgement remains available.
 
+## Control-plane SLI snapshots
+
+The maintenance loop emits a global `worker.control_plane_sli` event on the same interval as queue metrics. The event is content-free and contains only these aggregate fields:
+
+- `webhookAcceptanceP95Ms`: 24-hour p95 time from webhook receipt to durable acceptance;
+- `lifecycleQueueAgeSeconds`: age of the oldest available or leased lifecycle job;
+- `outboxLagSeconds`: age of the oldest available, leased, or reconciliation-required side effect;
+- `dispatchLatencyP95Seconds`: 24-hour p95 time from dispatch request to confirmed dispatch;
+- `completionLatencyP95Seconds`: 24-hour p95 execution completion time;
+- `staleAttempts`: non-terminal attempts without recent progress;
+- `reconciliationBacklog`: available or leased reconciliation items;
+- `reconciliationRepairs24h`: successfully repaired reconciliation items in the last 24 hours;
+- `terminalFailures24h` and `terminalRuns24h`: terminal run counts used to calculate failure rate; and
+- `terminalFailureRateBasisPoints`: terminal failures per 10,000 terminal runs.
+
+The query never returns repository source, findings, payloads, artifact names, commit messages, credentials, or tokens. A failed SLI query does not affect worker readiness or queue processing; the worker emits `worker.control_plane_sli_failed` with only `errorClass`. Queue metric collection and SLI collection fail independently.
+
+Use the following as initial observation thresholds, not paging SLOs. Tune them from production baselines before turning them into alerts:
+
+| Signal | Initial observation threshold |
+| --- | --- |
+| Webhook acceptance p95 | `> 1,000 ms` for 5 minutes |
+| Lifecycle queue age | `> 60 seconds` for 5 minutes |
+| Outbox lag | `> 60 seconds` for 5 minutes |
+| Dispatch latency p95 | `> 30 seconds` for 10 minutes |
+| Completion latency p95 | `> 1,800 seconds` for 10 minutes |
+| Stale attempts | `> 0` for two consecutive snapshots |
+| Reconciliation backlog | `> 20` or increasing for three consecutive snapshots |
+| Terminal failure rate | `> 500` basis points with at least 20 terminal runs in 24 hours |
+
+`reconciliationRepairs24h` is diagnostic: a sudden increase should be correlated with GitHub incidents, worker restarts, queue lag, and terminal failures rather than alerted on by itself. Formal availability objectives, burn-rate alerts, and escalation policy remain a later issue #190 delivery slice.
+
 ## Control-plane worker boundary
 
 The worker is an orchestrator only. It does not check out repository source, invoke KiCad, materialize a source workspace, or execute customer commands. Target-repository GitHub Actions or a separately enrolled customer-hosted runner remain the execution plane.
@@ -173,6 +205,8 @@ BOARDREADYOPS_WORKER_REPOSITORY_CONCURRENCY=2
 BOARDREADYOPS_WORKER_POLL_MS=1000
 BOARDREADYOPS_OUTBOX_CONCURRENCY=4
 BOARDREADYOPS_OUTBOX_POLL_MS=500
+BOARDREADYOPS_WORKER_METRICS_INTERVAL_MS=30000
+BOARDREADYOPS_WORKER_RETENTION_CLEANUP_INTERVAL_MS=3600000
 ```
 
 For a dry run:
