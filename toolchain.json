@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "node": {
+    "preferred": "24.18.0",
+    "engines": "^22.14.0 || ^24.0.0",
+    "supportedMajors": [22, 24]
+  },
+  "pnpm": {
+    "version": "11.8.0"
+  },
+  "python": {
+    "preferred": "3.13",
+    "minimum": "3.11",
+    "maximumExclusive": "3.14",
+    "uv": "0.11.16",
+    "mkdocs": "1.6.1",
+    "mkdocsMaterial": "9.7.6",
+    "mike": "2.2.0"
+  },
+  "validation": {
+    "preCommit": "4.6.0",
+    "actionlint": "1.7.12",
+    "semgrep": "1.170.0",
+    "gitleaks": "8.30.1",
+    "zizmor": "1.27.0",
+    "osvScanner": "2.3.8"
+  },
+  "browser": {
+    "provider": "puppeteer",
+    "name": "chrome",
+    "puppeteerVersion": "25.2.0"
+  }
+}

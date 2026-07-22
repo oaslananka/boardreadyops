@@ -21,3 +21,6 @@ SHA256SUMS
 apps/web/.next/
 
 **/node_modules/
+
+# Repository-local reproducible validation toolchain
+/.boardreadyops/toolchain/

@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { access, mkdtemp, rm, stat } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -116,7 +116,7 @@ export async function main(root = process.cwd()) {
     const { default: pa11y } = await import("pa11y");
     const { default: puppeteer } = await import("puppeteer");
     const failures = [];
-    const launchConfig = await createChromeLaunchConfig();
+    const launchConfig = await createChromeLaunchConfig(root);
     let browser = await puppeteer.launch(launchConfig);
     try {
       for (const [index, page] of pages.entries()) {
@@ -154,9 +154,9 @@ export function pageUrlForFile(origin, siteDir, file) {
   return `${origin}/boardreadyops/${relativePage}`;
 }
 
-export async function createChromeLaunchConfig() {
+export async function createChromeLaunchConfig(root = process.cwd()) {
   return {
-    executablePath: process.env.PA11Y_CHROME_PATH || (await detectChromeExecutable()),
+    executablePath: process.env.PA11Y_CHROME_PATH || (await detectChromeExecutable(root)),
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   };
 }
@@ -182,8 +182,9 @@ export function candidateChromeExecutables(env = process.env) {
   return candidates.filter(Boolean);
 }
 
-async function detectChromeExecutable() {
-  const candidates = candidateChromeExecutables();
+async function detectChromeExecutable(root) {
+  const toolchainChrome = await readToolchainChromePath(root);
+  const candidates = [toolchainChrome, ...candidateChromeExecutables()].filter(Boolean);
   for (const candidate of candidates) {
     try {
       await access(candidate);
@@ -193,6 +194,16 @@ async function detectChromeExecutable() {
     }
   }
   return undefined;
+}
+
+export async function readToolchainChromePath(root = process.cwd()) {
+  try {
+    const value = (await readFile(path.join(root, ".boardreadyops", "toolchain", "browser-path"), "utf8")).trim();
+    return value || undefined;
+  } catch (error) {
+    if (error && error.code === "ENOENT") return undefined;
+    throw error;
+  }
 }
 
 async function startStaticServer(siteDir) {
