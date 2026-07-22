@@ -138,7 +138,7 @@ describeDatabase("transactional release-run outbox producer", () => {
     const plannedAt = new Date("2026-07-22T03:00:00.000Z");
     const runId = `run-transition-${suffix}`;
     const createOutboxId = `outbox-create-${suffix}`;
-    const executionAttemptId = `attempt-transition-${suffix}`;
+    const executionAttemptId = "11111111-1111-4111-8111-111111111111";
     const dispatchOutboxId = `outbox-dispatch-${suffix}`;
     const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(database(), {
       id: idSequence([runId, createOutboxId]),
@@ -238,7 +238,7 @@ describeDatabase("transactional release-run outbox producer", () => {
     const plannedAt = new Date("2026-07-22T04:00:00.000Z");
     const runId = `run-stale-${suffix}`;
     const createOutboxId = `outbox-stale-create-${suffix}`;
-    const executionAttemptId = `attempt-stale-${suffix}`;
+    const executionAttemptId = "22222222-2222-4222-8222-222222222222";
     const dispatchOutboxId = `outbox-stale-dispatch-${suffix}`;
     const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(database(), {
       id: idSequence([runId, createOutboxId]),
