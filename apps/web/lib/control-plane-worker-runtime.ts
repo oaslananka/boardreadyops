@@ -40,11 +40,24 @@ type PendingOperation = {
   reject: (reason?: unknown) => void;
 };
 
-const sensitiveKeyPattern =
-  /(?:authorization|cookie|credential|findings|oidc|password|privatekey|repositorysource|secret|signedcapability|sourcecontent|token|webhookpayload)/iu;
+const sensitiveKeyFragments = [
+  "authorization",
+  "cookie",
+  "credential",
+  "findings",
+  "oidc",
+  "password",
+  "privatekey",
+  "repositorysource",
+  "secret",
+  "signedcapability",
+  "sourcecontent",
+  "token",
+  "webhookpayload",
+] as const;
 const credentialAssignmentPattern =
   /\b(authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu;
-const bearerPattern = /\bBearer\s+[A-Za-z0-9._~+/=-]+/giu;
+const bearerPattern = /\bBearer\s+[a-z0-9._~+/=-]+/giu;
 const maximumLogStringLength = 2_000;
 
 function actionContext(action: GitHubAppLifecycleAction | undefined): ActionContext {
@@ -119,6 +132,11 @@ function normalizedKey(key: string): string {
   return key.replace(/[^a-z0-9]/giu, "").toLowerCase();
 }
 
+function isSensitiveKey(key: string): boolean {
+  const normalized = normalizedKey(key);
+  return sensitiveKeyFragments.some((fragment) => normalized.includes(fragment));
+}
+
 function sanitizedString(value: string): string {
   return value
     .replace(bearerPattern, "Bearer [REDACTED]")
@@ -127,14 +145,16 @@ function sanitizedString(value: string): string {
 }
 
 function sanitizedValue(value: unknown, key: string | undefined, seen: WeakSet<object>): unknown {
-  if (key && sensitiveKeyPattern.test(normalizedKey(key))) return "[REDACTED]";
+  if (key && isSensitiveKey(key)) return "[REDACTED]";
   if (typeof value === "string") return sanitizedString(value);
   if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
   if (typeof value === "bigint") return value.toString();
   if (value === undefined) return undefined;
+  if (typeof value === "symbol") return value.description ?? "Symbol";
+  if (typeof value === "function") return `[Function ${value.name || "anonymous"}]`;
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map((item) => sanitizedValue(item, undefined, seen));
-  if (typeof value !== "object") return String(value).slice(0, maximumLogStringLength);
+  if (typeof value !== "object") return `[Unsupported ${typeof value}]`;
   if (seen.has(value)) return "[Circular]";
   seen.add(value);
   const result: Record<string, unknown> = {};
