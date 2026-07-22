@@ -6,8 +6,8 @@ import { cloudDatabaseModels, cloudDatabaseSchemaVersion } from "../../../packag
 const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
-  it("publishes the runner-protocol schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(18);
+  it("publishes the cloud schema version and models", () => {
+    expect(cloudDatabaseSchemaVersion).toBe(19);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -21,6 +21,8 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("WebhookInbox");
     expect(cloudDatabaseModels).toContain("ControlPlaneJob");
     expect(cloudDatabaseModels).toContain("ControlPlaneOutbox");
+    expect(cloudDatabaseModels).toContain("ControlPlaneReconciliationItem");
+    expect(cloudDatabaseModels).toContain("ControlPlaneReplayOperation");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
@@ -45,6 +47,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0016_control_plane_transactional_outbox.sql",
       "0017_release_run_outbox_producer.sql",
       "0018_control_plane_outbox_transitions.sql",
+      "0019_control_plane_reconciliation_operations.sql",
     ]);
   });
 

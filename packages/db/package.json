@@ -60,6 +60,11 @@
       "types": "./src/control-plane-outbox-store.ts",
       "import": "./src/control-plane-outbox-store.ts",
       "default": "./src/control-plane-outbox-store.ts"
+    },
+    "./control-plane-operations-store": {
+      "types": "./src/control-plane-operations-store.ts",
+      "import": "./src/control-plane-operations-store.ts",
+      "default": "./src/control-plane-operations-store.ts"
     }
   },
   "devDependencies": {

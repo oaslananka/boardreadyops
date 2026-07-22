@@ -6,8 +6,8 @@ import { cloudDatabaseSchemaVersion } from "../../../packages/db/src/index.js";
 const migrationPath = join(process.cwd(), "packages/db/migrations/0018_control_plane_outbox_transitions.sql");
 
 describe("control-plane outbox transition migration", () => {
-  it("publishes schema version 18", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(18);
+  it("includes schema version 18", () => {
+    expect(cloudDatabaseSchemaVersion).toBeGreaterThanOrEqual(18);
   });
 
   it("atomically advances Check Run creation to the next durable effect", async () => {
