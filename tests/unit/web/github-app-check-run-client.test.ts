@@ -129,7 +129,9 @@ describe("GitHub App readiness comment upsert", () => {
   });
 
   it("creates a marker comment when no previous readiness output exists", async () => {
-    request.mockResolvedValueOnce(jsonResponse([])).mockResolvedValueOnce(jsonResponse({ id: 99 }, 201));
+    request
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ id: 99 }, 201));
 
     await upsertReadinessComment({
       apiBaseUrl: "https://github.test/api/v3",
