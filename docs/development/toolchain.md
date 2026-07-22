@@ -29,7 +29,7 @@ corepack pnpm run toolchain:doctor
 corepack pnpm run verify:all
 ```
 
-`verify:all` injects the repository-local toolchain environment, runs the full repository verification, cloud typecheck and build, workflow linting, accessibility checks, and security compliance. Missing or incompatible tools and host-inherited setgid directory modes fail in `toolchain:doctor` before the expensive stages begin. Bootstrap and toolchain-run commands normalize only that untracked mode metadata. The injected environment also provides a loopback-only placeholder `DATABASE_URL` when none is set, allowing Knip to load Prisma configuration without requiring credentials or opening a database connection.
+`verify:all` injects the repository-local toolchain environment, runs the full repository verification, cloud typecheck and build, workflow linting, accessibility checks, and security compliance. Missing or incompatible tools and host-inherited setgid directory modes fail in `toolchain:doctor` before the expensive stages begin. Bootstrap and toolchain-run commands normalize only that untracked mode metadata. The injected environment also provides a loopback-only placeholder `DATABASE_URL` when none is set, allowing Knip to load Prisma configuration without requiring credentials or opening a database connection. It sets `ALLOW_MAJOR_RELEASE=true` only inside the verification environment so the current stable package version can be validated without a manual prefix; this flag does not publish or release artifacts.
 
 The generated environment file can also be sourced for interactive work:
 

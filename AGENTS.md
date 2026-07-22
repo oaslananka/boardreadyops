@@ -22,7 +22,7 @@ BoardReadyOps is a local-first CLI and GitHub Action for KiCad hardware review. 
 - Docs: `task docs`
 - Garbage collection checks: `task gc`
 - Structure checks: `task verify:structure`
-- Full local verify: `ALLOW_MAJOR_RELEASE=true task verify`
+- Full local verify: `task verify`
 
 ## Repository Layout
 

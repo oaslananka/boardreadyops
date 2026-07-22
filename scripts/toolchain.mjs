@@ -311,6 +311,7 @@ async function writeEnvironmentFile(paths, browserPath) {
     `export PUPPETEER_CACHE_DIR=${shellQuote(path.join(paths.cache, "puppeteer"))}`,
     `export PA11Y_CHROME_PATH=${shellQuote(browserPath)}`,
     `export DATABASE_URL=${shellQuote(process.env.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain")}`,
+    "export ALLOW_MAJOR_RELEASE=true",
     `export PATH=${shellQuote(`${paths.bin}:${path.join(paths.venv, "bin")}`)}:"$PATH"`,
     "",
   ];
@@ -326,6 +327,7 @@ export function buildToolchainEnvironment(paths, baseEnvironment = process.env) 
     PRE_COMMIT_HOME: path.join(paths.cache, "pre-commit"),
     PUPPETEER_CACHE_DIR: path.join(paths.cache, "puppeteer"),
     DATABASE_URL: baseEnvironment.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain",
+    ALLOW_MAJOR_RELEASE: "true",
     PATH: `${pathEntries.join(path.delimiter)}${path.delimiter}${baseEnvironment.PATH ?? ""}`,
   };
 }

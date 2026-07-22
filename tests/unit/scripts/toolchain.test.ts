@@ -114,10 +114,16 @@ describe("reproducible contributor toolchain", () => {
     const env = buildToolchainEnvironment(paths, { PATH: "/usr/bin" });
 
     expect(env.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain");
+    expect(env.ALLOW_MAJOR_RELEASE).toBe("true");
     expect(env.PATH).toContain(`${paths.bin}${path.delimiter}`);
 
-    const custom = buildToolchainEnvironment(paths, { DATABASE_URL: "postgresql://custom", PATH: "/usr/bin" });
+    const custom = buildToolchainEnvironment(paths, {
+      ALLOW_MAJOR_RELEASE: "false",
+      DATABASE_URL: "postgresql://custom",
+      PATH: "/usr/bin",
+    });
     expect(custom.DATABASE_URL).toBe("postgresql://custom");
+    expect(custom.ALLOW_MAJOR_RELEASE).toBe("true");
   });
 
   it.skipIf(process.platform === "win32")("normalizes inherited setgid directory modes", async () => {
