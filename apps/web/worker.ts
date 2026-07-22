@@ -9,6 +9,14 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
 import { processControlPlaneOutboxEffect } from "./lib/control-plane-outbox-worker.js";
 import { processControlPlaneJob } from "./lib/control-plane-worker.js";
+import {
+  createScopedConcurrencyGate,
+  jobCorrelation,
+  outboxCorrelation,
+  sanitizeWorkerLogFields,
+  workerScopeFromJob,
+  workerScopeFromOutboxEffect,
+} from "./lib/control-plane-worker-runtime.js";
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
 import { createRunnerClient } from "./lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mode.js";
@@ -40,7 +48,7 @@ function log(level: "error" | "info" | "warn", event: string, fields: Record<str
       level,
       component: "control-plane-worker",
       event,
-      ...fields,
+      ...sanitizeWorkerLogFields(fields),
     })}\n`,
   );
 }
@@ -48,6 +56,13 @@ function log(level: "error" | "info" | "warn", event: string, fields: Record<str
 const workerId = (process.env.BOARDREADYOPS_WORKER_ID?.trim() || `${hostname()}-${process.pid}`).slice(0, 128);
 const concurrency = integerEnvironment("BOARDREADYOPS_WORKER_CONCURRENCY", 4, 1, 32);
 const outboxConcurrency = integerEnvironment("BOARDREADYOPS_OUTBOX_CONCURRENCY", 4, 1, 32);
+const installationConcurrency = integerEnvironment(
+  "BOARDREADYOPS_WORKER_INSTALLATION_CONCURRENCY",
+  4,
+  1,
+  32,
+);
+const repositoryConcurrency = integerEnvironment("BOARDREADYOPS_WORKER_REPOSITORY_CONCURRENCY", 2, 1, 32);
 const pollMilliseconds = integerEnvironment("BOARDREADYOPS_WORKER_POLL_MS", 1000, 100, 60_000);
 const outboxPollMilliseconds = integerEnvironment("BOARDREADYOPS_OUTBOX_POLL_MS", 500, 100, 60_000);
 const metricsIntervalMilliseconds = integerEnvironment(
@@ -73,6 +88,10 @@ const executor = createPgQueryExecutor({ connectionString: databaseUrl, max: dat
 const jobs = createSqlControlPlaneJobStore(executor);
 const outbox = createSqlControlPlaneOutboxStore(executor);
 const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
+const scopedConcurrency = createScopedConcurrencyGate({
+  installationLimit: installationConcurrency,
+  repositoryLimit: repositoryConcurrency,
+});
 const runner = runnerModeSummary();
 const checkRuns = createGitHubAppCheckRunClient();
 const durableCheckRuns = checkRuns?.ensurePullRequestCheckRun
@@ -132,6 +151,11 @@ const healthServer = createServer(async (request, response) => {
         lastOutboxPollAt,
         lastSuccessfulJobAt,
         lastSuccessfulOutboxEffectAt,
+        scopedConcurrency: {
+          installationLimit: installationConcurrency,
+          repositoryLimit: repositoryConcurrency,
+          ...scopedConcurrency.snapshot(),
+        },
       }),
     );
     return;
@@ -164,6 +188,8 @@ async function startHealthServer(): Promise<void> {
     workerId,
     concurrency,
     outboxConcurrency,
+    installationConcurrency,
+    repositoryConcurrency,
     healthPort,
     runnerMode: runner.mode,
     configurationValid: controlPlaneConfigurationValid,
@@ -177,7 +203,11 @@ async function collectQueueMetrics(currentTime: number): Promise<void> {
   nextMetricsAt = currentTime + metricsIntervalMilliseconds;
   try {
     const [jobMetrics, outboxMetrics] = await Promise.all([jobs.collectMetrics(), outbox.collectMetrics()]);
-    log("info", "worker.queue_metrics", { ...jobMetrics, ...outboxMetrics });
+    log("info", "worker.queue_metrics", {
+      ...jobMetrics,
+      ...outboxMetrics,
+      scopedConcurrency: scopedConcurrency.snapshot(),
+    });
   } catch (error) {
     log("warn", "worker.metrics_failed", { errorClass: errorClass(error) });
   }
@@ -215,20 +245,23 @@ async function claimAvailableOutboxEffects(): Promise<ClaimedControlPlaneOutboxE
 }
 
 async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<void> {
-  const results = await Promise.all(
-    claimed.map((job) =>
-      processControlPlaneJob(job, {
-        workerId,
-        jobs,
-        lifecycle,
-      }),
-    ),
+  const completed = await Promise.all(
+    claimed.map(async (job) => ({
+      correlation: jobCorrelation(job),
+      result: await scopedConcurrency.run(workerScopeFromJob(job), () =>
+        processControlPlaneJob(job, {
+          workerId,
+          jobs,
+          lifecycle,
+        }),
+      ),
+    })),
   );
-  for (const result of results) {
+  for (const { correlation, result } of completed) {
     if (result.status === "completed") lastSuccessfulJobAt = new Date().toISOString();
     log(result.status === "completed" ? "info" : "warn", "worker.job_terminal", {
       workerId,
-      jobId: result.jobId,
+      ...correlation,
       status: result.status,
     });
   }
@@ -236,23 +269,25 @@ async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<vo
 
 async function processClaimedOutboxEffects(claimed: ClaimedControlPlaneOutboxEffect[]): Promise<void> {
   if (!durableCheckRuns) return;
-  const results = await Promise.all(
-    claimed.map((effect) =>
-      processControlPlaneOutboxEffect(effect, {
-        workerId,
-        outbox,
-        dispatchMode,
-        checkRuns: durableCheckRuns,
-        ...(workflowDispatch ? { workflowDispatch } : {}),
-      }),
-    ),
+  const completed = await Promise.all(
+    claimed.map(async (effect) => ({
+      correlation: outboxCorrelation(effect),
+      result: await scopedConcurrency.run(workerScopeFromOutboxEffect(effect), () =>
+        processControlPlaneOutboxEffect(effect, {
+          workerId,
+          outbox,
+          dispatchMode,
+          checkRuns: durableCheckRuns,
+          ...(workflowDispatch ? { workflowDispatch } : {}),
+        }),
+      ),
+    })),
   );
-  for (const result of results) {
+  for (const { correlation, result } of completed) {
     if (result.status === "completed") lastSuccessfulOutboxEffectAt = new Date().toISOString();
     log(result.status === "completed" ? "info" : "warn", "worker.outbox_effect_terminal", {
       workerId,
-      outboxId: result.outboxId,
-      effectType: result.effectType,
+      ...correlation,
       status: result.status,
     });
   }
@@ -311,7 +346,7 @@ function shutdown(signal: string): Promise<void> {
   if (shutdownPromise) return shutdownPromise;
   shuttingDown = true;
   ready = false;
-  log("info", "worker.shutdown_started", { workerId, signal });
+  log("info", "worker.shutdown_started", { workerId, signal, ...scopedConcurrency.snapshot() });
   shutdownPromise = (async () => {
     await closeHealthServer();
     await activeLoops;
