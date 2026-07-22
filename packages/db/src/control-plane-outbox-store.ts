@@ -348,11 +348,9 @@ class SqlControlPlaneOutboxStore implements ControlPlaneOutboxStore {
     const persistedExecutionAttemptId = row?.text("execution_attempt_id");
 
     return {
-      outcome:
-        outcome === "completed" || outcome === "check_run_conflict"
-          ? outcome
-          : "stale",
-      ...(persistedNextEffectType === "github.check_run.complete" || persistedNextEffectType === "github.workflow.dispatch"
+      outcome: outcome === "completed" || outcome === "check_run_conflict" ? outcome : "stale",
+      ...(persistedNextEffectType === "github.check_run.complete" ||
+      persistedNextEffectType === "github.workflow.dispatch"
         ? { nextEffectType: persistedNextEffectType }
         : {}),
       ...(persistedNextOutboxId ? { nextOutboxId: persistedNextOutboxId } : {}),
