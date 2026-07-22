@@ -31,13 +31,17 @@ export type UpsertReadinessCommentInput = {
   request?: GitHubRequest;
 };
 
-export type DurableGitHubAppCheckRunClient = GitHubAppCheckRunClient & {
-  ensurePullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
+export type GitHubAppCheckRunClientResult = GitHubAppCheckRunClient & {
+  ensurePullRequestCheckRun?(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
   completeCheckRun(input: CompleteGitHubCheckRunInput): Promise<void>;
   createPullRequestComment?(input: PullRequestCommentInput): Promise<void>;
+};
+
+export type DurableGitHubAppCheckRunClient = GitHubAppCheckRunClientResult & {
+  ensurePullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
 };
 
 export declare function detailsUrl(runId: string): string | undefined;
 export declare function ensurePullRequestCheckRun(input: EnsurePullRequestCheckRunInput): Promise<{ id: number }>;
 export declare function upsertReadinessComment(input: UpsertReadinessCommentInput): Promise<void>;
-export declare function createGitHubAppCheckRunClient(): DurableGitHubAppCheckRunClient | undefined;
+export declare function createGitHubAppCheckRunClient(): GitHubAppCheckRunClientResult | undefined;
