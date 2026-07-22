@@ -1,4 +1,5 @@
 import type {
+  CompleteGitHubCheckRunInput,
   CreatePullRequestCheckRunInput,
   GitHubAppCheckRunClient,
 } from "@boardreadyops/cloud-core/lifecycle-executor";
@@ -32,6 +33,7 @@ export type UpsertReadinessCommentInput = {
 
 export type DurableGitHubAppCheckRunClient = GitHubAppCheckRunClient & {
   ensurePullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
+  completeCheckRun(input: CompleteGitHubCheckRunInput): Promise<void>;
   createPullRequestComment?(input: PullRequestCommentInput): Promise<void>;
 };
 
