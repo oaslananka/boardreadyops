@@ -3,10 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cloudDatabaseModels, cloudDatabaseSchemaVersion } from "../../../packages/db/src/index.js";
 
-const migrationPath = join(
-  process.cwd(),
-  "packages/db/migrations/0019_control_plane_reconciliation_operations.sql",
-);
+const migrationPath = join(process.cwd(), "packages/db/migrations/0019_control_plane_reconciliation_operations.sql");
 
 describe("control-plane reconciliation operations migration", () => {
   it("publishes schema v19 operations models", () => {

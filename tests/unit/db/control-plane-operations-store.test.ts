@@ -83,12 +83,7 @@ describe("control-plane operations store", () => {
     const executor: SqlQueryExecutor = {
       async query(sql, params) {
         expect(sql).toContain("boardreadyops_claim_control_plane_reconciliation");
-        expect(params).toEqual([
-          "worker-1",
-          "2026-07-22T16:00:00.000Z",
-          "2026-07-22T16:02:00.000Z",
-          4,
-        ]);
+        expect(params).toEqual(["worker-1", "2026-07-22T16:00:00.000Z", "2026-07-22T16:02:00.000Z", 4]);
         return {
           rows: [
             {
@@ -191,7 +186,11 @@ describe("control-plane operations store", () => {
   });
 
   it("rejects malformed tenant, worker, and operation identifiers", async () => {
-    const executor: SqlQueryExecutor = { async query() { throw new Error("unexpected query"); } };
+    const executor: SqlQueryExecutor = {
+      async query() {
+        throw new Error("unexpected query");
+      },
+    };
     const store = createSqlControlPlaneOperationsStore(executor);
 
     await expect(store.listDeadLetters({ installationId: " contains space " })).rejects.toThrow(

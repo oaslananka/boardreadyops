@@ -1,11 +1,7 @@
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 
 export type ControlPlaneDeadLetterItemType = "job" | "outbox";
-export type ControlPlaneReconciliationSubjectType =
-  | "execution_attempt"
-  | "job"
-  | "outbox"
-  | "release_run";
+export type ControlPlaneReconciliationSubjectType = "execution_attempt" | "job" | "outbox" | "release_run";
 
 export type ControlPlaneDeadLetterItem = {
   itemType: ControlPlaneDeadLetterItemType;
@@ -377,9 +373,7 @@ export function createSqlControlPlaneOperationsStore(
           now().toISOString(),
           input.outcomeCode,
           input.repaired,
-          input.publicFailureReason
-            ? boundedFailure(input.publicFailureReason, 256, "operator_replay_required")
-            : null,
+          input.publicFailureReason ? boundedFailure(input.publicFailureReason, 256, "operator_replay_required") : null,
         ],
       );
       return databaseRows(result)[0]?.text("outcome") === "completed" ? "completed" : "stale";
