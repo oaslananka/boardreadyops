@@ -171,7 +171,6 @@ function sanitizedValue(value: unknown, key: string | undefined, seen: WeakSet<o
   if (typeof value === "function") return `[Function ${value.name || "anonymous"}]`;
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map((item) => sanitizedValue(item, undefined, seen));
-  if (typeof value !== "object") return `[Unsupported ${typeof value}]`;
   if (seen.has(value)) return "[Circular]";
   seen.add(value);
   const result: Record<string, unknown> = {};
