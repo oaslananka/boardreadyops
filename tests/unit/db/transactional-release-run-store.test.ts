@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createSqlGitHubAppLifecycleStore } from "../../../packages/db/src/lifecycle-store.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
+import { createSqlTransactionalGitHubAppLifecycleStore } from "../../../packages/db/src/transactional-lifecycle-store.js";
 
 const action = {
   type: "release_run.enqueue" as const,
@@ -30,7 +30,7 @@ describe("transactional release-run outbox store", () => {
             {
               run_id: "run-row-id",
               idempotency_key: "1283305324:42:0123456789abcdef",
-              status: "queued",
+              run_status: "queued",
               outbox_id: "outbox-row-id",
             },
           ],
@@ -38,7 +38,7 @@ describe("transactional release-run outbox store", () => {
       },
     };
     const ids = ["run-row-id", "outbox-row-id"];
-    const store = createSqlGitHubAppLifecycleStore(executor, {
+    const store = createSqlTransactionalGitHubAppLifecycleStore(executor, {
       id: () => ids.shift() ?? "unexpected-id",
       now: () => new Date("2026-07-22T02:00:00.000Z"),
       releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
@@ -62,7 +62,7 @@ describe("transactional release-run outbox store", () => {
         throw new Error("database should not be called");
       },
     };
-    const store = createSqlGitHubAppLifecycleStore(executor, {
+    const store = createSqlTransactionalGitHubAppLifecycleStore(executor, {
       releaseRepositoryRolloutPolicy: { repositories: [] },
     });
 
