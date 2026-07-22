@@ -3,10 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cloudDatabaseSchemaVersion } from "../../../packages/db/src/index.js";
 
-const migrationPath = join(
-  process.cwd(),
-  "packages/db/migrations/0017_release_run_outbox_producer.sql",
-);
+const migrationPath = join(process.cwd(), "packages/db/migrations/0017_release_run_outbox_producer.sql");
 
 describe("transactional release-run outbox producer migration", () => {
   it("publishes schema version 17", () => {
