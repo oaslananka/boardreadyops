@@ -66,8 +66,7 @@ describe("main branch governance ruleset", () => {
       "ci / test-unit",
       "ci / build",
       "ci / verify-dist",
-      "ci / security",
-      "dependency-review",
+      "security / gate",
     ]);
   });
 

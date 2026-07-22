@@ -40,15 +40,23 @@ The pinned hook recursively scans supported manifests and lockfiles from the rep
 
 ## OSV CI
 
-`.github/workflows/osv.yml` owns dependency vulnerability enforcement:
+The aggregate security workflow calls the official OSV reusable workflows through an immutable v2.3.8 commit SHA. Dependency-changing pull requests run a differential scan with SARIF upload disabled so fork pull requests remain tokenless and read-only. Trusted pushes, schedules, and manual runs use the full recursive scan.
 
-1. pull requests run the official differential reusable workflow and fail when the proposed change introduces a vulnerability;
-2. pushes to `main`, weekly schedules, and manual dispatches run a complete recursive source scan;
-3. the official reusable workflows publish SARIF to GitHub Code Scanning;
-4. both modes use OSV-Scanner v2.3.8 through an immutable full commit SHA;
-5. all jobs operate with read-only repository access plus the minimum `security-events: write` permission required for SARIF.
+`.github/workflows/osv.yml` remains a specialist defense-in-depth workflow for GitHub Code Scanning publication. It is path-filtered for package manifests, lockfiles, workspace configuration, Python requirement files, and its own workflow definition. Scheduled scans still detect newly disclosed vulnerabilities even when dependencies have not changed. The specialist workflow is not a branch-protection context; `security / gate` owns the merge decision.
 
-The workflow is path-filtered for package manifests, lockfiles, workspace configuration, Python requirement files, and its own workflow definition. Scheduled scans still detect newly disclosed vulnerabilities even when dependencies have not changed.
+## Aggregate merge gate
+
+Every pull request receives one stable `security / gate` conclusion from `.github/workflows/security.yml`. A policy job classifies the changed files, then the gate evaluates all applicable mandatory checks after they complete:
+
+- CodeQL and Semgrep for executable or workflow changes;
+- Gitleaks for every pull request;
+- Dependency Review and the OSV differential scan for dependency inventory changes;
+- repository license, NOTICE, REUSE, and supply-chain compliance for release, dependency, workflow, or security-policy changes; and
+- CycloneDX SBOM generation when the dependency inventory or security configuration changes.
+
+An applicable check must finish with `success`. Failure, cancellation, or an unexpected skip blocks the aggregate gate. Checks that are not applicable remain visible in the job summary with the policy reason; they are never inferred from a missing status. Fork pull requests run with read-only permissions. CodeQL is explicitly non-applicable for a fork because SARIF publication requires a trusted context, while Semgrep, Gitleaks, Dependency Review, OSV, and repository compliance continue without repository secrets.
+
+The `main` ruleset requires only the stable aggregate security context. Individual scanner jobs remain visible for diagnosis and code-scanning publication but are implementation details rather than branch-protection contracts. OpenSSF Scorecard, Trivy schedules, SonarQube Cloud Automatic Analysis, Socket, DeepScan, and other hosted integrations remain advisory unless separately promoted through a reviewed policy change.
 
 ## Semgrep CI
 
@@ -88,5 +96,6 @@ Developers who need local Sonar feedback should use SonarQube for IDE Connected 
 - Semgrep project-rule findings fail local commit and hosted security checks.
 - OSV pull-request scans fail when a change introduces a known vulnerability.
 - OSV complete scans fail when any supported manifest or lockfile resolves to a known vulnerability.
-- Gitleaks, dependency review, CodeQL, Trivy, and repository policy checks retain their existing enforcement behavior.
+- Gitleaks, Dependency Review, CodeQL, Semgrep, OSV, repository compliance, and required SBOM generation feed the stable `security / gate` conclusion according to the change policy.
+- Trivy, Scorecard, SonarQube Cloud, and other specialist integrations remain advisory unless the committed merge policy explicitly promotes them.
 - Sonar status is reported by the SonarQube Cloud integration rather than a repository scanner workflow.
