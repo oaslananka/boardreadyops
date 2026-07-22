@@ -46,9 +46,10 @@ async function runtimeAccess(installationId) {
   return result["to" + "ken"];
 }
 
-async function ensureOk(response, label) {
+async function responseText(response, label) {
   const text = await response.text();
   if (!response.ok) throw new Error(`${label} failed with status ${response.status}: ${text.slice(0, 256)}`);
+  return text;
 }
 
 async function markCheckRunning(rt, input) {
@@ -62,7 +63,18 @@ async function markCheckRunning(rt, input) {
       body: JSON.stringify({ status: "in_progress", started_at: new Date().toISOString() }),
     },
   );
-  await ensureOk(response, "check update");
+  await responseText(response, "check update");
+}
+
+function uncertainDeliveryError(error, message) {
+  const wrapped = new Error(message, { cause: error });
+  wrapped.name = "WorkflowDispatchDeliveryUncertainError";
+  wrapped.deliveryUncertain = true;
+  return wrapped;
+}
+
+export function workflowDispatchDeliveryIsUncertain(error) {
+  return typeof error === "object" && error !== null && error.deliveryUncertain === true;
 }
 
 const safeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"];
@@ -112,23 +124,58 @@ export function createRunnerClient() {
       const ref = input.action.repository.defaultBranch;
       if (!ref) throw new Error("target repository default branch is required");
       const rt = await runtimeAccess(input.action.installation.id);
-      const response = await fetch(
-        `${api()}/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(
-          repo.name,
-        )}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`,
-        {
-          method: "POST",
-          headers: requestHeaders(rt),
-          body: JSON.stringify({
-            ref,
-            inputs: runnerDispatchInputs(input),
-          }),
-        },
-      );
-      await ensureOk(response, "runner start");
-      await markCheckRunning(rt, input);
+      let response;
+
+      try {
+        response = await fetch(
+          `${api()}/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(
+            repo.name,
+          )}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`,
+          {
+            method: "POST",
+            headers: requestHeaders(rt),
+            body: JSON.stringify({
+              ref,
+              inputs: runnerDispatchInputs(input),
+              return_run_details: true,
+            }),
+          },
+        );
+      } catch (error) {
+        throw uncertainDeliveryError(error, "runner start failed before GitHub returned a response");
+      }
+
+      const text = await responseText(response, "runner start");
+      let result;
+      try {
+        result = text ? JSON.parse(text) : {};
+      } catch (error) {
+        throw uncertainDeliveryError(error, "runner start returned an unreadable workflow run response");
+      }
+
+      if (typeof result.workflow_run_id !== "number" || !Number.isSafeInteger(result.workflow_run_id)) {
+        throw uncertainDeliveryError(
+          undefined,
+          "runner start response did not include a numeric workflow_run_id",
+        );
+      }
+
+      try {
+        await markCheckRunning(rt, input);
+      } catch (error) {
+        throw uncertainDeliveryError(error, "workflow dispatch succeeded but the Check Run update was not confirmed");
+      }
+
+      const workflowRunUrl =
+        typeof result.html_url === "string"
+          ? result.html_url
+          : typeof result.run_url === "string"
+            ? result.run_url
+            : undefined;
+
       return {
-        workflowDispatchId: `${repo.owner}/${repo.name}/${workflow}/${input.runId}/${input.executionAttemptId}`,
+        workflowDispatchId: String(result.workflow_run_id),
+        ...(workflowRunUrl ? { workflowRunUrl } : {}),
       };
     },
   };
