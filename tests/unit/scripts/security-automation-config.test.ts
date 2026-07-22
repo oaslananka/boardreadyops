@@ -41,6 +41,7 @@ describe("dependency and security automation configuration", () => {
     expect(workflow).not.toContain("pnpm install --frozen-lockfile\n");
     expect(workflow).toContain("if: always()");
     expect(workflow).toContain("upload-sarif: false");
+    expect(workflow).toMatch(/osv-pull-request:[\s\S]*security-events: write/u);
     expect(workflow).toContain("github.event.pull_request.head.repo.full_name == github.repository");
     expect(workflow).not.toMatch(/pull_request:\n\s+paths-ignore:/u);
     expect(required).toContain("security / gate");
