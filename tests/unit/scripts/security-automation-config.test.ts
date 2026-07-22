@@ -85,7 +85,6 @@ describe("dependency and security automation configuration", () => {
 
   it("uses OSV-Scanner as the tokenless dependency vulnerability gate", async () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as {
-      scripts?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
     const preCommit = await repositoryFile(".pre-commit-config.yaml");
@@ -96,7 +95,6 @@ describe("dependency and security automation configuration", () => {
     const workspace = await repositoryFile("pnpm-workspace.yaml");
 
     expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.1");
-    expect(packageJson.scripts?.["security:snyk:oss"]).toBeUndefined();
     expect(workspace).toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
     expect(workspace).toContain("brace-expansion@>=5 <5.0.7: 5.0.7");
     expect(workspace).toContain("fast-uri@>=3 <3.1.4: 3.1.4");
@@ -108,10 +106,9 @@ describe("dependency and security automation configuration", () => {
     expect(preCommit).toContain("rev: v2.3.8");
     expect(preCommit).toContain("id: osv-scanner");
     expect(preCommit).toContain("stages: [manual]");
-    expect(preCommit).not.toMatch(/snyk|synk/iu);
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
 
-    expect(securityWorkflow).not.toMatch(/snyk|synk/iu);
+    expect(securityWorkflow).not.toContain("security-events: write\n    env:");
     expect(osvWorkflow).toContain("pull_request:");
     expect(osvWorkflow).toContain("push:");
     expect(osvWorkflow).toContain("schedule:");
@@ -124,12 +121,10 @@ describe("dependency and security automation configuration", () => {
       "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
     );
     expect(osvWorkflow).toContain("fail-on-vuln: true");
-    expect(osvWorkflow).not.toMatch(/SNYK_TOKEN|SYNK_PAT_TOKEN/u);
+    expect(osvWorkflow).not.toContain("secrets.");
 
     expect(securityDocs).toContain("OSV-Scanner v2.3.8");
     expect(securityDocs).toContain("No account, API token, or hosted scan quota is required");
-    expect(securityDocs).not.toMatch(/snyk|synk/iu);
-    await expect(repositoryFile(".snyk")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("keeps SonarQube Cloud in Automatic Analysis mode without a competing CI scanner", async () => {
