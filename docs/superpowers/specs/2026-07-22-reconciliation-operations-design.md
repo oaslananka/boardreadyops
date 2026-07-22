@@ -40,7 +40,7 @@ The worker will claim this queue in a later slice. This slice supplies the durab
 
 Lifecycle jobs may be replayed only from `dead_letter`. Outbox effects may be replayed only from `dead_letter`; `reconciliation_required` workflow dispatches remain non-replayable until authoritative GitHub state has been checked. Replays reset attempt/lease/error state, preserve idempotency keys, and append an audit event in the same transaction.
 
-Replay requests include a caller-provided operation ID. The database stores it as the audit request ID, and a uniqueness guard makes retries idempotent. Repeating the same operation returns the previously recorded outcome instead of executing twice.
+Replay requests include a caller-provided operation ID. A tenant-and-operation advisory transaction lock serializes concurrent retries before the database reads replay state or locks the target item. The operation record uses the same ID as the audit request ID, so concurrent or repeated delivery returns the previously recorded outcome instead of executing twice.
 
 ### Reason classification
 
@@ -89,7 +89,7 @@ The migration is additive and forward-compatible. Rollback is application-first;
 
 - Migration tests assert constraints, tenant joins, replay guards, audit writes, and absence of payload columns.
 - Unit tests verify row decoding, bounded inputs, reason classification, and exact SQL calls.
-- `tests/integration/control-plane-operations-postgres.test.ts` proves cross-tenant reads and mutations are rejected, repeated operation IDs are idempotent, reconciliation-required dispatches cannot be replayed, successful replay is audited once, and final reconciliation leases expire to a stable dead-letter state.
+- `tests/integration/control-plane-operations-postgres.test.ts` proves cross-tenant reads and mutations are rejected, concurrent repeated operation IDs are serialized and idempotent, reconciliation-required dispatches cannot be replayed, successful replay is audited once, and final reconciliation leases expire to a stable dead-letter state.
 
 ## Security and privacy
 
