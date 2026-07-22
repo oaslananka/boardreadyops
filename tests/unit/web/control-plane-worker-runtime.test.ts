@@ -1,0 +1,171 @@
+import { describe, expect, it } from "vitest";
+import {
+  createScopedConcurrencyGate,
+  jobCorrelation,
+  outboxCorrelation,
+  sanitizeWorkerLogFields,
+  workerScopeFromJob,
+  workerScopeFromOutboxEffect,
+} from "../../../apps/web/lib/control-plane-worker-runtime.js";
+import type { ClaimedControlPlaneJob } from "../../../packages/db/src/control-plane-job-store.js";
+import type { ClaimedControlPlaneOutboxEffect } from "../../../packages/db/src/control-plane-outbox-store.js";
+
+const releaseAction = {
+  type: "release_run.enqueue" as const,
+  installation: { id: 123 },
+  repository: {
+    id: 456,
+    owner: "octo",
+    name: "board",
+    fullName: "octo/board",
+    private: false,
+    defaultBranch: "main",
+  },
+  pullRequestNumber: 7,
+  ref: "feature/board",
+  commitSha: "a".repeat(40),
+  triggerKind: "pr" as const,
+};
+
+const job: ClaimedControlPlaneJob = {
+  jobId: "job-1",
+  inboxId: "inbox-1",
+  jobType: "github_webhook.lifecycle",
+  payloadVersion: 1,
+  attemptCount: 1,
+  eventType: "pull_request",
+  eventAction: "opened",
+  deliveryId: "delivery-1",
+  actions: [releaseAction],
+};
+
+const effect: ClaimedControlPlaneOutboxEffect = {
+  outboxId: "outbox-1",
+  releaseRunId: "run-1",
+  executionAttemptId: "attempt-1",
+  effectType: "github.workflow.dispatch",
+  payloadVersion: 1,
+  idempotencyKey: "github.workflow.dispatch:attempt-1",
+  attemptCount: 1,
+  payload: {
+    version: 1,
+    type: "github.workflow.dispatch",
+    input: {
+      action: releaseAction,
+      runId: "run-1",
+      idempotencyKey: "release-run:octo/board:7",
+      githubCheckRunId: 99,
+      executionAttemptId: "attempt-1",
+    },
+  },
+};
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}
+
+async function settle(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+describe("control-plane worker runtime", () => {
+  it("extracts complete safe correlation from lifecycle jobs", () => {
+    expect(jobCorrelation(job)).toEqual({
+      deliveryId: "delivery-1",
+      installationId: 123,
+      repositoryId: 456,
+      repository: "octo/board",
+      jobId: "job-1",
+    });
+    expect(workerScopeFromJob(job)).toEqual({ installationId: 123, repositoryId: 456 });
+  });
+
+  it("extracts complete safe correlation from outbox effects", () => {
+    expect(outboxCorrelation(effect)).toEqual({
+      installationId: 123,
+      repositoryId: 456,
+      repository: "octo/board",
+      releaseRunId: "run-1",
+      executionAttemptId: "attempt-1",
+      outboxId: "outbox-1",
+      effectType: "github.workflow.dispatch",
+    });
+    expect(workerScopeFromOutboxEffect(effect)).toEqual({ installationId: 123, repositoryId: 456 });
+  });
+
+  it("redacts sensitive fields and credential-like strings recursively", () => {
+    const sanitized = sanitizeWorkerLogFields({
+      safe: "visible",
+      token: "ghs_secret",
+      oidcEnvelope: { subject: "repo:octo/board" },
+      signedCapability: "capability-value",
+      repositorySource: "private source code",
+      sensitiveFindings: [{ evidence: "secret board detail" }],
+      nested: {
+        authorization: "Bearer abc.def.ghi",
+        message: "request failed authorization=Bearer-token secret=hidden password=hunter2",
+      },
+      oversized: "x".repeat(3_000),
+    });
+
+    expect(sanitized).toMatchObject({
+      safe: "visible",
+      token: "[REDACTED]",
+      oidcEnvelope: "[REDACTED]",
+      signedCapability: "[REDACTED]",
+      repositorySource: "[REDACTED]",
+      sensitiveFindings: "[REDACTED]",
+      nested: {
+        authorization: "[REDACTED]",
+      },
+    });
+    expect(JSON.stringify(sanitized)).not.toContain("ghs_secret");
+    expect(JSON.stringify(sanitized)).not.toContain("abc.def.ghi");
+    expect(JSON.stringify(sanitized)).not.toContain("hidden");
+    expect(JSON.stringify(sanitized)).not.toContain("hunter2");
+    expect(String(sanitized.oversized)).toHaveLength(2_000);
+  });
+
+  it("limits concurrent work per installation and repository without blocking unrelated repositories", async () => {
+    const gate = createScopedConcurrencyGate({ installationLimit: 2, repositoryLimit: 1 });
+    const first = deferred();
+    const second = deferred();
+    const third = deferred();
+    const started: string[] = [];
+    const scopeA = { installationId: 123, repositoryId: 456 };
+    const scopeB = { installationId: 123, repositoryId: 789 };
+
+    const firstRun = gate.run(scopeA, async () => {
+      started.push("first");
+      await first.promise;
+    });
+    const secondRun = gate.run(scopeA, async () => {
+      started.push("second");
+      await second.promise;
+    });
+    const thirdRun = gate.run(scopeB, async () => {
+      started.push("third");
+      await third.promise;
+    });
+
+    await settle();
+    expect(started).toEqual(["first", "third"]);
+    expect(gate.snapshot()).toEqual({ active: 2, waiting: 1 });
+
+    first.resolve();
+    await firstRun;
+    await settle();
+    expect(started).toEqual(["first", "third", "second"]);
+    expect(gate.snapshot()).toEqual({ active: 2, waiting: 0 });
+
+    second.resolve();
+    third.resolve();
+    await Promise.all([secondRun, thirdRun]);
+    expect(gate.snapshot()).toEqual({ active: 0, waiting: 0 });
+  });
+});
