@@ -4,6 +4,20 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.16.0](https://github.com/oaslananka/boardreadyops/compare/v1.15.0...v1.16.0) (2026-07-22)
+
+
+### Features
+
+* **cloud:** dispatch transactional outbox effects ([#208](https://github.com/oaslananka/boardreadyops/issues/208)) ([3146836](https://github.com/oaslananka/boardreadyops/commit/3146836e3c28aa180a8d9308c94c02f69027cccd)), closes [#188](https://github.com/oaslananka/boardreadyops/issues/188)
+* **db:** add atomic release-run outbox producer ([#207](https://github.com/oaslananka/boardreadyops/issues/207)) ([e8721d1](https://github.com/oaslananka/boardreadyops/commit/e8721d10152f544fe86fae3307dce69af47917dd))
+* **db:** add transactional outbox foundation ([#205](https://github.com/oaslananka/boardreadyops/issues/205)) ([e919758](https://github.com/oaslananka/boardreadyops/commit/e91975870c5534c90303fb90a3621bd0b3842070))
+
+
+### Bug Fixes
+
+* **deps:** patch Hono adapter and sharp advisories ([#209](https://github.com/oaslananka/boardreadyops/issues/209)) ([9ca259c](https://github.com/oaslananka/boardreadyops/commit/9ca259c295cad4a158dd006f5e43838b4e4980a3))
+
 ## [1.15.0](https://github.com/oaslananka/boardreadyops/compare/v1.14.0...v1.15.0) (2026-07-22)
 
 
