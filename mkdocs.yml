@@ -171,6 +171,7 @@ nav:
           - Rule Engine: architecture/rule-engine.md
           - Explanation: explanation/architecture.md
           - Cloud Data Model: architecture/cloud-data-model.md
+          - Transactional Outbox: architecture/transactional-outbox.md
           - GitHub App RFC: architecture/github-app-rfc.md
           - ADR:
               - "0001: Single Repo, No Mirror": architecture/adr/0001-single-repo-no-mirror.md
