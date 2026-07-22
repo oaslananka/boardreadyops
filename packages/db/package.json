@@ -21,6 +21,11 @@
       "import": "./src/lifecycle-store.ts",
       "default": "./src/lifecycle-store.ts"
     },
+    "./transactional-lifecycle-store": {
+      "types": "./src/transactional-lifecycle-store.ts",
+      "import": "./src/transactional-lifecycle-store.ts",
+      "default": "./src/transactional-lifecycle-store.ts"
+    },
     "./pg-executor": {
       "types": "./src/pg-executor.ts",
       "import": "./src/pg-executor.ts",
