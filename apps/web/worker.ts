@@ -83,10 +83,14 @@ const durableCheckRuns = checkRuns?.ensurePullRequestCheckRun
   : undefined;
 const workflowDispatch = runnerWorkflowDispatchClient(runner, createRunnerClient);
 const dispatchMode = runner.mode === "github-actions" ? "github-actions" : "none";
-const controlPlaneConfigurationValid =
+const lifecycleConfigurationValid = runner.configurationValid;
+const outboxConfigurationValid =
   runner.configurationValid &&
+  runner.mode !== "disabled" &&
   Boolean(durableCheckRuns) &&
   (runner.mode !== "github-actions" || Boolean(workflowDispatch));
+const controlPlaneConfigurationValid =
+  lifecycleConfigurationValid && (runner.mode === "disabled" || outboxConfigurationValid);
 let shuttingDown = false;
 let ready = false;
 let lastPollAt: string | undefined;
@@ -122,6 +126,8 @@ const healthServer = createServer(async (request, response) => {
         service: "control-plane-worker",
         databaseReady,
         runnerConfigurationValid: controlPlaneConfigurationValid,
+        lifecycleConfigurationValid,
+        outboxConfigurationValid,
         lastPollAt,
         lastOutboxPollAt,
         lastSuccessfulJobAt,
@@ -161,6 +167,8 @@ async function startHealthServer(): Promise<void> {
     healthPort,
     runnerMode: runner.mode,
     configurationValid: controlPlaneConfigurationValid,
+    lifecycleConfigurationValid,
+    outboxConfigurationValid,
   });
 }
 
@@ -252,7 +260,7 @@ async function processClaimedOutboxEffects(claimed: ClaimedControlPlaneOutboxEff
 
 async function runLifecycleLoop(): Promise<void> {
   while (!shuttingDown) {
-    if (!controlPlaneConfigurationValid) {
+    if (!lifecycleConfigurationValid) {
       await sleep(pollMilliseconds);
       continue;
     }
@@ -267,7 +275,7 @@ async function runLifecycleLoop(): Promise<void> {
 
 async function runOutboxLoop(): Promise<void> {
   while (!shuttingDown) {
-    if (!controlPlaneConfigurationValid) {
+    if (!outboxConfigurationValid) {
       await sleep(outboxPollMilliseconds);
       continue;
     }
