@@ -22,7 +22,7 @@ create table if not exists control_plane_replay_operations (
   item_id text not null,
   actor_id text not null,
   outcome text not null,
-  audit_event_id text references audit_events(id) on delete restrict,
+  audit_event_id text references audit_events(id) on delete set null,
   created_at timestamptz not null default now(),
   constraint control_plane_replay_operation_id_valid check (
     char_length(operation_id) between 1 and 128
@@ -304,6 +304,10 @@ declare
   v_status text;
   v_outcome text;
 begin
+  perform pg_advisory_xact_lock(
+    hashtextextended(p_installation_id || ':' || p_operation_id, 0)
+  );
+
   select * into v_existing
     from control_plane_replay_operations
    where installation_id = p_installation_id
