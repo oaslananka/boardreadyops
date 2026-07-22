@@ -22,6 +22,30 @@ describe("dependency and security automation configuration", () => {
       "- name: Assert compliance checks did not mutate the checkout\n        run: git diff --exit-code",
     );
   });
+  it("emits one stable aggregate security gate for every pull request", async () => {
+    const workflow = await repositoryFile(".github/workflows/security.yml");
+    const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
+      rules: Array<{
+        type: string;
+        parameters?: { required_status_checks?: Array<{ context: string }> };
+      }>;
+    };
+    const required =
+      ruleset.rules
+        .find((rule) => rule.type === "required_status_checks")
+        ?.parameters?.required_status_checks?.map(({ context }) => context) ?? [];
+
+    expect(workflow).toContain("name: security / gate");
+    expect(workflow).toContain("node scripts/security-gate.mjs");
+    expect(workflow).toContain("if: always()");
+    expect(workflow).toContain("upload-sarif: false");
+    expect(workflow).toContain("github.event.pull_request.head.repo.full_name == github.repository");
+    expect(workflow).not.toMatch(/pull_request:\n\s+paths-ignore:/u);
+    expect(required).toContain("security / gate");
+    expect(required).not.toContain("ci / security");
+    expect(required).not.toContain("dependency-review");
+  });
+
   it("keeps Renovate project-scoped, scheduled, and supply-chain hardened", async () => {
     const renovate = JSON.parse(await repositoryFile("renovate.json")) as Record<string, unknown>;
 

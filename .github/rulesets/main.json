@@ -55,10 +55,7 @@
             "context": "ci / verify-dist"
           },
           {
-            "context": "ci / security"
-          },
-          {
-            "context": "dependency-review"
+            "context": "security / gate"
           }
         ],
         "strict_required_status_checks_policy": true

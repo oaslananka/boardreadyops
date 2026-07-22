@@ -65,13 +65,13 @@ The stable required checks are:
 | `ci / test-unit` | Deterministic unit regression suite |
 | `ci / build` | Bundle and artifact compilation |
 | `ci / verify-dist` | Committed bundle integrity |
-| `ci / security` | License, notice, and supply-chain policy |
-| `dependency-review` | Dependency-diff risk review |
+| `security / gate` | Aggregate mandatory security, dependency, secret, compliance, and SBOM decision |
 
 Conditional matrix, integration, accessibility, coverage, mutation, and
-security-scanner jobs continue to run according to the risk profile or their own
-workflow triggers. They are monitored even when they are not stable required
-contexts.
+specialist security-scanner jobs continue to run according to the risk profile
+or their own workflow triggers. `security / gate` reports applicable and
+non-applicable security checks explicitly; the underlying scanner names are not
+branch-protection contracts.
 
 ## Emergency Bypass
 
