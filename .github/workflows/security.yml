@@ -2,11 +2,6 @@ name: security
 
 on:
   pull_request:
-    paths-ignore:
-      - docs/**
-      - "*.md"
-      - mkdocs.yml
-      - .coderabbit.yaml
   push:
     branches: [main]
     paths-ignore:
@@ -38,9 +33,54 @@ env:
   SCORECARD_MIN_SCORE: "9.0"
 
 jobs:
+  policy:
+    name: security / policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code_changed: ${{ steps.classify.outputs.code_changed }}
+      dependency_changed: ${{ steps.classify.outputs.dependency_changed }}
+      needs_security: ${{ steps.classify.outputs.needs_security }}
+      needs_sbom: ${{ steps.classify.outputs.needs_sbom }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: changed-files
+        name: Detect changed files
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            git fetch --no-tags --depth=100 origin "${BASE_REF}"
+            git diff --name-only "origin/${BASE_REF}...HEAD" > changed-files.txt
+          elif [[ "${EVENT_NAME}" == "push" ]]; then
+            if [[ "${EVENT_BEFORE}" =~ ^0+$ ]]; then
+              git show --name-only --pretty=format: "${HEAD_SHA}" > changed-files.txt
+            else
+              git diff --name-only "${EVENT_BEFORE}" "${HEAD_SHA}" > changed-files.txt
+            fi
+          else
+            git ls-files > changed-files.txt
+          fi
+          echo "Changed files:"
+          sed 's/^/- /' changed-files.txt
+      - id: classify
+        name: Classify security policy
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: node scripts/ci-risk-profile.mjs changed-files.txt
+
   dependency-review:
+    needs: policy
     name: security / dependency-review
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name == 'pull_request'
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name == 'pull_request' && needs.policy.outputs.dependency_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -55,8 +95,62 @@ jobs:
           fail-on-severity: high
           comment-summary-in-pr: never
 
+
+  osv-pull-request:
+    needs: policy
+    name: security / osv dependency diff
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name == 'pull_request' && needs.policy.outputs.dependency_changed == 'true'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    with:
+      scan-args: |-
+        --recursive
+        ./
+      upload-sarif: false
+      fail-on-vuln: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+  osv-full:
+    needs: policy
+    name: security / osv full scan
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name != 'pull_request'
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    with:
+      scan-args: |-
+        --recursive
+        ./
+      fail-on-vuln: true
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+  compliance:
+    needs: policy
+    name: security / repository compliance
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.needs_security == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run security
+      - name: Assert compliance checks did not mutate the checkout
+        run: git diff --exit-code
+
   codeql:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
+    needs: policy
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.code_changed == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     name: security / codeql
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -77,12 +171,13 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run build
       - uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
 
   semgrep:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
+    needs: policy
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.code_changed == 'true'
     name: security / semgrep
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -120,6 +215,7 @@ jobs:
           category: semgrep
 
   gitleaks:
+    needs: policy
     if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: security / gitleaks
     runs-on: ubuntu-24.04
@@ -149,7 +245,8 @@ jobs:
         run: gitleaks detect --source . --redact --verbose
 
   sbom:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
+    needs: policy
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.needs_sbom == 'true'
     name: security / sbom
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -163,7 +260,7 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run sbom
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -205,3 +302,30 @@ jobs:
         with:
           name: scorecard-baseline
           path: scorecard.json
+
+  gate:
+    name: security / gate
+    if: always()
+    needs:
+      - policy
+      - dependency-review
+      - osv-pull-request
+      - osv-full
+      - compliance
+      - codeql
+      - semgrep
+      - gitleaks
+      - sbom
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Evaluate mandatory security results
+        env:
+          SECURITY_GATE_INPUT: >-
+            {"eventName":"${{ github.event_name }}","forkPullRequest":${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }},"policy":{"codeScan":${{ needs.policy.outputs.code_changed == 'true' }},"dependencyScan":${{ needs.policy.outputs.dependency_changed == 'true' }},"compliance":${{ needs.policy.outputs.needs_security == 'true' }},"sbom":${{ needs.policy.outputs.needs_sbom == 'true' }}},"results":{"policy":"${{ needs.policy.result }}","codeql":"${{ needs.codeql.result }}","semgrep":"${{ needs.semgrep.result }}","gitleaks":"${{ needs.gitleaks.result }}","dependencyReview":"${{ needs.dependency-review.result }}","osvPullRequest":"${{ needs.osv-pull-request.result }}","osvFull":"${{ needs.osv-full.result }}","compliance":"${{ needs.compliance.result }}","sbom":"${{ needs.sbom.result }}"}}
+        run: node scripts/security-gate.mjs
