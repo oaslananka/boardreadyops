@@ -126,6 +126,7 @@ async function createDeadLetterJob(tenant: TenantFixture): Promise<string> {
 
 async function cleanup(): Promise<void> {
   if (!executor) return;
+  await executor.query("delete from webhook_inbox where delivery_id like $1", [`${testPrefix}%`]);
   await executor.query("delete from installations where account_login like $1", [`${testPrefix}%`]);
 }
 
