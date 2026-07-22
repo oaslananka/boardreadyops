@@ -1,10 +1,9 @@
 # Branch Protection
 
 The active `main` branch policy is stored as code in
-`.github/rulesets/main.json`. The ruleset requires one independent approving
-review, dismisses stale approvals after reviewable pushes, blocks unresolved
-review conversations, enforces strict stable checks, and permits only squash
-merges.
+`.github/rulesets/main.json`. The ruleset requires signed commits and one independent approving review,
+dismisses stale approvals after reviewable pushes, blocks unresolved review
+conversations, enforces strict stable checks, and permits only squash merges.
 
 CODEOWNERS review is not required while the repository has a single maintainer;
 the global independent-review rule remains mandatory. Trusted automation can
