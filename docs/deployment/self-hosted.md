@@ -48,7 +48,13 @@ Install Docker Engine and the Docker Compose v2 plugin on the VPS. The web and c
 
 The webhook endpoint never performs GitHub Check Run creation or workflow dispatch inline. It verifies and normalizes the request, atomically stores one `webhook_inbox` row and one `control_plane_jobs` row, and returns HTTP 202. The lifecycle worker claims jobs with PostgreSQL leases and writes release-run state plus required `control_plane_outbox` records transactionally. An independent outbox loop delivers Check Run and workflow effects, so GitHub API latency does not block unrelated webhook planning. Check Run creation is replay-safe through `external_id = runId`; an uncertain workflow dispatch becomes `reconciliation_required` and is not automatically replayed. See [Transactional outbox](../architecture/transactional-outbox.md) for the state model, reconciliation procedure, metrics, and external-broker triggers.
 
-Web intake logs expose only outcome and request-to-accept latency. The worker periodically emits aggregate available, leased, retrying, dead-letter, reconciliation-required, oldest-age, and outbox-lag metrics without repository, installation, delivery, or payload fields. Successful webhook processing immediately replaces normalized actions with an empty array. Terminal inbox metadata is retained for 30 days by default and then removed in bounded worker cleanup batches; dead-letter actions remain available only until that retention deadline. Verified deliveries are guarded by a configurable per-installation, per-process rate window (`BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE`, default 1200); retries with the same GitHub delivery ID are exempt so idempotent acknowledgement remains available.
+Web intake logs expose only outcome and request-to-accept latency. The worker periodically emits aggregate available, leased, retrying, dead-letter, reconciliation-required, oldest-age, and outbox-lag metrics without payload or finding content. Terminal worker logs include only safe correlation identifiers such as delivery, installation, repository, run, attempt, job, and outbox IDs. All structured fields pass through recursive credential, OIDC, capability, source, and finding redaction before serialization. Successful webhook processing immediately replaces normalized actions with an empty array. Terminal inbox metadata is retained for 30 days by default and then removed in bounded worker cleanup batches; dead-letter actions remain available only until that retention deadline. Verified deliveries are guarded by a configurable per-installation, per-process rate window (`BOARDREADYOPS_WEBHOOK_RATE_LIMIT_PER_MINUTE`, default 1200); retries with the same GitHub delivery ID are exempt so idempotent acknowledgement remains available.
+
+## Control-plane worker boundary
+
+The worker is an orchestrator only. It does not check out repository source, invoke KiCad, materialize a source workspace, or execute customer commands. Target-repository GitHub Actions or a separately enrolled customer-hosted runner remain the execution plane.
+
+The cloud build emits `apps/web/.next/worker-meta.json` from esbuild and runs `pnpm run verify:control-plane-worker-boundary`. The build fails if the worker dependency graph contains KiCad execution modules, repository checkout/source-workspace modules, runner executors, or `child_process`. Treat a boundary-verifier failure as an architectural regression rather than bypassing the check.
 
 ## First Compose deployment
 
@@ -81,6 +87,8 @@ Expected response:
   "service": "boardreadyops-cloud"
 }
 ```
+
+The worker readiness response also reports the database/configuration state, the latest lifecycle and outbox polls, and scoped-concurrency `active` and `waiting` counts. A worker sets readiness false before graceful shutdown and stops claiming new batches. Existing leased work drains before the database pool closes; after an ungraceful termination, PostgreSQL lease expiry makes unfinished work claimable by another replica.
 
 Inspect the native Docker health state with:
 
@@ -116,6 +124,31 @@ The deploy script performs these steps:
 
 The deploy no longer copies `.next` into a running container. Each release is an immutable Docker image tied to one Git revision.
 
+## Independent worker scaling
+
+The lifecycle and outbox batch limits are independent from the web process. Scale worker replicas only after accounting for database connections and GitHub API throughput:
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --scale worker=2
+```
+
+`BOARDREADYOPS_WORKER_CONCURRENCY` and `BOARDREADYOPS_OUTBOX_CONCURRENCY` cap each replica's claimed batch. The shared in-process gate then caps concurrent work per installation and repository across both loops. These scoped limits are per replica, so the effective upper bound is the configured limit multiplied by the number of replicas. Database leases preserve single ownership of each job/effect; they do not provide a distributed GitHub API rate limiter.
+
+Recommended initial values are four lifecycle jobs, four outbox effects, four operations per installation, and two operations per repository per replica. Increase them only with queue-lag, GitHub rate-limit, database pool, and readiness data.
+
+## Rolling deployment and rollback
+
+Use an application-first rolling deployment:
+
+1. Apply forward-compatible additive migrations once.
+2. Deploy and verify the web canary.
+3. Replace the web container.
+4. Withdraw one worker replica from readiness and terminate it with SIGTERM.
+5. Allow active leases to drain, then start the new worker image.
+6. Verify `/health/ready`, queue metrics, and outbox lag before replacing additional replicas.
+
+For rollback, stop new worker replicas, deploy the previous compatible immutable image for web and worker, and retain the current database schema. Do not automatically reverse migrations. Any work left by a killed replica becomes available after lease expiry. Reconciliation-required workflow dispatches remain operator-controlled and must not be blindly replayed.
+
 Supported environment overrides:
 
 ```text
@@ -135,6 +168,8 @@ BOARDREADYOPS_CLOUD_DRY_RUN=1
 BOARDREADYOPS_CLOUD_HEALTH_ATTEMPTS=60
 BOARDREADYOPS_CLOUD_HEALTH_DELAY_MS=1000
 BOARDREADYOPS_WORKER_CONCURRENCY=4
+BOARDREADYOPS_WORKER_INSTALLATION_CONCURRENCY=4
+BOARDREADYOPS_WORKER_REPOSITORY_CONCURRENCY=2
 BOARDREADYOPS_WORKER_POLL_MS=1000
 BOARDREADYOPS_OUTBOX_CONCURRENCY=4
 BOARDREADYOPS_OUTBOX_POLL_MS=500
