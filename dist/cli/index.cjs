@@ -21885,7 +21885,7 @@ function useColor() {
 var program = new Command();
 
 // src/generated/version.ts
-var boardReadyVersion = "1.14.0";
+var boardReadyVersion = "1.15.0";
 
 // src/i18n/en.ts
 var en = {
