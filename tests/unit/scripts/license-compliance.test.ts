@@ -1,7 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { renderNotice } from "../../../scripts/build-notice.mjs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { main, renderNotice } from "../../../scripts/build-notice.mjs";
 import { findLicensePolicyViolations } from "../../../scripts/check-licenses.mjs";
 import { pnpmLicenseCommandLine } from "../../../scripts/lib/pnpm-licenses.mjs";
+
+const temporaryRoots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
 
 describe("license compliance scripts", () => {
   it("renders a deterministic NOTICE from pnpm license output", () => {
@@ -42,6 +51,33 @@ describe("license compliance scripts", () => {
     expect(notice).toContain("- `dual@1.0.0`, `dual@2.0.0`");
     expect(notice).toContain("Container image redistributes KiCad under GPL terms.");
     expect(notice).toMatch(/[^\n]\n$/);
+  });
+
+  it("rejects a stale NOTICE without rewriting it and reports changed package entries", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-notice-check-"));
+    temporaryRoots.push(root);
+
+    const staleNotice = renderNotice({
+      MIT: [{ name: "sharp", versions: ["0.34.5"], license: "MIT" }],
+    });
+    await writeFile(path.join(root, "NOTICE"), staleNotice);
+
+    await expect(
+      main(root, {
+        check: true,
+        readReport: async () => ({
+          MIT: [{ name: "sharp", versions: ["0.35.3"], license: "MIT" }],
+        }),
+      }),
+    ).rejects.toThrow(
+      [
+        "NOTICE is out of date. Run `corepack pnpm run notice`.",
+        "Changed package entries:",
+        "- removed: `sharp@0.34.5`",
+        "- added: `sharp@0.35.3`",
+      ].join("\n"),
+    );
+    expect(await readFile(path.join(root, "NOTICE"), "utf8")).toBe(staleNotice);
   });
 
   it("allows only the approved license policy for distributed dependencies", () => {

@@ -9,6 +9,19 @@ async function repositoryFile(path: string): Promise<string> {
 }
 
 describe("dependency and security automation configuration", () => {
+  it("verifies NOTICE compliance without mutating the CI checkout", async () => {
+    const workflow = await repositoryFile(".github/workflows/ci.yml");
+    const packageJson = JSON.parse(await repositoryFile("package.json")) as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(packageJson.scripts?.security).toContain("notice:check");
+    expect(workflow).not.toContain("- run: pnpm run notice\n");
+    expect(workflow).toContain("- run: pnpm run security");
+    expect(workflow).toContain(
+      "- name: Assert compliance checks did not mutate the checkout\n        run: git diff --exit-code",
+    );
+  });
   it("keeps Renovate project-scoped, scheduled, and supply-chain hardened", async () => {
     const renovate = JSON.parse(await repositoryFile("renovate.json")) as Record<string, unknown>;
 
@@ -24,6 +37,11 @@ describe("dependency and security automation configuration", () => {
     expect(await repositoryFile("renovate.json")).not.toContain("3 days");
     expect(renovate.pinDigests).toBe(true);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
+    expect(renovate.postUpgradeTasks).toEqual({
+      commands: ["corepack pnpm run notice"],
+      fileFilters: ["NOTICE"],
+      executionMode: "branch",
+    });
     expect(renovate.ignorePaths).toEqual(
       expect.arrayContaining(["**/.next/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**"]),
     );
@@ -39,6 +57,7 @@ describe("dependency and security automation configuration", () => {
     expect(workflow).toContain("pnpm run renovate:validate");
     expect(workflow).not.toContain("npx ");
     expect(workflow).toContain("RENOVATE_REPOSITORIES: '[\"oaslananka/boardreadyops\"]'");
+    expect(workflow).toContain("RENOVATE_ALLOWED_COMMANDS: '[\"^corepack pnpm run notice$\"]'");
     expect(workflow).toContain("token: $" + "{{ secrets.GH_AUTH_TOKEN }}");
     expect(workflow).not.toContain("pull_request_target");
   });

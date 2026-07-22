@@ -27,6 +27,13 @@ describe("ci-risk-profile", () => {
     expect(profile.needs_build).toBe(true);
   });
 
+  it("runs NOTICE compliance for dependency inventory and generator changes", () => {
+    for (const file of ["package.json", "pnpm-lock.yaml", "scripts/build-notice.mjs"]) {
+      const profile = classifyChangedFiles([file], { eventName: "pull_request" });
+      expect(profile.needs_security, file).toBe(true);
+    }
+  });
+
   it("runs package and action gates for dist or action changes", () => {
     const profile = classifyChangedFiles(["action.yml", "dist/action/index.cjs"], {
       eventName: "pull_request",

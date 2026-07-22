@@ -62,7 +62,7 @@ const PARSER_MODEL_PATTERNS = [/^src\/kicad\//, /^tests\/unit\/kicad\//];
 const SECURITY_PATTERNS = [
   /^SECURITY\.md$/,
   /^\.github\/workflows\/(security|trivy|provenance|publish-npm)\.ya?ml$/,
-  /^scripts\/(check-licenses|check-reuse|check-scorecard-baseline|generate-sbom)\.mjs$/,
+  /^scripts\/(build-notice|check-licenses|check-reuse|check-scorecard-baseline|generate-sbom)\.mjs$/,
   /^package\.json$/,
   /^pnpm-lock\.yaml$/,
   /^NOTICE$/,

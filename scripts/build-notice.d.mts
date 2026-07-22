@@ -8,5 +8,11 @@ export type PnpmLicensePackage = {
 
 export type PnpmLicenseReport = Record<string, PnpmLicensePackage[]>;
 
-export declare function main(root?: string, options?: { check?: boolean }): Promise<void>;
+export declare function main(
+  root?: string,
+  options?: {
+    check?: boolean;
+    readReport?: (root: string) => Promise<PnpmLicenseReport>;
+  },
+): Promise<void>;
 export declare function renderNotice(report: PnpmLicenseReport): string;
