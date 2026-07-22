@@ -25,7 +25,7 @@ describe("control-plane operations store", () => {
               reason_code: "delivery_uncertain",
               error_class: "WorkflowDispatchDeliveryUncertainError",
               attempt_count: 2,
-              failed_at: "2026-07-22T15:55:00.000Z",
+              failed_at: new Date("2026-07-22T15:55:00.000Z"),
               replay_safe: false,
             },
           ],
@@ -100,8 +100,8 @@ describe("control-plane operations store", () => {
               subject_type: "execution_attempt",
               subject_id: "attempt-1",
               reason_code: "callback_missing",
-              deadline_at: "2026-07-22T16:05:00.000Z",
-              next_check_at: "2026-07-22T16:00:00.000Z",
+              deadline_at: new Date("2026-07-22T16:05:00.000Z"),
+              next_check_at: new Date("2026-07-22T16:00:00.000Z"),
               attempt_count: 1,
             },
           ],
@@ -167,6 +167,27 @@ describe("control-plane operations store", () => {
       terminalRuns24h: 40,
       terminalFailureRateBasisPoints: 250,
     });
+  });
+
+  it("redacts credentials from persisted reconciliation failures", async () => {
+    const executor: SqlQueryExecutor = {
+      async query(sql, params) {
+        expect(sql).toContain("boardreadyops_fail_control_plane_reconciliation");
+        expect(String(params?.[5])).not.toContain("authorization=");
+        expect(String(params?.[5])).toContain("[REDACTED]");
+        return { rows: [{ outcome: "retry" }] };
+      },
+    };
+
+    await expect(
+      createSqlControlPlaneOperationsStore(executor, { now: () => now }).failReconciliationItem({
+        reconciliationId: "reconciliation-1",
+        workerId: "worker-1",
+        attemptCount: 1,
+        errorClass: "NetworkError",
+        errorMessage: `authorization=Bearer ${"x".repeat(200)}`,
+      }),
+    ).resolves.toBe("retry");
   });
 
   it("rejects malformed tenant, worker, and operation identifiers", async () => {

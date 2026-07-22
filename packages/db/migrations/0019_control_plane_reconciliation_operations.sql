@@ -1,14 +1,22 @@
 -- Tenant-scoped dead-letter operations, durable reconciliation work, and privacy-safe SLIs.
 
 alter table webhook_inbox
-  add column if not exists accepted_at timestamptz not null default clock_timestamp();
+  add column if not exists accepted_at timestamptz;
+
+update webhook_inbox
+   set accepted_at = received_at
+ where accepted_at is null;
+
+alter table webhook_inbox
+  alter column accepted_at set default clock_timestamp(),
+  alter column accepted_at set not null;
 
 create index if not exists webhook_inbox_installation_accepted_idx
   on webhook_inbox(installation_external_id, accepted_at desc, id)
   where installation_external_id is not null;
 
 create table if not exists control_plane_replay_operations (
-  operation_id text primary key,
+  operation_id text not null,
   installation_id text not null references installations(id) on delete cascade,
   item_type text not null,
   item_id text not null,
@@ -24,7 +32,8 @@ create table if not exists control_plane_replay_operations (
   constraint control_plane_replay_actor_id_valid check (char_length(actor_id) between 1 and 128),
   constraint control_plane_replay_outcome_valid check (
     outcome in ('not_found', 'not_replayable', 'replayed')
-  )
+  ),
+  primary key (installation_id, operation_id)
 );
 
 create index if not exists control_plane_replay_operations_installation_created_idx
@@ -292,16 +301,17 @@ declare
   v_repository_id text;
   v_release_run_id text;
   v_audit_event_id text;
+  v_status text;
   v_outcome text;
 begin
   select * into v_existing
     from control_plane_replay_operations
-   where operation_id = p_operation_id
+   where installation_id = p_installation_id
+     and operation_id = p_operation_id
    for update;
 
   if found then
-    if v_existing.installation_id <> p_installation_id
-       or v_existing.item_type <> p_item_type
+    if v_existing.item_type <> p_item_type
        or v_existing.item_id <> p_item_id
        or v_existing.actor_id <> p_actor_id then
       raise exception 'replay operation id was reused for a different request' using errcode = '23505';
@@ -311,8 +321,8 @@ begin
   end if;
 
   if p_item_type = 'job' then
-    select r.id
-      into v_repository_id
+    select r.id, cpj.status
+      into v_repository_id, v_status
       from control_plane_jobs cpj
       join webhook_inbox wi on wi.id = cpj.inbox_id
       join installations i on i.github_installation_id = wi.installation_external_id
@@ -320,13 +330,12 @@ begin
         on r.installation_id = i.id
        and r.github_repo_id = wi.repository_external_id
      where cpj.id = p_item_id
-       and i.id = p_installation_id;
+       and i.id = p_installation_id
+     for update of cpj;
 
     if not found then
       v_outcome := 'not_found';
-    elsif not exists (
-      select 1 from control_plane_jobs where id = p_item_id and status = 'dead_letter'
-    ) then
+    elsif v_status <> 'dead_letter' then
       v_outcome := 'not_replayable';
     else
       update control_plane_jobs
@@ -339,8 +348,7 @@ begin
              completed_at = null,
              last_error_class = null,
              last_error_message = null
-       where id = p_item_id
-         and status = 'dead_letter';
+       where id = p_item_id;
 
       update webhook_inbox wi
          set state = 'accepted',
@@ -354,33 +362,20 @@ begin
       v_outcome := 'replayed';
     end if;
   elsif p_item_type = 'outbox' then
-    select r.id, rr.id
-      into v_repository_id, v_release_run_id
+    select r.id, rr.id, cpo.status
+      into v_repository_id, v_release_run_id, v_status
       from control_plane_outbox cpo
       join release_runs rr on rr.id = cpo.release_run_id
       join repositories r on r.id = rr.repository_id
      where cpo.id = p_item_id
-       and r.installation_id = p_installation_id;
+       and r.installation_id = p_installation_id
+     for update of cpo;
 
     if not found then
       v_outcome := 'not_found';
-    elsif exists (
-      select 1
-        from control_plane_outbox
-       where id = p_item_id
-         and status = 'reconciliation_required'
-    ) then
-      return query select 'not_replayable'::text, null::text;
-      insert into control_plane_replay_operations (
-        operation_id, installation_id, item_type, item_id, actor_id, outcome, created_at
-      ) values (
-        p_operation_id, p_installation_id, p_item_type, p_item_id, p_actor_id,
-        'not_replayable', p_now
-      );
-      return;
-    elsif not exists (
-      select 1 from control_plane_outbox where id = p_item_id and status = 'dead_letter'
-    ) then
+    elsif v_status = 'reconciliation_required' then
+      v_outcome := 'not_replayable';
+    elsif v_status <> 'dead_letter' then
       v_outcome := 'not_replayable';
     else
       update control_plane_outbox
@@ -394,8 +389,7 @@ begin
              external_result = null,
              last_error_class = null,
              last_error_message = null
-       where id = p_item_id
-         and status = 'dead_letter';
+       where id = p_item_id;
       v_outcome := 'replayed';
     end if;
   else

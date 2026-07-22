@@ -108,6 +108,9 @@ export type ControlPlaneOperationsStoreOptions = {
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const reasonCodePattern = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u;
+const credentialAssignmentPattern =
+  /\b(authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[=:]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu;
+const bearerPattern = /\bBearer\s+[a-z0-9._~+/=-]+/giu;
 const supportedDeadLetterTypes = new Set<ControlPlaneDeadLetterItemType>(["job", "outbox"]);
 const supportedSubjectTypes = new Set<ControlPlaneReconciliationSubjectType>([
   "execution_attempt",
@@ -138,6 +141,14 @@ class DatabaseRow {
     if (value === "false" || value === "f") return false;
     return undefined;
   }
+
+  timestamp(column: string): string | undefined {
+    const value = this.value?.[column];
+    if (value instanceof Date && Number.isFinite(value.valueOf())) return value.toISOString();
+    if (typeof value !== "string") return undefined;
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.valueOf()) ? parsed.toISOString() : undefined;
+  }
 }
 
 function databaseRows(result: unknown): DatabaseRow[] {
@@ -163,12 +174,22 @@ function validReasonCode(value: string, label: string): string {
 }
 
 function boundedFailure(value: string, maximum: number, fallback: string): string {
-  const normalized = value.replace(/[\r\n\t]+/gu, " ").trim();
+  const normalized = value
+    .replace(bearerPattern, "Bearer [REDACTED]")
+    .replace(credentialAssignmentPattern, "$1=[REDACTED]")
+    .replace(/[\r\n\t]+/gu, " ")
+    .trim();
   return (normalized || fallback).slice(0, maximum);
 }
 
 function requiredText(row: DatabaseRow, column: string, label: string): string {
   const value = row.text(column);
+  if (!value) throw new Error(`control-plane operations query returned an incomplete ${label}`);
+  return value;
+}
+
+function requiredTimestamp(row: DatabaseRow, column: string, label: string): string {
+  const value = row.timestamp(column);
   if (!value) throw new Error(`control-plane operations query returned an incomplete ${label}`);
   return value;
 }
@@ -201,7 +222,7 @@ function decodedDeadLetter(row: DatabaseRow): ControlPlaneDeadLetterItem {
     reasonCode: requiredText(row, "reason_code", "dead letter"),
     ...(errorClass ? { errorClass } : {}),
     attemptCount,
-    failedAt: requiredText(row, "failed_at", "dead letter"),
+    failedAt: requiredTimestamp(row, "failed_at", "dead letter"),
     replaySafe,
   };
 }
@@ -228,8 +249,8 @@ function decodedReconciliationItem(row: DatabaseRow): ClaimedControlPlaneReconci
     subjectType: subjectType as ControlPlaneReconciliationSubjectType,
     subjectId: requiredText(row, "subject_id", "reconciliation item"),
     reasonCode: requiredText(row, "reason_code", "reconciliation item"),
-    deadlineAt: requiredText(row, "deadline_at", "reconciliation item"),
-    nextCheckAt: requiredText(row, "next_check_at", "reconciliation item"),
+    deadlineAt: requiredTimestamp(row, "deadline_at", "reconciliation item"),
+    nextCheckAt: requiredTimestamp(row, "next_check_at", "reconciliation item"),
     attemptCount,
   };
 }
