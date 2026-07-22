@@ -108,12 +108,7 @@ describeDatabase("transactional release-run outbox producer", () => {
 
   it("supersedes the previous active run before planning the newer commit", async () => {
     const store = createSqlTransactionalGitHubAppLifecycleStore(database(), {
-      id: idSequence([
-        `run-old-${suffix}`,
-        `outbox-old-${suffix}`,
-        `run-new-${suffix}`,
-        `outbox-new-${suffix}`,
-      ]),
+      id: idSequence([`run-old-${suffix}`, `outbox-old-${suffix}`, `run-new-${suffix}`, `outbox-new-${suffix}`]),
       now: () => new Date("2026-07-22T02:10:00.000Z"),
       releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
     });

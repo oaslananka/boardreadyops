@@ -42,8 +42,7 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
   const base = createSqlGitHubAppLifecycleStore(executor, options);
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
-  const rollout =
-    options.releaseRepositoryRolloutPolicy ?? releaseRepositoryRolloutPolicyFromEnvironment(process.env);
+  const rollout = options.releaseRepositoryRolloutPolicy ?? releaseRepositoryRolloutPolicyFromEnvironment(process.env);
 
   return {
     upsertInstallation: base.upsertInstallation,

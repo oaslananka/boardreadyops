@@ -1,9 +1,5 @@
 import type { GitHubAppLifecycleAction } from "./lifecycle.js";
-import type {
-  EnqueuedReleaseRun,
-  EnqueueReleaseRunInput,
-  GitHubAppLifecycleStore,
-} from "./lifecycle-executor.js";
+import type { EnqueuedReleaseRun, EnqueueReleaseRunInput, GitHubAppLifecycleStore } from "./lifecycle-executor.js";
 
 export type EnqueuedReleaseRunWithOutbox = EnqueuedReleaseRun & {
   outboxId?: string;
