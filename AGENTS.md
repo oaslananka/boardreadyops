@@ -6,8 +6,8 @@ BoardReadyOps is a local-first CLI and GitHub Action for KiCad hardware review. 
 
 ## Setup
 
-- Enable the package manager shim when permitted: `corepack enable`
-- Install dependencies: `corepack pnpm install --frozen-lockfile`
+- Bootstrap the repository-local toolchain: `corepack pnpm run toolchain:bootstrap`
+- Validate prerequisites before long checks: `corepack pnpm run toolchain:doctor`
 - Build committed bundles: `corepack pnpm run build`
 - Verify committed bundles: `corepack pnpm run verify:dist`
 
@@ -22,7 +22,7 @@ BoardReadyOps is a local-first CLI and GitHub Action for KiCad hardware review. 
 - Docs: `task docs`
 - Garbage collection checks: `task gc`
 - Structure checks: `task verify:structure`
-- Full local verify: `ALLOW_MAJOR_RELEASE=true task verify`
+- Full local verify: `task verify`
 
 ## Repository Layout
 

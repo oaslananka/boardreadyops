@@ -155,6 +155,7 @@ nav:
       - Repository Standards: reference/repository-standards.md
       - Development:
           - Setup: development/setup.md
+          - Reproducible Toolchain: development/toolchain.md
           - Coding Standards: development/coding-standards.md
           - Testing Policy: development/testing-policy.md
           - Release Process: development/release-process.md

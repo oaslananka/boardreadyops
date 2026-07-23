@@ -3,7 +3,10 @@ version: "3"
 tasks:
   setup:
     cmds:
-      - corepack pnpm install --frozen-lockfile
+      - corepack pnpm run toolchain:bootstrap
+  doctor:
+    cmds:
+      - corepack pnpm run toolchain:doctor
   lint:
     cmds:
       - corepack pnpm run lint
@@ -83,18 +86,7 @@ tasks:
       - corepack pnpm audit --audit-level moderate
   verify:all:
     cmds:
-      - task: lint
-      - task: typecheck
-      - task: test
-      - task: test:int
-      - task: test:property
-      - task: mutation
-      - task: knip
-      - task: gc
-      - task: verify:structure
-      - task: verify:dist
-      - task: verify:version
-      - task: sbom
+      - corepack pnpm run verify:all
   docs:
     cmds:
       - corepack pnpm run docs

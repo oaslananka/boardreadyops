@@ -429,10 +429,12 @@ describe("compatibility matrix", () => {
     const binaryWorkflow = yaml.load(await readFile(".github/workflows/binary-build.yml", "utf8")) as Workflow;
     const containerWorkflow = yaml.load(await readFile(".github/workflows/container-build.yml", "utf8")) as Workflow;
     const dockerfile = await readFile("apps/container/Dockerfile", "utf8");
+    const toolchain = JSON.parse(await readFile("toolchain.json", "utf8")) as { node: { preferred: string } };
 
     expect(packageJson.engines?.node).toBe("^22.14.0 || ^24.0.0");
     expect(packageJson.engines?.node).not.toContain("26");
-    expect(binaryWorkflow.env?.NODE_VERSION).toBe(config.node.recommended);
+    expect(toolchain.node.preferred.split(".")[0]).toBe(config.node.recommended);
+    expect(binaryWorkflow.env?.NODE_VERSION).toBe(toolchain.node.preferred);
     expect(containerWorkflow.env?.NODE_VERSION).toBe(config.node.tested?.[config.node.recommended]);
     expect(containerWorkflow.env?.KICAD_PPA_SERIES).toBe(config.kicad.recommended);
     expect(dockerfile).toContain(`ARG NODE_VERSION=${config.node.tested?.[config.node.recommended]}`);

@@ -26,6 +26,7 @@ permissions:
   contents: read
 
 env:
+  NODE_VERSION: "24.18.0"
   UV_VERSION: "0.11.16"
 
 jobs:
@@ -108,7 +109,7 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         if: env.SHOULD_PUBLISH == 'true'
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - name: Ensure npm supports trusted publishing
         if: env.SHOULD_PUBLISH == 'true'
