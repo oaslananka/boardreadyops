@@ -44,12 +44,14 @@ export type ControlPlaneDeadLetterRouteFactories = {
   createOperationsStore(executor: SqlQueryExecutor): DeadLetterOperations;
 };
 
+const defaultControlPlaneDeadLetterRouteFactories: ControlPlaneDeadLetterRouteFactories = {
+  createQueryExecutor: createPgQueryExecutor,
+  createOperationsStore: createSqlControlPlaneOperationsStore,
+};
+
 export function createControlPlaneDeadLetterRouteDependencies(
   environment: Readonly<Record<string, string | undefined>> = process.env,
-  factories: ControlPlaneDeadLetterRouteFactories = {
-    createQueryExecutor: createPgQueryExecutor,
-    createOperationsStore: createSqlControlPlaneOperationsStore,
-  },
+  factories: ControlPlaneDeadLetterRouteFactories = defaultControlPlaneDeadLetterRouteFactories,
 ): ControlPlaneDeadLetterRouteDependencies {
   return {
     environment,
