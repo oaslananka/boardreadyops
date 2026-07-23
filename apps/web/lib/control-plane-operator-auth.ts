@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 const actorIdentifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const operatorTokenPattern = /^[\x21-\x7E]{32,512}$/u;
-const bearerPattern = /^Bearer ([\x21-\x7E]{32,512})$/u;
+const bearerPrefix = "Bearer ";
 
 export type ConfiguredControlPlaneOperator = {
   token: string;
@@ -32,11 +32,11 @@ export function authenticateControlPlaneOperator(
   const configured = configuredControlPlaneOperator(environment);
   if (!configured) return { status: "disabled" };
 
-  const match = bearerPattern.exec(request.headers.get("authorization") ?? "");
-  if (!match) return { status: "unauthorized" };
+  const authorization = request.headers.get("authorization") ?? "";
+  if (!authorization.startsWith(bearerPrefix)) return { status: "unauthorized" };
 
-  const presentedToken = match[1];
-  if (!presentedToken) return { status: "unauthorized" };
+  const presentedToken = authorization.slice(bearerPrefix.length);
+  if (!operatorTokenPattern.test(presentedToken)) return { status: "unauthorized" };
   const presented = Buffer.from(presentedToken, "utf8");
   const expected = Buffer.from(configured.token, "utf8");
   if (presented.byteLength !== expected.byteLength || !timingSafeEqual(presented, expected)) {

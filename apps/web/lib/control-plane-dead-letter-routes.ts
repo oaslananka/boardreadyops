@@ -39,22 +39,31 @@ function jsonError(error: string, status: number, headers?: Readonly<Record<stri
   return jsonResponse({ ok: false, error }, status, headers);
 }
 
-function defaultQueryExecutor(environment: Readonly<Record<string, string | undefined>>): SqlQueryExecutor | undefined {
-  const connectionString = environment.DATABASE_URL;
-  if (!connectionString) return undefined;
-  return createPgQueryExecutor({
-    connectionString,
-    max: Number(environment.DATABASE_POOL_MAX ?? 5),
-  });
-}
-
-const defaultEnvironment = process.env;
-
-const defaultDependencies: ControlPlaneDeadLetterRouteDependencies = {
-  environment: defaultEnvironment,
-  queryExecutor: () => defaultQueryExecutor(defaultEnvironment),
-  createOperationsStore: (executor) => createSqlControlPlaneOperationsStore(executor),
+export type ControlPlaneDeadLetterRouteFactories = {
+  createQueryExecutor(options: { connectionString: string; max: number }): SqlQueryExecutor;
+  createOperationsStore(executor: SqlQueryExecutor): DeadLetterOperations;
 };
+
+export function createControlPlaneDeadLetterRouteDependencies(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+  factories: ControlPlaneDeadLetterRouteFactories = {
+    createQueryExecutor: createPgQueryExecutor,
+    createOperationsStore: createSqlControlPlaneOperationsStore,
+  },
+): ControlPlaneDeadLetterRouteDependencies {
+  return {
+    environment,
+    queryExecutor() {
+      const connectionString = environment.DATABASE_URL;
+      if (!connectionString) return undefined;
+      return factories.createQueryExecutor({
+        connectionString,
+        max: Number(environment.DATABASE_POOL_MAX ?? 5),
+      });
+    },
+    createOperationsStore: factories.createOperationsStore,
+  };
+}
 
 function authenticatedActor(
   request: Request,
@@ -101,7 +110,7 @@ function operationsStore(dependencies: ControlPlaneDeadLetterRouteDependencies):
 export async function handleControlPlaneDeadLetterListRequest(
   request: Request,
   installationId: string,
-  dependencies: ControlPlaneDeadLetterRouteDependencies = defaultDependencies,
+  dependencies: ControlPlaneDeadLetterRouteDependencies = createControlPlaneDeadLetterRouteDependencies(),
 ): Promise<Response> {
   const actor = authenticatedActor(request, dependencies);
   if (actor instanceof Response) return actor;
@@ -135,7 +144,7 @@ export async function handleControlPlaneDeadLetterListRequest(
 export async function handleControlPlaneDeadLetterReplayRequest(
   request: Request,
   params: ReplayRouteParams,
-  dependencies: ControlPlaneDeadLetterRouteDependencies = defaultDependencies,
+  dependencies: ControlPlaneDeadLetterRouteDependencies = createControlPlaneDeadLetterRouteDependencies(),
 ): Promise<Response> {
   const actor = authenticatedActor(request, dependencies);
   if (actor instanceof Response) return actor;

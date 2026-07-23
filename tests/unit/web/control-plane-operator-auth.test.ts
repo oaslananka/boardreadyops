@@ -49,6 +49,9 @@ describe("control-plane operator authentication", () => {
     expect(authenticateControlPlaneOperator(request("Bearer wrong-token"), environment)).toEqual({
       status: "unauthorized",
     });
+    expect(authenticateControlPlaneOperator(request(`Bearer ${"z".repeat(token.length)}`), environment)).toEqual({
+      status: "unauthorized",
+    });
     expect(authenticateControlPlaneOperator(request(`Bearer ${token} trailing`), environment)).toEqual({
       status: "unauthorized",
     });

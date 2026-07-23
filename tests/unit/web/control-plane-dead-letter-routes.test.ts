@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   POST as replayDeadLetter,
   runtime as replayRuntime,
@@ -9,6 +9,7 @@ import {
 } from "../../../apps/web/app/api/v1/operator/installations/[installationId]/dead-letters/route.js";
 import {
   type ControlPlaneDeadLetterRouteDependencies,
+  createControlPlaneDeadLetterRouteDependencies,
   handleControlPlaneDeadLetterListRequest,
   handleControlPlaneDeadLetterReplayRequest,
 } from "../../../apps/web/lib/control-plane-dead-letter-routes.js";
@@ -20,6 +21,9 @@ const installationId = "11111111-1111-4111-8111-111111111111";
 const itemId = "22222222-2222-4222-8222-222222222222";
 const operationId = "33333333-3333-4333-8333-333333333333";
 const executor = { query: vi.fn() } as unknown as SqlQueryExecutor;
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 function request(
   path: string,
@@ -71,6 +75,55 @@ describe("control-plane dead-letter operator routes", () => {
     expect(replayDeadLetter).toBeTypeOf("function");
   });
 
+  it("builds explicit database wiring and delegates the Next routes", async () => {
+    const store = operationsStore();
+    const createQueryExecutor = vi.fn(() => executor);
+    const createOperationsStore = vi.fn(() => store);
+    const wired = createControlPlaneDeadLetterRouteDependencies(
+      {
+        BOARDREADYOPS_OPERATOR_API_TOKEN: token,
+        BOARDREADYOPS_OPERATOR_ACTOR_ID: "operator.primary",
+        DATABASE_URL: "postgresql://db.example/boardreadyops",
+        DATABASE_POOL_MAX: "7",
+      },
+      { createQueryExecutor, createOperationsStore },
+    );
+    expect(wired.queryExecutor()).toBe(executor);
+    expect(createQueryExecutor).toHaveBeenCalledWith({
+      connectionString: "postgresql://db.example/boardreadyops",
+      max: 7,
+    });
+    expect(wired.createOperationsStore(executor)).toBe(store);
+    expect(createOperationsStore).toHaveBeenCalledWith(executor);
+
+    const withoutDatabase = createControlPlaneDeadLetterRouteDependencies(
+      {},
+      { createQueryExecutor, createOperationsStore },
+    );
+    expect(withoutDatabase.queryExecutor()).toBeUndefined();
+
+    vi.stubEnv("BOARDREADYOPS_OPERATOR_API_TOKEN", token);
+    vi.stubEnv("BOARDREADYOPS_OPERATOR_ACTOR_ID", "operator.primary");
+    vi.stubEnv("DATABASE_URL", "");
+    const listResponse = await listDeadLetters(
+      request(`/api/v1/operator/installations/${installationId}/dead-letters`, {
+        authorization: `Bearer ${token}`,
+      }),
+      { params: Promise.resolve({ installationId }) },
+    );
+    expect(listResponse.status).toBe(503);
+    expect(await json(listResponse)).toEqual({ ok: false, error: "database is not configured" });
+
+    const replayResponse = await replayDeadLetter(
+      request(`/api/v1/operator/installations/${installationId}/dead-letters/job/${itemId}/replay`, {
+        method: "POST",
+        authorization: `Bearer ${token}`,
+      }),
+      { params: Promise.resolve({ installationId, itemType: "job", itemId }) },
+    );
+    expect(replayResponse.status).toBe(400);
+  });
+
   it("fails closed when operator configuration is disabled or authentication fails", async () => {
     const disabled = dependencies(operationsStore(), {});
     const disabledResponse = await handleControlPlaneDeadLetterListRequest(
@@ -106,7 +159,14 @@ describe("control-plane dead-letter operator routes", () => {
     );
     expect(invalidInstallation.status).toBe(400);
 
-    for (const query of ["?limit=0", "?limit=101", "?limit=1.5", "?limit=01", "?before=not-a-date"]) {
+    for (const query of [
+      "?limit=0",
+      "?limit=101",
+      "?limit=1.5",
+      "?limit=01",
+      "?before=not-a-date",
+      `?before=${"x".repeat(65)}`,
+    ]) {
       const response = await handleControlPlaneDeadLetterListRequest(
         request(`/api/v1/operator/installations/${installationId}/dead-letters${query}`, {
           authorization: `Bearer ${token}`,
@@ -268,6 +328,29 @@ describe("control-plane dead-letter operator routes", () => {
       });
       expect(await json(response)).toEqual({ ok: true, outcome, auditEventId: "audit-1" });
     }
+  });
+
+  it("hides replay store failures behind a stable unavailable response", async () => {
+    const deps = dependencies(
+      operationsStore({
+        replayDeadLetter: vi.fn(async () => {
+          throw new Error("password=do-not-leak");
+        }),
+      }),
+    );
+    const response = await handleControlPlaneDeadLetterReplayRequest(
+      request(`/api/v1/operator/installations/${installationId}/dead-letters/job/${itemId}/replay`, {
+        method: "POST",
+        authorization: `Bearer ${token}`,
+        idempotencyKey: operationId,
+      }),
+      { installationId, itemType: "job", itemId },
+      deps,
+    );
+    expect(response.status).toBe(503);
+    const payload = await json(response);
+    expect(payload).toEqual({ ok: false, error: "dead-letter replay is temporarily unavailable" });
+    expect(JSON.stringify(payload)).not.toContain("do-not-leak");
   });
 
   it("maps tenant misses and unsafe replay without revealing database details", async () => {
