@@ -45,6 +45,8 @@ describe("GitHub workflow reconciliation migration", () => {
     expect(sql).toContain("boardreadyops_reschedule_github_workflow_reconciliation");
     expect(sql).toContain("boardreadyops_apply_github_workflow_reconciliation");
     expect(sql).toContain("for update of control_plane_reconciliation_items, release_run_attempts, release_runs");
+    expect(sql).toContain("select cpri as item, rra as attempt, rr as run");
+    expect(sql).toContain("into v_locked");
     expect(sql).toContain("release_runs.execution_attempt_id = release_run_attempts.id");
     expect(sql).toContain("insert into audit_events");
     expect(sql).toContain("control_plane.github_workflow_reconciled");

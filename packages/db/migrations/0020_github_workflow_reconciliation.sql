@@ -295,6 +295,7 @@ language plpgsql
 security invoker
 as $$
 declare
+  v_locked record;
   v_item control_plane_reconciliation_items%rowtype;
   v_attempt release_run_attempts%rowtype;
   v_run release_runs%rowtype;
@@ -309,8 +310,8 @@ begin
     raise exception 'invalid workflow reconciliation observation' using errcode = '22023';
   end if;
 
-  select cpri, rra, rr
-    into v_item, v_attempt, v_run
+  select cpri as item, rra as attempt, rr as run
+    into v_locked
     from control_plane_reconciliation_items cpri
     join release_run_attempts rra
       on rra.id = cpri.execution_attempt_id
@@ -325,9 +326,13 @@ begin
    -- for update of control_plane_reconciliation_items, release_run_attempts, release_runs
    for update of cpri, rra, rr;
 
-  if v_item.id is null then
+  if not found then
     return 'stale';
   end if;
+
+  v_item := v_locked.item;
+  v_attempt := v_locked.attempt;
+  v_run := v_locked.run;
 
   if v_attempt.status in ('completed', 'failed', 'cancelled', 'timed_out', 'stale', 'superseded')
      or v_run.status in ('completed', 'failed', 'timed_out', 'superseded') then
