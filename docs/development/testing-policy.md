@@ -52,3 +52,5 @@ Database-backed files under `tests/integration/*-postgres.test.ts` require:
 4. No production or shared database credentials. The suites apply migrations and delete test fixtures.
 
 Run them serially with `BOARDREADYOPS_POSTGRES_TESTS=true DATABASE_URL=... corepack pnpm run test:int` or use the same variables with `corepack pnpm run verify:all`. Both local and CI execution require this explicit opt-in. The repository-local `boardreadyops_toolchain` URL is configuration-only and is rejected as a PostgreSQL test target. Without the opt-in, the final verification summary marks PostgreSQL integration as environment-dependent rather than claiming it was tested.
+
+KiCad execution inside `verify:all` is opt-in with `BOARDREADYOPS_KICAD_TESTS=true` and an absolute `BOARDREADYOPS_KICAD_CLI` path. Without both values, the summary records the KiCad suite as skipped and environment-dependent.

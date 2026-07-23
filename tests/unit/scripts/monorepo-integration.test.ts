@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildKicadCliCandidates,
   buildMonorepoIntegrationPlan,
   isSupportedKicadVersion,
   TOOLCHAIN_DATABASE_URL,
@@ -50,6 +51,22 @@ describe("complete monorepo integration", () => {
     expect(plan.postgres.status).toBe("tested");
     expect(plan.postgresTests).toContain("tests/integration/control-plane-job-store-postgres.test.ts");
     expect(plan.kicad.status).toBe("tested");
+  });
+
+  it("uses only fixed absolute KiCad CLI paths", () => {
+    expect(buildKicadCliCandidates({ environment: {}, platform: "linux" })).toEqual(["/usr/bin/kicad-cli"]);
+    expect(
+      buildKicadCliCandidates({
+        environment: { BOARDREADYOPS_KICAD_CLI: "/opt/kicad/bin/kicad-cli" },
+        platform: "linux",
+      }),
+    ).toEqual(["/opt/kicad/bin/kicad-cli"]);
+    expect(() =>
+      buildKicadCliCandidates({
+        environment: { BOARDREADYOPS_KICAD_CLI: "kicad-cli" },
+        platform: "linux",
+      }),
+    ).toThrow(/absolute/u);
   });
 
   it("reports KiCad as tested only for supported major versions", () => {

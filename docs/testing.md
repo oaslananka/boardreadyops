@@ -36,7 +36,7 @@ corepack pnpm run test:int
 corepack pnpm run test:int:monorepo
 ```
 
-`test:int:monorepo` always runs the environment-independent integration files and records their status for the `verify:all` summary. PostgreSQL files require both `BOARDREADYOPS_POSTGRES_TESTS=true` and a disposable `DATABASE_URL`; the repository-local toolchain placeholder is never accepted as a test database. CI uses the same opt-in contract.
+`test:int:monorepo` always runs the environment-independent integration files and records their status for the `verify:all` summary. PostgreSQL files require both `BOARDREADYOPS_POSTGRES_TESTS=true` and a disposable `DATABASE_URL`; the repository-local toolchain placeholder is never accepted as a test database. CI uses the same opt-in contract. KiCad execution is separately opt-in with `BOARDREADYOPS_KICAD_TESTS=true` and an absolute `BOARDREADYOPS_KICAD_CLI` path.
 
 Use integration tests when behavior crosses the CLI, project discovery, fixture layout, filesystem, cloud persistence, or runtime boundaries.
 

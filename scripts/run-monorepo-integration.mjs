@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getPostgresTestConnectionString, TOOLCHAIN_DATABASE_URL } from "./postgres-test-contract.mjs";
+import { getPostgresTestConnectionString } from "./postgres-test-contract.mjs";
 
-export { TOOLCHAIN_DATABASE_URL };
+export { TOOLCHAIN_DATABASE_URL } from "./postgres-test-contract.mjs";
 
 export const REQUIRED_INTEGRATION_TESTS = [
   "tests/integration/build-concurrency.test.ts",
@@ -54,9 +55,29 @@ export function isSupportedKicadVersion(version) {
   return /^(9|10)\./u.test(version.trim());
 }
 
-function supportedKicadAvailable() {
-  const result = spawnSync("kicad-cli", ["version"], { encoding: "utf8" });
-  return !result.error && result.status === 0 && isSupportedKicadVersion(result.stdout ?? "");
+export function buildKicadCliCandidates({ environment = process.env, platform = process.platform } = {}) {
+  const explicit = environment.BOARDREADYOPS_KICAD_CLI?.trim();
+  if (explicit) {
+    if (!path.isAbsolute(explicit)) {
+      throw new Error("BOARDREADYOPS_KICAD_CLI must be an absolute path");
+    }
+    return [explicit];
+  }
+  if (platform === "win32") {
+    return ["C:\\Program Files\\KiCad\\10.1\\bin\\kicad-cli.exe", "C:\\Program Files\\KiCad\\10.0\\bin\\kicad-cli.exe"];
+  }
+  if (platform === "darwin") {
+    return ["/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"];
+  }
+  return ["/usr/bin/kicad-cli"];
+}
+
+function supportedKicadAvailable(environment = process.env) {
+  for (const candidate of buildKicadCliCandidates({ environment })) {
+    const result = spawnSync(candidate, ["version"], { encoding: "utf8" });
+    if (!result.error && result.status === 0 && isSupportedKicadVersion(result.stdout ?? "")) return true;
+  }
+  return false;
 }
 
 function runPinnedPnpm(args, { environment = process.env } = {}) {
@@ -85,9 +106,9 @@ function vitestArguments(outputFile, files) {
 }
 
 export function runMonorepoIntegration({ environment = process.env } = {}) {
-  const kicadAvailable = supportedKicadAvailable();
+  const kicadAvailable = supportedKicadAvailable(environment);
   if (environment.BOARDREADYOPS_KICAD_TESTS === "true" && !kicadAvailable) {
-    throw new Error("BOARDREADYOPS_KICAD_TESTS=true requires kicad-cli on PATH");
+    throw new Error("BOARDREADYOPS_KICAD_TESTS=true requires a supported absolute BOARDREADYOPS_KICAD_CLI path");
   }
 
   const plan = buildMonorepoIntegrationPlan({ environment, kicadAvailable });
