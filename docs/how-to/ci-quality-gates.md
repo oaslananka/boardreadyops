@@ -30,12 +30,14 @@ type-only file false failure is fixed.
 
 ## Pull request policy
 
-- Require at least one approval.
-- Require CODEOWNERS review for repository policy, workflows, release, source,
-  schemas, and documentation surfaces.
+- BoardReadyOps currently requires zero human approvals because it is maintained
+  by one person; requiring an independent reviewer would make normal merges
+  impossible without adding a real control.
+- Require all review conversations to be resolved.
 - Require the branch to be up to date before merging.
-- Dismiss stale approvals after new commits when there are enough reviewers to
-  sustain the policy.
+- Keep CODEOWNERS as ownership metadata, but do not require CODEOWNERS review
+  until another trusted maintainer or security owner is available.
+- Reconsider a one-approval rule when a second maintainer is onboarded.
 
 ## Escalation policy
 
