@@ -401,6 +401,7 @@ export async function handleResultRequest(
   const metricsJson = JSON.stringify(parsed.data.metrics);
   const reportLinksJson = JSON.stringify(parsed.data.reportLinks);
   const payloadJson = JSON.stringify(parsed.data);
+  const githubCheckConclusion = checkConclusion(parsed.data);
   const updateResult = await executor.query(
     `with existing as materialized (
        select id,
@@ -579,6 +580,7 @@ export async function handleResultRequest(
          contract_version,
          status,
          conclusion,
+         github_check_conclusion,
          decision,
          metrics,
          report_links,
@@ -591,6 +593,7 @@ export async function handleResultRequest(
               $8,
               $3,
               $9,
+              $16,
               $4,
               $10::jsonb,
               $11::jsonb,
@@ -604,6 +607,7 @@ export async function handleResultRequest(
            contract_version = excluded.contract_version,
            status = excluded.status,
            conclusion = excluded.conclusion,
+           github_check_conclusion = excluded.github_check_conclusion,
            decision = excluded.decision,
            metrics = excluded.metrics,
            report_links = excluded.report_links,
@@ -686,6 +690,7 @@ export async function handleResultRequest(
       digest,
       artifactsJson,
       dependencies.verifiedLeaseId ?? null,
+      githubCheckConclusion,
     ],
   );
   const row = rows(updateResult)[0];

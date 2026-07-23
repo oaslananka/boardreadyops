@@ -1,5 +1,82 @@
 -- Tenant-scoped GitHub Check Run reconciliation for accepted terminal results whose publication did not converge.
 
+alter table release_run_results
+  add column if not exists github_check_conclusion text;
+
+create or replace function boardreadyops_github_check_conclusion(
+  p_status text,
+  p_decision text,
+  p_payload jsonb
+)
+returns text
+language sql
+immutable
+security invoker
+as $$
+  select case
+    when p_status = 'timed_out' then 'timed_out'
+    when p_status = 'failed'
+      or p_decision in ('fail', 'error')
+      or p_payload #>> '{readiness,status}' = 'blocked'
+      then 'failure'
+    when p_status = 'completed' and p_decision = 'pass' then
+      case
+        when p_payload #>> '{readiness,status}' = 'at-risk'
+          or jsonb_array_length(coalesce(p_payload #> '{readiness,warnings}', '[]'::jsonb)) > 0
+          or jsonb_array_length(coalesce(p_payload #> '{waivers,active}', '[]'::jsonb)) > 0
+          or jsonb_array_length(coalesce(p_payload #> '{waivers,expired}', '[]'::jsonb)) > 0
+          or exists (
+            select 1
+            from jsonb_array_elements(coalesce(p_payload -> 'findings', '[]'::jsonb)) finding
+            where finding ->> 'severity' in ('medium', 'low', 'info')
+          )
+          then 'neutral'
+        else 'success'
+      end
+    else 'neutral'
+  end;
+$$;
+
+create or replace function boardreadyops_set_github_check_conclusion()
+returns trigger
+language plpgsql
+security invoker
+as $$
+begin
+  new.github_check_conclusion := boardreadyops_github_check_conclusion(new.status, new.decision, new.payload);
+  return new;
+end;
+$$;
+
+drop trigger if exists release_run_results_set_github_check_conclusion on release_run_results;
+create trigger release_run_results_set_github_check_conclusion
+before insert or update of status, decision, payload, github_check_conclusion
+on release_run_results
+for each row
+execute function boardreadyops_set_github_check_conclusion();
+
+update release_run_results
+set github_check_conclusion = boardreadyops_github_check_conclusion(status, decision, payload)
+where github_check_conclusion is null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'release_run_results_github_check_conclusion_valid'
+      and conrelid = 'release_run_results'::regclass
+  ) then
+    alter table release_run_results
+      add constraint release_run_results_github_check_conclusion_valid
+      check (github_check_conclusion in ('failure', 'neutral', 'success', 'timed_out'));
+  end if;
+end;
+$$;
+
+alter table release_run_results
+  alter column github_check_conclusion set not null;
+
 create or replace function boardreadyops_detect_github_check_run_reconciliation(
   p_now timestamptz,
   p_observation_delay_seconds integer,
@@ -202,7 +279,7 @@ as $$
     release_runs.id,
     release_runs.github_check_run_id,
     release_runs.status,
-    release_run_results.conclusion,
+    release_run_results.github_check_conclusion,
     coalesce(release_runs.completed_at, release_run_results.received_at),
     cpri.deadline_at
   from control_plane_reconciliation_items cpri
@@ -330,7 +407,7 @@ begin
       'checkRunId', v_run.github_check_run_id,
       'observedStatus', p_observed_status,
       'observedConclusion', p_observed_conclusion,
-      'expectedConclusion', v_result.conclusion,
+      'expectedConclusion', v_result.github_check_conclusion,
       'action', p_action,
       'outcome', v_outcome
     )),
@@ -441,7 +518,7 @@ begin
       'checkRunId', v_run.github_check_run_id,
       'observedStatus', p_observed_status,
       'observedConclusion', p_observed_conclusion,
-      'expectedConclusion', v_result.conclusion,
+      'expectedConclusion', v_result.github_check_conclusion,
       'publicFailureReason', case when v_outcome = 'failed' then p_public_failure_reason else null end,
       'outcome', v_outcome
     )),

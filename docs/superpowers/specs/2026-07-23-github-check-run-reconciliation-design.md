@@ -6,7 +6,7 @@ Converge GitHub Check Run display state after BoardReadyOps has accepted a signe
 
 ## Source of truth
 
-The persisted, signature-verified `release_run_results` row is authoritative. Reconciliation may repair GitHub presentation and publication metadata, but it must never infer or replace the release result from GitHub state.
+The persisted, signature-verified `release_run_results` row is authoritative. Schema v21 stores the exact GitHub-facing conclusion used by the result route, including neutral outcomes for accepted at-risk results. A compatibility trigger derives the same value for writes from an older web replica during a rolling deployment. Reconciliation may repair GitHub presentation and publication metadata, but it must never infer or replace the release result from GitHub state.
 
 ## Candidate detection
 
@@ -21,7 +21,7 @@ One durable `release_run / reporting_stale` reconciliation item is created with 
 
 ## Safe context
 
-The lease-bound database context contains only tenant/resource IDs, repository owner/name, Check Run ID, run status, expected conclusion, completion timestamp, and deadline. It excludes result payloads, findings, report links, artifacts, source, and credentials.
+The lease-bound database context contains only tenant/resource IDs, repository owner/name, Check Run ID, run status, the persisted GitHub-facing conclusion, completion timestamp, and deadline. It excludes result payloads, findings, report links, artifacts, source, and credentials.
 
 ## Worker flow
 

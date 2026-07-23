@@ -12,6 +12,11 @@ describe("GitHub Check Run reconciliation migration", () => {
 
   it("detects terminal results whose Check Run publication is incomplete", async () => {
     const sql = await readFile(migrationPath, "utf8");
+    expect(sql).toContain("add column if not exists github_check_conclusion text");
+    expect(sql).toContain("boardreadyops_github_check_conclusion");
+    expect(sql).toContain("boardreadyops_set_github_check_conclusion");
+    expect(sql).toContain("before insert or update of status, decision, payload, github_check_conclusion");
+    expect(sql).toContain("alter column github_check_conclusion set not null");
     expect(sql).toContain("boardreadyops_detect_github_check_run_reconciliation");
     expect(sql).toContain("release_run_results.github_check_published_at is null");
     expect(sql).toContain("release_runs.github_check_run_id is not null");
@@ -24,13 +29,19 @@ describe("GitHub Check Run reconciliation migration", () => {
   it("returns lease-bound content-free context", async () => {
     const sql = await readFile(migrationPath, "utf8");
     expect(sql).toContain("boardreadyops_claim_github_check_run_reconciliation");
-    expect(sql).toContain("boardreadyops_github_check_run_reconciliation_context");
-    expect(sql).toContain("expected_conclusion text");
-    expect(sql).toContain("github_check_run_id bigint");
-    expect(sql).toContain("lease_owner = p_worker_id");
-    expect(sql).not.toContain("payload jsonb");
-    expect(sql).not.toContain("findings");
-    expect(sql).not.toContain("report_links");
+    const contextStart = sql.indexOf(
+      "create or replace function boardreadyops_github_check_run_reconciliation_context",
+    );
+    const contextEnd = sql.indexOf("create or replace function boardreadyops_apply_github_check_run_reconciliation");
+    const contextSql = sql.slice(contextStart, contextEnd);
+    expect(contextStart).toBeGreaterThanOrEqual(0);
+    expect(contextEnd).toBeGreaterThan(contextStart);
+    expect(contextSql).toContain("expected_conclusion text");
+    expect(contextSql).toContain("github_check_run_id bigint");
+    expect(contextSql).toContain("lease_owner = p_worker_id");
+    expect(contextSql).not.toContain("payload");
+    expect(contextSql).not.toContain("findings");
+    expect(contextSql).not.toContain("report_links");
   });
 
   it("atomically records repaired or terminal publication state", async () => {

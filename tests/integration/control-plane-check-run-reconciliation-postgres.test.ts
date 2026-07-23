@@ -40,7 +40,11 @@ type TerminalFixture = {
   githubCheckRunId: number;
 };
 
-async function createTerminalFixture(label: string, conclusion: "failure" | "success"): Promise<TerminalFixture> {
+async function createTerminalFixture(
+  label: string,
+  conclusion: "failure" | "success",
+  payload: Record<string, unknown> = {},
+): Promise<TerminalFixture> {
   const staleAt = new Date(Date.now() - 10 * 60 * 1000);
   const installationId = randomUUID();
   const repositoryId = randomUUID();
@@ -84,19 +88,53 @@ async function createTerminalFixture(label: string, conclusion: "failure" | "suc
   );
   await database().query(
     `insert into release_run_results (
-       run_id, contract_version, status, conclusion, decision,
+       run_id, contract_version, status, conclusion, github_check_conclusion, decision,
        metrics, report_links, payload, result_digest, received_at
      ) values (
-       $1, 1, $2, $3, $4,
-       '{}'::jsonb, '[]'::jsonb, '{}'::jsonb, $5, $6::timestamptz
+       $1, 1, $2, $3, $3, $4,
+       '{}'::jsonb, '[]'::jsonb, $5::jsonb, $6, $7::timestamptz
      )`,
-    [releaseRunId, runStatus, conclusion, decision, "b".repeat(64), staleAt.toISOString()],
+    [releaseRunId, runStatus, conclusion, decision, JSON.stringify(payload), "b".repeat(64), staleAt.toISOString()],
   );
 
   return { installationId, repositoryId, releaseRunId, githubInstallationId, githubCheckRunId };
 }
 
 describeDatabase("GitHub Check Run PostgreSQL reconciliation", () => {
+  it("derives the exact neutral Check conclusion for accepted at-risk results", async () => {
+    const fixture = await createTerminalFixture("at-risk", "success", {
+      status: "completed",
+      decision: "pass",
+      findings: [{ ruleId: "bom.lifecycle", severity: "medium", message: "Review lifecycle status." }],
+      readiness: { status: "at-risk", warnings: ["Review required."] },
+      waivers: { active: [], expired: [] },
+    });
+    const now = new Date();
+    const store = createSqlControlPlaneOperationsStore(database(), { now: () => now, leaseSeconds: 60 });
+
+    expect(
+      rows(
+        await database().query("select github_check_conclusion from release_run_results where run_id = $1", [
+          fixture.releaseRunId,
+        ]),
+      )[0],
+    ).toEqual({ github_check_conclusion: "neutral" });
+
+    await store.detectCheckRunReconciliationCandidates({
+      observationDelaySeconds: 300,
+      terminalDeadlineSeconds: 1800,
+      limit: 10,
+    });
+    const claimed = (await store.claimCheckRunReconciliationItems({ workerId: `${testPrefix}-worker`, limit: 1 }))[0];
+    if (!claimed) throw new Error("expected one Check Run reconciliation item");
+    await expect(
+      store.loadCheckRunReconciliationContext({
+        reconciliationId: claimed.reconciliationId,
+        workerId: `${testPrefix}-worker`,
+      }),
+    ).resolves.toMatchObject({ expectedConclusion: "neutral" });
+  });
+
   it("detects, leases, and atomically repairs terminal publication state", async () => {
     const fixture = await createTerminalFixture("success", "success");
     const now = new Date();
