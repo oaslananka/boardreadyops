@@ -508,6 +508,47 @@ export function createSqlControlPlaneOperationsStore(
   const leaseSeconds = positiveInteger(options.leaseSeconds, 120, "leaseSeconds");
   const retryBaseSeconds = positiveInteger(options.retryBaseSeconds, 30, "retryBaseSeconds");
 
+  async function claimReconciliationItemsWith(
+    input: { workerId: string; limit?: number },
+    functionName:
+      | "boardreadyops_claim_control_plane_reconciliation"
+      | "boardreadyops_claim_github_workflow_reconciliation"
+      | "boardreadyops_claim_github_check_run_reconciliation",
+  ): Promise<ClaimedControlPlaneReconciliationItem[]> {
+    validIdentifier(input.workerId, "reconciliation worker id");
+    const claimedAt = now();
+    const leaseExpiresAt = new Date(claimedAt.valueOf() + leaseSeconds * 1000);
+    const limit = Math.max(1, Math.min(input.limit ?? 1, 100));
+    const result = await executor.query(
+      `select * from ${functionName}(
+         $1, $2::timestamptz, $3::timestamptz, $4::integer
+       )`,
+      [input.workerId, claimedAt.toISOString(), leaseExpiresAt.toISOString(), limit],
+    );
+    return databaseRows(result).map(decodedReconciliationItem);
+  }
+
+  async function detectReconciliationCandidatesWith(
+    input: { observationDelaySeconds: number; terminalDeadlineSeconds: number; limit?: number },
+    functionName:
+      | "boardreadyops_detect_github_check_run_reconciliation"
+      | "boardreadyops_detect_github_workflow_reconciliation",
+  ): Promise<number> {
+    const observationDelaySeconds = positiveInteger(input.observationDelaySeconds, 300, "observationDelaySeconds");
+    const terminalDeadlineSeconds = positiveInteger(input.terminalDeadlineSeconds, 1800, "terminalDeadlineSeconds");
+    if (terminalDeadlineSeconds <= observationDelaySeconds) {
+      throw new Error("terminalDeadlineSeconds must be greater than observationDelaySeconds");
+    }
+    const limit = Math.max(1, Math.min(input.limit ?? 100, 1000));
+    const result = await executor.query(
+      `select ${functionName}(
+         $1::timestamptz, $2::integer, $3::integer, $4::integer
+       ) as detected`,
+      [now().toISOString(), observationDelaySeconds, terminalDeadlineSeconds, limit],
+    );
+    return databaseRows(result)[0]?.integer("detected") ?? 0;
+  }
+
   return {
     async listDeadLetters(input) {
       validIdentifier(input.installationId, "installation id");
@@ -578,46 +619,16 @@ export function createSqlControlPlaneOperationsStore(
       return databaseRows(result)[0]?.text("outcome") === "enqueued" ? "enqueued" : "existing";
     },
 
-    async claimReconciliationItems(input) {
-      validIdentifier(input.workerId, "reconciliation worker id");
-      const claimedAt = now();
-      const leaseExpiresAt = new Date(claimedAt.valueOf() + leaseSeconds * 1000);
-      const limit = Math.max(1, Math.min(input.limit ?? 1, 100));
-      const result = await executor.query(
-        `select * from boardreadyops_claim_control_plane_reconciliation(
-           $1, $2::timestamptz, $3::timestamptz, $4::integer
-         )`,
-        [input.workerId, claimedAt.toISOString(), leaseExpiresAt.toISOString(), limit],
-      );
-      return databaseRows(result).map(decodedReconciliationItem);
+    claimReconciliationItems(input) {
+      return claimReconciliationItemsWith(input, "boardreadyops_claim_control_plane_reconciliation");
     },
 
-    async claimWorkflowReconciliationItems(input) {
-      validIdentifier(input.workerId, "reconciliation worker id");
-      const claimedAt = now();
-      const leaseExpiresAt = new Date(claimedAt.valueOf() + leaseSeconds * 1000);
-      const limit = Math.max(1, Math.min(input.limit ?? 1, 100));
-      const result = await executor.query(
-        `select * from boardreadyops_claim_github_workflow_reconciliation(
-           $1, $2::timestamptz, $3::timestamptz, $4::integer
-         )`,
-        [input.workerId, claimedAt.toISOString(), leaseExpiresAt.toISOString(), limit],
-      );
-      return databaseRows(result).map(decodedReconciliationItem);
+    claimWorkflowReconciliationItems(input) {
+      return claimReconciliationItemsWith(input, "boardreadyops_claim_github_workflow_reconciliation");
     },
 
-    async claimCheckRunReconciliationItems(input) {
-      validIdentifier(input.workerId, "reconciliation worker id");
-      const claimedAt = now();
-      const leaseExpiresAt = new Date(claimedAt.valueOf() + leaseSeconds * 1000);
-      const limit = Math.max(1, Math.min(input.limit ?? 1, 100));
-      const result = await executor.query(
-        `select * from boardreadyops_claim_github_check_run_reconciliation(
-           $1, $2::timestamptz, $3::timestamptz, $4::integer
-         )`,
-        [input.workerId, claimedAt.toISOString(), leaseExpiresAt.toISOString(), limit],
-      );
-      return databaseRows(result).map(decodedReconciliationItem);
+    claimCheckRunReconciliationItems(input) {
+      return claimReconciliationItemsWith(input, "boardreadyops_claim_github_check_run_reconciliation");
     },
 
     async completeReconciliationItem(input) {
@@ -664,36 +675,12 @@ export function createSqlControlPlaneOperationsStore(
       return outcome === "retry" || outcome === "dead_letter" ? outcome : "stale";
     },
 
-    async detectCheckRunReconciliationCandidates(input) {
-      const observationDelaySeconds = positiveInteger(input.observationDelaySeconds, 300, "observationDelaySeconds");
-      const terminalDeadlineSeconds = positiveInteger(input.terminalDeadlineSeconds, 1800, "terminalDeadlineSeconds");
-      if (terminalDeadlineSeconds <= observationDelaySeconds) {
-        throw new Error("terminalDeadlineSeconds must be greater than observationDelaySeconds");
-      }
-      const limit = Math.max(1, Math.min(input.limit ?? 100, 1000));
-      const result = await executor.query(
-        `select boardreadyops_detect_github_check_run_reconciliation(
-           $1::timestamptz, $2::integer, $3::integer, $4::integer
-         ) as detected`,
-        [now().toISOString(), observationDelaySeconds, terminalDeadlineSeconds, limit],
-      );
-      return databaseRows(result)[0]?.integer("detected") ?? 0;
+    detectCheckRunReconciliationCandidates(input) {
+      return detectReconciliationCandidatesWith(input, "boardreadyops_detect_github_check_run_reconciliation");
     },
 
-    async detectWorkflowReconciliationCandidates(input) {
-      const observationDelaySeconds = positiveInteger(input.observationDelaySeconds, 300, "observationDelaySeconds");
-      const terminalDeadlineSeconds = positiveInteger(input.terminalDeadlineSeconds, 1800, "terminalDeadlineSeconds");
-      if (terminalDeadlineSeconds <= observationDelaySeconds) {
-        throw new Error("terminalDeadlineSeconds must be greater than observationDelaySeconds");
-      }
-      const limit = Math.max(1, Math.min(input.limit ?? 100, 1000));
-      const result = await executor.query(
-        `select boardreadyops_detect_github_workflow_reconciliation(
-           $1::timestamptz, $2::integer, $3::integer, $4::integer
-         ) as detected`,
-        [now().toISOString(), observationDelaySeconds, terminalDeadlineSeconds, limit],
-      );
-      return databaseRows(result)[0]?.integer("detected") ?? 0;
+    detectWorkflowReconciliationCandidates(input) {
+      return detectReconciliationCandidatesWith(input, "boardreadyops_detect_github_workflow_reconciliation");
     },
 
     async loadCheckRunReconciliationContext(input) {
