@@ -120,7 +120,7 @@ Expected response:
 }
 ```
 
-The worker readiness response also reports the database/configuration state, the latest lifecycle and outbox polls, and scoped-concurrency `active` and `waiting` counts. A worker sets readiness false before graceful shutdown and stops claiming new batches. Existing leased work drains before the database pool closes; after an ungraceful termination, PostgreSQL lease expiry makes unfinished work claimable by another replica.
+The worker readiness response also reports the database/configuration state, the latest lifecycle, outbox, and workflow-reconciliation polls, the latest successful reconciliation, and scoped-concurrency `active` and `waiting` counts. A worker sets readiness false before graceful shutdown and stops claiming new batches. Existing leased work drains before the database pool closes; after an ungraceful termination, PostgreSQL lease expiry makes unfinished work claimable by another replica.
 
 Inspect the native Docker health state with:
 
@@ -207,6 +207,12 @@ BOARDREADYOPS_OUTBOX_CONCURRENCY=4
 BOARDREADYOPS_OUTBOX_POLL_MS=500
 BOARDREADYOPS_WORKER_METRICS_INTERVAL_MS=30000
 BOARDREADYOPS_WORKER_RETENTION_CLEANUP_INTERVAL_MS=3600000
+BOARDREADYOPS_RECONCILIATION_CONCURRENCY=2
+BOARDREADYOPS_RECONCILIATION_POLL_MS=5000
+BOARDREADYOPS_RECONCILIATION_DETECT_INTERVAL_MS=30000
+BOARDREADYOPS_RECONCILIATION_OBSERVATION_SECONDS=300
+BOARDREADYOPS_RECONCILIATION_DEADLINE_SECONDS=1800
+BOARDREADYOPS_RECONCILIATION_NEXT_CHECK_SECONDS=60
 ```
 
 For a dry run:
