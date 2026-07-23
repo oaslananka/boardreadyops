@@ -122,4 +122,63 @@ describe("GitHub workflow reconciliation reader", () => {
       }),
     ).rejects.not.toThrow("do-not-leak");
   });
+
+  it("rejects malformed inputs and missing GitHub App configuration", async () => {
+    await expect(
+      readGitHubWorkflowRun({
+        apiBaseUrl: "https://api.github.com",
+        token: "token",
+        repositoryOwner: "octo",
+        repositoryName: "board",
+        workflowRunId: "invalid",
+      }),
+    ).rejects.toThrow("invalid GitHub workflow run id");
+
+    expect(() => createGitHubWorkflowReconciliationClient({ environment: { GITHUB_APP_ID: "123" } })).toThrow(
+      "GitHub App workflow reconciliation is not configured",
+    );
+
+    const client = createGitHubWorkflowReconciliationClient({
+      environment: {
+        GITHUB_APP_ID: "123",
+        GITHUB_APP_PRIVATE_KEY: "line-1\\nline-2",
+      },
+      authFactory: vi.fn(() => vi.fn(async () => ({ token: "token" }))),
+      request: vi.fn(async () => jsonResponse({ status: "queued" })),
+    });
+    await expect(
+      client.readWorkflowRun({
+        githubInstallationId: 0,
+        repositoryOwner: "octo",
+        repositoryName: "board",
+        workflowRunId: "987",
+      }),
+    ).rejects.toThrow("invalid GitHub installation id");
+  });
+
+  it("rejects unreadable and structurally invalid successful responses", async () => {
+    const unreadable = vi.fn(async () => new Response("not-json", { status: 200 }));
+    await expect(
+      readGitHubWorkflowRun({
+        apiBaseUrl: "https://api.github.com/",
+        token: "token",
+        repositoryOwner: "octo",
+        repositoryName: "board",
+        workflowRunId: "987",
+        request: unreadable,
+      }),
+    ).rejects.toThrow("GitHub workflow lookup returned an unreadable response");
+
+    const invalid = vi.fn(async () => jsonResponse(null));
+    await expect(
+      readGitHubWorkflowRun({
+        apiBaseUrl: "https://api.github.com",
+        token: "token",
+        repositoryOwner: "octo",
+        repositoryName: "board",
+        workflowRunId: "987",
+        request: invalid,
+      }),
+    ).rejects.toThrow("GitHub workflow lookup returned an invalid response");
+  });
 });

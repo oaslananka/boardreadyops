@@ -294,4 +294,39 @@ describe("control-plane workflow reconciliation", () => {
     );
     expect(operations.failReconciliationItem.mock.calls[0]?.[0]?.errorMessage).not.toContain("secret-value");
   });
+
+  it("falls back to bounded failure handling when deadline terminalization races", async () => {
+    const overdueContext = { ...context, deadlineAt: "2026-07-23T15:59:00.000Z" };
+    const operations = {
+      loadWorkflowReconciliationContext: vi.fn(async () => overdueContext),
+      rescheduleReconciliationItem: vi.fn(async () => "rescheduled" as const),
+      applyWorkflowReconciliation: vi.fn(async () => {
+        throw new Error("lease changed");
+      }),
+      completeReconciliationItem: vi.fn(async () => "completed" as const),
+      failReconciliationItem: vi.fn(
+        async (
+          _input: Parameters<ControlPlaneWorkflowReconciliationDependencies["operations"]["failReconciliationItem"]>[0],
+        ) => "retry" as const,
+      ),
+    };
+    const deps: ControlPlaneWorkflowReconciliationDependencies = {
+      workerId: "worker-1",
+      operations,
+      github: {
+        readWorkflowRun: vi.fn(async () => {
+          throw new Error("upstream unavailable");
+        }),
+      },
+      now: () => now,
+      nextCheckSeconds: 60,
+    };
+
+    await expect(processControlPlaneWorkflowReconciliation(item, deps)).resolves.toEqual({
+      reconciliationId: "reconciliation-1",
+      status: "retry",
+      outcomeCode: "github_lookup_failed",
+    });
+    expect(operations.failReconciliationItem).toHaveBeenCalledWith(expect.objectContaining({ errorClass: "Error" }));
+  });
 });

@@ -81,7 +81,7 @@ export function createGitHubWorkflowReconciliationClient(
 ): GitHubWorkflowReconciliationClient {
   const environment = options.environment ?? process.env;
   const appId = environment.GITHUB_APP_ID?.trim();
-  const privateKey = environment.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/gu, "\n").trim();
+  const privateKey = environment.GITHUB_APP_PRIVATE_KEY?.replaceAll("\\n", "\n").trim();
   if (!appId || !privateKey) throw new Error("GitHub App workflow reconciliation is not configured");
   const apiBaseUrl = environment.GITHUB_API_BASE_URL?.trim() || "https://api.github.com";
   const authFactory = options.authFactory ?? (createAppAuth as unknown as AuthFactory);
