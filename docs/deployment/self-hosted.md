@@ -67,20 +67,28 @@ The maintenance loop emits a global `worker.control_plane_sli` event on the same
 
 The query never returns repository source, findings, payloads, artifact names, commit messages, credentials, or tokens. A failed SLI query does not affect worker readiness or queue processing; the worker emits `worker.control_plane_sli_failed` with only `errorClass`. Queue metric collection and SLI collection fail independently.
 
-Use the following as initial observation thresholds, not paging SLOs. Tune them from production baselines before turning them into alerts:
+## Initial GitHub Cloud GA SLO policy
 
-| Signal | Initial observation threshold |
-| --- | --- |
-| Webhook acceptance p95 | `> 1,000 ms` for 5 minutes |
-| Lifecycle queue age | `> 60 seconds` for 5 minutes |
-| Outbox lag | `> 60 seconds` for 5 minutes |
-| Dispatch latency p95 | `> 30 seconds` for 10 minutes |
-| Completion latency p95 | `> 1,800 seconds` for 10 minutes |
-| Stale attempts | `> 0` for two consecutive snapshots |
-| Reconciliation backlog | `> 20` or increasing for three consecutive snapshots |
-| Terminal failure rate | `> 500` basis points with at least 20 terminal runs in 24 hours |
+The initial alert policy is versioned as `github-cloud-ga-v1`. It evaluates only the aggregate snapshot above and emits transition events without repository, installation, source, finding, payload, artifact, credential, or token fields.
 
-`reconciliationRepairs24h` is diagnostic: a sudden increase should be correlated with GitHub incidents, worker restarts, queue lag, and terminal failures rather than alerted on by itself. Formal availability objectives, burn-rate alerts, and escalation policy remain a later issue #190 delivery slice.
+| Signal | Alert trigger | Severity |
+| --- | --- | --- |
+| Webhook acceptance p95 | `> 1,000 ms` for 5 minutes | warning |
+| Lifecycle queue age | `> 60 seconds` for 5 minutes | critical |
+| Outbox lag | `> 60 seconds` for 5 minutes | critical |
+| Dispatch latency p95 | `> 30 seconds` for 10 minutes | warning |
+| Completion latency p95 | `> 1,800 seconds` for 10 minutes | warning |
+| Stale attempts | `> 0` for two consecutive snapshots | critical |
+| Reconciliation backlog | `> 20` immediately or increasing for three consecutive snapshots | warning |
+| Terminal failure rate | `> 500` basis points with at least 20 terminal runs in 24 hours | critical |
+
+The terminal failure-rate gate is 500 basis points and is evaluated only when there are at least 20 terminal runs in the preceding 24 hours.
+
+Every successful snapshot emits `worker.control_plane_slo_evaluation` with the policy version, aggregate health, and active signal names. A signal emits `worker.control_plane_slo_firing` only when it first enters the alerting state and `worker.control_plane_slo_recovered` only when it leaves that state. Repeated breached snapshots do not repeat the firing transition.
+
+Critical transitions page the platform on-call. Warning transitions open or update operational triage and should be correlated with GitHub status, worker restarts, queue lag, outbox lag, and reconciliation activity. `reconciliationRepairs24h` remains diagnostic and does not alert by itself.
+
+If policy evaluation throws, the worker emits `worker.control_plane_slo_failed` with only `errorClass`. SLI collection or SLO evaluation failure does not affect worker readiness or queue processing. The evaluator keeps debounce state in memory, so a worker restart resets local duration and consecutive-snapshot history. External log or metrics infrastructure must retain durable incident state and must not treat a worker restart as recovery.
 
 ## Control-plane worker boundary
 
