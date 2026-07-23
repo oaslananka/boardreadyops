@@ -1,18 +1,22 @@
 # Branch Protection
 
 The active `main` branch policy is stored as code in
-`.github/rulesets/main.json`. The ruleset requires signed commits and one independent approving review,
-dismisses stale approvals after reviewable pushes, blocks unresolved review
-conversations, enforces strict stable checks, and permits only squash merges.
+`.github/rulesets/main.json`. The ruleset requires signed commits, zero required
+human approvals while the repository has a single maintainer, resolved review
+conversations, strict stable checks, and squash-only merges. Stale-review
+dismissal remains enabled so the policy can be tightened without changing its
+baseline semantics.
 
-CODEOWNERS review is not required while the repository has a single maintainer;
-the global independent-review rule remains mandatory. Trusted automation can
-open and update pull requests but has no silent review bypass.
+CODEOWNERS continues to record ownership, but CODEOWNERS review is not required
+while `@oaslananka` is the sole maintainer. Trusted automation can open and
+update pull requests; the maintainer must still inspect bot, agent, security, and
+CI feedback before merge.
 
-The repository administrator role has a PR-only emergency bypass. Direct pushes
-remain blocked. Every bypass requires green checks, a documented reason and
-rollback plan, the `manual-review` label, and a retrospective review within two
-business days.
+The repository administrator role has a PR-only emergency bypass for exceptional
+ruleset or CI infrastructure failures. Direct pushes remain blocked. Every
+bypass requires available checks to be green, a documented reason and rollback
+plan, the `manual-review` label, and a retrospective review within two business
+days.
 
 ## Apply or update the ruleset
 

@@ -4,6 +4,8 @@ Audit date: 2026-07-02
 Repository: `oaslananka/boardreadyops`
 Mode: audit plus low-risk implementation pull request
 
+Current-policy note: since 2026-07-23, the live and committed `main` ruleset uses zero required human approvals for the single-maintainer model while retaining signed commits, strict checks, resolved review conversations, and squash-only merges. Statements below about one required approval describe the 2026-07-02 audit snapshot.
+
 ## Executive summary
 
 BoardReadyOps is already above basic open-source hygiene. It has a clear README,

@@ -37,26 +37,29 @@ policy decisions and external GitHub settings.
 
 ## Review Model
 
-Every pull request targeting `main` must pass the required CI gates and receive
-one independent approving review from a reviewer with repository write access.
-Approvals are dismissed when reviewable commits change, and all review
-conversations must be resolved before merge. Automated review tools are
-supporting evidence; they do not replace the required human approval.
+Every pull request targeting `main` must pass the required CI gates. Because the
+repository currently has one maintainer, the branch ruleset enforces zero
+required human approvals. All review conversations must still be resolved before
+merge, and the maintainer must inspect automated review, security, coverage, and
+CI evidence before making the merge decision.
 
-The repository is currently maintained by one administrator. Normal reviewed
-merges therefore require onboarding another trusted reviewer. The administrator
-role has a PR-only emergency bypass so urgent work can still be merged through a
-visible pull request; it does not permit direct pushes to `main`.
+When a second trusted maintainer with repository write access is onboarded,
+revisit this policy and consider requiring one independent approval. Until then,
+requiring the sole author to obtain an impossible independent review would block
+normal maintenance without adding a real control.
 
-Use the PR-only emergency bypass only when an eligible reviewer is unavailable
-and delaying the change creates a material security, release, or availability
-risk. The pull request must have green required checks, carry `manual-review`,
-and include a comment explaining the reason and scope. Record a retrospective
-review within two business days and open follow-up issues for any findings.
+The administrator role retains a PR-only emergency bypass for exceptional
+ruleset or CI infrastructure failures; it does not permit direct pushes to
+`main`. Use the bypass only when delaying a material security, release, or
+availability fix is riskier than proceeding. The pull request must have all
+available checks green, carry `manual-review`, and document the reason, scope,
+and rollback plan. Record a retrospective review within two business days and
+open follow-up issues for any findings.
 
 Release Please, Renovate, and other automation may create and update pull
-requests, but they do not bypass review. Their pull requests require normal
-approval or the same documented emergency procedure.
+requests. Their pull requests do not require a human approval while the project
+is single-maintainer, but they must pass the same required checks, resolve all
+review conversations, and receive an explicit maintainer merge decision.
 
 ## CODEOWNERS
 
@@ -93,9 +96,9 @@ Required policy:
 ## Branch Protection
 
 The committed repository ruleset at `.github/rulesets/main.json` is the source
-of truth for `main`. It requires signed commits, one approval, stale-approval dismissal, resolved
-review conversations, strict stable status checks, linear history, and
-squash-only merging. The admin bypass is limited to pull requests.
+of truth for `main`. It requires signed commits, zero required human approvals while the project is
+single-maintainer, stale-review dismissal, resolved review conversations, strict
+stable status checks, linear history, and squash-only merging. The admin bypass is limited to pull requests.
 
 Apply or update the ruleset from an authenticated administrator context:
 
