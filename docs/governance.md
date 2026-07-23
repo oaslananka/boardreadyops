@@ -27,19 +27,22 @@ Every pull request must:
 
 ## Review And Ownership
 
-Every pull request targeting `main` requires one independent approving review
-from a reviewer with write access. A review is no longer valid after a
-reviewable commit changes, and unresolved review conversations block merge.
-Automated analysis is evidence for the reviewer, not a replacement for approval.
+Every pull request targeting `main` must pass the required checks. While
+`@oaslananka` is the sole maintainer, the ruleset uses zero required human
+approvals. Unresolved review conversations still block merge, and the maintainer
+must inspect automated analysis, security findings, coverage, and CI evidence
+before merging.
 
 `CODEOWNERS` continues to identify responsible ownership. CODEOWNERS review is
 not required while `@oaslananka` is both the sole code owner and sole maintainer,
-because that setting would not provide an independent reviewer. Re-evaluate it
-when another maintainer or dedicated security owner is onboarded.
+because that setting would not provide an independent reviewer. Re-evaluate both
+CODEOWNERS review and a one-approval rule when another trusted maintainer or
+dedicated security owner is onboarded.
 
 Release Please, Renovate, Dependabot, GitHub Actions, and other automation have
-no silent review bypass. They may create or update pull requests, which then
-follow the same review policy.
+no silent merge path. They may create or update pull requests, which must pass
+the same checks, resolve review conversations, and receive an explicit maintainer
+merge decision.
 
 ## Branch Protection Baseline
 
@@ -47,7 +50,7 @@ follow the same review policy.
 source of truth. The active baseline requires:
 
 - signed commits with a GitHub-verified signature;
-- one independent approving review;
+- zero required human approvals while the repository remains single-maintainer;
 - stale approvals dismissed after reviewable pushes;
 - all review conversations resolved;
 - strict required status checks and an up-to-date branch;
@@ -79,8 +82,8 @@ The only bypass actor is the repository administrator role with
 `bypass_mode: pull_request`. This PR-only emergency bypass preserves the pull
 request and audit trail and cannot be used for a direct push.
 
-Use it only when no eligible reviewer is available and delay creates a material
-security, release, or availability risk. Before merge:
+Use it only when a ruleset or CI infrastructure failure blocks a material
+security, release, or availability fix. Before merge:
 
 1. all required checks must be green;
 2. the pull request must carry `manual-review`;

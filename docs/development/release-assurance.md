@@ -4,25 +4,31 @@ BoardReadyOps releases must be repeatable, reviewable, and easy to audit.
 
 ## Branch controls
 
-The `main` branch uses strict required checks, one required approving review, code owner review, stale review dismissal, conversation resolution, linear history, disabled force pushes, disabled deletion, and admin enforcement.
+The `main` branch uses strict required checks, zero required human approvals for
+the current single-maintainer model, resolved review conversations, linear
+history, signed commits, disabled force pushes, disabled deletion, squash-only
+merges, and a PR-only administrator bypass. CODEOWNERS review is not required
+while the sole code owner and sole maintainer are the same person.
 
-Required commit signatures are not enabled yet. That remains an explicit future hardening decision, not an assumed control.
+Every squash merge to `main` must produce a GitHub-verified commit. Review and
+CODEOWNERS approval requirements should be reconsidered when a second trusted
+maintainer is onboarded.
 
 ### Required status checks
 
-The following CI jobs are expected as required status checks on `main`. Maintainers should confirm these match the current `ci.yml` job names when updating branch protection:
+The committed ruleset requires these stable contexts on `main`:
 
+- `ci / risk-profile`
 - `ci / lint`
 - `ci / typecheck`
 - `ci / test-unit`
-- `ci / test-int (KiCad 10.0, Node 22)`
-- `ci / test-int (KiCad 10.0, Node 24)`
 - `ci / build`
 - `ci / verify-dist`
-- `ci / coverage-gate`
-- `lint-fast`
+- `security / gate`
 
-Jobs that are conditionally skipped (e.g. `ci / mutation`, `ci / test-action`) are not required by default. Update this list when workflow jobs are added, renamed, or removed.
+Conditional matrix, integration, accessibility, coverage, mutation, and
+specialist scanner jobs continue to run according to the risk profile, but their
+individual names are not branch-protection contracts.
 
 ## Release checks
 

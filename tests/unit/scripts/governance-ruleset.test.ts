@@ -33,7 +33,7 @@ type StatusChecksRule = {
 };
 
 describe("main branch governance ruleset", () => {
-  it("requires independent review, fresh approvals, and resolved conversations", async () => {
+  it("supports solo-maintainer merges while requiring resolved conversations", async () => {
     const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
       rules: Array<PullRequestRule | StatusChecksRule | { type: string }>;
       bypass_actors: Array<{ actor_id: number; actor_type: string; bypass_mode: string }>;
@@ -45,7 +45,7 @@ describe("main branch governance ruleset", () => {
       dismiss_stale_reviews_on_push: true,
       require_code_owner_review: false,
       require_last_push_approval: false,
-      required_approving_review_count: 1,
+      required_approving_review_count: 0,
       required_review_thread_resolution: true,
     });
     expect(ruleset.bypass_actors).toEqual([{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" }]);
@@ -109,14 +109,14 @@ describe("main branch governance ruleset", () => {
     },
   );
 
-  it("documents the independent-review and PR-only emergency bypass policy", async () => {
+  it("documents the solo-maintainer review and PR-only emergency bypass policy", async () => {
     const governance = await repositoryFile("GOVERNANCE.md");
     const detailedGovernance = await repositoryFile("docs/governance.md");
     const setup = await repositoryFile("scripts/setup-branch-protection.sh");
 
     for (const document of [governance, detailedGovernance]) {
       const normalized = document.replace(/\s+/g, " ");
-      expect(normalized).toContain("one independent approving review");
+      expect(normalized).toContain("zero required human approvals");
       expect(normalized).toContain("signed commits");
       expect(normalized).toContain("PR-only emergency bypass");
       expect(normalized).toContain("retrospective review");
