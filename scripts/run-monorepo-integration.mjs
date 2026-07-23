@@ -64,7 +64,10 @@ export function buildKicadCliCandidates({ environment = process.env, platform = 
     return [explicit];
   }
   if (platform === "win32") {
-    return ["C:\\Program Files\\KiCad\\10.1\\bin\\kicad-cli.exe", "C:\\Program Files\\KiCad\\10.0\\bin\\kicad-cli.exe"];
+    return [
+      String.raw`C:\Program Files\KiCad\10.1\bin\kicad-cli.exe`,
+      String.raw`C:\Program Files\KiCad\10.0\bin\kicad-cli.exe`,
+    ];
   }
   if (platform === "darwin") {
     return ["/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"];
