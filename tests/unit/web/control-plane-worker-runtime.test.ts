@@ -182,4 +182,15 @@ describe("control-plane worker runtime", () => {
     expect(source).toContain('"worker.control_plane_sli"');
     expect(source).toContain('"worker.control_plane_sli_failed"');
   });
+
+  it("wires workflow reconciliation detection and processing loops", () => {
+    const source = workerSource();
+
+    expect(source).toContain("operations.detectWorkflowReconciliationCandidates");
+    expect(source).toContain("operations.claimWorkflowReconciliationItems");
+    expect(source).toContain("processControlPlaneWorkflowReconciliation");
+    expect(source).toContain("createGitHubWorkflowReconciliationClient");
+    expect(source).toContain("reconciliation deadline must be greater than observation delay");
+    expect(source).toContain('"worker.reconciliation_terminal"');
+  });
 });

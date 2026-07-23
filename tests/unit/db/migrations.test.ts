@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(19);
+    expect(cloudDatabaseSchemaVersion).toBe(20);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -48,6 +48,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0017_release_run_outbox_producer.sql",
       "0018_control_plane_outbox_transitions.sql",
       "0019_control_plane_reconciliation_operations.sql",
+      "0020_github_workflow_reconciliation.sql",
     ]);
   });
 
