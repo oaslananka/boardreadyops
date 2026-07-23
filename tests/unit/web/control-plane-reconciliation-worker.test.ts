@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { processControlPlaneWorkflowReconciliation } from "../../../apps/web/lib/control-plane-reconciliation-worker.js";
+import {
+  type ControlPlaneWorkflowReconciliationDependencies,
+  processControlPlaneWorkflowReconciliation,
+} from "../../../apps/web/lib/control-plane-reconciliation-worker.js";
+import type { GitHubWorkflowObservation } from "../../../apps/web/lib/github-workflow-reconciliation-client.js";
 import type {
   ClaimedControlPlaneReconciliationItem,
   ControlPlaneWorkflowReconciliationContext,
@@ -34,7 +38,10 @@ const context: ControlPlaneWorkflowReconciliationContext = {
   deadlineAt: "2026-07-23T16:10:00.000Z",
 };
 
-function dependencies(observation: unknown, overrides: Record<string, unknown> = {}) {
+function dependencies(
+  observation: GitHubWorkflowObservation,
+  overrides: Partial<ControlPlaneWorkflowReconciliationDependencies> = {},
+): ControlPlaneWorkflowReconciliationDependencies {
   const operations = {
     loadWorkflowReconciliationContext: vi.fn(async () => context),
     rescheduleReconciliationItem: vi.fn(async () => "rescheduled" as const),
@@ -162,6 +169,7 @@ describe("control-plane workflow reconciliation", () => {
           loadWorkflowReconciliationContext: vi.fn(async () => overdueContext),
           rescheduleReconciliationItem: vi.fn(async () => "rescheduled" as const),
           applyWorkflowReconciliation: vi.fn(async () => "applied" as const),
+          completeReconciliationItem: vi.fn(async () => "completed" as const),
           failReconciliationItem: vi.fn(async () => "retry" as const),
         },
       },
@@ -185,10 +193,10 @@ describe("control-plane workflow reconciliation", () => {
       completeReconciliationItem: vi.fn(async () => "completed" as const),
       failReconciliationItem: vi.fn(async () => "retry" as const),
     };
-    const deps = {
+    const deps: ControlPlaneWorkflowReconciliationDependencies = {
       workerId: "worker-1",
       operations,
-      github: { readWorkflowRun: vi.fn() },
+      github: { readWorkflowRun: vi.fn(async () => ({ kind: "not_found" as const })) },
       now: () => now,
       nextCheckSeconds: 60,
     };
@@ -214,9 +222,13 @@ describe("control-plane workflow reconciliation", () => {
       rescheduleReconciliationItem: vi.fn(async () => "rescheduled" as const),
       applyWorkflowReconciliation: vi.fn(async () => "applied" as const),
       completeReconciliationItem: vi.fn(async () => "completed" as const),
-      failReconciliationItem: vi.fn(async () => "retry" as const),
+      failReconciliationItem: vi.fn(
+        async (
+          _input: Parameters<ControlPlaneWorkflowReconciliationDependencies["operations"]["failReconciliationItem"]>[0],
+        ) => "retry" as const,
+      ),
     };
-    const deps = {
+    const deps: ControlPlaneWorkflowReconciliationDependencies = {
       workerId: "worker-1",
       operations,
       github: {
@@ -248,9 +260,14 @@ describe("control-plane workflow reconciliation", () => {
       loadWorkflowReconciliationContext: vi.fn(async () => context),
       rescheduleReconciliationItem: vi.fn(async () => "rescheduled" as const),
       applyWorkflowReconciliation: vi.fn(async () => "applied" as const),
-      failReconciliationItem: vi.fn(async () => "retry" as const),
+      completeReconciliationItem: vi.fn(async () => "completed" as const),
+      failReconciliationItem: vi.fn(
+        async (
+          _input: Parameters<ControlPlaneWorkflowReconciliationDependencies["operations"]["failReconciliationItem"]>[0],
+        ) => "retry" as const,
+      ),
     };
-    const deps = {
+    const deps: ControlPlaneWorkflowReconciliationDependencies = {
       workerId: "worker-1",
       operations,
       github: {
