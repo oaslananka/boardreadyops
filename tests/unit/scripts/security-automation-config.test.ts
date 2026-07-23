@@ -115,6 +115,10 @@ describe("dependency and security automation configuration", () => {
 
     expect(webDockerfile).toContain("USER node");
     expect(webDockerfile).toContain("COPY --chown=node:node --from=build");
+    expect(webDockerfile).toContain("COPY apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint");
+    expect(webDockerfile).not.toContain(
+      "COPY --chown=node:node apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint",
+    );
     expect(actionDockerfile).not.toContain("\nUSER ");
     expect(actionDockerfile).toContain(
       "# nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint",

@@ -43,7 +43,7 @@ COPY --chown=node:node --from=build /app/apps/web/.next/static ./apps/web/.next/
 COPY --chown=node:node --from=build /app/apps/web/.next/worker.mjs ./worker.mjs
 COPY --chown=node:node --from=build /app/apps/web/.next/migrate.mjs ./migrate.mjs
 COPY --chown=node:node --from=build /app/apps/web/public ./apps/web/public
-COPY --chown=node:node apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint
+COPY apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint
 RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint
 
 USER node
