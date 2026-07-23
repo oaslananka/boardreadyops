@@ -91,7 +91,7 @@
 - [ ] Add environment placeholders and the operations runbook page.
 - [ ] Add the page to MkDocs navigation.
 - [ ] Re-run documentation tests and confirm GREEN.
-- [ ] Run `pnpm run docs:build` through the repository toolchain.
+- [ ] Run `pnpm run docs` through the repository toolchain and then run the strict MkDocs build used by CI.
 
 ### Task 5: Verification and delivery
 
