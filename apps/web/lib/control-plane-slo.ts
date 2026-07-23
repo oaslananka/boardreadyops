@@ -2,7 +2,7 @@ import type { ControlPlaneSliSnapshot } from "@boardreadyops/db/control-plane-op
 
 export const CONTROL_PLANE_SLO_POLICY_VERSION = "github-cloud-ga-v1" as const;
 
-export type ControlPlaneSloSignal =
+type ControlPlaneSloSignal =
   | "webhook_acceptance_p95"
   | "lifecycle_queue_age"
   | "outbox_lag"
@@ -12,10 +12,10 @@ export type ControlPlaneSloSignal =
   | "reconciliation_backlog"
   | "terminal_failure_rate";
 
-export type ControlPlaneSloSeverity = "critical" | "warning";
-export type ControlPlaneSloTransitionState = "firing" | "recovered";
+type ControlPlaneSloSeverity = "critical" | "warning";
+type ControlPlaneSloTransitionState = "firing" | "recovered";
 
-export type ControlPlaneSloTransition = {
+type ControlPlaneSloTransition = {
   policyVersion: typeof CONTROL_PLANE_SLO_POLICY_VERSION;
   signal: ControlPlaneSloSignal;
   state: ControlPlaneSloTransitionState;
@@ -26,7 +26,7 @@ export type ControlPlaneSloTransition = {
   reasonCode: string;
 };
 
-export type ControlPlaneSloEvaluation = {
+type ControlPlaneSloEvaluation = {
   policyVersion: typeof CONTROL_PLANE_SLO_POLICY_VERSION;
   healthy: boolean;
   activeSignals: ControlPlaneSloSignal[];
