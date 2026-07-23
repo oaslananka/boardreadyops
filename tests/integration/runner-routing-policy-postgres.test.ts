@@ -2,8 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { createSqlRunnerLeaseStore } from "../../packages/db/src/runner-lease-store.js";
+import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
 let githubIdentifier = 980_000_000;

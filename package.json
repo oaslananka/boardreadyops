@@ -48,7 +48,7 @@
     "test:snapshot": "vitest run tests/snapshot",
     "test:bench": "vitest bench",
     "coverage": "pnpm run build && vitest run --coverage tests/unit tests/action tests/property tests/snapshot",
-    "coverage:ci": "pnpm run build && node scripts/run-codecov-coverage.mjs",
+    "coverage:ci": "pnpm run coverage:all",
     "codecov:bundle": "node scripts/run-codecov-bundle-analysis.mjs",
     "benchmark": "vitest bench --run",
     "mutation": "stryker run",
@@ -99,7 +99,12 @@
     "toolchain:env": "node scripts/toolchain.mjs print-env",
     "workflow:lint": "node scripts/toolchain.mjs run pre-commit run actionlint --all-files && node scripts/toolchain.mjs run pre-commit run zizmor --all-files",
     "verify:all": "node scripts/toolchain.mjs run corepack pnpm run verify:all:inner",
-    "verify:all:inner": "node scripts/toolchain.mjs doctor --strict && pnpm run verify && pnpm run cloud:typecheck && pnpm run cloud:build && pnpm run workflow:lint"
+    "verify:all:inner": "node scripts/toolchain.mjs doctor --strict && pnpm run verify && pnpm run test:int:monorepo && pnpm run cloud:typecheck && pnpm run cloud:build && pnpm run workflow:lint && pnpm run coverage:cloud && pnpm run verify:summary",
+    "coverage:core": "pnpm run build && node scripts/run-codecov-coverage.mjs",
+    "coverage:cloud": "node scripts/run-cloud-codecov-coverage.mjs",
+    "coverage:all": "pnpm run coverage:core && pnpm run coverage:cloud",
+    "verify:summary": "node scripts/verification-summary.mjs",
+    "test:int:monorepo": "node scripts/run-monorepo-integration.mjs"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [
