@@ -15,8 +15,9 @@ permissions:
   contents: read
 
 env:
+  ALLOW_MAJOR_RELEASE: "true"
+  DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain
   NODE_VERSION: "24.18.0"
-
   UV_VERSION: "0.11.16"
 
 jobs:
@@ -185,6 +186,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
+      BOARDREADYOPS_POSTGRES_TESTS: "true"
       DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test
     services:
       postgres:
@@ -435,8 +437,8 @@ jobs:
           disable_search: true
           files: coverage/lcov.info
           fail_ci_if_error: false
-          flags: unit
-          name: boardreadyops-unit-coverage
+          flags: core
+          name: boardreadyops-core-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -445,8 +447,29 @@ jobs:
           disable_search: true
           files: coverage/test-results.junit.xml
           fail_ci_if_error: false
-          flags: unit
-          name: boardreadyops-unit-tests
+          flags: core
+          name: boardreadyops-core-tests
+          report_type: test_results
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload cloud coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          disable_search: true
+          files: coverage/cloud/lcov.info
+          fail_ci_if_error: false
+          flags: cloud
+          name: boardreadyops-cloud-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload cloud test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        with:
+          disable_search: true
+          files: coverage/cloud/test-results.junit.xml
+          fail_ci_if_error: false
+          flags: cloud
+          name: boardreadyops-cloud-tests
           report_type: test_results
           token: ${{ secrets.CODECOV_TOKEN }}
 

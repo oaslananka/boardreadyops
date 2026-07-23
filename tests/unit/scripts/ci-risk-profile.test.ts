@@ -67,6 +67,18 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("runs cloud coverage for changed cloud paths", () => {
+    for (const file of [
+      "apps/web/lib/cloud-readiness.ts",
+      "packages/cloud-core/src/lifecycle.ts",
+      "packages/contracts/src/runner-protocol.ts",
+      "packages/db/src/lifecycle-store.ts",
+      "vitest.cloud.config.ts",
+    ]) {
+      expect(classifyChangedFiles([file], { eventName: "pull_request" }).needs_coverage, file).toBe(true);
+    }
+  });
+
   it("runs the coverage gate when only tests change", () => {
     const profile = classifyChangedFiles(["tests/unit/report/html.test.ts"], { eventName: "pull_request" });
     expect(profile.needs_coverage).toBe(true);

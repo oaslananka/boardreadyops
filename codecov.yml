@@ -16,20 +16,29 @@ coverage:
         threshold: 1%
         informational: true
         flags:
-          - unit
+          - core
+          - cloud
     patch:
       default:
         target: auto
         threshold: 1%
         informational: true
         flags:
-          - unit
+          - core
+          - cloud
     changes: false
 
 flags:
-  unit:
+  core:
     paths:
       - src/
+    carryforward: true
+  cloud:
+    paths:
+      - apps/web/
+      - packages/cloud-core/
+      - packages/contracts/
+      - packages/db/
     carryforward: true
 
 component_management:
@@ -63,6 +72,16 @@ component_management:
       name: GitHub Action inputs
       paths:
         - src/action/inputs.ts
+    - component_id: cloud_control_plane
+      name: Cloud control plane
+      paths:
+        - packages/cloud-core/**
+        - packages/contracts/**
+        - packages/db/**
+    - component_id: hosted_web
+      name: Hosted web application
+      paths:
+        - apps/web/**
 
 bundle_analysis:
   warning_threshold: "5%"

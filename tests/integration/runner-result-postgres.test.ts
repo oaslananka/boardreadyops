@@ -2,8 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { handleResultRequest, type ResultRouteDependencies } from "../../apps/web/app/api/v1/runs/result/route.js";
 import { createSqlGitHubAppLifecycleStore } from "../../packages/db/src/lifecycle-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
+import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 1 }) : undefined;
 const installationId = "11111111-1111-4111-8111-111111111111";

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
+import { buildCloudCoverageArguments } from "../../../scripts/run-cloud-codecov-coverage.mjs";
 import { buildCodecovBundleOptions } from "../../../scripts/run-codecov-bundle-analysis.mjs";
 import { buildCodecovCoverageArguments } from "../../../scripts/run-codecov-coverage.mjs";
 
@@ -17,6 +18,9 @@ describe("Codecov integration", () => {
     expect(local).not.toContain("--reporter=github-actions");
     expect(github).toContain("--reporter=github-actions");
     expect(github).toContain("--outputFile.junit=coverage/test-results.junit.xml");
+    expect(buildCloudCoverageArguments({ githubActions: true })).toContain(
+      "--outputFile.junit=coverage/cloud/test-results.junit.xml",
+    );
   });
 
   it("uses a bundle token only when one is available", () => {
@@ -32,11 +36,15 @@ describe("Codecov integration", () => {
     const workflow = await text(".github/workflows/ci.yml");
     const coverageCi = packageJson.scripts?.["coverage:ci"] ?? "";
 
-    expect(coverageCi).toBe("pnpm run build && node scripts/run-codecov-coverage.mjs");
+    expect(coverageCi).toBe("pnpm run coverage:all");
     expect(workflow).toContain("run: pnpm run coverage:ci");
-    expect(workflow.match(/codecov\/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f/gu)).toHaveLength(2);
+    expect(workflow.match(/codecov\/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f/gu)).toHaveLength(4);
     expect(workflow).toContain("report_type: test_results");
     expect(workflow).toContain("files: coverage/test-results.junit.xml");
+    expect(workflow).toContain("files: coverage/cloud/lcov.info");
+    expect(workflow).toContain("files: coverage/cloud/test-results.junit.xml");
+    expect(workflow).toContain("flags: core");
+    expect(workflow).toContain("flags: cloud");
     expect(workflow.match(/if: \$\{\{ !cancelled\(\) \}\}/gu)?.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -49,6 +57,7 @@ describe("Codecov integration", () => {
     expect(serialized).toContain("reporting_notifications");
     expect(serialized).toContain("bundle_analysis");
     expect(serialized).toContain("informational");
+    expect(serialized).toContain('"cloud"');
     expect(serialized).not.toContain('"integration"');
   });
 

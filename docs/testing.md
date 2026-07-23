@@ -29,13 +29,16 @@ Use unit tests for new helpers, rule branches, report formatting, config validat
 
 ## Integration Tests
 
-Integration tests live under `tests/integration/` and exercise CLI behavior, multi-project discovery, cross-platform path handling, fabrication diffs, and the fixture corpus.
+Integration tests live under `tests/integration/` and exercise CLI behavior, multi-project discovery, cross-platform path handling, fabrication diffs, the fixture corpus, and PostgreSQL-backed cloud persistence.
 
 ```bash
 corepack pnpm run test:int
+corepack pnpm run test:int:monorepo
 ```
 
-Use integration tests when behavior crosses the CLI, project discovery, fixture layout, or filesystem boundaries.
+`test:int:monorepo` always runs the environment-independent integration files and records their status for the `verify:all` summary. PostgreSQL files require both `BOARDREADYOPS_POSTGRES_TESTS=true` and a disposable `DATABASE_URL`; the repository-local toolchain placeholder is never accepted as a test database. CI uses the same opt-in contract.
+
+Use integration tests when behavior crosses the CLI, project discovery, fixture layout, filesystem, cloud persistence, or runtime boundaries.
 
 ## Property Tests
 

@@ -6,8 +6,9 @@ import {
   createSqlRunnerLeaseStore,
   type RunnerLeaseStore,
 } from "../../packages/db/src/runner-lease-store.js";
+import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
 let githubIdentifier = 970_000_000;
