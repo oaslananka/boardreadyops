@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { access, chmod, lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, chmod, lstat, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -19,6 +19,8 @@ export function resolveToolchainPaths(repositoryRoot, cacheRoot = defaultCacheRo
   const cache = path.join(cacheRoot, "toolchain-v1");
   const venv = path.join(root, "venv");
   const windows = process.platform === "win32";
+  const browserRuntime = path.join(cache, "browser-runtime");
+  const browserRuntimeRoot = path.join(browserRuntime, "root");
   return {
     repositoryRoot,
     root,
@@ -31,6 +33,11 @@ export function resolveToolchainPaths(repositoryRoot, cacheRoot = defaultCacheRo
     browserPathFile: path.join(root, "browser-path"),
     hooksStamp: path.join(root, "hooks-ready.json"),
     envFile: path.join(root, "env.sh"),
+    browserRuntimeRoot,
+    browserRuntimeDebs: path.join(browserRuntime, "debs"),
+    browserRuntimeStamp: path.join(browserRuntime, "ready.json"),
+    browserRuntimeLib: path.join(browserRuntimeRoot, "usr", "lib", "x86_64-linux-gnu"),
+    browserRuntimeLibFallback: path.join(browserRuntimeRoot, "lib", "x86_64-linux-gnu"),
   };
 }
 
@@ -207,11 +214,13 @@ export function evaluateToolchain(config, probe) {
   checks.push(
     check(
       "browser",
-      Boolean(probe.browserPath) && probe.browserExecutable,
-      probe.browserPath && probe.browserExecutable
-        ? `Chrome ${probe.browserPath}`
-        : "Pinned Chrome executable not found",
-      "Run `node scripts/toolchain.mjs bootstrap` to install Puppeteer's pinned Chrome build.",
+      Boolean(probe.browserPath) && probe.browserExecutable && Boolean(probe.browserVersion),
+      probe.browserPath && probe.browserExecutable && probe.browserVersion
+        ? `Chrome ${probe.browserVersion} (${probe.browserPath})`
+        : probe.browserPath && probe.browserExecutable
+          ? "Pinned Chrome exists but cannot start with the prepared runtime libraries"
+          : "Pinned Chrome executable not found",
+      "Run `node scripts/toolchain.mjs bootstrap` to install Puppeteer's pinned Chrome build and user-scoped Ubuntu runtime libraries.",
     ),
   );
   return { ok: checks.every((entry) => entry.status === "pass"), checks };
@@ -220,6 +229,9 @@ export function evaluateToolchain(config, probe) {
 export async function probeToolchain(config, paths) {
   const env = buildToolchainEnvironment(paths);
   const browserPath = (await readOptional(paths.browserPathFile))?.trim() || undefined;
+  const browserExecutable = browserPath ? await isExecutable(browserPath) : false;
+  const browserVersion =
+    browserPath && browserExecutable ? await commandVersion(browserPath, ["--version"], env) : undefined;
   return {
     platform: process.platform,
     architecture: process.arch,
@@ -238,7 +250,8 @@ export async function probeToolchain(config, paths) {
     uvVersion: normalizePrefixedVersion(await commandVersion(paths.uv, ["--version"], env), "uv"),
     hooksReady: await hooksStampMatches(config, paths.hooksStamp),
     browserPath,
-    browserExecutable: browserPath ? await isExecutable(browserPath) : false,
+    browserExecutable,
+    browserVersion,
     packageDependenciesInstalled: await exists(
       path.join(paths.repositoryRoot, "node_modules", ".bin", executableName("puppeteer")),
     ),
@@ -265,6 +278,8 @@ async function bootstrap(config, paths) {
       env: { ...buildToolchainEnvironment(paths), ...step.env },
     });
   }
+  process.stdout.write("==> Prepare user-scoped Chrome runtime libraries\n");
+  await prepareBrowserRuntime(config, paths);
   const browserPath = await discoverPuppeteerExecutable(paths);
   await writeFile(paths.browserPathFile, `${browserPath}\n`);
   await writeFile(
@@ -276,6 +291,45 @@ async function bootstrap(config, paths) {
   renderDoctor(result);
   if (!result.ok) {
     throw new Error("Toolchain bootstrap completed but validation still failed.");
+  }
+}
+
+async function prepareBrowserRuntime(config, paths) {
+  if (await browserRuntimeStampMatches(config, paths)) return;
+  const browserRuntime = path.dirname(paths.browserRuntimeRoot);
+  await rm(browserRuntime, { recursive: true, force: true });
+  await Promise.all([
+    mkdir(paths.browserRuntimeDebs, { recursive: true }),
+    mkdir(paths.browserRuntimeRoot, { recursive: true }),
+  ]);
+  await run("apt-get", ["download", ...config.browser.ubuntuRuntimePackages], {
+    cwd: paths.browserRuntimeDebs,
+    env: buildToolchainEnvironment(paths),
+  });
+  const archives = (await readdir(paths.browserRuntimeDebs))
+    .filter((entry) => entry.endsWith(".deb"))
+    .sort((left, right) => left.localeCompare(right));
+  if (archives.length === 0) throw new Error("apt-get download did not produce Chrome runtime packages");
+  for (const archive of archives) {
+    await run("dpkg-deb", ["-x", path.join(paths.browserRuntimeDebs, archive), paths.browserRuntimeRoot], {
+      cwd: paths.browserRuntimeDebs,
+      env: buildToolchainEnvironment(paths),
+    });
+  }
+  await writeFile(
+    paths.browserRuntimeStamp,
+    `${JSON.stringify({ schemaVersion: 1, browser: config.browser }, null, 2)}\n`,
+  );
+}
+
+async function browserRuntimeStampMatches(config, paths) {
+  const raw = await readOptional(paths.browserRuntimeStamp);
+  if (!raw || !(await exists(paths.browserRuntimeLib))) return false;
+  try {
+    const stamp = JSON.parse(raw);
+    return JSON.stringify(stamp.browser) === JSON.stringify(config.browser);
+  } catch {
+    return false;
   }
 }
 
@@ -310,6 +364,7 @@ async function writeEnvironmentFile(paths, browserPath) {
     `export PRE_COMMIT_HOME=${shellQuote(path.join(paths.cache, "pre-commit"))}`,
     `export PUPPETEER_CACHE_DIR=${shellQuote(path.join(paths.cache, "puppeteer"))}`,
     `export PA11Y_CHROME_PATH=${shellQuote(browserPath)}`,
+    `export LD_LIBRARY_PATH=${shellQuote(`${paths.browserRuntimeLib}:${paths.browserRuntimeLibFallback}`)}:"\${LD_LIBRARY_PATH:-}"`,
     `export DATABASE_URL=${shellQuote(process.env.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain")}`,
     "export ALLOW_MAJOR_RELEASE=true",
     `export PATH=${shellQuote(`${paths.bin}:${path.join(paths.venv, "bin")}`)}:"$PATH"`,
@@ -320,12 +375,16 @@ async function writeEnvironmentFile(paths, browserPath) {
 
 export function buildToolchainEnvironment(paths, baseEnvironment = process.env) {
   const pathEntries = [paths.bin, path.join(paths.venv, process.platform === "win32" ? "Scripts" : "bin")];
+  const browserLibraries = [paths.browserRuntimeLib, paths.browserRuntimeLibFallback, baseEnvironment.LD_LIBRARY_PATH]
+    .filter(Boolean)
+    .join(path.delimiter);
   return {
     ...baseEnvironment,
     BOARDREADYOPS_TOOLCHAIN_ROOT: paths.root,
     VIRTUAL_ENV: paths.venv,
     PRE_COMMIT_HOME: path.join(paths.cache, "pre-commit"),
     PUPPETEER_CACHE_DIR: path.join(paths.cache, "puppeteer"),
+    LD_LIBRARY_PATH: browserLibraries,
     DATABASE_URL: baseEnvironment.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain",
     ALLOW_MAJOR_RELEASE: "true",
     PATH: `${pathEntries.join(path.delimiter)}${path.delimiter}${baseEnvironment.PATH ?? ""}`,

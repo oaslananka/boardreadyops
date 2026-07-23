@@ -35,6 +35,7 @@ function healthyProbe(overrides: Partial<ToolchainProbe> = {}): ToolchainProbe {
     hooksReady: true,
     browserPath: "/repo/.boardreadyops/toolchain/cache/puppeteer/chrome",
     browserExecutable: true,
+    browserVersion: "Google Chrome for Testing 150.0.7871.24",
     packageDependenciesInstalled: true,
     repositoryModesNormalized: true,
     ...overrides,
@@ -71,6 +72,23 @@ describe("reproducible contributor toolchain", () => {
     expect(packageJson.packageManager).toMatch(new RegExp(`^pnpm@${config.pnpm.version.replaceAll(".", "\\.")}`));
     expect(packageJson.engines.node).toBe(config.node.engines);
     expect(packageJson.devDependencies.puppeteer).toBe(config.browser.puppeteerVersion);
+    expect(config.browser.ubuntuRuntimePackages).toEqual([
+      "libatk1.0-0t64",
+      "libatk-bridge2.0-0t64",
+      "libxcomposite1",
+      "libxdamage1",
+      "libxfixes3",
+      "libxrandr2",
+      "libgbm1",
+      "libatspi2.0-0t64",
+      "libcairo2",
+      "libpango-1.0-0",
+      "libxcb-render0",
+      "libxcb-shm0",
+      "libpixman-1-0",
+      "libthai0",
+      "libdatrie1",
+    ]);
     expect(requirements).toContain(`mkdocs==${config.python.mkdocs}`);
     expect(requirements).toContain(`mkdocs-material==${config.python.mkdocsMaterial}`);
     expect(requirements).toContain(`mike==${config.python.mike}`);
@@ -98,6 +116,7 @@ describe("reproducible contributor toolchain", () => {
 
     expect(paths.root).toBe("/repo/.boardreadyops/toolchain");
     expect(paths.cache).toBe("/cache/boardreadyops/toolchain-v1");
+    expect(paths.browserRuntimeRoot).toBe("/cache/boardreadyops/toolchain-v1/browser-runtime/root");
     expect(plan.every((step) => step.cwd === "/repo" || step.cwd.startsWith(paths.root))).toBe(true);
     expect(plan.flatMap((step) => step.command).join(" ")).not.toMatch(/\bsudo\b|\/usr\/local|corepack enable/u);
     expect(
@@ -115,6 +134,7 @@ describe("reproducible contributor toolchain", () => {
 
     expect(env.DATABASE_URL).toBe("postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain");
     expect(env.ALLOW_MAJOR_RELEASE).toBe("true");
+    expect(env.LD_LIBRARY_PATH).toContain(paths.browserRuntimeLib);
     expect(env.PATH).toContain(`${paths.bin}${path.delimiter}`);
 
     const custom = buildToolchainEnvironment(paths, {
@@ -149,6 +169,18 @@ describe("reproducible contributor toolchain", () => {
     expect(result.checks.every((check) => check.status === "pass")).toBe(true);
   });
 
+  it("rejects a present browser binary that cannot launch", async () => {
+    const result = evaluateToolchain(await manifest(), healthyProbe({ browserVersion: undefined }));
+    const browser = result.checks.find((check) => check.id === "browser");
+
+    expect(result.ok).toBe(false);
+    expect(browser).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("cannot start"),
+      remediation: expect.stringContaining("bootstrap"),
+    });
+  });
+
   it("fails early with actionable missing prerequisite messages", async () => {
     const result = evaluateToolchain(
       await manifest(),
@@ -160,6 +192,7 @@ describe("reproducible contributor toolchain", () => {
         hooksReady: false,
         browserPath: undefined,
         browserExecutable: false,
+        browserVersion: undefined,
         packageDependenciesInstalled: false,
         repositoryModesNormalized: false,
       }),

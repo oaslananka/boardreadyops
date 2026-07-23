@@ -28,6 +28,23 @@
   "browser": {
     "provider": "puppeteer",
     "name": "chrome",
-    "puppeteerVersion": "25.2.0"
+    "puppeteerVersion": "25.2.0",
+    "ubuntuRuntimePackages": [
+      "libatk1.0-0t64",
+      "libatk-bridge2.0-0t64",
+      "libxcomposite1",
+      "libxdamage1",
+      "libxfixes3",
+      "libxrandr2",
+      "libgbm1",
+      "libatspi2.0-0t64",
+      "libcairo2",
+      "libpango-1.0-0",
+      "libxcb-render0",
+      "libxcb-shm0",
+      "libpixman-1-0",
+      "libthai0",
+      "libdatrie1"
+    ]
   }
 }

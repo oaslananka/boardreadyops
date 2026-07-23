@@ -4,7 +4,7 @@
 
 ## Ubuntu 24.04 bootstrap
 
-A fresh Ubuntu 24.04 x64 host needs Node with Corepack and Python with `venv` support. The repository then installs everything else without `sudo`, secrets, or global package-manager changes:
+A fresh Ubuntu 24.04 x64 host needs Node with Corepack, Python with `venv` support, and the standard `apt-get`/`dpkg-deb` utilities. The repository then installs everything else without `sudo`, secrets, or global package-manager changes:
 
 ```bash
 corepack pnpm run toolchain:bootstrap
@@ -16,6 +16,7 @@ The bootstrap keeps project executables inside the repository and reusable downl
 - `.boardreadyops/toolchain/venv/` for uv, MkDocs, and pre-commit;
 - `${XDG_CACHE_HOME:-~/.cache}/boardreadyops/toolchain-v1/pre-commit/` for reusable pinned validation hook environments;
 - `${XDG_CACHE_HOME:-~/.cache}/boardreadyops/toolchain-v1/puppeteer/` for Puppeteer's compatible Chrome build;
+- `${XDG_CACHE_HOME:-~/.cache}/boardreadyops/toolchain-v1/browser-runtime/` for Ubuntu Chrome shared libraries extracted without root access;
 - `.boardreadyops/toolchain/bin/pnpm` as a wrapper around `corepack pnpm`.
 
 This wrapper prevents nested package scripts from accidentally resolving a broken or unconfigured host-global pnpm shim.
@@ -39,7 +40,7 @@ source "$(corepack pnpm -s toolchain:env)"
 
 ## Browser discovery
 
-The bootstrap asks Puppeteer 25.2.0 to install its compatible Chrome revision and records the executable in `.boardreadyops/toolchain/browser-path`. Documentation accessibility checks prefer `PA11Y_CHROME_PATH`, then this recorded path, and finally standard system Chrome or Edge locations.
+The bootstrap asks Puppeteer 25.2.0 to install its compatible Chrome revision and records the executable in `.boardreadyops/toolchain/browser-path`. Documentation accessibility checks prefer `PA11Y_CHROME_PATH`, then this recorded path, and finally standard system Chrome or Edge locations. Doctor executes the recorded browser with `--version`, so a present but unloadable binary fails before the 194-page accessibility scan begins.
 
 ## Optional prerequisites
 

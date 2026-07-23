@@ -27,6 +27,7 @@ export interface ToolchainManifest {
     provider: "puppeteer";
     name: "chrome";
     puppeteerVersion: string;
+    ubuntuRuntimePackages: string[];
   };
 }
 
@@ -42,6 +43,11 @@ export interface ToolchainPaths {
   browserPathFile: string;
   hooksStamp: string;
   envFile: string;
+  browserRuntimeRoot: string;
+  browserRuntimeDebs: string;
+  browserRuntimeStamp: string;
+  browserRuntimeLib: string;
+  browserRuntimeLibFallback: string;
 }
 
 export interface BootstrapStep {
@@ -64,6 +70,7 @@ export interface ToolchainProbe {
   hooksReady: boolean;
   browserPath: string | undefined;
   browserExecutable: boolean;
+  browserVersion: string | undefined;
   packageDependenciesInstalled: boolean;
   repositoryModesNormalized: boolean;
 }
