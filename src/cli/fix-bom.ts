@@ -5,6 +5,7 @@
  * orchestration rather than delimited-file mechanics.
  */
 
+import type { BoardReadyOpsConfig } from "../core/config.js";
 import { parseDelimitedRows } from "../util/delimited.js";
 
 export interface BomTarget {
@@ -18,7 +19,7 @@ export interface DelimitedDocument {
   rows: string[][];
 }
 
-type ConfigProject = NonNullable<import("../core/config.js").BoardReadyOpsConfig["projects"]>[number];
+type ConfigProject = NonNullable<BoardReadyOpsConfig["projects"]>[number];
 
 /**
  * Parse a delimited document (CSV or TSV) from text.
