@@ -362,7 +362,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `picocolors@1.1.1`
   - Description: The tiniest and the fastest library for terminal output formatting with ANSI colors
   - Homepage: https://github.com/alexeyraspopov/picocolors#readme
-- `semver@6.3.1`, `semver@7.7.4`, `semver@7.8.0`, `semver@7.8.5`
+- `semver@6.3.1`, `semver@7.7.4`, `semver@7.8.5`
   - Description: The semantic version parser used by npm.
   - Homepage: https://github.com/npm/node-semver#readme
 - `siginfo@2.0.0`
@@ -470,7 +470,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@azure/storage-common@12.3.0`
   - Description: Azure Storage Common Client Library for JavaScript
   - Homepage: https://github.com/Azure/azure-sdk-for-js/blob/main/sdk/storage/storage-internal-avro/
-- `@babel/code-frame@7.29.0`, `@babel/code-frame@7.29.7`
+- `@babel/code-frame@7.29.7`
   - Description: Generate errors that contain a code frame that point to source locations.
   - Homepage: https://babel.dev/docs/en/next/babel-code-frame
 - `@babel/compat-data@7.29.7`
@@ -479,7 +479,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/core@7.29.7`
   - Description: Babel compiler core.
   - Homepage: https://babel.dev/docs/en/next/babel-core
-- `@babel/generator@7.29.1`, `@babel/generator@7.29.7`
+- `@babel/generator@7.29.7`
   - Description: Turns an AST into code.
   - Homepage: https://babel.dev/docs/en/next/babel-generator
 - `@babel/helper-annotate-as-pure@7.27.3`
@@ -491,16 +491,16 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/helper-create-class-features-plugin@7.29.3`
   - Description: Compile class public and private fields, private methods and decorators to ES6
   - Homepage: https://github.com/babel/babel#readme
-- `@babel/helper-globals@7.28.0`, `@babel/helper-globals@7.29.7`
+- `@babel/helper-globals@7.29.7`
   - Description: A collection of JavaScript globals for Babel internal usage
   - Homepage: https://github.com/babel/babel#readme
 - `@babel/helper-member-expression-to-functions@7.28.5`
   - Description: Helper function to replace certain member expressions with function calls
   - Homepage: https://babel.dev/docs/en/next/babel-helper-member-expression-to-functions
-- `@babel/helper-module-imports@7.28.6`, `@babel/helper-module-imports@7.29.7`
+- `@babel/helper-module-imports@7.29.7`
   - Description: Babel helper functions for inserting module loads
   - Homepage: https://babel.dev/docs/en/next/babel-helper-module-imports
-- `@babel/helper-module-transforms@7.28.6`, `@babel/helper-module-transforms@7.29.7`
+- `@babel/helper-module-transforms@7.29.7`
   - Description: Babel helper functions for implementing ES6 module transformations
   - Homepage: https://babel.dev/docs/en/next/babel-helper-module-transforms
 - `@babel/helper-optimise-call-expression@7.27.1`
@@ -518,16 +518,16 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/helper-string-parser@7.29.7`
   - Description: A utility package to parse strings
   - Homepage: https://babel.dev/docs/en/next/babel-helper-string-parser
-- `@babel/helper-validator-identifier@7.28.5`, `@babel/helper-validator-identifier@7.29.7`
+- `@babel/helper-validator-identifier@7.29.7`
   - Description: Validate identifier/keywords name
   - Homepage: https://github.com/babel/babel#readme
-- `@babel/helper-validator-option@7.27.1`, `@babel/helper-validator-option@7.29.7`
+- `@babel/helper-validator-option@7.29.7`
   - Description: Validate plugin/preset options
   - Homepage: https://github.com/babel/babel#readme
 - `@babel/helpers@7.29.7`
   - Description: Collection of helper functions used by Babel transforms.
   - Homepage: https://babel.dev/docs/en/next/babel-helpers
-- `@babel/parser@7.29.3`, `@babel/parser@7.29.7`
+- `@babel/parser@7.29.7`
   - Description: A JavaScript parser
   - Homepage: https://babel.dev/docs/en/next/babel-parser
 - `@babel/plugin-proposal-decorators@7.29.0`
@@ -557,10 +557,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/preset-typescript@7.28.5`
   - Description: Babel preset for TypeScript.
   - Homepage: https://babel.dev/docs/en/next/babel-preset-typescript
-- `@babel/template@7.28.6`, `@babel/template@7.29.7`
+- `@babel/template@7.29.7`
   - Description: Generate an AST from a string template.
   - Homepage: https://babel.dev/docs/en/next/babel-template
-- `@babel/traverse@7.29.0`, `@babel/traverse@7.29.7`
+- `@babel/traverse@7.29.7`
   - Description: The Babel Traverse module maintains the overall tree state, and is responsible for replacing, removing, and adding nodes
   - Homepage: https://babel.dev/docs/en/next/babel-traverse
 - `@babel/types@7.29.7`
@@ -704,7 +704,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@kurkle/color@0.3.4`
   - Description: css color parsing, manupulation and conversion
   - Homepage: https://github.com/kurkle/color#readme
-- `@next/env@16.2.10`
+- `@next/env@16.2.11`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
 - `@nodable/entities@2.1.0`
@@ -1056,7 +1056,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `core-util-is@1.0.3`
   - Description: The `util.is*` functions introduced in Node v0.12.
   - Homepage: https://github.com/isaacs/core-util-is#readme
-- `cosmiconfig@9.0.1`, `cosmiconfig@9.0.2`
+- `cosmiconfig@9.0.2`
   - Description: Find and load configuration from a package.json property, rc file, TypeScript module, and more!
   - Homepage: https://github.com/cosmiconfig/cosmiconfig#readme
 - `cosmiconfig-typescript-loader@6.3.0`
@@ -1464,7 +1464,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `netmask@2.1.1`
   - Description: Parse and lookup IP network blocks
   - Homepage: https://github.com/rs/node-netmask
-- `next@16.2.10`
+- `next@16.2.11`
   - Description: The React Framework
   - Homepage: https://nextjs.org
 - `node-releases@2.0.44`
