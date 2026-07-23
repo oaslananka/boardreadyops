@@ -193,4 +193,12 @@ describe("control-plane worker runtime", () => {
     expect(source).toContain("reconciliation deadline must be greater than observation delay");
     expect(source).toContain('"worker.reconciliation_terminal"');
   });
+  it("wires Check Run reconciliation detection and processing loops", () => {
+    const source = workerSource();
+
+    expect(source).toContain("operations.detectCheckRunReconciliationCandidates");
+    expect(source).toContain("operations.claimCheckRunReconciliationItems");
+    expect(source).toContain("processControlPlaneCheckRunReconciliation");
+    expect(source).toContain('"worker.check_run_reconciliation_terminal"');
+  });
 });

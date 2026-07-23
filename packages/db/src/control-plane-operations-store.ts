@@ -47,6 +47,24 @@ export type ControlPlaneWorkflowReconciliationContext = {
   deadlineAt: string;
 };
 
+export type ControlPlaneCheckRunReconciliationContext = {
+  reconciliationId: string;
+  installationId: string;
+  githubInstallationId: number;
+  repositoryId: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  repositoryFullName: string;
+  releaseRunId: string;
+  githubCheckRunId: number;
+  runStatus: string;
+  expectedConclusion: "failure" | "neutral" | "success" | "timed_out";
+  completedAt: string;
+  deadlineAt: string;
+};
+
+export type ControlPlaneCheckRunReconciliationAction = "observed_current" | "updated";
+
 export type ControlPlaneWorkflowTerminalStatus = "failed" | "timed_out";
 
 export type ControlPlaneSliSnapshot = {
@@ -100,6 +118,10 @@ export type ControlPlaneOperationsStore = {
     workerId: string;
     limit?: number;
   }): Promise<ClaimedControlPlaneReconciliationItem[]>;
+  claimCheckRunReconciliationItems(input: {
+    workerId: string;
+    limit?: number;
+  }): Promise<ClaimedControlPlaneReconciliationItem[]>;
   completeReconciliationItem(input: {
     reconciliationId: string;
     workerId: string;
@@ -119,10 +141,19 @@ export type ControlPlaneOperationsStore = {
     terminalDeadlineSeconds: number;
     limit?: number;
   }): Promise<number>;
+  detectCheckRunReconciliationCandidates(input: {
+    observationDelaySeconds: number;
+    terminalDeadlineSeconds: number;
+    limit?: number;
+  }): Promise<number>;
   loadWorkflowReconciliationContext(input: {
     reconciliationId: string;
     workerId: string;
   }): Promise<ControlPlaneWorkflowReconciliationContext | undefined>;
+  loadCheckRunReconciliationContext(input: {
+    reconciliationId: string;
+    workerId: string;
+  }): Promise<ControlPlaneCheckRunReconciliationContext | undefined>;
   rescheduleReconciliationItem(input: {
     reconciliationId: string;
     workerId: string;
@@ -137,6 +168,20 @@ export type ControlPlaneOperationsStore = {
     terminalStatus: ControlPlaneWorkflowTerminalStatus;
     publicFailureReason: string;
   }): Promise<"already_terminal" | "applied" | "stale">;
+  applyCheckRunReconciliation(input: {
+    reconciliationId: string;
+    workerId: string;
+    observedStatus: string;
+    observedConclusion?: string;
+    action: ControlPlaneCheckRunReconciliationAction;
+  }): Promise<"already_published" | "applied" | "stale">;
+  finalizeCheckRunReconciliationFailure(input: {
+    reconciliationId: string;
+    workerId: string;
+    observedStatus: string;
+    observedConclusion?: string;
+    publicFailureReason: string;
+  }): Promise<"already_published" | "failed" | "stale">;
   collectSliSnapshot(input?: { installationId?: string }): Promise<ControlPlaneSliSnapshot>;
 };
 
@@ -402,6 +447,41 @@ function decodedWorkflowReconciliationContext(
   };
 }
 
+function decodedCheckRunReconciliationContext(
+  row: DatabaseRow | undefined,
+): ControlPlaneCheckRunReconciliationContext | undefined {
+  if (!row) return undefined;
+  const githubInstallationId = row.integer("github_installation_id");
+  const githubCheckRunId = row.integer("github_check_run_id");
+  const expectedConclusion = row.text("expected_conclusion");
+  if (githubInstallationId === undefined || githubCheckRunId === undefined) {
+    throw new Error("Check Run reconciliation context returned invalid GitHub identifiers");
+  }
+  if (
+    expectedConclusion !== "failure" &&
+    expectedConclusion !== "neutral" &&
+    expectedConclusion !== "success" &&
+    expectedConclusion !== "timed_out"
+  ) {
+    throw new Error("Check Run reconciliation context returned an invalid expected conclusion");
+  }
+  return {
+    reconciliationId: requiredText(row, "reconciliation_id", "Check Run reconciliation context"),
+    installationId: requiredText(row, "installation_id", "Check Run reconciliation context"),
+    githubInstallationId,
+    repositoryId: requiredText(row, "repository_id", "Check Run reconciliation context"),
+    repositoryOwner: requiredText(row, "repository_owner", "Check Run reconciliation context"),
+    repositoryName: requiredText(row, "repository_name", "Check Run reconciliation context"),
+    repositoryFullName: requiredText(row, "repository_full_name", "Check Run reconciliation context"),
+    releaseRunId: requiredText(row, "release_run_id", "Check Run reconciliation context"),
+    githubCheckRunId,
+    runStatus: requiredText(row, "run_status", "Check Run reconciliation context"),
+    expectedConclusion,
+    completedAt: requiredTimestamp(row, "completed_at", "Check Run reconciliation context"),
+    deadlineAt: requiredTimestamp(row, "deadline_at", "Check Run reconciliation context"),
+  };
+}
+
 function decodedSliSnapshot(row: DatabaseRow | undefined): ControlPlaneSliSnapshot {
   return {
     webhookAcceptanceP95Ms: row?.integer("webhook_acceptance_p95_ms") ?? 0,
@@ -524,6 +604,20 @@ export function createSqlControlPlaneOperationsStore(
       return databaseRows(result).map(decodedReconciliationItem);
     },
 
+    async claimCheckRunReconciliationItems(input) {
+      validIdentifier(input.workerId, "reconciliation worker id");
+      const claimedAt = now();
+      const leaseExpiresAt = new Date(claimedAt.valueOf() + leaseSeconds * 1000);
+      const limit = Math.max(1, Math.min(input.limit ?? 1, 100));
+      const result = await executor.query(
+        `select * from boardreadyops_claim_github_check_run_reconciliation(
+           $1, $2::timestamptz, $3::timestamptz, $4::integer
+         )`,
+        [input.workerId, claimedAt.toISOString(), leaseExpiresAt.toISOString(), limit],
+      );
+      return databaseRows(result).map(decodedReconciliationItem);
+    },
+
     async completeReconciliationItem(input) {
       validIdentifier(input.reconciliationId, "reconciliation id");
       validIdentifier(input.workerId, "reconciliation worker id");
@@ -568,6 +662,22 @@ export function createSqlControlPlaneOperationsStore(
       return outcome === "retry" || outcome === "dead_letter" ? outcome : "stale";
     },
 
+    async detectCheckRunReconciliationCandidates(input) {
+      const observationDelaySeconds = positiveInteger(input.observationDelaySeconds, 300, "observationDelaySeconds");
+      const terminalDeadlineSeconds = positiveInteger(input.terminalDeadlineSeconds, 1800, "terminalDeadlineSeconds");
+      if (terminalDeadlineSeconds <= observationDelaySeconds) {
+        throw new Error("terminalDeadlineSeconds must be greater than observationDelaySeconds");
+      }
+      const limit = Math.max(1, Math.min(input.limit ?? 100, 1000));
+      const result = await executor.query(
+        `select boardreadyops_detect_github_check_run_reconciliation(
+           $1::timestamptz, $2::integer, $3::integer, $4::integer
+         ) as detected`,
+        [now().toISOString(), observationDelaySeconds, terminalDeadlineSeconds, limit],
+      );
+      return databaseRows(result)[0]?.integer("detected") ?? 0;
+    },
+
     async detectWorkflowReconciliationCandidates(input) {
       const observationDelaySeconds = positiveInteger(input.observationDelaySeconds, 300, "observationDelaySeconds");
       const terminalDeadlineSeconds = positiveInteger(input.terminalDeadlineSeconds, 1800, "terminalDeadlineSeconds");
@@ -582,6 +692,16 @@ export function createSqlControlPlaneOperationsStore(
         [now().toISOString(), observationDelaySeconds, terminalDeadlineSeconds, limit],
       );
       return databaseRows(result)[0]?.integer("detected") ?? 0;
+    },
+
+    async loadCheckRunReconciliationContext(input) {
+      validIdentifier(input.reconciliationId, "reconciliation id");
+      validIdentifier(input.workerId, "reconciliation worker id");
+      const result = await executor.query(
+        "select * from boardreadyops_github_check_run_reconciliation_context($1, $2)",
+        [input.reconciliationId, input.workerId],
+      );
+      return decodedCheckRunReconciliationContext(databaseRows(result)[0]);
     },
 
     async loadWorkflowReconciliationContext(input) {
@@ -640,6 +760,56 @@ export function createSqlControlPlaneOperationsStore(
       );
       const outcome = databaseRows(result)[0]?.text("outcome");
       if (outcome === "applied" || outcome === "already_terminal") return outcome;
+      return "stale";
+    },
+
+    async applyCheckRunReconciliation(input) {
+      validIdentifier(input.reconciliationId, "reconciliation id");
+      validIdentifier(input.workerId, "reconciliation worker id");
+      validReasonCode(input.observedStatus, "observed Check Run status");
+      if (input.observedConclusion) validReasonCode(input.observedConclusion, "observed Check Run conclusion");
+      if (input.action !== "observed_current" && input.action !== "updated") {
+        throw new Error("invalid Check Run reconciliation action");
+      }
+      const result = await executor.query(
+        `select boardreadyops_apply_github_check_run_reconciliation(
+           $1, $2, $3::timestamptz, $4, $5, $6
+         ) as outcome`,
+        [
+          input.reconciliationId,
+          input.workerId,
+          now().toISOString(),
+          input.observedStatus,
+          input.observedConclusion ?? null,
+          input.action,
+        ],
+      );
+      const outcome = databaseRows(result)[0]?.text("outcome");
+      if (outcome === "applied" || outcome === "already_published") return outcome;
+      return "stale";
+    },
+
+    async finalizeCheckRunReconciliationFailure(input) {
+      validIdentifier(input.reconciliationId, "reconciliation id");
+      validIdentifier(input.workerId, "reconciliation worker id");
+      validReasonCode(input.observedStatus, "observed Check Run status");
+      if (input.observedConclusion) validReasonCode(input.observedConclusion, "observed Check Run conclusion");
+      validReasonCode(input.publicFailureReason, "public failure reason");
+      const result = await executor.query(
+        `select boardreadyops_fail_github_check_run_reconciliation(
+           $1, $2, $3::timestamptz, $4, $5, $6
+         ) as outcome`,
+        [
+          input.reconciliationId,
+          input.workerId,
+          now().toISOString(),
+          input.observedStatus,
+          input.observedConclusion ?? null,
+          input.publicFailureReason,
+        ],
+      );
+      const outcome = databaseRows(result)[0]?.text("outcome");
+      if (outcome === "failed" || outcome === "already_published") return outcome;
       return "stale";
     },
 

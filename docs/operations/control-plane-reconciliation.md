@@ -143,3 +143,28 @@ Relevant structured worker events are `worker.reconciliation_detected`, `worker.
 3. Confirm the installation is active and the GitHub App can read Actions state in the target repository.
 4. Inspect the stable reconciliation outcome and audit event; do not use private workflow logs as application telemetry.
 5. Replay only records explicitly reported as safe by the dead-letter API. An uncertain dispatch without a persisted workflow run ID remains non-replayable and requires a later reconciliation path or manual incident decision.
+
+## GitHub Check Run publication reconciliation
+
+After a signed terminal result is accepted, GitHub Check Run publication can still fail or become inconsistent. The worker detects terminal release runs with a persisted Check Run ID and no `github_check_published_at` timestamp after the same observation window used by workflow reconciliation. It claims a `release_run / reporting_stale` reconciliation lease and reads exactly that Check Run with a short-lived installation token.
+
+The persisted signed result remains authoritative. Reconciliation never changes release-run status, decision, conclusion, findings, or accepted payload. If the Check Run already has the expected terminal conclusion, only publication metadata is repaired. If it is queued, in progress, or has a different conclusion, the worker updates it with the persisted expected conclusion and a generic summary that points operators to the BoardReadyOps run. Findings, source, report links, artifacts, and GitHub response bodies are not copied into the reconciliation context or worker logs.
+
+| Observation | Before deadline | At or after deadline |
+| --- | --- | --- |
+| expected terminal status/conclusion | mark publication reconciled | mark publication reconciled |
+| pending or mismatched Check Run | update and mark reconciled | update; record `github_check_run_update_failed` if convergence fails |
+| `404` | recheck as `github_check_run_not_found` | record stable `github_check_run_not_found` |
+| lookup unavailable | bounded retry | record stable `github_check_run_lookup_failed` |
+
+Stable failure recording updates `release_run_results.last_publication_error`, completes the reconciliation item, and appends `control_plane.github_check_run_reconciliation_failed`. It does not turn a successful release into a failure. A terminal reconciliation row prevents the same unchanged publication failure from being rediscovered indefinitely.
+
+Relevant structured events are `worker.check_run_reconciliation_detected`, `worker.check_run_reconciliation_detection_failed`, `worker.check_run_reconciliation_claim_failed`, and `worker.check_run_reconciliation_terminal`. `/health/ready` includes `lastCheckRunReconciliationPollAt` and `lastSuccessfulCheckRunReconciliationAt`.
+
+### Check Run drift incident check
+
+1. Confirm `reconciliationConfigurationValid` is `true` and the Check Run reconciliation poll timestamp is advancing.
+2. Correlate `worker.check_run_reconciliation_terminal` by safe reconciliation ID; do not enable GitHub response-body logging.
+3. Confirm the GitHub App installation still has Checks read/write access for the target repository.
+4. Inspect `last_publication_error` and the corresponding audit event. The accepted terminal BoardReadyOps result remains authoritative.
+5. After correcting permissions or a GitHub incident, use a controlled operator remediation rather than changing the release result or manually fabricating findings.

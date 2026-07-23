@@ -215,6 +215,8 @@ BOARDREADYOPS_RECONCILIATION_DEADLINE_SECONDS=1800
 BOARDREADYOPS_RECONCILIATION_NEXT_CHECK_SECONDS=60
 ```
 
+The same reconciliation cadence covers both missed GitHub Actions callbacks and terminal Check Run publication drift. The worker readiness payload reports `lastCheckRunReconciliationPollAt` and `lastSuccessfulCheckRunReconciliationAt` separately so operators can distinguish publication repair from workflow-state convergence.
+
 For a dry run:
 
 ```bash

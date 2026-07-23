@@ -151,3 +151,61 @@ describe("GitHub App readiness comment upsert", () => {
     );
   });
 });
+
+describe("GitHub App Check Run observation", () => {
+  it("returns only normalized Check Run state", async () => {
+    request.mockResolvedValueOnce(
+      jsonResponse({
+        id: 77,
+        status: "completed",
+        conclusion: "success",
+        output: { title: "private", summary: "private findings" },
+        details_url: "https://private.example/run",
+      }),
+    );
+
+    const { readGitHubCheckRun } = await import("../../../apps/web/lib/github-app-check-run-client.js");
+    await expect(
+      readGitHubCheckRun({
+        apiBaseUrl: "https://github.test/api/v3",
+        token: "installation-token",
+        repositoryOwner: "octo-org",
+        repositoryName: "hardware-board",
+        checkRunId: 77,
+        request,
+      }),
+    ).resolves.toEqual({ kind: "present", status: "completed", conclusion: "success" });
+  });
+
+  it("maps 404 without exposing the response body", async () => {
+    request.mockResolvedValueOnce(jsonResponse({ message: "private repository detail" }, 404));
+    const { readGitHubCheckRun } = await import("../../../apps/web/lib/github-app-check-run-client.js");
+
+    await expect(
+      readGitHubCheckRun({
+        apiBaseUrl: "https://api.github.com",
+        token: "installation-token",
+        repositoryOwner: "octo-org",
+        repositoryName: "hardware-board",
+        checkRunId: 77,
+        request,
+      }),
+    ).resolves.toEqual({ kind: "not_found" });
+  });
+
+  it("uses status-only errors for failed observations", async () => {
+    request.mockResolvedValueOnce(jsonResponse({ message: "token=do-not-leak private repository" }, 503));
+    const { readGitHubCheckRun } = await import("../../../apps/web/lib/github-app-check-run-client.js");
+
+    const promise = readGitHubCheckRun({
+      apiBaseUrl: "https://api.github.com",
+      token: "installation-token",
+      repositoryOwner: "octo-org",
+      repositoryName: "hardware-board",
+      checkRunId: 77,
+      request,
+    });
+    await expect(promise).rejects.toThrow("GitHub check run lookup failed with status 503");
+    await expect(promise).rejects.not.toThrow("do-not-leak");
+  });
+});
