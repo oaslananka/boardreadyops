@@ -114,9 +114,9 @@ describe("reproducible contributor toolchain", () => {
     const paths = resolveToolchainPaths("/repo", "/cache/boardreadyops");
     const plan = buildBootstrapPlan(config, paths);
 
-    expect(paths.root).toBe("/repo/.boardreadyops/toolchain");
-    expect(paths.cache).toBe("/cache/boardreadyops/toolchain-v1");
-    expect(paths.browserRuntimeRoot).toBe("/cache/boardreadyops/toolchain-v1/browser-runtime/root");
+    expect(paths.root).toBe(path.join("/repo", ".boardreadyops", "toolchain"));
+    expect(paths.cache).toBe(path.join("/cache/boardreadyops", "toolchain-v1"));
+    expect(paths.browserRuntimeRoot).toBe(path.join("/cache/boardreadyops", "toolchain-v1", "browser-runtime", "root"));
     expect(plan.every((step) => step.cwd === "/repo" || step.cwd.startsWith(paths.root))).toBe(true);
     expect(plan.flatMap((step) => step.command).join(" ")).not.toMatch(/\bsudo\b|\/usr\/local|corepack enable/u);
     expect(

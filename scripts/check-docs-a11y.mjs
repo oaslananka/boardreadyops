@@ -201,7 +201,7 @@ export async function readToolchainChromePath(root = process.cwd()) {
     const value = (await readFile(path.join(root, ".boardreadyops", "toolchain", "browser-path"), "utf8")).trim();
     return value || undefined;
   } catch (error) {
-    if (error && error.code === "ENOENT") return undefined;
+    if (error?.code === "ENOENT") return undefined;
     throw error;
   }
 }

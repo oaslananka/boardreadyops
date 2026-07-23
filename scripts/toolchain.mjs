@@ -5,7 +5,7 @@ import { access, chmod, lstat, mkdir, readdir, readFile, rm, writeFile } from "n
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const scriptRoot = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepositoryRoot = path.dirname(scriptRoot);
@@ -120,110 +120,116 @@ export function buildBootstrapPlan(config, paths) {
 }
 
 export function evaluateToolchain(config, probe) {
-  const checks = [];
-  checks.push(
+  const browserReady = Boolean(probe.browserPath) && probe.browserExecutable && Boolean(probe.browserVersion);
+  const checks = [
     check(
       "platform",
       ["linux", "darwin", "win32"].includes(probe.platform) && ["x64", "arm64"].includes(probe.architecture),
       `${probe.platform}-${probe.architecture}`,
       "Use Ubuntu 24.04 x64 for the canonical automation environment; macOS and Windows remain supported contributor targets.",
     ),
-  );
-  checks.push(
     check(
       "repository-modes",
       probe.repositoryModesNormalized,
-      probe.repositoryModesNormalized
-        ? "Repository directory modes normalized"
-        : "Repository contains inherited setgid directories",
+      repositoryModeMessage(probe.repositoryModesNormalized),
       "Run `node scripts/toolchain.mjs bootstrap` to remove host-inherited setgid bits without changing tracked content.",
     ),
-  );
-  checks.push(
     check(
       "node",
       supportsNode(config, probe.nodeVersion),
       `Node ${probe.nodeVersion}`,
       `Install Node ${config.node.preferred} or another runtime allowed by ${config.node.engines}.`,
     ),
-  );
-  checks.push(
     check(
       "corepack",
       Boolean(probe.corepackVersion),
-      probe.corepackVersion ? `Corepack ${probe.corepackVersion}` : "Corepack not found",
+      versionMessage("Corepack", probe.corepackVersion, "Corepack not found"),
       "Install a Node distribution that includes Corepack; do not depend on a host-global pnpm shim.",
     ),
-  );
-  checks.push(
     check(
       "pnpm",
       probe.pnpmVersion === config.pnpm.version,
-      probe.pnpmVersion ? `pnpm ${probe.pnpmVersion}` : "pnpm not available through Corepack",
+      versionMessage("pnpm", probe.pnpmVersion, "pnpm not available through Corepack"),
       "Run `node scripts/toolchain.mjs bootstrap` to create the repository-local pnpm wrapper.",
     ),
-  );
-  checks.push(
     check(
       "python",
       supportsPython(config, probe.pythonVersion),
-      probe.pythonVersion ? `Python ${probe.pythonVersion}` : "Python not found",
+      versionMessage("Python", probe.pythonVersion, "Python not found"),
       `Install Python ${config.python.minimum} through <${config.python.maximumExclusive}, then rerun bootstrap.`,
     ),
-  );
-  checks.push(
     check(
       "dependencies",
       probe.packageDependenciesInstalled,
-      probe.packageDependenciesInstalled ? "Node dependencies installed" : "Node dependencies missing",
+      availabilityMessage(
+        probe.packageDependenciesInstalled,
+        "Node dependencies installed",
+        "Node dependencies missing",
+      ),
       "Run `node scripts/toolchain.mjs bootstrap` before verification.",
     ),
-  );
-  checks.push(
     check(
       "mkdocs",
       probe.mkdocsVersion === config.python.mkdocs,
-      probe.mkdocsVersion ? `MkDocs ${probe.mkdocsVersion}` : "MkDocs not found",
+      versionMessage("MkDocs", probe.mkdocsVersion, "MkDocs not found"),
       "Run the repository-local bootstrap to install pinned documentation dependencies.",
     ),
-  );
-  checks.push(
     check(
       "pre-commit",
       probe.preCommitVersion === config.validation.preCommit,
-      probe.preCommitVersion ? `pre-commit ${probe.preCommitVersion}` : "pre-commit not found",
+      versionMessage("pre-commit", probe.preCommitVersion, "pre-commit not found"),
       "Run the repository-local bootstrap to install pre-commit and validation hooks.",
     ),
-  );
-  checks.push(
     check(
       "uv",
       probe.uvVersion === config.python.uv,
-      probe.uvVersion ? `uv ${probe.uvVersion}` : "uv not found",
+      versionMessage("uv", probe.uvVersion, "uv not found"),
       "Run the repository-local bootstrap to install the pinned uv release.",
     ),
-  );
-  checks.push(
     check(
       "hooks",
       probe.hooksReady,
-      probe.hooksReady ? "Pinned validation hooks prepared" : "Pinned validation hooks are not prepared",
+      availabilityMessage(
+        probe.hooksReady,
+        "Pinned validation hooks prepared",
+        "Pinned validation hooks are not prepared",
+      ),
       "Run `node scripts/toolchain.mjs bootstrap` to prepare Actionlint, Semgrep, Gitleaks, zizmor, and OSV hooks.",
     ),
-  );
-  checks.push(
     check(
       "browser",
-      Boolean(probe.browserPath) && probe.browserExecutable && Boolean(probe.browserVersion),
-      probe.browserPath && probe.browserExecutable && probe.browserVersion
-        ? `Chrome ${probe.browserVersion} (${probe.browserPath})`
-        : probe.browserPath && probe.browserExecutable
-          ? "Pinned Chrome exists but cannot start with the prepared runtime libraries"
-          : "Pinned Chrome executable not found",
+      browserReady,
+      browserMessage(probe),
       "Run `node scripts/toolchain.mjs bootstrap` to install Puppeteer's pinned Chrome build and user-scoped Ubuntu runtime libraries.",
     ),
-  );
+  ];
   return { ok: checks.every((entry) => entry.status === "pass"), checks };
+}
+
+function repositoryModeMessage(normalized) {
+  return availabilityMessage(
+    normalized,
+    "Repository directory modes normalized",
+    "Repository contains inherited setgid directories",
+  );
+}
+
+function versionMessage(name, version, missingMessage) {
+  return version ? `${name} ${version}` : missingMessage;
+}
+
+function availabilityMessage(available, presentMessage, missingMessage) {
+  return available ? presentMessage : missingMessage;
+}
+
+function browserMessage(probe) {
+  if (probe.browserPath && probe.browserExecutable && probe.browserVersion) {
+    return `Chrome ${probe.browserVersion} (${probe.browserPath})`;
+  }
+  if (probe.browserPath && probe.browserExecutable) {
+    return "Pinned Chrome exists but cannot start with the prepared runtime libraries";
+  }
+  return "Pinned Chrome executable not found";
 }
 
 export async function probeToolchain(config, paths) {
@@ -357,6 +363,11 @@ async function writePnpmWrapper(paths) {
 }
 
 async function writeEnvironmentFile(paths, browserPath) {
+  const browserRuntimePath = [paths.browserRuntimeLib, paths.browserRuntimeLibFallback].join(":");
+  const repositoryToolPath = [paths.bin, path.join(paths.venv, "bin")].join(":");
+  const databaseUrl = process.env.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain";
+  const quotedBrowserRuntimePath = shellQuote(browserRuntimePath);
+  const quotedRepositoryToolPath = shellQuote(repositoryToolPath);
   const lines = [
     "# Generated by scripts/toolchain.mjs. Do not edit.",
     `export BOARDREADYOPS_TOOLCHAIN_ROOT=${shellQuote(paths.root)}`,
@@ -364,10 +375,10 @@ async function writeEnvironmentFile(paths, browserPath) {
     `export PRE_COMMIT_HOME=${shellQuote(path.join(paths.cache, "pre-commit"))}`,
     `export PUPPETEER_CACHE_DIR=${shellQuote(path.join(paths.cache, "puppeteer"))}`,
     `export PA11Y_CHROME_PATH=${shellQuote(browserPath)}`,
-    `export LD_LIBRARY_PATH=${shellQuote(`${paths.browserRuntimeLib}:${paths.browserRuntimeLibFallback}`)}:"\${LD_LIBRARY_PATH:-}"`,
-    `export DATABASE_URL=${shellQuote(process.env.DATABASE_URL || "postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_toolchain")}`,
+    `export LD_LIBRARY_PATH=${quotedBrowserRuntimePath}:"\${LD_LIBRARY_PATH:-}"`,
+    `export DATABASE_URL=${shellQuote(databaseUrl)}`,
     "export ALLOW_MAJOR_RELEASE=true",
-    `export PATH=${shellQuote(`${paths.bin}:${path.join(paths.venv, "bin")}`)}:"$PATH"`,
+    `export PATH=${quotedRepositoryToolPath}:"$PATH"`,
     "",
   ];
   await writeFile(paths.envFile, lines.join("\n"));
@@ -439,13 +450,8 @@ function supportsPython(config, version) {
 }
 
 function numericVersion(version) {
-  return (
-    String(version)
-      .replace(/^v/u, "")
-      .match(/\d+(?:\.\d+)*/u)?.[0]
-      ?.split(".")
-      .map(Number) ?? [0]
-  );
+  const extracted = extractVersion(version, 1, 4);
+  return extracted ? extracted.split(".").map(Number) : [0];
 }
 
 function compareVersion(left, right) {
@@ -459,7 +465,7 @@ function compareVersion(left, right) {
 async function pythonModuleVersion(python, module, env) {
   if (!(await exists(python))) return undefined;
   const value = await commandVersion(python, ["-m", module, "--version"], env);
-  return value?.match(/\d+\.\d+\.\d+/u)?.[0];
+  return extractVersion(value, 3, 3);
 }
 
 async function firstCommandVersion(candidates, env) {
@@ -481,8 +487,30 @@ async function commandVersion(command, args, env) {
 
 function normalizePrefixedVersion(value, prefix) {
   if (!value) return undefined;
-  const match = value.match(/\d+(?:\.\d+){1,3}/u);
-  return match?.[0] ?? (prefix ? value.replace(prefix, "").trim() : value.trim());
+  return extractVersion(value, 2, 4) ?? (prefix ? value.replace(prefix, "").trim() : value.trim());
+}
+
+function extractVersion(value, minimumSegments, maximumSegments) {
+  const input = String(value ?? "");
+  for (let start = 0; start < input.length; start += 1) {
+    if (!isAsciiDigit(input[start])) continue;
+    let cursor = start;
+    let segments = 0;
+    while (segments < maximumSegments) {
+      while (cursor < input.length && isAsciiDigit(input[cursor])) cursor += 1;
+      segments += 1;
+      const hasAnotherSegment = input[cursor] === "." && isAsciiDigit(input[cursor + 1]);
+      if (!hasAnotherSegment || segments === maximumSegments) break;
+      cursor += 1;
+    }
+    if (segments >= minimumSegments) return input.slice(start, cursor);
+    start = cursor;
+  }
+  return undefined;
+}
+
+function isAsciiDigit(character) {
+  return character !== undefined && character >= "0" && character <= "9";
 }
 
 function defaultCacheRoot() {
@@ -532,7 +560,7 @@ async function readOptional(file) {
   try {
     return await readFile(file, "utf8");
   } catch (error) {
-    if (error && error.code === "ENOENT") return undefined;
+    if (error?.code === "ENOENT") return undefined;
     throw error;
   }
 }
@@ -562,7 +590,8 @@ async function capture(command, args, options) {
 }
 
 function shellQuote(value) {
-  return `'${String(value).replaceAll("'", `'"'"'`)}'`;
+  const escaped = String(value).replaceAll("'", "'\"'\"'");
+  return `'${escaped}'`;
 }
 
 async function main() {
@@ -592,9 +621,13 @@ async function main() {
   throw new Error(`Unknown toolchain command: ${command}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : "";
+if (import.meta.url === invokedPath) {
+  try {
+    await main();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${message}\n`);
     process.exitCode = 1;
-  });
+  }
 }
