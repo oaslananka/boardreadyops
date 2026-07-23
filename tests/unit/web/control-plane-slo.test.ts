@@ -79,6 +79,65 @@ describe("control-plane SLO evaluator", () => {
     ]);
   });
 
+  it.each([
+    {
+      signal: "webhook_acceptance_p95",
+      breached: snapshot({ webhookAcceptanceP95Ms: 1_001 }),
+      durationMilliseconds: 5 * 60 * 1_000,
+      observedValue: 1_001,
+      threshold: 1_000,
+      severity: "warning",
+      reasonCode: "webhook_acceptance_p95_sustained",
+    },
+    {
+      signal: "outbox_lag",
+      breached: snapshot({ outboxLagSeconds: 61 }),
+      durationMilliseconds: 5 * 60 * 1_000,
+      observedValue: 61,
+      threshold: 60,
+      severity: "critical",
+      reasonCode: "outbox_lag_sustained",
+    },
+    {
+      signal: "dispatch_latency_p95",
+      breached: snapshot({ dispatchLatencyP95Seconds: 31 }),
+      durationMilliseconds: 10 * 60 * 1_000,
+      observedValue: 31,
+      threshold: 30,
+      severity: "warning",
+      reasonCode: "dispatch_latency_p95_sustained",
+    },
+    {
+      signal: "completion_latency_p95",
+      breached: snapshot({ completionLatencyP95Seconds: 1_801 }),
+      durationMilliseconds: 10 * 60 * 1_000,
+      observedValue: 1_801,
+      threshold: 1_800,
+      severity: "warning",
+      reasonCode: "completion_latency_p95_sustained",
+    },
+  ] as const)("pins the $signal sustained policy", (policy) => {
+    const evaluator = createControlPlaneSloEvaluator();
+    const startedAt = at("2026-07-23T18:00:00.000Z");
+
+    expect(evaluator.evaluate(policy.breached, startedAt).events).toEqual([]);
+    expect(
+      evaluator.evaluate(policy.breached, new Date(startedAt.valueOf() + policy.durationMilliseconds - 1)).events,
+    ).toEqual([]);
+    expect(
+      evaluator.evaluate(policy.breached, new Date(startedAt.valueOf() + policy.durationMilliseconds)).events,
+    ).toEqual([
+      expect.objectContaining({
+        signal: policy.signal,
+        state: "firing",
+        severity: policy.severity,
+        observedValue: policy.observedValue,
+        threshold: policy.threshold,
+        reasonCode: policy.reasonCode,
+      }),
+    ]);
+  });
+
   it("requires two consecutive stale-attempt snapshots", () => {
     const evaluator = createControlPlaneSloEvaluator();
 
