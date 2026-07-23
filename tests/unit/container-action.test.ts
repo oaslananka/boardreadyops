@@ -59,6 +59,8 @@ describe("container action release surfaces", () => {
     expect(dockerfile).toContain("/usr/local/lib/node_modules/npm");
     expect(dockerfile).toContain("useradd --create-home --shell /bin/bash --uid 10001 boardreadyops");
     expect(dockerfile).not.toContain("\nUSER ");
+    expect(dockerfile).toContain("# nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint");
+    expect(dockerfile).toContain("GitHub Docker actions require the default root user");
     expect(dockerfile).toContain('ENTRYPOINT ["boardreadyops"]');
   });
 

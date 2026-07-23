@@ -44,6 +44,16 @@ The aggregate security workflow calls the official OSV reusable workflows throug
 
 `.github/workflows/osv.yml` remains a specialist defense-in-depth workflow for GitHub Code Scanning publication. It is path-filtered for package manifests, lockfiles, workspace configuration, Python requirement files, and its own workflow definition. Scheduled scans still detect newly disclosed vulnerabilities even when dependencies have not changed. The specialist workflow is not a branch-protection context; `security / gate` owns the merge decision.
 
+## Package-manager supply-chain policy
+
+The repository enforces a seven-day release quarantine in npm, pnpm, and every Renovate package rule. pnpm additionally blocks exotic transitive dependency sources and rejects package metadata trust downgrades. These controls reduce exposure to newly published malicious or compromised packages before they enter the lockfile.
+
+Security fixes sometimes need to land before the normal quarantine expires. `pnpm-workspace.yaml` therefore uses exact package-and-version exclusions only for reviewed urgent fixes already present in the lockfile. Trust exceptions are also exact-version entries and must remain minimal. Do not add package-wide wildcards or disable the global policies to unblock an update; remove each temporary release-age exclusion after the package is older than seven days.
+
+## Container runtime privilege policy
+
+The hosted cloud image owns its copied runtime artifacts as the built-in `node` account and declares `USER node` before the health check and entrypoint. The published GitHub Docker action remains an explicit exception because GitHub mounts `GITHUB_WORKSPACE` with runner-dependent ownership and the action must be able to read and write that workspace. The action Dockerfile documents this constraint next to a rule-specific Semgrep suppression; the exception does not apply to standalone or hosted service images.
+
 ## Aggregate merge gate
 
 Every pull request receives one stable `security / gate` conclusion from `.github/workflows/security.yml`. A policy job classifies the changed files, then the gate evaluates all applicable mandatory checks after they complete:

@@ -38,13 +38,15 @@ LABEL org.opencontainers.image.title="BoardReadyOps Cloud" \
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
-COPY --from=build /app/apps/web/.next/standalone ./
-COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build /app/apps/web/.next/worker.mjs ./worker.mjs
-COPY --from=build /app/apps/web/.next/migrate.mjs ./migrate.mjs
-COPY --from=build /app/apps/web/public ./apps/web/public
+COPY --chown=node:node --from=build /app/apps/web/.next/standalone ./
+COPY --chown=node:node --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --chown=node:node --from=build /app/apps/web/.next/worker.mjs ./worker.mjs
+COPY --chown=node:node --from=build /app/apps/web/.next/migrate.mjs ./migrate.mjs
+COPY --chown=node:node --from=build /app/apps/web/public ./apps/web/public
 COPY apps/web/docker-entrypoint.sh /usr/local/bin/boardreadyops-entrypoint
 RUN chmod 0755 /usr/local/bin/boardreadyops-entrypoint
+
+USER node
 
 EXPOSE 3000
 
