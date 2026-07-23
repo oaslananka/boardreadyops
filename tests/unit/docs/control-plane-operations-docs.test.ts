@@ -34,4 +34,24 @@ describe("control-plane operator documentation", () => {
     const navigation = fs.readFileSync("mkdocs.yml", "utf8");
     expect(navigation).toContain("Control-plane Reconciliation: operations/control-plane-reconciliation.md");
   });
+
+  it("documents the initial GitHub Cloud GA SLO policy and transition events", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+    const operations = fs.readFileSync(documentationPath, "utf8");
+    const combined = `${deployment}
+${operations}`;
+
+    expect(combined).toContain("github-cloud-ga-v1");
+    expect(combined).toContain("worker.control_plane_slo_evaluation");
+    expect(combined).toContain("worker.control_plane_slo_firing");
+    expect(combined).toContain("worker.control_plane_slo_recovered");
+    expect(combined).toContain("worker.control_plane_slo_failed");
+    expect(combined).toContain("1,000 ms");
+    expect(combined).toContain("60 seconds");
+    expect(combined).toContain("500 basis points");
+    expect(combined).toContain("at least 20 terminal runs");
+    expect(combined).toContain("transition");
+    expect(combined).toContain("does not affect worker readiness");
+    expect(combined).toContain("worker restart resets");
+  });
 });

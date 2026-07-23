@@ -3,6 +3,7 @@ import { hostname } from "node:os";
 import { type ClaimedControlPlaneJob, createSqlControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 import {
   type ClaimedControlPlaneReconciliationItem,
+  type ControlPlaneSliSnapshot,
   createSqlControlPlaneOperationsStore,
 } from "@boardreadyops/db/control-plane-operations-store";
 import {
@@ -14,6 +15,7 @@ import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db
 import { processControlPlaneCheckRunReconciliation } from "./lib/control-plane-check-run-reconciliation-worker.js";
 import { processControlPlaneOutboxEffect } from "./lib/control-plane-outbox-worker.js";
 import { processControlPlaneWorkflowReconciliation } from "./lib/control-plane-reconciliation-worker.js";
+import { createControlPlaneSloEvaluator } from "./lib/control-plane-slo.js";
 import { processControlPlaneJob } from "./lib/control-plane-worker.js";
 import {
   createScopedConcurrencyGate,
@@ -118,6 +120,7 @@ const databasePoolMaximum = integerEnvironment(
 const executor = createPgQueryExecutor({ connectionString: databaseUrl, max: databasePoolMaximum });
 const jobs = createSqlControlPlaneJobStore(executor);
 const operations = createSqlControlPlaneOperationsStore(executor);
+const controlPlaneSlo = createControlPlaneSloEvaluator();
 const outbox = createSqlControlPlaneOutboxStore(executor);
 const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
 const scopedConcurrency = createScopedConcurrencyGate({
@@ -271,11 +274,29 @@ async function collectQueueMetrics(currentTime: number): Promise<void> {
     log("warn", "worker.metrics_failed", { errorClass: errorClass(error) });
   }
 
+  let snapshot: ControlPlaneSliSnapshot;
   try {
-    const snapshot = await operations.collectSliSnapshot();
+    snapshot = await operations.collectSliSnapshot();
     log("info", "worker.control_plane_sli", snapshot);
   } catch (error) {
     log("warn", "worker.control_plane_sli_failed", { errorClass: errorClass(error) });
+    return;
+  }
+
+  try {
+    const evaluation = controlPlaneSlo.evaluate(snapshot);
+    log("info", "worker.control_plane_slo_evaluation", {
+      policyVersion: evaluation.policyVersion,
+      healthy: evaluation.healthy,
+      activeSignals: evaluation.activeSignals,
+    });
+    for (const event of evaluation.events) {
+      const eventName =
+        event.state === "firing" ? "worker.control_plane_slo_firing" : "worker.control_plane_slo_recovered";
+      log(event.state === "firing" ? "warn" : "info", eventName, event);
+    }
+  } catch (error) {
+    log("warn", "worker.control_plane_slo_failed", { errorClass: errorClass(error) });
   }
 }
 

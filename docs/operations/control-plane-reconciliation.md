@@ -168,3 +168,23 @@ Relevant structured events are `worker.check_run_reconciliation_detected`, `work
 3. Confirm the GitHub App installation still has Checks read/write access for the target repository.
 4. Inspect `last_publication_error` and the corresponding audit event. The accepted terminal BoardReadyOps result remains authoritative.
 5. After correcting permissions or a GitHub incident, use a controlled operator remediation rather than changing the release result or manually fabricating findings.
+
+## SLO alert incident response
+
+The initial GitHub Cloud GA policy is `github-cloud-ga-v1`. It evaluates privacy-safe aggregate SLI snapshots and emits these structured events:
+
+- `worker.control_plane_slo_evaluation`: policy version, aggregate health, and active signal names for every successful snapshot;
+- `worker.control_plane_slo_firing`: one transition when a signal first satisfies its duration, consecutive-snapshot, trend, or volume gate;
+- `worker.control_plane_slo_recovered`: one transition when an active signal returns to a healthy value; and
+- `worker.control_plane_slo_failed`: evaluation failure with only `errorClass`.
+
+Use this incident sequence:
+
+1. Open the latest `worker.control_plane_slo_evaluation` and identify the active aggregate signals.
+2. Treat a critical firing transition as a platform page. Treat a warning transition as operational triage requiring ownership and a recorded next check.
+3. Correlate lifecycle queue age, outbox lag, reconciliation backlog, recent repairs, terminal failures, worker health, and GitHub service status. Do not enable private source, findings, payload, workflow-log, or credential logging.
+4. For lifecycle or outbox backlog, verify healthy claim loops and database leases before replaying anything. Use the dead-letter API only for records explicitly marked replay-safe.
+5. For stale attempts or callback failures, follow the GitHub workflow state reconciliation procedure above and preserve its fail-closed result mapping.
+6. Close or downgrade the incident only after a `worker.control_plane_slo_recovered` transition and confirmation that the underlying aggregate signal is stable.
+
+SLI collection and SLO evaluation are observability paths and do not affect worker readiness or queue processing. The evaluator's debounce state is process-local; a worker restart resets local duration, consecutive-snapshot, and backlog-trend history. A restart is not a recovery signal, so durable alerting must retain the existing incident until a real recovery transition arrives.

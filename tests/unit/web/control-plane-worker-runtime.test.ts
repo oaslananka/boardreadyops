@@ -179,8 +179,14 @@ describe("control-plane worker runtime", () => {
 
     expect(source).toContain("createSqlControlPlaneOperationsStore");
     expect(source).toContain("operations.collectSliSnapshot()");
+    expect(source).toContain("createControlPlaneSloEvaluator");
+    expect(source).toContain("controlPlaneSlo.evaluate(snapshot)");
     expect(source).toContain('"worker.control_plane_sli"');
     expect(source).toContain('"worker.control_plane_sli_failed"');
+    expect(source).toContain('"worker.control_plane_slo_evaluation"');
+    expect(source).toContain('"worker.control_plane_slo_firing"');
+    expect(source).toContain('"worker.control_plane_slo_recovered"');
+    expect(source).toContain('"worker.control_plane_slo_failed"');
   });
 
   it("wires workflow reconciliation detection and processing loops", () => {
