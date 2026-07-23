@@ -49,4 +49,6 @@ COPY action-entrypoint.sh /usr/local/bin/boardreadyops-action
 
 RUN chmod 0755 /usr/local/bin/boardreadyops-action
 
+# GitHub Docker actions require the default root user to access the mounted GITHUB_WORKSPACE across runner UIDs.
+# nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint
 ENTRYPOINT ["boardreadyops"]

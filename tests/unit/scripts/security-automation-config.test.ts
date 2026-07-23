@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = process.cwd();
@@ -72,6 +73,53 @@ describe("dependency and security automation configuration", () => {
     expect(renovate.ignorePaths).toEqual(
       expect.arrayContaining(["**/.next/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**"]),
     );
+  });
+
+  it("enforces package-manager release quarantine and dependency trust policies", async () => {
+    const npmrc = await repositoryFile(".npmrc");
+    const workspace = yaml.load(await repositoryFile("pnpm-workspace.yaml")) as {
+      minimumReleaseAge?: number;
+      trustPolicy?: string;
+      blockExoticSubdeps?: boolean;
+      minimumReleaseAgeExclude?: string[];
+      trustPolicyExclude?: string[];
+    };
+    const renovate = JSON.parse(await repositoryFile("renovate.json")) as {
+      packageRules?: Array<{ minimumReleaseAge?: string | false }>;
+    };
+
+    expect(npmrc).toMatch(/^min-release-age=7$/mu);
+    expect(workspace.minimumReleaseAge).toBe(10_080);
+    expect(workspace.trustPolicy).toBe("no-downgrade");
+    expect(workspace.blockExoticSubdeps).toBe(true);
+    expect(workspace.minimumReleaseAgeExclude).toEqual(
+      expect.arrayContaining([
+        "next@16.2.11",
+        "@next/env@16.2.11",
+        "fast-uri@3.1.4",
+        "renovate@43.272.4",
+        "@renovatebot/osv-offline-db@3.0.9",
+        "@renovatebot/osv-offline@3.0.9",
+      ]),
+    );
+    expect(workspace.trustPolicyExclude).toEqual(["@yarnpkg/libzip@3.2.2", "semver@6.3.1"]);
+    expect(renovate.packageRules).not.toHaveLength(0);
+    for (const rule of renovate.packageRules ?? []) {
+      expect(rule.minimumReleaseAge).toBe("7 days");
+    }
+  });
+
+  it("runs the cloud image as non-root and documents the GitHub action exception", async () => {
+    const webDockerfile = await repositoryFile("apps/web/Dockerfile");
+    const actionDockerfile = await repositoryFile("apps/container/Dockerfile");
+
+    expect(webDockerfile).toContain("USER node");
+    expect(webDockerfile).toContain("COPY --chown=node:node --from=build");
+    expect(actionDockerfile).not.toContain("\nUSER ");
+    expect(actionDockerfile).toContain(
+      "# nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint",
+    );
+    expect(actionDockerfile).toContain("GitHub Docker actions require the default root user");
   });
 
   it("runs a pinned Renovate release only on schedule or manual dispatch", async () => {

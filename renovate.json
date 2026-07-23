@@ -72,21 +72,24 @@
         "@actions/exec"
       ],
       "automerge": false,
-      "addLabels": ["manual-review"]
+      "addLabels": ["manual-review"],
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Require explicit Dependency Dashboard approval for major upgrades.",
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true,
       "automerge": false,
-      "addLabels": ["breaking-change", "manual-review"]
+      "addLabels": ["breaking-change", "manual-review"],
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Keep GitHub Actions and container updates visible and manually reviewed.",
       "matchManagers": ["github-actions", "dockerfile", "docker-compose"],
       "pinDigests": true,
       "automerge": false,
-      "addLabels": ["supply-chain", "manual-review"]
+      "addLabels": ["supply-chain", "manual-review"],
+      "minimumReleaseAge": "7 days"
     }
   ],
   "vulnerabilityAlerts": {
