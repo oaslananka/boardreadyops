@@ -1,6 +1,6 @@
 import { createAppAuth } from "@octokit/auth-app";
 
-const readinessCheckName = "BoardReadyOps / release readiness";
+export const readinessCheckName = "BoardReadyOps / release readiness";
 const readinessCommentMarker = "<!-- boardreadyops:release-readiness -->";
 
 function requiredEnv(name) {
@@ -59,6 +59,12 @@ function normalizedCheckRunState(value, fallback) {
   return typeof value === "string" && /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u.test(value) ? value : fallback;
 }
 
+function normalizedCheckRunBinding(value, fallback, maximumLength = 256) {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= maximumLength ? normalized : fallback;
+}
+
 export async function readGitHubCheckRun(input) {
   const request = input.request ?? fetch;
   const response = await request(
@@ -70,7 +76,14 @@ export async function readGitHubCheckRun(input) {
   const result = await response.json();
   const status = normalizedCheckRunState(result?.status, "unknown");
   const conclusion = result?.conclusion == null ? undefined : normalizedCheckRunState(result.conclusion, "unknown");
-  return { kind: "present", status, ...(conclusion ? { conclusion } : {}) };
+  return {
+    kind: "present",
+    name: normalizedCheckRunBinding(result?.name, "unknown"),
+    externalId: normalizedCheckRunBinding(result?.external_id, "unknown"),
+    headSha: normalizedCheckRunBinding(result?.head_sha, "unknown", 128),
+    status,
+    ...(conclusion ? { conclusion } : {}),
+  };
 }
 
 function requestHeaders(token) {

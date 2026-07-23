@@ -157,6 +157,9 @@ describe("GitHub App Check Run observation", () => {
     request.mockResolvedValueOnce(
       jsonResponse({
         id: 77,
+        name: "BoardReadyOps / release readiness",
+        external_id: "run-1",
+        head_sha: "a".repeat(40),
         status: "completed",
         conclusion: "success",
         output: { title: "private", summary: "private findings" },
@@ -174,7 +177,14 @@ describe("GitHub App Check Run observation", () => {
         checkRunId: 77,
         request,
       }),
-    ).resolves.toEqual({ kind: "present", status: "completed", conclusion: "success" });
+    ).resolves.toEqual({
+      kind: "present",
+      name: "BoardReadyOps / release readiness",
+      externalId: "run-1",
+      headSha: "a".repeat(40),
+      status: "completed",
+      conclusion: "success",
+    });
   });
 
   it("maps 404 without exposing the response body", async () => {

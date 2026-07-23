@@ -14,7 +14,14 @@ type PullRequestCommentInput = {
 
 export type GitHubCheckRunObservation =
   | { kind: "not_found" }
-  | { kind: "present"; status: string; conclusion?: string };
+  | {
+      kind: "present";
+      name: string;
+      externalId: string;
+      headSha: string;
+      status: string;
+      conclusion?: string;
+    };
 
 export type ReadGitHubCheckRunInput = {
   apiBaseUrl: string;
@@ -60,6 +67,7 @@ export type DurableGitHubAppCheckRunClient = GitHubAppCheckRunClientResult & {
   ensurePullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
 };
 
+export declare const readinessCheckName = "BoardReadyOps / release readiness";
 export declare function detailsUrl(runId: string): string | undefined;
 export declare function readGitHubCheckRun(input: ReadGitHubCheckRunInput): Promise<GitHubCheckRunObservation>;
 export declare function ensurePullRequestCheckRun(input: EnsurePullRequestCheckRunInput): Promise<{ id: number }>;

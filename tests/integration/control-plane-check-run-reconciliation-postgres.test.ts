@@ -183,6 +183,7 @@ describeDatabase("GitHub Check Run PostgreSQL reconciliation", () => {
       repositoryOwner: "octo-org",
       repositoryName: "success-board",
       releaseRunId: fixture.releaseRunId,
+      commitSha: "a".repeat(40),
       githubCheckRunId: fixture.githubCheckRunId,
       runStatus: "completed",
       expectedConclusion: "success",

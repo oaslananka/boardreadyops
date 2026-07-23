@@ -152,6 +152,7 @@ The persisted signed result remains authoritative. Schema v21 records the exact 
 
 | Observation | Before deadline | At or after deadline |
 | --- | --- | --- |
+| Check Run identity/binding mismatch | record `github_check_run_binding_mismatch`; do not update | record `github_check_run_binding_mismatch`; do not update |
 | expected terminal status/conclusion | mark publication reconciled | mark publication reconciled |
 | pending or mismatched Check Run | update and mark reconciled | update; record `github_check_run_update_failed` if convergence fails |
 | `404` | recheck as `github_check_run_not_found` | record stable `github_check_run_not_found` |

@@ -30,6 +30,7 @@ const context: ControlPlaneCheckRunReconciliationContext = {
   repositoryName: "board",
   repositoryFullName: "octo/board",
   releaseRunId: "run-1",
+  commitSha: "a".repeat(40),
   githubCheckRunId: 77,
   runStatus: "completed",
   expectedConclusion: "success",
@@ -38,9 +39,27 @@ const context: ControlPlaneCheckRunReconciliationContext = {
 };
 
 function dependencies(
-  observation: { kind: "not_found" } | { kind: "present"; status: string; conclusion?: string },
+  observation:
+    | { kind: "not_found" }
+    | {
+        kind: "present";
+        status: string;
+        conclusion?: string;
+        name?: string;
+        externalId?: string;
+        headSha?: string;
+      },
   overrides: Partial<ControlPlaneCheckRunReconciliationDependencies> = {},
 ): ControlPlaneCheckRunReconciliationDependencies {
+  const normalizedObservation =
+    observation.kind === "present"
+      ? {
+          name: "BoardReadyOps / release readiness",
+          externalId: "run-1",
+          headSha: "a".repeat(40),
+          ...observation,
+        }
+      : observation;
   const operations = {
     loadCheckRunReconciliationContext: vi.fn(async () => context),
     rescheduleReconciliationItem: vi.fn(async () => "rescheduled" as const),
@@ -53,7 +72,7 @@ function dependencies(
     workerId: "worker-1",
     operations,
     github: {
-      readCheckRun: vi.fn(async () => observation),
+      readCheckRun: vi.fn(async () => normalizedObservation),
       completeCheckRun: vi.fn(async () => undefined),
     },
     now: () => now,
@@ -63,6 +82,33 @@ function dependencies(
 }
 
 describe("control-plane Check Run reconciliation", () => {
+  it.each([
+    { field: "name", value: "Unrelated check" },
+    { field: "externalId", value: "other-run" },
+    { field: "headSha", value: "b".repeat(40) },
+  ] as const)("fails closed when the persisted Check Run ID has a mismatched $field", async ({ field, value }) => {
+    const deps = dependencies({
+      kind: "present",
+      status: "completed",
+      conclusion: "success",
+      [field]: value,
+    });
+
+    await expect(processControlPlaneCheckRunReconciliation(item, deps)).resolves.toEqual({
+      reconciliationId: "reconciliation-check-1",
+      status: "failed",
+      outcomeCode: "github_check_run_binding_mismatch",
+    });
+    expect(deps.github.completeCheckRun).not.toHaveBeenCalled();
+    expect(deps.operations.finalizeCheckRunReconciliationFailure).toHaveBeenCalledWith({
+      reconciliationId: "reconciliation-check-1",
+      workerId: "worker-1",
+      observedStatus: "completed",
+      observedConclusion: "success",
+      publicFailureReason: "github_check_run_binding_mismatch",
+    });
+  });
+
   it("repairs only database publication state when GitHub is already current", async () => {
     const deps = dependencies({ kind: "present", status: "completed", conclusion: "success" });
 

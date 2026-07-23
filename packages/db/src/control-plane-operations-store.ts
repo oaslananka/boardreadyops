@@ -56,6 +56,7 @@ export type ControlPlaneCheckRunReconciliationContext = {
   repositoryName: string;
   repositoryFullName: string;
   releaseRunId: string;
+  commitSha: string;
   githubCheckRunId: number;
   runStatus: string;
   expectedConclusion: "failure" | "neutral" | "success" | "timed_out";
@@ -474,6 +475,7 @@ function decodedCheckRunReconciliationContext(
     repositoryName: requiredText(row, "repository_name", "Check Run reconciliation context"),
     repositoryFullName: requiredText(row, "repository_full_name", "Check Run reconciliation context"),
     releaseRunId: requiredText(row, "release_run_id", "Check Run reconciliation context"),
+    commitSha: requiredText(row, "commit_sha", "Check Run reconciliation context"),
     githubCheckRunId,
     runStatus: requiredText(row, "run_status", "Check Run reconciliation context"),
     expectedConclusion,

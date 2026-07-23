@@ -38,6 +38,7 @@ describe("GitHub Check Run reconciliation migration", () => {
     expect(contextEnd).toBeGreaterThan(contextStart);
     expect(contextSql).toContain("expected_conclusion text");
     expect(contextSql).toContain("github_check_run_id bigint");
+    expect(contextSql).toContain("commit_sha text");
     expect(contextSql).toContain("lease_owner = p_worker_id");
     expect(contextSql).not.toContain("payload");
     expect(contextSql).not.toContain("findings");

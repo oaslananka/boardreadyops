@@ -21,7 +21,7 @@ One durable `release_run / reporting_stale` reconciliation item is created with 
 
 ## Safe context
 
-The lease-bound database context contains only tenant/resource IDs, repository owner/name, Check Run ID, run status, the persisted GitHub-facing conclusion, completion timestamp, and deadline. It excludes result payloads, findings, report links, artifacts, source, and credentials.
+The lease-bound database context contains only tenant/resource IDs, repository owner/name, Check Run ID, release-run ID, commit SHA, run status, the persisted GitHub-facing conclusion, completion timestamp, and deadline. It excludes result payloads, findings, report links, artifacts, source, and credentials. Before applying any update, the worker verifies the fetched Check Run name, `external_id`, and `head_sha` against the expected BoardReadyOps check, release run, and commit. A mismatch is terminally classified as `github_check_run_binding_mismatch`; reconciliation never mutates an unbound Check Run.
 
 ## Worker flow
 

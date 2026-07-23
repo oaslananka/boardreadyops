@@ -4,7 +4,7 @@ import type {
   ControlPlaneCheckRunReconciliationContext,
   ControlPlaneOperationsStore,
 } from "@boardreadyops/db/control-plane-operations-store";
-import type { GitHubCheckRunObservation } from "./github-app-check-run-client.js";
+import { type GitHubCheckRunObservation, readinessCheckName } from "./github-app-check-run-client.js";
 
 type CheckRunReconciliationOperations = Pick<
   ControlPlaneOperationsStore,
@@ -66,6 +66,17 @@ function recoveryPresentation(conclusion: ControlPlaneCheckRunReconciliationCont
     summary:
       "BoardReadyOps restored this Check Run from the accepted signed terminal result. Open the BoardReadyOps run for complete evidence and details.",
   };
+}
+
+function isBoundToContext(
+  observation: Extract<GitHubCheckRunObservation, { kind: "present" }>,
+  context: ControlPlaneCheckRunReconciliationContext,
+): boolean {
+  return (
+    observation.name === readinessCheckName &&
+    observation.externalId === context.releaseRunId &&
+    observation.headSha.toLowerCase() === context.commitSha.toLowerCase()
+  );
 }
 
 function isCurrent(
@@ -169,6 +180,14 @@ export async function processControlPlaneCheckRunReconciliation(
     return finalizeFailure(item, dependencies, {
       observedStatus: "not_found",
       publicFailureReason: "github_check_run_not_found",
+    });
+  }
+
+  if (!isBoundToContext(observation, context)) {
+    return finalizeFailure(item, dependencies, {
+      observedStatus: observation.status,
+      ...(observation.conclusion ? { observedConclusion: observation.conclusion } : {}),
+      publicFailureReason: "github_check_run_binding_mismatch",
     });
   }
 
