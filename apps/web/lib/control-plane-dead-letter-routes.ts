@@ -129,12 +129,12 @@ export async function handleControlPlaneDeadLetterListRequest(
       limit: query.limit,
       ...(query.before ? { before: query.before } : {}),
     });
-    const nextBefore = items.length === query.limit ? items.at(-1)?.failedAt : undefined;
+    const lastItem = items.length === query.limit ? items.at(-1) : undefined;
     return jsonResponse(
       {
         ok: true,
         items,
-        ...(nextBefore ? { nextBefore } : {}),
+        ...(lastItem ? { nextBefore: lastItem.failedAt } : {}),
       },
       200,
     );

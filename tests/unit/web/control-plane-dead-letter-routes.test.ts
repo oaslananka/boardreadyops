@@ -96,6 +96,16 @@ describe("control-plane dead-letter operator routes", () => {
     expect(wired.createOperationsStore(executor)).toBe(store);
     expect(createOperationsStore).toHaveBeenCalledWith(executor);
 
+    const defaultPool = createControlPlaneDeadLetterRouteDependencies(
+      { DATABASE_URL: "postgresql://db.example/boardreadyops" },
+      { createQueryExecutor, createOperationsStore },
+    );
+    expect(defaultPool.queryExecutor()).toBe(executor);
+    expect(createQueryExecutor).toHaveBeenLastCalledWith({
+      connectionString: "postgresql://db.example/boardreadyops",
+      max: 5,
+    });
+
     const withoutDatabase = createControlPlaneDeadLetterRouteDependencies(
       {},
       { createQueryExecutor, createOperationsStore },
@@ -237,6 +247,22 @@ describe("control-plane dead-letter operator routes", () => {
     expect(JSON.stringify(payload)).not.toContain("normalizedActions");
   });
 
+  it("lists an empty page without a cursor when fewer than the requested limit exist", async () => {
+    const listDeadLetters = vi.fn(async () => []);
+    const deps = dependencies(operationsStore({ listDeadLetters }));
+    const response = await handleControlPlaneDeadLetterListRequest(
+      request(`/api/v1/operator/installations/${installationId}/dead-letters`, {
+        authorization: `Bearer ${token}`,
+      }),
+      installationId,
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    expect(listDeadLetters).toHaveBeenCalledWith({ installationId, limit: 50 });
+    expect(await json(response)).toEqual({ ok: true, items: [] });
+  });
+
   it("reports unavailable database configuration and hides store failures", async () => {
     const missingDatabase = dependencies();
     vi.mocked(missingDatabase.queryExecutor).mockReturnValue(undefined);
@@ -266,6 +292,22 @@ describe("control-plane dead-letter operator routes", () => {
     );
     expect(failingResponse.status).toBe(503);
     expect(JSON.stringify(await json(failingResponse))).not.toContain("do-not-leak");
+  });
+
+  it("fails replay authentication before accessing the database", async () => {
+    const deps = dependencies();
+    const response = await handleControlPlaneDeadLetterReplayRequest(
+      request(`/api/v1/operator/installations/${installationId}/dead-letters/job/${itemId}/replay`, {
+        method: "POST",
+        authorization: `Bearer ${"z".repeat(token.length)}`,
+        idempotencyKey: operationId,
+      }),
+      { installationId, itemType: "job", itemId },
+      deps,
+    );
+
+    expect(response.status).toBe(401);
+    expect(deps.queryExecutor).not.toHaveBeenCalled();
   });
 
   it("requires validated replay identifiers and an idempotency key", async () => {
@@ -304,6 +346,23 @@ describe("control-plane dead-letter operator routes", () => {
     expect(deps.queryExecutor).not.toHaveBeenCalled();
   });
 
+  it("reports unavailable replay storage after validating the request", async () => {
+    const deps = dependencies();
+    vi.mocked(deps.queryExecutor).mockReturnValue(undefined);
+    const response = await handleControlPlaneDeadLetterReplayRequest(
+      request(`/api/v1/operator/installations/${installationId}/dead-letters/job/${itemId}/replay`, {
+        method: "POST",
+        authorization: `Bearer ${token}`,
+        idempotencyKey: operationId,
+      }),
+      { installationId, itemType: "job", itemId },
+      deps,
+    );
+
+    expect(response.status).toBe(503);
+    expect(await json(response)).toEqual({ ok: false, error: "database is not configured" });
+  });
+
   it("replays with the configured actor and maps idempotent success outcomes", async () => {
     for (const outcome of ["replayed", "already_applied"] as const) {
       const replayDeadLetter = vi.fn(async () => ({ outcome, auditEventId: "audit-1" }));
@@ -328,6 +387,23 @@ describe("control-plane dead-letter operator routes", () => {
       });
       expect(await json(response)).toEqual({ ok: true, outcome, auditEventId: "audit-1" });
     }
+  });
+
+  it("returns idempotent success without inventing an audit event identifier", async () => {
+    const replayDeadLetter = vi.fn(async () => ({ outcome: "already_applied" as const }));
+    const deps = dependencies(operationsStore({ replayDeadLetter }));
+    const response = await handleControlPlaneDeadLetterReplayRequest(
+      request(`/api/v1/operator/installations/${installationId}/dead-letters/job/${itemId}/replay`, {
+        method: "POST",
+        authorization: `Bearer ${token}`,
+        idempotencyKey: operationId,
+      }),
+      { installationId, itemType: "job", itemId },
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toEqual({ ok: true, outcome: "already_applied" });
   });
 
   it("hides replay store failures behind a stable unavailable response", async () => {
