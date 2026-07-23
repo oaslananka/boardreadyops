@@ -3,8 +3,9 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createSqlControlPlaneOutboxStore } from "../../packages/db/src/control-plane-outbox-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "../../packages/db/src/transactional-lifecycle-store.js";
+import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 4 }) : undefined;
 const suffix = randomUUID().replaceAll("-", "").slice(0, 12);

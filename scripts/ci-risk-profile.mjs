@@ -90,7 +90,10 @@ const COVERAGE_PATTERNS = [
   /^src\/(core|rules|bom|pinmap|report|kicad|notifiers)\//,
   /^src\/action\/inputs\.ts$/,
   /^tests\//,
-  /^vitest\.config\.[cm]?ts$/,
+  /^packages\/(cloud-core|contracts|db)\//,
+  /^apps\/web\//,
+  /^vitest(?:\.cloud)?\.config\.[cm]?ts$/,
+  /^scripts\/run-(?:cloud-)?codecov-coverage\.mjs$/,
 ];
 
 function matchesAny(path, patterns) {

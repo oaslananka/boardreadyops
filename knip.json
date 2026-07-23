@@ -18,5 +18,5 @@
       "project": ["lib/**/*.{ts,js}", "app/api/github/webhook/**/*.{ts,js}"]
     }
   },
-  "ignoreBinaries": ["psql"]
+  "ignoreBinaries": ["kicad-cli", "psql"]
 }
