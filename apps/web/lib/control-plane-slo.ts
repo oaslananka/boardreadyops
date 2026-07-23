@@ -261,9 +261,7 @@ export function createControlPlaneSloEvaluator(): ControlPlaneSloEvaluator {
           observedValue: snapshot.reconciliationBacklog,
           threshold: 20,
           severity: "warning",
-          reasonCode: backlogAboveThreshold
-            ? "reconciliation_backlog_threshold"
-            : "reconciliation_backlog_increasing",
+          reasonCode: backlogAboveThreshold ? "reconciliation_backlog_threshold" : "reconciliation_backlog_increasing",
           breached: backlogAboveThreshold || backlogIncreasing,
         }),
         immediateObservation({

@@ -3,6 +3,7 @@ import { hostname } from "node:os";
 import { type ClaimedControlPlaneJob, createSqlControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 import {
   type ClaimedControlPlaneReconciliationItem,
+  type ControlPlaneSliSnapshot,
   createSqlControlPlaneOperationsStore,
 } from "@boardreadyops/db/control-plane-operations-store";
 import {
@@ -12,8 +13,8 @@ import {
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
 import { processControlPlaneOutboxEffect } from "./lib/control-plane-outbox-worker.js";
-import { createControlPlaneSloEvaluator } from "./lib/control-plane-slo.js";
 import { processControlPlaneWorkflowReconciliation } from "./lib/control-plane-reconciliation-worker.js";
+import { createControlPlaneSloEvaluator } from "./lib/control-plane-slo.js";
 import { processControlPlaneJob } from "./lib/control-plane-worker.js";
 import {
   createScopedConcurrencyGate,
@@ -260,7 +261,7 @@ async function collectQueueMetrics(currentTime: number): Promise<void> {
     log("warn", "worker.metrics_failed", { errorClass: errorClass(error) });
   }
 
-  let snapshot;
+  let snapshot: ControlPlaneSliSnapshot;
   try {
     snapshot = await operations.collectSliSnapshot();
     log("info", "worker.control_plane_sli", snapshot);
