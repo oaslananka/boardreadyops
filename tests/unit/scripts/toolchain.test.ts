@@ -122,7 +122,8 @@ describe("reproducible contributor toolchain", () => {
     expect(
       plan.some((step) => step.command.join(" ").includes("pnpm install --frozen-lockfile --ignore-scripts")),
     ).toBe(true);
-    const hooks = plan.find((step) => step.command.join(" ").includes("pre-commit install-hooks"));
+    const hooks = plan.find((step) => step.name === "Prepare pinned validation hooks");
+    expect(hooks?.command.at(-1)).toBe("install-hooks");
     expect(hooks?.env).toMatchObject({ GOMAXPROCS: "2", GOFLAGS: "-p=2" });
     expect(plan.some((step) => step.command.includes(`uv==${config.python.uv}`))).toBe(true);
     expect(plan.some((step) => step.command.join(" ").includes("puppeteer browsers install chrome"))).toBe(true);

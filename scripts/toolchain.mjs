@@ -504,7 +504,6 @@ function extractVersion(value, minimumSegments, maximumSegments) {
       cursor += 1;
     }
     if (segments >= minimumSegments) return input.slice(start, cursor);
-    start = cursor;
   }
   return undefined;
 }
