@@ -76,8 +76,8 @@
     "release:history": "node scripts/generate-release-history.mjs",
     "release:readme": "node scripts/sync-release-readme.mjs",
     "docs": "node scripts/compatibility.mjs render && node scripts/generate-rule-docs.mjs && node scripts/update-action-inputs-docs.mjs && pnpm run api:docs && pnpm run release:history && node scripts/docs-build.mjs",
-    "docs:a11y": "node scripts/check-docs-a11y.mjs",
-    "docs:serve": "mkdocs serve",
+    "docs:a11y": "node scripts/toolchain.mjs run node scripts/check-docs-a11y.mjs",
+    "docs:serve": "node scripts/toolchain.mjs run mkdocs serve",
     "knip": "knip",
     "sbom": "node scripts/generate-sbom.mjs",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run knip && pnpm run compatibility:check && pnpm run build && pnpm run verify:dist && pnpm run verify:version && pnpm run verify:marketplace && pnpm run test:unit && pnpm run test:property && pnpm run test:snapshot && pnpm run test:action && pnpm run test:a11y && pnpm run coverage && pnpm run verify:structure && pnpm run gc && pnpm run docs && pnpm run security",
@@ -92,7 +92,14 @@
     "verify:control-plane-worker-boundary": "node scripts/verify-control-plane-worker-boundary.mjs",
     "cloud:dev": "pnpm --filter @boardreadyops/web dev",
     "cloud:deploy:self-hosted": "node scripts/deploy-cloud.mjs",
-    "cloud:provision:admin-db-url": "node scripts/provision-admin-database-url.mjs"
+    "cloud:provision:admin-db-url": "node scripts/provision-admin-database-url.mjs",
+    "toolchain:bootstrap": "node scripts/toolchain.mjs bootstrap",
+    "toolchain:doctor": "node scripts/toolchain.mjs doctor --strict",
+    "toolchain:doctor:json": "node scripts/toolchain.mjs doctor --json",
+    "toolchain:env": "node scripts/toolchain.mjs print-env",
+    "workflow:lint": "node scripts/toolchain.mjs run pre-commit run actionlint --all-files && node scripts/toolchain.mjs run pre-commit run zizmor --all-files",
+    "verify:all": "node scripts/toolchain.mjs run corepack pnpm run verify:all:inner",
+    "verify:all:inner": "node scripts/toolchain.mjs doctor --strict && pnpm run verify && pnpm run cloud:typecheck && pnpm run cloud:build && pnpm run workflow:lint"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [

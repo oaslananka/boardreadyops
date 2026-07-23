@@ -8,6 +8,7 @@ import {
   filterPa11yIssues,
   formatPa11yFailures,
   pa11yOptions,
+  readToolchainChromePath,
   runPa11yPageWithRetry,
 } from "../../../scripts/check-docs-a11y.mjs";
 
@@ -125,6 +126,15 @@ describe("check-docs-a11y", () => {
     ).resolves.toEqual([]);
     expect(calls).toBe(2);
     expect(recoveries).toBe(1);
+  });
+
+  it("discovers the repository-local Puppeteer browser path", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-toolchain-browser-"));
+    const browserPath = path.join(root, "cache", "chrome");
+    await fs.mkdir(path.join(root, ".boardreadyops", "toolchain"), { recursive: true });
+    await fs.writeFile(path.join(root, ".boardreadyops", "toolchain", "browser-path"), `${browserPath}\n`);
+
+    await expect(readToolchainChromePath(root)).resolves.toBe(browserPath);
   });
 
   it("detects standard Windows browser install paths", () => {

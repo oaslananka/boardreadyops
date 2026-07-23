@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: "24"
+  NODE_VERSION: "24.18.0"
 
   UV_VERSION: "0.11.16"
 

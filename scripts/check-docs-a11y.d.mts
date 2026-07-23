@@ -24,6 +24,7 @@ export const pa11yOptions: {
 export function createChromeLaunchConfig(): Promise<{ executablePath?: string; args: string[] }>;
 
 export function candidateChromeExecutables(env?: NodeJS.ProcessEnv): string[];
+export function readToolchainChromePath(root?: string): Promise<string | undefined>;
 
 export function runPa11yPageWithRetry<T extends { issues: unknown[] }>(
   pa11y: (url: string, options: Record<string, unknown>) => Promise<T>,

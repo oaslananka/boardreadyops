@@ -26,7 +26,7 @@ defaults:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  NODE_VERSION: "24"
+  NODE_VERSION: "24.18.0"
 
   SCORECARD_CHECKS: Dangerous-Workflow,Dependency-Update-Tool,Fuzzing,License,Pinned-Dependencies,SAST,Security-Policy,Token-Permissions,Vulnerabilities
   SCORECARD_IMAGE: ghcr.io/ossf/scorecard:v5.5.0@sha256:3f24714e9366917adb7a05635382c97dfecb14b21eaef3dfa2ea48c8e23e0795
