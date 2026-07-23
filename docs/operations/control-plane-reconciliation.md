@@ -100,3 +100,46 @@ Workflow dispatches with uncertain delivery remain non-replayable until installa
 Rotate the operator token through the secret manager and deployment platform. During rotation, deploy the new value atomically; requests using the previous token must begin returning `401`. Keep the actor ID stable when the same operator identity continues to own the action. Change it when responsibility transfers so later audit events remain attributable.
 
 After rotation, verify an authenticated list request, an unauthenticated `401`, and the absence of bearer values in application, proxy, and tracing logs.
+
+## GitHub workflow state reconciliation
+
+The control-plane worker periodically detects current GitHub Actions execution attempts that have a persisted workflow run ID but remain non-terminal beyond the observation window. Each candidate is inserted into the durable reconciliation queue with an explicit deadline. The worker then mints a short-lived token for the candidate's persisted `github_installation_id` and reads exactly one workflow run from the scoped target repository.
+
+Configure the initial cadence with:
+
+```dotenv
+BOARDREADYOPS_RECONCILIATION_CONCURRENCY=2
+BOARDREADYOPS_RECONCILIATION_POLL_MS=5000
+BOARDREADYOPS_RECONCILIATION_DETECT_INTERVAL_MS=30000
+BOARDREADYOPS_RECONCILIATION_OBSERVATION_SECONDS=300
+BOARDREADYOPS_RECONCILIATION_DEADLINE_SECONDS=1800
+BOARDREADYOPS_RECONCILIATION_NEXT_CHECK_SECONDS=60
+```
+
+`BOARDREADYOPS_RECONCILIATION_OBSERVATION_SECONDS` prevents normal callback latency from creating premature work. `BOARDREADYOPS_RECONCILIATION_DEADLINE_SECONDS` is the maximum time a detected attempt may remain ambiguous. Pending GitHub state, a temporary `404`, and `completed / success` without a signed callback are rechecked at the configured interval until that deadline. PostgreSQL leases prevent two replicas from applying the same observation, and every terminal repair verifies that the attempt is still the release run's current attempt.
+
+Stable terminal mappings are intentionally fail-closed:
+
+| Authoritative GitHub state | BoardReadyOps outcome | Public failure reason |
+| --- | --- | --- |
+| `completed / success` before deadline, callback absent | recheck | `github_result_callback_pending` |
+| `completed / success` after deadline, callback absent | `failed` | `github_result_callback_missing` |
+| `completed / timed_out` | `timed_out` | `github_workflow_timed_out` |
+| `completed / <other conclusion>` | `failed` | `github_workflow_<conclusion>` |
+| workflow run returns `404` before deadline | recheck | `github_workflow_not_found` |
+| workflow run remains `404` after deadline | `failed` | `github_workflow_not_found` |
+| still pending after the explicit deadline | `timed_out` | `github_workflow_deadline_exceeded` |
+| GitHub lookup unavailable before deadline | retry | `github_lookup_failed` |
+| GitHub lookup unavailable after deadline | `failed` | `github_workflow_lookup_failed` |
+
+A GitHub `success` conclusion alone never marks a BoardReadyOps release successful. Success requires the existing signed, attempt-bound result callback and digest validation. Reconciliation reads no workflow logs, jobs, artifacts, inputs, source, findings, or commit messages. Installation tokens remain in memory only, and persisted audit metadata contains bounded status/conclusion identifiers rather than GitHub response bodies.
+
+Relevant structured worker events are `worker.reconciliation_detected`, `worker.reconciliation_claim_failed`, `worker.reconciliation_detection_failed`, and `worker.reconciliation_terminal`. The readiness response includes the reconciliation configuration state and latest poll/success timestamps.
+
+### Missed-callback incident check
+
+1. Confirm `reconciliationConfigurationValid` is `true` on `/health/ready`.
+2. Check `worker.reconciliation_detected` and `worker.reconciliation_terminal` without enabling payload logging.
+3. Confirm the installation is active and the GitHub App can read Actions state in the target repository.
+4. Inspect the stable reconciliation outcome and audit event; do not use private workflow logs as application telemetry.
+5. Replay only records explicitly reported as safe by the dead-letter API. An uncertain dispatch without a persisted workflow run ID remains non-replayable and requires a later reconciliation path or manual incident decision.

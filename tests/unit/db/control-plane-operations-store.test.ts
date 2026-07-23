@@ -211,4 +211,151 @@ describe("control-plane operations store", () => {
       "invalid reconciliation worker id",
     );
   });
+
+  it("detects workflow reconciliation candidates with explicit observation and terminal deadlines", async () => {
+    const executor: SqlQueryExecutor = {
+      async query(sql, params) {
+        expect(sql).toContain("boardreadyops_detect_github_workflow_reconciliation");
+        expect(params).toEqual(["2026-07-22T16:00:00.000Z", 300, 1800, 25]);
+        return { rows: [{ detected: "3" }] };
+      },
+    };
+
+    await expect(
+      createSqlControlPlaneOperationsStore(executor, { now: () => now }).detectWorkflowReconciliationCandidates({
+        observationDelaySeconds: 300,
+        terminalDeadlineSeconds: 1800,
+        limit: 25,
+      }),
+    ).resolves.toBe(3);
+  });
+
+  it("rejects a terminal deadline that does not extend beyond observation", async () => {
+    const executor: SqlQueryExecutor = {
+      async query() {
+        throw new Error("unexpected query");
+      },
+    };
+
+    await expect(
+      createSqlControlPlaneOperationsStore(executor).detectWorkflowReconciliationCandidates({
+        observationDelaySeconds: 300,
+        terminalDeadlineSeconds: 300,
+      }),
+    ).rejects.toThrow("terminalDeadlineSeconds must be greater than observationDelaySeconds");
+  });
+
+  it("loads lease-bound safe GitHub workflow reconciliation context", async () => {
+    const executor: SqlQueryExecutor = {
+      async query(sql, params) {
+        expect(sql).toContain("boardreadyops_github_workflow_reconciliation_context");
+        expect(params).toEqual(["reconciliation-1", "worker-1"]);
+        expect(sql).not.toContain("payload");
+        return {
+          rows: [
+            {
+              reconciliation_id: "reconciliation-1",
+              installation_id: "installation-1",
+              github_installation_id: "123",
+              repository_id: "repository-1",
+              repository_owner: "octo",
+              repository_name: "board",
+              repository_full_name: "octo/board",
+              release_run_id: "run-1",
+              execution_attempt_id: "attempt-1",
+              github_workflow_run_id: "987",
+              attempt_status: "dispatched",
+              deadline_at: new Date("2026-07-22T16:30:00.000Z"),
+            },
+          ],
+        };
+      },
+    };
+
+    await expect(
+      createSqlControlPlaneOperationsStore(executor).loadWorkflowReconciliationContext({
+        reconciliationId: "reconciliation-1",
+        workerId: "worker-1",
+      }),
+    ).resolves.toEqual({
+      reconciliationId: "reconciliation-1",
+      installationId: "installation-1",
+      githubInstallationId: 123,
+      repositoryId: "repository-1",
+      repositoryOwner: "octo",
+      repositoryName: "board",
+      repositoryFullName: "octo/board",
+      releaseRunId: "run-1",
+      executionAttemptId: "attempt-1",
+      githubWorkflowRunId: "987",
+      attemptStatus: "dispatched",
+      deadlineAt: "2026-07-22T16:30:00.000Z",
+    });
+  });
+
+  it("reschedules and applies lease-bound workflow reconciliation outcomes", async () => {
+    const calls: Array<{ sql: string; params: readonly unknown[] | undefined }> = [];
+    const executor: SqlQueryExecutor = {
+      async query(sql, params) {
+        calls.push({ sql, params });
+        return { rows: [{ outcome: calls.length === 1 ? "rescheduled" : "applied" }] };
+      },
+    };
+    const store = createSqlControlPlaneOperationsStore(executor, { now: () => now });
+
+    await expect(
+      store.rescheduleReconciliationItem({
+        reconciliationId: "reconciliation-1",
+        workerId: "worker-1",
+        nextCheckAt: new Date("2026-07-22T16:01:00.000Z"),
+        outcomeCode: "github_workflow_in_progress",
+      }),
+    ).resolves.toBe("rescheduled");
+    await expect(
+      store.applyWorkflowReconciliation({
+        reconciliationId: "reconciliation-1",
+        workerId: "worker-1",
+        observedStatus: "completed",
+        observedConclusion: "success",
+        terminalStatus: "failed",
+        publicFailureReason: "github_result_callback_missing",
+      }),
+    ).resolves.toBe("applied");
+
+    expect(calls[0]?.sql).toContain("boardreadyops_reschedule_github_workflow_reconciliation");
+    expect(calls[0]?.params).toEqual([
+      "reconciliation-1",
+      "worker-1",
+      "2026-07-22T16:00:00.000Z",
+      "2026-07-22T16:01:00.000Z",
+      "github_workflow_in_progress",
+    ]);
+    expect(calls[1]?.sql).toContain("boardreadyops_apply_github_workflow_reconciliation");
+    expect(calls[1]?.params).toEqual([
+      "reconciliation-1",
+      "worker-1",
+      "2026-07-22T16:00:00.000Z",
+      "completed",
+      "success",
+      "failed",
+      "github_result_callback_missing",
+    ]);
+  });
+
+  it("claims only GitHub workflow reconciliation items", async () => {
+    const executor: SqlQueryExecutor = {
+      async query(sql, params) {
+        expect(sql).toContain("boardreadyops_claim_github_workflow_reconciliation");
+        expect(params).toEqual(["worker-1", "2026-07-22T16:00:00.000Z", "2026-07-22T16:02:00.000Z", 2]);
+        return { rows: [] };
+      },
+    };
+
+    await expect(
+      createSqlControlPlaneOperationsStore(executor, {
+        now: () => now,
+        leaseSeconds: 120,
+      }).claimWorkflowReconciliationItems({ workerId: "worker-1", limit: 2 }),
+    ).resolves.toEqual([]);
+  });
 });

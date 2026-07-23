@@ -16,12 +16,17 @@ describe("control-plane operator documentation", () => {
     expect(documentation).toContain("Idempotency-Key");
     expect(documentation).toContain("private network");
     expect(documentation).toContain("audit event");
+    expect(documentation).toContain("github_result_callback_missing");
+    expect(documentation).toContain("github_workflow_deadline_exceeded");
+    expect(documentation).toContain("short-lived token");
   });
 
   it("keeps deploy configuration and public navigation synchronized", () => {
     const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_OPERATOR_API_TOKEN=");
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_OPERATOR_ACTOR_ID=");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_RECONCILIATION_DEADLINE_SECONDS=1800");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_RECONCILIATION_NEXT_CHECK_SECONDS=60");
 
     const navigation = fs.readFileSync("mkdocs.yml", "utf8");
     expect(navigation).toContain("Control-plane Reconciliation: operations/control-plane-reconciliation.md");

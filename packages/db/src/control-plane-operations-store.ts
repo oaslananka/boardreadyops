@@ -32,6 +32,23 @@ export type ClaimedControlPlaneReconciliationItem = {
   attemptCount: number;
 };
 
+export type ControlPlaneWorkflowReconciliationContext = {
+  reconciliationId: string;
+  installationId: string;
+  githubInstallationId: number;
+  repositoryId: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  repositoryFullName: string;
+  releaseRunId: string;
+  executionAttemptId: string;
+  githubWorkflowRunId: string;
+  attemptStatus: string;
+  deadlineAt: string;
+};
+
+export type ControlPlaneWorkflowTerminalStatus = "failed" | "timed_out";
+
 export type ControlPlaneSliSnapshot = {
   webhookAcceptanceP95Ms: number;
   lifecycleQueueAgeSeconds: number;
@@ -79,6 +96,10 @@ export type ControlPlaneOperationsStore = {
     workerId: string;
     limit?: number;
   }): Promise<ClaimedControlPlaneReconciliationItem[]>;
+  claimWorkflowReconciliationItems(input: {
+    workerId: string;
+    limit?: number;
+  }): Promise<ClaimedControlPlaneReconciliationItem[]>;
   completeReconciliationItem(input: {
     reconciliationId: string;
     workerId: string;
@@ -93,6 +114,29 @@ export type ControlPlaneOperationsStore = {
     errorClass: string;
     errorMessage: string;
   }): Promise<"dead_letter" | "retry" | "stale">;
+  detectWorkflowReconciliationCandidates(input: {
+    observationDelaySeconds: number;
+    terminalDeadlineSeconds: number;
+    limit?: number;
+  }): Promise<number>;
+  loadWorkflowReconciliationContext(input: {
+    reconciliationId: string;
+    workerId: string;
+  }): Promise<ControlPlaneWorkflowReconciliationContext | undefined>;
+  rescheduleReconciliationItem(input: {
+    reconciliationId: string;
+    workerId: string;
+    nextCheckAt: Date;
+    outcomeCode: string;
+  }): Promise<"rescheduled" | "stale">;
+  applyWorkflowReconciliation(input: {
+    reconciliationId: string;
+    workerId: string;
+    observedStatus: string;
+    observedConclusion?: string;
+    terminalStatus: ControlPlaneWorkflowTerminalStatus;
+    publicFailureReason: string;
+  }): Promise<"already_terminal" | "applied" | "stale">;
   collectSliSnapshot(input?: { installationId?: string }): Promise<ControlPlaneSliSnapshot>;
 };
 
@@ -334,6 +378,30 @@ function decodedReconciliationItem(row: DatabaseRow): ClaimedControlPlaneReconci
   };
 }
 
+function decodedWorkflowReconciliationContext(
+  row: DatabaseRow | undefined,
+): ControlPlaneWorkflowReconciliationContext | undefined {
+  if (!row) return undefined;
+  const githubInstallationId = row.integer("github_installation_id");
+  if (githubInstallationId === undefined) {
+    throw new Error("workflow reconciliation context returned an invalid GitHub installation id");
+  }
+  return {
+    reconciliationId: requiredText(row, "reconciliation_id", "workflow reconciliation context"),
+    installationId: requiredText(row, "installation_id", "workflow reconciliation context"),
+    githubInstallationId,
+    repositoryId: requiredText(row, "repository_id", "workflow reconciliation context"),
+    repositoryOwner: requiredText(row, "repository_owner", "workflow reconciliation context"),
+    repositoryName: requiredText(row, "repository_name", "workflow reconciliation context"),
+    repositoryFullName: requiredText(row, "repository_full_name", "workflow reconciliation context"),
+    releaseRunId: requiredText(row, "release_run_id", "workflow reconciliation context"),
+    executionAttemptId: requiredText(row, "execution_attempt_id", "workflow reconciliation context"),
+    githubWorkflowRunId: requiredText(row, "github_workflow_run_id", "workflow reconciliation context"),
+    attemptStatus: requiredText(row, "attempt_status", "workflow reconciliation context"),
+    deadlineAt: requiredTimestamp(row, "deadline_at", "workflow reconciliation context"),
+  };
+}
+
 function decodedSliSnapshot(row: DatabaseRow | undefined): ControlPlaneSliSnapshot {
   return {
     webhookAcceptanceP95Ms: row?.integer("webhook_acceptance_p95_ms") ?? 0,
@@ -442,6 +510,20 @@ export function createSqlControlPlaneOperationsStore(
       return databaseRows(result).map(decodedReconciliationItem);
     },
 
+    async claimWorkflowReconciliationItems(input) {
+      validIdentifier(input.workerId, "reconciliation worker id");
+      const claimedAt = now();
+      const leaseExpiresAt = new Date(claimedAt.valueOf() + leaseSeconds * 1000);
+      const limit = Math.max(1, Math.min(input.limit ?? 1, 100));
+      const result = await executor.query(
+        `select * from boardreadyops_claim_github_workflow_reconciliation(
+           $1, $2::timestamptz, $3::timestamptz, $4::integer
+         )`,
+        [input.workerId, claimedAt.toISOString(), leaseExpiresAt.toISOString(), limit],
+      );
+      return databaseRows(result).map(decodedReconciliationItem);
+    },
+
     async completeReconciliationItem(input) {
       validIdentifier(input.reconciliationId, "reconciliation id");
       validIdentifier(input.workerId, "reconciliation worker id");
@@ -484,6 +566,81 @@ export function createSqlControlPlaneOperationsStore(
       );
       const outcome = databaseRows(result)[0]?.text("outcome");
       return outcome === "retry" || outcome === "dead_letter" ? outcome : "stale";
+    },
+
+    async detectWorkflowReconciliationCandidates(input) {
+      const observationDelaySeconds = positiveInteger(input.observationDelaySeconds, 300, "observationDelaySeconds");
+      const terminalDeadlineSeconds = positiveInteger(input.terminalDeadlineSeconds, 1800, "terminalDeadlineSeconds");
+      if (terminalDeadlineSeconds <= observationDelaySeconds) {
+        throw new Error("terminalDeadlineSeconds must be greater than observationDelaySeconds");
+      }
+      const limit = Math.max(1, Math.min(input.limit ?? 100, 1000));
+      const result = await executor.query(
+        `select boardreadyops_detect_github_workflow_reconciliation(
+           $1::timestamptz, $2::integer, $3::integer, $4::integer
+         ) as detected`,
+        [now().toISOString(), observationDelaySeconds, terminalDeadlineSeconds, limit],
+      );
+      return databaseRows(result)[0]?.integer("detected") ?? 0;
+    },
+
+    async loadWorkflowReconciliationContext(input) {
+      validIdentifier(input.reconciliationId, "reconciliation id");
+      validIdentifier(input.workerId, "reconciliation worker id");
+      const result = await executor.query(
+        "select * from boardreadyops_github_workflow_reconciliation_context($1, $2)",
+        [input.reconciliationId, input.workerId],
+      );
+      return decodedWorkflowReconciliationContext(databaseRows(result)[0]);
+    },
+
+    async rescheduleReconciliationItem(input) {
+      validIdentifier(input.reconciliationId, "reconciliation id");
+      validIdentifier(input.workerId, "reconciliation worker id");
+      validReasonCode(input.outcomeCode, "reconciliation outcome code");
+      const result = await executor.query(
+        `select boardreadyops_reschedule_github_workflow_reconciliation(
+           $1, $2, $3::timestamptz, $4::timestamptz, $5
+         ) as outcome`,
+        [
+          input.reconciliationId,
+          input.workerId,
+          now().toISOString(),
+          input.nextCheckAt.toISOString(),
+          input.outcomeCode,
+        ],
+      );
+      return databaseRows(result)[0]?.text("outcome") === "rescheduled" ? "rescheduled" : "stale";
+    },
+
+    async applyWorkflowReconciliation(input) {
+      validIdentifier(input.reconciliationId, "reconciliation id");
+      validIdentifier(input.workerId, "reconciliation worker id");
+      validReasonCode(input.observedStatus, "observed workflow status");
+      if (input.observedConclusion) {
+        validReasonCode(input.observedConclusion, "observed workflow conclusion");
+      }
+      if (input.terminalStatus !== "failed" && input.terminalStatus !== "timed_out") {
+        throw new Error("invalid workflow reconciliation terminal status");
+      }
+      validReasonCode(input.publicFailureReason, "public failure reason");
+      const result = await executor.query(
+        `select boardreadyops_apply_github_workflow_reconciliation(
+           $1, $2, $3::timestamptz, $4, $5, $6, $7
+         ) as outcome`,
+        [
+          input.reconciliationId,
+          input.workerId,
+          now().toISOString(),
+          input.observedStatus,
+          input.observedConclusion ?? null,
+          input.terminalStatus,
+          input.publicFailureReason,
+        ],
+      );
+      const outcome = databaseRows(result)[0]?.text("outcome");
+      if (outcome === "applied" || outcome === "already_terminal") return outcome;
+      return "stale";
     },
 
     async collectSliSnapshot(input = {}) {

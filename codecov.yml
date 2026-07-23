@@ -89,3 +89,4 @@ bundle_analysis:
 
 ignore:
   - "dist/**/*"
+  - "apps/web/worker.ts"

@@ -32,7 +32,6 @@ export default defineConfig({
         "packages/db/src/**/*.ts",
         "apps/web/lib/**/*.ts",
         "apps/web/app/api/**/*.ts",
-        "apps/web/worker.ts",
       ],
       exclude: ["**/*.d.ts", "**/index.ts"],
       thresholds: {
