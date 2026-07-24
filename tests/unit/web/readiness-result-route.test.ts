@@ -224,6 +224,9 @@ describe("readiness result route authentication and publication", () => {
         body: expect.stringContaining("## ⚠️ BoardReadyOps: Review warnings"),
       }),
     );
+    const [persistenceSql, persistenceParams] = query.mock.calls[0] as [string, unknown[]];
+    expect(persistenceSql).toContain("github_check_conclusion");
+    expect(persistenceParams[15]).toBe("neutral");
   });
 
   it("computes the same terminal digest regardless of finding order", async () => {

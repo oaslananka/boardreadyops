@@ -43,4 +43,4 @@ All mutations require the reconciliation lease owner and current release-run att
 
 ## Delivery boundary
 
-This PR delivers workflow-run reconciliation and missed-callback convergence. It does not repair GitHub Check Run display state or search for uncertain workflow dispatches that lack a workflow run ID.
+This PR delivered workflow-run reconciliation and missed-callback convergence. GitHub Check Run display repair is delivered separately by the schema v21 Check Run reconciliation slice; searching uncertain workflow dispatches without a workflow run ID remains follow-up work.

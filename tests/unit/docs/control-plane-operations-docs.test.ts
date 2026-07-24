@@ -19,6 +19,9 @@ describe("control-plane operator documentation", () => {
     expect(documentation).toContain("github_result_callback_missing");
     expect(documentation).toContain("github_workflow_deadline_exceeded");
     expect(documentation).toContain("short-lived token");
+    expect(documentation).toContain("GitHub Check Run publication reconciliation");
+    expect(documentation).toContain("github_check_run_update_failed");
+    expect(documentation).toContain("lastSuccessfulCheckRunReconciliationAt");
   });
 
   it("keeps deploy configuration and public navigation synchronized", () => {
