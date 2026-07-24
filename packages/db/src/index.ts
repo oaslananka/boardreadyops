@@ -1,4 +1,4 @@
-export const cloudDatabaseSchemaVersion = 20;
+export const cloudDatabaseSchemaVersion = 21;
 
 export const cloudDatabaseModels = [
   "Installation",

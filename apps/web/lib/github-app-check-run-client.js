@@ -1,6 +1,6 @@
 import { createAppAuth } from "@octokit/auth-app";
 
-const readinessCheckName = "BoardReadyOps / release readiness";
+export const readinessCheckName = "BoardReadyOps / release readiness";
 const readinessCommentMarker = "<!-- boardreadyops:release-readiness -->";
 
 function requiredEnv(name) {
@@ -53,6 +53,37 @@ function checkRunEndpoint(apiBaseUrl, owner, name, checkRunId) {
   return `${apiBaseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(
     name,
   )}/check-runs/${encodeURIComponent(String(checkRunId))}`;
+}
+
+function normalizedCheckRunState(value, fallback) {
+  return typeof value === "string" && /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u.test(value) ? value : fallback;
+}
+
+function normalizedCheckRunBinding(value, fallback, maximumLength = 256) {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.length <= maximumLength ? normalized : fallback;
+}
+
+export async function readGitHubCheckRun(input) {
+  const request = input.request ?? fetch;
+  const response = await request(
+    checkRunEndpoint(input.apiBaseUrl, input.repositoryOwner, input.repositoryName, input.checkRunId),
+    { method: "GET", headers: requestHeaders(input.token) },
+  );
+  if (response.status === 404) return { kind: "not_found" };
+  if (!response.ok) throw new Error(`GitHub check run lookup failed with status ${response.status}`);
+  const result = await response.json();
+  const status = normalizedCheckRunState(result?.status, "unknown");
+  const conclusion = result?.conclusion == null ? undefined : normalizedCheckRunState(result.conclusion, "unknown");
+  return {
+    kind: "present",
+    name: normalizedCheckRunBinding(result?.name, "unknown"),
+    externalId: normalizedCheckRunBinding(result?.external_id, "unknown"),
+    headSha: normalizedCheckRunBinding(result?.head_sha, "unknown", 128),
+    status,
+    ...(conclusion ? { conclusion } : {}),
+  };
 }
 
 function requestHeaders(token) {
@@ -209,6 +240,16 @@ export function createGitHubAppCheckRunClient() {
   }
 
   return {
+    async readCheckRun(input) {
+      const token = await installationToken(input.installationId);
+      return readGitHubCheckRun({
+        apiBaseUrl,
+        token,
+        repositoryOwner: input.repositoryOwner,
+        repositoryName: input.repositoryName,
+        checkRunId: input.checkRunId,
+      });
+    },
     ensurePullRequestCheckRun: ensure,
     createPullRequestCheckRun: ensure,
 

@@ -12,6 +12,7 @@ import {
 } from "@boardreadyops/db/control-plane-outbox-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
+import { processControlPlaneCheckRunReconciliation } from "./lib/control-plane-check-run-reconciliation-worker.js";
 import { processControlPlaneOutboxEffect } from "./lib/control-plane-outbox-worker.js";
 import { processControlPlaneWorkflowReconciliation } from "./lib/control-plane-reconciliation-worker.js";
 import { createControlPlaneSloEvaluator } from "./lib/control-plane-slo.js";
@@ -112,7 +113,7 @@ const retentionCleanupIntervalMilliseconds = integerEnvironment(
 const healthPort = integerEnvironment("BOARDREADYOPS_WORKER_HEALTH_PORT", 3001, 1, 65_535);
 const databasePoolMaximum = integerEnvironment(
   "DATABASE_POOL_MAX",
-  Math.max(8, concurrency + outboxConcurrency + reconciliationConcurrency + 2),
+  Math.max(8, concurrency + outboxConcurrency + reconciliationConcurrency * 2 + 2),
   1,
   100,
 );
@@ -134,13 +135,20 @@ const durableCheckRuns = checkRuns?.ensurePullRequestCheckRun
       completeCheckRun: checkRuns.completeCheckRun,
     }
   : undefined;
+const checkRunReconciliation = checkRuns?.readCheckRun
+  ? {
+      readCheckRun: checkRuns.readCheckRun,
+      completeCheckRun: checkRuns.completeCheckRun,
+    }
+  : undefined;
 const workflowDispatch = runnerWorkflowDispatchClient(runner, createRunnerClient);
 const workflowReconciliation =
   process.env.GITHUB_APP_ID?.trim() && process.env.GITHUB_APP_PRIVATE_KEY?.trim()
     ? createGitHubWorkflowReconciliationClient()
     : undefined;
 const dispatchMode = runner.mode === "github-actions" ? "github-actions" : "none";
-const reconciliationConfigurationValid = runner.mode !== "github-actions" || Boolean(workflowReconciliation);
+const reconciliationConfigurationValid =
+  runner.mode !== "github-actions" || Boolean(workflowReconciliation && checkRunReconciliation);
 const lifecycleConfigurationValid = runner.configurationValid;
 const outboxConfigurationValid =
   runner.configurationValid &&
@@ -156,12 +164,15 @@ let ready = false;
 let lastPollAt: string | undefined;
 let lastOutboxPollAt: string | undefined;
 let lastReconciliationPollAt: string | undefined;
+let lastCheckRunReconciliationPollAt: string | undefined;
 let lastSuccessfulReconciliationAt: string | undefined;
+let lastSuccessfulCheckRunReconciliationAt: string | undefined;
 let lastSuccessfulJobAt: string | undefined;
 let lastSuccessfulOutboxEffectAt: string | undefined;
 let nextMetricsAt = 0;
 let nextRetentionCleanupAt = 0;
 let nextReconciliationDetectionAt = 0;
+let nextCheckRunReconciliationDetectionAt = 0;
 
 async function databaseIsReady(): Promise<boolean> {
   try {
@@ -195,7 +206,9 @@ const healthServer = createServer(async (request, response) => {
         lastPollAt,
         lastOutboxPollAt,
         lastReconciliationPollAt,
+        lastCheckRunReconciliationPollAt,
         lastSuccessfulReconciliationAt,
+        lastSuccessfulCheckRunReconciliationAt,
         lastSuccessfulJobAt,
         lastSuccessfulOutboxEffectAt,
         scopedConcurrency: {
@@ -302,6 +315,21 @@ async function detectWorkflowReconciliationCandidates(currentTime: number): Prom
   }
 }
 
+async function detectCheckRunReconciliationCandidates(currentTime: number): Promise<void> {
+  if (!checkRunReconciliation || currentTime < nextCheckRunReconciliationDetectionAt) return;
+  nextCheckRunReconciliationDetectionAt = currentTime + reconciliationDetectionIntervalMilliseconds;
+  try {
+    const detected = await operations.detectCheckRunReconciliationCandidates({
+      observationDelaySeconds: reconciliationObservationSeconds,
+      terminalDeadlineSeconds: reconciliationDeadlineSeconds,
+      limit: Math.max(100, reconciliationConcurrency * 10),
+    });
+    if (detected > 0) log("info", "worker.check_run_reconciliation_detected", { detected });
+  } catch (error) {
+    log("warn", "worker.check_run_reconciliation_detection_failed", { errorClass: errorClass(error) });
+  }
+}
+
 async function purgeExpiredInbox(currentTime: number): Promise<void> {
   if (currentTime < nextRetentionCleanupAt) return;
   nextRetentionCleanupAt = currentTime + retentionCleanupIntervalMilliseconds;
@@ -339,6 +367,16 @@ async function claimWorkflowReconciliationItems(): Promise<ClaimedControlPlaneRe
     return operations.claimWorkflowReconciliationItems({ workerId, limit: reconciliationConcurrency });
   } catch (error) {
     log("error", "worker.reconciliation_claim_failed", { workerId, errorClass: errorClass(error) });
+    return [];
+  }
+}
+
+async function claimCheckRunReconciliationItems(): Promise<ClaimedControlPlaneReconciliationItem[]> {
+  lastCheckRunReconciliationPollAt = new Date().toISOString();
+  try {
+    return operations.claimCheckRunReconciliationItems({ workerId, limit: reconciliationConcurrency });
+  } catch (error) {
+    log("error", "worker.check_run_reconciliation_claim_failed", { workerId, errorClass: errorClass(error) });
     return [];
   }
 }
@@ -429,6 +467,43 @@ async function processClaimedWorkflowReconciliations(claimed: ClaimedControlPlan
   }
 }
 
+async function processClaimedCheckRunReconciliations(claimed: ClaimedControlPlaneReconciliationItem[]): Promise<void> {
+  if (!checkRunReconciliation) return;
+  const completed = await Promise.all(
+    claimed.map((item) =>
+      scopedConcurrency.run(
+        {
+          installationId: item.installationId,
+          ...(item.repositoryId ? { repositoryId: item.repositoryId } : {}),
+        },
+        () =>
+          processControlPlaneCheckRunReconciliation(item, {
+            workerId,
+            operations,
+            github: checkRunReconciliation,
+            nextCheckSeconds: reconciliationNextCheckSeconds,
+          }),
+      ),
+    ),
+  );
+  for (const result of completed) {
+    if (result.status === "applied" || result.status === "already_published") {
+      lastSuccessfulCheckRunReconciliationAt = new Date().toISOString();
+    }
+    const successful =
+      result.status === "applied" ||
+      result.status === "already_published" ||
+      result.status === "rescheduled" ||
+      result.status === "stale";
+    log(successful ? "info" : "warn", "worker.check_run_reconciliation_terminal", {
+      workerId,
+      reconciliationId: result.reconciliationId,
+      status: result.status,
+      outcomeCode: result.outcomeCode,
+    });
+  }
+}
+
 async function runLifecycleLoop(): Promise<void> {
   while (!shuttingDown) {
     if (!lifecycleConfigurationValid) {
@@ -461,16 +536,22 @@ async function runOutboxLoop(): Promise<void> {
 
 async function runReconciliationLoop(): Promise<void> {
   while (!shuttingDown) {
-    if (!workflowReconciliation) {
+    if (!workflowReconciliation || !checkRunReconciliation) {
       await sleep(reconciliationPollMilliseconds);
       continue;
     }
-    const claimed = await claimWorkflowReconciliationItems();
-    if (claimed.length === 0) {
+    const [workflowItems, checkRunItems] = await Promise.all([
+      claimWorkflowReconciliationItems(),
+      claimCheckRunReconciliationItems(),
+    ]);
+    if (workflowItems.length === 0 && checkRunItems.length === 0) {
       await sleep(reconciliationPollMilliseconds);
       continue;
     }
-    await processClaimedWorkflowReconciliations(claimed);
+    await Promise.all([
+      processClaimedWorkflowReconciliations(workflowItems),
+      processClaimedCheckRunReconciliations(checkRunItems),
+    ]);
   }
 }
 
@@ -479,6 +560,7 @@ async function runMaintenanceLoop(): Promise<void> {
     const currentTime = Date.now();
     await collectQueueMetrics(currentTime);
     await detectWorkflowReconciliationCandidates(currentTime);
+    await detectCheckRunReconciliationCandidates(currentTime);
     await purgeExpiredInbox(currentTime);
     await sleep(1000);
   }
