@@ -1,5 +1,6 @@
 import type { GitHubAppLifecycleAction } from "@boardreadyops/cloud-core/lifecycle";
 import type { ClaimedControlPlaneJob } from "@boardreadyops/db/control-plane-job-store";
+import type { ClaimedControlPlaneReconciliationItem } from "@boardreadyops/db/control-plane-operations-store";
 import type { ClaimedControlPlaneOutboxEffect } from "@boardreadyops/db/control-plane-outbox-store";
 
 export type WorkerScope = {
@@ -136,6 +137,13 @@ export function workerScopeFromOutboxEffect(effect: ClaimedControlPlaneOutboxEff
   return {
     ...(correlation.installationId !== undefined ? { installationId: correlation.installationId } : {}),
     ...(correlation.repositoryId !== undefined ? { repositoryId: correlation.repositoryId } : {}),
+  };
+}
+
+export function workerScopeFromReconciliationItem(item: ClaimedControlPlaneReconciliationItem): WorkerScope {
+  return {
+    installationId: item.installationId,
+    ...(item.repositoryId ? { repositoryId: item.repositoryId } : {}),
   };
 }
 

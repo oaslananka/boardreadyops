@@ -128,7 +128,7 @@ Expected response:
 }
 ```
 
-The worker readiness response also reports the database/configuration state, the latest lifecycle, outbox, and workflow-reconciliation polls, the latest successful reconciliation, and scoped-concurrency `active` and `waiting` counts. A worker sets readiness false before graceful shutdown and stops claiming new batches. Existing leased work drains before the database pool closes; after an ungraceful termination, PostgreSQL lease expiry makes unfinished work claimable by another replica.
+The worker readiness response also reports the database/configuration state, the latest lifecycle, outbox, internal lifecycle-reconciliation, workflow-reconciliation, and Check Run reconciliation polls, the latest successful repair timestamps including `lastLifecycleReconciliationPollAt` and `lastSuccessfulLifecycleReconciliationAt`, and scoped-concurrency `active` and `waiting` counts. A worker sets readiness false before graceful shutdown and stops claiming new batches. Existing leased work drains before the database pool closes; after an ungraceful termination, PostgreSQL lease expiry makes unfinished work claimable by another replica.
 
 Inspect the native Docker health state with:
 
@@ -223,7 +223,7 @@ BOARDREADYOPS_RECONCILIATION_DEADLINE_SECONDS=1800
 BOARDREADYOPS_RECONCILIATION_NEXT_CHECK_SECONDS=60
 ```
 
-The same reconciliation cadence covers both missed GitHub Actions callbacks and terminal Check Run publication drift. The worker readiness payload reports `lastCheckRunReconciliationPollAt` and `lastSuccessfulCheckRunReconciliationAt` separately so operators can distinguish publication repair from workflow-state convergence.
+The same reconciliation cadence covers internal webhook inbox/job drift, missed GitHub Actions callbacks, and terminal Check Run publication drift. Internal lifecycle repair uses `lifecycle_job_missing` and `lifecycle_inbox_state_drift`, treats `control_plane_jobs.status` as authoritative, and does not require GitHub credentials. Its logs never include normalized actions. The worker readiness payload reports `lastLifecycleReconciliationPollAt`, `lastSuccessfulLifecycleReconciliationAt`, `lastCheckRunReconciliationPollAt`, and `lastSuccessfulCheckRunReconciliationAt` separately so operators can distinguish database repair, publication repair, and workflow-state convergence.
 
 For a dry run:
 

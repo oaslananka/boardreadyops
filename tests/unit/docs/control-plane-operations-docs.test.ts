@@ -24,6 +24,25 @@ describe("control-plane operator documentation", () => {
     expect(documentation).toContain("lastSuccessfulCheckRunReconciliationAt");
   });
 
+  it("documents lifecycle inbox and job drift reconciliation", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+    const operations = fs.readFileSync(documentationPath, "utf8");
+    const combined = `${deployment}
+${operations}`;
+
+    expect(combined).toContain("lifecycle_job_missing");
+    expect(combined).toContain("lifecycle_inbox_state_drift");
+    expect(combined).toContain("control_plane_jobs.status");
+    expect(combined).toContain("worker.lifecycle_reconciliation_detected");
+    expect(combined).toContain("worker.lifecycle_reconciliation_detection_failed");
+    expect(combined).toContain("worker.lifecycle_reconciliation_claim_failed");
+    expect(combined).toContain("worker.lifecycle_reconciliation_terminal");
+    expect(combined).toContain("lastLifecycleReconciliationPollAt");
+    expect(combined).toContain("lastSuccessfulLifecycleReconciliationAt");
+    expect(combined).toContain("does not require GitHub credentials");
+    expect(combined).toContain("normalized actions");
+  });
+
   it("keeps deploy configuration and public navigation synchronized", () => {
     const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_OPERATOR_API_TOKEN=");

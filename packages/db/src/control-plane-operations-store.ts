@@ -1,7 +1,12 @@
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 
 export type ControlPlaneDeadLetterItemType = "job" | "outbox";
-export type ControlPlaneReconciliationSubjectType = "execution_attempt" | "job" | "outbox" | "release_run";
+export type ControlPlaneReconciliationSubjectType =
+  | "execution_attempt"
+  | "job"
+  | "outbox"
+  | "release_run"
+  | "webhook_inbox";
 
 export type ControlPlaneDeadLetterItem = {
   itemType: ControlPlaneDeadLetterItemType;
@@ -123,6 +128,10 @@ export type ControlPlaneOperationsStore = {
     workerId: string;
     limit?: number;
   }): Promise<ClaimedControlPlaneReconciliationItem[]>;
+  claimLifecycleReconciliationItems(input: {
+    workerId: string;
+    limit?: number;
+  }): Promise<ClaimedControlPlaneReconciliationItem[]>;
   completeReconciliationItem(input: {
     reconciliationId: string;
     workerId: string;
@@ -147,6 +156,11 @@ export type ControlPlaneOperationsStore = {
     terminalDeadlineSeconds: number;
     limit?: number;
   }): Promise<number>;
+  detectLifecycleReconciliationCandidates(input: {
+    observationDelaySeconds: number;
+    terminalDeadlineSeconds: number;
+    limit?: number;
+  }): Promise<number>;
   loadWorkflowReconciliationContext(input: {
     reconciliationId: string;
     workerId: string;
@@ -161,6 +175,10 @@ export type ControlPlaneOperationsStore = {
     nextCheckAt: Date;
     outcomeCode: string;
   }): Promise<"rescheduled" | "stale">;
+  applyLifecycleReconciliation(input: {
+    reconciliationId: string;
+    workerId: string;
+  }): Promise<"already_repaired" | "already_terminal" | "applied" | "stale">;
   applyWorkflowReconciliation(input: {
     reconciliationId: string;
     workerId: string;
@@ -212,6 +230,7 @@ const supportedSubjectTypes = new Set<ControlPlaneReconciliationSubjectType>([
   "job",
   "outbox",
   "release_run",
+  "webhook_inbox",
 ]);
 
 class DatabaseRow {
@@ -512,6 +531,7 @@ export function createSqlControlPlaneOperationsStore(
     input: { workerId: string; limit?: number },
     functionName:
       | "boardreadyops_claim_control_plane_reconciliation"
+      | "boardreadyops_claim_control_plane_lifecycle_reconciliation"
       | "boardreadyops_claim_github_workflow_reconciliation"
       | "boardreadyops_claim_github_check_run_reconciliation",
   ): Promise<ClaimedControlPlaneReconciliationItem[]> {
@@ -531,6 +551,7 @@ export function createSqlControlPlaneOperationsStore(
   async function detectReconciliationCandidatesWith(
     input: { observationDelaySeconds: number; terminalDeadlineSeconds: number; limit?: number },
     functionName:
+      | "boardreadyops_detect_control_plane_lifecycle_reconciliation"
       | "boardreadyops_detect_github_check_run_reconciliation"
       | "boardreadyops_detect_github_workflow_reconciliation",
   ): Promise<number> {
@@ -631,6 +652,10 @@ export function createSqlControlPlaneOperationsStore(
       return claimReconciliationItemsWith(input, "boardreadyops_claim_github_check_run_reconciliation");
     },
 
+    claimLifecycleReconciliationItems(input) {
+      return claimReconciliationItemsWith(input, "boardreadyops_claim_control_plane_lifecycle_reconciliation");
+    },
+
     async completeReconciliationItem(input) {
       validIdentifier(input.reconciliationId, "reconciliation id");
       validIdentifier(input.workerId, "reconciliation worker id");
@@ -679,6 +704,10 @@ export function createSqlControlPlaneOperationsStore(
       return detectReconciliationCandidatesWith(input, "boardreadyops_detect_github_check_run_reconciliation");
     },
 
+    detectLifecycleReconciliationCandidates(input) {
+      return detectReconciliationCandidatesWith(input, "boardreadyops_detect_control_plane_lifecycle_reconciliation");
+    },
+
     detectWorkflowReconciliationCandidates(input) {
       return detectReconciliationCandidatesWith(input, "boardreadyops_detect_github_workflow_reconciliation");
     },
@@ -720,6 +749,22 @@ export function createSqlControlPlaneOperationsStore(
         ],
       );
       return databaseRows(result)[0]?.text("outcome") === "rescheduled" ? "rescheduled" : "stale";
+    },
+
+    async applyLifecycleReconciliation(input) {
+      validIdentifier(input.reconciliationId, "reconciliation id");
+      validIdentifier(input.workerId, "reconciliation worker id");
+      const result = await executor.query(
+        `select boardreadyops_apply_control_plane_lifecycle_reconciliation(
+           $1, $2, $3::timestamptz
+         ) as outcome`,
+        [input.reconciliationId, input.workerId, now().toISOString()],
+      );
+      const outcome = databaseRows(result)[0]?.text("outcome");
+      if (outcome === "applied" || outcome === "already_repaired" || outcome === "already_terminal") {
+        return outcome;
+      }
+      return "stale";
     },
 
     async applyWorkflowReconciliation(input) {
