@@ -189,3 +189,26 @@ Use this incident sequence:
 6. Close or downgrade the incident only after a `worker.control_plane_slo_recovered` transition and confirmation that the underlying aggregate signal is stable.
 
 SLI collection and SLO evaluation are observability paths and do not affect worker readiness or queue processing. The evaluator's debounce state is process-local; a worker restart resets local duration, consecutive-snapshot, and backlog-trend history. A restart is not a recovery signal, so durable alerting must retain the existing incident until a real recovery transition arrives.
+
+## Webhook inbox and lifecycle-job reconciliation
+
+The worker also detects internal PostgreSQL drift between `webhook_inbox` and `control_plane_jobs`. This path does not require GitHub credentials because it never calls GitHub: it repairs only tenant-scoped records already persisted by webhook acceptance and lifecycle processing.
+
+Two stable reason codes identify the detected condition:
+
+- `lifecycle_job_missing`: a non-terminal inbox is older than the observation window but has no durable lifecycle job;
+- `lifecycle_inbox_state_drift`: an inbox state does not match the authoritative `control_plane_jobs.status` value.
+
+When a job exists, `control_plane_jobs.status` is authoritative. The projection is `available` to `accepted`, `leased` to `processing`, `completed` to `processed`, and `dead_letter` to `dead_letter`. A missing job is recreated with the original `provider:delivery_id` idempotency key and the persisted normalized actions. Concurrent repair is a no-op: the reconciliation item completes without creating a second job.
+
+Only inboxes that resolve to a persisted installation are detected. Repository scope is attached when the persisted GitHub repository identifier resolves inside that installation. Terminal inboxes without jobs are not recreated. Successful processing clears normalized actions through the normal lifecycle completion path; reconciliation telemetry never includes normalized actions, webhook payloads, source, findings, credentials, or raw database errors.
+
+The dedicated loop is independent from workflow and Check Run reconciliation. Relevant structured events are `worker.lifecycle_reconciliation_detected`, `worker.lifecycle_reconciliation_detection_failed`, `worker.lifecycle_reconciliation_claim_failed`, and `worker.lifecycle_reconciliation_terminal`. `/health/ready` exposes `lastLifecycleReconciliationPollAt` and `lastSuccessfulLifecycleReconciliationAt` separately from GitHub reconciliation timestamps.
+
+### Lifecycle drift incident check
+
+1. Confirm `lastLifecycleReconciliationPollAt` is advancing and the database readiness check is healthy.
+2. Correlate `worker.lifecycle_reconciliation_terminal` by reconciliation ID, status, and stable outcome code only.
+3. For `lifecycle_job_missing`, confirm one available job now exists for the inbox and that the idempotency key matches the original delivery.
+4. For `lifecycle_inbox_state_drift`, compare only inbox state and job status; do not expose normalized actions through logs or incident tooling.
+5. If the item reaches reconciliation dead letter, correct the database or migration fault before using the operator replay path. Do not manufacture a second job or bypass tenant scope manually.
