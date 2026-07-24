@@ -7,8 +7,10 @@ import {
   sanitizeWorkerLogFields,
   workerScopeFromJob,
   workerScopeFromOutboxEffect,
+  workerScopeFromReconciliationItem,
 } from "../../../apps/web/lib/control-plane-worker-runtime.js";
 import type { ClaimedControlPlaneJob } from "../../../packages/db/src/control-plane-job-store.js";
+import type { ClaimedControlPlaneReconciliationItem } from "../../../packages/db/src/control-plane-operations-store.js";
 import type { ClaimedControlPlaneOutboxEffect } from "../../../packages/db/src/control-plane-outbox-store.js";
 
 const releaseAction = {
@@ -61,6 +63,18 @@ const effect: ClaimedControlPlaneOutboxEffect = {
   },
 };
 
+const lifecycleReconciliationItem: ClaimedControlPlaneReconciliationItem = {
+  reconciliationId: "reconciliation-1",
+  installationId: "installation-1",
+  repositoryId: "repository-1",
+  subjectType: "webhook_inbox",
+  subjectId: "inbox-1",
+  reasonCode: "lifecycle_job_missing",
+  deadlineAt: "2026-07-24T02:00:00.000Z",
+  nextCheckAt: "2026-07-24T01:30:00.000Z",
+  attemptCount: 1,
+};
+
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
   const promise = new Promise<void>((resolver) => {
@@ -88,6 +102,13 @@ describe("control-plane worker runtime", () => {
       jobId: "job-1",
     });
     expect(workerScopeFromJob(job)).toEqual({ installationId: 123, repositoryId: 456 });
+  });
+
+  it("extracts tenant scope from reconciliation items without subject data", () => {
+    expect(workerScopeFromReconciliationItem(lifecycleReconciliationItem)).toEqual({
+      installationId: "installation-1",
+      repositoryId: "repository-1",
+    });
   });
 
   it("extracts complete safe correlation from outbox effects", () => {
@@ -187,6 +208,29 @@ describe("control-plane worker runtime", () => {
     expect(source).toContain('"worker.control_plane_slo_firing"');
     expect(source).toContain('"worker.control_plane_slo_recovered"');
     expect(source).toContain('"worker.control_plane_slo_failed"');
+  });
+
+  it("wires lifecycle reconciliation independently from GitHub clients", () => {
+    const source = workerSource();
+
+    expect(source).toContain("operations.detectLifecycleReconciliationCandidates");
+    expect(source).toContain("operations.claimLifecycleReconciliationItems");
+    expect(source).toContain("processControlPlaneLifecycleReconciliation");
+    expect(source).toContain("runLifecycleReconciliationLoop()");
+    expect(source).toContain('"worker.lifecycle_reconciliation_detected"');
+    expect(source).toContain('"worker.lifecycle_reconciliation_detection_failed"');
+    expect(source).toContain('"worker.lifecycle_reconciliation_claim_failed"');
+    expect(source).toContain('"worker.lifecycle_reconciliation_terminal"');
+    expect(source).toContain("lastLifecycleReconciliationPollAt");
+    expect(source).toContain("lastSuccessfulLifecycleReconciliationAt");
+
+    const lifecycleLoopStart = source.indexOf("async function runLifecycleReconciliationLoop");
+    const githubLoopStart = source.indexOf("async function runGitHubReconciliationLoop");
+    const lifecycleLoop = source.slice(lifecycleLoopStart, githubLoopStart);
+    expect(lifecycleLoopStart).toBeGreaterThanOrEqual(0);
+    expect(githubLoopStart).toBeGreaterThan(lifecycleLoopStart);
+    expect(lifecycleLoop).not.toContain("workflowReconciliation");
+    expect(lifecycleLoop).not.toContain("checkRunReconciliation");
   });
 
   it("wires workflow reconciliation detection and processing loops", () => {
