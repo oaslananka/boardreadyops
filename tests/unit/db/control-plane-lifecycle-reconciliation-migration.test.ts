@@ -49,6 +49,7 @@ describe("control-plane lifecycle reconciliation migration", () => {
     expect(sql).toContain("when 'dead_letter' then 'dead_letter'");
     expect(sql).toContain("normalized_actions = case when v_expected_state = 'processed' then '[]'::jsonb");
     expect(sql).toContain("boardreadyops_complete_control_plane_reconciliation");
+    expect(sql).toContain("lifecycle job idempotency conflict");
     expect(sql).not.toContain("raise notice");
   });
 });

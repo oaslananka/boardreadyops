@@ -433,7 +433,7 @@ begin
     end if;
 
     if v_job.id is null then
-      return 'stale';
+      raise exception 'lifecycle job idempotency conflict' using errcode = '23505';
     end if;
 
     v_projection := boardreadyops_project_lifecycle_inbox_state(v_job.id, p_now);
