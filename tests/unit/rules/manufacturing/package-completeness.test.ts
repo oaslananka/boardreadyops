@@ -2,24 +2,34 @@ import { describe, expect, it } from "vitest";
 import { runPipeline } from "../../../../src/core/pipeline.js";
 import { expectRule, runFixture, writeFixture } from "../helpers.js";
 
-describe("manufacturing.package-completeness", () => {
-  it("reports missing categories in a project with partial outputs", async () => {
-    const result = await runFixture("package-completeness-missing");
-    const findings = result.findings.filter((f) => f.ruleId === "manufacturing.package-completeness");
-    expect(findings.length).toBeGreaterThanOrEqual(2);
-    const missingIds = findings.map((f) => (f.details as { missingCategory: string }).missingCategory);
-    expect(missingIds).toContain("drill");
-    expect(missingIds).toContain("bom");
-    // Each finding has a valid fix description
-    for (const f of findings) {
-      expect(f.fix?.description).toBeTruthy();
-    }
-  });
+const KICAD_FIXTURE_TIMEOUT_MS = 30_000;
 
-  it("passes when all base categories are present", async () => {
-    const result = await runFixture("package-completeness-pass");
-    expectRule(result, "manufacturing.package-completeness", 0);
-  });
+describe("manufacturing.package-completeness", () => {
+  it(
+    "reports missing categories in a project with partial outputs",
+    async () => {
+      const result = await runFixture("package-completeness-missing");
+      const findings = result.findings.filter((f) => f.ruleId === "manufacturing.package-completeness");
+      expect(findings.length).toBeGreaterThanOrEqual(2);
+      const missingIds = findings.map((f) => (f.details as { missingCategory: string }).missingCategory);
+      expect(missingIds).toContain("drill");
+      expect(missingIds).toContain("bom");
+      // Each finding has a valid fix description
+      for (const f of findings) {
+        expect(f.fix?.description).toBeTruthy();
+      }
+    },
+    KICAD_FIXTURE_TIMEOUT_MS,
+  );
+
+  it(
+    "passes when all base categories are present",
+    async () => {
+      const result = await runFixture("package-completeness-pass");
+      expectRule(result, "manufacturing.package-completeness", 0);
+    },
+    KICAD_FIXTURE_TIMEOUT_MS,
+  );
 
   it("includes completeness score and category breakdown in finding details", async () => {
     const root = await writeFixture({

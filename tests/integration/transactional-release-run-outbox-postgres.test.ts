@@ -180,7 +180,9 @@ describeDatabase("transactional release-run outbox producer", () => {
          (select count(*)::int from release_runs where repository_id = $1) as run_count,
          (select count(*)::int from control_plane_outbox where release_run_id = $2) as outbox_count,
          (select payload ->> 'runId' from control_plane_outbox where release_run_id = $2) as payload_run_id,
-         (select idempotency_key from control_plane_outbox where release_run_id = $2) as outbox_key`,
+         (select idempotency_key from control_plane_outbox where release_run_id = $2) as outbox_key,
+         (select count(*)::int from release_run_transition_events where release_run_id = $2)
+           as transition_events`,
       [repositoryRowId, first.runId],
     );
     expect(rows(state)[0]).toEqual({
@@ -188,10 +190,11 @@ describeDatabase("transactional release-run outbox producer", () => {
       outbox_count: 1,
       payload_run_id: first.runId,
       outbox_key: `github.check_run.create:${first.runId}`,
+      transition_events: 0,
     });
   });
 
-  it("supersedes the previous active run before planning the newer commit", async () => {
+  it("increments the previous run version and records one scoped supersession event", async () => {
     const store = createSqlTransactionalGitHubAppLifecycleStore(database(), {
       id: idSequence([`run-old-${suffix}`, `outbox-old-${suffix}`, `run-new-${suffix}`, `outbox-new-${suffix}`]),
       now: () => new Date("2026-07-22T02:10:00.000Z"),
@@ -201,14 +204,209 @@ describeDatabase("transactional release-run outbox producer", () => {
     const previous = await store.enqueueReleaseRunWithOutbox(action("b".repeat(40)));
     const current = await store.enqueueReleaseRunWithOutbox(action("c".repeat(40)));
     const result = await database().query(
-      "select id, status from release_runs where id = any($1::text[]) order by id",
+      `select release_runs.id,
+              release_runs.status,
+              release_runs.version::int as version,
+              (select count(*)::int
+                 from release_run_transition_events
+                where release_run_id = release_runs.id) as transition_events,
+              (select reason_code
+                 from release_run_transition_events
+                where release_run_id = release_runs.id
+                  and entity_type = 'release_run') as reason_code,
+              (select installation_id
+                 from release_run_transition_events
+                where release_run_id = release_runs.id
+                  and entity_type = 'release_run') as event_installation_id,
+              (select repository_id
+                 from release_run_transition_events
+                where release_run_id = release_runs.id
+                  and entity_type = 'release_run') as event_repository_id
+         from release_runs
+        where release_runs.id = any($1::text[])
+        order by release_runs.id`,
       [[previous.runId, current.runId]],
     );
 
     expect(rows(result)).toEqual([
-      { id: `run-new-${suffix}`, status: "queued" },
-      { id: `run-old-${suffix}`, status: "superseded" },
+      {
+        id: `run-new-${suffix}`,
+        status: "queued",
+        version: 0,
+        transition_events: 0,
+        reason_code: null,
+        event_installation_id: null,
+        event_repository_id: null,
+      },
+      {
+        id: `run-old-${suffix}`,
+        status: "superseded",
+        version: 1,
+        transition_events: 1,
+        reason_code: "newer_commit",
+        event_installation_id: installationRowId,
+        event_repository_id: repositoryRowId,
+      },
     ]);
+  });
+
+  it("supersedes every nonterminal attempt with one versioned event while retaining the current pointer", async () => {
+    const store = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([
+        `run-attempts-old-${suffix}`,
+        `outbox-attempts-old-${suffix}`,
+        `run-attempts-new-${suffix}`,
+        `outbox-attempts-new-${suffix}`,
+      ]),
+      now: () => new Date("2026-07-22T02:20:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const previous = await store.enqueueReleaseRunWithOutbox(action("d".repeat(40)));
+    const firstAttemptId = randomUUID();
+    const currentAttemptId = randomUUID();
+
+    await database().query(
+      `insert into release_run_attempts (
+         id, run_id, attempt_number, status, created_at, dispatch_requested_at, started_at, heartbeat_at
+       ) values
+         ($1, $3, 1, 'dispatching', $4::timestamptz, $4::timestamptz, null, null),
+         ($2, $3, 2, 'in_progress', $4::timestamptz, $4::timestamptz, $4::timestamptz, $4::timestamptz)`,
+      [firstAttemptId, currentAttemptId, previous.runId, "2026-07-22T02:19:00.000Z"],
+    );
+    await database().query(
+      `update release_runs
+          set status = 'running',
+              execution_attempt_id = $2,
+              execution_attempt_started_at = $3::timestamptz
+        where id = $1`,
+      [previous.runId, currentAttemptId, "2026-07-22T02:19:00.000Z"],
+    );
+
+    await store.enqueueReleaseRunWithOutbox(action("e".repeat(40)));
+
+    expect(
+      rows(
+        await database().query(
+          `select status,
+                  version::int as version,
+                  execution_attempt_id,
+                  (select count(*)::int
+                     from release_run_transition_events
+                    where release_run_id = release_runs.id
+                      and entity_type = 'release_run') as run_events,
+                  (select count(*)::int
+                     from release_run_transition_events
+                    where release_run_id = release_runs.id
+                      and entity_type = 'execution_attempt') as attempt_events
+             from release_runs
+            where id = $1`,
+          [previous.runId],
+        ),
+      )[0],
+    ).toEqual({
+      status: "superseded",
+      version: 1,
+      execution_attempt_id: currentAttemptId,
+      run_events: 1,
+      attempt_events: 2,
+    });
+
+    expect(
+      rows(
+        await database().query(
+          `select id,
+                  status,
+                  version::int as version,
+                  failure_class,
+                  failure_message,
+                  completed_at is not null as completed
+             from release_run_attempts
+            where run_id = $1
+            order by attempt_number`,
+          [previous.runId],
+        ),
+      ),
+    ).toEqual([
+      {
+        id: firstAttemptId,
+        status: "superseded",
+        version: 1,
+        failure_class: "newer_commit",
+        failure_message: "A newer commit superseded this execution attempt.",
+        completed: true,
+      },
+      {
+        id: currentAttemptId,
+        status: "superseded",
+        version: 1,
+        failure_class: "newer_commit",
+        failure_message: "A newer commit superseded this execution attempt.",
+        completed: true,
+      },
+    ]);
+  });
+
+  it("serializes concurrent different commits to one active run with run-bound outbox payloads", async () => {
+    const firstStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-concurrent-a-${suffix}`, `outbox-concurrent-a-${suffix}`]),
+      now: () => new Date("2026-07-22T02:30:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const secondStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-concurrent-b-${suffix}`, `outbox-concurrent-b-${suffix}`]),
+      now: () => new Date("2026-07-22T02:30:01.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+
+    const results = await Promise.all([
+      firstStore.enqueueReleaseRunWithOutbox(action("f".repeat(40))),
+      secondStore.enqueueReleaseRunWithOutbox(action("1".repeat(40))),
+    ]);
+    const runIds = results.map((result) => result.runId);
+
+    const state = rows(
+      await database().query(
+        `select release_runs.id,
+                release_runs.status,
+                release_runs.version::int as version,
+                control_plane_outbox.id as outbox_id,
+                control_plane_outbox.payload ->> 'runId' as payload_run_id,
+                control_plane_outbox.idempotency_key as outbox_key,
+                (select count(*)::int
+                   from release_run_attempts
+                  where run_id = release_runs.id
+                    and status in ('queued', 'dispatching', 'dispatched', 'in_progress', 'uploading_artifacts', 'reporting'))
+                  as active_attempts,
+                (select count(*)::int
+                   from release_run_transition_events
+                  where release_run_id = release_runs.id
+                    and entity_type = 'release_run') as run_events
+           from release_runs
+           join control_plane_outbox on control_plane_outbox.release_run_id = release_runs.id
+          where release_runs.id = any($1::text[])
+            and control_plane_outbox.effect_type = 'github.check_run.create'
+          order by release_runs.status, release_runs.id`,
+        [runIds],
+      ),
+    );
+
+    expect(state).toHaveLength(2);
+    expect(state.filter((row) => row.status === "queued")).toHaveLength(1);
+    expect(state.filter((row) => row.status === "superseded")).toHaveLength(1);
+    expect(state.filter((row) => row.status === "queued")[0]).toMatchObject({
+      version: 0,
+      active_attempts: 0,
+      run_events: 0,
+    });
+    expect(state.filter((row) => row.status === "superseded")[0]).toMatchObject({
+      version: 1,
+      active_attempts: 0,
+      run_events: 1,
+    });
+    for (const row of state) {
+      expect(row.payload_run_id).toBe(row.id);
+      expect(row.outbox_key).toBe(`github.check_run.create:${String(row.id)}`);
+    }
   });
 
   it("atomically advances Check Run creation and workflow dispatch state", async () => {
