@@ -81,13 +81,13 @@ ${operations}`;
     const reconciliation = fs.readFileSync(documentationPath, "utf8");
     const navigation = fs.readFileSync("mkdocs.yml", "utf8");
 
-    expect(canaries).toContain("oaslananka/boardreadyops-canary-public");
-    expect(canaries).toContain("oaslananka/boardreadyops-canary-private");
+    expect(canaries).toContain("oaslananka-dev/boardreadyops-canary-public");
+    expect(canaries).toContain("oaslananka-dev/boardreadyops-canary-private");
     expect(canaries).toContain("17 */6 * * *");
     expect(canaries).toContain("47 */6 * * *");
     expect(canaries).toContain("workflow_dispatch:");
     expect(canaries).toContain(
-      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@31466185759f0a4de8d9853c81dc564fb5b4cfcc",
+      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87",
     );
     expect(canaries).toContain("actions: read");
     expect(canaries).toContain("checks: read");
@@ -95,6 +95,10 @@ ${operations}`;
     expect(canaries).toContain("pull-requests: write");
     expect(canaries).toContain("no long-lived personal access token");
     expect(canaries).toContain("no new GitHub App permission");
+    expect(canaries).toContain("verify the live App registration");
+    expect(canaries).toContain("Do not install the App");
+    expect(canaries).toContain("No organization or account permissions");
+    expect(canaries).toContain("#88");
     expect(canaries).toContain("approval-required state");
     expect(canaries).toContain("does not depend on those ordinary pull request workflows");
     expect(canaries).toContain("exact nonce SHA");
