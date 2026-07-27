@@ -100,6 +100,37 @@ function payload(
   };
 }
 
+async function createCheckRunBinding(id: string): Promise<string> {
+  externalIdOffset += 2;
+  const installationId = `${testPrefix}-installation-${id}`;
+  const repositoryId = `${testPrefix}-repository-${id}`;
+  const runId = `run-${id}`;
+  const now = at(0).toISOString();
+  await database().query(
+    `insert into installations (
+       id, github_installation_id, account_login, account_type, plan_tier
+     ) values ($1, $2::bigint, $3, 'Organization', 'enterprise')`,
+    [installationId, externalIdSeed + externalIdOffset, `${testPrefix}-${id}`],
+  );
+  await database().query(
+    `insert into repositories (
+       id, installation_id, github_repo_id, owner, name, private, default_branch
+     ) values ($1, $2, $3::bigint, 'octo', $4, false, 'main')`,
+    [repositoryId, installationId, externalIdSeed + externalIdOffset + 1, `repo-${id}`],
+  );
+  await database().query(
+    `insert into release_runs (
+       id, repository_id, idempotency_key, commit_sha, ref, trigger_kind,
+       status, started_at
+     ) values (
+       $1, $2, $3, $4, 'refs/heads/main', 'push',
+       'queued', $5::timestamptz
+     )`,
+    [runId, repositoryId, `${testPrefix}:${runId}`, "a".repeat(40), now],
+  );
+  return runId;
+}
+
 async function createWorkflowDispatchBinding(id: string, executionAttemptId: string): Promise<string> {
   externalIdOffset += 2;
   const installationId = `${testPrefix}-installation-${id}`;
@@ -154,7 +185,12 @@ async function insertEffect(
   const status = input.status ?? "available";
   const now = input.availableAt ?? at(0);
   const executionAttemptId = effectType === "github.workflow.dispatch" ? randomUUID() : null;
-  const releaseRunId = executionAttemptId ? await createWorkflowDispatchBinding(id, executionAttemptId) : null;
+  let releaseRunId: string | null = null;
+  if (executionAttemptId) {
+    releaseRunId = await createWorkflowDispatchBinding(id, executionAttemptId);
+  } else if (effectType === "github.check_run.create") {
+    releaseRunId = await createCheckRunBinding(id);
+  }
   await database().query(
     `insert into control_plane_outbox (
        id, release_run_id, execution_attempt_id, effect_type, payload_version,
@@ -287,16 +323,17 @@ describeDatabase("control-plane PostgreSQL transactional outbox", () => {
 
   it("rolls back an outbox write with its surrounding statement", async () => {
     const id = `${testPrefix}-${randomUUID()}`;
+    const releaseRunId = await createCheckRunBinding(id);
     await expect(
       database().query(
         `with inserted as (
            insert into control_plane_outbox (
-             id, effect_type, idempotency_key, payload, available_at, created_at
-           ) values ($1, 'github.check_run.create', $2, $3::jsonb, now(), now())
+             id, release_run_id, effect_type, idempotency_key, payload, available_at, created_at
+           ) values ($1, $2, 'github.check_run.create', $3, $4::jsonb, now(), now())
            returning id
          )
          select 1 / 0 from inserted`,
-        [id, `${testPrefix}:${id}`, JSON.stringify(payload("github.check_run.create", id))],
+        [id, releaseRunId, `${testPrefix}:${id}`, JSON.stringify(payload("github.check_run.create", id))],
       ),
     ).rejects.toThrow();
 
