@@ -173,6 +173,36 @@ export default async function RunPage({ params }: RunPageProps) {
       </section>
 
       <section className="panel">
+        <h2>Lifecycle transitions</h2>
+        {run.transitions.length === 0 ? (
+          <p>No versioned lifecycle transition has been recorded for this run.</p>
+        ) : (
+          <ol className="stack-list">
+            {run.transitions.map((transition) => (
+              <li
+                key={`${transition.entityType}:${transition.executionAttemptId ?? "run"}:${transition.toVersion}:${transition.occurredAt}`}
+              >
+                <div>
+                  <strong>{transition.entityType === "release_run" ? "Logical run" : "Execution attempt"}</strong>{" "}
+                  <StatusPill value={transition.reasonCode} />
+                </div>
+                <p>
+                  <code>{transition.fromStatus}</code> to <code>{transition.toStatus}</code> · version{" "}
+                  {transition.fromVersion} to {transition.toVersion}
+                </p>
+                {transition.executionAttemptId ? (
+                  <p>
+                    Attempt: <code>{transition.executionAttemptId}</code>
+                  </p>
+                ) : null}
+                <p>Recorded {formatRunDate(transition.occurredAt)}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <section className="panel">
         <h2>Publication</h2>
         <dl className="grid-list">
           <div>

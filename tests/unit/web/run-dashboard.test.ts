@@ -139,6 +139,30 @@ describe("run dashboard data", () => {
           },
         ],
       },
+      {
+        rows: [
+          {
+            entity_type: "execution_attempt",
+            execution_attempt_id: "attempt-2",
+            from_status: "reporting",
+            to_status: "completed",
+            from_version: 3,
+            to_version: 4,
+            reason_code: "runner_result_completed",
+            occurred_at: completedAt,
+          },
+          {
+            entity_type: "release_run",
+            execution_attempt_id: null,
+            from_status: "running",
+            to_status: "completed",
+            from_version: 2,
+            to_version: 3,
+            reason_code: "runner_result_completed",
+            occurred_at: completedAt,
+          },
+        ],
+      },
     ]);
 
     const result = await lookupRunDashboard("run-123", executor, {
@@ -235,12 +259,35 @@ describe("run dashboard data", () => {
             resultDigest: undefined,
           },
         ],
+        transitions: [
+          {
+            entityType: "execution_attempt",
+            executionAttemptId: "attempt-2",
+            fromStatus: "reporting",
+            toStatus: "completed",
+            fromVersion: 3,
+            toVersion: 4,
+            reasonCode: "runner_result_completed",
+            occurredAt: "2026-07-10T17:00:02.500Z",
+          },
+          {
+            entityType: "release_run",
+            executionAttemptId: undefined,
+            fromStatus: "running",
+            toStatus: "completed",
+            fromVersion: 2,
+            toVersion: 3,
+            reasonCode: "runner_result_completed",
+            occurredAt: "2026-07-10T17:00:02.500Z",
+          },
+        ],
       },
     });
 
     const runSql = String(query.mock.calls[0]?.[0]);
     const artifactSql = String(query.mock.calls[2]?.[0]);
     const attemptSql = String(query.mock.calls[3]?.[0]);
+    const transitionSql = String(query.mock.calls[4]?.[0]);
     expect(runSql).not.toContain("installations");
     expect(runSql).not.toContain("account_login");
     expect(runSql).toContain("left join release_run_results");
@@ -248,6 +295,12 @@ describe("run dashboard data", () => {
     expect(artifactSql).not.toContain("storage_path");
     expect(attemptSql).toContain("from release_run_attempts");
     expect(attemptSql).toContain("order by attempt_number desc");
+    expect(transitionSql).toContain("from release_run_transition_events");
+    expect(transitionSql).toContain("order by occurred_at desc, id desc");
+    expect(transitionSql).toContain("limit 100");
+    expect(transitionSql).not.toContain("metadata");
+    expect(transitionSql).not.toContain("payload");
+    expect(transitionSql).not.toContain("error");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
   });
 });
