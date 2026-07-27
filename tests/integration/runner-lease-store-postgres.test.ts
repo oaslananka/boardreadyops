@@ -24,6 +24,11 @@ function rows(result: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
 }
 
+function databaseExecutor() {
+  if (!executor) throw new Error("DATABASE_URL is required");
+  return executor;
+}
+
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -229,15 +234,52 @@ describeDatabase("runner lease PostgreSQL store", () => {
       expect([first.status, second.status].sort()).toEqual(["claimed", "empty"]);
 
       const state = rows(
-        await executor!.query(
-          `select
-             (select count(*)::int from runner_job_leases where run_id = $1 and status = 'active') as active_leases,
-             (select count(*)::int from release_run_attempts where run_id = $1) as attempts,
-             (select status from release_runs where id = $1) as run_status`,
+        await databaseExecutor().query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_run_attempts.status as attempt_status,
+                  release_run_attempts.version::int as attempt_version,
+                  runner_job_leases.expected_run_status,
+                  runner_job_leases.expected_run_version::int as expected_run_version,
+                  runner_job_leases.expected_attempt_status,
+                  runner_job_leases.expected_attempt_version::int as expected_attempt_version
+             from release_runs
+             join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
+             join runner_job_leases on runner_job_leases.execution_attempt_id = release_run_attempts.id
+            where release_runs.id = $1
+              and runner_job_leases.status = 'active'`,
           [runId],
         ),
       )[0];
-      expect(state).toEqual({ active_leases: 1, attempts: 1, run_status: "running" });
+      expect(state).toEqual({
+        run_status: "running",
+        run_version: 1,
+        attempt_status: "in_progress",
+        attempt_version: 0,
+        expected_run_status: "running",
+        expected_run_version: 1,
+        expected_attempt_status: "in_progress",
+        expected_attempt_version: 0,
+      });
+      const transitions = rows(
+        await databaseExecutor().query(
+          `select entity_type, from_status, to_status,
+                  from_version::int as from_version, to_version::int as to_version, reason_code
+             from release_run_transition_events
+            where release_run_id = $1`,
+          [runId],
+        ),
+      );
+      expect(transitions).toEqual([
+        {
+          entity_type: "release_run",
+          from_status: "queued",
+          to_status: "running",
+          from_version: 0,
+          to_version: 1,
+          reason_code: "runner_lease_claimed",
+        },
+      ]);
     } finally {
       await cleanupTenant(tenant, managedIdentityId);
     }
@@ -289,23 +331,67 @@ describeDatabase("runner lease PostgreSQL store", () => {
 
       expect(second.executionAttemptId).not.toBe(first.executionAttemptId);
       const leaseRows = rows(
-        await executor!.query(
-          `select status, execution_attempt_id from runner_job_leases where run_id = $1 order by claimed_at, id`,
+        await databaseExecutor().query(
+          `select status, execution_attempt_id,
+                  expected_run_status, expected_run_version::int as expected_run_version,
+                  expected_attempt_status, expected_attempt_version::int as expected_attempt_version
+             from runner_job_leases
+            where run_id = $1
+            order by claimed_at, id`,
           [runId],
         ),
       );
       expect(leaseRows).toEqual([
-        { status: "expired", execution_attempt_id: first.executionAttemptId },
-        { status: "active", execution_attempt_id: second.executionAttemptId },
+        {
+          status: "expired",
+          execution_attempt_id: first.executionAttemptId,
+          expected_run_status: "queued",
+          expected_run_version: 2,
+          expected_attempt_status: "stale",
+          expected_attempt_version: 1,
+        },
+        {
+          status: "active",
+          execution_attempt_id: second.executionAttemptId,
+          expected_run_status: "running",
+          expected_run_version: 3,
+          expected_attempt_status: "in_progress",
+          expected_attempt_version: 0,
+        },
       ]);
       const attemptRows = rows(
-        await executor!.query(`select status, id from release_run_attempts where run_id = $1 order by attempt_number`, [
-          runId,
-        ]),
+        await databaseExecutor().query(
+          `select status, version::int as version, id
+             from release_run_attempts
+            where run_id = $1
+            order by attempt_number`,
+          [runId],
+        ),
       );
       expect(attemptRows).toEqual([
-        { status: "stale", id: first.executionAttemptId },
-        { status: "in_progress", id: second.executionAttemptId },
+        { status: "stale", version: 1, id: first.executionAttemptId },
+        { status: "in_progress", version: 0, id: second.executionAttemptId },
+      ]);
+      const runState = rows(
+        await databaseExecutor().query(`select status, version::int as version from release_runs where id = $1`, [
+          runId,
+        ]),
+      )[0];
+      expect(runState).toEqual({ status: "running", version: 3 });
+      const transitionCounts = rows(
+        await databaseExecutor().query(
+          `select reason_code, entity_type, count(*)::int as count
+             from release_run_transition_events
+            where release_run_id = $1
+            group by reason_code, entity_type
+            order by reason_code, entity_type`,
+          [runId],
+        ),
+      );
+      expect(transitionCounts).toEqual([
+        { reason_code: "runner_lease_claimed", entity_type: "release_run", count: 2 },
+        { reason_code: "runner_lease_expired", entity_type: "execution_attempt", count: 1 },
+        { reason_code: "runner_lease_expired", entity_type: "release_run", count: 1 },
       ]);
     } finally {
       await cleanupTenant(tenant, managedIdentityId);
@@ -385,10 +471,16 @@ describeDatabase("runner lease PostgreSQL store", () => {
       expect(replayed).toEqual({ status: "replayed" });
 
       const state = rows(
-        await executor!.query(
+        await databaseExecutor().query(
           `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
                   release_run_attempts.status as attempt_status,
-                  runner_job_leases.status as lease_status
+                  release_run_attempts.version::int as attempt_version,
+                  runner_job_leases.status as lease_status,
+                  runner_job_leases.expected_run_status,
+                  runner_job_leases.expected_run_version::int as expected_run_version,
+                  runner_job_leases.expected_attempt_status,
+                  runner_job_leases.expected_attempt_version::int as expected_attempt_version
            from release_runs
            join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
            join runner_job_leases on runner_job_leases.execution_attempt_id = release_run_attempts.id
@@ -396,16 +488,296 @@ describeDatabase("runner lease PostgreSQL store", () => {
           [runId],
         ),
       )[0];
-      expect(state).toEqual({ run_status: "queued", attempt_status: "stale", lease_status: "relinquished" });
+      expect(state).toEqual({
+        run_status: "queued",
+        run_version: 2,
+        attempt_status: "stale",
+        attempt_version: 1,
+        lease_status: "relinquished",
+        expected_run_status: "queued",
+        expected_run_version: 2,
+        expected_attempt_status: "stale",
+        expected_attempt_version: 1,
+      });
 
       const auditTypes = rows(
-        await executor!.query(`select event_type from audit_events where release_run_id = $1 order by created_at, id`, [
-          runId,
-        ]),
+        await databaseExecutor().query(
+          `select event_type from audit_events where release_run_id = $1 order by created_at, id`,
+          [runId],
+        ),
       ).map((row) => row.event_type);
       expect(auditTypes).toEqual(["runner.lease.claimed", "runner.lease.renewed", "runner.lease.relinquished"]);
+      const transitionCounts = rows(
+        await databaseExecutor().query(
+          `select reason_code, entity_type, count(*)::int as count
+             from release_run_transition_events
+            where release_run_id = $1
+            group by reason_code, entity_type
+            order by reason_code, entity_type`,
+          [runId],
+        ),
+      );
+      expect(transitionCounts).toEqual([
+        { reason_code: "runner_lease_claimed", entity_type: "release_run", count: 1 },
+        { reason_code: "runner_lease_relinquished", entity_type: "execution_attempt", count: 1 },
+        { reason_code: "runner_lease_relinquished", entity_type: "release_run", count: 1 },
+      ]);
     } finally {
       await cleanupTenant(tenant);
+    }
+  });
+
+  it("versions only real heartbeat status changes and keeps lease snapshots current", async () => {
+    const claimedAt = testTime(1500);
+    const uploadingAt = testTime(1510);
+    const repeatedAt = testTime(1520);
+    const reportingAt = testTime(1530);
+    const tenant = await createTenant("lease-test-heartbeat-version");
+    const runId = await createQueuedRun(tenant, claimedAt);
+    const managedIdentityId = await createManagedIdentity("lease-test-heartbeat-version", claimedAt);
+    const attemptId = randomUUID();
+    const leaseId = randomUUID();
+
+    try {
+      const job = claimed(
+        await fixedStore({ now: claimedAt, ids: [attemptId, leaseId], tokens: [token("heartbeat-version")] }).claimJob({
+          workerClass: "managed",
+          managedRunnerIdentityId: managedIdentityId,
+          requestTimestamp: requestTimestamp(claimedAt),
+          requestNonce: nonce("heartbeat-version-claim"),
+          capabilities: ["kicad:10"],
+        }),
+      );
+
+      const heartbeatBase = {
+        workerClass: "managed" as const,
+        managedRunnerIdentityId: managedIdentityId,
+        runId,
+        executionAttemptId: job.executionAttemptId,
+        leaseId: job.leaseId,
+        leaseToken: job.leaseToken,
+      };
+      await expect(
+        fixedStore({ now: uploadingAt, ids: [], tokens: [] }).heartbeat({
+          ...heartbeatBase,
+          requestTimestamp: requestTimestamp(uploadingAt),
+          requestNonce: nonce("heartbeat-uploading"),
+          stage: "uploading_artifacts",
+          progressPercent: 70,
+        }),
+      ).resolves.toMatchObject({ status: "active" });
+      await expect(
+        fixedStore({ now: repeatedAt, ids: [], tokens: [] }).heartbeat({
+          ...heartbeatBase,
+          requestTimestamp: requestTimestamp(repeatedAt),
+          requestNonce: nonce("heartbeat-uploading-repeat"),
+          stage: "uploading_artifacts",
+          progressPercent: 75,
+        }),
+      ).resolves.toMatchObject({ status: "active" });
+      await expect(
+        fixedStore({ now: reportingAt, ids: [], tokens: [] }).heartbeat({
+          ...heartbeatBase,
+          requestTimestamp: requestTimestamp(reportingAt),
+          requestNonce: nonce("heartbeat-reporting"),
+          stage: "reporting",
+          progressPercent: 90,
+        }),
+      ).resolves.toMatchObject({ status: "active" });
+
+      const state = rows(
+        await databaseExecutor().query(
+          `select release_runs.version::int as run_version,
+                  release_run_attempts.status as attempt_status,
+                  release_run_attempts.version::int as attempt_version,
+                  runner_job_leases.stage,
+                  runner_job_leases.progress_percent,
+                  runner_job_leases.expected_attempt_status,
+                  runner_job_leases.expected_attempt_version::int as expected_attempt_version
+             from release_runs
+             join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
+             join runner_job_leases on runner_job_leases.execution_attempt_id = release_run_attempts.id
+            where release_runs.id = $1`,
+          [runId],
+        ),
+      )[0];
+      expect(state).toEqual({
+        run_version: 1,
+        attempt_status: "reporting",
+        attempt_version: 2,
+        stage: "reporting",
+        progress_percent: 90,
+        expected_attempt_status: "reporting",
+        expected_attempt_version: 2,
+      });
+      const heartbeatTransitions = rows(
+        await databaseExecutor().query(
+          `select from_status, to_status,
+                  from_version::int as from_version, to_version::int as to_version
+             from release_run_transition_events
+            where release_run_id = $1
+              and reason_code = 'runner_lease_heartbeat'
+            order by occurred_at`,
+          [runId],
+        ),
+      );
+      expect(heartbeatTransitions).toEqual([
+        { from_status: "in_progress", to_status: "uploading_artifacts", from_version: 0, to_version: 1 },
+        { from_status: "uploading_artifacts", to_status: "reporting", from_version: 1, to_version: 2 },
+      ]);
+    } finally {
+      await cleanupTenant(tenant, managedIdentityId);
+    }
+  });
+
+  it("fails closed when a lease run version, attempt version, or current-attempt pointer drifts", async () => {
+    const scenarios = ["run-version", "attempt-version", "attempt-pointer"] as const;
+
+    for (const [index, scenario] of scenarios.entries()) {
+      const claimedAt = testTime(2100 + index * 120);
+      const heartbeatAt = testTime(2110 + index * 120);
+      const tenant = await createTenant(`lease-test-stale-${scenario}`);
+      const runId = await createQueuedRun(tenant, claimedAt);
+      const managedIdentityId = await createManagedIdentity(`lease-test-stale-${scenario}`, claimedAt);
+      const attemptId = randomUUID();
+      const leaseId = randomUUID();
+
+      try {
+        const job = claimed(
+          await fixedStore({
+            now: claimedAt,
+            ids: [attemptId, leaseId],
+            tokens: [token(`stale-${scenario}`)],
+          }).claimJob({
+            workerClass: "managed",
+            managedRunnerIdentityId: managedIdentityId,
+            requestTimestamp: requestTimestamp(claimedAt),
+            requestNonce: nonce(`stale-${scenario}-claim`),
+            capabilities: ["kicad:10"],
+          }),
+        );
+
+        if (scenario === "run-version") {
+          await databaseExecutor().query("update release_runs set version = version + 1 where id = $1", [runId]);
+        } else if (scenario === "attempt-version") {
+          await databaseExecutor().query("update release_run_attempts set version = version + 1 where id = $1", [
+            attemptId,
+          ]);
+        } else {
+          const replacementAttemptId = randomUUID();
+          await databaseExecutor().query(
+            `insert into release_run_attempts (
+               id, run_id, attempt_number, status, created_at, started_at, heartbeat_at
+             ) values ($1, $2, 2, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
+            [replacementAttemptId, runId, heartbeatAt],
+          );
+          await databaseExecutor().query("update release_runs set execution_attempt_id = $1 where id = $2", [
+            replacementAttemptId,
+            runId,
+          ]);
+        }
+
+        const result = await fixedStore({ now: heartbeatAt, ids: [], tokens: [] }).heartbeat({
+          workerClass: "managed",
+          managedRunnerIdentityId: managedIdentityId,
+          runId,
+          executionAttemptId: job.executionAttemptId,
+          leaseId: job.leaseId,
+          leaseToken: job.leaseToken,
+          requestTimestamp: requestTimestamp(heartbeatAt),
+          requestNonce: nonce(`stale-${scenario}-heartbeat`),
+          stage: "uploading_artifacts",
+          progressPercent: 50,
+        });
+        expect(result).toEqual({ status: "stale" });
+
+        const state = rows(
+          await databaseExecutor().query(
+            `select runner_job_leases.status as lease_status,
+                    runner_job_leases.stage,
+                    runner_job_leases.expected_run_version::int as expected_run_version,
+                    runner_job_leases.expected_attempt_version::int as expected_attempt_version,
+                    (select count(*)::int
+                       from release_run_transition_events
+                      where release_run_id = $1) as transition_count
+               from runner_job_leases
+              where runner_job_leases.id = $2`,
+            [runId, leaseId],
+          ),
+        )[0];
+        expect(state).toEqual({
+          lease_status: "active",
+          stage: "claimed",
+          expected_run_version: 1,
+          expected_attempt_version: 0,
+          transition_count: 1,
+        });
+      } finally {
+        await cleanupTenant(tenant, managedIdentityId);
+      }
+    }
+  });
+
+  it("expires a stale-bound lease without mutating a newer lifecycle snapshot", async () => {
+    const claimedAt = testTime(2700);
+    const expiredAt = testTime(2820);
+    const tenant = await createTenant("lease-test-stale-expiry");
+    const runId = await createQueuedRun(tenant, claimedAt);
+    const managedIdentityId = await createManagedIdentity("lease-test-stale-expiry", claimedAt);
+    const attemptId = randomUUID();
+    const leaseId = randomUUID();
+
+    try {
+      await fixedStore({
+        now: claimedAt,
+        ids: [attemptId, leaseId],
+        tokens: [token("stale-expiry")],
+        leaseDurationSeconds: 60,
+        maximumLeaseDurationSeconds: 300,
+      }).claimJob({
+        workerClass: "managed",
+        managedRunnerIdentityId: managedIdentityId,
+        requestTimestamp: requestTimestamp(claimedAt),
+        requestNonce: nonce("stale-expiry-claim"),
+        capabilities: ["kicad:10"],
+      });
+      await databaseExecutor().query("update release_runs set version = version + 1 where id = $1", [runId]);
+
+      const expired = rows(
+        await databaseExecutor().query("select boardreadyops_expire_runner_leases($1::timestamptz)::int as count", [
+          expiredAt,
+        ]),
+      )[0]?.count;
+      expect(expired).toBe(1);
+
+      const state = rows(
+        await databaseExecutor().query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_run_attempts.status as attempt_status,
+                  release_run_attempts.version::int as attempt_version,
+                  runner_job_leases.status as lease_status,
+                  (select count(*)::int
+                     from release_run_transition_events
+                    where release_run_id = $1) as transition_count
+             from release_runs
+             join runner_job_leases on runner_job_leases.run_id = release_runs.id
+             join release_run_attempts on release_run_attempts.id = runner_job_leases.execution_attempt_id
+            where release_runs.id = $1
+              and runner_job_leases.id = $2`,
+          [runId, leaseId],
+        ),
+      )[0];
+      expect(state).toEqual({
+        run_status: "running",
+        run_version: 2,
+        attempt_status: "in_progress",
+        attempt_version: 0,
+        lease_status: "expired",
+        transition_count: 1,
+      });
+    } finally {
+      await cleanupTenant(tenant, managedIdentityId);
     }
   });
 
@@ -432,7 +804,9 @@ describeDatabase("runner lease PostgreSQL store", () => {
       expect(result).toEqual({ status: "empty", retryAfterSeconds: 15 });
 
       const attemptCount = rows(
-        await executor!.query(`select count(*)::int as count from release_run_attempts where run_id = $1`, [runB]),
+        await databaseExecutor().query(`select count(*)::int as count from release_run_attempts where run_id = $1`, [
+          runB,
+        ]),
       )[0]?.count;
       expect(attemptCount).toBe(0);
     } finally {
