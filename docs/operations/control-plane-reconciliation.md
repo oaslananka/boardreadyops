@@ -190,6 +190,8 @@ Use this incident sequence:
 
 SLI collection and SLO evaluation are observability paths and do not affect worker readiness or queue processing. The evaluator's debounce state is process-local; a worker restart resets local duration, consecutive-snapshot, and backlog-trend history. A restart is not a recovery signal, so durable alerting must retain the existing incident until a real recovery transition arrives.
 
+Public and private end-to-end observations are defined in the [synthetic target-repository canary runbook](synthetic-target-repository-canaries.md). Canary failures should be correlated with these aggregate SLO and reconciliation signals without exposing tenant content.
+
 ## Webhook inbox and lifecycle-job reconciliation
 
 The worker also detects internal PostgreSQL drift between `webhook_inbox` and `control_plane_jobs`. This path does not require GitHub credentials because it never calls GitHub: it repairs only tenant-scoped records already persisted by webhook acceptance and lifecycle processing.

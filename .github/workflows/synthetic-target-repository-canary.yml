@@ -1,0 +1,78 @@
+name: BoardReadyOps Synthetic Target Canary
+
+on:
+  workflow_call:
+    inputs:
+      visibility:
+        description: Expected caller repository visibility
+        required: true
+        type: string
+      timeout-seconds:
+        description: Maximum convergence wait in seconds
+        required: false
+        type: number
+        default: 1200
+      poll-interval-seconds:
+        description: Delay between convergence observations
+        required: false
+        type: number
+        default: 15
+      public-origin:
+        description: Expected BoardReadyOps public HTTPS origin
+        required: false
+        type: string
+        default: https://boardreadyops.oaslananka.dev
+      readiness-workflow:
+        description: Target repository readiness workflow filename
+        required: false
+        type: string
+        default: readiness-runner.yml
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: boardreadyops-target-canary-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Validate canary inputs
+        env:
+          CANARY_VISIBILITY: ${{ inputs.visibility }}
+        run: |
+          case "$CANARY_VISIBILITY" in
+            public|private) ;;
+            *)
+              echo "visibility must be public or private" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Check out pinned canary implementation
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: _boardreadyops-canary
+          persist-credentials: false
+
+      - name: Run synthetic target-repository canary
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          BOARDREADYOPS_CANARY_VISIBILITY: ${{ inputs.visibility }}
+          BOARDREADYOPS_CANARY_TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+          BOARDREADYOPS_CANARY_POLL_INTERVAL_SECONDS: ${{ inputs.poll-interval-seconds }}
+          BOARDREADYOPS_CANARY_PUBLIC_ORIGIN: ${{ inputs.public-origin }}
+          BOARDREADYOPS_CANARY_READINESS_WORKFLOW: ${{ inputs.readiness-workflow }}
+        run: node _boardreadyops-canary/scripts/run-synthetic-target-repository-canary.mjs
