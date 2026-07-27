@@ -59,6 +59,8 @@ permissions:
 
 There is no long-lived personal access token, callback secret, GitHub App private key, or BoardReadyOps API key in either canary repository. The repository token can mutate and observe only its own repository. The reusable workflow is pinned to the exact BoardReadyOps commit that contains the reviewed implementation.
 
+When this token opens or updates the persistent pull request, GitHub creates the `pull_request` event. Ordinary pull request workflows may enter an approval-required state. The canary does not depend on those ordinary pull request workflows; it depends on the BoardReadyOps GitHub App webhook and the separate target-repository `workflow_dispatch` started by the control plane.
+
 Private source, workflow logs, and artifacts remain in `oaslananka/boardreadyops-canary-private`. Canary summaries contain repository identity, expected SHA, elapsed time, stable reason code, and known Check Run or workflow URLs only. They do not contain source, findings, artifact names, webhook payloads, credentials, OIDC claims, installation tokens, or raw GitHub response bodies.
 
 ## Public repository wrapper
@@ -85,7 +87,7 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@85f75d9bf64d412dda060b259d2db071c532aa9a
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@31466185759f0a4de8d9853c81dc564fb5b4cfcc
     with:
       visibility: public
 ```
@@ -114,7 +116,7 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@85f75d9bf64d412dda060b259d2db071c532aa9a
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@31466185759f0a4de8d9853c81dc564fb5b4cfcc
     with:
       visibility: private
 ```

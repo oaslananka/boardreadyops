@@ -87,7 +87,7 @@ ${operations}`;
     expect(canaries).toContain("47 */6 * * *");
     expect(canaries).toContain("workflow_dispatch:");
     expect(canaries).toContain(
-      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@85f75d9bf64d412dda060b259d2db071c532aa9a",
+      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@31466185759f0a4de8d9853c81dc564fb5b4cfcc",
     );
     expect(canaries).toContain("actions: read");
     expect(canaries).toContain("checks: read");
@@ -95,6 +95,8 @@ ${operations}`;
     expect(canaries).toContain("pull-requests: write");
     expect(canaries).toContain("no long-lived personal access token");
     expect(canaries).toContain("no new GitHub App permission");
+    expect(canaries).toContain("approval-required state");
+    expect(canaries).toContain("does not depend on those ordinary pull request workflows");
     expect(canaries).toContain("exact nonce SHA");
     expect(canaries).toContain("workflow_dispatch");
     expect(canaries).toContain("GitHub status");
