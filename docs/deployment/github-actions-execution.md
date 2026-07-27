@@ -123,6 +123,8 @@ Repository administrators must permit GitHub Actions and the pinned third-party 
 9. Verify the OIDC callback completes the Check Run and the dashboard shows findings and the Actions run link.
 10. Verify no target checkout exists on the control-plane host or `ops-vps-03`.
 
+For continuous production-path validation across both repository visibility classes, provision and commission the [synthetic target-repository canaries](../operations/synthetic-target-repository-canaries.md).
+
 ## Failure modes
 
 | Symptom | Likely cause |
