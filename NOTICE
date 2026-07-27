@@ -179,7 +179,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `puppeteer-core@24.43.1`, `puppeteer-core@25.2.0`
   - Description: A high-level API to control headless Chrome over the DevTools Protocol
   - Homepage: https://github.com/puppeteer/puppeteer/tree/main#readme
-- `readdir-glob@1.1.3`
+- `readdir-glob@3.0.0`
   - Description: Recursive fs.readdir with streaming API and glob filtering.
   - Homepage: https://github.com/Yqnn/node-readdir-glob
 - `rxjs@7.8.2`
@@ -211,7 +211,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `glob@13.0.6`
   - Description: the most correct and second fastest glob implementation in JavaScript
   - Homepage: https://github.com/isaacs/node-glob#readme
-- `lru-cache@11.4.0`
+- `lru-cache@11.5.2`
   - Description: A cache object that deletes the least-recently-used items.
   - Homepage: https://github.com/isaacs/node-lru-cache#readme
 - `minimatch@10.2.5`
@@ -347,9 +347,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `minimalistic-assert@1.0.1`
   - Description: minimalistic-assert ===
   - Homepage: https://github.com/calvinmetcalf/minimalistic-assert
-- `minimatch@5.1.9`
-  - Description: a glob matcher in javascript
-  - Homepage: https://github.com/isaacs/minimatch#readme
 - `mute-stream@3.0.0`
   - Description: Bytes go in, but they don't come out (when muted).
   - Homepage: https://github.com/npm/mute-stream#readme
@@ -946,7 +943,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `aws-ssl-profiles@1.1.2`
   - Description: AWS RDS SSL certificates bundles.
   - Homepage: https://github.com/mysqljs/aws-ssl-profiles#readme
-- `balanced-match@1.0.2`, `balanced-match@4.0.4`
+- `balanced-match@4.0.4`
   - Description: Match balanced character pairs, like "{" and "}"
   - Homepage: https://github.com/juliangruber/balanced-match#readme
 - `base64-js@1.5.1`
@@ -967,7 +964,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `bottleneck@2.19.5`
   - Description: Distributed task scheduler and rate limiter
   - Homepage: https://github.com/SGrondin/bottleneck#readme
-- `brace-expansion@2.1.2`, `brace-expansion@5.0.7`
+- `brace-expansion@5.0.8`
   - Description: Brace expansion as known from sh/bash
   - Homepage: https://github.com/juliangruber/brace-expansion#readme
 - `braces@3.0.3`
@@ -1344,7 +1341,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `js-tokens@4.0.0`, `js-tokens@10.0.0`
   - Description: Tiny JavaScript tokenizer.
   - Homepage: https://github.com/lydell/js-tokens#readme
-- `js-yaml@4.3.0`, `js-yaml@5.2.1`
+- `js-yaml@4.3.0`, `js-yaml@5.2.2`
   - Description: YAML 1.2 parser and serializer
   - Homepage: https://github.com/nodeca/js-yaml#readme
 - `jsesc@3.1.0`
@@ -1550,7 +1547,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `pkg-types@2.3.1`
   - Description: Node.js utilities and TypeScript definitions for `package.json` and `tsconfig.json`
   - Homepage: https://github.com/unjs/pkg-types#readme
-- `postcss@8.5.15`
+- `postcss@8.5.18`
   - Description: Tool for transforming styles with JS plugins
   - Homepage: https://postcss.org/
 - `postgres-array@2.0.0`
@@ -1810,7 +1807,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `util-deprecate@1.0.2`
   - Description: The Node.js `util.deprecate()` function with browser support
   - Homepage: https://github.com/TooTallNate/util-deprecate
-- `valibot@1.2.0`
+- `valibot@1.4.2`
   - Description: The modular and type safe schema library for validating structural data
   - Homepage: https://valibot.dev
 - `vite@8.0.16`
