@@ -12,6 +12,8 @@ const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
 const testPrefix = `outbox-test-${randomUUID()}`;
+const externalIdSeed = Number.parseInt(randomUUID().replaceAll("-", "").slice(0, 12), 16);
+let externalIdOffset = 0;
 
 const action = {
   type: "release_run.enqueue" as const,
@@ -55,7 +57,11 @@ function store(now: Date, leaseSeconds = 60) {
   });
 }
 
-function payload(effectType: ControlPlaneOutboxEffectType, id: string): ControlPlaneOutboxPayload {
+function payload(
+  effectType: ControlPlaneOutboxEffectType,
+  id: string,
+  executionAttemptId = randomUUID(),
+): ControlPlaneOutboxPayload {
   if (effectType === "github.check_run.create") {
     return {
       version: 1,
@@ -89,9 +95,46 @@ function payload(effectType: ControlPlaneOutboxEffectType, id: string): ControlP
       runId: `run-${id}`,
       idempotencyKey: `release-${id}`,
       githubCheckRunId: 789,
-      executionAttemptId: randomUUID(),
+      executionAttemptId,
     },
   };
+}
+
+async function createWorkflowDispatchBinding(id: string, executionAttemptId: string): Promise<string> {
+  externalIdOffset += 2;
+  const installationId = `${testPrefix}-installation-${id}`;
+  const repositoryId = `${testPrefix}-repository-${id}`;
+  const runId = `run-${id}`;
+  const now = at(0).toISOString();
+  await database().query(
+    `insert into installations (
+       id, github_installation_id, account_login, account_type, plan_tier
+     ) values ($1, $2::bigint, $3, 'Organization', 'enterprise')`,
+    [installationId, externalIdSeed + externalIdOffset, `${testPrefix}-${id}`],
+  );
+  await database().query(
+    `insert into repositories (
+       id, installation_id, github_repo_id, owner, name, private, default_branch
+     ) values ($1, $2, $3::bigint, 'octo', $4, false, 'main')`,
+    [repositoryId, installationId, externalIdSeed + externalIdOffset + 1, `repo-${id}`],
+  );
+  await database().query(
+    `insert into release_runs (
+       id, repository_id, idempotency_key, commit_sha, ref, trigger_kind,
+       status, started_at, execution_attempt_id, execution_attempt_started_at
+     ) values (
+       $1, $2, $3, $4, 'refs/heads/main', 'push',
+       'queued', $5::timestamptz, $6, $5::timestamptz
+     )`,
+    [runId, repositoryId, `${testPrefix}:${runId}`, "a".repeat(40), now, executionAttemptId],
+  );
+  await database().query(
+    `insert into release_run_attempts (
+       id, run_id, attempt_number, status, created_at, dispatch_requested_at
+     ) values ($1, $2, 1, 'dispatching', $3::timestamptz, $3::timestamptz)`,
+    [executionAttemptId, runId, now],
+  );
+  return runId;
 }
 
 async function insertEffect(
@@ -110,21 +153,25 @@ async function insertEffect(
   const effectType = input.effectType ?? "github.check_run.create";
   const status = input.status ?? "available";
   const now = input.availableAt ?? at(0);
+  const executionAttemptId = effectType === "github.workflow.dispatch" ? randomUUID() : null;
+  const releaseRunId = executionAttemptId ? await createWorkflowDispatchBinding(id, executionAttemptId) : null;
   await database().query(
     `insert into control_plane_outbox (
-       id, effect_type, payload_version, idempotency_key, payload, priority,
-       status, available_at, attempt_count, max_attempts, lease_owner,
-       lease_expires_at, created_at, delivery_started_at
+       id, release_run_id, execution_attempt_id, effect_type, payload_version,
+       idempotency_key, payload, priority, status, available_at, attempt_count,
+       max_attempts, lease_owner, lease_expires_at, created_at, delivery_started_at
      ) values (
-       $1, $2, 1, $3, $4::jsonb, 100,
-       $5, $6::timestamptz, $7, $8, $9,
-       $10::timestamptz, $11::timestamptz, $12::timestamptz
+       $1, $2, $3, $4, 1,
+       $5, $6::jsonb, 100, $7, $8::timestamptz, $9,
+       $10, $11, $12::timestamptz, $13::timestamptz, $14::timestamptz
      )`,
     [
       id,
+      releaseRunId,
+      executionAttemptId,
       effectType,
       `${testPrefix}:${id}`,
-      JSON.stringify(payload(effectType, id)),
+      JSON.stringify(payload(effectType, id, executionAttemptId ?? undefined)),
       status,
       now.toISOString(),
       input.attemptCount ?? 0,
@@ -141,6 +188,7 @@ async function insertEffect(
 async function cleanup(): Promise<void> {
   if (!executor) return;
   await executor.query("delete from control_plane_outbox where id like $1", [`${testPrefix}%`]);
+  await executor.query("delete from installations where account_login like $1", [`${testPrefix}%`]);
 }
 
 beforeEach(cleanup);
