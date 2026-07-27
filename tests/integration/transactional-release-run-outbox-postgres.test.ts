@@ -39,6 +39,11 @@ function action(commitSha: string) {
   };
 }
 
+type ReleaseAction = ReturnType<typeof action> & {
+  pullRequestDraft?: boolean;
+  pullRequestFromFork?: boolean;
+};
+
 function idSequence(values: string[]): () => string {
   return () => values.shift() ?? `unexpected-${randomUUID()}`;
 }
@@ -52,6 +57,26 @@ function rows(result: unknown): Record<string, unknown>[] {
 async function cleanup(): Promise<void> {
   if (!executor) return;
   await executor.query("delete from installations where id = $1", [installationRowId]);
+}
+
+async function prepareCheckRunCreate(label: string, releaseAction: ReleaseAction, leaseSeconds = 60) {
+  const plannedAt = new Date("2026-07-22T02:30:00.000Z");
+  const runId = `run-${label}-${suffix}`;
+  const createOutboxId = `outbox-${label}-create-${suffix}`;
+  const workerId = `${label}-create-worker-${suffix}`;
+  const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+    id: idSequence([runId, createOutboxId]),
+    now: () => plannedAt,
+    releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+  });
+  await lifecycle.enqueueReleaseRunWithOutbox(releaseAction);
+  const store = createSqlControlPlaneOutboxStore(database(), {
+    now: () => plannedAt,
+    leaseSeconds,
+  });
+  const effect = (await store.claimEffects({ workerId }))[0];
+  if (!effect) throw new Error("expected Check Run creation effect");
+  return { plannedAt, runId, createOutboxId, workerId, store, effect };
 }
 
 async function prepareWorkflowDispatch(label: string, commitSha: string, leaseSeconds = 60) {
@@ -243,13 +268,13 @@ describeDatabase("transactional release-run outbox producer", () => {
     )[0];
     expect(prepared).toEqual({
       run_status: "queued",
-      run_version: 0,
+      run_version: 1,
       github_check_run_id: "987654",
       execution_attempt_id: executionAttemptId,
       attempt_status: "dispatching",
       attempt_version: 0,
       dispatch_status: "available",
-      expected_run_version: 0,
+      expected_run_version: 1,
       expected_attempt_version: 0,
     });
 
@@ -291,13 +316,269 @@ describeDatabase("transactional release-run outbox producer", () => {
     )[0];
     expect(completed).toEqual({
       run_status: "dispatched",
-      run_version: 1,
+      run_version: 2,
       attempt_status: "dispatched",
       attempt_version: 1,
       github_workflow_dispatch_id: "456789",
       outbox_status: "completed",
       persisted_dispatch_id: "456789",
-      transition_events: 2,
+      transition_events: 3,
+    });
+  });
+
+  it("terminalizes safe-mode Check Run creation through a versioned transition event", async () => {
+    const prepared = await prepareCheckRunCreate("safe-mode", {
+      ...action("2".repeat(40)),
+      pullRequestDraft: true,
+    });
+    const completionOutboxId = `outbox-safe-mode-complete-${suffix}`;
+
+    await expect(
+      prepared.store.completeCheckRunCreateEffect({
+        effect: prepared.effect,
+        workerId: prepared.workerId,
+        githubCheckRunId: 700001,
+        dispatchMode: "github-actions",
+        nextOutboxId: completionOutboxId,
+      }),
+    ).resolves.toMatchObject({
+      outcome: "completed",
+      nextEffectType: "github.check_run.complete",
+      nextOutboxId: completionOutboxId,
+    });
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_runs.decision,
+                  release_runs.github_check_run_id,
+                  release_runs.duration_ms,
+                  (select count(*)::int from release_run_attempts where run_id = release_runs.id) as attempts,
+                  (select status from control_plane_outbox where id = $2) as create_status,
+                  (select status from control_plane_outbox where id = $3) as completion_status,
+                  (select expected_run_version::int from control_plane_outbox where id = $3)
+                    as completion_expected_run_version,
+                  (select expected_attempt_version::int from control_plane_outbox where id = $3)
+                    as completion_expected_attempt_version,
+                  (select count(*)::int
+                     from release_run_transition_events
+                    where release_run_id = release_runs.id
+                      and reason_code = 'check_run_safe_mode_completed') as transition_events
+             from release_runs
+            where release_runs.id = $1`,
+          [prepared.runId, prepared.createOutboxId, completionOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      run_status: "completed",
+      run_version: 1,
+      decision: "neutral",
+      github_check_run_id: "700001",
+      duration_ms: 0,
+      attempts: 0,
+      create_status: "completed",
+      completion_status: "available",
+      completion_expected_run_version: null,
+      completion_expected_attempt_version: null,
+      transition_events: 1,
+    });
+  });
+
+  it("keeps runner-disabled Check Run creation queued without changing the run version", async () => {
+    const prepared = await prepareCheckRunCreate("runner-disabled", action("3".repeat(40)));
+
+    await expect(
+      prepared.store.completeCheckRunCreateEffect({
+        effect: prepared.effect,
+        workerId: prepared.workerId,
+        githubCheckRunId: 700002,
+        dispatchMode: "none",
+      }),
+    ).resolves.toEqual({ outcome: "completed" });
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_runs.github_check_run_id,
+                  release_runs.execution_attempt_id,
+                  control_plane_outbox.status as outbox_status,
+                  (select count(*)::int from release_run_transition_events where release_run_id = release_runs.id)
+                    as transition_events
+             from release_runs
+             join control_plane_outbox on control_plane_outbox.id = $2
+            where release_runs.id = $1`,
+          [prepared.runId, prepared.createOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      run_status: "queued",
+      run_version: 0,
+      github_check_run_id: "700002",
+      execution_attempt_id: null,
+      outbox_status: "completed",
+      transition_events: 0,
+    });
+  });
+
+  it("preserves the original Check Run binding and rejects run-version drift without writes", async () => {
+    const prepared = await prepareCheckRunCreate("create-version-stale", action("4".repeat(40)));
+    await database().query("update release_runs set version = version + 1 where id = $1", [prepared.runId]);
+    await database().query(
+      `insert into control_plane_outbox (
+         id, release_run_id, effect_type, payload_version, idempotency_key,
+         payload, priority, status, available_at, attempt_count, max_attempts, created_at
+       )
+       select $2, release_run_id, effect_type, payload_version, idempotency_key,
+              payload, priority, 'available', available_at, 0, max_attempts, created_at
+         from control_plane_outbox
+        where id = $1
+       on conflict (idempotency_key)
+       do update set idempotency_key = excluded.idempotency_key`,
+      [prepared.createOutboxId, `outbox-create-version-replay-${suffix}`],
+    );
+
+    expect(
+      rows(
+        await database().query(
+          "select expected_run_version::int, expected_attempt_version::int from control_plane_outbox where id = $1",
+          [prepared.createOutboxId],
+        ),
+      ),
+    ).toEqual([{ expected_run_version: 0, expected_attempt_version: null }]);
+
+    await expect(
+      prepared.store.completeCheckRunCreateEffect({
+        effect: prepared.effect,
+        workerId: prepared.workerId,
+        githubCheckRunId: 700003,
+        dispatchMode: "github-actions",
+        executionAttemptId: "33333333-3333-4333-8333-333333333333",
+        nextOutboxId: `outbox-create-version-dispatch-${suffix}`,
+      }),
+    ).resolves.toEqual({ outcome: "stale" });
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_runs.github_check_run_id,
+                  release_runs.execution_attempt_id,
+                  control_plane_outbox.status as outbox_status,
+                  (select count(*)::int from release_run_attempts where run_id = release_runs.id) as attempts,
+                  (select count(*)::int from release_run_transition_events where release_run_id = release_runs.id)
+                    as transition_events
+             from release_runs
+             join control_plane_outbox on control_plane_outbox.id = $2
+            where release_runs.id = $1`,
+          [prepared.runId, prepared.createOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      run_status: "queued",
+      run_version: 1,
+      github_check_run_id: null,
+      execution_attempt_id: null,
+      outbox_status: "leased",
+      attempts: 0,
+      transition_events: 0,
+    });
+  });
+
+  it("rejects current-attempt pointer drift before creating another attempt", async () => {
+    const prepared = await prepareCheckRunCreate("create-pointer-stale", action("5".repeat(40)));
+    const driftAttemptId = "44444444-4444-4444-8444-444444444444";
+    await database().query(
+      `insert into release_run_attempts (
+         id, run_id, attempt_number, status, created_at, dispatch_requested_at
+       ) values ($1, $2, 1, 'dispatching', $3::timestamptz, $3::timestamptz)`,
+      [driftAttemptId, prepared.runId, prepared.plannedAt.toISOString()],
+    );
+    await database().query(
+      `update release_runs
+          set execution_attempt_id = $2,
+              execution_attempt_started_at = $3::timestamptz
+        where id = $1`,
+      [prepared.runId, driftAttemptId, prepared.plannedAt.toISOString()],
+    );
+
+    await expect(
+      prepared.store.completeCheckRunCreateEffect({
+        effect: prepared.effect,
+        workerId: prepared.workerId,
+        githubCheckRunId: 700004,
+        dispatchMode: "github-actions",
+        executionAttemptId: "55555555-5555-4555-8555-555555555555",
+        nextOutboxId: `outbox-create-pointer-dispatch-${suffix}`,
+      }),
+    ).resolves.toEqual({ outcome: "stale" });
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.version::int as run_version,
+                  release_runs.github_check_run_id,
+                  release_runs.execution_attempt_id,
+                  control_plane_outbox.status as outbox_status,
+                  (select count(*)::int from release_run_attempts where run_id = release_runs.id) as attempts,
+                  (select count(*)::int from release_run_transition_events where release_run_id = release_runs.id)
+                    as transition_events
+             from release_runs
+             join control_plane_outbox on control_plane_outbox.id = $2
+            where release_runs.id = $1`,
+          [prepared.runId, prepared.createOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      run_version: 0,
+      github_check_run_id: null,
+      execution_attempt_id: driftAttemptId,
+      outbox_status: "leased",
+      attempts: 1,
+      transition_events: 0,
+    });
+  });
+
+  it("quarantines a conflicting persisted Check Run ID without planning another effect", async () => {
+    const prepared = await prepareCheckRunCreate("create-conflict", action("6".repeat(40)));
+    await database().query("update release_runs set github_check_run_id = 700005 where id = $1", [prepared.runId]);
+
+    await expect(
+      prepared.store.completeCheckRunCreateEffect({
+        effect: prepared.effect,
+        workerId: prepared.workerId,
+        githubCheckRunId: 700006,
+        dispatchMode: "none",
+      }),
+    ).resolves.toEqual({ outcome: "check_run_conflict" });
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.github_check_run_id,
+                  release_runs.version::int as run_version,
+                  control_plane_outbox.status as outbox_status,
+                  control_plane_outbox.last_error_class,
+                  control_plane_outbox.external_result ->> 'ensuredGitHubCheckRunId' as ensured_check_run_id,
+                  (select count(*)::int from control_plane_outbox where release_run_id = release_runs.id)
+                    as outbox_count
+             from release_runs
+             join control_plane_outbox on control_plane_outbox.id = $2
+            where release_runs.id = $1`,
+          [prepared.runId, prepared.createOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      github_check_run_id: "700005",
+      run_version: 0,
+      outbox_status: "reconciliation_required",
+      last_error_class: "check_run_conflict",
+      ensured_check_run_id: "700006",
+      outbox_count: 1,
     });
   });
 
@@ -332,7 +613,7 @@ describeDatabase("transactional release-run outbox producer", () => {
           [prepared.dispatchOutboxId],
         ),
       ),
-    ).toEqual([{ expected_run_version: 0, expected_attempt_version: 0 }]);
+    ).toEqual([{ expected_run_version: 1, expected_attempt_version: 0 }]);
 
     await expect(
       prepared.dispatchStore.completeWorkflowDispatchEffect({
@@ -362,12 +643,12 @@ describeDatabase("transactional release-run outbox producer", () => {
       )[0],
     ).toEqual({
       run_status: "queued",
-      run_version: 1,
+      run_version: 2,
       attempt_status: "dispatching",
       attempt_version: 0,
       github_workflow_dispatch_id: null,
       outbox_status: "leased",
-      transition_events: 0,
+      transition_events: 1,
     });
 
     const recoveryAt = new Date(prepared.dispatchAt.valueOf() + 2000);
@@ -419,12 +700,12 @@ describeDatabase("transactional release-run outbox producer", () => {
       )[0],
     ).toEqual({
       run_status: "queued",
-      run_version: 0,
+      run_version: 1,
       attempt_status: "dispatching",
       attempt_version: 1,
       github_workflow_dispatch_id: null,
       outbox_status: "leased",
-      transition_events: 0,
+      transition_events: 1,
     });
   });
 
