@@ -4,6 +4,40 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.19.0](https://github.com/oaslananka/boardreadyops/compare/v1.18.0...v1.19.0) (2026-07-27)
+
+
+### Features
+
+* **ci:** add cloud coverage and monorepo verification ([#230](https://github.com/oaslananka/boardreadyops/issues/230)) ([78e1ab5](https://github.com/oaslananka/boardreadyops/commit/78e1ab530bc8d59b38c14bfb175c7191d9f48ef9))
+* **ci:** add reproducible repository toolchain ([#228](https://github.com/oaslananka/boardreadyops/issues/228)) ([71a694f](https://github.com/oaslananka/boardreadyops/commit/71a694f92ee82454ec18b49e467353288778a738)), closes [#220](https://github.com/oaslananka/boardreadyops/issues/220)
+* **ci:** add synthetic target-repository canaries ([#238](https://github.com/oaslananka/boardreadyops/issues/238)) ([8e73aee](https://github.com/oaslananka/boardreadyops/commit/8e73aeef9c939478f0181c2517eec511d4da42d5))
+* **cloud:** emit control-plane SLI snapshots ([#214](https://github.com/oaslananka/boardreadyops/issues/214)) ([a61e88a](https://github.com/oaslananka/boardreadyops/commit/a61e88a70bc4d0bc693006f9512b79c8d5d23b3c))
+* **core:** add control-plane SLO alerting ([#235](https://github.com/oaslananka/boardreadyops/issues/235)) ([7eb6bb7](https://github.com/oaslananka/boardreadyops/commit/7eb6bb7246e654cc678968cdf8322290a297263a))
+* **core:** add tenant-scoped dead-letter operator API ([#233](https://github.com/oaslananka/boardreadyops/issues/233)) ([d696f20](https://github.com/oaslananka/boardreadyops/commit/d696f207185043340b97a0313136d2fc28856d8b))
+* **core:** add versioned release-run transitions ([#242](https://github.com/oaslananka/boardreadyops/issues/242)) ([9b4e6aa](https://github.com/oaslananka/boardreadyops/commit/9b4e6aa9db51f5bce25a0d7f79a3aae32750adcb))
+* **core:** guard Check Run creation transitions ([#245](https://github.com/oaslananka/boardreadyops/issues/245)) ([4dba216](https://github.com/oaslananka/boardreadyops/commit/4dba2164b6601ce9d35bcf9e39f46b0a4641fc12))
+* **core:** guard release-run supersession ([#247](https://github.com/oaslananka/boardreadyops/issues/247)) ([2266b4c](https://github.com/oaslananka/boardreadyops/commit/2266b4c0891d65508545d6c56398dca0662e6cc9))
+* **core:** guard runner lease transitions ([#249](https://github.com/oaslananka/boardreadyops/issues/249)) ([1aae59b](https://github.com/oaslananka/boardreadyops/commit/1aae59be77b7b0860f322ae28fe1bb6e0be12d9a))
+* **core:** guard runner result transitions ([#248](https://github.com/oaslananka/boardreadyops/issues/248)) ([3ebca30](https://github.com/oaslananka/boardreadyops/commit/3ebca30d0bcee64716d1588e052d7b71a261aa13))
+* **core:** guard workflow dispatch transitions ([#244](https://github.com/oaslananka/boardreadyops/issues/244)) ([710fbbb](https://github.com/oaslananka/boardreadyops/commit/710fbbb4ca33d20b1a6754ffc02044abe3c73613))
+* **core:** guard workflow reconciliation transitions ([#246](https://github.com/oaslananka/boardreadyops/issues/246)) ([9749ce6](https://github.com/oaslananka/boardreadyops/commit/9749ce6e4a9b8c53436ea8cef79adaf545f044a5))
+* **core:** reconcile GitHub Check Run drift ([#236](https://github.com/oaslananka/boardreadyops/issues/236)) ([2d07e25](https://github.com/oaslananka/boardreadyops/commit/2d07e251bfb311454b905a961de5d2c949ab435e))
+* **core:** reconcile missed GitHub workflow callbacks ([#234](https://github.com/oaslananka/boardreadyops/issues/234)) ([1f8253d](https://github.com/oaslananka/boardreadyops/commit/1f8253df545d736f50e297ee91d8d64162527227))
+* **core:** reconcile webhook inbox and lifecycle job drift ([#237](https://github.com/oaslananka/boardreadyops/issues/237)) ([284b483](https://github.com/oaslananka/boardreadyops/commit/284b483ba9186f46f421e056ee16ea2a7ba1b097))
+
+
+### Bug Fixes
+
+* **ci:** harden supply-chain and container policies ([#231](https://github.com/oaslananka/boardreadyops/issues/231)) ([a7b5ed0](https://github.com/oaslananka/boardreadyops/commit/a7b5ed0e359f89f393e35ad1d0ca1f436b599e84))
+* **ci:** make NOTICE verification immutable ([#223](https://github.com/oaslananka/boardreadyops/issues/223)) ([9262984](https://github.com/oaslananka/boardreadyops/commit/9262984cc9bab8d7c1fd303fd26a31b186f06c4e))
+* **ci:** persist solo-maintainer review policy ([#232](https://github.com/oaslananka/boardreadyops/issues/232)) ([1e7adcf](https://github.com/oaslananka/boardreadyops/commit/1e7adcf6109a0a60713ad94a0eb44f2534581597))
+* **deps:** patch OSV dependency findings ([#240](https://github.com/oaslananka/boardreadyops/issues/240)) ([4078861](https://github.com/oaslananka/boardreadyops/commit/40788612c2a84d185f7d3f087c0d2a525295ad87))
+* **deps:** update dependency next to v16.2.11 [security] ([#229](https://github.com/oaslananka/boardreadyops/issues/229)) ([63d0771](https://github.com/oaslananka/boardreadyops/commit/63d0771423e3ac93c312672b22a7052c87a139ec))
+* **governance:** require reviewed main pull requests ([#224](https://github.com/oaslananka/boardreadyops/issues/224)) ([4cae73f](https://github.com/oaslananka/boardreadyops/commit/4cae73ff2aeef6d139aa6df8e2aaf5d2f4bdead8))
+* **governance:** restore signed commit enforcement ([#225](https://github.com/oaslananka/boardreadyops/issues/225)) ([7a44e1f](https://github.com/oaslananka/boardreadyops/commit/7a44e1f988dc808d92492836282a2aceeb173ed2))
+* **security:** add aggregate merge gate ([#226](https://github.com/oaslananka/boardreadyops/issues/226)) ([02038db](https://github.com/oaslananka/boardreadyops/commit/02038dbcac3d5f10595c2365595c04fd50ec783b))
+
 ## [1.18.0](https://github.com/oaslananka/boardreadyops/compare/v1.17.0...v1.18.0) (2026-07-22)
 
 
