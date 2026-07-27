@@ -30,7 +30,7 @@ const dependencies: ResultRouteDependencies = {
     expectedRunId === runId && expectedAttemptId === attemptId,
 };
 
-function callbackRequest(): Request {
+function callbackRequest(overrides: Record<string, unknown> = {}): Request {
   const url = new URL("https://boardreadyops.test/api/v1/runs/result");
   url.searchParams.set("run_id", runId);
   url.searchParams.set("attempt_id", attemptId);
@@ -63,6 +63,7 @@ function callbackRequest(): Request {
       ],
       metrics: { durationMs: 1250, readinessScore: 82 },
       reportLinks: [{ label: "HTML report", url: "https://reports.example.test/run-123/index.html" }],
+      ...overrides,
     }),
   });
 }
@@ -110,9 +111,21 @@ describeDatabase("runner result PostgreSQL integration", () => {
     expect(replayed.status).toBe(200);
     await expect(replayed.json()).resolves.toMatchObject({ ok: true, status: "replayed", runId });
 
+    const conflicting = await handleResultRequest(
+      callbackRequest({ status: "failed", decision: "error", findings: [] }),
+      dependencies,
+    );
+    expect(conflicting.status).toBe(409);
+    await expect(conflicting.json()).resolves.toMatchObject({
+      ok: false,
+      error: "terminal result conflicts with the persisted result",
+      runId,
+      executionAttemptId: attemptId,
+    });
+
     const runRows = rows(
       await executor.query(
-        `select status, decision, completed_at, duration_ms, terminal_result_digest
+        `select status, version::int as version, decision, completed_at, duration_ms, terminal_result_digest
        from release_runs where id = $1`,
         [runId],
       ),
@@ -120,11 +133,57 @@ describeDatabase("runner result PostgreSQL integration", () => {
     expect(runRows).toEqual([
       expect.objectContaining({
         status: "completed",
+        version: 1,
         decision: "fail",
         completed_at: new Date(completedAt),
         duration_ms: 1250,
         terminal_result_digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
       }),
+    ]);
+
+    const attemptRows = rows(
+      await executor.query(
+        `select status, version::int as version, completed_at, result_digest
+           from release_run_attempts
+          where id = $1`,
+        [attemptId],
+      ),
+    );
+    expect(attemptRows).toEqual([
+      expect.objectContaining({
+        status: "completed",
+        version: 1,
+        completed_at: new Date(completedAt),
+        result_digest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      }),
+    ]);
+
+    const transitionRows = rows(
+      await executor.query(
+        `select entity_type, from_status, to_status, from_version::int, to_version::int, reason_code
+           from release_run_transition_events
+          where release_run_id = $1
+          order by entity_type`,
+        [runId],
+      ),
+    );
+    expect(transitionRows).toEqual([
+      {
+        entity_type: "execution_attempt",
+        from_status: "in_progress",
+        to_status: "completed",
+        from_version: 0,
+        to_version: 1,
+        reason_code: "runner_result_completed",
+      },
+      {
+        entity_type: "release_run",
+        from_status: "running",
+        to_status: "completed",
+        from_version: 0,
+        to_version: 1,
+        reason_code: "runner_result_completed",
+      },
     ]);
 
     const resultRows = rows(
@@ -186,6 +245,223 @@ describeDatabase("runner result PostgreSQL integration", () => {
     );
     expect(remainingRows).toEqual([{ installations: 0, repositories: 0, runs: 0, audit_events: 0 }]);
   });
+  it("fails closed on stale runner-result run and attempt versions without metadata or events", async () => {
+    if (!executor) throw new Error("DATABASE_URL is required");
+    const staleInstallationId = "99999999-9999-4999-8999-999999999991";
+    const staleRepositoryId = "99999999-9999-4999-8999-999999999992";
+    const staleRunId = "99999999-9999-4999-8999-999999999993";
+    const staleAttemptId = "99999999-9999-4999-8999-999999999994";
+    const digest = "b".repeat(64);
+
+    await executor.query("delete from installations where id = $1", [staleInstallationId]);
+    await executor.query(
+      `insert into installations (id, github_installation_id, account_login, account_type)
+       values ($1, 33333, 'stale-org', 'Organization')`,
+      [staleInstallationId],
+    );
+    await executor.query(
+      `insert into repositories (id, installation_id, github_repo_id, owner, name, default_branch)
+       values ($1, $2, 33334, 'stale-org', 'stale-board', 'main')`,
+      [staleRepositoryId, staleInstallationId],
+    );
+    await executor.query(
+      `insert into release_runs (
+         id, repository_id, commit_sha, ref, trigger_kind, status,
+         execution_attempt_id, execution_attempt_started_at, started_at
+       ) values ($1, $2, $3, 'refs/heads/main', 'manual', 'running', $4, $5::timestamptz, $5::timestamptz)`,
+      [staleRunId, staleRepositoryId, "3".repeat(40), staleAttemptId, "2026-07-12T13:00:00.000Z"],
+    );
+    await executor.query(
+      `insert into release_run_attempts (
+         id, run_id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at, started_at
+       ) values ($1, $2, 1, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
+      [staleAttemptId, staleRunId, "2026-07-12T13:00:00.000Z"],
+    );
+
+    const staleRun = rows(
+      await executor.query(
+        `select * from boardreadyops_apply_runner_result_state(
+           $1, true, 'running', 1, $2, 'in_progress', 0,
+           'completed', 'pass', $3::timestamptz, $4, $4
+         )`,
+        [staleRunId, staleAttemptId, "2026-07-12T13:01:00.000Z", digest],
+      ),
+    );
+    expect(staleRun[0]?.transition_outcome).toBe("stale");
+
+    const staleAttempt = rows(
+      await executor.query(
+        `select * from boardreadyops_apply_runner_result_state(
+           $1, true, 'running', 0, $2, 'in_progress', 1,
+           'completed', 'pass', $3::timestamptz, $4, $4
+         )`,
+        [staleRunId, staleAttemptId, "2026-07-12T13:01:00.000Z", digest],
+      ),
+    );
+    expect(staleAttempt[0]?.transition_outcome).toBe("stale");
+
+    expect(
+      rows(
+        await executor.query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_runs.decision,
+                  release_run_attempts.status as attempt_status,
+                  release_run_attempts.version::int as attempt_version,
+                  release_run_attempts.result_digest,
+                  (select count(*)::int from release_run_transition_events where release_run_id = $1) as events
+             from release_runs
+             join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
+            where release_runs.id = $1`,
+          [staleRunId],
+        ),
+      )[0],
+    ).toEqual({
+      run_status: "running",
+      run_version: 0,
+      decision: null,
+      attempt_status: "in_progress",
+      attempt_version: 0,
+      result_digest: null,
+      events: 0,
+    });
+
+    await executor.query("delete from installations where id = $1", [staleInstallationId]);
+  });
+
+  it("maps running and no-attempt callbacks while emitting events only for changed entities", async () => {
+    if (!executor) throw new Error("DATABASE_URL is required");
+    const progressInstallationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
+    const progressRepositoryId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
+    const progressRunId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3";
+    const progressAttemptId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4";
+    const noAttemptRunId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5";
+    const digest = "c".repeat(64);
+
+    await executor.query("delete from installations where id = $1", [progressInstallationId]);
+    await executor.query(
+      `insert into installations (id, github_installation_id, account_login, account_type)
+       values ($1, 44444, 'progress-org', 'Organization')`,
+      [progressInstallationId],
+    );
+    await executor.query(
+      `insert into repositories (id, installation_id, github_repo_id, owner, name, default_branch)
+       values ($1, $2, 44445, 'progress-org', 'progress-board', 'main')`,
+      [progressRepositoryId, progressInstallationId],
+    );
+    await executor.query(
+      `insert into release_runs (
+         id, repository_id, commit_sha, ref, trigger_kind, status,
+         execution_attempt_id, execution_attempt_started_at, started_at
+       ) values
+         ($1, $3, $4, 'refs/heads/main', 'manual', 'dispatched', $2, $6::timestamptz, $6::timestamptz),
+         ($5, $3, $7, 'refs/heads/main', 'manual', 'queued', null, null, $6::timestamptz)`,
+      [
+        progressRunId,
+        progressAttemptId,
+        progressRepositoryId,
+        "4".repeat(40),
+        noAttemptRunId,
+        "2026-07-12T14:00:00.000Z",
+        "5".repeat(40),
+      ],
+    );
+    await executor.query(
+      `insert into release_run_attempts (
+         id, run_id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at
+       ) values ($1, $2, 1, 'dispatching', $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
+      [progressAttemptId, progressRunId, "2026-07-12T14:00:00.000Z"],
+    );
+
+    const progress = rows(
+      await executor.query(
+        `select transition_outcome,
+                run_status,
+                run_version::int as run_version,
+                attempt_status,
+                attempt_version::int as attempt_version,
+                run_changed,
+                attempt_changed
+           from boardreadyops_apply_runner_result_state(
+             $1, true, 'dispatched', 0, $2, 'dispatching', 0,
+             'running', null, $3::timestamptz, null, $4
+           )`,
+        [progressRunId, progressAttemptId, "2026-07-12T14:01:00.000Z", digest],
+      ),
+    );
+    expect(progress[0]).toMatchObject({
+      transition_outcome: "applied",
+      run_status: "running",
+      run_version: 1,
+      attempt_status: "in_progress",
+      attempt_version: 1,
+      run_changed: true,
+      attempt_changed: true,
+    });
+
+    const noAttempt = rows(
+      await executor.query(
+        `select transition_outcome,
+                run_status,
+                run_version::int as run_version,
+                attempt_status,
+                attempt_version::int as attempt_version,
+                run_changed,
+                attempt_changed
+           from boardreadyops_apply_runner_result_state(
+             $1, true, 'queued', 0, null, null, null,
+             'running', null, $2::timestamptz, null, $3
+           )`,
+        [noAttemptRunId, "2026-07-12T14:01:00.000Z", digest],
+      ),
+    );
+    expect(noAttempt[0]).toMatchObject({
+      transition_outcome: "applied",
+      run_status: "running",
+      run_version: 1,
+      attempt_status: null,
+      attempt_version: null,
+      run_changed: true,
+      attempt_changed: false,
+    });
+
+    expect(
+      rows(
+        await executor.query(
+          `select release_run_id, entity_type, from_status, to_status, reason_code
+             from release_run_transition_events
+            where release_run_id = any($1::text[])
+            order by release_run_id, entity_type`,
+          [[progressRunId, noAttemptRunId]],
+        ),
+      ),
+    ).toEqual([
+      {
+        release_run_id: progressRunId,
+        entity_type: "execution_attempt",
+        from_status: "dispatching",
+        to_status: "in_progress",
+        reason_code: "runner_result_running",
+      },
+      {
+        release_run_id: progressRunId,
+        entity_type: "release_run",
+        from_status: "dispatched",
+        to_status: "running",
+        reason_code: "runner_result_running",
+      },
+      {
+        release_run_id: noAttemptRunId,
+        entity_type: "release_run",
+        from_status: "queued",
+        to_status: "running",
+        reason_code: "runner_result_running",
+      },
+    ]);
+
+    await executor.query("delete from installations where id = $1", [progressInstallationId]);
+  });
+
   it("records retry attempts separately and supersedes the active attempt with a newer commit", async () => {
     if (!executor) throw new Error("DATABASE_URL is required");
     const lifecycleInstallationId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

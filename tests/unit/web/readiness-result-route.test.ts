@@ -315,17 +315,21 @@ describe("readiness result route authentication and publication", () => {
     expect(sql).toContain("deleted_artifacts as");
     expect(sql).toContain("inserted_artifacts as");
     expect(sql).toContain("updated_attempt as");
-    expect(sql).toContain("update release_run_attempts");
-    expect(sql).toContain("'in_progress'");
+    expect(sql).toContain("boardreadyops_apply_runner_result_state");
+    expect(sql).toContain("classified.version");
+    expect(sql).toContain("classified.attempt_version");
+    expect(sql).toContain("classified.persistence_outcome = 'accepted'");
+    expect(sql).toContain("effective.effective_outcome");
+    expect(sql).not.toMatch(/\bupdate release_runs\b/u);
+    expect(sql).not.toContain("update release_run_attempts");
     expect(sql).toContain("insert into release_run_results");
     expect(sql).toContain("runner.result.persisted");
     expect(sql).toContain("jsonb_object_keys($10::jsonb)");
     expect(sql).not.toContain("jsonb_object_length");
     expect(sql).toContain("jsonb_to_recordset($6::jsonb)");
     expect(sql).toContain("jsonb_to_recordset($14::jsonb)");
-    expect(sql).toContain("coalesce(release_runs.completed_at");
-    expect(sql).toContain("release_runs.terminal_result_digest");
-    expect(sql).toMatch(/coalesce\(\s+release_runs\.duration_ms/u);
+    expect(sql).toContain("coalesce(updated.completed_at, effective.completed_at)");
+    expect(sql).toContain("existing.terminal_result_digest");
     expect(params.slice(0, 6)).toEqual([
       "run-123",
       executionAttemptId,
