@@ -83,6 +83,7 @@ describe("dependency and security automation configuration", () => {
       blockExoticSubdeps?: boolean;
       minimumReleaseAgeExclude?: string[];
       trustPolicyExclude?: string[];
+      overrides?: Record<string, string>;
     };
     const renovate = JSON.parse(await repositoryFile("renovate.json")) as {
       packageRules?: Array<{ minimumReleaseAge?: string | false }>;
@@ -100,9 +101,20 @@ describe("dependency and security automation configuration", () => {
         "renovate@43.272.4",
         "@renovatebot/osv-offline-db@3.0.9",
         "@renovatebot/osv-offline@3.0.9",
+        "brace-expansion@5.0.8",
+        "js-yaml@5.2.2",
+        "postcss@8.5.18",
+        "valibot@1.4.2",
       ]),
     );
     expect(workspace.trustPolicyExclude).toEqual(["@yarnpkg/libzip@3.2.2", "semver@6.3.1"]);
+    expect(workspace.overrides).toMatchObject({
+      "archiver>readdir-glob": "3.0.0",
+      "brace-expansion@>=5 <5.0.8": "5.0.8",
+      postcss: "8.5.18",
+      valibot: "1.4.2",
+    });
+    expect(workspace.overrides).not.toHaveProperty("brace-expansion@>=2 <2.1.2");
     expect(renovate.packageRules).not.toHaveLength(0);
     for (const rule of renovate.packageRules ?? []) {
       expect(rule.minimumReleaseAge).toBe("7 days");
@@ -192,9 +204,10 @@ describe("dependency and security automation configuration", () => {
     const securityDocs = await repositoryFile("docs/security-automation.md");
     const workspace = await repositoryFile("pnpm-workspace.yaml");
 
-    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.1");
-    expect(workspace).toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
-    expect(workspace).toContain("brace-expansion@>=5 <5.0.7: 5.0.7");
+    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.2");
+    expect(workspace).not.toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
+    expect(workspace).toContain("'archiver>readdir-glob': 3.0.0");
+    expect(workspace).toContain("brace-expansion@>=5 <5.0.8: 5.0.8");
     expect(workspace).toContain("fast-uri@>=3 <3.1.4: 3.1.4");
     expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.0");
     expect(workspace).toContain("linkify-it@>=5 <5.0.2: 5.0.2");

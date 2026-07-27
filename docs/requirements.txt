@@ -4,4 +4,4 @@ mike==2.2.0
 
 # Pin transitive deps for OSV scanner vulnerabilities
 idna>=3.15
-pymdown-extensions>=10.21.3
+pymdown-extensions>=11.0.0
