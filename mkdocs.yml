@@ -117,6 +117,7 @@ nav:
           - GitHub Actions Execution: deployment/github-actions-execution.md
           - Customer Self-hosted Runner: deployment/self-hosted-runner.md
       - Control-plane Reconciliation: operations/control-plane-reconciliation.md
+      - Synthetic Target Canaries: operations/synthetic-target-repository-canaries.md
       - Testing: testing.md
       - Accessibility: accessibility.md
       - Branch Protection: branch-protection.md

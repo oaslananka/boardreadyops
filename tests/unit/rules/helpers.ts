@@ -7,12 +7,21 @@ import { runPipeline } from "../../../src/core/pipeline.js";
 import type { RunResult } from "../../../src/core/result.js";
 
 const fixtureRoot = path.resolve("tests/fixtures/projects");
+type RunPipelineInput = NonNullable<Parameters<typeof runPipeline>[0]>;
 
-export async function runFixture(
-  fixture: string,
-  options: Partial<Parameters<typeof runPipeline>[0]> = {},
-): Promise<RunResult> {
-  return runPipeline({ path: path.join(fixtureRoot, fixture), failOn: "never", ...options });
+export async function runFixture(fixture: string, options: Omit<RunPipelineInput, "path"> = {}): Promise<RunResult> {
+  const temp = await copyFixture(fixture);
+  const outcome = await runPipeline({ ...options, path: temp, failOn: options.failOn ?? "never" }).then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+  try {
+    await fs.rm(temp, { recursive: true, force: true });
+  } catch (error) {
+    if (outcome.ok) throw error;
+  }
+  if (!outcome.ok) throw outcome.error;
+  return outcome.value;
 }
 
 export function expectRule(result: RunResult, ruleId: string, count?: number): Finding[] {

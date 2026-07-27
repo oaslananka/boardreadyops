@@ -1,0 +1,7 @@
+paths:
+  .github/workflows/synthetic-target-repository-canary.yml:
+    ignore:
+      # GitHub.com exposes these reusable-workflow job identity fields, but
+      # actionlint v1.7.12 does not yet include them in its job context schema.
+      - workflow_repository
+      - workflow_sha

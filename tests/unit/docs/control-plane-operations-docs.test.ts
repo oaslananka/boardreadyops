@@ -73,4 +73,51 @@ ${operations}`;
     expect(combined).toContain("does not affect worker readiness");
     expect(combined).toContain("worker restart resets");
   });
+  it("documents public and private synthetic target-repository canaries", () => {
+    const canaryPath = "docs/operations/synthetic-target-repository-canaries.md";
+    expect(fs.existsSync(canaryPath)).toBe(true);
+    const canaries = fs.existsSync(canaryPath) ? fs.readFileSync(canaryPath, "utf8") : "";
+    const execution = fs.readFileSync("docs/deployment/github-actions-execution.md", "utf8");
+    const reconciliation = fs.readFileSync(documentationPath, "utf8");
+    const navigation = fs.readFileSync("mkdocs.yml", "utf8");
+
+    expect(canaries).toContain("oaslananka/boardreadyops-canary-public");
+    expect(canaries).toContain("oaslananka/boardreadyops-canary-private");
+    expect(canaries).toContain("17 */6 * * *");
+    expect(canaries).toContain("47 */6 * * *");
+    expect(canaries).toContain("workflow_dispatch:");
+    expect(canaries).toContain(
+      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@31466185759f0a4de8d9853c81dc564fb5b4cfcc",
+    );
+    expect(canaries).toContain("actions: read");
+    expect(canaries).toContain("checks: read");
+    expect(canaries).toContain("contents: write");
+    expect(canaries).toContain("pull-requests: write");
+    expect(canaries).toContain("no long-lived personal access token");
+    expect(canaries).toContain("no new GitHub App permission");
+    expect(canaries).toContain("approval-required state");
+    expect(canaries).toContain("does not depend on those ordinary pull request workflows");
+    expect(canaries).toContain("exact nonce SHA");
+    expect(canaries).toContain("workflow_dispatch");
+    expect(canaries).toContain("GitHub status");
+    expect(canaries).toContain("/health/ready");
+    expect(canaries).toContain("worker.control_plane_slo_evaluation");
+    expect(canaries).toContain("worker.reconciliation_terminal");
+    for (const reason of [
+      "canary_pr_update_failed",
+      "canary_check_run_missing",
+      "canary_check_run_timeout",
+      "canary_check_run_failed",
+      "canary_check_run_binding_invalid",
+      "canary_workflow_missing",
+      "canary_workflow_timeout",
+      "canary_workflow_failed",
+      "canary_github_api_unavailable",
+    ]) {
+      expect(canaries).toContain(reason);
+    }
+    expect(navigation).toContain("Synthetic Target Canaries: operations/synthetic-target-repository-canaries.md");
+    expect(execution).toContain("synthetic-target-repository-canaries.md");
+    expect(reconciliation).toContain("synthetic-target-repository-canaries.md");
+  });
 });
