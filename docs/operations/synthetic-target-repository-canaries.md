@@ -20,12 +20,12 @@ They do not call a control-plane database or internal API directly. A direct pro
 
 ## Repository inventory
 
-Provision exactly these repositories under the `oaslananka` account:
+Provision exactly these repositories under the `oaslananka-dev` organization:
 
 | Repository | Required visibility | Schedule |
 | --- | --- | --- |
-| `oaslananka/boardreadyops-canary-public` | public | `17 */6 * * *` |
-| `oaslananka/boardreadyops-canary-private` | private | `47 */6 * * *` |
+| `oaslananka-dev/boardreadyops-canary-public` | public | `17 */6 * * *` |
+| `oaslananka-dev/boardreadyops-canary-private` | private | `47 */6 * * *` |
 
 The stagger keeps the two observations from starting together while providing four public and four private observations per day.
 
@@ -45,7 +45,9 @@ The hardware project must be small, deterministic, and expected to pass. A delib
 
 ## Security boundary
 
-The production BoardReadyOps GitHub App receives no new GitHub App permission. It keeps the ordinary target-repository profile: Metadata read, Pull requests read, Checks read/write, and Actions read/write. The App still has no Contents write permission.
+The production BoardReadyOps GitHub App receives no new GitHub App permission. It keeps the ordinary target-repository profile: Metadata read, Pull requests read, Checks read/write, and Actions read/write. The App still has no Contents write permission. No organization or account permissions are permitted.
+
+Before installation, verify the live App registration rather than relying only on repository documentation. The requested permissions and subscribed events must match the deployed execution profile in [GitHub App permissions and webhook subscriptions](../security/github-app-permissions.md). Do not install the App when the live registration requests Contents, repository administration, organization, account, secret, workflow, or unrelated write access. Stop commissioning and keep [#88](https://github.com/oaslananka/boardreadyops/issues/88) open until the external registration is reduced and reviewed.
 
 The scheduled canary workflow uses the caller repository's short-lived `GITHUB_TOKEN` with only:
 
@@ -61,11 +63,11 @@ There is no long-lived personal access token, callback secret, GitHub App privat
 
 When this token opens or updates the persistent pull request, GitHub creates the `pull_request` event. Ordinary pull request workflows may enter an approval-required state. The canary does not depend on those ordinary pull request workflows; it depends on the BoardReadyOps GitHub App webhook and the separate target-repository `workflow_dispatch` started by the control plane.
 
-Private source, workflow logs, and artifacts remain in `oaslananka/boardreadyops-canary-private`. Canary summaries contain repository identity, expected SHA, elapsed time, stable reason code, and known Check Run or workflow URLs only. They do not contain source, findings, artifact names, webhook payloads, credentials, OIDC claims, installation tokens, or raw GitHub response bodies.
+Private source, workflow logs, and artifacts remain in `oaslananka-dev/boardreadyops-canary-private`. Canary summaries contain repository identity, expected SHA, elapsed time, stable reason code, and known Check Run or workflow URLs only. They do not contain source, findings, artifact names, webhook payloads, credentials, OIDC claims, installation tokens, or raw GitHub response bodies.
 
 ## Public repository wrapper
 
-Create `.github/workflows/boardreadyops-canary.yml` in `oaslananka/boardreadyops-canary-public`:
+Create `.github/workflows/boardreadyops-canary.yml` in `oaslananka-dev/boardreadyops-canary-public`:
 
 ```yaml
 name: BoardReadyOps Public Synthetic Canary
@@ -87,14 +89,14 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@31466185759f0a4de8d9853c81dc564fb5b4cfcc # BoardReadyOps canary workflow
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87 # BoardReadyOps canary workflow
     with:
       visibility: public
 ```
 
 ## Private repository wrapper
 
-Create `.github/workflows/boardreadyops-canary.yml` in `oaslananka/boardreadyops-canary-private`:
+Create `.github/workflows/boardreadyops-canary.yml` in `oaslananka-dev/boardreadyops-canary-private`:
 
 ```yaml
 name: BoardReadyOps Private Synthetic Canary
@@ -116,7 +118,7 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@31466185759f0a4de8d9853c81dc564fb5b4cfcc # BoardReadyOps canary workflow
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87 # BoardReadyOps canary workflow
     with:
       visibility: private
 ```
@@ -128,15 +130,16 @@ Do not change the pin to a branch or tag. Upgrade it only after reviewing a newe
 For each repository:
 
 1. Verify the repository name and public/private visibility exactly match the inventory table.
-2. Install the production BoardReadyOps GitHub App on that repository.
-3. Confirm the App installation has Pull requests read, Checks read/write, and Actions read/write.
-4. Add the reviewed `readiness-runner.yml` to the default branch at `.github/workflows/readiness-runner.yml`.
-5. Add a minimal passing KiCad project and `boardreadyops.yml` to the default branch.
-6. Add `canary/nonce.txt` with an initial informational value.
-7. Enable GitHub Actions for the repository and allow the pinned actions used by both workflows.
-8. Enable the repository setting that allows GitHub Actions to create and approve pull requests.
-9. Add the appropriate wrapper shown above.
-10. Confirm the default branch is `main` and no existing branch or pull request uses the fixed `boardreadyops-canary` identity for another purpose.
+2. Verify the live App registration matches the documented least-privilege profile and has no organization or account permissions.
+3. Install the production BoardReadyOps GitHub App on only the two canary repositories.
+4. Confirm the installation has Metadata read, Pull requests read, Checks read/write, and Actions read/write, with no Contents permission.
+5. Add the reviewed `readiness-runner.yml` to the default branch at `.github/workflows/readiness-runner.yml`.
+6. Add a minimal passing KiCad project and `boardreadyops.yml` to the default branch.
+7. Add `canary/nonce.txt` with an initial informational value.
+8. Enable GitHub Actions for the repository and allow the pinned actions used by both workflows.
+9. Enable the repository setting that allows GitHub Actions to create and approve pull requests. If an organization policy blocks this repository setting, change the organization policy only after checking the effective setting on every other organization repository.
+10. Add the appropriate wrapper shown above.
+11. Confirm the default branch is `main` and no existing branch or pull request uses the fixed `boardreadyops-canary` identity for another purpose.
 
 The canary workflow creates or reuses the `boardreadyops-canary` branch and a persistent pull request titled `chore: BoardReadyOps synthetic canary`. Every run creates one commit whose parent is the current `main` commit and changes only `canary/nonce.txt`.
 
