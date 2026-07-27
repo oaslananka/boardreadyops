@@ -83,6 +83,25 @@ async function createReleaseRun(tenant: TenantFixture): Promise<string> {
   return runId;
 }
 
+async function bindDispatchAttempt(runId: string): Promise<string> {
+  const executionAttemptId = randomUUID();
+  const startedAt = at(-1).toISOString();
+  await database().query(
+    `insert into release_run_attempts (
+       id, run_id, attempt_number, status, created_at, dispatch_requested_at
+     ) values ($1, $2, 1, 'dispatching', $3::timestamptz, $3::timestamptz)`,
+    [executionAttemptId, runId, startedAt],
+  );
+  await database().query(
+    `update release_runs
+        set execution_attempt_id = $2,
+            execution_attempt_started_at = $3::timestamptz
+      where id = $1`,
+    [runId, executionAttemptId, startedAt],
+  );
+  return executionAttemptId;
+}
+
 async function createDeadLetterJob(tenant: TenantFixture): Promise<string> {
   const inboxId = randomUUID();
   const jobId = randomUUID();
@@ -194,21 +213,22 @@ describeDatabase("control-plane PostgreSQL reconciliation operations", () => {
   it("never replays a workflow dispatch with uncertain delivery", async () => {
     const tenant = await createTenant("uncertain-dispatch");
     const runId = await createReleaseRun(tenant);
+    const executionAttemptId = await bindDispatchAttempt(runId);
     const outboxId = randomUUID();
     const now = at(0);
     await database().query(
       `insert into control_plane_outbox (
-         id, release_run_id, effect_type, idempotency_key, payload,
+         id, release_run_id, execution_attempt_id, effect_type, idempotency_key, payload,
          status, available_at, attempt_count, max_attempts, created_at,
          delivery_started_at, completed_at, last_error_class, last_error_message
        ) values (
-         $1, $2, 'github.workflow.dispatch', $3,
+         $1, $2, $3, 'github.workflow.dispatch', $4,
          jsonb_build_object('version', 1, 'type', 'github.workflow.dispatch', 'input', '{}'::jsonb),
-         'reconciliation_required', $4::timestamptz, 1, 8, $4::timestamptz,
-         $4::timestamptz, $4::timestamptz, 'delivery_uncertain',
+         'reconciliation_required', $5::timestamptz, 1, 8, $5::timestamptz,
+         $5::timestamptz, $5::timestamptz, 'delivery_uncertain',
          'Delivery started but the authoritative workflow state is unknown.'
        )`,
-      [outboxId, runId, `${testPrefix}:${outboxId}`, now.toISOString()],
+      [outboxId, runId, executionAttemptId, `${testPrefix}:${outboxId}`, now.toISOString()],
     );
 
     const operationId = randomUUID();
