@@ -65,6 +65,11 @@
       "types": "./src/control-plane-operations-store.ts",
       "import": "./src/control-plane-operations-store.ts",
       "default": "./src/control-plane-operations-store.ts"
+    },
+    "./control-plane-run-transition-store": {
+      "types": "./src/control-plane-run-transition-store.ts",
+      "import": "./src/control-plane-run-transition-store.ts",
+      "default": "./src/control-plane-run-transition-store.ts"
     }
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { createControlPlaneRunTransitionStore } from "../../../packages/db/src/control-plane-run-transition-store.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
@@ -5,6 +6,13 @@ import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.
 const transitionedAt = new Date("2026-07-27T05:00:00.000Z");
 
 describe("control-plane run transition store", () => {
+  it("is exported through the database package boundary", async () => {
+    const manifest = JSON.parse(await readFile("packages/db/package.json", "utf8")) as {
+      exports?: Record<string, unknown>;
+    };
+    expect(manifest.exports).toHaveProperty("./control-plane-run-transition-store");
+  });
+
   it("binds a guarded run and current-attempt transition", async () => {
     const executor: SqlQueryExecutor = {
       async query(sql, params) {

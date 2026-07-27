@@ -226,14 +226,24 @@ declare
   v_attempt_from_version bigint;
   v_attempt_to_version bigint;
 begin
-  select release_runs, repositories.installation_id, release_runs.repository_id
-    into v_run, v_installation_id, v_repository_id
+  select release_runs.*
+    into v_run
     from release_runs
-    join repositories on repositories.id = release_runs.repository_id
    where release_runs.id = p_release_run_id
    for update of release_runs;
 
   if v_run.id is null then
+    return query
+    select 'not_found'::text, null::text, null::bigint, null::text, null::bigint;
+    return;
+  end if;
+
+  select repositories.installation_id, repositories.id
+    into v_installation_id, v_repository_id
+    from repositories
+   where repositories.id = v_run.repository_id;
+
+  if v_installation_id is null then
     return query
     select 'not_found'::text, null::text, null::bigint, null::text, null::bigint;
     return;
@@ -260,7 +270,7 @@ begin
   end if;
 
   if p_expected_execution_attempt_id is not null then
-    select release_run_attempts
+    select release_run_attempts.*
       into v_attempt
       from release_run_attempts
      where release_run_attempts.id = p_expected_execution_attempt_id
