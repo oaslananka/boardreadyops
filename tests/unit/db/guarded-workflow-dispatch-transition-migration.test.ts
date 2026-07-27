@@ -39,6 +39,8 @@ describe("guarded workflow-dispatch transition migration", () => {
     expect(sql).toContain("new.effect_type <> 'github.workflow.dispatch'");
     expect(sql).toContain("release_runs.execution_attempt_id = release_run_attempts.id");
     expect(sql).toContain("release_run_attempts.run_id = release_runs.id");
+    expect(sql).toContain("existing.idempotency_key = new.idempotency_key");
+    expect(sql).toContain("if found then");
     expect(sql).toContain("new.expected_run_version := v_run_version");
     expect(sql).toContain("new.expected_attempt_version := v_attempt_version");
     expect(sql).toContain("before insert on control_plane_outbox");
