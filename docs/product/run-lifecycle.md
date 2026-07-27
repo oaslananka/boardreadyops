@@ -74,6 +74,25 @@ Schema version 23 adds an explicit optimistic-concurrency version to each logica
 
 Every applied entity change increments its version exactly once. `release_run_transition_events` records tenant scope, entity identity, from/to state, from/to version, reason code, and timestamp. The table is append-only and contains no source, findings, artifacts, webhook payloads, credentials, or raw errors.
 
+
+## Guarded runner lease policy
+
+Schema version 29 binds each runner lease to the authoritative lifecycle snapshot it owns:
+
+- expected logical-run status and version;
+- expected execution-attempt status and version; and
+- the logical run's current execution-attempt pointer.
+
+A successful lease claim creates a version-zero execution attempt, changes the authoritative attempt pointer, increments the logical-run version once, and appends a `runner_lease_claimed` transition event. Managed and self-hosted runner protocol request and response contracts remain unchanged.
+
+Heartbeats may update lease expiry, stage, progress, message, and attempt heartbeat metadata without creating a lifecycle transition. When the heartbeat advances the attempt from `in_progress` to `uploading_artifacts` or `reporting`, the attempt version increments exactly once, one `runner_lease_heartbeat` event is appended, and the lease snapshot advances to the new attempt version. A repeated heartbeat for the same lifecycle state produces no version increment or transition event.
+
+Relinquish and valid lease expiry are bounded retry paths. They terminalize or stale the current attempt, return the logical run from `running` to `queued`, increment both changed entity versions, and append one tenant-scoped event per entity with reason `runner_lease_relinquished` or `runner_lease_expired`.
+
+Run-version drift, attempt-version drift, or current-attempt pointer drift fails closed. A stale expired lease may be closed operationally so it cannot be reused, but it cannot change the newer logical-run or attempt lifecycle state and cannot append lifecycle transition events for that newer state.
+
 ## Phased adoption
 
-The schema and typed `ControlPlaneRunTransitionStore` are additive foundations. Existing lifecycle, outbox, callback, supersession, and reconciliation writers remain compatible while they are migrated in focused follow-up slices. Until those callers are migrated, the versioned function protects only operations that explicitly use the new store; it is not yet the sole write path for every release-run mutation.
+Schemas 24 through 29 have moved workflow-dispatch completion, Check Run creation, workflow reconciliation, newer-commit supersession, runner-result persistence, and runner lease lifecycle changes onto expected-state/version/current-attempt guards. These paths now increment versions and append transition evidence at the authoritative PostgreSQL boundary.
+
+Issue #23 remains open for the final production-writer audit: retire or migrate the legacy `LifecycleStore` direct writers, verify no later runner protocol definition bypasses the guarded functions, and complete dashboard/metrics/audit surfacing for transition conflicts and recovery outcomes. Historical SQL in earlier migrations is not treated as active behavior when a later migration replaces the function.
