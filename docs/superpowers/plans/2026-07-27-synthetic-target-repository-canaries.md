@@ -4,7 +4,7 @@
 
 **Goal:** Add public/private target-repository synthetic canary automation that exercises the production pull-request webhook, target-repository workflow dispatch, OIDC callback, and Check Run publication path while preventing tests from mutating tracked KiCad fixtures.
 
-**Architecture:** First make `runFixture()` execute against disposable copies so real KiCad side effects never dirty tracked fixtures. Then add a dependency-injected Node.js canary library and CLI that uses the caller repository's short-lived `GITHUB_TOKEN` to update a persistent PR and verify exact-SHA Check Run and workflow convergence. A reusable GitHub Actions workflow checks out the implementation commit by `github.workflow_sha`, invokes the CLI, and leaves scheduling to thin public/private repository wrappers.
+**Architecture:** First make `runFixture()` execute against disposable copies so real KiCad side effects never dirty tracked fixtures. Then add a dependency-injected Node.js canary library and CLI that uses the caller repository's short-lived `GITHUB_TOKEN` to update a persistent PR and verify exact-SHA Check Run and workflow convergence. A reusable GitHub Actions workflow checks out the implementation commit by `job.workflow_sha` from `job.workflow_repository`, invokes the CLI, and leaves scheduling to thin public/private repository wrappers.
 
 **Tech Stack:** Node.js 22 ESM, TypeScript declaration files, Vitest 4, GitHub REST API, GitHub Actions reusable workflows, KiCad 10, MkDocs Material.
 
@@ -273,7 +273,7 @@ git commit -m "feat(ci): add target-repository canary engine"
 **Interfaces:**
 - `workflow_call` inputs: `visibility` (required), `timeout-seconds` (default `1200`), `poll-interval-seconds` (default `15`), `public-origin` (default production origin), and `readiness-workflow` (default `readiness-runner.yml`).
 - Uses caller `github.token`; no custom secret input.
-- Checks out `oaslananka/boardreadyops` at `${{ github.workflow_sha }}` into `_boardreadyops-canary` with persisted credentials disabled, then runs the CLI with caller repository context.
+- Checks out `${{ job.workflow_repository }}` at `${{ job.workflow_sha }}` into `_boardreadyops-canary` with persisted credentials disabled, then runs the CLI with caller repository context.
 
 - [ ] **Step 1: Write the failing static workflow contract test**
 
@@ -285,8 +285,9 @@ expect(workflow).toContain("actions: read");
 expect(workflow).toContain("checks: read");
 expect(workflow).toContain("contents: write");
 expect(workflow).toContain("pull-requests: write");
-expect(workflow).toContain("repository: oaslananka/boardreadyops");
-expect(workflow).toContain("ref: $" + "{{ github.workflow_sha }}");
+expect(workflow).toContain("repository: $" + "{{ job.workflow_repository }}");
+expect(workflow).toContain("ref: $" + "{{ job.workflow_sha }}");
+expect(workflow).not.toContain("github.workflow_sha");
 expect(workflow).toContain("persist-credentials: false");
 expect(workflow).toContain("node _boardreadyops-canary/scripts/run-synthetic-target-repository-canary.mjs");
 expect(workflow).toContain("GITHUB_TOKEN: $" + "{{ github.token }}");

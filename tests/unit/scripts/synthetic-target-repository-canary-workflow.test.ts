@@ -27,8 +27,9 @@ describe("synthetic target-repository canary workflow", () => {
   it("runs the implementation pinned to the reusable workflow commit", async () => {
     const workflow = await readFile(workflowPath, "utf8");
 
-    expect(workflow).toContain("repository: oaslananka/boardreadyops");
-    expect(workflow).toContain("ref: $" + "{{ github.workflow_sha }}");
+    expect(workflow).toContain("repository: $" + "{{ job.workflow_repository }}");
+    expect(workflow).toContain("ref: $" + "{{ job.workflow_sha }}");
+    expect(workflow).not.toContain("github.workflow_sha");
     expect(workflow).toContain("persist-credentials: false");
     expect(workflow).toContain("path: _boardreadyops-canary");
     expect(workflow).toContain("node _boardreadyops-canary/scripts/run-synthetic-target-repository-canary.mjs");
@@ -36,6 +37,15 @@ describe("synthetic target-repository canary workflow", () => {
     expect(workflow).toContain("GITHUB_REPOSITORY: $" + "{{ github.repository }}");
     expect(workflow).toContain("GITHUB_RUN_ID: $" + "{{ github.run_id }}");
     expect(workflow).toContain("GITHUB_RUN_ATTEMPT: $" + "{{ github.run_attempt }}");
+  });
+
+  it("limits the actionlint compatibility exception to the new reusable-workflow identity fields", async () => {
+    const config = await readFile(".github/actionlint.yaml", "utf8");
+
+    expect(config).toContain(".github/workflows/synthetic-target-repository-canary.yml");
+    expect(config).toContain("workflow_repository");
+    expect(config).toContain("workflow_sha");
+    expect(config).not.toContain(".github/workflows/**/*");
   });
 
   it("keeps one bounded non-cancelling observation per caller repository", async () => {
