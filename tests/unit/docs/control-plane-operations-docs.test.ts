@@ -73,6 +73,20 @@ ${operations}`;
     expect(combined).toContain("does not affect worker readiness");
     expect(combined).toContain("worker restart resets");
   });
+  it("documents guarded runner lease lifecycle transitions", () => {
+    const lifecycle = fs.readFileSync("docs/product/run-lifecycle.md", "utf8");
+
+    expect(lifecycle).toContain("Schema version 29");
+    expect(lifecycle).toContain("runner_lease_claimed");
+    expect(lifecycle).toContain("runner_lease_heartbeat");
+    expect(lifecycle).toContain("runner_lease_relinquished");
+    expect(lifecycle).toContain("runner_lease_expired");
+    expect(lifecycle).toContain("current execution-attempt pointer");
+    expect(lifecycle).toContain("produces no version increment or transition event");
+    expect(lifecycle).toContain("cannot change the newer logical-run or attempt lifecycle state");
+    expect(lifecycle).toContain("legacy `LifecycleStore` direct writers");
+  });
+
   it("documents public and private synthetic target-repository canaries", () => {
     const canaryPath = "docs/operations/synthetic-target-repository-canaries.md";
     expect(fs.existsSync(canaryPath)).toBe(true);
