@@ -20,14 +20,14 @@ describe("guarded runner lease transitions migration", () => {
     expect(sql).toContain("alter column expected_attempt_version set not null");
   });
 
-  it("extends the logical run graph only for bounded runner retry", async () => {
+  it("scopes bounded retry to the guarded lease functions", async () => {
     const sql = await readFile(migrationPath, "utf8");
 
-    expect(sql).toContain("create or replace function boardreadyops_release_run_transition_allowed(");
-    expect(sql).toContain("when p_from_status = 'running' and p_to_status in (");
-    expect(sql).toContain("'queued', 'completed', 'failed', 'timed_out', 'cancelled', 'superseded'");
+    expect(sql).not.toContain("create or replace function boardreadyops_release_run_transition_allowed(");
+    expect(sql.match(/run_record\.status = 'running'/gu)).toHaveLength(2);
     expect(sql).toContain("runner_lease_relinquished");
     expect(sql).toContain("runner_lease_expired");
+    expect(sql).toContain("cannot requeue a running logical run without atomically");
   });
 
   it("guards claim and binds the created lease to the authoritative snapshot", async () => {

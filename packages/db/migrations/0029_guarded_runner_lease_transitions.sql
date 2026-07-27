@@ -67,30 +67,10 @@ begin
 end;
 $$;
 
--- A runner relinquish or lease expiry is a bounded retry: the current attempt
--- becomes terminal/stale while the logical run returns from running to queued.
-create or replace function boardreadyops_release_run_transition_allowed(
-  p_from_status text,
-  p_to_status text
-)
-returns boolean
-language sql
-immutable
-parallel safe
-as $$
-  select case
-    when p_from_status = 'queued' and p_to_status in (
-      'dispatched', 'running', 'completed', 'failed', 'timed_out', 'cancelled', 'superseded'
-    ) then true
-    when p_from_status = 'dispatched' and p_to_status in (
-      'running', 'completed', 'failed', 'timed_out', 'cancelled', 'superseded'
-    ) then true
-    when p_from_status = 'running' and p_to_status in (
-      'queued', 'completed', 'failed', 'timed_out', 'cancelled', 'superseded'
-    ) then true
-    else false
-  end;
-$$;
+-- A runner relinquish or lease expiry is a bounded retry implemented only
+-- inside the guarded lease functions below. The general transition graph stays
+-- strict so callers cannot requeue a running logical run without atomically
+-- terminalizing its current execution attempt.
 
 create or replace function boardreadyops_expire_runner_leases(p_now timestamptz)
 returns integer
@@ -165,7 +145,7 @@ begin
       and run_record.version is not distinct from lease_record.expected_run_version
       and attempt_record.status is not distinct from lease_record.expected_attempt_status
       and attempt_record.version is not distinct from lease_record.expected_attempt_version
-      and boardreadyops_release_run_transition_allowed(run_record.status, 'queued')
+      and run_record.status = 'running'
       and boardreadyops_release_run_attempt_transition_allowed(attempt_record.status, 'stale');
 
     next_run_version := run_record.version;
@@ -918,7 +898,7 @@ begin
     and run_record.version is not distinct from lease_record.expected_run_version
     and attempt_record.status is not distinct from lease_record.expected_attempt_status
     and attempt_record.version is not distinct from lease_record.expected_attempt_version
-    and boardreadyops_release_run_transition_allowed(run_record.status, 'queued')
+    and run_record.status = 'running'
     and boardreadyops_release_run_attempt_transition_allowed(attempt_record.status, p_attempt_status);
 
   if not lifecycle_binding_valid then
