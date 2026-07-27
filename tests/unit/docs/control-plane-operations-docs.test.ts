@@ -84,7 +84,11 @@ ${operations}`;
     expect(lifecycle).toContain("current execution-attempt pointer");
     expect(lifecycle).toContain("produces no version increment or transition event");
     expect(lifecycle).toContain("cannot change the newer logical-run or attempt lifecycle state");
-    expect(lifecycle).toContain("legacy `LifecycleStore` direct writers");
+    expect(lifecycle).toContain("metadata-only lifecycle store");
+    expect(lifecycle).toContain("Lifecycle transitions");
+    expect(lifecycle).toContain("at most 100");
+    expect(lifecycle).toContain("verify:transition-writers");
+    expect(lifecycle).not.toContain("Issue #23 remains open");
   });
 
   it("documents public and private synthetic target-repository canaries", () => {
