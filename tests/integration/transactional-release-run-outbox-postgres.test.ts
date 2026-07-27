@@ -54,6 +54,57 @@ async function cleanup(): Promise<void> {
   await executor.query("delete from installations where id = $1", [installationRowId]);
 }
 
+async function prepareWorkflowDispatch(label: string, commitSha: string, leaseSeconds = 60) {
+  const plannedAt = new Date("2026-07-22T05:00:00.000Z");
+  const runId = `run-${label}-${suffix}`;
+  const createOutboxId = `outbox-${label}-create-${suffix}`;
+  const executionAttemptId = randomUUID();
+  const dispatchOutboxId = `outbox-${label}-dispatch-${suffix}`;
+  const createWorkerId = `${label}-create-worker-${suffix}`;
+  const dispatchWorkerId = `${label}-dispatch-worker-${suffix}`;
+  const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+    id: idSequence([runId, createOutboxId]),
+    now: () => plannedAt,
+    releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+  });
+  await lifecycle.enqueueReleaseRunWithOutbox(action(commitSha));
+
+  const createStore = createSqlControlPlaneOutboxStore(database(), {
+    now: () => plannedAt,
+    leaseSeconds: 60,
+  });
+  const createEffect = (await createStore.claimEffects({ workerId: createWorkerId }))[0];
+  if (!createEffect) throw new Error("expected Check Run creation effect");
+  await createStore.completeCheckRunCreateEffect({
+    effect: createEffect,
+    workerId: createWorkerId,
+    githubCheckRunId: 900000,
+    dispatchMode: "github-actions",
+    executionAttemptId,
+    nextOutboxId: dispatchOutboxId,
+  });
+
+  const dispatchAt = new Date(plannedAt.valueOf() + 1000);
+  const dispatchStore = createSqlControlPlaneOutboxStore(database(), {
+    now: () => dispatchAt,
+    leaseSeconds,
+  });
+  const dispatchEffect = (await dispatchStore.claimEffects({ workerId: dispatchWorkerId })).find(
+    (effect) => effect.outboxId === dispatchOutboxId,
+  );
+  if (!dispatchEffect) throw new Error("expected workflow dispatch effect");
+
+  return {
+    runId,
+    executionAttemptId,
+    dispatchOutboxId,
+    dispatchWorkerId,
+    dispatchAt,
+    dispatchStore,
+    dispatchEffect,
+  };
+}
+
 beforeEach(async () => {
   await cleanup();
   await database().query(
@@ -174,10 +225,14 @@ describeDatabase("transactional release-run outbox producer", () => {
     const prepared = rows(
       await database().query(
         `select release_runs.status as run_status,
+                release_runs.version::int as run_version,
                 release_runs.github_check_run_id,
                 release_runs.execution_attempt_id,
                 release_run_attempts.status as attempt_status,
-                control_plane_outbox.status as dispatch_status
+                release_run_attempts.version::int as attempt_version,
+                control_plane_outbox.status as dispatch_status,
+                control_plane_outbox.expected_run_version::int as expected_run_version,
+                control_plane_outbox.expected_attempt_version::int as expected_attempt_version
            from release_runs
            join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
            join control_plane_outbox on control_plane_outbox.execution_attempt_id = release_run_attempts.id
@@ -188,10 +243,14 @@ describeDatabase("transactional release-run outbox producer", () => {
     )[0];
     expect(prepared).toEqual({
       run_status: "queued",
+      run_version: 0,
       github_check_run_id: "987654",
       execution_attempt_id: executionAttemptId,
       attempt_status: "dispatching",
+      attempt_version: 0,
       dispatch_status: "available",
+      expected_run_version: 0,
+      expected_attempt_version: 0,
     });
 
     const dispatchAt = new Date(plannedAt.valueOf() + 1000);
@@ -214,10 +273,14 @@ describeDatabase("transactional release-run outbox producer", () => {
     const completed = rows(
       await database().query(
         `select release_runs.status as run_status,
+                release_runs.version::int as run_version,
                 release_run_attempts.status as attempt_status,
+                release_run_attempts.version::int as attempt_version,
                 release_run_attempts.github_workflow_dispatch_id,
                 control_plane_outbox.status as outbox_status,
-                control_plane_outbox.external_result ->> 'workflowDispatchId' as persisted_dispatch_id
+                control_plane_outbox.external_result ->> 'workflowDispatchId' as persisted_dispatch_id,
+                (select count(*)::int from release_run_transition_events where release_run_id = release_runs.id)
+                  as transition_events
            from release_runs
            join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
            join control_plane_outbox on control_plane_outbox.execution_attempt_id = release_run_attempts.id
@@ -228,10 +291,140 @@ describeDatabase("transactional release-run outbox producer", () => {
     )[0];
     expect(completed).toEqual({
       run_status: "dispatched",
+      run_version: 1,
       attempt_status: "dispatched",
+      attempt_version: 1,
       github_workflow_dispatch_id: "456789",
       outbox_status: "completed",
       persisted_dispatch_id: "456789",
+      transition_events: 2,
+    });
+  });
+
+  it("rejects workflow completion when the effect-bound run version becomes stale", async () => {
+    const prepared = await prepareWorkflowDispatch("run-version-stale", "f".repeat(40), 1);
+    await prepared.dispatchStore.markDeliveryStarted({
+      outboxId: prepared.dispatchOutboxId,
+      workerId: prepared.dispatchWorkerId,
+    });
+    await database().query("update release_runs set version = version + 1 where id = $1", [prepared.runId]);
+    await database().query(
+      `insert into control_plane_outbox (
+         id, release_run_id, execution_attempt_id, effect_type, payload_version,
+         idempotency_key, payload, priority, status, available_at, attempt_count,
+         max_attempts, created_at
+       )
+       select $2, release_run_id, execution_attempt_id, effect_type, payload_version,
+              idempotency_key, payload, priority, 'available', available_at, 0,
+              max_attempts, created_at
+         from control_plane_outbox
+        where id = $1
+       on conflict (idempotency_key)
+       do update set idempotency_key = excluded.idempotency_key`,
+      [prepared.dispatchOutboxId, `outbox-run-version-replay-${suffix}`],
+    );
+    expect(
+      rows(
+        await database().query(
+          `select expected_run_version::int, expected_attempt_version::int
+             from control_plane_outbox
+            where id = $1`,
+          [prepared.dispatchOutboxId],
+        ),
+      ),
+    ).toEqual([{ expected_run_version: 0, expected_attempt_version: 0 }]);
+
+    await expect(
+      prepared.dispatchStore.completeWorkflowDispatchEffect({
+        effect: prepared.dispatchEffect,
+        workerId: prepared.dispatchWorkerId,
+        workflowDispatchId: "run-version-delivered",
+      }),
+    ).resolves.toBe("stale");
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_run_attempts.status as attempt_status,
+                  release_run_attempts.version::int as attempt_version,
+                  release_run_attempts.github_workflow_dispatch_id,
+                  control_plane_outbox.status as outbox_status,
+                  (select count(*)::int from release_run_transition_events where release_run_id = release_runs.id)
+                    as transition_events
+             from release_runs
+             join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
+             join control_plane_outbox on control_plane_outbox.id = $2
+            where release_runs.id = $1`,
+          [prepared.runId, prepared.dispatchOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      run_status: "queued",
+      run_version: 1,
+      attempt_status: "dispatching",
+      attempt_version: 0,
+      github_workflow_dispatch_id: null,
+      outbox_status: "leased",
+      transition_events: 0,
+    });
+
+    const recoveryAt = new Date(prepared.dispatchAt.valueOf() + 2000);
+    await expect(
+      createSqlControlPlaneOutboxStore(database(), { now: () => recoveryAt }).claimEffects({
+        workerId: `run-version-recovery-${suffix}`,
+      }),
+    ).resolves.toEqual([]);
+    expect(
+      rows(
+        await database().query("select status, last_error_class from control_plane_outbox where id = $1", [
+          prepared.dispatchOutboxId,
+        ]),
+      )[0],
+    ).toEqual({ status: "reconciliation_required", last_error_class: "delivery_uncertain" });
+  });
+
+  it("rejects workflow completion when the effect-bound attempt version becomes stale", async () => {
+    const prepared = await prepareWorkflowDispatch("attempt-version-stale", "1".repeat(40));
+    await database().query("update release_run_attempts set version = version + 1 where id = $1", [
+      prepared.executionAttemptId,
+    ]);
+
+    await expect(
+      prepared.dispatchStore.completeWorkflowDispatchEffect({
+        effect: prepared.dispatchEffect,
+        workerId: prepared.dispatchWorkerId,
+        workflowDispatchId: "attempt-version-delivered",
+      }),
+    ).resolves.toBe("stale");
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.status as run_status,
+                  release_runs.version::int as run_version,
+                  release_run_attempts.status as attempt_status,
+                  release_run_attempts.version::int as attempt_version,
+                  release_run_attempts.github_workflow_dispatch_id,
+                  control_plane_outbox.status as outbox_status,
+                  (select count(*)::int from release_run_transition_events where release_run_id = release_runs.id)
+                    as transition_events
+             from release_runs
+             join release_run_attempts on release_run_attempts.id = release_runs.execution_attempt_id
+             join control_plane_outbox on control_plane_outbox.id = $2
+            where release_runs.id = $1`,
+          [prepared.runId, prepared.dispatchOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      run_status: "queued",
+      run_version: 0,
+      attempt_status: "dispatching",
+      attempt_version: 1,
+      github_workflow_dispatch_id: null,
+      outbox_status: "leased",
+      transition_events: 0,
     });
   });
 
