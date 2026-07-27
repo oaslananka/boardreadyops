@@ -406,6 +406,7 @@ export async function handleResultRequest(
     `with existing as materialized (
        select id,
               status,
+              version,
               github_check_run_id,
               repository_id,
               pull_request_number,
@@ -415,6 +416,9 @@ export async function handleResultRequest(
               (select release_run_attempts.status
                from release_run_attempts
                where release_run_attempts.id = release_runs.execution_attempt_id) as attempt_status,
+              (select release_run_attempts.version
+               from release_run_attempts
+               where release_run_attempts.id = release_runs.execution_attempt_id) as attempt_version,
               (select release_run_results.result_digest
                from release_run_results
                where release_run_results.run_id = release_runs.id) as persisted_result_digest
@@ -440,68 +444,56 @@ export async function handleResultRequest(
               end as persistence_outcome
        from existing
      ),
-     updated as (
-       update release_runs
-       set status = $3,
-           decision = $4,
-           completed_at = case
-             when $3 in ('completed', 'failed', 'timed_out') then coalesce(release_runs.completed_at, $5::timestamptz)
-             else release_runs.completed_at
-           end,
-           duration_ms = case
-             when $3 in ('completed', 'failed', 'timed_out') then coalesce(
-               release_runs.duration_ms,
-               greatest(
-                 0,
-                 floor(
-                   extract(epoch from (coalesce(release_runs.completed_at, $5::timestamptz) - release_runs.started_at)) * 1000
-                 )::integer
-               )
-             )
-             else release_runs.duration_ms
-           end,
-           terminal_result_digest = case
-             when $3 in ('completed', 'failed', 'timed_out') then $7
-             else release_runs.terminal_result_digest
-           end
+     transitioned as materialized (
+       select classified.*,
+              transition.transition_outcome,
+              transition.run_changed,
+              transition.attempt_changed
        from classified
-       where release_runs.id = classified.id
-         and classified.persistence_outcome = 'accepted'
-       returning release_runs.id,
-                 release_runs.github_check_run_id,
-                 release_runs.repository_id,
-                 release_runs.pull_request_number,
-                 release_runs.completed_at
+       left join lateral boardreadyops_apply_runner_result_state(
+         classified.id,
+         classified.persistence_outcome = 'accepted',
+         classified.status,
+         classified.version,
+         classified.execution_attempt_id,
+         classified.attempt_status,
+         classified.attempt_version,
+         $3,
+         $4,
+         $5::timestamptz,
+         $7,
+         $13
+       ) as transition
+         on true
+     ),
+     effective as (
+       select transitioned.*,
+              case
+                when transitioned.persistence_outcome <> 'accepted'
+                  then transitioned.persistence_outcome
+                when transitioned.transition_outcome = 'applied'
+                  then 'accepted'
+                when transitioned.transition_outcome in ('stale', 'not_found')
+                  then 'stale_attempt'
+                else 'invalid_transition'
+              end as effective_outcome
+       from transitioned
+     ),
+     updated as (
+       select effective.id,
+              effective.github_check_run_id,
+              effective.repository_id,
+              effective.pull_request_number,
+              release_runs.completed_at
+       from effective
+       join release_runs on release_runs.id = effective.id
+       where effective.effective_outcome = 'accepted'
      ),
      updated_attempt as (
-       update release_run_attempts
-       set status = case $3
-             when 'queued' then 'dispatching'
-             when 'running' then 'in_progress'
-             else $3
-           end,
-           started_at = case
-             when $3 in ('running', 'completed', 'failed', 'timed_out')
-               then coalesce(release_run_attempts.started_at, $5::timestamptz)
-             else release_run_attempts.started_at
-           end,
-           heartbeat_at = $5::timestamptz,
-           completed_at = case
-             when $3 in ('completed', 'failed', 'timed_out')
-               then coalesce(release_run_attempts.completed_at, $5::timestamptz)
-             else release_run_attempts.completed_at
-           end,
-           result_digest = case
-             when $3 in ('completed', 'failed', 'timed_out') then $13
-             else release_run_attempts.result_digest
-           end
-       from updated
-       where release_run_attempts.id = $2
-         and release_run_attempts.run_id = updated.id
-         and release_run_attempts.status in (
-           'queued', 'dispatching', 'dispatched', 'in_progress', 'uploading_artifacts', 'reporting'
-         )
-       returning release_run_attempts.id
+       select effective.execution_attempt_id as id
+       from effective
+       where effective.effective_outcome = 'accepted'
+         and effective.execution_attempt_id is not null
      ),
      completed_lease as (
      update runner_job_leases
@@ -658,21 +650,21 @@ export async function handleResultRequest(
        join upserted_result on upserted_result.run_id = updated.id
        returning id
      )
-     select classified.persistence_outcome,
-            classified.id,
-            classified.github_check_run_id,
-            classified.pull_request_number,
+     select effective.effective_outcome as persistence_outcome,
+            effective.id,
+            effective.github_check_run_id,
+            effective.pull_request_number,
             repositories.owner,
             repositories.name,
             installations.github_installation_id,
-            coalesce(updated.completed_at, classified.completed_at) as completed_at,
+            coalesce(updated.completed_at, effective.completed_at) as completed_at,
             (select count(*) from inserted_findings) as inserted_finding_count,
             (select count(*) from inserted_artifacts) as inserted_artifact_count,
             (select count(*) from updated_attempt) as updated_attempt_count,
             (select count(*) from persisted_audit) as persisted_audit_count
-     from classified
-     left join updated on updated.id = classified.id
-     join repositories on repositories.id = classified.repository_id
+     from effective
+     left join updated on updated.id = effective.id
+     join repositories on repositories.id = effective.repository_id
      join installations on installations.id = repositories.installation_id`,
     [
       runId,
@@ -715,6 +707,13 @@ export async function handleResultRequest(
   if (persistenceOutcome === "conflicting_terminal_result") {
     return Response.json(
       { ok: false, error: "terminal result conflicts with the persisted result", runId, executionAttemptId },
+      { status: 409 },
+    );
+  }
+
+  if (persistenceOutcome === "invalid_transition") {
+    return Response.json(
+      { ok: false, error: "runner result is not valid for the current lifecycle state", runId, executionAttemptId },
       { status: 409 },
     );
   }
