@@ -6,6 +6,7 @@ import {
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { authenticateControlPlaneOperator } from "./control-plane-operator-auth.js";
+import { controlPlaneJsonError, controlPlaneJsonResponse } from "./control-plane-operator-response.js";
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const supportedItemTypes = new Set<ControlPlaneDeadLetterItemType>(["job", "outbox"]);
@@ -23,21 +24,6 @@ type ReplayRouteParams = {
   itemType: string;
   itemId: string;
 };
-
-function jsonResponse(value: unknown, status: number, headers: Readonly<Record<string, string>> = {}): Response {
-  return Response.json(value, {
-    status,
-    headers: {
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff",
-      ...headers,
-    },
-  });
-}
-
-function jsonError(error: string, status: number, headers?: Readonly<Record<string, string>>): Response {
-  return jsonResponse({ ok: false, error }, status, headers);
-}
 
 export type ControlPlaneDeadLetterRouteFactories = {
   createQueryExecutor(options: { connectionString: string; max: number }): SqlQueryExecutor;
@@ -73,10 +59,10 @@ function authenticatedActor(
 ): { actorId: string } | Response {
   const authentication = authenticateControlPlaneOperator(request, dependencies.environment);
   if (authentication.status === "disabled") {
-    return jsonError("operator API is not configured", 503);
+    return controlPlaneJsonError("operator API is not configured", 503);
   }
   if (authentication.status === "unauthorized") {
-    return jsonError("operator authentication is required", 401, { "www-authenticate": "Bearer" });
+    return controlPlaneJsonError("operator authentication is required", 401, { "www-authenticate": "Bearer" });
   }
   return { actorId: authentication.actorId };
 }
@@ -90,22 +76,22 @@ function parsedListQuery(request: Request): { limit: number; before?: Date } | R
   const rawLimit = url.searchParams.get("limit");
   let limit = 50;
   if (rawLimit !== null) {
-    if (!/^[1-9]\d{0,2}$/u.test(rawLimit)) return jsonError("dead-letter limit is invalid", 400);
+    if (!/^[1-9]\d{0,2}$/u.test(rawLimit)) return controlPlaneJsonError("dead-letter limit is invalid", 400);
     limit = Number(rawLimit);
-    if (limit > 100) return jsonError("dead-letter limit is invalid", 400);
+    if (limit > 100) return controlPlaneJsonError("dead-letter limit is invalid", 400);
   }
 
   const rawBefore = url.searchParams.get("before");
   if (rawBefore === null) return { limit };
-  if (rawBefore.length > 64) return jsonError("dead-letter cursor is invalid", 400);
+  if (rawBefore.length > 64) return controlPlaneJsonError("dead-letter cursor is invalid", 400);
   const before = new Date(rawBefore);
-  if (!Number.isFinite(before.valueOf())) return jsonError("dead-letter cursor is invalid", 400);
+  if (!Number.isFinite(before.valueOf())) return controlPlaneJsonError("dead-letter cursor is invalid", 400);
   return { limit, before };
 }
 
 function operationsStore(dependencies: ControlPlaneDeadLetterRouteDependencies): DeadLetterOperations | Response {
   const executor = dependencies.queryExecutor();
-  if (!executor) return jsonError("database is not configured", 503);
+  if (!executor) return controlPlaneJsonError("database is not configured", 503);
   return dependencies.createOperationsStore(executor);
 }
 
@@ -116,7 +102,7 @@ export async function handleControlPlaneDeadLetterListRequest(
 ): Promise<Response> {
   const actor = authenticatedActor(request, dependencies);
   if (actor instanceof Response) return actor;
-  if (!validIdentifier(installationId)) return jsonError("installation identifier is invalid", 400);
+  if (!validIdentifier(installationId)) return controlPlaneJsonError("installation identifier is invalid", 400);
 
   const query = parsedListQuery(request);
   if (query instanceof Response) return query;
@@ -130,7 +116,7 @@ export async function handleControlPlaneDeadLetterListRequest(
       ...(query.before ? { before: query.before } : {}),
     });
     const lastItem = items.length === query.limit ? items.at(-1) : undefined;
-    return jsonResponse(
+    return controlPlaneJsonResponse(
       {
         ok: true,
         items,
@@ -139,7 +125,7 @@ export async function handleControlPlaneDeadLetterListRequest(
       200,
     );
   } catch {
-    return jsonError("dead-letter listing is temporarily unavailable", 503);
+    return controlPlaneJsonError("dead-letter listing is temporarily unavailable", 503);
   }
 }
 
@@ -156,11 +142,11 @@ export async function handleControlPlaneDeadLetterReplayRequest(
     !validIdentifier(params.itemId) ||
     !supportedItemTypes.has(params.itemType as ControlPlaneDeadLetterItemType)
   ) {
-    return jsonError("dead-letter replay target is invalid", 400);
+    return controlPlaneJsonError("dead-letter replay target is invalid", 400);
   }
 
   const operationId = request.headers.get("idempotency-key") ?? "";
-  if (!validIdentifier(operationId)) return jsonError("Idempotency-Key header is required", 400);
+  if (!validIdentifier(operationId)) return controlPlaneJsonError("Idempotency-Key header is required", 400);
 
   const store = operationsStore(dependencies);
   if (store instanceof Response) return store;
@@ -174,11 +160,11 @@ export async function handleControlPlaneDeadLetterReplayRequest(
       actorId: actor.actorId,
     });
 
-    if (result.outcome === "not_found") return jsonError("dead-letter item not found", 404);
+    if (result.outcome === "not_found") return controlPlaneJsonError("dead-letter item not found", 404);
     if (result.outcome === "not_replayable") {
-      return jsonError("dead-letter item is not safely replayable", 409);
+      return controlPlaneJsonError("dead-letter item is not safely replayable", 409);
     }
-    return jsonResponse(
+    return controlPlaneJsonResponse(
       {
         ok: true,
         outcome: result.outcome,
@@ -187,6 +173,6 @@ export async function handleControlPlaneDeadLetterReplayRequest(
       200,
     );
   } catch {
-    return jsonError("dead-letter replay is temporarily unavailable", 503);
+    return controlPlaneJsonError("dead-letter replay is temporarily unavailable", 503);
   }
 }

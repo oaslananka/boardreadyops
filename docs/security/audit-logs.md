@@ -76,6 +76,53 @@ Indexes include event ID as a tie-breaker for stable pagination when timestamps 
 - Do not query audit events without an installation predicate.
 - Do not bypass append-only protection in normal application code.
 
-## Current implementation slice
+## Authenticated operator export
 
-This migration provides the tenant-scoped table, structural constraints, tenant-chain validation, append-only triggers, and query indexes. Follow-up work must add allowlisted write helpers, authenticated tenant query surfaces, retention/export procedures, and tests for each lifecycle integration point.
+Operators can export bounded, privacy-safe audit summaries through:
+
+```text
+GET /api/v1/operator/installations/{installationId}/audit-events
+```
+
+The route uses the existing `BOARDREADYOPS_OPERATOR_API_TOKEN` Bearer token and
+`BOARDREADYOPS_OPERATOR_ACTOR_ID` configuration. The installation identifier is
+part of the path and remains mandatory for every database query. Optional query
+filters are:
+
+- `repositoryId`
+- `releaseRunId`
+- `eventType`
+- `limit`, from 1 to 100, defaulting to 50
+- an opaque `cursor` returned by the previous page
+
+Pagination is ordered by `(created_at, id)` in reverse chronological order, so
+events with the same timestamp are not skipped or duplicated. Responses set
+`Cache-Control: no-store` and do not expose raw webhook payloads, artifact
+contents, database errors, or internal storage locators.
+
+The export returns stable identifiers, actor and subject dimensions, repository
+full name, event timestamp, and a metadata allowlist containing only bounded
+primitive values required for operational reconstruction. Unknown keys, nested
+objects, credential-like fields, publication error bodies, and oversized strings
+are omitted even if legacy rows contain them. Authorization is never derived from
+audit metadata.
+
+Example:
+
+```bash
+curl --fail --silent --show-error \
+  --header "Authorization: Bearer ${BOARDREADYOPS_OPERATOR_API_TOKEN}" \
+  "https://boardreadyops.example/api/v1/operator/installations/INSTALLATION_ID/audit-events?releaseRunId=RUN_ID&limit=50"
+```
+
+## Current implementation status
+
+The database provides tenant-chain validation, append-only triggers, deterministic
+query indexes, and audit writes for runner registration, runner leases, runner
+results, artifact upload, dead-letter replay, and reconciliation operations. The
+authenticated operator export provides the first supported query surface.
+
+Issue #43 remains open for installation/repository enablement events, policy and
+waiver event coverage, artifact download/deletion events, authenticated product
+UI or customer export, retention controls, and complete release-decision
+reconstruction tests.
