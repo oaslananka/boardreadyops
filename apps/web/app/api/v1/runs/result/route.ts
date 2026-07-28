@@ -225,6 +225,34 @@ function resultDigest(result: ReleaseRunResult): string {
     .digest("hex");
 }
 
+function releaseDecisionAuditMetadata(result: ReleaseRunResult, githubCheckConclusion: CheckConclusion) {
+  const activeWaivers = result.waivers?.active ?? [];
+  const expiredWaivers = result.waivers?.expired ?? [];
+  const readiness = result.readiness;
+
+  return {
+    decisionSummaryVersion: 1,
+    decision: result.decision ?? "not_available",
+    githubCheckConclusion,
+    readinessReported: readiness !== undefined,
+    waiversReported: result.waivers !== undefined,
+    activeWaiverCount: activeWaivers.length,
+    expiredWaiverCount: expiredWaivers.length,
+    staleWaiverCount: [...activeWaivers, ...expiredWaivers].filter((waiver) => waiver.stale).length,
+    ...(readiness
+      ? {
+          readinessStatus: readiness.status,
+          readinessScore: readiness.score,
+          blockingCount: readiness.blocking,
+          nonBlockingCount: readiness.nonBlocking,
+          missingRequiredCount: readiness.missingRequired.length,
+          missingRecommendedCount: readiness.missingRecommended.length,
+          warningCount: readiness.warnings.length,
+        }
+      : {}),
+  };
+}
+
 function publicationErrorMessage(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).slice(0, 2000);
 }
@@ -402,6 +430,7 @@ export async function handleResultRequest(
   const reportLinksJson = JSON.stringify(parsed.data.reportLinks);
   const payloadJson = JSON.stringify(parsed.data);
   const githubCheckConclusion = checkConclusion(parsed.data);
+  const decisionAuditMetadataJson = JSON.stringify(releaseDecisionAuditMetadata(parsed.data, githubCheckConclusion));
   const updateResult = await executor.query(
     `with existing as materialized (
        select id,
@@ -644,7 +673,7 @@ export async function handleResultRequest(
                 'artifactCount', (select count(*) from inserted_artifacts),
                 'metricCount', (select count(*) from jsonb_object_keys($10::jsonb)),
                 'reportLinkCount', jsonb_array_length($11::jsonb)
-              )
+              ) || $17::jsonb
        from updated
        join repositories on repositories.id = updated.repository_id
        join upserted_result on upserted_result.run_id = updated.id
@@ -683,6 +712,7 @@ export async function handleResultRequest(
       artifactsJson,
       dependencies.verifiedLeaseId ?? null,
       githubCheckConclusion,
+      decisionAuditMetadataJson,
     ],
   );
   const row = rows(updateResult)[0];

@@ -291,6 +291,39 @@ describe("readiness result route authentication and publication", () => {
       artifacts,
       metrics,
       reportLinks,
+      readiness: {
+        score: 72,
+        status: "blocked",
+        blocking: 2,
+        nonBlocking: 1,
+        missingRequired: ["bom"],
+        missingRecommended: ["assembly-drawing"],
+        warnings: ["Production readiness is blocked."],
+      },
+      waivers: {
+        active: [
+          {
+            rule: "bom.missing-mpn",
+            owner: "hardware-team",
+            reason: "Approved for one prototype lot.",
+            evidence: "internal-review-record",
+            stale: true,
+            expired: false,
+            matched: 0,
+          },
+        ],
+        expired: [
+          {
+            rule: "pcb.unrouted",
+            owner: "hardware-team",
+            reason: "Expired temporary exception.",
+            expires: "2026-07-01",
+            stale: false,
+            expired: true,
+            matched: 1,
+          },
+        ],
+      },
     });
     query.mockResolvedValueOnce({
       rows: [
@@ -370,6 +403,28 @@ describe("readiness result route authentication and publication", () => {
         },
       ]),
     );
+    expect(params[16]).toBe(
+      JSON.stringify({
+        decisionSummaryVersion: 1,
+        decision: "fail",
+        githubCheckConclusion: "failure",
+        readinessReported: true,
+        waiversReported: true,
+        activeWaiverCount: 1,
+        expiredWaiverCount: 1,
+        staleWaiverCount: 1,
+        readinessStatus: "blocked",
+        readinessScore: 72,
+        blockingCount: 2,
+        nonBlockingCount: 1,
+        missingRequiredCount: 1,
+        missingRecommendedCount: 1,
+        warningCount: 1,
+      }),
+    );
+    expect(params[16]).not.toContain("hardware-team");
+    expect(params[16]).not.toContain("prototype lot");
+    expect(sql).toContain(") || $17::jsonb");
 
     const [publicationSql, publicationParams] = query.mock.calls[1] as [string, unknown[]];
     expect(publicationSql).toContain("update release_run_results");

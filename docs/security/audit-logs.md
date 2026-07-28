@@ -169,6 +169,26 @@ validation succeeded and that streaming was permitted, but it does not claim tha
 the client received every byte. Transfer-completion accounting would require a
 separate delivery mechanism and event.
 
+## Release decision reconstruction
+
+Each accepted `runner.result.persisted` event contains a versioned, privacy-safe
+decision summary that can be exported with the existing mandatory installation and release-run
+filters. The summary records the normalized decision, persisted conclusion, effective
+GitHub Check conclusion, readiness status and score, blocking/non-blocking counts,
+missing-output and warning counts, and active/expired/stale waiver counts.
+
+Only bounded primitive summaries are recorded. Finding messages, waiver owners,
+waiver reasons, approval identities, evidence references, report contents, and the
+raw result payload remain outside audit metadata. The full persisted result stays in
+the release-run result store; the append-only audit event provides the stable,
+versioned summary needed to reconstruct why the run passed, failed, or required
+review without changing the existing result-digest replay contract.
+
+PostgreSQL integration coverage verifies that this summary is tenant-scoped,
+release-run-scoped, visible through the operator export, and does not expose waiver
+content. Policy preset and waiver mutation history remains separate future scope
+because no hosted persistent mutation surface currently exists for those resources.
+
 ## Current implementation status
 
 The database provides tenant-chain validation, append-only triggers, deterministic
@@ -178,6 +198,8 @@ upload, signed artifact download starts, dead-letter replay, and reconciliation
 operations. The
 authenticated operator export provides the first supported query surface.
 
-Issue #43 remains open for policy and waiver event coverage, artifact deletion and
-expiry events, authenticated product UI or customer export, retention controls, and
-complete release-decision reconstruction tests.
+Issue #43 remains open for policy and waiver mutation event coverage, artifact
+deletion and expiry events, authenticated product UI or customer export, and
+retention controls. Result-level release decisions are reconstructable from the
+existing tenant-scoped operator export; cross-resource reconstruction will expand as
+those remaining mutation surfaces are implemented.

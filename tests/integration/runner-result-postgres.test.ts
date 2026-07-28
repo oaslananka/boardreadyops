@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { handleResultRequest, type ResultRouteDependencies } from "../../apps/web/app/api/v1/runs/result/route.js";
+import { createSqlAuditLogStore } from "../../packages/db/src/audit-log-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -62,6 +63,40 @@ function callbackRequest(overrides: Record<string, unknown> = {}): Request {
       ],
       metrics: { durationMs: 1250, readinessScore: 82 },
       reportLinks: [{ label: "HTML report", url: "https://reports.example.test/run-123/index.html" }],
+      readiness: {
+        score: 82,
+        status: "blocked",
+        blocking: 1,
+        nonBlocking: 0,
+        missingRequired: ["bom"],
+        missingRecommended: [],
+        warnings: ["A production finding blocks release."],
+      },
+      waivers: {
+        active: [
+          {
+            rule: "bom.lifecycle",
+            owner: "hardware-team",
+            reason: "Prototype-only risk acceptance.",
+            approvedBy: "release-manager",
+            evidence: "internal-review-record",
+            stale: true,
+            expired: false,
+            matched: 0,
+          },
+        ],
+        expired: [
+          {
+            rule: "bom.missing-mpn",
+            owner: "hardware-team",
+            reason: "Expired exception.",
+            expires: "2026-07-01",
+            stale: false,
+            expired: true,
+            matched: 1,
+          },
+        ],
+      },
       ...overrides,
     }),
   });
@@ -218,14 +253,63 @@ describeDatabase("runner result PostgreSQL integration", () => {
     expect(childRows).toEqual([{ findings: 1, artifacts: 1 }]);
 
     const auditRows = rows(
-      await executor.query(`select event_type from audit_events where release_run_id = $1 order by created_at, id`, [
-        runId,
-      ]),
+      await executor.query(
+        `select event_type, metadata from audit_events where release_run_id = $1 order by created_at, id`,
+        [runId],
+      ),
     );
     expect(auditRows.map((row) => row.event_type)).toEqual([
       "runner.result.persisted",
       "runner.result.publication_succeeded",
       "runner.result.publication_succeeded",
+    ]);
+    expect(auditRows[0]?.metadata).toMatchObject({
+      decisionSummaryVersion: 1,
+      decision: "fail",
+      conclusion: "failure",
+      githubCheckConclusion: "failure",
+      readinessReported: true,
+      readinessStatus: "blocked",
+      readinessScore: 82,
+      blockingCount: 1,
+      nonBlockingCount: 0,
+      missingRequiredCount: 1,
+      missingRecommendedCount: 0,
+      warningCount: 1,
+      waiversReported: true,
+      activeWaiverCount: 1,
+      expiredWaiverCount: 1,
+      staleWaiverCount: 1,
+      findingCount: 1,
+      artifactCount: 1,
+    });
+    expect(JSON.stringify(auditRows[0]?.metadata)).not.toContain("hardware-team");
+    expect(JSON.stringify(auditRows[0]?.metadata)).not.toContain("Prototype-only");
+    expect(JSON.stringify(auditRows[0]?.metadata)).not.toContain("internal-review-record");
+
+    const exportedDecision = await createSqlAuditLogStore(executor).listAuditEvents({
+      installationId,
+      releaseRunId: runId,
+      eventType: "runner.result.persisted",
+    });
+    expect(exportedDecision).toEqual([
+      expect.objectContaining({
+        installationId,
+        repositoryId,
+        releaseRunId: runId,
+        eventType: "runner.result.persisted",
+        metadata: expect.objectContaining({
+          decisionSummaryVersion: 1,
+          decision: "fail",
+          conclusion: "failure",
+          githubCheckConclusion: "failure",
+          readinessStatus: "blocked",
+          readinessScore: 82,
+          activeWaiverCount: 1,
+          expiredWaiverCount: 1,
+          staleWaiverCount: 1,
+        }),
+      }),
     ]);
 
     await expect(executor.query("delete from audit_events where release_run_id = $1", [runId])).rejects.toThrow(
