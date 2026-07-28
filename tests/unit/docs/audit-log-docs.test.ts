@@ -14,4 +14,14 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("`releaseRunId`");
     expect(documentation).toContain("`eventType`");
   });
+  it("documents fail-closed signed artifact access auditing", async () => {
+    const documentation = await readFile(documentationUrl, "utf8");
+    expect(documentation).toContain("`artifact.download.started`");
+    expect(documentation).toContain("actor type `signed_url`");
+    expect(documentation).toContain("returns a stable `503` response without serving bytes");
+    expect(documentation).toContain("does not claim that");
+    expect(documentation).toContain("the client received every byte");
+    expect(documentation).toContain("URL signatures");
+    expect(documentation).toContain("IP addresses");
+  });
 });

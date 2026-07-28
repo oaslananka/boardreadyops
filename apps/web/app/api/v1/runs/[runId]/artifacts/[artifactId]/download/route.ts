@@ -18,6 +18,8 @@ type DownloadRouteProps = {
 export type ArtifactDownloadRecord = {
   id: string;
   runId: string;
+  installationId: string;
+  repositoryId: string;
   kind: string;
   name: string;
   storagePath: string;
@@ -38,7 +40,16 @@ export type ArtifactDownloadLookupResult =
 export type ArtifactDownloadRouteDependencies = {
   environment: Readonly<Record<string, string | undefined>>;
   lookupArtifact(runId: string, artifactId: string): Promise<ArtifactDownloadLookupResult>;
+  recordDownloadStarted(artifact: ArtifactDownloadRecord): Promise<void>;
   now(): number;
+};
+
+export type ArtifactDownloadRouteFactories = {
+  createQueryExecutor(options: { connectionString: string; max: number }): ArtifactDownloadQueryExecutor;
+};
+
+const defaultFactories: ArtifactDownloadRouteFactories = {
+  createQueryExecutor: createPgQueryExecutor,
 };
 
 type QueryResult = {
@@ -73,9 +84,20 @@ export async function lookupArtifactDownload(
   executor: ArtifactDownloadQueryExecutor,
 ): Promise<ArtifactDownloadLookupResult> {
   const result = await executor.query(
-    `select id, run_id, kind, name, storage_path, sha256, bytes, role
-     from artifacts
-     where id = $1 and run_id = $2`,
+    `select artifact.id,
+            artifact.run_id,
+            repository.installation_id,
+            repository.id as repository_id,
+            artifact.kind,
+            artifact.name,
+            artifact.storage_path,
+            artifact.sha256,
+            artifact.bytes,
+            artifact.role
+       from artifacts as artifact
+       join release_runs as release_run on release_run.id = artifact.run_id
+       join repositories as repository on repository.id = release_run.repository_id
+      where artifact.id = $1 and artifact.run_id = $2`,
     [artifactId, runId],
   );
   const row = rows(result)[0];
@@ -89,6 +111,8 @@ export async function lookupArtifactDownload(
     artifact: {
       id: stringValue(row, "id") ?? "",
       runId: stringValue(row, "run_id") ?? "",
+      installationId: stringValue(row, "installation_id") ?? "",
+      repositoryId: stringValue(row, "repository_id") ?? "",
       kind: stringValue(row, "kind") ?? "artifact",
       name: stringValue(row, "name") ?? "artifact",
       storagePath: stringValue(row, "storage_path") ?? "",
@@ -99,25 +123,60 @@ export async function lookupArtifactDownload(
   };
 }
 
-function defaultDependencies(): ArtifactDownloadRouteDependencies {
-  const environment = process.env;
+export async function recordArtifactDownloadStarted(
+  artifact: ArtifactDownloadRecord,
+  executor: ArtifactDownloadQueryExecutor,
+): Promise<void> {
+  await executor.query(
+    `insert into audit_events (
+       installation_id, event_type, actor_type, subject_type, subject_id,
+       repository_id, release_run_id, artifact_id, metadata
+     ) values (
+       $1, 'artifact.download.started', 'signed_url', 'artifact', $4,
+       $2, $3, $4, $5::jsonb
+     )`,
+    [
+      artifact.installationId,
+      artifact.repositoryId,
+      artifact.runId,
+      artifact.id,
+      JSON.stringify({
+        bytes: artifact.bytes,
+        sha256: artifact.sha256,
+        itemType: artifact.kind,
+        scope: artifact.role,
+      }),
+    ],
+  );
+}
+
+export function createArtifactDownloadRouteDependencies(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+  factories: ArtifactDownloadRouteFactories = defaultFactories,
+): ArtifactDownloadRouteDependencies {
+  let executor: ArtifactDownloadQueryExecutor | undefined;
+  const queryExecutor = (): ArtifactDownloadQueryExecutor | undefined => {
+    const connectionString = environment.DATABASE_URL;
+    if (!connectionString) return undefined;
+    executor ??= factories.createQueryExecutor({
+      connectionString,
+      max: Number(environment.DATABASE_POOL_MAX ?? 5),
+    });
+    return executor;
+  };
+
   return {
     environment,
     now: Date.now,
     async lookupArtifact(runId, artifactId) {
-      const connectionString = environment.DATABASE_URL;
-      if (!connectionString) {
-        return { state: "not-configured" };
-      }
-
-      return await lookupArtifactDownload(
-        runId,
-        artifactId,
-        createPgQueryExecutor({
-          connectionString,
-          max: Number(environment.DATABASE_POOL_MAX ?? 5),
-        }),
-      );
+      const configuredExecutor = queryExecutor();
+      if (!configuredExecutor) return { state: "not-configured" };
+      return await lookupArtifactDownload(runId, artifactId, configuredExecutor);
+    },
+    async recordDownloadStarted(artifact) {
+      const configuredExecutor = queryExecutor();
+      if (!configuredExecutor) throw new Error("artifact metadata store is not configured");
+      await recordArtifactDownloadStarted(artifact, configuredExecutor);
     },
   };
 }
@@ -148,7 +207,7 @@ function jsonError(error: string, status: number): Response {
 export async function handleArtifactDownloadRequest(
   request: Request,
   params: { runId: string; artifactId: string },
-  dependencies: ArtifactDownloadRouteDependencies = defaultDependencies(),
+  dependencies: ArtifactDownloadRouteDependencies = createArtifactDownloadRouteDependencies(),
 ): Promise<Response> {
   const { runId, artifactId } = params;
   const url = new URL(request.url);
@@ -164,7 +223,12 @@ export async function handleArtifactDownloadRequest(
     return jsonError("artifact URL is invalid or expired", 403);
   }
 
-  const lookup = await dependencies.lookupArtifact(runId, artifactId);
+  let lookup: ArtifactDownloadLookupResult;
+  try {
+    lookup = await dependencies.lookupArtifact(runId, artifactId);
+  } catch {
+    return jsonError("artifact metadata is temporarily unavailable", 503);
+  }
   if (lookup.state === "not-configured") {
     return jsonError("artifact metadata store is not configured", 503);
   }
@@ -209,6 +273,13 @@ export async function handleArtifactDownloadRequest(
   if (fileStat.size !== lookup.artifact.bytes) {
     await fileHandle.close();
     return jsonError("artifact metadata does not match the stored file", 409);
+  }
+
+  try {
+    await dependencies.recordDownloadStarted(lookup.artifact);
+  } catch {
+    await fileHandle.close().catch(() => undefined);
+    return jsonError("artifact access audit is temporarily unavailable", 503);
   }
 
   const nodeStream = fileHandle.createReadStream({ autoClose: true });
