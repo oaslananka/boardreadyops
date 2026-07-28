@@ -103,6 +103,7 @@ describe("SQL GitHub App metadata store", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("insert into installations");
     expect(calls[0]?.sql).toContain("on conflict (github_installation_id)");
+    expect(calls[0]?.sql).toContain("else installations.suspended_at");
     expect(calls[0]?.params).toEqual([
       "installation-row-id",
       12345,
@@ -154,6 +155,8 @@ describe("SQL GitHub App metadata store", () => {
     expect(Object.keys(store).sort()).toEqual([
       "deleteInstallation",
       "removeRepository",
+      "suspendInstallation",
+      "unsuspendInstallation",
       "upsertInstallation",
       "upsertRepository",
     ]);
@@ -215,6 +218,39 @@ describe("GitHub lifecycle audit event selection", () => {
     ).toMatchObject({ eventType: "github_app.installation.disabled", subjectType: "installation" });
   });
 
+  it("selects suspension and unsuspension events with retry-safe identifiers", () => {
+    const suspendedAction = { type: "installation.suspended" as const, installation };
+    const suspended = lifecycleAuditEventForAction(suspendedAction, {
+      deliveryId: "delivery-suspend",
+      eventType: "installation",
+      eventAction: "suspend",
+    });
+    const replay = lifecycleAuditEventForAction(suspendedAction, {
+      deliveryId: "delivery-suspend",
+      eventType: "installation",
+      eventAction: "suspend",
+    });
+    const unsuspended = lifecycleAuditEventForAction(
+      { type: "installation.unsuspended", installation },
+      { deliveryId: "delivery-unsuspend", eventType: "installation", eventAction: "unsuspend" },
+    );
+
+    expect(suspended).toMatchObject({
+      eventType: "github_app.installation.suspended",
+      requestId: "delivery-suspend",
+      subjectType: "installation",
+      metadata: { action: "suspend", githubInstallationId: 12345 },
+    });
+    expect(replay?.id).toBe(suspended?.id);
+    expect(unsuspended).toMatchObject({
+      eventType: "github_app.installation.unsuspended",
+      requestId: "delivery-unsuspend",
+      subjectType: "installation",
+      metadata: { action: "unsuspend", githubInstallationId: 12345 },
+    });
+    expect(unsuspended?.id).not.toBe(suspended?.id);
+  });
+
   it("does not misclassify pull-request metadata upserts as enablement changes", () => {
     const pullRequestContext = {
       deliveryId: "delivery-pr",
@@ -258,6 +294,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
     expect(calls[0]?.sql).toContain("insert into audit_events");
     expect(calls[0]?.sql).toContain("'github_webhook'");
     expect(calls[0]?.sql).toContain("on conflict (id) do nothing");
+    expect(calls[0]?.sql).toContain("not exists (select 1 from audit_events where id = $6::text)");
     expect(calls[0]?.params).toEqual([
       "installation-row-id",
       12345,
@@ -269,6 +306,55 @@ describe("SQL GitHub lifecycle audit writes", () => {
       "installation",
       "delivery-created",
       JSON.stringify({ action: "created", githubInstallationId: 12345 }),
+    ]);
+  });
+
+  it("persists guarded installation suspension transitions and audit events atomically", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    await store.suspendInstallation(
+      { type: "installation.suspended", installation },
+      { deliveryId: "delivery-suspend", eventType: "installation", eventAction: "suspend" },
+    );
+    await store.unsuspendInstallation(
+      { type: "installation.unsuspended", installation },
+      { deliveryId: "delivery-unsuspend", eventType: "installation", eventAction: "unsuspend" },
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.sql).toContain("set suspended_at = $2::timestamptz");
+    expect(calls[0]?.sql).toContain("$2::timestamptz is not null and suspended_at is null");
+    expect(calls[0]?.sql).toContain("not exists (select 1 from audit_events where id = $4::text)");
+    expect(calls[0]?.sql).toContain("insert into audit_events");
+    expect(calls[0]?.sql).toContain("where $4::text is not null");
+    expect(calls[0]?.params).toEqual([
+      12345,
+      "2026-07-04T00:00:00.000Z",
+      "2026-07-04T00:00:00.000Z",
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      "github_app.installation.suspended",
+      "installation",
+      "delivery-suspend",
+      JSON.stringify({ action: "suspend", githubInstallationId: 12345 }),
+    ]);
+
+    expect(calls[1]?.sql).toContain("set suspended_at = $2::timestamptz");
+    expect(calls[1]?.sql).toContain("$2::timestamptz is null and suspended_at is not null");
+    expect(calls[1]?.sql).toContain("not exists (select 1 from audit_events where id = $4::text)");
+    expect(calls[1]?.sql).toContain("insert into audit_events");
+    expect(calls[1]?.sql).toContain("where $4::text is not null");
+    expect(calls[1]?.params).toEqual([
+      12345,
+      null,
+      "2026-07-04T00:00:00.000Z",
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      "github_app.installation.unsuspended",
+      "installation",
+      "delivery-unsuspend",
+      JSON.stringify({ action: "unsuspend", githubInstallationId: 12345 }),
     ]);
   });
 
@@ -286,6 +372,8 @@ describe("SQL GitHub lifecycle audit writes", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("returning id, installation_id");
+    expect(calls[0]?.sql).toContain("else repositories.disabled_at");
+    expect(calls[0]?.sql).toContain("not exists (select 1 from audit_events where id = $9::text)");
     expect(calls[0]?.sql).toContain("persisted.installation_id");
     expect(calls[0]?.sql).toContain("subject_type, subject_id");
     expect(calls[0]?.sql).toContain("repository_id, request_id");
@@ -352,6 +440,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
 
     expect(calls).toHaveLength(2);
     expect(calls[0]?.sql).toContain("returning id, installation_id");
+    expect(calls[0]?.sql).toContain("not exists (select 1 from audit_events where id = $4::text)");
     expect(calls[0]?.sql).toContain("where $4::text is not null");
     expect(calls[0]?.params).toEqual([
       98765,
@@ -364,6 +453,7 @@ describe("SQL GitHub lifecycle audit writes", () => {
       JSON.stringify({ action: "removed", githubRepositoryId: 98765, repositoryPrivate: true }),
     ]);
     expect(calls[1]?.sql).toContain("update installations");
+    expect(calls[1]?.sql).toContain("not exists (select 1 from audit_events where id = $3::text)");
     expect(calls[1]?.sql).toContain("where $3::text is not null");
     expect(calls[1]?.params).toEqual([
       12345,

@@ -66,6 +66,38 @@ describe("GitHub App lifecycle normalization", () => {
     ]);
   });
 
+  it("converts installation suspend and unsuspend events into dedicated actions without repository mutations", () => {
+    const suspended = normalizeGitHubAppWebhook({
+      event: "installation",
+      delivery: "delivery-suspend",
+      payload: {
+        action: "suspend",
+        installation,
+        repositories: [repository],
+      },
+    });
+    const unsuspended = normalizeGitHubAppWebhook({
+      event: "installation",
+      delivery: "delivery-unsuspend",
+      payload: {
+        action: "unsuspend",
+        installation,
+        repositories: [repository],
+      },
+    });
+
+    expect(suspended).toMatchObject({
+      accepted: true,
+      action: "suspend",
+      actions: [{ type: "installation.suspended", installation: { id: 12345 } }],
+    });
+    expect(unsuspended).toMatchObject({
+      accepted: true,
+      action: "unsuspend",
+      actions: [{ type: "installation.unsuspended", installation: { id: 12345 } }],
+    });
+  });
+
   it("converts repository add and remove events into repository actions", () => {
     const normalized = normalizeGitHubAppWebhook({
       event: "installation_repositories",

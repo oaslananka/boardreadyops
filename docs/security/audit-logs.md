@@ -123,6 +123,8 @@ allowlisted transitions in the same PostgreSQL statement as the state mutation:
 
 - `github_app.installation.enabled` for an `installation` / `created` action,
 - `github_app.installation.disabled` for an `installation` / `deleted` action,
+- `github_app.installation.suspended` for an `installation` / `suspend` action,
+- `github_app.installation.unsuspended` for an `installation` / `unsuspend` action,
 - `github_app.repository.enabled` for repository additions during installation
   creation or an `installation_repositories` / `added` action,
 - `github_app.repository.disabled` for repository removals during installation
@@ -132,7 +134,14 @@ These events use actor type `github_webhook`. The validated GitHub delivery ID i
 stored as the request ID, while the subject ID and optional repository dimension
 come from the persisted installation/repository rows. Event IDs are derived
 deterministically from the delivery, event type, and external subject ID, so a
-worker retry cannot duplicate an already committed event.
+worker retry cannot duplicate an already committed event. Suspension and
+unsuspension writes are guarded so an event is inserted only when the installation
+state transition actually changes `suspended_at`. A delivery whose audit event was
+already recorded cannot mutate the installation again, even after a later opposite
+transition; repeated or stale deliveries cannot reset the current state or create a
+second transition event. Installation and repository metadata refreshes preserve
+the current suspension/disabled state, and previously recorded enable/disable
+deliveries cannot reverse a later opposite transition.
 
 Event metadata is restricted to the source action, the GitHub installation or
 repository ID, and the `repositoryPrivate` visibility boolean where applicable.
@@ -164,11 +173,11 @@ separate delivery mechanism and event.
 
 The database provides tenant-chain validation, append-only triggers, deterministic
 query indexes, and audit writes for runner registration, runner leases, runner
-results, GitHub installation/repository enablement changes, artifact upload, signed
-artifact download starts, dead-letter replay, and reconciliation operations. The
+results, GitHub installation/repository enablement and suspension changes, artifact
+upload, signed artifact download starts, dead-letter replay, and reconciliation
+operations. The
 authenticated operator export provides the first supported query surface.
 
-Issue #43 remains open for installation suspension/unsuspension coverage, policy
-and waiver event coverage, artifact deletion and expiry events, authenticated
-product UI or customer export, retention controls, and complete release-decision
-reconstruction tests.
+Issue #43 remains open for policy and waiver event coverage, artifact deletion and
+expiry events, authenticated product UI or customer export, retention controls, and
+complete release-decision reconstruction tests.

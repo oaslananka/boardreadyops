@@ -7,7 +7,12 @@ export type EnqueuedReleaseRunWithOutbox = EnqueuedReleaseRun & {
 
 export type GitHubAppDurableLifecycleStore = Pick<
   GitHubAppLifecycleStore,
-  "deleteInstallation" | "removeRepository" | "upsertInstallation" | "upsertRepository"
+  | "deleteInstallation"
+  | "removeRepository"
+  | "suspendInstallation"
+  | "unsuspendInstallation"
+  | "upsertInstallation"
+  | "upsertRepository"
 > & {
   enqueueReleaseRunWithOutbox(action: EnqueueReleaseRunInput): Promise<EnqueuedReleaseRunWithOutbox>;
 };
@@ -16,6 +21,8 @@ export type DurableLifecyclePlanResult = {
   total: number;
   installationsUpserted: number;
   installationsDeleted: number;
+  installationsSuspended: number;
+  installationsUnsuspended: number;
   repositoriesUpserted: number;
   repositoriesRemoved: number;
   releaseRunsPlanned: number;
@@ -31,6 +38,8 @@ export async function planGitHubAppLifecycleActions(
     total: actions.length,
     installationsUpserted: 0,
     installationsDeleted: 0,
+    installationsSuspended: 0,
+    installationsUnsuspended: 0,
     repositoriesUpserted: 0,
     repositoriesRemoved: 0,
     releaseRunsPlanned: 0,
@@ -46,6 +55,14 @@ export async function planGitHubAppLifecycleActions(
       case "installation.deleted":
         await store.deleteInstallation(action, context);
         result.installationsDeleted += 1;
+        break;
+      case "installation.suspended":
+        await store.suspendInstallation(action, context);
+        result.installationsSuspended += 1;
+        break;
+      case "installation.unsuspended":
+        await store.unsuspendInstallation(action, context);
+        result.installationsUnsuspended += 1;
         break;
       case "repository.upsert":
         await store.upsertRepository(action, context);

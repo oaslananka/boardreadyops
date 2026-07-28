@@ -74,6 +74,14 @@ export type GitHubAppLifecycleStore = {
     action: Extract<GitHubAppLifecycleAction, { type: "installation.deleted" }>,
     context?: GitHubAppLifecycleContext,
   ): Promise<void>;
+  suspendInstallation(
+    action: Extract<GitHubAppLifecycleAction, { type: "installation.suspended" }>,
+    context?: GitHubAppLifecycleContext,
+  ): Promise<void>;
+  unsuspendInstallation(
+    action: Extract<GitHubAppLifecycleAction, { type: "installation.unsuspended" }>,
+    context?: GitHubAppLifecycleContext,
+  ): Promise<void>;
   upsertRepository(
     action: Extract<GitHubAppLifecycleAction, { type: "repository.upsert" }>,
     context?: GitHubAppLifecycleContext,
@@ -93,6 +101,8 @@ export type GitHubAppLifecycleExecutionResult = {
   total: number;
   installationsUpserted: number;
   installationsDeleted: number;
+  installationsSuspended: number;
+  installationsUnsuspended: number;
   repositoriesUpserted: number;
   repositoriesRemoved: number;
   releaseRunsQueued: number;
@@ -106,6 +116,8 @@ export const emptyGitHubAppLifecycleExecutionResult = {
   total: 0,
   installationsUpserted: 0,
   installationsDeleted: 0,
+  installationsSuspended: 0,
+  installationsUnsuspended: 0,
   repositoriesUpserted: 0,
   repositoriesRemoved: 0,
   releaseRunsQueued: 0,
@@ -271,6 +283,14 @@ export async function executeGitHubAppLifecycleActions(
         await store.deleteInstallation(action);
         result.installationsDeleted += 1;
         break;
+      case "installation.suspended":
+        await store.suspendInstallation(action);
+        result.installationsSuspended += 1;
+        break;
+      case "installation.unsuspended":
+        await store.unsuspendInstallation(action);
+        result.installationsUnsuspended += 1;
+        break;
       case "repository.upsert":
         await store.upsertRepository(action);
         result.repositoriesUpserted += 1;
@@ -313,6 +333,8 @@ export function createNoopGitHubAppLifecycleStore(): GitHubAppLifecycleStore {
   return {
     async upsertInstallation() {},
     async deleteInstallation() {},
+    async suspendInstallation() {},
+    async unsuspendInstallation() {},
     async upsertRepository() {},
     async removeRepository() {},
     async enqueueReleaseRun() {

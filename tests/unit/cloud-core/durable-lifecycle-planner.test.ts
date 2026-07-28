@@ -25,6 +25,8 @@ function store(): GitHubAppDurableLifecycleStore {
   return {
     upsertInstallation: vi.fn(async () => undefined),
     deleteInstallation: vi.fn(async () => undefined),
+    suspendInstallation: vi.fn(async () => undefined),
+    unsuspendInstallation: vi.fn(async () => undefined),
     upsertRepository: vi.fn(async () => undefined),
     removeRepository: vi.fn(async () => undefined),
     enqueueReleaseRunWithOutbox: vi.fn(async () => ({
@@ -44,12 +46,40 @@ describe("durable lifecycle planner", () => {
       total: 1,
       installationsUpserted: 0,
       installationsDeleted: 0,
+      installationsSuspended: 0,
+      installationsUnsuspended: 0,
       repositoriesUpserted: 0,
       repositoriesRemoved: 0,
       releaseRunsPlanned: 1,
       outboxEffectsPlanned: 1,
     });
     expect(lifecycle.enqueueReleaseRunWithOutbox).toHaveBeenCalledWith(releaseAction);
+  });
+
+  it("plans installation suspension transitions with webhook audit context", async () => {
+    const lifecycle = store();
+    const installation = { id: 12345, accountLogin: "oaslananka", accountType: "User" };
+    const suspended = { type: "installation.suspended" as const, installation };
+    const unsuspended = { type: "installation.unsuspended" as const, installation };
+    const context = {
+      deliveryId: "delivery-suspension",
+      eventType: "installation",
+      eventAction: "suspend",
+    };
+
+    await expect(planGitHubAppLifecycleActions([suspended, unsuspended], lifecycle, context)).resolves.toEqual({
+      total: 2,
+      installationsUpserted: 0,
+      installationsDeleted: 0,
+      installationsSuspended: 1,
+      installationsUnsuspended: 1,
+      repositoriesUpserted: 0,
+      repositoriesRemoved: 0,
+      releaseRunsPlanned: 0,
+      outboxEffectsPlanned: 0,
+    });
+    expect(lifecycle.suspendInstallation).toHaveBeenCalledWith(suspended, context);
+    expect(lifecycle.unsuspendInstallation).toHaveBeenCalledWith(unsuspended, context);
   });
 
   it("preserves action order for replay-safe database changes", async () => {

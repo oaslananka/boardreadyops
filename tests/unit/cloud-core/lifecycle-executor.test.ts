@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GitHubAppLifecycleAction } from "../../../packages/cloud-core/src/lifecycle.js";
 import {
+  createNoopGitHubAppLifecycleStore,
   type DispatchReleaseRunWorkflowInput,
   type EnqueueReleaseRunInput,
   executeGitHubAppLifecycleActions,
@@ -47,6 +48,8 @@ function lifecycleStore(overrides: Partial<GitHubAppLifecycleStore> = {}): GitHu
   return {
     upsertInstallation: vi.fn(async () => undefined),
     deleteInstallation: vi.fn(async () => undefined),
+    suspendInstallation: vi.fn(async () => undefined),
+    unsuspendInstallation: vi.fn(async () => undefined),
     upsertRepository: vi.fn(async () => undefined),
     removeRepository: vi.fn(async () => undefined),
     enqueueReleaseRun: vi.fn(async () => ({
@@ -104,6 +107,8 @@ describe("GitHub App lifecycle execution", () => {
       total: 3,
       installationsUpserted: 1,
       installationsDeleted: 0,
+      installationsSuspended: 0,
+      installationsUnsuspended: 0,
       repositoriesUpserted: 1,
       repositoriesRemoved: 0,
       releaseRunsQueued: 1,
@@ -112,6 +117,55 @@ describe("GitHub App lifecycle execution", () => {
       workflowDispatchesCreated: 0,
       workflowDispatchesSkipped: 1,
     });
+  });
+
+  it("dispatches installation suspension transitions to dedicated store methods", async () => {
+    const calls: string[] = [];
+    const store = lifecycleStore({
+      suspendInstallation: vi.fn(async () => {
+        calls.push("installation.suspended");
+      }),
+      unsuspendInstallation: vi.fn(async () => {
+        calls.push("installation.unsuspended");
+      }),
+    });
+    const actions: GitHubAppLifecycleAction[] = [
+      { type: "installation.suspended", installation },
+      { type: "installation.unsuspended", installation },
+    ];
+
+    const result = await executeGitHubAppLifecycleActions(actions, store);
+
+    expect(calls).toEqual(["installation.suspended", "installation.unsuspended"]);
+    expect(result).toEqual({
+      total: 2,
+      installationsUpserted: 0,
+      installationsDeleted: 0,
+      installationsSuspended: 1,
+      installationsUnsuspended: 1,
+      repositoriesUpserted: 0,
+      repositoriesRemoved: 0,
+      releaseRunsQueued: 0,
+      checkRunsCreated: 0,
+      checkRunsSkipped: 0,
+      workflowDispatchesCreated: 0,
+      workflowDispatchesSkipped: 0,
+    });
+  });
+
+  it("accepts suspension transitions through the no-op lifecycle store", async () => {
+    const actions: GitHubAppLifecycleAction[] = [
+      { type: "installation.suspended", installation },
+      { type: "installation.unsuspended", installation },
+    ];
+
+    await expect(executeGitHubAppLifecycleActions(actions, createNoopGitHubAppLifecycleStore())).resolves.toMatchObject(
+      {
+        total: 2,
+        installationsSuspended: 1,
+        installationsUnsuspended: 1,
+      },
+    );
   });
 
   it("creates a stable release run idempotency key", () => {
