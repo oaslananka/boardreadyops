@@ -27,6 +27,8 @@ describe("audit log documentation", () => {
   it("documents retry-safe GitHub lifecycle auditing without pull-request noise", async () => {
     const documentation = await readFile(documentationUrl, "utf8");
     expect(documentation).toContain("`github_app.installation.enabled`");
+    expect(documentation).toContain("`github_app.installation.suspended`");
+    expect(documentation).toContain("`github_app.installation.unsuspended`");
     expect(documentation).toContain("`github_app.repository.disabled`");
     expect(documentation).toContain("actor type `github_webhook`");
     expect(documentation).toContain("Event IDs are derived");
@@ -35,5 +37,7 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("`repositoryPrivate`");
     expect(documentation).toContain("webhook signatures");
     expect(documentation).toContain("payload bodies");
+    expect(documentation).toContain("state transition actually changes `suspended_at`");
+    expect(documentation).not.toContain("remains open for installation suspension/unsuspension coverage");
   });
 });

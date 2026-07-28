@@ -24,7 +24,12 @@ export type SqlLifecycleStoreOptions = {
 
 export type GitHubAppMetadataStore = Pick<
   GitHubAppLifecycleStore,
-  "upsertInstallation" | "deleteInstallation" | "upsertRepository" | "removeRepository"
+  | "upsertInstallation"
+  | "deleteInstallation"
+  | "suspendInstallation"
+  | "unsuspendInstallation"
+  | "upsertRepository"
+  | "removeRepository"
 >;
 
 export const releaseRepositoryRolloutEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES";
@@ -55,7 +60,12 @@ function deterministicAuditEventId(parts: readonly (number | string)[]): string 
 }
 
 function installationAuditEventType(
-  action: Extract<GitHubAppLifecycleAction, { type: "installation.upsert" | "installation.deleted" }>,
+  action: Extract<
+    GitHubAppLifecycleAction,
+    {
+      type: "installation.upsert" | "installation.deleted" | "installation.suspended" | "installation.unsuspended";
+    }
+  >,
   context: GitHubAppLifecycleContext,
 ): string | undefined {
   if (context.eventType !== "installation") return undefined;
@@ -64,6 +74,12 @@ function installationAuditEventType(
   }
   if (action.type === "installation.deleted" && context.eventAction === "deleted") {
     return "github_app.installation.disabled";
+  }
+  if (action.type === "installation.suspended" && context.eventAction === "suspend") {
+    return "github_app.installation.suspended";
+  }
+  if (action.type === "installation.unsuspended" && context.eventAction === "unsuspend") {
+    return "github_app.installation.unsuspended";
   }
   return undefined;
 }
@@ -91,7 +107,12 @@ export function lifecycleAuditEventForAction(
 ): GitHubLifecycleAuditEvent | undefined {
   if (!context || action.type === "release_run.enqueue") return undefined;
 
-  if (action.type === "installation.upsert" || action.type === "installation.deleted") {
+  if (
+    action.type === "installation.upsert" ||
+    action.type === "installation.deleted" ||
+    action.type === "installation.suspended" ||
+    action.type === "installation.unsuspended"
+  ) {
     const eventType = installationAuditEventType(action, context);
     if (!eventType) return undefined;
     return {
@@ -182,6 +203,41 @@ export function createSqlGitHubAppMetadataStore(
       audit?.requestId ?? null,
       JSON.stringify(audit?.metadata ?? {}),
     ] as const;
+  const persistInstallationSuspensionTransition = async (
+    action: Extract<GitHubAppLifecycleAction, { type: "installation.suspended" | "installation.unsuspended" }>,
+    context: GitHubAppLifecycleContext | undefined,
+    suspended: boolean,
+  ) => {
+    const at = iso(now);
+    const audit = lifecycleAuditEventForAction(action, context);
+    await executor.query(
+      `with persisted as (
+         update installations
+         set suspended_at = $2::timestamptz
+         where github_installation_id = $1
+           and (
+             $4::text is null
+             or not exists (select 1 from audit_events where id = $4::text)
+           )
+           and (
+             ($2::timestamptz is null and suspended_at is not null)
+             or ($2::timestamptz is not null and suspended_at is null)
+           )
+         returning id
+       ), audited as (
+         insert into audit_events (
+           id, installation_id, event_type, actor_type, subject_type, subject_id,
+           request_id, metadata, created_at
+         )
+         select $4, persisted.id, $5, 'github_webhook', $6, persisted.id, $7, $8::jsonb, $3
+         from persisted
+         where $4::text is not null
+         on conflict (id) do nothing
+       )
+       select id from persisted`,
+      [action.installation.id, suspended ? at : null, at, ...auditParameters(audit)],
+    );
+  };
 
   return {
     async upsertInstallation(action, context) {
@@ -192,7 +248,15 @@ export function createSqlGitHubAppMetadataStore(
            insert into installations (id, github_installation_id, account_login, account_type, created_at, suspended_at)
            values ($1, $2, $3, $4, $5, null)
            on conflict (github_installation_id)
-           do update set account_login = excluded.account_login, account_type = excluded.account_type, suspended_at = null
+           do update set
+             account_login = excluded.account_login,
+             account_type = excluded.account_type,
+             suspended_at = case
+               when $6::text is not null
+                 and not exists (select 1 from audit_events where id = $6::text)
+               then null
+               else installations.suspended_at
+             end
            returning id
          ), audited as (
            insert into audit_events (
@@ -224,6 +288,10 @@ export function createSqlGitHubAppMetadataStore(
            update installations
            set suspended_at = $2
            where github_installation_id = $1
+             and (
+               $3::text is null
+               or not exists (select 1 from audit_events where id = $3::text)
+             )
            returning id
          ), audited as (
            insert into audit_events (
@@ -240,6 +308,14 @@ export function createSqlGitHubAppMetadataStore(
       );
     },
 
+    async suspendInstallation(action, context) {
+      await persistInstallationSuspensionTransition(action, context, true);
+    },
+
+    async unsuspendInstallation(action, context) {
+      await persistInstallationSuspensionTransition(action, context, false);
+    },
+
     async upsertRepository(action, context) {
       const at = iso(now);
       const audit = lifecycleAuditEventForAction(action, context);
@@ -250,7 +326,18 @@ export function createSqlGitHubAppMetadataStore(
            from installations
            where github_installation_id = $1
            on conflict (github_repo_id)
-           do update set installation_id = excluded.installation_id, owner = excluded.owner, name = excluded.name, private = excluded.private, default_branch = excluded.default_branch, disabled_at = null
+           do update set
+             installation_id = excluded.installation_id,
+             owner = excluded.owner,
+             name = excluded.name,
+             private = excluded.private,
+             default_branch = excluded.default_branch,
+             disabled_at = case
+               when $9::text is not null
+                 and not exists (select 1 from audit_events where id = $9::text)
+               then null
+               else repositories.disabled_at
+             end
            returning id, installation_id
          ), audited as (
            insert into audit_events (
@@ -286,6 +373,10 @@ export function createSqlGitHubAppMetadataStore(
            update repositories
            set disabled_at = $3
            where github_repo_id = $1
+             and (
+               $4::text is null
+               or not exists (select 1 from audit_events where id = $4::text)
+             )
              and exists (
                select 1 from installations
                where installations.id = repositories.installation_id

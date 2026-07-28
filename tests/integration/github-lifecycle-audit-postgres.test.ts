@@ -149,6 +149,159 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
     ]);
   });
 
+  it("records only real installation suspension transitions and exports them", async () => {
+    const lifecycle = store();
+    const createdContext = {
+      deliveryId: "delivery-installation-created-for-suspension",
+      eventType: "installation",
+      eventAction: "created",
+    };
+    await planGitHubAppLifecycleActions([{ type: "installation.upsert", installation }], lifecycle, createdContext);
+
+    const suspended = { type: "installation.suspended" as const, installation };
+    const suspendContext = {
+      deliveryId: "delivery-installation-suspend",
+      eventType: "installation",
+      eventAction: "suspend",
+    };
+    await planGitHubAppLifecycleActions([suspended], lifecycle, suspendContext);
+    await planGitHubAppLifecycleActions([suspended], lifecycle, suspendContext);
+
+    const suspendedRows = rows(
+      await database().query("select suspended_at from installations where github_installation_id = $1", [
+        installationExternalId,
+      ]),
+    );
+    expect(suspendedRows).toEqual([{ suspended_at: expect.any(Date) }]);
+
+    await planGitHubAppLifecycleActions([{ type: "installation.upsert", installation }], lifecycle, {
+      deliveryId: "delivery-pull-request-after-suspend",
+      eventType: "pull_request",
+      eventAction: "synchronize",
+    });
+    const afterMetadataRefresh = rows(
+      await database().query("select suspended_at from installations where github_installation_id = $1", [
+        installationExternalId,
+      ]),
+    );
+    expect(afterMetadataRefresh).toEqual([{ suspended_at: expect.any(Date) }]);
+
+    await planGitHubAppLifecycleActions([{ type: "installation.upsert", installation }], lifecycle, createdContext);
+    const afterStaleCreatedReplay = rows(
+      await database().query("select suspended_at from installations where github_installation_id = $1", [
+        installationExternalId,
+      ]),
+    );
+    expect(afterStaleCreatedReplay).toEqual([{ suspended_at: expect.any(Date) }]);
+
+    const unsuspended = { type: "installation.unsuspended" as const, installation };
+    const unsuspendContext = {
+      deliveryId: "delivery-installation-unsuspend",
+      eventType: "installation",
+      eventAction: "unsuspend",
+    };
+    await planGitHubAppLifecycleActions([unsuspended], lifecycle, unsuspendContext);
+    await planGitHubAppLifecycleActions([unsuspended], lifecycle, unsuspendContext);
+
+    const installationRows = rows(
+      await database().query("select id, suspended_at from installations where github_installation_id = $1", [
+        installationExternalId,
+      ]),
+    );
+    const installationId = installationRows[0]?.id;
+    if (typeof installationId !== "string") throw new Error("installation fixture was not persisted");
+    expect(installationRows).toEqual([{ id: installationId, suspended_at: null }]);
+
+    const persisted = rows(
+      await database().query(
+        `select event_type, request_id, metadata
+           from audit_events
+          where request_id in ($1, $2)
+          order by event_type`,
+        [suspendContext.deliveryId, unsuspendContext.deliveryId],
+      ),
+    );
+    expect(persisted).toEqual([
+      {
+        event_type: "github_app.installation.suspended",
+        request_id: suspendContext.deliveryId,
+        metadata: { action: "suspend", githubInstallationId: installationExternalId },
+      },
+      {
+        event_type: "github_app.installation.unsuspended",
+        request_id: unsuspendContext.deliveryId,
+        metadata: { action: "unsuspend", githubInstallationId: installationExternalId },
+      },
+    ]);
+
+    const auditExport = createSqlAuditLogStore(database());
+    await expect(
+      auditExport.listAuditEvents({ installationId, eventType: "github_app.installation.suspended" }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        installationId,
+        eventType: "github_app.installation.suspended",
+        requestId: suspendContext.deliveryId,
+        metadata: { action: "suspend", githubInstallationId: installationExternalId },
+      }),
+    ]);
+    await expect(
+      auditExport.listAuditEvents({ installationId, eventType: "github_app.installation.unsuspended" }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        installationId,
+        eventType: "github_app.installation.unsuspended",
+        requestId: unsuspendContext.deliveryId,
+        metadata: { action: "unsuspend", githubInstallationId: installationExternalId },
+      }),
+    ]);
+
+    const resuspendContext = {
+      deliveryId: "delivery-installation-resuspend",
+      eventType: "installation",
+      eventAction: "suspend",
+    };
+    await planGitHubAppLifecycleActions([suspended], lifecycle, resuspendContext);
+    await planGitHubAppLifecycleActions([unsuspended], lifecycle, unsuspendContext);
+
+    const afterStaleUnsuspendReplay = rows(
+      await database().query("select suspended_at from installations where github_installation_id = $1", [
+        installationExternalId,
+      ]),
+    );
+    expect(afterStaleUnsuspendReplay).toEqual([{ suspended_at: expect.any(Date) }]);
+
+    const reunsuspendContext = {
+      deliveryId: "delivery-installation-reunsuspend",
+      eventType: "installation",
+      eventAction: "unsuspend",
+    };
+    await planGitHubAppLifecycleActions([unsuspended], lifecycle, reunsuspendContext);
+    await planGitHubAppLifecycleActions([suspended], lifecycle, resuspendContext);
+
+    const afterStaleSuspendReplay = rows(
+      await database().query("select suspended_at from installations where github_installation_id = $1", [
+        installationExternalId,
+      ]),
+    );
+    expect(afterStaleSuspendReplay).toEqual([{ suspended_at: null }]);
+
+    const replayProtectedEvents = rows(
+      await database().query(
+        `select request_id, count(*)::int as count
+           from audit_events
+          where request_id in ($1, $2)
+          group by request_id
+          order by request_id`,
+        [resuspendContext.deliveryId, reunsuspendContext.deliveryId],
+      ),
+    );
+    expect(replayProtectedEvents).toEqual([
+      { request_id: resuspendContext.deliveryId, count: 1 },
+      { request_id: reunsuspendContext.deliveryId, count: 1 },
+    ]);
+  });
+
   it("records repository removal and installation deletion under the same tenant", async () => {
     const lifecycle = store();
     await planGitHubAppLifecycleActions([{ type: "repository.removed", installation, repository }], lifecycle, {
@@ -194,5 +347,53 @@ describeDatabase("GitHub lifecycle audit PostgreSQL integration", () => {
         github_repo_id: String(repositoryExternalId),
       },
     ]);
+
+    await planGitHubAppLifecycleActions([{ type: "repository.upsert", installation, repository }], lifecycle, {
+      deliveryId: "delivery-pull-request-after-repository-removal",
+      eventType: "pull_request",
+      eventAction: "synchronize",
+    });
+    const afterRepositoryMetadataRefresh = rows(
+      await database().query("select disabled_at from repositories where github_repo_id = $1", [repositoryExternalId]),
+    );
+    expect(afterRepositoryMetadataRefresh).toEqual([{ disabled_at: expect.any(Date) }]);
+
+    const repositoryReaddedContext = {
+      deliveryId: "delivery-repository-readded",
+      eventType: "installation_repositories",
+      eventAction: "added",
+    };
+    await planGitHubAppLifecycleActions(
+      [{ type: "repository.upsert", installation, repository }],
+      lifecycle,
+      repositoryReaddedContext,
+    );
+    await planGitHubAppLifecycleActions([{ type: "repository.removed", installation, repository }], lifecycle, {
+      deliveryId: "delivery-repository-removed",
+      eventType: "installation_repositories",
+      eventAction: "removed",
+    });
+    const afterStaleRepositoryRemovalReplay = rows(
+      await database().query("select disabled_at from repositories where github_repo_id = $1", [repositoryExternalId]),
+    );
+    expect(afterStaleRepositoryRemovalReplay).toEqual([{ disabled_at: null }]);
+
+    await planGitHubAppLifecycleActions([{ type: "installation.upsert", installation }], lifecycle, {
+      deliveryId: "delivery-installation-recreated",
+      eventType: "installation",
+      eventAction: "created",
+    });
+    await planGitHubAppLifecycleActions([{ type: "installation.deleted", installation }], lifecycle, {
+      deliveryId: "delivery-installation-deleted",
+      eventType: "installation",
+      eventAction: "deleted",
+    });
+
+    const afterStaleDeleteReplay = rows(
+      await database().query("select suspended_at from installations where github_installation_id = $1", [
+        installationExternalId,
+      ]),
+    );
+    expect(afterStaleDeleteReplay).toEqual([{ suspended_at: null }]);
   });
 });
