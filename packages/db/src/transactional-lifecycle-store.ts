@@ -5,7 +5,7 @@ import type {
 } from "@boardreadyops/cloud-core/durable-lifecycle-planner";
 import { releaseRunIdempotencyKey } from "@boardreadyops/cloud-core/lifecycle-executor";
 import {
-  createSqlGitHubAppLifecycleStore,
+  createSqlGitHubAppMetadataStore,
   type ReleaseRepositoryRolloutPolicy,
   releaseRepositoryRolloutPolicyFromEnvironment,
   type SqlLifecycleStoreOptions,
@@ -39,7 +39,7 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
   executor: SqlQueryExecutor,
   options: SqlLifecycleStoreOptions = {},
 ): GitHubAppDurableLifecycleStore {
-  const base = createSqlGitHubAppLifecycleStore(executor, options);
+  const base = createSqlGitHubAppMetadataStore(executor, options);
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
   const rollout = options.releaseRepositoryRolloutPolicy ?? releaseRepositoryRolloutPolicyFromEnvironment(process.env);
