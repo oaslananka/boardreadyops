@@ -91,8 +91,12 @@ Relinquish and valid lease expiry are bounded retry paths. They terminalize or s
 
 Run-version drift, attempt-version drift, or current-attempt pointer drift fails closed. A stale expired lease may be closed operationally so it cannot be reused, but it cannot change the newer logical-run or attempt lifecycle state and cannot append lifecycle transition events for that newer state.
 
-## Phased adoption
+## Production enforcement and observability
 
-Schemas 24 through 29 have moved workflow-dispatch completion, Check Run creation, workflow reconciliation, newer-commit supersession, runner-result persistence, and runner lease lifecycle changes onto expected-state/version/current-attempt guards. These paths now increment versions and append transition evidence at the authoritative PostgreSQL boundary.
+Schemas 24 through 29 move workflow-dispatch completion, Check Run creation, workflow reconciliation, newer-commit supersession, runner-result persistence, and runner lease lifecycle changes onto expected-state/version/current-attempt guards. These paths increment versions and append transition evidence at the authoritative PostgreSQL boundary.
 
-Issue #23 remains open for the final production-writer audit: retire or migrate the legacy `LifecycleStore` direct writers, verify no later runner protocol definition bypasses the guarded functions, and complete dashboard/metrics/audit surfacing for transition conflicts and recovery outcomes. Historical SQL in earlier migrations is not treated as active behavior when a later migration replaces the function.
+The runtime metadata-only lifecycle store is limited to installation and repository CRUD. Durable release-run creation uses `boardreadyops_enqueue_release_run_with_outbox`, while dispatch, Check Run, reconciliation, callback, supersession, and runner-lease state changes use the guarded functions owned by schemas 24 through 29. The `verify:transition-writers` CI gate rejects direct runtime SQL writers for `release_runs` or `release_run_attempts`, rejects the retired lifecycle factory, and verifies that every protected PostgreSQL function is last defined by its expected guarded migration.
+
+The hosted run dashboard exposes a **Lifecycle transitions** timeline from the append-only event table. It returns at most 100 newest-first records and displays only entity type, execution-attempt identifier, from/to status, from/to version, stable reason code, and timestamp. Older runs without versioned events show an explicit empty state. Source, findings, artifacts, webhook payloads, credentials, raw errors, and free-form metadata are not queried for this timeline.
+
+Operational visibility remains split by audience: the dashboard shows per-run state and retry history, Check Runs communicate the current readiness outcome, aggregate SLI/SLO signals cover stale attempts and reconciliation backlog, and durable reconciliation/audit records retain stable recovery outcome codes. Historical SQL in earlier migrations is not active behavior when a later migration replaces the function.

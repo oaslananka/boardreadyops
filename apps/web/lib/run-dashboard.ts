@@ -32,6 +32,7 @@ type RunDetail = {
   findings: FindingDetail[];
   artifacts: ArtifactDetail[];
   attempts: AttemptDetail[];
+  transitions: TransitionDetail[];
 };
 
 type ReportLinkDetail = {
@@ -74,6 +75,17 @@ type AttemptDetail = {
   failureClass: string | undefined;
   failureMessage: string | undefined;
   resultDigest: string | undefined;
+};
+
+type TransitionDetail = {
+  entityType: string;
+  executionAttemptId: string | undefined;
+  fromStatus: string;
+  toStatus: string;
+  fromVersion: number;
+  toVersion: number;
+  reasonCode: string;
+  occurredAt: string;
 };
 
 export type RunLookupResult = { state: "not-configured" } | { state: "not-found" } | { state: "found"; run: RunDetail };
@@ -240,7 +252,7 @@ export async function lookupRunDashboard(
     return { state: "not-found" };
   }
 
-  const [findingsResult, artifactsResult, attemptsResult] = await Promise.all([
+  const [findingsResult, artifactsResult, attemptsResult, transitionsResult] = await Promise.all([
     executor.query(
       `select rule_id, severity, message, path, kind, waived_at
        from findings
@@ -261,6 +273,16 @@ export async function lookupRunDashboard(
        from release_run_attempts
        where run_id = $1
        order by attempt_number desc`,
+      [runId],
+    ),
+    executor.query(
+      `select entity_type, execution_attempt_id, from_status, to_status,
+              from_version::int as from_version, to_version::int as to_version,
+              reason_code, occurred_at
+       from release_run_transition_events
+       where release_run_id = $1
+       order by occurred_at desc, id desc
+       limit 100`,
       [runId],
     ),
   ]);
@@ -311,6 +333,19 @@ export async function lookupRunDashboard(
     }),
   );
 
+  const transitions = rows(transitionsResult).map(
+    (row): TransitionDetail => ({
+      entityType: requiredString(row, "entity_type"),
+      executionAttemptId: stringValue(row, "execution_attempt_id"),
+      fromStatus: requiredString(row, "from_status"),
+      toStatus: requiredString(row, "to_status"),
+      fromVersion: numberValue(row, "from_version") ?? 0,
+      toVersion: numberValue(row, "to_version") ?? 0,
+      reasonCode: requiredString(row, "reason_code"),
+      occurredAt: requiredString(row, "occurred_at"),
+    }),
+  );
+
   return {
     state: "found",
     run: {
@@ -340,6 +375,7 @@ export async function lookupRunDashboard(
       findings,
       artifacts,
       attempts,
+      transitions,
     },
   };
 }
