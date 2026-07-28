@@ -36,7 +36,11 @@ export async function processControlPlaneJob(
   dependencies: ControlPlaneWorkerDependencies,
 ): Promise<ProcessControlPlaneJobResult> {
   try {
-    await planGitHubAppLifecycleActions(job.actions, dependencies.lifecycle);
+    await planGitHubAppLifecycleActions(job.actions, dependencies.lifecycle, {
+      deliveryId: job.deliveryId,
+      eventType: job.eventType,
+      ...(job.eventAction ? { eventAction: job.eventAction } : {}),
+    });
     const status = await dependencies.jobs.completeJob({
       jobId: job.jobId,
       workerId: dependencies.workerId,

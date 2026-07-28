@@ -64,7 +64,11 @@ describe("control-plane worker", () => {
     });
 
     expect(result).toMatchObject({ status: "completed", jobId: "job-1" });
-    expect(lifecycle.upsertInstallation).toHaveBeenCalledOnce();
+    expect(lifecycle.upsertInstallation).toHaveBeenCalledWith(job.actions[0], {
+      deliveryId: "delivery-1",
+      eventType: "installation",
+      eventAction: "created",
+    });
     expect(jobs.completeJob).toHaveBeenCalledWith({ jobId: "job-1", workerId: "worker-1" });
     expect(jobs.failJob).not.toHaveBeenCalled();
   });
