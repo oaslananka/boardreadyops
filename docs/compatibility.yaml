@@ -1,11 +1,11 @@
 source_checked:
-  date: "2026-06-02"
+  date: "2026-07-28"
   node:
     releases: "https://nodejs.org/en/about/previous-releases"
     schedule: "https://github.com/nodejs/Release#release-schedule"
     index: "https://nodejs.org/dist/index.json"
   kicad:
-    release: "https://www.kicad.org/blog/2026/05/KiCad-10.0.4-Release/"
+    release: "https://www.kicad.org/blog/2026/07/KiCad-10.0.5-Release/"
     linux_packages: "https://www.kicad.org/download/linux-distros/"
     tags: "https://gitlab.com/kicad/code/kicad/-/tags"
   cyclonedx:
@@ -17,7 +17,7 @@ source_checked:
 kicad:
   minimum: "9.0"
   recommended: "10.0"
-  latestVerified: "10.0.4"
+  latestVerified: "10.0.5"
   eol:
     - "9.0"
   tested:

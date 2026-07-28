@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 import { buildDriftReport, findCompatibilityDrift, renderSupportMatrix } from "../../../scripts/compatibility.mjs";
 
 type CompatibilityConfig = {
+  source_checked: {
+    date: string;
+    kicad: { release: string };
+  };
   kicad: {
     minimum: string;
     recommended: string;
@@ -70,8 +74,8 @@ describe("compatibility matrix", () => {
     expect(supportMatrix).toBe(renderSupportMatrix(config));
     expect(supportMatrix).toContain("| KiCad | 9.0 | Minimum supported, upstream EOL, not CI-tested |");
     expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line |");
-    expect(supportMatrix).toContain("Latest verified patch: **10.0.4**");
-    expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line | 10.0.4 |");
+    expect(supportMatrix).toContain("Latest verified patch: **10.0.5**");
+    expect(supportMatrix).toContain("| KiCad | 10.0 | Recommended CI-tested line | 10.0.5 |");
     expect(supportMatrix).not.toContain("| KiCad | 9.1 | Supported |");
     expect(supportMatrix).not.toContain("| KiCad | 10.1 | Supported |");
     expect(supportMatrix).toContain("| Node.js | 22 | Minimum supported runtime |");
@@ -413,7 +417,9 @@ describe("compatibility matrix", () => {
     expect(integrationRuns).toContain("pnpm run test:int");
     expect(config.kicad.tested).toEqual(["10.0"]);
     expect(config.kicad.eol).toEqual(["9.0"]);
-    expect(config.kicad.latestVerified).toBe("10.0.4");
+    expect(config.source_checked.date).toBe("2026-07-28");
+    expect(config.source_checked.kicad.release).toBe("https://www.kicad.org/blog/2026/07/KiCad-10.0.5-Release/");
+    expect(config.kicad.latestVerified).toBe("10.0.5");
     expect(config.node.supported).toEqual(["22", "24"]);
     expect(config.node.current).toEqual(["26"]);
     expect(crossPlatform?.strategy?.matrix?.os).toEqual(["ubuntu-24.04", "macos-latest", "windows-2025-vs2026"]);
@@ -442,7 +448,7 @@ describe("compatibility matrix", () => {
     expect(readme).toContain("Node.js 22.14+ and 24");
     expect(readme).toMatch(/Node\.js 26\s+Current is tracked but not supported/);
     expect(readme).toContain("CI-tested on KiCad 10.0");
-    expect(readme).toMatch(/10\.0\.4 as the latest\s+verified patch/);
+    expect(readme).toMatch(/10\.0\.5 as the latest\s+verified patch/);
     expect(readme).not.toContain("KiCad 9.0 and 10.0");
     expect(readme).toContain("docs/support-matrix.md");
   });
