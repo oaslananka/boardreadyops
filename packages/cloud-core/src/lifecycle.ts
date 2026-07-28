@@ -32,6 +32,14 @@ export type GitHubAppLifecycleAction =
       installation: GitHubInstallationRef;
     }
   | {
+      type: "installation.suspended";
+      installation: GitHubInstallationRef;
+    }
+  | {
+      type: "installation.unsuspended";
+      installation: GitHubInstallationRef;
+    }
+  | {
       type: "repository.upsert";
       installation: GitHubInstallationRef;
       repository: GitHubRepositoryRef;
@@ -288,6 +296,15 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
   }
 
   if (options.event === "installation") {
+    if (action === "suspend" || action === "unsuspend") {
+      return result(options, action, [
+        {
+          type: action === "suspend" ? "installation.suspended" : "installation.unsuspended",
+          installation,
+        },
+      ]);
+    }
+
     const repositories = arrayValue(options.payload, "repositories").flatMap((repository) => {
       const parsed = repositoryFromPayload(repository);
       return parsed ? [parsed] : [];

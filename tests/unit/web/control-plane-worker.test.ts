@@ -7,6 +7,8 @@ function lifecycleStore(): GitHubAppDurableLifecycleStore {
   return {
     upsertInstallation: vi.fn(async () => undefined),
     deleteInstallation: vi.fn(async () => undefined),
+    suspendInstallation: vi.fn(async () => undefined),
+    unsuspendInstallation: vi.fn(async () => undefined),
     upsertRepository: vi.fn(async () => undefined),
     removeRepository: vi.fn(async () => undefined),
     enqueueReleaseRunWithOutbox: vi.fn(async () => ({

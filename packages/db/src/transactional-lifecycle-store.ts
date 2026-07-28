@@ -47,6 +47,8 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
   return {
     upsertInstallation: base.upsertInstallation,
     deleteInstallation: base.deleteInstallation,
+    suspendInstallation: base.suspendInstallation,
+    unsuspendInstallation: base.unsuspendInstallation,
     upsertRepository: base.upsertRepository,
     removeRepository: base.removeRepository,
 
