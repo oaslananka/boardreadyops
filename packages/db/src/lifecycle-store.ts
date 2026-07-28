@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
-import type { GitHubAppLifecycleAction } from "@boardreadyops/cloud-core/lifecycle";
+import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "@boardreadyops/cloud-core/lifecycle";
+import type { GitHubAppLifecycleStore } from "@boardreadyops/cloud-core/lifecycle-executor";
 
 export type SqlQueryResult = {
   rows?: readonly Record<string, unknown>[];
@@ -21,12 +22,10 @@ export type SqlLifecycleStoreOptions = {
   releaseRepositoryRolloutPolicy?: ReleaseRepositoryRolloutPolicy;
 };
 
-export type GitHubAppMetadataStore = {
-  upsertInstallation(action: Extract<GitHubAppLifecycleAction, { type: "installation.upsert" }>): Promise<void>;
-  deleteInstallation(action: Extract<GitHubAppLifecycleAction, { type: "installation.deleted" }>): Promise<void>;
-  upsertRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.upsert" }>): Promise<void>;
-  removeRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.removed" }>): Promise<void>;
-};
+export type GitHubAppMetadataStore = Pick<
+  GitHubAppLifecycleStore,
+  "upsertInstallation" | "deleteInstallation" | "upsertRepository" | "removeRepository"
+>;
 
 export const releaseRepositoryRolloutEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES";
 export const releaseRepositoryRolloutFileEnvName = "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE";
@@ -37,6 +36,89 @@ type Environment = Record<string, string | undefined>;
 
 function iso(now: () => Date): string {
   return now().toISOString();
+}
+
+export type GitHubLifecycleAuditEvent = {
+  id: string;
+  eventType: string;
+  requestId: string;
+  subjectType: "installation" | "repository";
+  metadata: Readonly<Record<string, boolean | number | string>>;
+};
+
+function deterministicAuditEventId(parts: readonly (number | string)[]): string {
+  const digest = createHash("sha256").update(parts.join("\u0000"), "utf8").digest().subarray(0, 16);
+  digest[6] = ((digest[6] ?? 0) & 0x0f) | 0x80;
+  digest[8] = ((digest[8] ?? 0) & 0x3f) | 0x80;
+  const hex = digest.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function installationAuditEventType(
+  action: Extract<GitHubAppLifecycleAction, { type: "installation.upsert" | "installation.deleted" }>,
+  context: GitHubAppLifecycleContext,
+): string | undefined {
+  if (context.eventType !== "installation") return undefined;
+  if (action.type === "installation.upsert" && context.eventAction === "created") {
+    return "github_app.installation.enabled";
+  }
+  if (action.type === "installation.deleted" && context.eventAction === "deleted") {
+    return "github_app.installation.disabled";
+  }
+  return undefined;
+}
+
+function repositoryAuditEventType(
+  action: Extract<GitHubAppLifecycleAction, { type: "repository.upsert" | "repository.removed" }>,
+  context: GitHubAppLifecycleContext,
+): string | undefined {
+  const enabled =
+    action.type === "repository.upsert" &&
+    ((context.eventType === "installation" && context.eventAction === "created") ||
+      (context.eventType === "installation_repositories" && context.eventAction === "added"));
+  if (enabled) return "github_app.repository.enabled";
+
+  const disabled =
+    action.type === "repository.removed" &&
+    ((context.eventType === "installation" && context.eventAction === "deleted") ||
+      (context.eventType === "installation_repositories" && context.eventAction === "removed"));
+  return disabled ? "github_app.repository.disabled" : undefined;
+}
+
+export function lifecycleAuditEventForAction(
+  action: GitHubAppLifecycleAction,
+  context: GitHubAppLifecycleContext | undefined,
+): GitHubLifecycleAuditEvent | undefined {
+  if (!context || action.type === "release_run.enqueue") return undefined;
+
+  if (action.type === "installation.upsert" || action.type === "installation.deleted") {
+    const eventType = installationAuditEventType(action, context);
+    if (!eventType) return undefined;
+    return {
+      id: deterministicAuditEventId([context.deliveryId, eventType, action.installation.id]),
+      eventType,
+      requestId: context.deliveryId,
+      subjectType: "installation",
+      metadata: {
+        action: context.eventAction ?? "unknown",
+        githubInstallationId: action.installation.id,
+      },
+    };
+  }
+
+  const eventType = repositoryAuditEventType(action, context);
+  if (!eventType) return undefined;
+  return {
+    id: deterministicAuditEventId([context.deliveryId, eventType, action.repository.id]),
+    eventType,
+    requestId: context.deliveryId,
+    subjectType: "repository",
+    metadata: {
+      action: context.eventAction ?? "unknown",
+      githubRepositoryId: action.repository.id,
+      repositoryPrivate: action.repository.private,
+    },
+  };
 }
 
 function normalizeRepositoryFullName(fullName: string): string | undefined {
@@ -92,41 +174,96 @@ export function createSqlGitHubAppMetadataStore(
 ): GitHubAppMetadataStore {
   const now = options.now ?? (() => new Date());
   const id = options.id ?? randomUUID;
+  const auditParameters = (audit: GitHubLifecycleAuditEvent | undefined) =>
+    [
+      audit?.id ?? null,
+      audit?.eventType ?? null,
+      audit?.subjectType ?? null,
+      audit?.requestId ?? null,
+      JSON.stringify(audit?.metadata ?? {}),
+    ] as const;
 
   return {
-    async upsertInstallation(action) {
+    async upsertInstallation(action, context) {
+      const at = iso(now);
+      const audit = lifecycleAuditEventForAction(action, context);
       await executor.query(
-        `insert into installations (id, github_installation_id, account_login, account_type, created_at, suspended_at)
-         values ($1, $2, $3, $4, $5, null)
-         on conflict (github_installation_id)
-         do update set account_login = excluded.account_login, account_type = excluded.account_type, suspended_at = null`,
+        `with persisted as (
+           insert into installations (id, github_installation_id, account_login, account_type, created_at, suspended_at)
+           values ($1, $2, $3, $4, $5, null)
+           on conflict (github_installation_id)
+           do update set account_login = excluded.account_login, account_type = excluded.account_type, suspended_at = null
+           returning id
+         ), audited as (
+           insert into audit_events (
+             id, installation_id, event_type, actor_type, subject_type, subject_id,
+             request_id, metadata, created_at
+           )
+           select $6, persisted.id, $7, 'github_webhook', $8, persisted.id, $9, $10::jsonb, $5
+           from persisted
+           where $6::text is not null
+           on conflict (id) do nothing
+         )
+         select id from persisted`,
         [
           id(),
           action.installation.id,
           action.installation.accountLogin ?? "",
           action.installation.accountType ?? "",
-          iso(now),
+          at,
+          ...auditParameters(audit),
         ],
       );
     },
 
-    async deleteInstallation(action) {
+    async deleteInstallation(action, context) {
+      const at = iso(now);
+      const audit = lifecycleAuditEventForAction(action, context);
       await executor.query(
-        `update installations
-         set suspended_at = $2
-         where github_installation_id = $1`,
-        [action.installation.id, iso(now)],
+        `with persisted as (
+           update installations
+           set suspended_at = $2
+           where github_installation_id = $1
+           returning id
+         ), audited as (
+           insert into audit_events (
+             id, installation_id, event_type, actor_type, subject_type, subject_id,
+             request_id, metadata, created_at
+           )
+           select $3, persisted.id, $4, 'github_webhook', $5, persisted.id, $6, $7::jsonb, $2
+           from persisted
+           where $3::text is not null
+           on conflict (id) do nothing
+         )
+         select id from persisted`,
+        [action.installation.id, at, ...auditParameters(audit)],
       );
     },
 
-    async upsertRepository(action) {
+    async upsertRepository(action, context) {
+      const at = iso(now);
+      const audit = lifecycleAuditEventForAction(action, context);
       await executor.query(
-        `insert into repositories (id, installation_id, github_repo_id, owner, name, private, default_branch, enabled_at, disabled_at)
-         select $8, id, $2, $3, $4, $5, $6, $7, null
-         from installations
-         where github_installation_id = $1
-         on conflict (github_repo_id)
-         do update set installation_id = excluded.installation_id, owner = excluded.owner, name = excluded.name, private = excluded.private, default_branch = excluded.default_branch, disabled_at = null`,
+        `with persisted as (
+           insert into repositories (id, installation_id, github_repo_id, owner, name, private, default_branch, enabled_at, disabled_at)
+           select $8, id, $2, $3, $4, $5, $6, $7, null
+           from installations
+           where github_installation_id = $1
+           on conflict (github_repo_id)
+           do update set installation_id = excluded.installation_id, owner = excluded.owner, name = excluded.name, private = excluded.private, default_branch = excluded.default_branch, disabled_at = null
+           returning id, installation_id
+         ), audited as (
+           insert into audit_events (
+             id, installation_id, event_type, actor_type, subject_type, subject_id,
+             repository_id, request_id, metadata, created_at
+           )
+           select $9, persisted.installation_id, $10, 'github_webhook', $11, persisted.id,
+                  persisted.id, $12, $13::jsonb, $7
+           from persisted
+           where $9::text is not null
+           on conflict (id) do nothing
+         )
+         select id from persisted`,
         [
           action.installation.id,
           action.repository.id,
@@ -134,23 +271,40 @@ export function createSqlGitHubAppMetadataStore(
           action.repository.name,
           action.repository.private,
           action.repository.defaultBranch ?? "main",
-          iso(now),
+          at,
           id(),
+          ...auditParameters(audit),
         ],
       );
     },
 
-    async removeRepository(action) {
+    async removeRepository(action, context) {
+      const at = iso(now);
+      const audit = lifecycleAuditEventForAction(action, context);
       await executor.query(
-        `update repositories
-         set disabled_at = $3
-         where github_repo_id = $1
-           and exists (
-             select 1 from installations
-             where installations.id = repositories.installation_id
-               and installations.github_installation_id = $2
-           )`,
-        [action.repository.id, action.installation.id, iso(now)],
+        `with persisted as (
+           update repositories
+           set disabled_at = $3
+           where github_repo_id = $1
+             and exists (
+               select 1 from installations
+               where installations.id = repositories.installation_id
+                 and installations.github_installation_id = $2
+             )
+           returning id, installation_id
+         ), audited as (
+           insert into audit_events (
+             id, installation_id, event_type, actor_type, subject_type, subject_id,
+             repository_id, request_id, metadata, created_at
+           )
+           select $4, persisted.installation_id, $5, 'github_webhook', $6, persisted.id,
+                  persisted.id, $7, $8::jsonb, $3
+           from persisted
+           where $4::text is not null
+           on conflict (id) do nothing
+         )
+         select id from persisted`,
+        [action.repository.id, action.installation.id, at, ...auditParameters(audit)],
       );
     },
   };

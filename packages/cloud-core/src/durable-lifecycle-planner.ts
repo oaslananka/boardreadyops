@@ -1,4 +1,4 @@
-import type { GitHubAppLifecycleAction } from "./lifecycle.js";
+import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "./lifecycle.js";
 import type { EnqueuedReleaseRun, EnqueueReleaseRunInput, GitHubAppLifecycleStore } from "./lifecycle-executor.js";
 
 export type EnqueuedReleaseRunWithOutbox = EnqueuedReleaseRun & {
@@ -25,6 +25,7 @@ export type DurableLifecyclePlanResult = {
 export async function planGitHubAppLifecycleActions(
   actions: readonly GitHubAppLifecycleAction[],
   store: GitHubAppDurableLifecycleStore,
+  context?: GitHubAppLifecycleContext,
 ): Promise<DurableLifecyclePlanResult> {
   const result: DurableLifecyclePlanResult = {
     total: actions.length,
@@ -39,19 +40,19 @@ export async function planGitHubAppLifecycleActions(
   for (const action of actions) {
     switch (action.type) {
       case "installation.upsert":
-        await store.upsertInstallation(action);
+        await store.upsertInstallation(action, context);
         result.installationsUpserted += 1;
         break;
       case "installation.deleted":
-        await store.deleteInstallation(action);
+        await store.deleteInstallation(action, context);
         result.installationsDeleted += 1;
         break;
       case "repository.upsert":
-        await store.upsertRepository(action);
+        await store.upsertRepository(action, context);
         result.repositoriesUpserted += 1;
         break;
       case "repository.removed":
-        await store.removeRepository(action);
+        await store.removeRepository(action, context);
         result.repositoriesRemoved += 1;
         break;
       case "release_run.enqueue": {
