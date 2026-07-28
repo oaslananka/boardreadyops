@@ -63,6 +63,12 @@ export type GitHubAppLifecycleResult = {
   actions: GitHubAppLifecycleAction[];
 };
 
+export type GitHubAppLifecycleContext = {
+  deliveryId: string;
+  eventType: string;
+  eventAction?: string;
+};
+
 export type NormalizeGitHubAppWebhookOptions = {
   event: string;
   delivery: string;

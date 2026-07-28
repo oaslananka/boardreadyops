@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { GitHubAppLifecycleAction } from "./lifecycle.js";
+import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "./lifecycle.js";
 
 export type EnqueueReleaseRunInput = Extract<GitHubAppLifecycleAction, { type: "release_run.enqueue" }>;
 
@@ -66,10 +66,22 @@ export type GitHubAppWorkflowDispatchClient = {
 };
 
 export type GitHubAppLifecycleStore = {
-  upsertInstallation(action: Extract<GitHubAppLifecycleAction, { type: "installation.upsert" }>): Promise<void>;
-  deleteInstallation(action: Extract<GitHubAppLifecycleAction, { type: "installation.deleted" }>): Promise<void>;
-  upsertRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.upsert" }>): Promise<void>;
-  removeRepository(action: Extract<GitHubAppLifecycleAction, { type: "repository.removed" }>): Promise<void>;
+  upsertInstallation(
+    action: Extract<GitHubAppLifecycleAction, { type: "installation.upsert" }>,
+    context?: GitHubAppLifecycleContext,
+  ): Promise<void>;
+  deleteInstallation(
+    action: Extract<GitHubAppLifecycleAction, { type: "installation.deleted" }>,
+    context?: GitHubAppLifecycleContext,
+  ): Promise<void>;
+  upsertRepository(
+    action: Extract<GitHubAppLifecycleAction, { type: "repository.upsert" }>,
+    context?: GitHubAppLifecycleContext,
+  ): Promise<void>;
+  removeRepository(
+    action: Extract<GitHubAppLifecycleAction, { type: "repository.removed" }>,
+    context?: GitHubAppLifecycleContext,
+  ): Promise<void>;
   enqueueReleaseRun(action: EnqueueReleaseRunInput): Promise<EnqueuedReleaseRun>;
   attachGitHubCheckRun(input: AttachGitHubCheckRunInput): Promise<void>;
   bindReleaseRunExecutionAttempt(input: BindReleaseRunExecutionAttemptInput): Promise<boolean>;

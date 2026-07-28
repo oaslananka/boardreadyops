@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createSqlGitHubAppMetadataStore,
+  lifecycleAuditEventForAction,
   parseReleaseRepositoryRolloutPolicy,
   releaseRepositoryRolloutEnvName,
   releaseRepositoryRolloutFileEnvName,
@@ -108,6 +109,11 @@ describe("SQL GitHub App metadata store", () => {
       "octo-org",
       "Organization",
       "2026-07-04T00:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      "{}",
     ]);
   });
 
@@ -133,6 +139,11 @@ describe("SQL GitHub App metadata store", () => {
       "main",
       "2026-07-04T00:00:00.000Z",
       "repository-row-id",
+      null,
+      null,
+      null,
+      null,
+      "{}",
     ]);
   });
 
@@ -150,5 +161,218 @@ describe("SQL GitHub App metadata store", () => {
     expect("bindReleaseRunExecutionAttempt" in store).toBe(false);
     expect("markReleaseRunDispatched" in store).toBe(false);
     expect("markReleaseRunSkipped" in store).toBe(false);
+  });
+});
+
+describe("GitHub lifecycle audit event selection", () => {
+  const created = {
+    deliveryId: "delivery-created",
+    eventType: "installation",
+    eventAction: "created",
+  };
+
+  it("selects tenant lifecycle events with deterministic retry-safe identifiers", () => {
+    const installationAction = { type: "installation.upsert" as const, installation };
+    const first = lifecycleAuditEventForAction(installationAction, created);
+    const replay = lifecycleAuditEventForAction(installationAction, created);
+
+    expect(first).toEqual({
+      id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u),
+      eventType: "github_app.installation.enabled",
+      requestId: "delivery-created",
+      subjectType: "installation",
+      metadata: {
+        action: "created",
+        githubInstallationId: 12345,
+      },
+    });
+    expect(replay?.id).toBe(first?.id);
+  });
+
+  it("selects repository add/remove and installation deletion events", () => {
+    expect(
+      lifecycleAuditEventForAction(
+        { type: "repository.upsert", installation, repository },
+        { deliveryId: "delivery-added", eventType: "installation_repositories", eventAction: "added" },
+      ),
+    ).toMatchObject({
+      eventType: "github_app.repository.enabled",
+      requestId: "delivery-added",
+      subjectType: "repository",
+      metadata: { action: "added", githubRepositoryId: 98765, repositoryPrivate: true },
+    });
+    expect(
+      lifecycleAuditEventForAction(
+        { type: "repository.removed", installation, repository },
+        { deliveryId: "delivery-removed", eventType: "installation_repositories", eventAction: "removed" },
+      ),
+    ).toMatchObject({ eventType: "github_app.repository.disabled", subjectType: "repository" });
+    expect(
+      lifecycleAuditEventForAction(
+        { type: "installation.deleted", installation },
+        { deliveryId: "delivery-deleted", eventType: "installation", eventAction: "deleted" },
+      ),
+    ).toMatchObject({ eventType: "github_app.installation.disabled", subjectType: "installation" });
+  });
+
+  it("does not misclassify pull-request metadata upserts as enablement changes", () => {
+    const pullRequestContext = {
+      deliveryId: "delivery-pr",
+      eventType: "pull_request",
+      eventAction: "synchronize",
+    };
+    expect(
+      lifecycleAuditEventForAction({ type: "installation.upsert", installation }, pullRequestContext),
+    ).toBeUndefined();
+    expect(
+      lifecycleAuditEventForAction({ type: "repository.upsert", installation, repository }, pullRequestContext),
+    ).toBeUndefined();
+    expect(
+      lifecycleAuditEventForAction(
+        { type: "installation.upsert", installation },
+        {
+          deliveryId: "delivery-permissions",
+          eventType: "installation",
+          eventAction: "new_permissions_accepted",
+        },
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("SQL GitHub lifecycle audit writes", () => {
+  it("persists installation enablement and its audit event atomically", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      id: () => "installation-row-id",
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    await store.upsertInstallation(
+      { type: "installation.upsert", installation },
+      { deliveryId: "delivery-created", eventType: "installation", eventAction: "created" },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("with persisted as");
+    expect(calls[0]?.sql).toContain("insert into audit_events");
+    expect(calls[0]?.sql).toContain("'github_webhook'");
+    expect(calls[0]?.sql).toContain("on conflict (id) do nothing");
+    expect(calls[0]?.params).toEqual([
+      "installation-row-id",
+      12345,
+      "octo-org",
+      "Organization",
+      "2026-07-04T00:00:00.000Z",
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      "github_app.installation.enabled",
+      "installation",
+      "delivery-created",
+      JSON.stringify({ action: "created", githubInstallationId: 12345 }),
+    ]);
+  });
+
+  it("persists repository enablement with the internal tenant dimension", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      id: () => "repository-row-id",
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    await store.upsertRepository(
+      { type: "repository.upsert", installation, repository },
+      { deliveryId: "delivery-added", eventType: "installation_repositories", eventAction: "added" },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("returning id, installation_id");
+    expect(calls[0]?.sql).toContain("persisted.installation_id");
+    expect(calls[0]?.sql).toContain("subject_type, subject_id");
+    expect(calls[0]?.sql).toContain("repository_id, request_id");
+    expect(calls[0]?.params).toEqual([
+      12345,
+      98765,
+      "octo-org",
+      "hardware-board",
+      true,
+      "main",
+      "2026-07-04T00:00:00.000Z",
+      "repository-row-id",
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      "github_app.repository.enabled",
+      "repository",
+      "delivery-added",
+      JSON.stringify({ action: "added", githubRepositoryId: 98765, repositoryPrivate: true }),
+    ]);
+  });
+
+  it("keeps pull-request metadata upserts audit-free with a null descriptor", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      id: () => "installation-row-id",
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    await store.upsertInstallation(
+      { type: "installation.upsert", installation },
+      { deliveryId: "delivery-pr", eventType: "pull_request", eventAction: "synchronize" },
+    );
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("insert into audit_events");
+    expect(calls[0]?.sql).toContain("where $6::text is not null");
+    expect(calls[0]?.params).toEqual([
+      "installation-row-id",
+      12345,
+      "octo-org",
+      "Organization",
+      "2026-07-04T00:00:00.000Z",
+      null,
+      null,
+      null,
+      null,
+      "{}",
+    ]);
+  });
+
+  it("persists repository and installation disablement atomically", async () => {
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+    });
+
+    await store.removeRepository(
+      { type: "repository.removed", installation, repository },
+      { deliveryId: "delivery-removed", eventType: "installation_repositories", eventAction: "removed" },
+    );
+    await store.deleteInstallation(
+      { type: "installation.deleted", installation },
+      { deliveryId: "delivery-deleted", eventType: "installation", eventAction: "deleted" },
+    );
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.sql).toContain("returning id, installation_id");
+    expect(calls[0]?.sql).toContain("where $4::text is not null");
+    expect(calls[0]?.params).toEqual([
+      98765,
+      12345,
+      "2026-07-04T00:00:00.000Z",
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      "github_app.repository.disabled",
+      "repository",
+      "delivery-removed",
+      JSON.stringify({ action: "removed", githubRepositoryId: 98765, repositoryPrivate: true }),
+    ]);
+    expect(calls[1]?.sql).toContain("update installations");
+    expect(calls[1]?.sql).toContain("where $3::text is not null");
+    expect(calls[1]?.params).toEqual([
+      12345,
+      "2026-07-04T00:00:00.000Z",
+      expect.stringMatching(/^[0-9a-f-]{36}$/u),
+      "github_app.installation.disabled",
+      "installation",
+      "delivery-deleted",
+      JSON.stringify({ action: "deleted", githubInstallationId: 12345 }),
+    ]);
   });
 });

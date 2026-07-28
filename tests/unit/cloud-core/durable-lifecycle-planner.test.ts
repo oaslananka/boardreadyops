@@ -73,4 +73,27 @@ describe("durable lifecycle planner", () => {
       vi.mocked(lifecycle.enqueueReleaseRunWithOutbox).mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
     );
   });
+  it("passes webhook audit context only to lifecycle metadata mutations", async () => {
+    const lifecycle = store();
+    const installationAction = {
+      type: "installation.upsert" as const,
+      installation: { id: 12345, accountLogin: "oaslananka", accountType: "User" },
+    };
+    const repositoryAction = {
+      type: "repository.upsert" as const,
+      installation: installationAction.installation,
+      repository: releaseAction.repository,
+    };
+    const context = {
+      deliveryId: "delivery-123",
+      eventType: "installation",
+      eventAction: "created",
+    };
+
+    await planGitHubAppLifecycleActions([installationAction, repositoryAction, releaseAction], lifecycle, context);
+
+    expect(lifecycle.upsertInstallation).toHaveBeenCalledWith(installationAction, context);
+    expect(lifecycle.upsertRepository).toHaveBeenCalledWith(repositoryAction, context);
+    expect(lifecycle.enqueueReleaseRunWithOutbox).toHaveBeenCalledWith(releaseAction);
+  });
 });

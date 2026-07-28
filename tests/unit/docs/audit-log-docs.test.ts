@@ -24,4 +24,16 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("URL signatures");
     expect(documentation).toContain("IP addresses");
   });
+  it("documents retry-safe GitHub lifecycle auditing without pull-request noise", async () => {
+    const documentation = await readFile(documentationUrl, "utf8");
+    expect(documentation).toContain("`github_app.installation.enabled`");
+    expect(documentation).toContain("`github_app.repository.disabled`");
+    expect(documentation).toContain("actor type `github_webhook`");
+    expect(documentation).toContain("Event IDs are derived");
+    expect(documentation).toContain("deterministically from the delivery");
+    expect(documentation).toContain("`pull_request` events do not produce enablement audit entries");
+    expect(documentation).toContain("`repositoryPrivate`");
+    expect(documentation).toContain("webhook signatures");
+    expect(documentation).toContain("payload bodies");
+  });
 });
