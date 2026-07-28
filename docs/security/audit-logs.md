@@ -115,14 +115,35 @@ curl --fail --silent --show-error \
   "https://boardreadyops.example/api/v1/operator/installations/INSTALLATION_ID/audit-events?releaseRunId=RUN_ID&limit=50"
 ```
 
+## Artifact download access events
+
+A signed artifact URL records `artifact.download.started` only after the URL
+signature, metadata lookup, local storage containment, regular-file status, and
+expected byte count have all been verified. The audit insert completes before
+the response stream is created. If the event cannot be persisted, the file handle
+is closed and the route returns a stable `503` response without serving bytes.
+
+The event uses actor type `signed_url`, subject type `artifact`, and the validated
+installation, repository, release-run, and artifact dimensions derived from the
+database relationship chain. Its metadata is limited to the stored byte count,
+SHA-256 digest, artifact kind, and artifact role. URL signatures, query strings,
+IP addresses, authorization headers, cookies, and raw request headers are not
+recorded.
+
+The event name deliberately says `started`: it proves that authorization and file
+validation succeeded and that streaming was permitted, but it does not claim that
+the client received every byte. Transfer-completion accounting would require a
+separate delivery mechanism and event.
+
 ## Current implementation status
 
 The database provides tenant-chain validation, append-only triggers, deterministic
 query indexes, and audit writes for runner registration, runner leases, runner
-results, artifact upload, dead-letter replay, and reconciliation operations. The
-authenticated operator export provides the first supported query surface.
+results, artifact upload, signed artifact download starts, dead-letter replay, and
+reconciliation operations. The authenticated operator export provides the first
+supported query surface.
 
 Issue #43 remains open for installation/repository enablement events, policy and
-waiver event coverage, artifact download/deletion events, authenticated product
+waiver event coverage, artifact deletion and expiry events, authenticated product
 UI or customer export, retention controls, and complete release-decision
 reconstruction tests.

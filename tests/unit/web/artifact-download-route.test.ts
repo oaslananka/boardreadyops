@@ -5,7 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type ArtifactDownloadRecord,
   type ArtifactDownloadRouteDependencies,
+  createArtifactDownloadRouteDependencies,
+  GET,
   handleArtifactDownloadRequest,
+  lookupArtifactDownload,
+  recordArtifactDownloadStarted,
 } from "../../../apps/web/app/api/v1/runs/[runId]/artifacts/[artifactId]/download/route.js";
 import { artifactDownloadExpiry, signArtifactDownload } from "../../../apps/web/lib/artifact-downloads.js";
 
@@ -43,6 +47,8 @@ function artifact(overrides: Partial<ArtifactDownloadRecord> = {}): ArtifactDown
   return {
     id: "artifact-456",
     runId: "run-123",
+    installationId: "installation-789",
+    repositoryId: "repository-234",
     kind: "release-archive",
     name: "board résumé.zip",
     storagePath: "run-123/board.zip",
@@ -57,6 +63,7 @@ function dependencies(
   storageRoot: string,
   lookupArtifact: ArtifactDownloadRouteDependencies["lookupArtifact"],
   environment: Readonly<Record<string, string | undefined>> = {},
+  recordDownloadStarted: ArtifactDownloadRouteDependencies["recordDownloadStarted"] = vi.fn(async () => undefined),
 ): ArtifactDownloadRouteDependencies {
   return {
     environment: {
@@ -66,11 +73,146 @@ function dependencies(
       ...environment,
     },
     lookupArtifact,
+    recordDownloadStarted,
     now: () => now,
   };
 }
 
+describe("artifact download audit database operations", () => {
+  it("looks up tenant dimensions through the release-run repository chain", async () => {
+    const query = vi.fn(async () => ({
+      rows: [
+        {
+          id: "artifact-456",
+          run_id: "run-123",
+          installation_id: "installation-789",
+          repository_id: "repository-234",
+          kind: "release-archive",
+          name: "board.zip",
+          storage_path: "run-123/board.zip",
+          sha256: "a".repeat(64),
+          bytes: 12,
+          role: "primary",
+        },
+      ],
+    }));
+
+    await expect(lookupArtifactDownload("run-123", "artifact-456", { query })).resolves.toEqual({
+      state: "found",
+      artifact: artifact({ name: "board.zip" }),
+    });
+    const call = (query.mock.calls as unknown as Array<[string, readonly unknown[] | undefined]>).at(0);
+    expect(call).toBeDefined();
+    const sql = call?.[0] ?? "";
+    const parameters = call?.[1];
+    expect(sql).toContain("join release_runs");
+    expect(sql).toContain("join repositories");
+    expect(sql).toContain("repository.installation_id");
+    expect(parameters).toEqual(["artifact-456", "run-123"]);
+  });
+
+  it("returns not-found for missing or malformed query results", async () => {
+    await expect(
+      lookupArtifactDownload("run-123", "artifact-456", { query: vi.fn(async () => ({})) }),
+    ).resolves.toEqual({ state: "not-found" });
+    await expect(
+      lookupArtifactDownload("run-123", "artifact-456", { query: vi.fn(async () => ({ rows: [] })) }),
+    ).resolves.toEqual({ state: "not-found" });
+  });
+
+  it("shares one configured executor between lookup and audit writes", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "artifact-456",
+            run_id: "run-123",
+            installation_id: "installation-789",
+            repository_id: "repository-234",
+            kind: "release-archive",
+            name: "board.zip",
+            storage_path: "run-123/board.zip",
+            sha256: "a".repeat(64),
+            bytes: 12,
+            role: "primary",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+    const executor = { query };
+    const createQueryExecutor = vi.fn(() => executor);
+    const configured = createArtifactDownloadRouteDependencies(
+      { DATABASE_URL: "postgresql://db.example/boardreadyops", DATABASE_POOL_MAX: "7" },
+      { createQueryExecutor },
+    );
+
+    const lookup = await configured.lookupArtifact("run-123", "artifact-456");
+    expect(lookup.state).toBe("found");
+    if (lookup.state !== "found") throw new Error("configured artifact was not found");
+    await configured.recordDownloadStarted(lookup.artifact);
+
+    expect(createQueryExecutor).toHaveBeenCalledOnce();
+    expect(createQueryExecutor).toHaveBeenCalledWith({
+      connectionString: "postgresql://db.example/boardreadyops",
+      max: 7,
+    });
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps database operations disabled without a connection string", async () => {
+    const createQueryExecutor = vi.fn();
+    const disabled = createArtifactDownloadRouteDependencies({}, { createQueryExecutor });
+
+    await expect(disabled.lookupArtifact("run-123", "artifact-456")).resolves.toEqual({
+      state: "not-configured",
+    });
+    await expect(disabled.recordDownloadStarted(artifact())).rejects.toThrow(
+      "artifact metadata store is not configured",
+    );
+    expect(createQueryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("writes a fixed tenant-scoped signed-link access event without request secrets", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    await recordArtifactDownloadStarted(artifact(), { query });
+
+    const call = (query.mock.calls as unknown as Array<[string, readonly unknown[] | undefined]>).at(0);
+    expect(call).toBeDefined();
+    const sql = call?.[0] ?? "";
+    const parameters = call?.[1];
+    expect(sql).toContain("insert into audit_events");
+    expect(sql).toContain("'artifact.download.started'");
+    expect(sql).toContain("'signed_url'");
+    expect(sql).toContain("'artifact'");
+    expect(parameters).toEqual([
+      "installation-789",
+      "repository-234",
+      "run-123",
+      "artifact-456",
+      JSON.stringify({
+        bytes: 12,
+        sha256: "a".repeat(64),
+        itemType: "release-archive",
+        scope: "primary",
+      }),
+    ]);
+    expect(JSON.stringify(parameters)).not.toContain("sig");
+    expect(JSON.stringify(parameters)).not.toContain("authorization");
+  });
+});
+
 describe("signed artifact download route", () => {
+  it("delegates the Next GET wrapper and requires a signed URL", async () => {
+    const response = await GET(
+      new Request("https://boardreadyops.test/api/v1/runs/run-123/artifacts/artifact-456/download"),
+      { params: Promise.resolve({ runId: "run-123", artifactId: "artifact-456" }) },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "signed artifact URL is required" });
+  });
+
   it("rejects invalid signatures before querying artifact metadata", async () => {
     const lookupArtifact = vi.fn();
     const response = await handleArtifactDownloadRequest(
@@ -85,6 +227,29 @@ describe("signed artifact download route", () => {
     expect(lookupArtifact).not.toHaveBeenCalled();
   });
 
+  it("hides metadata lookup failures behind a stable unavailable response", async () => {
+    const recordDownloadStarted = vi.fn(async () => undefined);
+    const response = await handleArtifactDownloadRequest(
+      signedRequest("run-123", "artifact-456"),
+      { runId: "run-123", artifactId: "artifact-456" },
+      dependencies(
+        "/unused",
+        vi.fn(async () => {
+          throw new Error("database connection detail must not escape");
+        }),
+        {},
+        recordDownloadStarted,
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "artifact metadata is temporarily unavailable",
+    });
+    expect(recordDownloadStarted).not.toHaveBeenCalled();
+  });
+
   it("streams an authorized local artifact with defensive response headers", async () => {
     const root = await temporaryDirectory();
     await mkdir(path.join(root, "run-123"));
@@ -94,11 +259,12 @@ describe("signed artifact download route", () => {
       state: "found" as const,
       artifact: artifact({ bytes: Buffer.byteLength(payload) }),
     }));
+    const recordDownloadStarted = vi.fn(async () => undefined);
 
     const response = await handleArtifactDownloadRequest(
       signedRequest("run-123", "artifact-456"),
       { runId: "run-123", artifactId: "artifact-456" },
-      dependencies(root, lookupArtifact),
+      dependencies(root, lookupArtifact, {}, recordDownloadStarted),
     );
 
     expect(response.status).toBe(200);
@@ -110,6 +276,8 @@ describe("signed artifact download route", () => {
     expect(response.headers.get("x-boardreadyops-artifact-id")).toBe("artifact-456");
     expect(response.headers.get("x-boardreadyops-artifact-sha256")).toBe("a".repeat(64));
     expect(response.headers.get("content-disposition")).toContain("filename*=UTF-8''board%20r%C3%A9sum%C3%A9.zip");
+    expect(recordDownloadStarted).toHaveBeenCalledOnce();
+    expect(recordDownloadStarted).toHaveBeenCalledWith(artifact({ bytes: Buffer.byteLength(payload) }));
   });
 
   it("rejects metadata size mismatches without serving the file", async () => {
@@ -169,5 +337,53 @@ describe("signed artifact download route", () => {
       dependencies(root, async () => ({ state: "found", artifact: artifact() }), { ARTIFACT_STORAGE_DRIVER: "s3" }),
     );
     expect(unsupported.status).toBe(501);
+  });
+  it("fails closed without streaming when the download audit cannot be recorded", async () => {
+    const root = await temporaryDirectory();
+    await mkdir(path.join(root, "run-123"));
+    const payload = "release-data";
+    await writeFile(path.join(root, "run-123", "board.zip"), payload);
+    const recordDownloadStarted = vi.fn(async () => {
+      throw new Error("database detail must not escape");
+    });
+
+    const response = await handleArtifactDownloadRequest(
+      signedRequest("run-123", "artifact-456"),
+      { runId: "run-123", artifactId: "artifact-456" },
+      dependencies(
+        root,
+        async () => ({ state: "found", artifact: artifact({ bytes: Buffer.byteLength(payload) }) }),
+        {},
+        recordDownloadStarted,
+      ),
+    );
+
+    expect(recordDownloadStarted).toHaveBeenCalledOnce();
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "artifact access audit is temporarily unavailable",
+    });
+  });
+
+  it("does not record access before stored-file validation succeeds", async () => {
+    const root = await temporaryDirectory();
+    await mkdir(path.join(root, "run-123"));
+    await writeFile(path.join(root, "run-123", "board.zip"), "release-data");
+    const recordDownloadStarted = vi.fn(async () => undefined);
+
+    const response = await handleArtifactDownloadRequest(
+      signedRequest("run-123", "artifact-456"),
+      { runId: "run-123", artifactId: "artifact-456" },
+      dependencies(
+        root,
+        async () => ({ state: "found", artifact: artifact({ bytes: 999 }) }),
+        {},
+        recordDownloadStarted,
+      ),
+    );
+
+    expect(response.status).toBe(409);
+    expect(recordDownloadStarted).not.toHaveBeenCalled();
   });
 });
