@@ -24,6 +24,19 @@ describe("control-plane operator documentation", () => {
     expect(documentation).toContain("lastSuccessfulCheckRunReconciliationAt");
   });
 
+  it("documents configurable terminal webhook retention without changing existing deadlines", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+    const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
+
+    expect(deployment).toContain("BOARDREADYOPS_WEBHOOK_RETENTION_DAYS");
+    expect(deployment).toContain("1 through 3650 days");
+    expect(deployment).toContain("newly accepted webhook inbox rows");
+    expect(deployment).toContain("does not rewrite existing `retention_until` deadlines");
+    expect(deployment).toContain("processed, failed, or dead-letter");
+    expect(deployment).toContain("in-flight rows are never purged");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_WEBHOOK_RETENTION_DAYS=30");
+  });
+
   it("documents lifecycle inbox and job drift reconciliation", () => {
     const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
     const operations = fs.readFileSync(documentationPath, "utf8");

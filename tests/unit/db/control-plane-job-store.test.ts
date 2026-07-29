@@ -52,6 +52,7 @@ describe("control-plane job store", () => {
     const store = createSqlControlPlaneJobStore(executor, {
       id: () => ids.shift() ?? "unexpected",
       now: () => new Date("2026-07-20T20:00:00.000Z"),
+      retentionDays: 90,
     });
 
     await expect(store.acceptGitHubWebhook(webhook())).resolves.toMatchObject({
@@ -61,6 +62,7 @@ describe("control-plane job store", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("boardreadyops_accept_github_webhook");
     expect(calls[0]?.params).toContain(JSON.stringify([action]));
+    expect(calls[0]?.params?.[11]).toBe("2026-10-18T20:00:00.000Z");
     expect(calls[0]?.params).not.toContain("GITHUB_WEBHOOK_SECRET");
   });
 
