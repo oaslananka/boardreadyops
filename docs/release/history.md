@@ -14,8 +14,8 @@ All notable changes to BoardReadyOps are recorded here.
 ### Features
 
 * **core:** add tenant-scoped audit export ([#252](https://github.com/oaslananka/boardreadyops/issues/252)) ([dd5868e](https://github.com/oaslananka/boardreadyops/commit/dd5868eb59d4ba156a04794ae72907e71abf119b))
-* **core:** audit artifact download starts ([#254](https://github.com/oaslananka/boardreadyops/issues/254)) ([32454f9](https://github.com/oaslananka/boardreadyops/commit/32454f98b7a4bde9b9ae1965494c3e13339ff757)), closes [#43](https://github.com/oaslananka/boardreadyops/issues/43)
-* **core:** audit GitHub App lifecycle changes ([#255](https://github.com/oaslananka/boardreadyops/issues/255)) ([ba36ebd](https://github.com/oaslananka/boardreadyops/commit/ba36ebd8ea959b4b66684e8bc1d9f2e67f861db7)), closes [#43](https://github.com/oaslananka/boardreadyops/issues/43)
+* **core:** audit artifact download starts ([#254](https://github.com/oaslananka/boardreadyops/issues/254)) ([32454f9](https://github.com/oaslananka/boardreadyops/commit/32454f98b7a4bde9b9ae1965494c3e13339ff757))
+* **core:** audit GitHub App lifecycle changes ([#255](https://github.com/oaslananka/boardreadyops/issues/255)) ([ba36ebd](https://github.com/oaslananka/boardreadyops/commit/ba36ebd8ea959b4b66684e8bc1d9f2e67f861db7))
 * **core:** audit installation suspension lifecycle ([#256](https://github.com/oaslananka/boardreadyops/issues/256)) ([588ed06](https://github.com/oaslananka/boardreadyops/commit/588ed068586b3a97782c0d1ae12f079ffc710657))
 * **core:** audit replaced artifact records ([#258](https://github.com/oaslananka/boardreadyops/issues/258)) ([7c111e1](https://github.com/oaslananka/boardreadyops/commit/7c111e11a39b9a422636b91dc6ef3b5d416ec274))
 * **core:** expose release decision audit summary ([#257](https://github.com/oaslananka/boardreadyops/issues/257)) ([7cf8ed8](https://github.com/oaslananka/boardreadyops/commit/7cf8ed874279f722f40d49ba865b35ef09a7ded2))
