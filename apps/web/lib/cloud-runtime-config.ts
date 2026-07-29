@@ -4,7 +4,8 @@ export type CloudRuntimeConfigurationErrorCode =
   | "invalid-persistence-mode"
   | "memory-persistence-not-allowed"
   | "missing-database-url"
-  | "invalid-webhook-retention-days";
+  | "invalid-webhook-retention-days"
+  | "invalid-artifact-capability-ttl-seconds";
 
 export class CloudRuntimeConfigurationError extends Error {
   readonly code: CloudRuntimeConfigurationErrorCode;
@@ -78,4 +79,37 @@ export function resolveControlPlaneRetentionConfiguration(
   }
 
   return { webhookInboxDays };
+}
+
+export type ArtifactCapabilityConfiguration = { uploadCapabilityTtlSeconds: number };
+
+export function resolveArtifactCapabilityConfiguration(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): ArtifactCapabilityConfiguration {
+  const raw = environment.BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS;
+  if (raw === undefined) {
+    return { uploadCapabilityTtlSeconds: 900 };
+  }
+
+  const normalized = raw.trim();
+  if (!/^\d+$/u.test(normalized)) {
+    throw new CloudRuntimeConfigurationError(
+      "invalid-artifact-capability-ttl-seconds",
+      "BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS must be an integer between 60 and 3600",
+    );
+  }
+
+  const uploadCapabilityTtlSeconds = Number(normalized);
+  if (
+    !Number.isSafeInteger(uploadCapabilityTtlSeconds) ||
+    uploadCapabilityTtlSeconds < 60 ||
+    uploadCapabilityTtlSeconds > 3600
+  ) {
+    throw new CloudRuntimeConfigurationError(
+      "invalid-artifact-capability-ttl-seconds",
+      "BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS must be an integer between 60 and 3600",
+    );
+  }
+
+  return { uploadCapabilityTtlSeconds };
 }
