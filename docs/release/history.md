@@ -13,8 +13,8 @@ All notable changes to BoardReadyOps are recorded here.
 
 ### Features
 
-* **core:** configure artifact capability expiry ([#261](https://github.com/oaslananka/boardreadyops/issues/261)) ([d40b366](https://github.com/oaslananka/boardreadyops/commit/d40b366501fa3fa36ff2655be626929f6a8a5410)), closes [#44](https://github.com/oaslananka/boardreadyops/issues/44)
-* **core:** configure webhook retention ([#259](https://github.com/oaslananka/boardreadyops/issues/259)) ([62db74f](https://github.com/oaslananka/boardreadyops/commit/62db74f378c17f5d7ae5de63d55d612a54570b72)), closes [#44](https://github.com/oaslananka/boardreadyops/issues/44)
+* **core:** configure artifact capability expiry ([#261](https://github.com/oaslananka/boardreadyops/issues/261)) ([d40b366](https://github.com/oaslananka/boardreadyops/commit/d40b366501fa3fa36ff2655be626929f6a8a5410)), relates to [#44](https://github.com/oaslananka/boardreadyops/issues/44)
+* **core:** configure webhook retention ([#259](https://github.com/oaslananka/boardreadyops/issues/259)) ([62db74f](https://github.com/oaslananka/boardreadyops/commit/62db74f378c17f5d7ae5de63d55d612a54570b72)), relates to [#44](https://github.com/oaslananka/boardreadyops/issues/44)
 
 ## [1.20.0](https://github.com/oaslananka/boardreadyops/compare/v1.19.0...v1.20.0) (2026-07-29)
 
