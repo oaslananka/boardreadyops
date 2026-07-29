@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(29);
+    expect(cloudDatabaseSchemaVersion).toBe(30);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -15,6 +15,7 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("RunnerJobLease");
     expect(cloudDatabaseModels).toContain("RunnerRequestNonce");
     expect(cloudDatabaseModels).toContain("RunnerArtifactUploadCapability");
+    expect(cloudDatabaseModels).toContain("ArtifactDeletionJob");
     expect(cloudDatabaseModels).toContain("AuditEvent");
     expect(cloudDatabaseModels).toContain("ReleaseRunResult");
     expect(cloudDatabaseModels).toContain("ReleaseRunAttempt");
@@ -59,6 +60,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0027_guarded_release_run_supersession.sql",
       "0028_guarded_runner_result_transition.sql",
       "0029_guarded_runner_lease_transitions.sql",
+      "0030_artifact_deletion_jobs.sql",
     ]);
   });
 
@@ -297,5 +299,23 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("cloud_schema_migrations");
     expect(sql).toContain("idempotency_key text unique");
     expect(sql).toContain("github_check_run_id bigint");
+  });
+  it("stores durable tenant-scoped artifact deletion jobs in schema v30", async () => {
+    const sql = await readFile(join(migrationsDir, "0030_artifact_deletion_jobs.sql"), "utf8");
+
+    expect(sql).toContain("create table if not exists artifact_deletion_jobs");
+    expect(sql).toContain("boardreadyops_claim_artifact_deletions");
+    expect(sql).toContain("boardreadyops_complete_artifact_deletion");
+    expect(sql).toContain("boardreadyops_fail_artifact_deletion");
+    expect(sql).toContain("for update skip locked");
+    expect(sql).toContain("artifact.object.deleted");
+    expect(sql).toContain("artifact.object.deletion_failed");
+    expect(sql).toContain("updated_expired");
+    expect(sql).toContain("'errorClass', 'lease_expired'");
+    expect(sql).toContain("references installations(id) on delete cascade");
+    expect(sql).toContain("references repositories(id) on delete cascade");
+    expect(sql).toContain("references release_runs(id) on delete cascade");
+    expect(sql).toContain("boardreadyops_validate_artifact_deletion_job_scope");
+    expect(sql).toContain("security invoker");
   });
 });

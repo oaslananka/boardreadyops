@@ -25,6 +25,7 @@ export type ResultRouteDependencies = {
   verifyOidcToken: (token: string, runId: string, executionAttemptId: string | undefined) => Promise<boolean>;
   authenticationVerified?: boolean;
   verifiedLeaseId?: string;
+  artifactStorageDriver?: () => string;
 };
 
 const resultKeyEnvName = "BOARDREADYOPS" + "_RUNNER_RESULT_KEY";
@@ -75,6 +76,11 @@ function createDefaultQueryExecutor() {
 
 function terminalStatus(status: string): boolean {
   return status === "completed" || status === "failed" || status === "timed_out";
+}
+
+function artifactStorageDriver(dependencies: ResultRouteDependencies): string {
+  const value = (dependencies.artifactStorageDriver?.() ?? process.env.ARTIFACT_STORAGE_DRIVER ?? "local").trim();
+  return value === "local" ? "local" : "unsupported";
 }
 
 function checkConclusion(result: {
@@ -553,11 +559,80 @@ export async function handleResultRequest(
               artifact.sha256,
               artifact.bytes,
               artifact.role,
+              artifact.storage_path,
               updated.repository_id,
               repository.installation_id
        from artifacts as artifact
        join updated on updated.id = artifact.run_id
        join repositories as repository on repository.id = updated.repository_id
+     ),
+     queued_artifact_deletions as (
+       insert into artifact_deletion_jobs (
+         artifact_id, installation_id, repository_id, release_run_id,
+         storage_driver, storage_path, deletion_reason, artifact_kind,
+         artifact_role, artifact_sha256, artifact_bytes, available_at, created_at
+       )
+       select captured_artifacts.id,
+              captured_artifacts.installation_id,
+              captured_artifacts.repository_id,
+              captured_artifacts.run_id,
+              $18,
+              captured_artifacts.storage_path,
+              'result_replaced',
+              captured_artifacts.kind,
+              captured_artifacts.role,
+              captured_artifacts.sha256,
+              captured_artifacts.bytes,
+              $5::timestamptz,
+              $5::timestamptz
+       from captured_artifacts
+       where not exists (
+         select 1
+         from jsonb_to_recordset($14::jsonb) as replacement(storage_path text)
+         where replacement.storage_path = captured_artifacts.storage_path
+       )
+         and not exists (
+           select 1
+           from artifacts as retained_artifact
+           where retained_artifact.storage_path = captured_artifacts.storage_path
+             and retained_artifact.run_id <> captured_artifacts.run_id
+         )
+       returning artifact_id
+     ),
+     skipped_artifact_deletion_audit as (
+       insert into audit_events (
+         installation_id,
+         event_type,
+         actor_type,
+         actor_id,
+         subject_type,
+         subject_id,
+         repository_id,
+         release_run_id,
+         metadata
+       )
+       select captured_artifacts.installation_id,
+              'artifact.object.deletion_skipped',
+              'runner',
+              $2,
+              'artifact',
+              captured_artifacts.id,
+              captured_artifacts.repository_id,
+              captured_artifacts.run_id,
+              jsonb_build_object(
+                'reason', 'storage_path_still_referenced',
+                'resultDigest', $13,
+                'executionAttemptId', $2,
+                'bytes', captured_artifacts.bytes,
+                'sha256', captured_artifacts.sha256,
+                'itemType', captured_artifacts.kind,
+                'scope', captured_artifacts.role
+              )
+       from captured_artifacts
+       left join queued_artifact_deletions
+         on queued_artifact_deletions.artifact_id = captured_artifacts.id
+       where queued_artifact_deletions.artifact_id is null
+       returning id
      ),
      deleted_artifacts as (
        delete from artifacts
@@ -601,6 +676,8 @@ export async function handleResultRequest(
      cleared_children as (
        select (select count(*) from deleted_findings) as deleted_finding_count,
               (select count(*) from deleted_artifacts) as deleted_artifact_count,
+              (select count(*) from queued_artifact_deletions) as queued_artifact_deletion_count,
+              (select count(*) from skipped_artifact_deletion_audit) as skipped_artifact_deletion_count,
               (select count(*) from artifact_deletion_audit) as artifact_deletion_audit_count
      ),
      inserted_findings as (
@@ -718,6 +795,8 @@ export async function handleResultRequest(
                 'leaseCompleted', exists(select 1 from completed_lease),
                  'findingCount', (select count(*) from inserted_findings),
                 'artifactCount', (select count(*) from inserted_artifacts),
+                'artifactDeletionJobCount', (select count(*) from queued_artifact_deletions),
+                'artifactDeletionSkippedCount', (select count(*) from skipped_artifact_deletion_audit),
                 'metricCount', (select count(*) from jsonb_object_keys($10::jsonb)),
                 'reportLinkCount', jsonb_array_length($11::jsonb)
               ) || $17::jsonb
@@ -760,6 +839,7 @@ export async function handleResultRequest(
       dependencies.verifiedLeaseId ?? null,
       githubCheckConclusion,
       decisionAuditMetadataJson,
+      artifactStorageDriver(dependencies),
     ],
   );
   const row = rows(updateResult)[0];
