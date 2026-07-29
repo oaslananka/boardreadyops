@@ -36,6 +36,11 @@
       "import": "./src/audit-log-store.ts",
       "default": "./src/audit-log-store.ts"
     },
+    "./artifact-deletion-store": {
+      "types": "./src/artifact-deletion-store.ts",
+      "import": "./src/artifact-deletion-store.ts",
+      "default": "./src/artifact-deletion-store.ts"
+    },
     "./runner-artifact-store": {
       "types": "./src/runner-artifact-store.ts",
       "import": "./src/runner-artifact-store.ts",

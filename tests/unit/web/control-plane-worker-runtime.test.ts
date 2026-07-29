@@ -203,6 +203,20 @@ describe("control-plane worker runtime", () => {
     expect(source.match(/webhookInboxDays/gu)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
+  it("wires durable artifact deletion without exposing storage paths in health", () => {
+    const source = workerSource();
+
+    expect(source).toContain("createSqlArtifactDeletionStore");
+    expect(source).toContain("processArtifactDeletion");
+    expect(source).toContain("runArtifactDeletionLoop()");
+    expect(source).toContain("artifactDeletionConfigurationValid");
+    expect(source).toContain("artifactDeletionLoopEnabled");
+    expect(source).toContain("lastArtifactDeletionPollAt");
+    expect(source).toContain("lastSuccessfulArtifactDeletionAt");
+    expect(source).toContain('"worker.artifact_deletion_terminal"');
+    expect(source).not.toContain("storagePath: result");
+  });
+
   it("wires privacy-safe control-plane SLI collection into maintenance", () => {
     const source = workerSource();
 

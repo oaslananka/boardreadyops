@@ -12,6 +12,10 @@ const repositoryId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
 const attemptId = "44444444-4444-4444-8444-444444444444";
 const replacedArtifactId = "55555555-5555-4555-8555-555555555555";
+const reusedArtifactId = "66666666-6666-4666-8666-666666666666";
+const siblingRunId = "77777777-7777-4777-8777-777777777777";
+const sharedArtifactId = "88888888-8888-4888-8888-888888888888";
+const siblingArtifactId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const completedAt = "2026-07-12T12:00:00.000Z";
 
 type QueryRow = Record<string, unknown>;
@@ -123,6 +127,12 @@ beforeAll(async () => {
     [runId, repositoryId, "0123456789abcdef0123456789abcdef01234567", attemptId, "2026-07-12T11:59:58.750Z"],
   );
   await executor.query(
+    `insert into release_runs (
+       id, repository_id, commit_sha, ref, trigger_kind, status, started_at, completed_at
+     ) values ($1, $2, $3, 'refs/heads/main', 'push', 'completed', $4::timestamptz, $4::timestamptz)`,
+    [siblingRunId, repositoryId, "89abcdef0123456789abcdef0123456789abcdef", "2026-07-12T11:00:00.000Z"],
+  );
+  await executor.query(
     `insert into release_run_attempts (
        id, run_id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at, started_at
      ) values ($1, $2, 1, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
@@ -131,8 +141,25 @@ beforeAll(async () => {
   await executor.query(
     `insert into artifacts (id, run_id, kind, name, storage_path, sha256, bytes, role)
      values ($1, $2, 'legacy-report', 'private-customer-report.html',
-             'private/tenant/run/report.html', $3, 1024, 'legacy')`,
-    [replacedArtifactId, runId, "c".repeat(64)],
+             'private/tenant/run/report.html', $3, 1024, 'legacy'),
+            ($4, $2, 'html-report', 'old-report.html',
+             'runs/33333333-3333-4333-8333-333333333333/report.html', $5, 1536, 'report'),
+            ($6, $2, 'evidence', 'shared-current.bin',
+             'shared/cross-run.bin', $7, 512, 'evidence'),
+            ($8, $9, 'evidence', 'shared-sibling.bin',
+             'shared/cross-run.bin', $10, 512, 'evidence')`,
+    [
+      replacedArtifactId,
+      runId,
+      "c".repeat(64),
+      reusedArtifactId,
+      "d".repeat(64),
+      sharedArtifactId,
+      "e".repeat(64),
+      siblingArtifactId,
+      siblingRunId,
+      "f".repeat(64),
+    ],
   );
 });
 
@@ -254,11 +281,27 @@ describeDatabase("runner result PostgreSQL integration", () => {
         `select
          (select count(*)::int from findings where run_id = $1) as findings,
          (select count(*)::int from artifacts where run_id = $1) as artifacts,
-         (select count(*)::int from artifacts where id = $2) as replaced_artifacts`,
-        [runId, replacedArtifactId],
+         (select count(*)::int from artifacts where id = $2) as replaced_artifacts,
+         (select count(*)::int from artifacts where id = $3) as reused_artifacts,
+         (select count(*)::int from artifact_deletion_jobs where artifact_id = $2) as artifact_deletion_jobs,
+         (select count(*)::int from artifact_deletion_jobs where artifact_id = $3) as reused_artifact_deletion_jobs,
+         (select count(*)::int from artifact_deletion_jobs where artifact_id = $4) as shared_artifact_deletion_jobs,
+         (select count(*)::int from artifacts where id = $5 and run_id = $6) as sibling_shared_artifacts`,
+        [runId, replacedArtifactId, reusedArtifactId, sharedArtifactId, siblingArtifactId, siblingRunId],
       ),
     );
-    expect(childRows).toEqual([{ findings: 1, artifacts: 1, replaced_artifacts: 0 }]);
+    expect(childRows).toEqual([
+      {
+        findings: 1,
+        artifacts: 1,
+        replaced_artifacts: 0,
+        reused_artifacts: 0,
+        artifact_deletion_jobs: 1,
+        reused_artifact_deletion_jobs: 0,
+        shared_artifact_deletion_jobs: 0,
+        sibling_shared_artifacts: 1,
+      },
+    ]);
 
     const auditRows = rows(
       await executor.query(
@@ -270,6 +313,10 @@ describeDatabase("runner result PostgreSQL integration", () => {
       ),
     );
     expect(auditRows.map((row) => row.event_type).sort()).toEqual([
+      "artifact.object.deletion_skipped",
+      "artifact.object.deletion_skipped",
+      "artifact.record.deleted",
+      "artifact.record.deleted",
       "artifact.record.deleted",
       "runner.result.persisted",
       "runner.result.publication_succeeded",
@@ -295,12 +342,16 @@ describeDatabase("runner result PostgreSQL integration", () => {
       staleWaiverCount: 1,
       findingCount: 1,
       artifactCount: 1,
+      artifactDeletionJobCount: 1,
+      artifactDeletionSkippedCount: 2,
     });
     expect(JSON.stringify(persistedAudit?.metadata)).not.toContain("hardware-team");
     expect(JSON.stringify(persistedAudit?.metadata)).not.toContain("Prototype-only");
     expect(JSON.stringify(persistedAudit?.metadata)).not.toContain("internal-review-record");
 
-    const deletionAudit = auditRows.find((row) => row.event_type === "artifact.record.deleted");
+    const deletionAudit = auditRows.find(
+      (row) => row.event_type === "artifact.record.deleted" && row.subject_id === replacedArtifactId,
+    );
     expect(deletionAudit).toMatchObject({
       subject_id: replacedArtifactId,
       artifact_id: null,
@@ -317,12 +368,72 @@ describeDatabase("runner result PostgreSQL integration", () => {
     expect(JSON.stringify(deletionAudit)).not.toContain("private-customer-report.html");
     expect(JSON.stringify(deletionAudit)).not.toContain("private/tenant/run/report.html");
 
+    const skippedDeletionAudit = auditRows.find(
+      (row) => row.event_type === "artifact.object.deletion_skipped" && row.subject_id === reusedArtifactId,
+    );
+    expect(skippedDeletionAudit).toMatchObject({
+      subject_id: reusedArtifactId,
+      artifact_id: null,
+      metadata: {
+        reason: "storage_path_still_referenced",
+        resultDigest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        executionAttemptId: attemptId,
+        bytes: 1536,
+        sha256: "d".repeat(64),
+        itemType: "html-report",
+        scope: "report",
+      },
+    });
+    expect(JSON.stringify(skippedDeletionAudit)).not.toContain("runs/33333333-3333-4333-8333-333333333333/report.html");
+
+    const sharedDeletionAudit = auditRows.find(
+      (row) => row.event_type === "artifact.object.deletion_skipped" && row.subject_id === sharedArtifactId,
+    );
+    expect(sharedDeletionAudit).toMatchObject({
+      subject_id: sharedArtifactId,
+      artifact_id: null,
+      metadata: expect.objectContaining({
+        reason: "storage_path_still_referenced",
+        sha256: "e".repeat(64),
+        itemType: "evidence",
+        scope: "evidence",
+      }),
+    });
+    expect(JSON.stringify(sharedDeletionAudit)).not.toContain("shared/cross-run.bin");
+
+    const deletionJobRows = rows(
+      await executor.query(
+        `select artifact_id, installation_id, repository_id, release_run_id, storage_driver,
+                storage_path, deletion_reason, artifact_kind, artifact_role, artifact_sha256, artifact_bytes, status
+           from artifact_deletion_jobs where artifact_id = $1`,
+        [replacedArtifactId],
+      ),
+    );
+    expect(deletionJobRows).toEqual([
+      {
+        artifact_id: replacedArtifactId,
+        installation_id: installationId,
+        repository_id: repositoryId,
+        release_run_id: runId,
+        storage_driver: "local",
+        storage_path: "private/tenant/run/report.html",
+        deletion_reason: "result_replaced",
+        artifact_kind: "legacy-report",
+        artifact_role: "legacy",
+        artifact_sha256: "c".repeat(64),
+        artifact_bytes: 1024,
+        status: "available",
+      },
+    ]);
+
     const exportedDeletion = await createSqlAuditLogStore(executor).listAuditEvents({
       installationId,
       releaseRunId: runId,
       eventType: "artifact.record.deleted",
     });
-    expect(exportedDeletion).toEqual([
+    expect(exportedDeletion).toHaveLength(3);
+    const exportedReplacedDeletion = exportedDeletion.find((event) => event.subjectId === replacedArtifactId);
+    expect(exportedReplacedDeletion).toEqual(
       expect.objectContaining({
         installationId,
         repositoryId,
@@ -342,8 +453,8 @@ describeDatabase("runner result PostgreSQL integration", () => {
           scope: "legacy",
         },
       }),
-    ]);
-    expect(exportedDeletion[0]).not.toHaveProperty("artifactId");
+    );
+    expect(exportedReplacedDeletion).not.toHaveProperty("artifactId");
 
     const exportedDecision = await createSqlAuditLogStore(executor).listAuditEvents({
       installationId,

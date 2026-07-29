@@ -50,6 +50,21 @@ describe("control-plane operator documentation", () => {
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS=900");
   });
 
+  it("documents durable physical deletion for replaced managed artifacts", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+    const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
+
+    expect(deployment).toContain("tenant-scoped durable physical-deletion job");
+    expect(deployment).toContain("not reused by the accepted replacement");
+    expect(deployment).toContain("artifact.object.deletion_skipped");
+    expect(deployment).toContain("already-missing file as idempotent success");
+    expect(deployment).toContain("dead-letters unsupported drivers or unsafe paths");
+    expect(deployment).toContain("never storage paths");
+    expect(deployment).toContain("artifacts replaced by a newer accepted result");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_ARTIFACT_DELETION_CONCURRENCY=2");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_ARTIFACT_DELETION_POLL_MS=1000");
+  });
+
   it("documents lifecycle inbox and job drift reconciliation", () => {
     const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
     const operations = fs.readFileSync(documentationPath, "utf8");
