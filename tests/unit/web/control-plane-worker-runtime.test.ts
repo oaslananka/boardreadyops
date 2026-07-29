@@ -195,6 +195,14 @@ describe("control-plane worker runtime", () => {
     expect(gate.snapshot()).toEqual({ active: 0, waiting: 0 });
   });
 
+  it("exposes configured webhook retention in operator health", () => {
+    const source = workerSource();
+
+    expect(source).toContain("resolveControlPlaneRetentionConfiguration");
+    expect(source).toContain("createSqlControlPlaneJobStore(executor)");
+    expect(source.match(/webhookInboxDays/gu)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
   it("wires privacy-safe control-plane SLI collection into maintenance", () => {
     const source = workerSource();
 

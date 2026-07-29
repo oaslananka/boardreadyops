@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CloudRuntimeConfigurationError,
   resolveCloudPersistenceConfiguration,
+  resolveControlPlaneRetentionConfiguration,
 } from "../../../apps/web/lib/cloud-runtime-config.js";
 
 describe("cloud runtime persistence configuration", () => {
@@ -66,5 +67,29 @@ describe("cloud runtime persistence configuration", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(CloudRuntimeConfigurationError);
     }
+  });
+});
+
+describe("control-plane webhook retention configuration", () => {
+  it("defaults terminal webhook inbox retention to 30 days", () => {
+    expect(resolveControlPlaneRetentionConfiguration({})).toEqual({ webhookInboxDays: 30 });
+  });
+
+  it("accepts an explicit bounded webhook inbox retention period", () => {
+    expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: " 90 " })).toEqual({
+      webhookInboxDays: 90,
+    });
+    expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: "1" })).toEqual({
+      webhookInboxDays: 1,
+    });
+    expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: "3650" })).toEqual({
+      webhookInboxDays: 3650,
+    });
+  });
+
+  it.each(["0", "3651", "1.5", "thirty", ""])("rejects invalid webhook inbox retention value %s", (value) => {
+    expect(() =>
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: value }),
+    ).toThrowError(expect.objectContaining({ code: "invalid-webhook-retention-days" }));
   });
 });

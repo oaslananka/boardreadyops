@@ -3,7 +3,8 @@ type CloudPersistenceMode = "postgres" | "memory";
 export type CloudRuntimeConfigurationErrorCode =
   | "invalid-persistence-mode"
   | "memory-persistence-not-allowed"
-  | "missing-database-url";
+  | "missing-database-url"
+  | "invalid-webhook-retention-days";
 
 export class CloudRuntimeConfigurationError extends Error {
   readonly code: CloudRuntimeConfigurationErrorCode;
@@ -48,4 +49,33 @@ export function resolveCloudPersistenceConfiguration(
   }
 
   return { mode, databaseUrl };
+}
+
+export type ControlPlaneRetentionConfiguration = { webhookInboxDays: number };
+
+export function resolveControlPlaneRetentionConfiguration(
+  environment: NodeJS.ProcessEnv = process.env,
+): ControlPlaneRetentionConfiguration {
+  const raw = environment.BOARDREADYOPS_WEBHOOK_RETENTION_DAYS;
+  if (raw === undefined) {
+    return { webhookInboxDays: 30 };
+  }
+
+  const normalized = raw.trim();
+  if (!/^\d+$/u.test(normalized)) {
+    throw new CloudRuntimeConfigurationError(
+      "invalid-webhook-retention-days",
+      "BOARDREADYOPS_WEBHOOK_RETENTION_DAYS must be an integer between 1 and 3650",
+    );
+  }
+
+  const webhookInboxDays = Number(normalized);
+  if (!Number.isSafeInteger(webhookInboxDays) || webhookInboxDays < 1 || webhookInboxDays > 3650) {
+    throw new CloudRuntimeConfigurationError(
+      "invalid-webhook-retention-days",
+      "BOARDREADYOPS_WEBHOOK_RETENTION_DAYS must be an integer between 1 and 3650",
+    );
+  }
+
+  return { webhookInboxDays };
 }
