@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.22.0](https://github.com/oaslananka/boardreadyops/compare/v1.21.0...v1.22.0) (2026-07-29)
+
+
+### Features
+
+* **core:** delete replaced artifact objects ([#263](https://github.com/oaslananka/boardreadyops/issues/263)) ([b735b08](https://github.com/oaslananka/boardreadyops/commit/b735b082a76a7845701e3ca5575479f26ff94b29)), closes [#44](https://github.com/oaslananka/boardreadyops/issues/44)
+
 ## [1.21.0](https://github.com/oaslananka/boardreadyops/compare/v1.20.0...v1.21.0) (2026-07-29)
 
 
