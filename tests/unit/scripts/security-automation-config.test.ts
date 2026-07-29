@@ -50,6 +50,29 @@ describe("dependency and security automation configuration", () => {
     expect(required).not.toContain("dependency-review");
   });
 
+  it("bounds Actions evidence while durable binaries stay in GitHub Releases", async () => {
+    const binary = await repositoryFile(".github/workflows/binary-build.yml");
+    const ci = await repositoryFile(".github/workflows/ci.yml");
+    const benchmark = await repositoryFile(".github/workflows/benchmark.yml");
+    const mutation = await repositoryFile(".github/workflows/mutation-nightly.yml");
+    const security = await repositoryFile(".github/workflows/security.yml");
+    const selfValidation = await repositoryFile(".github/workflows/self-validation.yml");
+
+    expect(binary.match(/retention-days: 1/gu) ?? []).toHaveLength(2);
+    expect(binary).toContain("gh release upload");
+    expect(binary).toContain("gh release create");
+    expect(ci).toContain("Upload bounded coverage evidence");
+    expect(ci).toContain(
+      "if: $" + "{{ failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}",
+    );
+    expect(ci.match(/retention-days: 7/gu) ?? []).toHaveLength(3);
+    expect(benchmark).toContain("retention-days: 7");
+    expect(mutation).toContain("retention-days: 7");
+    expect(security.match(/retention-days: 7/gu) ?? []).toHaveLength(2);
+    expect(selfValidation).toContain("retention-days: 7");
+    expect(selfValidation).not.toContain("retention-days: 30");
+  });
+
   it("keeps Renovate project-scoped, scheduled, and supply-chain hardened", async () => {
     const renovate = JSON.parse(await repositoryFile("renovate.json")) as Record<string, unknown>;
 

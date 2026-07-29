@@ -58,6 +58,7 @@ describe("binary build scripts", () => {
     expect(workflow).toContain("release-tag:");
     expect(workflow).toContain(matrixArtifactName);
     expect(workflow).toContain("path: dist/binary/boardreadyops-*");
+    expect(workflow.match(/retention-days: 1/gu) ?? []).toHaveLength(2);
     expect(releaseAssetsJob).toContain("actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c");
     expect(releaseAssetsJob).toContain("pattern: boardreadyops-*");
     expect(releaseAssetsJob).toContain("merge-multiple: true");
