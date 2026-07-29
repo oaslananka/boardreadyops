@@ -546,15 +546,62 @@ export async function handleResultRequest(
        where findings.run_id = updated.id
        returning findings.run_id
      ),
+     captured_artifacts as materialized (
+       select artifact.id,
+              artifact.run_id,
+              artifact.kind,
+              artifact.sha256,
+              artifact.bytes,
+              artifact.role,
+              updated.repository_id,
+              repository.installation_id
+       from artifacts as artifact
+       join updated on updated.id = artifact.run_id
+       join repositories as repository on repository.id = updated.repository_id
+     ),
      deleted_artifacts as (
        delete from artifacts
-       using updated
-       where artifacts.run_id = updated.id
-       returning artifacts.run_id
+       using captured_artifacts
+       where artifacts.id = captured_artifacts.id
+       returning artifacts.id
+     ),
+     artifact_deletion_audit as (
+       insert into audit_events (
+         installation_id,
+         event_type,
+         actor_type,
+         actor_id,
+         subject_type,
+         subject_id,
+         repository_id,
+         release_run_id,
+         metadata
+       )
+       select captured_artifacts.installation_id,
+              'artifact.record.deleted',
+              'runner',
+              $2,
+              'artifact',
+              captured_artifacts.id,
+              captured_artifacts.repository_id,
+              captured_artifacts.run_id,
+              jsonb_build_object(
+                'reason', 'result_replaced',
+                'resultDigest', $13,
+                'executionAttemptId', $2,
+                'bytes', captured_artifacts.bytes,
+                'sha256', captured_artifacts.sha256,
+                'itemType', captured_artifacts.kind,
+                'scope', captured_artifacts.role
+              )
+       from captured_artifacts
+       join deleted_artifacts on deleted_artifacts.id = captured_artifacts.id
+       returning id
      ),
      cleared_children as (
        select (select count(*) from deleted_findings) as deleted_finding_count,
-              (select count(*) from deleted_artifacts) as deleted_artifact_count
+              (select count(*) from deleted_artifacts) as deleted_artifact_count,
+              (select count(*) from artifact_deletion_audit) as artifact_deletion_audit_count
      ),
      inserted_findings as (
        insert into findings (run_id, rule_id, severity, message, path)

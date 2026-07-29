@@ -11,6 +11,7 @@ const installationId = "11111111-1111-4111-8111-111111111111";
 const repositoryId = "22222222-2222-4222-8222-222222222222";
 const runId = "33333333-3333-4333-8333-333333333333";
 const attemptId = "44444444-4444-4444-8444-444444444444";
+const replacedArtifactId = "55555555-5555-4555-8555-555555555555";
 const completedAt = "2026-07-12T12:00:00.000Z";
 
 type QueryRow = Record<string, unknown>;
@@ -126,6 +127,12 @@ beforeAll(async () => {
        id, run_id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at, started_at
      ) values ($1, $2, 1, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
     [attemptId, runId, "2026-07-12T11:59:58.750Z"],
+  );
+  await executor.query(
+    `insert into artifacts (id, run_id, kind, name, storage_path, sha256, bytes, role)
+     values ($1, $2, 'legacy-report', 'private-customer-report.html',
+             'private/tenant/run/report.html', $3, 1024, 'legacy')`,
+    [replacedArtifactId, runId, "c".repeat(64)],
   );
 });
 
@@ -246,24 +253,30 @@ describeDatabase("runner result PostgreSQL integration", () => {
       await executor.query(
         `select
          (select count(*)::int from findings where run_id = $1) as findings,
-         (select count(*)::int from artifacts where run_id = $1) as artifacts`,
-        [runId],
+         (select count(*)::int from artifacts where run_id = $1) as artifacts,
+         (select count(*)::int from artifacts where id = $2) as replaced_artifacts`,
+        [runId, replacedArtifactId],
       ),
     );
-    expect(childRows).toEqual([{ findings: 1, artifacts: 1 }]);
+    expect(childRows).toEqual([{ findings: 1, artifacts: 1, replaced_artifacts: 0 }]);
 
     const auditRows = rows(
       await executor.query(
-        `select event_type, metadata from audit_events where release_run_id = $1 order by created_at, id`,
+        `select event_type, subject_id, artifact_id, metadata
+           from audit_events
+          where release_run_id = $1
+          order by created_at, id`,
         [runId],
       ),
     );
-    expect(auditRows.map((row) => row.event_type)).toEqual([
+    expect(auditRows.map((row) => row.event_type).sort()).toEqual([
+      "artifact.record.deleted",
       "runner.result.persisted",
       "runner.result.publication_succeeded",
       "runner.result.publication_succeeded",
     ]);
-    expect(auditRows[0]?.metadata).toMatchObject({
+    const persistedAudit = auditRows.find((row) => row.event_type === "runner.result.persisted");
+    expect(persistedAudit?.metadata).toMatchObject({
       decisionSummaryVersion: 1,
       decision: "fail",
       conclusion: "failure",
@@ -283,9 +296,54 @@ describeDatabase("runner result PostgreSQL integration", () => {
       findingCount: 1,
       artifactCount: 1,
     });
-    expect(JSON.stringify(auditRows[0]?.metadata)).not.toContain("hardware-team");
-    expect(JSON.stringify(auditRows[0]?.metadata)).not.toContain("Prototype-only");
-    expect(JSON.stringify(auditRows[0]?.metadata)).not.toContain("internal-review-record");
+    expect(JSON.stringify(persistedAudit?.metadata)).not.toContain("hardware-team");
+    expect(JSON.stringify(persistedAudit?.metadata)).not.toContain("Prototype-only");
+    expect(JSON.stringify(persistedAudit?.metadata)).not.toContain("internal-review-record");
+
+    const deletionAudit = auditRows.find((row) => row.event_type === "artifact.record.deleted");
+    expect(deletionAudit).toMatchObject({
+      subject_id: replacedArtifactId,
+      artifact_id: null,
+      metadata: {
+        reason: "result_replaced",
+        resultDigest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        executionAttemptId: attemptId,
+        bytes: 1024,
+        sha256: "c".repeat(64),
+        itemType: "legacy-report",
+        scope: "legacy",
+      },
+    });
+    expect(JSON.stringify(deletionAudit)).not.toContain("private-customer-report.html");
+    expect(JSON.stringify(deletionAudit)).not.toContain("private/tenant/run/report.html");
+
+    const exportedDeletion = await createSqlAuditLogStore(executor).listAuditEvents({
+      installationId,
+      releaseRunId: runId,
+      eventType: "artifact.record.deleted",
+    });
+    expect(exportedDeletion).toEqual([
+      expect.objectContaining({
+        installationId,
+        repositoryId,
+        releaseRunId: runId,
+        eventType: "artifact.record.deleted",
+        actorType: "runner",
+        actorId: attemptId,
+        subjectType: "artifact",
+        subjectId: replacedArtifactId,
+        metadata: {
+          reason: "result_replaced",
+          resultDigest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+          executionAttemptId: attemptId,
+          bytes: 1024,
+          sha256: "c".repeat(64),
+          itemType: "legacy-report",
+          scope: "legacy",
+        },
+      }),
+    ]);
+    expect(exportedDeletion[0]).not.toHaveProperty("artifactId");
 
     const exportedDecision = await createSqlAuditLogStore(executor).listAuditEvents({
       installationId,
