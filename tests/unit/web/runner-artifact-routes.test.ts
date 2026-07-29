@@ -26,6 +26,7 @@ const publicKey = keys.publicKey.export({ type: "spki", format: "pem" }).toStrin
 
 const query = vi.fn();
 const issueCapabilities = vi.fn();
+const createArtifactStore = vi.fn();
 const beginUpload = vi.fn();
 const completeUpload = vi.fn();
 const failUpload = vi.fn();
@@ -41,7 +42,7 @@ function dependencies(environment: Readonly<Record<string, string | undefined>>)
   return {
     environment,
     queryExecutor: () => ({ query }),
-    createArtifactStore: () => store,
+    createArtifactStore,
     now: () => now,
   };
 }
@@ -114,6 +115,8 @@ function uploadRequest(content: string, headers: Record<string, string> = {}): R
 beforeEach(async () => {
   query.mockReset();
   issueCapabilities.mockReset();
+  createArtifactStore.mockReset();
+  createArtifactStore.mockReturnValue(store);
   beginUpload.mockReset();
   completeUpload.mockReset();
   failUpload.mockReset();
@@ -173,6 +176,49 @@ describe("runner artifact transport routes", () => {
     });
   });
 
+  it("passes the configured capability lifetime to the issuance store", async () => {
+    issueCapabilities.mockResolvedValue({
+      status: "accepted",
+      uploads: [
+        {
+          artifactId,
+          storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
+          uploadToken,
+          expiresAt: "2026-07-12T20:02:00.000Z",
+          maximumBytes: 5,
+        },
+      ],
+    });
+
+    const response = await handleRunnerArtifactCapabilityRequest(
+      signedCapabilityRequest(),
+      dependencies({
+        BOARDREADYOPS_PUBLIC_URL: "https://cloud.boardreadyops.example",
+        BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "120",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(createArtifactStore).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ capabilityTtlSeconds: 120 }),
+    );
+  });
+
+  it("fails closed before creating the issuance store when capability lifetime is invalid", async () => {
+    const response = await handleRunnerArtifactCapabilityRequest(
+      signedCapabilityRequest(),
+      dependencies({
+        BOARDREADYOPS_PUBLIC_URL: "https://cloud.boardreadyops.example",
+        BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "0",
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(createArtifactStore).not.toHaveBeenCalled();
+    expect(issueCapabilities).not.toHaveBeenCalled();
+  });
+
   it("rejects non-HTTPS public configuration before issuing capabilities", async () => {
     const response = await handleRunnerArtifactCapabilityRequest(
       signedCapabilityRequest(),
@@ -194,7 +240,7 @@ describe("runner artifact transport routes", () => {
     expect(issueCapabilities).not.toHaveBeenCalled();
   });
 
-  it("streams an exact artifact to the server-generated local path and persists metadata", async () => {
+  it("streams an exact artifact without re-resolving the issuance lifetime", async () => {
     const content = "hello";
     const sha256 = createHash("sha256").update(content).digest("hex");
     beginUpload.mockResolvedValue({
@@ -212,7 +258,11 @@ describe("runner artifact transport routes", () => {
     const response = await handleRunnerArtifactUploadRequest(
       uploadRequest(content),
       artifactId,
-      dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
+      dependencies({
+        ARTIFACT_STORAGE_DRIVER: "local",
+        ARTIFACT_STORAGE_ROOT: storageRoot,
+        BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "0",
+      }),
     );
 
     expect(response.status).toBe(201);

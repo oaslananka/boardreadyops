@@ -37,6 +37,19 @@ describe("control-plane operator documentation", () => {
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_WEBHOOK_RETENTION_DAYS=30");
   });
 
+  it("documents bounded artifact upload capability expiry", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+    const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
+
+    expect(deployment).toContain("BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS");
+    expect(deployment).toContain("defaults to 900 seconds");
+    expect(deployment).toContain("60 through 3600 seconds");
+    expect(deployment).toContain("does not rewrite persisted `expires_at` deadlines");
+    expect(deployment).toContain("already issued capabilities");
+    expect(deployment).toContain("artifactCapabilityTtlSeconds");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS=900");
+  });
+
   it("documents lifecycle inbox and job drift reconciliation", () => {
     const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
     const operations = fs.readFileSync(documentationPath, "utf8");

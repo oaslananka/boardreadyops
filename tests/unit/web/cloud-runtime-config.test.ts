@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CloudRuntimeConfigurationError,
+  resolveArtifactCapabilityConfiguration,
   resolveCloudPersistenceConfiguration,
   resolveControlPlaneRetentionConfiguration,
 } from "../../../apps/web/lib/cloud-runtime-config.js";
@@ -91,5 +92,29 @@ describe("control-plane webhook retention configuration", () => {
     expect(() =>
       resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: value }),
     ).toThrowError(expect.objectContaining({ code: "invalid-webhook-retention-days" }));
+  });
+});
+
+describe("artifact upload capability configuration", () => {
+  it("defaults upload capabilities to 15 minutes", () => {
+    expect(resolveArtifactCapabilityConfiguration({})).toEqual({ uploadCapabilityTtlSeconds: 900 });
+  });
+
+  it("accepts an explicit bounded upload capability lifetime", () => {
+    expect(resolveArtifactCapabilityConfiguration({ BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: " 120 " })).toEqual({
+      uploadCapabilityTtlSeconds: 120,
+    });
+    expect(resolveArtifactCapabilityConfiguration({ BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "60" })).toEqual({
+      uploadCapabilityTtlSeconds: 60,
+    });
+    expect(resolveArtifactCapabilityConfiguration({ BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "3600" })).toEqual({
+      uploadCapabilityTtlSeconds: 3600,
+    });
+  });
+
+  it.each(["0", "59", "3601", "1.5", "fifteen", ""])("rejects invalid artifact capability lifetime %s", (value) => {
+    expect(() =>
+      resolveArtifactCapabilityConfiguration({ BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: value }),
+    ).toThrowError(expect.objectContaining({ code: "invalid-artifact-capability-ttl-seconds" }));
   });
 });
