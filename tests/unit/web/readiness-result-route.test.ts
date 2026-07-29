@@ -345,7 +345,12 @@ describe("readiness result route authentication and publication", () => {
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("deleted_findings as");
     expect(sql).toContain("inserted_findings as");
+    expect(sql).toContain("captured_artifacts as materialized");
     expect(sql).toContain("deleted_artifacts as");
+    expect(sql).toContain("artifact_deletion_audit as");
+    expect(sql).toContain("'artifact.record.deleted'");
+    expect(sql).toContain("'result_replaced'");
+    expect(sql).toContain("join deleted_artifacts on deleted_artifacts.id = captured_artifacts.id");
     expect(sql).toContain("inserted_artifacts as");
     expect(sql).toContain("updated_attempt as");
     expect(sql).toContain("boardreadyops_apply_runner_result_state");

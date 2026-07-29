@@ -24,6 +24,18 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("URL signatures");
     expect(documentation).toContain("IP addresses");
   });
+  it("documents atomic artifact record deletion auditing without overclaiming storage erasure", async () => {
+    const documentation = await readFile(documentationUrl, "utf8");
+    expect(documentation).toContain("`artifact.record.deleted`");
+    expect(documentation).toContain("same PostgreSQL statement");
+    expect(documentation).toContain("kept as the subject ID");
+    expect(documentation).toContain("Artifact names");
+    expect(documentation).toContain("storage paths");
+    expect(documentation).toContain("surrounding result transaction rolls back");
+    expect(documentation).toContain("not claim that a backing storage object");
+    expect(documentation).toContain("was physically erased");
+    expect(documentation).toContain("storage-object deletion and expiry events");
+  });
   it("documents privacy-safe release decision reconstruction", async () => {
     const documentation = await readFile(documentationUrl, "utf8");
     expect(documentation).toContain("`runner.result.persisted`");

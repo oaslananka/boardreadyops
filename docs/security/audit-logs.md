@@ -169,6 +169,27 @@ validation succeeded and that streaming was permitted, but it does not claim tha
 the client received every byte. Transfer-completion accounting would require a
 separate delivery mechanism and event.
 
+## Artifact record deletion events
+
+When an accepted terminal result replaces the artifact set for a release run, each
+previous artifact metadata row that is actually deleted produces an
+`artifact.record.deleted` event in the same PostgreSQL statement. The event uses
+actor type `runner`, subject type `artifact`, and preserves the validated
+installation, repository, and release-run dimensions. The deleted artifact ID is
+kept as the subject ID; the nullable artifact foreign-key dimension is intentionally
+omitted because the referenced row no longer exists.
+
+Metadata is restricted to the replacement reason, result digest, execution-attempt
+ID, byte count, SHA-256 digest, artifact kind, and artifact role. Artifact names,
+storage paths, report contents, and source payloads are not recorded. If any audit
+insert fails, the surrounding result transaction rolls back, so artifact metadata
+cannot be deleted without its corresponding audit event. Exact result replay does
+not create another deletion event.
+
+This event proves deletion of the BoardReadyOps artifact metadata record. It does
+not claim that a backing storage object was physically erased; storage-object expiry
+and purge remain separate lifecycle work.
+
 ## Release decision reconstruction
 
 Each accepted `runner.result.persisted` event contains a versioned, privacy-safe
@@ -194,12 +215,12 @@ because no hosted persistent mutation surface currently exists for those resourc
 The database provides tenant-chain validation, append-only triggers, deterministic
 query indexes, and audit writes for runner registration, runner leases, runner
 results, GitHub installation/repository enablement and suspension changes, artifact
-upload, signed artifact download starts, dead-letter replay, and reconciliation
-operations. The
+upload, signed artifact download starts, artifact-record replacement deletions,
+dead-letter replay, and reconciliation operations. The
 authenticated operator export provides the first supported query surface.
 
 Issue #43 remains open for policy and waiver mutation event coverage, artifact
-deletion and expiry events, authenticated product UI or customer export, and
-retention controls. Result-level release decisions are reconstructable from the
+storage-object deletion and expiry events, authenticated product UI or customer
+export, and retention controls. Result-level release decisions are reconstructable from the
 existing tenant-scoped operator export; cross-resource reconstruction will expand as
 those remaining mutation surfaces are implemented.
