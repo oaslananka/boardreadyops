@@ -416,13 +416,14 @@ jobs:
       - run: corepack install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run coverage:ci
-      - name: Upload coverage report
+      - name: Upload bounded coverage evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
+        if: ${{ failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
         with:
           name: coverage-report
           path: coverage/
           if-no-files-found: warn
+          retention-days: 7
       - name: Validate Codecov configuration
         if: ${{ !cancelled() }}
         run: >-
@@ -501,6 +502,7 @@ jobs:
           name: mutation-report
           path: reports/mutation/
           if-no-files-found: warn
+          retention-days: 7
 
   security:
     needs: risk-profile
@@ -545,3 +547,4 @@ jobs:
         with:
           name: sbom
           path: sbom.cyclonedx.json
+          retention-days: 7

@@ -266,6 +266,7 @@ jobs:
         with:
           name: sbom
           path: sbom.cyclonedx.json
+          retention-days: 7
 
   scorecard:
     name: security / scorecard advisory
@@ -302,6 +303,7 @@ jobs:
         with:
           name: scorecard-baseline
           path: scorecard.json
+          retention-days: 7
 
   gate:
     name: security / gate
