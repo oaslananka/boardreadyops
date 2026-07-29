@@ -7,8 +7,13 @@ import {
 } from "@boardreadyops/contracts";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { createSqlRunnerArtifactStore, type RunnerArtifactStore } from "@boardreadyops/db/runner-artifact-store";
+import {
+  createSqlRunnerArtifactStore,
+  type RunnerArtifactStore,
+  type RunnerArtifactStoreOptions,
+} from "@boardreadyops/db/runner-artifact-store";
 import { safeLocalArtifactPath } from "./artifact-downloads.js";
+import { resolveArtifactCapabilityConfiguration } from "./cloud-runtime-config.js";
 import { authenticateRunnerRequest } from "./runner-request-auth.js";
 
 const maximumCapabilityRequestBytes = 64 * 1024;
@@ -18,7 +23,7 @@ const uploadTokenPattern = /^[A-Za-z0-9_-]{43,256}$/u;
 export type RunnerArtifactRouteDependencies = {
   environment: Readonly<Record<string, string | undefined>>;
   queryExecutor(): SqlQueryExecutor | undefined;
-  createArtifactStore(executor: SqlQueryExecutor): RunnerArtifactStore;
+  createArtifactStore(executor: SqlQueryExecutor, options?: RunnerArtifactStoreOptions): RunnerArtifactStore;
   now(): Date;
 };
 
@@ -55,7 +60,7 @@ function defaultDependencies(): RunnerArtifactRouteDependencies {
   return {
     environment,
     queryExecutor: () => configuredQueryExecutor(environment),
-    createArtifactStore: (executor) => createSqlRunnerArtifactStore(executor),
+    createArtifactStore: (executor, options) => createSqlRunnerArtifactStore(executor, options),
     now: () => new Date(),
   };
 }
@@ -227,22 +232,27 @@ export async function handleRunnerArtifactCapabilityRequest(
   }
 
   try {
-    const result = await dependencies.createArtifactStore(executor).issueCapabilities({
-      ...authenticated.identity,
-      requestTimestamp: authenticated.envelope.timestamp,
-      requestNonce: authenticated.envelope.nonce,
-      runId: parsed.data.runId,
-      executionAttemptId: parsed.data.executionAttemptId,
-      leaseId: parsed.data.leaseId,
-      leaseToken: parsed.data.leaseToken,
-      artifacts: parsed.data.artifacts.map((artifact) => ({
-        kind: artifact.kind,
-        name: artifact.name,
-        role: artifact.role,
-        bytes: artifact.bytes,
-        ...(artifact.sha256 === undefined ? {} : { sha256: artifact.sha256 }),
-      })),
-    });
+    const capabilityConfiguration = resolveArtifactCapabilityConfiguration(dependencies.environment);
+    const result = await dependencies
+      .createArtifactStore(executor, {
+        capabilityTtlSeconds: capabilityConfiguration.uploadCapabilityTtlSeconds,
+      })
+      .issueCapabilities({
+        ...authenticated.identity,
+        requestTimestamp: authenticated.envelope.timestamp,
+        requestNonce: authenticated.envelope.nonce,
+        runId: parsed.data.runId,
+        executionAttemptId: parsed.data.executionAttemptId,
+        leaseId: parsed.data.leaseId,
+        leaseToken: parsed.data.leaseToken,
+        artifacts: parsed.data.artifacts.map((artifact) => ({
+          kind: artifact.kind,
+          name: artifact.name,
+          role: artifact.role,
+          bytes: artifact.bytes,
+          ...(artifact.sha256 === undefined ? {} : { sha256: artifact.sha256 }),
+        })),
+      });
     if (result.status !== "accepted") {
       return result.status === "replayed"
         ? jsonResponse({ ok: false, error: "artifact capability request was replayed" }, 409)

@@ -1,5 +1,9 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { CloudRuntimeConfigurationError, resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
+import {
+  CloudRuntimeConfigurationError,
+  resolveArtifactCapabilityConfiguration,
+  resolveCloudPersistenceConfiguration,
+} from "./cloud-runtime-config.js";
 
 const service = "boardreadyops-cloud" as const;
 const defaultTimeoutMs = 2_000;
@@ -12,6 +16,9 @@ export type CloudReadinessResult =
       checks: {
         configuration: "pass";
         database: "pass";
+      };
+      effectiveConfiguration: {
+        artifactCapabilityTtlSeconds: number;
       };
     }
   | {
@@ -74,8 +81,10 @@ export async function checkCloudReadiness(
   }
 
   let configuration: ReturnType<typeof resolveCloudPersistenceConfiguration>;
+  let artifactCapabilityConfiguration: ReturnType<typeof resolveArtifactCapabilityConfiguration>;
   try {
     configuration = resolveCloudPersistenceConfiguration(environment);
+    artifactCapabilityConfiguration = resolveArtifactCapabilityConfiguration(environment);
   } catch (error) {
     if (error instanceof CloudRuntimeConfigurationError) {
       return {
@@ -116,6 +125,9 @@ export async function checkCloudReadiness(
       checks: {
         configuration: "pass",
         database: "pass",
+      },
+      effectiveConfiguration: {
+        artifactCapabilityTtlSeconds: artifactCapabilityConfiguration.uploadCapabilityTtlSeconds,
       },
     };
   } catch (error) {

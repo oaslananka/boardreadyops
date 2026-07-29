@@ -24,6 +24,7 @@ describe("cloud readiness", () => {
           NODE_ENV: "production",
           DATABASE_URL: "postgresql://example.invalid/boardreadyops",
           GITHUB_WEBHOOK_SECRET: "secret",
+          BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "120",
         },
         query,
       }),
@@ -35,8 +36,33 @@ describe("cloud readiness", () => {
         configuration: "pass",
         database: "pass",
       },
+      effectiveConfiguration: {
+        artifactCapabilityTtlSeconds: 120,
+      },
     });
     expect(query).toHaveBeenCalledWith("select 1 as ready");
+  });
+
+  it("fails readiness before querying PostgreSQL when artifact capability lifetime is invalid", async () => {
+    const query = vi.fn();
+
+    await expect(
+      checkCloudReadiness({
+        environment: {
+          NODE_ENV: "production",
+          DATABASE_URL: "postgresql://example.invalid/boardreadyops",
+          GITHUB_WEBHOOK_SECRET: "secret",
+          BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "0",
+        },
+        query,
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      service: "boardreadyops-cloud",
+      check: "readiness",
+      reason: "missing-configuration",
+    });
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("reports database-unavailable without leaking the database error", async () => {
