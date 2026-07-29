@@ -24,6 +24,18 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("URL signatures");
     expect(documentation).toContain("IP addresses");
   });
+  it("documents privacy-safe release decision reconstruction", async () => {
+    const documentation = await readFile(documentationUrl, "utf8");
+    expect(documentation).toContain("`runner.result.persisted`");
+    expect(documentation).toContain("versioned, privacy-safe");
+    expect(documentation).toContain("GitHub Check conclusion");
+    expect(documentation).toContain("active/expired/stale waiver counts");
+    expect(documentation).toContain("Finding messages, waiver owners");
+    expect(documentation).toContain("does not expose waiver");
+    expect(documentation).toContain("content. Policy preset");
+    expect(documentation).toContain("without changing the existing result-digest replay contract");
+    expect(documentation).not.toContain("complete release-decision reconstruction tests");
+  });
   it("documents retry-safe GitHub lifecycle auditing without pull-request noise", async () => {
     const documentation = await readFile(documentationUrl, "utf8");
     expect(documentation).toContain("`github_app.installation.enabled`");
