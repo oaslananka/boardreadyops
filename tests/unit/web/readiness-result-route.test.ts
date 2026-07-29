@@ -346,6 +346,12 @@ describe("readiness result route authentication and publication", () => {
     expect(sql).toContain("deleted_findings as");
     expect(sql).toContain("inserted_findings as");
     expect(sql).toContain("captured_artifacts as materialized");
+    expect(sql).toContain("queued_artifact_deletions as");
+    expect(sql).toContain("insert into artifact_deletion_jobs");
+    expect(sql).toContain("jsonb_to_recordset($14::jsonb) as replacement");
+    expect(sql).toContain("retained_artifact.storage_path = captured_artifacts.storage_path");
+    expect(sql).toContain("artifact.object.deletion_skipped");
+    expect(sql).toContain("storage_path_still_referenced");
     expect(sql).toContain("deleted_artifacts as");
     expect(sql).toContain("artifact_deletion_audit as");
     expect(sql).toContain("'artifact.record.deleted'");
@@ -429,12 +435,40 @@ describe("readiness result route authentication and publication", () => {
     );
     expect(params[16]).not.toContain("hardware-team");
     expect(params[16]).not.toContain("prototype lot");
+    expect(params[17]).toBe("local");
     expect(sql).toContain(") || $17::jsonb");
 
     const [publicationSql, publicationParams] = query.mock.calls[1] as [string, unknown[]];
     expect(publicationSql).toContain("update release_run_results");
     expect(publicationParams[5]).toBe("runner.result.publication_succeeded");
     expect(publicationParams.slice(0, 5)).toEqual(["run-123", "2026-07-10T18:00:00.000Z", false, false, null]);
+  });
+
+  it("marks unsupported artifact storage drivers for terminal deletion handling", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [], artifacts: [] });
+    query.mockResolvedValueOnce({
+      rows: [
+        {
+          persistence_outcome: "superseded",
+          id: "run-123",
+          github_check_run_id: 987,
+          pull_request_number: 42,
+          owner: "octo-org",
+          name: "hardware-board",
+          github_installation_id: 12345,
+          inserted_finding_count: 0,
+        },
+      ],
+    });
+
+    const response = await handleResultRequest(resultRequest({ body }), {
+      ...dependencies,
+      artifactStorageDriver: () => "s3",
+    });
+
+    expect(response.status).toBe(409);
+    const [, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(params[17]).toBe("unsupported");
   });
 
   it("rejects a superseded run without replacing findings or publishing stale GitHub output", async () => {

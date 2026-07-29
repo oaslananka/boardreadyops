@@ -1,5 +1,9 @@
 import { createServer } from "node:http";
 import { hostname } from "node:os";
+import {
+  type ClaimedArtifactDeletion,
+  createSqlArtifactDeletionStore,
+} from "@boardreadyops/db/artifact-deletion-store";
 import { type ClaimedControlPlaneJob, createSqlControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 import {
   type ClaimedControlPlaneReconciliationItem,
@@ -12,6 +16,7 @@ import {
 } from "@boardreadyops/db/control-plane-outbox-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
+import { processArtifactDeletion } from "./lib/artifact-deletion-worker.js";
 import { resolveControlPlaneRetentionConfiguration } from "./lib/cloud-runtime-config.js";
 import { processControlPlaneCheckRunReconciliation } from "./lib/control-plane-check-run-reconciliation-worker.js";
 import { processControlPlaneLifecycleReconciliation } from "./lib/control-plane-lifecycle-reconciliation-worker.js";
@@ -68,10 +73,17 @@ function log(level: "error" | "info" | "warn", event: string, fields: Record<str
 const workerId = (process.env.BOARDREADYOPS_WORKER_ID?.trim() || `${hostname()}-${process.pid}`).slice(0, 128);
 const concurrency = integerEnvironment("BOARDREADYOPS_WORKER_CONCURRENCY", 4, 1, 32);
 const outboxConcurrency = integerEnvironment("BOARDREADYOPS_OUTBOX_CONCURRENCY", 4, 1, 32);
+const artifactDeletionConcurrency = integerEnvironment("BOARDREADYOPS_ARTIFACT_DELETION_CONCURRENCY", 2, 1, 16);
 const installationConcurrency = integerEnvironment("BOARDREADYOPS_WORKER_INSTALLATION_CONCURRENCY", 4, 1, 32);
 const repositoryConcurrency = integerEnvironment("BOARDREADYOPS_WORKER_REPOSITORY_CONCURRENCY", 2, 1, 32);
 const pollMilliseconds = integerEnvironment("BOARDREADYOPS_WORKER_POLL_MS", 1000, 100, 60_000);
 const outboxPollMilliseconds = integerEnvironment("BOARDREADYOPS_OUTBOX_POLL_MS", 500, 100, 60_000);
+const artifactDeletionPollMilliseconds = integerEnvironment(
+  "BOARDREADYOPS_ARTIFACT_DELETION_POLL_MS",
+  1_000,
+  100,
+  60_000,
+);
 const reconciliationConcurrency = integerEnvironment("BOARDREADYOPS_RECONCILIATION_CONCURRENCY", 2, 1, 16);
 const reconciliationPollMilliseconds = integerEnvironment("BOARDREADYOPS_RECONCILIATION_POLL_MS", 5_000, 500, 60_000);
 const reconciliationDetectionIntervalMilliseconds = integerEnvironment(
@@ -117,7 +129,7 @@ const retention = resolveControlPlaneRetentionConfiguration();
 const healthPort = integerEnvironment("BOARDREADYOPS_WORKER_HEALTH_PORT", 3001, 1, 65_535);
 const databasePoolMaximum = integerEnvironment(
   "DATABASE_POOL_MAX",
-  Math.max(8, concurrency + outboxConcurrency + reconciliationConcurrency * 3 + 2),
+  Math.max(8, concurrency + outboxConcurrency + artifactDeletionConcurrency + reconciliationConcurrency * 3 + 2),
   1,
   100,
 );
@@ -126,11 +138,16 @@ const jobs = createSqlControlPlaneJobStore(executor);
 const operations = createSqlControlPlaneOperationsStore(executor);
 const controlPlaneSlo = createControlPlaneSloEvaluator();
 const outbox = createSqlControlPlaneOutboxStore(executor);
+const artifactDeletions = createSqlArtifactDeletionStore(executor);
 const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
 const scopedConcurrency = createScopedConcurrencyGate({
   installationLimit: installationConcurrency,
   repositoryLimit: repositoryConcurrency,
 });
+const artifactStorageDriver = (process.env.ARTIFACT_STORAGE_DRIVER?.trim() || "local").toLowerCase();
+const artifactStorageRoot = process.env.ARTIFACT_STORAGE_ROOT?.trim();
+const artifactDeletionConfigurationValid = artifactStorageDriver === "local" && Boolean(artifactStorageRoot);
+const artifactDeletionLoopEnabled = artifactStorageDriver !== "local" || artifactDeletionConfigurationValid;
 const runner = runnerModeSummary();
 const checkRuns = createGitHubAppCheckRunClient();
 const durableCheckRuns = checkRuns?.ensurePullRequestCheckRun
@@ -167,6 +184,7 @@ let shuttingDown = false;
 let ready = false;
 let lastPollAt: string | undefined;
 let lastOutboxPollAt: string | undefined;
+let lastArtifactDeletionPollAt: string | undefined;
 let lastLifecycleReconciliationPollAt: string | undefined;
 let lastReconciliationPollAt: string | undefined;
 let lastCheckRunReconciliationPollAt: string | undefined;
@@ -175,6 +193,7 @@ let lastSuccessfulReconciliationAt: string | undefined;
 let lastSuccessfulCheckRunReconciliationAt: string | undefined;
 let lastSuccessfulJobAt: string | undefined;
 let lastSuccessfulOutboxEffectAt: string | undefined;
+let lastSuccessfulArtifactDeletionAt: string | undefined;
 let nextMetricsAt = 0;
 let nextRetentionCleanupAt = 0;
 let nextLifecycleReconciliationDetectionAt = 0;
@@ -210,12 +229,20 @@ const healthServer = createServer(async (request, response) => {
         lifecycleConfigurationValid,
         outboxConfigurationValid,
         reconciliationConfigurationValid,
+        artifactDeletion: {
+          configurationValid: artifactDeletionConfigurationValid,
+          loopEnabled: artifactDeletionLoopEnabled,
+          storageDriver: artifactStorageDriver,
+          concurrency: artifactDeletionConcurrency,
+          pollMilliseconds: artifactDeletionPollMilliseconds,
+        },
         retention: {
           webhookInboxDays: retention.webhookInboxDays,
           cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
         },
         lastPollAt,
         lastOutboxPollAt,
+        lastArtifactDeletionPollAt,
         lastLifecycleReconciliationPollAt,
         lastReconciliationPollAt,
         lastCheckRunReconciliationPollAt,
@@ -224,6 +251,7 @@ const healthServer = createServer(async (request, response) => {
         lastSuccessfulCheckRunReconciliationAt,
         lastSuccessfulJobAt,
         lastSuccessfulOutboxEffectAt,
+        lastSuccessfulArtifactDeletionAt,
         scopedConcurrency: {
           installationLimit: installationConcurrency,
           repositoryLimit: repositoryConcurrency,
@@ -261,6 +289,7 @@ async function startHealthServer(): Promise<void> {
     workerId,
     concurrency,
     outboxConcurrency,
+    artifactDeletionConcurrency,
     installationConcurrency,
     repositoryConcurrency,
     healthPort,
@@ -270,6 +299,12 @@ async function startHealthServer(): Promise<void> {
     outboxConfigurationValid,
     reconciliationConfigurationValid,
     reconciliationConcurrency,
+    artifactDeletion: {
+      configurationValid: artifactDeletionConfigurationValid,
+      loopEnabled: artifactDeletionLoopEnabled,
+      storageDriver: artifactStorageDriver,
+      pollMilliseconds: artifactDeletionPollMilliseconds,
+    },
     retention: {
       webhookInboxDays: retention.webhookInboxDays,
       cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
@@ -281,10 +316,15 @@ async function collectQueueMetrics(currentTime: number): Promise<void> {
   if (currentTime < nextMetricsAt) return;
   nextMetricsAt = currentTime + metricsIntervalMilliseconds;
   try {
-    const [jobMetrics, outboxMetrics] = await Promise.all([jobs.collectMetrics(), outbox.collectMetrics()]);
+    const [jobMetrics, outboxMetrics, artifactDeletionMetrics] = await Promise.all([
+      jobs.collectMetrics(),
+      outbox.collectMetrics(),
+      artifactDeletions.collectMetrics(),
+    ]);
     log("info", "worker.queue_metrics", {
       ...jobMetrics,
       ...outboxMetrics,
+      ...artifactDeletionMetrics,
       scopedConcurrency: scopedConcurrency.snapshot(),
     });
   } catch (error) {
@@ -393,6 +433,16 @@ async function claimAvailableOutboxEffects(): Promise<ClaimedControlPlaneOutboxE
   }
 }
 
+async function claimArtifactDeletions(): Promise<ClaimedArtifactDeletion[]> {
+  lastArtifactDeletionPollAt = new Date().toISOString();
+  try {
+    return artifactDeletions.claimDeletions({ workerId, limit: artifactDeletionConcurrency });
+  } catch (error) {
+    log("error", "worker.artifact_deletion_claim_failed", { workerId, errorClass: errorClass(error) });
+    return [];
+  }
+}
+
 async function claimLifecycleReconciliationItems(): Promise<ClaimedControlPlaneReconciliationItem[]> {
   lastLifecycleReconciliationPollAt = new Date().toISOString();
   try {
@@ -468,6 +518,30 @@ async function processClaimedOutboxEffects(claimed: ClaimedControlPlaneOutboxEff
       workerId,
       ...correlation,
       status: result.status,
+    });
+  }
+}
+
+async function processClaimedArtifactDeletions(claimed: ClaimedArtifactDeletion[]): Promise<void> {
+  const completed = await Promise.all(
+    claimed.map((job) =>
+      scopedConcurrency.run({ installationId: job.installationId, repositoryId: job.repositoryId }, () =>
+        processArtifactDeletion(job, {
+          workerId,
+          store: artifactDeletions,
+          ...(artifactStorageRoot ? { storageRoot: artifactStorageRoot } : {}),
+        }),
+      ),
+    ),
+  );
+  for (const result of completed) {
+    if (result.status === "completed") lastSuccessfulArtifactDeletionAt = new Date().toISOString();
+    log(result.status === "completed" ? "info" : "warn", "worker.artifact_deletion_terminal", {
+      workerId,
+      deletionJobId: result.deletionJobId,
+      artifactId: result.artifactId,
+      status: result.status,
+      ...(result.outcome ? { outcome: result.outcome } : {}),
     });
   }
 }
@@ -595,6 +669,21 @@ async function runOutboxLoop(): Promise<void> {
   }
 }
 
+async function runArtifactDeletionLoop(): Promise<void> {
+  while (!shuttingDown) {
+    if (!artifactDeletionLoopEnabled) {
+      await sleep(artifactDeletionPollMilliseconds);
+      continue;
+    }
+    const claimed = await claimArtifactDeletions();
+    if (claimed.length === 0) {
+      await sleep(artifactDeletionPollMilliseconds);
+      continue;
+    }
+    await processClaimedArtifactDeletions(claimed);
+  }
+}
+
 async function runLifecycleReconciliationLoop(): Promise<void> {
   while (!shuttingDown) {
     const claimed = await claimLifecycleReconciliationItems();
@@ -682,6 +771,7 @@ try {
   activeLoops = Promise.all([
     runLifecycleLoop(),
     runOutboxLoop(),
+    runArtifactDeletionLoop(),
     runLifecycleReconciliationLoop(),
     runGitHubReconciliationLoop(),
     runMaintenanceLoop(),
