@@ -34,3 +34,4 @@ jobs:
         with:
           name: benchmark
           path: benchmark.txt
+          retention-days: 7
