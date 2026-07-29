@@ -12,6 +12,7 @@ import {
 } from "@boardreadyops/db/control-plane-outbox-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
+import { resolveControlPlaneRetentionConfiguration } from "./lib/cloud-runtime-config.js";
 import { processControlPlaneCheckRunReconciliation } from "./lib/control-plane-check-run-reconciliation-worker.js";
 import { processControlPlaneLifecycleReconciliation } from "./lib/control-plane-lifecycle-reconciliation-worker.js";
 import { processControlPlaneOutboxEffect } from "./lib/control-plane-outbox-worker.js";
@@ -112,6 +113,7 @@ const retentionCleanupIntervalMilliseconds = integerEnvironment(
   60_000,
   86_400_000,
 );
+const retention = resolveControlPlaneRetentionConfiguration();
 const healthPort = integerEnvironment("BOARDREADYOPS_WORKER_HEALTH_PORT", 3001, 1, 65_535);
 const databasePoolMaximum = integerEnvironment(
   "DATABASE_POOL_MAX",
@@ -208,6 +210,10 @@ const healthServer = createServer(async (request, response) => {
         lifecycleConfigurationValid,
         outboxConfigurationValid,
         reconciliationConfigurationValid,
+        retention: {
+          webhookInboxDays: retention.webhookInboxDays,
+          cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
+        },
         lastPollAt,
         lastOutboxPollAt,
         lastLifecycleReconciliationPollAt,
@@ -264,6 +270,10 @@ async function startHealthServer(): Promise<void> {
     outboxConfigurationValid,
     reconciliationConfigurationValid,
     reconciliationConcurrency,
+    retention: {
+      webhookInboxDays: retention.webhookInboxDays,
+      cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
+    },
   });
 }
 

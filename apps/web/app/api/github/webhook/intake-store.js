@@ -3,7 +3,10 @@ import {
   createSqlControlPlaneJobStore,
 } from "@boardreadyops/db/control-plane-job-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
+import {
+  resolveCloudPersistenceConfiguration,
+  resolveControlPlaneRetentionConfiguration,
+} from "../../../../lib/cloud-runtime-config.js";
 
 let cachedStore;
 
@@ -16,11 +19,13 @@ export function getControlPlaneJobStore() {
     return cachedStore;
   }
 
+  const retention = resolveControlPlaneRetentionConfiguration();
   cachedStore = createSqlControlPlaneJobStore(
     createPgQueryExecutor({
       connectionString: configuration.databaseUrl,
       max: Number(process.env.DATABASE_POOL_MAX ?? 5),
     }),
+    { retentionDays: retention.webhookInboxDays },
   );
   return cachedStore;
 }
