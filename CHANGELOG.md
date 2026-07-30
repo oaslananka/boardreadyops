@@ -4,6 +4,14 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.23.0](https://github.com/oaslananka/boardreadyops/compare/v1.22.0...v1.23.0) (2026-07-30)
+
+
+### Features
+
+* **cloud:** add repository setup and readiness flow ([#269](https://github.com/oaslananka/boardreadyops/issues/269)) ([66f6f45](https://github.com/oaslananka/boardreadyops/commit/66f6f45631a3084d4c02ea38ab40b99f9a046d04))
+* scale run investigation dashboard ([#266](https://github.com/oaslananka/boardreadyops/issues/266)) ([cf8327a](https://github.com/oaslananka/boardreadyops/commit/cf8327a216bac5536572af06eb74c9f133193842)), closes [#221](https://github.com/oaslananka/boardreadyops/issues/221)
+
 ## [1.22.0](https://github.com/oaslananka/boardreadyops/compare/v1.21.0...v1.22.0) (2026-07-29)
 
 
