@@ -62,14 +62,16 @@ function claimsAreTrusted(payload, expectations, nowSeconds) {
     stringClaim(payload, "iss") === githubActionsOidcIssuer &&
     audienceMatches(
       payload.aud,
-      expectations.executionAttemptId
-        ? `boardreadyops-cloud:${expectations.runId}:${expectations.executionAttemptId}`
-        : `boardreadyops-cloud:${expectations.runId}`,
+      expectations.audience ??
+        (expectations.executionAttemptId
+          ? `boardreadyops-cloud:${expectations.runId}:${expectations.executionAttemptId}`
+          : `boardreadyops-cloud:${expectations.runId}`),
     ) &&
     stringClaim(payload, "repository") === expectations.repository &&
     (expectations.repositoryId === undefined || stringClaim(payload, "repository_id") === expectations.repositoryId) &&
     stringClaim(payload, "workflow_ref") === expectations.workflowRef &&
     stringClaim(payload, "ref") === expectations.ref &&
+    (expectations.sha === undefined || stringClaim(payload, "sha") === expectations.sha) &&
     stringClaim(payload, "event_name") === "workflow_dispatch" &&
     stringClaim(payload, "runner_environment") === "github-hosted"
   );
@@ -110,10 +112,12 @@ export async function verifyGitHubActionsOidcToken(
   {
     runId,
     executionAttemptId,
+    audience,
     repository = defaultRepository,
     repositoryId,
     workflowRef = defaultWorkflowRef,
     ref = "refs/heads/main",
+    sha,
     fetchImpl = globalThis.fetch,
     now = Date.now,
   },
@@ -140,7 +144,7 @@ export async function verifyGitHubActionsOidcToken(
     header.kid.length === 0 ||
     !claimsAreTrusted(
       payload,
-      { runId, executionAttemptId, repository, repositoryId, workflowRef, ref },
+      { runId, executionAttemptId, audience, repository, repositoryId, workflowRef, ref, sha },
       Math.floor(now() / 1000),
     )
   ) {

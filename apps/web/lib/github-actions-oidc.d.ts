@@ -1,10 +1,12 @@
 export type GitHubActionsOidcVerificationOptions = {
   readonly runId: string;
   readonly executionAttemptId?: string;
+  readonly audience?: string;
   readonly repository?: string;
   readonly repositoryId?: string;
   readonly workflowRef?: string;
   readonly ref?: string;
+  readonly sha?: string;
   readonly fetchImpl?: typeof fetch;
   readonly now?: () => number;
 };

@@ -18,10 +18,9 @@ The current service:
 7. attempts to upsert one top-level pull request summary comment as a
    non-blocking enhancement.
 
-The control plane does not currently read repository contents through the
-GitHub REST API, create commit statuses, administer repositories, manage
-secrets or variables, access organization membership, or use account-level
-APIs.
+The control plane does not read repository contents through the GitHub REST API, create commit statuses, administer repositories, manage secrets or variables, access organization membership, or use account-level APIs.
+
+Repository setup follows the same boundary. The App reads workflow metadata with Actions read access and does not call the Administration-only repository Actions settings endpoint, then dispatches a repository-owned setup probe. The workflow uses its own short-lived `GITHUB_TOKEN` to check out the default branch and GitHub Actions OIDC to return a bounded readiness result. The production App does not write `boardreadyops.yml` or workflow files. Any future assisted installation must be a separately reviewed, explicit opt-in flow because it would require Contents write.
 
 ## Minimum repository permissions
 

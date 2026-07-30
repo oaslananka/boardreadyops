@@ -260,6 +260,19 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
           </Definition>
           <Definition label="BoardReadyOps">{run.boardReadyOpsVersion ?? "Not reported"}</Definition>
           <Definition label="KiCad">{run.kicadVersion ?? "Not reported"}</Definition>
+          <Definition label="Policy preset">
+            {run.setupPreset
+              ? `${humanize(run.setupPreset)} v${run.setupPresetVersion ?? "?"} · revision ${run.setupRevision ?? "?"}`
+              : "Not recorded"}
+          </Definition>
+          <Definition label="Setup readiness">
+            {run.setupWorkflowStatus || run.setupConfigStatus
+              ? `Workflow ${humanize(run.setupWorkflowStatus ?? "unknown")} · config ${humanize(run.setupConfigStatus ?? "unknown")}`
+              : "Not recorded"}
+          </Definition>
+          <Definition label="Workflow contract">
+            {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
+          </Definition>
         </DefinitionGrid>
         <nav className="source-links" aria-label="Authoritative GitHub sources">
           <a href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}`}>Open source commit</a>

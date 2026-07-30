@@ -30,8 +30,10 @@ This is not zero-file onboarding. The workflow requirement is the least-privileg
 ## Required UX surfaces
 
 - GitHub App install success page.
-- Repository setup page with copyable workflow and starter configuration.
-- Detection of missing workflow, disabled Actions, and missing App Actions permission.
+- Repository setup page with four policy presets, exact configuration preview, canonical workflow path, permission review, and explicit setup steps.
+- Versioned setup history and run-level policy provenance.
+- Detection of missing workflow, disabled Actions, incompatible workflow metadata, missing or invalid configuration, expired or stale probes, and missing App Actions permission.
+- A target-repository setup probe authenticated with repository/workflow/ref/probe-bound GitHub Actions OIDC.
 - First run status page.
 - PR Check Run output.
 - Hosted run dashboard.
@@ -43,7 +45,7 @@ This is not zero-file onboarding. The workflow requirement is the least-privileg
 - Do not dispatch draft or fork pull requests in the initial hosted profile.
 - Keep source, logs, and workflow artifacts in the target repository.
 - Use exact-SHA action pins and exact-SHA checkout verification.
-- Use warn-mode starter policy unless the repository owner explicitly selects enforce mode.
+- Use the prototype preset as the lowest-friction default; every preset remains visible and reviewable before it is committed.
 - Do not dispatch repositories outside the installation selection and rollout policy.
 
 ## Acceptance criteria
