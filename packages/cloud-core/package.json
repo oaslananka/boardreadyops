@@ -28,6 +28,11 @@
       "types": "./src/runner-request-signature.ts",
       "import": "./src/runner-request-signature.ts",
       "default": "./src/runner-request-signature.ts"
+    },
+    "./repository-setup": {
+      "types": "./src/repository-setup.ts",
+      "import": "./src/repository-setup.ts",
+      "default": "./src/repository-setup.ts"
     }
   },
   "scripts": {

@@ -32,6 +32,26 @@ into the same path on the target repository's default branch. The target reposit
 
 Do not place the workflow only on a pull request branch. GitHub's workflow-dispatch endpoint resolves workflow files from the repository default branch.
 
+### Guided repository setup and readiness probe
+
+The hosted setup preview is available at `/setup`. It presents four versioned policy presets—open-source hardware, prototype fabrication, production release, and contract-design handoff—plus the exact proposed `boardreadyops.yml`, workflow path, permissions, and review steps. Selecting or switching a preset appends a new setup revision; it never rewrites prior setup history.
+
+The operator API exposes the persisted setup state at:
+
+```text
+GET|POST /api/v1/operator/installations/<installation-id>/repositories/<repository-id>/setup
+```
+
+`POST` supports idempotent `select_preset` and `probe` actions. A probe first reads the target workflow metadata through the installation-scoped App token using the existing Actions permission; it does not call the Administration-only repository Actions settings endpoint. When the workflow is active, the control plane dispatches a 15-minute setup probe in the target repository. The probe checks out the repository default branch with persisted credentials disabled, validates `boardreadyops.yml` using a pinned CLI, and posts only bounded status metadata to:
+
+```text
+POST /api/v1/setup-probes/result?probe_id=<uuid>
+```
+
+The callback accepts GitHub Actions OIDC only. Verification binds the token to the repository full name and numeric repository ID, `.github/workflows/readiness-runner.yml`, the persisted default-branch ref, and the exact probe audience. Missing workflow, disabled Actions, incompatible workflow metadata, missing configuration, invalid configuration, expired probe, stale probe, and dispatch failure remain distinct states.
+
+Every accepted release run snapshots the effective setup revision. Later preset changes therefore do not alter the policy provenance shown for historical runs.
+
 ## Workflow permissions
 
 The job declares only:

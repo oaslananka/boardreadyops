@@ -106,6 +106,12 @@ export type RunDetail = {
   lastPublicationError: string | undefined;
   repository: string;
   repositoryPrivate: boolean;
+  setupPreset?: string;
+  setupPresetVersion?: number;
+  setupRevision?: number;
+  setupWorkflowContractVersion?: number;
+  setupWorkflowStatus?: string;
+  setupConfigStatus?: string;
   investigationState: RunInvestigationState;
   reconciliationCount: number;
   deadLetterCount: number;
@@ -413,6 +419,12 @@ export async function lookupRunDashboard(
        repositories.owner,
        repositories.name,
        repositories.private,
+       repository_setup_revisions.preset as setup_preset,
+       repository_setup_revisions.preset_version as setup_preset_version,
+       repository_setup_revisions.revision as setup_revision,
+       repository_setup_revisions.workflow_contract_version as setup_workflow_contract_version,
+       repository_setup_revisions.workflow_status as setup_workflow_status,
+       repository_setup_revisions.config_status as setup_config_status,
        coalesce((
          select count(*)::int
          from control_plane_reconciliation_items
@@ -439,6 +451,8 @@ export async function lookupRunDashboard(
      from release_runs
      join repositories on repositories.id = release_runs.repository_id
      left join release_run_results on release_run_results.run_id = release_runs.id
+     left join repository_setup_revisions
+       on repository_setup_revisions.id = release_runs.repository_setup_revision_id
      where release_runs.id = $1`,
     [runId],
   );
@@ -569,6 +583,12 @@ export async function lookupRunDashboard(
   const deadLetterCount = numberValue(runRow, "dead_letter_count") ?? 0;
   const resultContractVersion = numberValue(runRow, "contract_version");
   const lastActivityAt = stringValue(runRow, "last_activity_at");
+  const setupPreset = stringValue(runRow, "setup_preset");
+  const setupPresetVersion = numberValue(runRow, "setup_preset_version");
+  const setupRevision = numberValue(runRow, "setup_revision");
+  const setupWorkflowContractVersion = numberValue(runRow, "setup_workflow_contract_version");
+  const setupWorkflowStatus = stringValue(runRow, "setup_workflow_status");
+  const setupConfigStatus = stringValue(runRow, "setup_config_status");
   const now = options.now?.() ?? new Date();
 
   return {
@@ -598,6 +618,12 @@ export async function lookupRunDashboard(
       lastPublicationError: stringValue(runRow, "last_publication_error"),
       repository: `${requiredString(runRow, "owner")}/${requiredString(runRow, "name")}`,
       repositoryPrivate: booleanValue(runRow, "private"),
+      ...(setupPreset ? { setupPreset } : {}),
+      ...(setupPresetVersion === undefined ? {} : { setupPresetVersion }),
+      ...(setupRevision === undefined ? {} : { setupRevision }),
+      ...(setupWorkflowContractVersion === undefined ? {} : { setupWorkflowContractVersion }),
+      ...(setupWorkflowStatus ? { setupWorkflowStatus } : {}),
+      ...(setupConfigStatus ? { setupConfigStatus } : {}),
       investigationState: investigationState({
         status,
         reconciliationCount,

@@ -278,6 +278,31 @@ gates:
     expect(report.checks.map((check: { name: string }) => check.name)).toEqual(["runtime"]);
   });
 
+  it("validates an explicit repository config path with doctor", async () => {
+    const temp = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-doctor-config-"));
+    await fs.mkdir(path.join(temp, "ci"), { recursive: true });
+    await fs.writeFile(path.join(temp, "ci", "boardreadyops.yml"), "version: 1\nmode: warn\nfail-on: high\n", "utf8");
+    const previousCwd = process.cwd();
+    process.chdir(temp);
+    try {
+      const doctor = captureStreams();
+      expect(
+        await runCli(
+          ["doctor", "--check", "repository", "--format", "json", "--config", "ci/boardreadyops.yml"],
+          doctor,
+        ),
+      ).toBe(0);
+      const report = JSON.parse(doctor.stdoutText());
+      expect(report.checks[0]?.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ severity: "pass", message: "boardreadyops.yml found and valid." }),
+        ]),
+      );
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
   it("rejects unsupported doctor options and Node engine majors", async () => {
     const invalidCheck = captureStreams();
     expect(await runCli(["doctor", "--check", "typo"], invalidCheck)).toBe(2);

@@ -274,11 +274,12 @@ The locale setting affects status lines, configuration and environment error pre
 ```sh
 boardreadyops doctor
 boardreadyops doctor --check repository
+boardreadyops doctor --check repository --config ci/boardreadyops.yml --format json
 boardreadyops doctor --format json
 boardreadyops schema doctor
 ```
 
-`--check` accepts `runtime`, `kicad`, `adapters`, `repository`, `suppressions`, or `action`; unknown check names return exit code `2`. `--format` accepts only `text` and `json`, and unknown formats also return exit code `2`.
+`--check` accepts `runtime`, `kicad`, `adapters`, `repository`, `suppressions`, or `action`; unknown check names return exit code `2`. `--config <path>` selects a non-default configuration file for the repository check. `--format` accepts only `text` and `json`, and unknown formats also return exit code `2`.
 
 The JSON form returns structured check items with `pass`, `warn`, `fail`, or `info` severities plus deduplicated recommendations. `boardreadyops schema doctor` prints the JSON Schema for consumers that ingest the report.
 

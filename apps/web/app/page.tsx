@@ -11,12 +11,15 @@ export default function HomePage() {
             BoardReadyOps turns normalized hardware checks into a traceable investigation: decision, execution attempts,
             findings, artifacts, publication state, and privacy-bounded audit evidence.
           </p>
-          <div>
+          <div className="panel-actions">
+            <Link className="button button-primary" href="/setup">
+              Preview repository setup
+            </Link>
             <Link
-              className="button button-primary"
+              className="button button-secondary"
               href="https://docs.boardreadyops.com/product/zero-config-onboarding/"
             >
-              Connect a repository
+              Read onboarding guide
             </Link>
           </div>
         </section>

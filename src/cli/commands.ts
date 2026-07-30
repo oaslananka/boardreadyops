@@ -92,6 +92,7 @@ export function registerAllCommands(
     .command("doctor")
     .option("--format <format>", "text or json", "text")
     .option("--check <name>", "run one doctor check")
+    .option("--config <path>", "boardreadyops.yml location")
     .action(async (options: DoctorCommandOptions) => {
       process.exitCode = await doctorCommand(options, streams);
     });

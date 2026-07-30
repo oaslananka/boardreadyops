@@ -10,6 +10,11 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts", "**/*.tsx", "../../tests/unit/web/run-investigation-accessibility.test.ts"],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../../tests/unit/web/run-investigation-accessibility.test.ts",
+    "../../tests/unit/web/repository-setup-page.test.ts"
+  ],
   "exclude": ["node_modules"]
 }

@@ -1189,3 +1189,63 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+.setup-page {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.setup-preset-grid,
+.setup-file-list {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+
+.setup-preset-card,
+.setup-file-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: var(--space-4);
+}
+
+.setup-preset-card[data-selected="true"] {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 28%, transparent);
+}
+
+.setup-preset-card-heading,
+.setup-file-preview > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.setup-preset-card h3,
+.setup-file-preview h3 {
+  margin-top: 0;
+}
+
+.setup-file-preview pre {
+  max-height: 32rem;
+  overflow: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  white-space: pre;
+}
+
+.setup-file-preview pre:focus-visible,
+.table-scroll:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.setup-steps {
+  display: grid;
+  gap: var(--space-3);
+  padding-inline-start: 1.5rem;
+}

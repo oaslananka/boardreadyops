@@ -79,6 +79,19 @@ describe("control-plane transition writer boundary", () => {
     });
   });
 
+  it("accepts the repository setup migration as the guarded enqueue owner", () => {
+    const migrations = [
+      source(
+        "packages/db/migrations/0032_repository_setup_flow.sql",
+        "create or replace function boardreadyops_enqueue_release_run_with_outbox() returns void language sql as $$ select 1 $$;",
+      ),
+    ];
+
+    expect(findProtectedFunctionOwnershipViolations(migrations)).not.toContain(
+      expect.stringContaining("boardreadyops_enqueue_release_run_with_outbox"),
+    );
+  });
+
   it("requires the guarded migration to remain the final owner of every protected function", () => {
     const migrations = [
       source(
