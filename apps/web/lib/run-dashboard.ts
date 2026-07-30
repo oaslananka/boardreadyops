@@ -5,34 +5,22 @@ import {
   configuredArtifactDownloadSigningKey,
 } from "./artifact-downloads.js";
 
-type RunDetail = {
-  id: string;
-  status: string;
-  decision: string | undefined;
-  commitSha: string;
-  ref: string;
-  pullRequestNumber: number | undefined;
-  triggerKind: string;
-  startedAt: string;
-  completedAt: string | undefined;
-  durationMs: number | undefined;
-  boardReadyOpsVersion: string | undefined;
-  kicadVersion: string | undefined;
-  githubCheckRunId: string | undefined;
-  readinessScore: number | undefined;
-  resultContractVersion: number | undefined;
-  conclusion: string | undefined;
-  metrics: Readonly<Record<string, number>>;
-  reportLinks: ReportLinkDetail[];
-  lastPublicationAttemptAt: string | undefined;
-  githubCheckPublishedAt: string | undefined;
-  githubCommentPublishedAt: string | undefined;
-  lastPublicationError: string | undefined;
-  repository: string;
-  findings: FindingDetail[];
-  artifacts: ArtifactDetail[];
-  attempts: AttemptDetail[];
-  transitions: TransitionDetail[];
+type RunInvestigationState =
+  | "completed"
+  | "current"
+  | "dead_letter"
+  | "failed"
+  | "partial_data"
+  | "reconciliation"
+  | "stale"
+  | "superseded"
+  | "timed_out";
+
+type PageInfo = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 };
 
 type ReportLinkDetail = {
@@ -41,6 +29,7 @@ type ReportLinkDetail = {
 };
 
 type FindingDetail = {
+  id: string;
   ruleId: string;
   severity: string;
   message: string;
@@ -48,6 +37,8 @@ type FindingDetail = {
   kind: string | undefined;
   waivedAt: string | undefined;
 };
+
+type ArtifactAvailability = "available" | "metadata-only";
 
 type ArtifactDetail = {
   id: string;
@@ -58,6 +49,8 @@ type ArtifactDetail = {
   role: string;
   uploadedAt: string;
   downloadUrl: string | undefined;
+  availability: ArtifactAvailability;
+  retention: "no-automatic-expiry";
 };
 
 type AttemptDetail = {
@@ -88,6 +81,58 @@ type TransitionDetail = {
   occurredAt: string;
 };
 
+export type RunDetail = {
+  id: string;
+  status: string;
+  decision: string | undefined;
+  commitSha: string;
+  ref: string;
+  pullRequestNumber: number | undefined;
+  triggerKind: string;
+  startedAt: string;
+  completedAt: string | undefined;
+  durationMs: number | undefined;
+  boardReadyOpsVersion: string | undefined;
+  kicadVersion: string | undefined;
+  githubCheckRunId: string | undefined;
+  readinessScore: number | undefined;
+  resultContractVersion: number | undefined;
+  conclusion: string | undefined;
+  metrics: Readonly<Record<string, number>>;
+  reportLinks: ReportLinkDetail[];
+  lastPublicationAttemptAt: string | undefined;
+  githubCheckPublishedAt: string | undefined;
+  githubCommentPublishedAt: string | undefined;
+  lastPublicationError: string | undefined;
+  repository: string;
+  repositoryPrivate: boolean;
+  investigationState: RunInvestigationState;
+  reconciliationCount: number;
+  deadLetterCount: number;
+  lastActivityAt: string | undefined;
+  findings: FindingDetail[];
+  findingsPage: PageInfo;
+  artifacts: ArtifactDetail[];
+  artifactsPage: PageInfo;
+  attempts: AttemptDetail[];
+  transitions: TransitionDetail[];
+};
+
+export type RunDashboardFilters = {
+  findingSearch?: string;
+  findingSeverity?: string;
+  findingState?: "active" | "all" | "waived";
+  findingSort?: "path" | "rule" | "severity";
+  findingGroup?: "kind" | "none" | "path" | "rule" | "severity";
+  findingsPage?: number;
+  artifactSearch?: string;
+  artifactRole?: string;
+  artifactKind?: string;
+  artifactSort?: "name" | "newest" | "size";
+  artifactsPage?: number;
+  pageSize?: number;
+};
+
 export type RunLookupResult = { state: "not-configured" } | { state: "not-found" } | { state: "found"; run: RunDetail };
 
 export type RunDashboardQueryExecutor = {
@@ -100,50 +145,76 @@ type QueryResult = {
 
 type RunDashboardEnvironment = Readonly<Record<string, string | undefined>>;
 
+type RunDashboardLoaderDependencies = Readonly<{
+  artifactDownloadExpiry: typeof artifactDownloadExpiry;
+  artifactDownloadUrl: typeof artifactDownloadUrl;
+  configuredArtifactDownloadSigningKey: typeof configuredArtifactDownloadSigningKey;
+  createQueryExecutor: typeof createPgQueryExecutor;
+}>;
+
+const defaultRunDashboardLoaderDependencies: RunDashboardLoaderDependencies = {
+  artifactDownloadExpiry,
+  artifactDownloadUrl,
+  configuredArtifactDownloadSigningKey,
+  createQueryExecutor: createPgQueryExecutor,
+};
+
 type RunDashboardOptions = {
   artifactDownloadUrl?: (input: { runId: string; artifactId: string }) => string | undefined;
+  filters?: RunDashboardFilters;
+  now?: () => Date;
 };
 
-const severityRank: Readonly<Record<string, number>> = {
-  critical: 0,
-  error: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-  info: 4,
+type NormalizedFilters = Required<
+  Pick<RunDashboardFilters, "artifactSearch" | "artifactsPage" | "findingSearch" | "findingsPage" | "pageSize">
+> & {
+  artifactRole?: string;
+  artifactKind?: string;
+  artifactSort: "name" | "newest" | "size";
+  findingSeverity?: string;
+  findingSort: "path" | "rule" | "severity";
+  findingState: "active" | "all" | "waived";
 };
+
+const activeRunStatuses = new Set(["queued", "dispatching", "dispatched", "running", "reporting"]);
+const supportedFindingSeverities = new Set(["critical", "error", "high", "medium", "low", "info", "warning"]);
+const maximumSearchLength = 128;
+const facetPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const defaultPageSize = 25;
+const maximumPageSize = 100;
 
 function rows(result: unknown): readonly Record<string, unknown>[] {
-  if (typeof result !== "object" || result === null || !("rows" in result)) {
-    return [];
-  }
-
+  if (typeof result !== "object" || result === null || !("rows" in result)) return [];
   const value = (result as QueryResult).rows;
   return Array.isArray(value) ? value : [];
 }
 
 function stringValue(row: Record<string, unknown>, key: string): string | undefined {
   const value = row[key];
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (typeof value === "number" || typeof value === "bigint") {
-    return String(value);
-  }
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
   return typeof value === "string" ? value : undefined;
 }
 
 function numberValue(row: Record<string, unknown>, key: string): number | undefined {
   const value = row[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "bigint" && value <= BigInt(Number.MAX_SAFE_INTEGER)) return Number(value);
+  if (typeof value === "string" && /^\d+$/u.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function booleanValue(row: Record<string, unknown>, key: string): boolean {
+  const value = row[key];
+  return value === true || value === "true" || value === "t";
 }
 
 function metricsValue(row: Record<string, unknown>, key: string): Readonly<Record<string, number>> {
   const value = row[key];
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return {};
-  }
-
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
   return Object.fromEntries(
     Object.entries(value).filter(
       (entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]),
@@ -153,17 +224,18 @@ function metricsValue(row: Record<string, unknown>, key: string): Readonly<Recor
 
 function reportLinksValue(row: Record<string, unknown>, key: string): ReportLinkDetail[] {
   const value = row[key];
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
+  if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
-    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
-      return [];
-    }
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return [];
     const label = (entry as Record<string, unknown>).label;
     const url = (entry as Record<string, unknown>).url;
-    return typeof label === "string" && typeof url === "string" ? [{ label, url }] : [];
+    if (typeof label !== "string" || typeof url !== "string") return [];
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === "https:" ? [{ label, url }] : [];
+    } catch {
+      return [];
+    }
   });
 }
 
@@ -171,41 +243,140 @@ function requiredString(row: Record<string, unknown>, key: string): string {
   return stringValue(row, key) ?? "";
 }
 
-function bySeverityThenRule(a: FindingDetail, b: FindingDetail): number {
-  const rank = (severityRank[a.severity] ?? 99) - (severityRank[b.severity] ?? 99);
-  return rank === 0 ? a.ruleId.localeCompare(b.ruleId) : rank;
+function normalizedPositiveInteger(value: number | undefined, fallback: number, maximum: number): number {
+  if (!Number.isSafeInteger(value) || value === undefined || value < 1) return fallback;
+  return Math.min(value, maximum);
+}
+
+function normalizedSearch(value: string | undefined): string {
+  return value?.trim().slice(0, maximumSearchLength) ?? "";
+}
+
+function normalizeFilters(filters: RunDashboardFilters | undefined): NormalizedFilters {
+  const findingState = filters?.findingState;
+  const findingSort = filters?.findingSort;
+  const findingSeverity = filters?.findingSeverity?.trim().toLowerCase();
+  const artifactRole = filters?.artifactRole?.trim().toLowerCase();
+  const artifactKind = filters?.artifactKind?.trim().toLowerCase();
+  const artifactSort = filters?.artifactSort;
+  return {
+    findingSearch: normalizedSearch(filters?.findingSearch),
+    ...(findingSeverity && supportedFindingSeverities.has(findingSeverity) ? { findingSeverity } : {}),
+    findingState: findingState === "active" || findingState === "waived" ? findingState : "all",
+    findingSort: findingSort === "path" || findingSort === "rule" ? findingSort : "severity",
+    findingsPage: normalizedPositiveInteger(filters?.findingsPage, 1, 100_000),
+    artifactSearch: normalizedSearch(filters?.artifactSearch),
+    ...(artifactRole && facetPattern.test(artifactRole) ? { artifactRole } : {}),
+    ...(artifactKind && facetPattern.test(artifactKind) ? { artifactKind } : {}),
+    artifactSort: artifactSort === "name" || artifactSort === "size" ? artifactSort : "newest",
+    artifactsPage: normalizedPositiveInteger(filters?.artifactsPage, 1, 100_000),
+    pageSize: normalizedPositiveInteger(filters?.pageSize, defaultPageSize, maximumPageSize),
+  };
+}
+
+function escapedLike(value: string): string {
+  return value.replace(/[\\%_]/gu, (match) => `\\${match}`);
+}
+
+function pageInfo(page: number, pageSize: number, total: number): PageInfo {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  return { page: Math.min(page, totalPages), pageSize, total, totalPages };
+}
+
+function findingPredicates(runId: string, filters: NormalizedFilters): { sql: string; parameters: unknown[] } {
+  const predicates = ["findings.run_id = $1"];
+  const parameters: unknown[] = [runId];
+  if (filters.findingSearch) {
+    parameters.push(`%${escapedLike(filters.findingSearch.toLowerCase())}%`);
+    const placeholder = `$${parameters.length}`;
+    predicates.push(
+      String.raw`(lower(findings.rule_id) like ${placeholder} escape '\' or lower(findings.message) like ${placeholder} escape '\' or lower(coalesce(findings.path, '')) like ${placeholder} escape '\')`,
+    );
+  }
+  if (filters.findingSeverity) {
+    parameters.push(filters.findingSeverity);
+    predicates.push(`lower(findings.severity) = $${parameters.length}`);
+  }
+  if (filters.findingState === "active") predicates.push("findings.waived_at is null");
+  if (filters.findingState === "waived") predicates.push("findings.waived_at is not null");
+  return { sql: predicates.join(" and "), parameters };
+}
+
+function findingOrder(sort: NormalizedFilters["findingSort"]): string {
+  if (sort === "path") return "coalesce(findings.path, '') asc, findings.rule_id asc, findings.id asc";
+  if (sort === "rule") return "findings.rule_id asc, findings.path asc nulls last, findings.id asc";
+  return `case lower(findings.severity)
+    when 'critical' then 0 when 'error' then 0 when 'high' then 1
+    when 'medium' then 2 when 'warning' then 2 when 'low' then 3 when 'info' then 4 else 99 end,
+    findings.rule_id asc, findings.id asc`;
+}
+
+function artifactPredicates(runId: string, filters: NormalizedFilters): { sql: string; parameters: unknown[] } {
+  const predicates = ["artifacts.run_id = $1"];
+  const parameters: unknown[] = [runId];
+  if (filters.artifactSearch) {
+    parameters.push(`%${escapedLike(filters.artifactSearch.toLowerCase())}%`);
+    const placeholder = `$${parameters.length}`;
+    predicates.push(
+      String.raw`(lower(artifacts.name) like ${placeholder} escape '\' or lower(artifacts.kind) like ${placeholder} escape '\' or lower(artifacts.sha256) like ${placeholder} escape '\')`,
+    );
+  }
+  if (filters.artifactRole) {
+    parameters.push(filters.artifactRole);
+    predicates.push(`lower(artifacts.role) = $${parameters.length}`);
+  }
+  if (filters.artifactKind) {
+    parameters.push(filters.artifactKind);
+    predicates.push(`lower(artifacts.kind) = $${parameters.length}`);
+  }
+  return { sql: predicates.join(" and "), parameters };
+}
+
+function artifactOrder(sort: NormalizedFilters["artifactSort"]): string {
+  if (sort === "name") return "artifacts.name asc, artifacts.uploaded_at desc, artifacts.id desc";
+  if (sort === "size") return "artifacts.bytes desc, artifacts.uploaded_at desc, artifacts.id desc";
+  return "artifacts.uploaded_at desc, artifacts.id desc";
+}
+
+function investigationState(input: {
+  status: string;
+  reconciliationCount: number;
+  deadLetterCount: number;
+  resultContractVersion: number | undefined;
+  lastActivityAt: string | undefined;
+  now: Date;
+}): RunInvestigationState {
+  if (input.deadLetterCount > 0) return "dead_letter";
+  if (input.reconciliationCount > 0) return "reconciliation";
+  if (input.status === "failed") return "failed";
+  if (input.status === "timed_out") return "timed_out";
+  if (input.status === "superseded") return "superseded";
+  if (input.status === "completed" && input.resultContractVersion === undefined) return "partial_data";
+  if (input.status === "completed") return "completed";
+  if (activeRunStatuses.has(input.status) && input.lastActivityAt) {
+    const lastActivity = new Date(input.lastActivityAt);
+    if (Number.isFinite(lastActivity.valueOf()) && input.now.valueOf() - lastActivity.valueOf() > 15 * 60_000) {
+      return "stale";
+    }
+  }
+  return "current";
 }
 
 export function formatRunDate(input: string | undefined): string {
-  if (!input) {
-    return "—";
-  }
-
+  if (!input) return "—";
   const date = new Date(input);
   return Number.isNaN(date.getTime()) ? input : date.toISOString();
 }
 
 export function formatRunDuration(durationMs: number | undefined): string {
-  if (durationMs === undefined) {
-    return "—";
-  }
-
-  if (durationMs < 1000) {
-    return `${durationMs} ms`;
-  }
-
+  if (durationMs === undefined) return "—";
+  if (durationMs < 1000) return `${durationMs} ms`;
   return `${(durationMs / 1000).toFixed(1)} s`;
 }
 
 export function formatArtifactBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
@@ -214,6 +385,7 @@ export async function lookupRunDashboard(
   executor: RunDashboardQueryExecutor,
   options: RunDashboardOptions = {},
 ): Promise<RunLookupResult> {
+  const filters = normalizeFilters(options.filters);
   const runResult = await executor.query(
     `select
        release_runs.id,
@@ -239,7 +411,31 @@ export async function lookupRunDashboard(
        release_run_results.github_comment_published_at,
        release_run_results.last_publication_error,
        repositories.owner,
-       repositories.name
+       repositories.name,
+       repositories.private,
+       coalesce((
+         select count(*)::int
+         from control_plane_reconciliation_items
+         where control_plane_reconciliation_items.release_run_id = release_runs.id
+           and control_plane_reconciliation_items.status in ('available', 'leased')
+       ), 0)::int as reconciliation_count,
+       coalesce((
+         select count(*)::int
+         from control_plane_reconciliation_items
+         where control_plane_reconciliation_items.release_run_id = release_runs.id
+           and control_plane_reconciliation_items.status = 'dead_letter'
+       ), 0)::int as dead_letter_count,
+       coalesce((
+         select max(coalesce(
+           release_run_attempts.heartbeat_at,
+           release_run_attempts.started_at,
+           release_run_attempts.dispatched_at,
+           release_run_attempts.dispatch_requested_at,
+           release_run_attempts.created_at
+         ))
+         from release_run_attempts
+         where release_run_attempts.run_id = release_runs.id
+       ), release_runs.completed_at, release_runs.started_at) as last_activity_at
      from release_runs
      join repositories on repositories.id = release_runs.repository_id
      left join release_run_results on release_run_results.run_id = release_runs.id
@@ -247,32 +443,22 @@ export async function lookupRunDashboard(
     [runId],
   );
   const runRow = rows(runResult)[0];
+  if (!runRow) return { state: "not-found" };
 
-  if (!runRow) {
-    return { state: "not-found" };
-  }
+  const findingScope = findingPredicates(runId, filters);
+  const artifactScope = artifactPredicates(runId, filters);
 
-  const [findingsResult, artifactsResult, attemptsResult, transitionsResult] = await Promise.all([
-    executor.query(
-      `select rule_id, severity, message, path, kind, waived_at
-       from findings
-       where run_id = $1`,
-      [runId],
-    ),
-    executor.query(
-      `select id, kind, name, sha256, bytes, role, uploaded_at
-       from artifacts
-       where run_id = $1
-       order by uploaded_at desc`,
-      [runId],
-    ),
+  const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult] = await Promise.all([
+    executor.query(`select count(*)::int as total from findings where ${findingScope.sql}`, findingScope.parameters),
+    executor.query(`select count(*)::int as total from artifacts where ${artifactScope.sql}`, artifactScope.parameters),
     executor.query(
       `select id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at,
               started_at, heartbeat_at, completed_at, retry_after_at,
               github_workflow_dispatch_id, failure_class, failure_message, result_digest
        from release_run_attempts
        where run_id = $1
-       order by attempt_number desc`,
+       order by attempt_number desc
+       limit 50`,
       [runId],
     ),
     executor.query(
@@ -287,21 +473,51 @@ export async function lookupRunDashboard(
     ),
   ]);
 
-  const findings = rows(findingsResult)
-    .map(
-      (row): FindingDetail => ({
-        ruleId: requiredString(row, "rule_id"),
-        severity: requiredString(row, "severity"),
-        message: requiredString(row, "message"),
-        path: stringValue(row, "path"),
-        kind: stringValue(row, "kind"),
-        waivedAt: stringValue(row, "waived_at"),
-      }),
-    )
-    .sort(bySeverityThenRule);
+  const findingTotal = numberValue(rows(findingCountResult)[0] ?? {}, "total") ?? 0;
+  const artifactTotal = numberValue(rows(artifactCountResult)[0] ?? {}, "total") ?? 0;
+  const findingsPage = pageInfo(filters.findingsPage, filters.pageSize, findingTotal);
+  const artifactsPage = pageInfo(filters.artifactsPage, filters.pageSize, artifactTotal);
+  const findingOffset = (findingsPage.page - 1) * filters.pageSize;
+  const artifactOffset = (artifactsPage.page - 1) * filters.pageSize;
+
+  const [findingsResult, artifactsResult] = await Promise.all([
+    executor.query(
+      `select findings.id, findings.rule_id, findings.severity, findings.message,
+              findings.path, findings.kind, findings.waived_at
+       from findings
+       where ${findingScope.sql}
+       order by ${findingOrder(filters.findingSort)}
+       limit $${findingScope.parameters.length + 1}
+       offset $${findingScope.parameters.length + 2}`,
+      [...findingScope.parameters, filters.pageSize, findingOffset],
+    ),
+    executor.query(
+      `select artifacts.id, artifacts.kind, artifacts.name, artifacts.sha256,
+              artifacts.bytes, artifacts.role, artifacts.uploaded_at
+       from artifacts
+       where ${artifactScope.sql}
+       order by ${artifactOrder(filters.artifactSort)}
+       limit $${artifactScope.parameters.length + 1}
+       offset $${artifactScope.parameters.length + 2}`,
+      [...artifactScope.parameters, filters.pageSize, artifactOffset],
+    ),
+  ]);
+
+  const findings = rows(findingsResult).map(
+    (row): FindingDetail => ({
+      id: requiredString(row, "id"),
+      ruleId: requiredString(row, "rule_id"),
+      severity: requiredString(row, "severity"),
+      message: requiredString(row, "message"),
+      path: stringValue(row, "path"),
+      kind: stringValue(row, "kind"),
+      waivedAt: stringValue(row, "waived_at"),
+    }),
+  );
 
   const artifacts = rows(artifactsResult).map((row): ArtifactDetail => {
     const artifactId = requiredString(row, "id");
+    const downloadUrl = options.artifactDownloadUrl?.({ runId, artifactId });
     return {
       id: artifactId,
       kind: requiredString(row, "kind"),
@@ -310,7 +526,9 @@ export async function lookupRunDashboard(
       bytes: numberValue(row, "bytes") ?? 0,
       role: requiredString(row, "role"),
       uploadedAt: requiredString(row, "uploaded_at"),
-      downloadUrl: options.artifactDownloadUrl?.({ runId, artifactId }),
+      downloadUrl,
+      availability: downloadUrl ? "available" : "metadata-only",
+      retention: "no-automatic-expiry",
     };
   });
 
@@ -346,11 +564,18 @@ export async function lookupRunDashboard(
     }),
   );
 
+  const status = requiredString(runRow, "status");
+  const reconciliationCount = numberValue(runRow, "reconciliation_count") ?? 0;
+  const deadLetterCount = numberValue(runRow, "dead_letter_count") ?? 0;
+  const resultContractVersion = numberValue(runRow, "contract_version");
+  const lastActivityAt = stringValue(runRow, "last_activity_at");
+  const now = options.now?.() ?? new Date();
+
   return {
     state: "found",
     run: {
       id: requiredString(runRow, "id"),
-      status: requiredString(runRow, "status"),
+      status,
       decision: stringValue(runRow, "decision"),
       commitSha: requiredString(runRow, "commit_sha"),
       ref: requiredString(runRow, "ref"),
@@ -363,7 +588,7 @@ export async function lookupRunDashboard(
       kicadVersion: stringValue(runRow, "kicad_version"),
       githubCheckRunId: stringValue(runRow, "github_check_run_id"),
       readinessScore: numberValue(runRow, "readiness_score"),
-      resultContractVersion: numberValue(runRow, "contract_version"),
+      resultContractVersion,
       conclusion: stringValue(runRow, "conclusion"),
       metrics: metricsValue(runRow, "metrics"),
       reportLinks: reportLinksValue(runRow, "report_links"),
@@ -372,8 +597,22 @@ export async function lookupRunDashboard(
       githubCommentPublishedAt: stringValue(runRow, "github_comment_published_at"),
       lastPublicationError: stringValue(runRow, "last_publication_error"),
       repository: `${requiredString(runRow, "owner")}/${requiredString(runRow, "name")}`,
+      repositoryPrivate: booleanValue(runRow, "private"),
+      investigationState: investigationState({
+        status,
+        reconciliationCount,
+        deadLetterCount,
+        resultContractVersion,
+        lastActivityAt,
+        now,
+      }),
+      reconciliationCount,
+      deadLetterCount,
+      lastActivityAt,
       findings,
+      findingsPage,
       artifacts,
+      artifactsPage,
       attempts,
       transitions,
     },
@@ -383,34 +622,37 @@ export async function lookupRunDashboard(
 export async function loadRunDashboard(
   runId: string,
   environment: RunDashboardEnvironment = process.env,
+  filters: RunDashboardFilters = {},
+  dependencies: RunDashboardLoaderDependencies = defaultRunDashboardLoaderDependencies,
 ): Promise<RunLookupResult> {
   const connectionString = environment.DATABASE_URL;
-
-  if (!connectionString) {
-    return { state: "not-configured" };
-  }
+  if (!connectionString) return { state: "not-configured" };
 
   const baseUrl = environment.BOARDREADYOPS_PUBLIC_URL ?? environment.NEXT_PUBLIC_APP_URL;
-  const key = configuredArtifactDownloadSigningKey(environment);
-  const expiresAt = baseUrl && key ? artifactDownloadExpiry() : undefined;
+  const key = dependencies.configuredArtifactDownloadSigningKey(environment);
+  const expiresAt = baseUrl && key ? dependencies.artifactDownloadExpiry() : undefined;
+  const executor = dependencies.createQueryExecutor({
+    connectionString,
+    max: Number(environment.DATABASE_POOL_MAX ?? 5),
+  });
 
-  return await lookupRunDashboard(
-    runId,
-    createPgQueryExecutor({
-      connectionString,
-      max: Number(environment.DATABASE_POOL_MAX ?? 5),
-    }),
-    baseUrl && key && expiresAt
-      ? {
-          artifactDownloadUrl: ({ runId: resultRunId, artifactId }) =>
-            artifactDownloadUrl({
-              runId: resultRunId,
-              artifactId,
-              expiresAt,
-              baseUrl,
-              key,
-            }),
-        }
-      : {},
-  );
+  try {
+    return await lookupRunDashboard(runId, executor, {
+      filters,
+      ...(baseUrl && key && expiresAt
+        ? {
+            artifactDownloadUrl: ({ runId: resultRunId, artifactId }) =>
+              dependencies.artifactDownloadUrl({
+                runId: resultRunId,
+                artifactId,
+                expiresAt,
+                baseUrl,
+                key,
+              }),
+          }
+        : {}),
+    });
+  } finally {
+    await executor.close();
+  }
 }

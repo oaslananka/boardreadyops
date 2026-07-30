@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "BoardReadyOps Cloud",
-  description: "Self-hosted release readiness dashboard for KiCad hardware projects.",
+  title: { default: "BoardReadyOps Cloud", template: "%s · BoardReadyOps" },
+  description: "Accessible release investigation for KiCad hardware projects.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

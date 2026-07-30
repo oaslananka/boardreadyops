@@ -1,16 +1,55 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("run dashboard page", () => {
-  it("renders bounded lifecycle transition evidence with an empty state", () => {
-    const page = readFileSync("apps/web/app/runs/[runId]/page.tsx", "utf8");
+const component = readFileSync("apps/web/components/run-investigation.tsx", "utf8");
+const styles = readFileSync("apps/web/app/styles.css", "utf8");
 
-    expect(page).toContain("Lifecycle transitions");
-    expect(page).toContain("No versioned lifecycle transition has been recorded for this run.");
-    expect(page).toContain("transition.reasonCode");
-    expect(page).toContain("transition.executionAttemptId");
-    expect(page).toContain("transition.fromVersion");
-    expect(page).toContain("transition.toVersion");
-    expect(page).toContain("formatRunDate(transition.occurredAt)");
+describe("run investigation routes", () => {
+  it("provides route-level navigation and shared investigation components", () => {
+    for (const route of ["attempts", "findings", "artifacts", "publication", "audit"]) {
+      expect(readFileSync(`apps/web/app/runs/[runId]/${route}/page.tsx`, "utf8")).toContain(`active="${route}"`);
+    }
+    expect(component).toContain('aria-label="Run investigation"');
+    expect(component).toContain("Breadcrumbs");
+    for (const sharedComponent of ["RunHeader", "AttemptTimeline", "FindingList", "ArtifactTable"]) {
+      expect(component).toContain(`export function ${sharedComponent}`);
+    }
+    expect(component).toContain("Lifecycle transitions");
+    expect(component).toContain("No lifecycle transitions");
+  });
+
+  it("uses semantic, non-color-only status and bounded investigation controls", () => {
+    expect(component).toContain("StatusBadge");
+    expect(component).toContain("Search findings");
+    expect(component).toContain('name="findingGroup"');
+    expect(component).toContain("findingsPage");
+    expect(component).toContain("Search artifacts");
+    expect(component).toContain('name="artifactKind"');
+    expect(component).toContain('name="artifactSort"');
+    expect(component).toContain("artifactsPage");
+    expect(component).toContain("Copy SHA-256");
+    expect(component).toContain("no automatic age-based expiry");
+    expect(component).toContain("Open GitHub checks");
+    expect(component).toContain("Operator authentication required");
+    expect(styles).toContain(":focus-visible");
+    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(styles).toContain(".status-icon");
+    expect(styles).toContain(".sr-only");
+  });
+
+  it("defines explicit loading, failure, unavailable, expired, stale, recovery, and partial states", () => {
+    expect(readFileSync("apps/web/app/runs/[runId]/loading.tsx", "utf8")).toContain("Loading run investigation");
+    expect(readFileSync("apps/web/app/runs/[runId]/error.tsx", "utf8")).toContain(
+      "Run investigation could not be loaded",
+    );
+    const notFoundPage = readFileSync("apps/web/app/runs/[runId]/not-found.tsx", "utf8");
+    expect(notFoundPage).toContain("not found or no longer available");
+    expect(notFoundPage).toContain("unauthorized");
+    expect(notFoundPage).toContain("expired");
+    expect(component).toContain("This run may be stale");
+    expect(component).toContain("Reconciliation is active");
+    expect(component).toContain("Recovery requires operator action");
+    expect(component).toContain("This run has partial data");
+    expect(component).toContain("A newer run superseded this result");
   });
 });

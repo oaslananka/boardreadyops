@@ -1,9 +1,24 @@
+import { transform } from "esbuild";
 import { defineConfig } from "vitest/config";
 
 const PIPELINE_TEST_TIMEOUT_MS = 15_000;
 
 export default defineConfig({
   plugins: [
+    {
+      name: "web-tsx-tests",
+      enforce: "pre",
+      async transform(code, id) {
+        if (!id.includes("/apps/web/") || !id.endsWith(".tsx")) return;
+        return await transform(code, {
+          loader: "tsx",
+          jsx: "automatic",
+          format: "esm",
+          sourcemap: "inline",
+          sourcefile: id,
+        });
+      },
+    },
     {
       name: "raw-mustache",
       transform(code, id) {

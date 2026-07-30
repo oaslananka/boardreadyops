@@ -1,5 +1,10 @@
+import { fileURLToPath } from "node:url";
+
+const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
+
 const nextConfig = {
   output: "standalone",
+  outputFileTracingRoot: repositoryRoot,
   poweredByHeader: false,
   reactStrictMode: true,
   transpilePackages: [
