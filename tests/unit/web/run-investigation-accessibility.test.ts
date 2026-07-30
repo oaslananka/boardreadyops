@@ -64,6 +64,8 @@ function sampleRun(): RunDetail {
     lastPublicationError: undefined,
     repository: "oaslananka/boardreadyops",
     repositoryPrivate: false,
+    trustMode: "safe",
+    safeModeReasons: ["private-repository"],
     investigationState: "completed",
     reconciliationCount: 0,
     deadLetterCount: 0,

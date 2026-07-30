@@ -5,6 +5,9 @@ import {
   configuredArtifactDownloadSigningKey,
 } from "./artifact-downloads.js";
 
+type RunTrustMode = "safe" | "standard";
+type RunSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
+
 type RunInvestigationState =
   | "completed"
   | "current"
@@ -106,6 +109,8 @@ export type RunDetail = {
   lastPublicationError: string | undefined;
   repository: string;
   repositoryPrivate: boolean;
+  trustMode: RunTrustMode;
+  safeModeReasons: RunSafeModeReason[];
   setupPreset?: string;
   setupPresetVersion?: number;
   setupRevision?: number;
@@ -183,6 +188,11 @@ type NormalizedFilters = Required<
 };
 
 const activeRunStatuses = new Set(["queued", "dispatching", "dispatched", "running", "reporting"]);
+const supportedSafeModeReasons = [
+  "draft-pull-request",
+  "fork-pull-request",
+  "private-repository",
+] as const satisfies readonly RunSafeModeReason[];
 const supportedFindingSeverities = new Set(["critical", "error", "high", "medium", "low", "info", "warning"]);
 const maximumSearchLength = 128;
 const facetPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -216,6 +226,13 @@ function numberValue(row: Record<string, unknown>, key: string): number | undefi
 function booleanValue(row: Record<string, unknown>, key: string): boolean {
   const value = row[key];
   return value === true || value === "true" || value === "t";
+}
+
+function safeModeReasonsValue(row: Record<string, unknown>, key: string): RunSafeModeReason[] {
+  const value = row[key];
+  if (!Array.isArray(value)) return [];
+  const observed = new Set(value.filter((entry): entry is string => typeof entry === "string"));
+  return supportedSafeModeReasons.filter((reason) => observed.has(reason));
 }
 
 function metricsValue(row: Record<string, unknown>, key: string): Readonly<Record<string, number>> {
@@ -401,6 +418,8 @@ export async function lookupRunDashboard(
        release_runs.ref,
        release_runs.pull_request_number,
        release_runs.trigger_kind,
+       release_runs.trust_mode,
+       release_runs.safe_mode_reasons,
        release_runs.started_at,
        release_runs.completed_at,
        release_runs.duration_ms,
@@ -583,6 +602,8 @@ export async function lookupRunDashboard(
   const deadLetterCount = numberValue(runRow, "dead_letter_count") ?? 0;
   const resultContractVersion = numberValue(runRow, "contract_version");
   const lastActivityAt = stringValue(runRow, "last_activity_at");
+  const trustMode: RunTrustMode = stringValue(runRow, "trust_mode") === "safe" ? "safe" : "standard";
+  const safeModeReasons = trustMode === "safe" ? safeModeReasonsValue(runRow, "safe_mode_reasons") : [];
   const setupPreset = stringValue(runRow, "setup_preset");
   const setupPresetVersion = numberValue(runRow, "setup_preset_version");
   const setupRevision = numberValue(runRow, "setup_revision");
@@ -618,6 +639,8 @@ export async function lookupRunDashboard(
       lastPublicationError: stringValue(runRow, "last_publication_error"),
       repository: `${requiredString(runRow, "owner")}/${requiredString(runRow, "name")}`,
       repositoryPrivate: booleanValue(runRow, "private"),
+      trustMode,
+      safeModeReasons,
       ...(setupPreset ? { setupPreset } : {}),
       ...(setupPresetVersion === undefined ? {} : { setupPresetVersion }),
       ...(setupRevision === undefined ? {} : { setupRevision }),

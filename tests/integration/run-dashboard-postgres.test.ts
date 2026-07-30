@@ -31,8 +31,9 @@ beforeAll(async () => {
   await database().query(
     `insert into release_runs (
        id, repository_id, commit_sha, ref, pull_request_number, trigger_kind,
-       status, decision, completed_at, duration_ms, readiness_score
-     ) values ($1, $2, $3, 'refs/heads/main', 221, 'pr', 'completed', 'pass', now(), 1250, 97)`,
+       status, decision, completed_at, duration_ms, readiness_score, trust_mode, safe_mode_reasons
+     ) values ($1, $2, $3, 'refs/heads/main', 221, 'pr', 'completed', 'pass', now(), 1250, 97,
+               'safe', array['private-repository']::text[])`,
     [runId, repositoryId, "d".repeat(40)],
   );
   await database().query(
@@ -80,6 +81,8 @@ describeDatabase("run dashboard PostgreSQL integration", () => {
 
     expect(result.state).toBe("found");
     if (result.state !== "found") throw new Error("dashboard fixture was not found");
+    expect(result.run.trustMode).toBe("safe");
+    expect(result.run.safeModeReasons).toEqual(["private-repository"]);
     expect(result.run.findingsPage).toEqual({ page: 2, pageSize: 10, total: 31, totalPages: 4 });
     expect(result.run.findings).toHaveLength(10);
     expect(result.run.findings[0]?.ruleId).toBe("rule.11");

@@ -72,3 +72,14 @@ When safe mode is enabled, runners must:
 ## Current implementation slice
 
 This change provides detection, validated workflow inputs, fail-safe dispatch policy, terminal skip consistency, and retry behavior. Full repository checkout, policy evaluation, artifact production, and public Marketplace hardening remain separate runtime work.
+
+## Durable trust-mode evidence
+
+Every newly enqueued release run snapshots its execution trust mode before any Check Run or workflow effect is created:
+
+- `standard` records an empty safe-mode reason set.
+- `safe` records the canonical reason set (`draft-pull-request`, `fork-pull-request`, and/or `private-repository`).
+- The enqueue transaction emits one tenant-scoped `release_run.trust_mode_selected` audit event for the new run; idempotent webhook replays do not create duplicate events.
+- The run investigation dashboard shows the persisted trust mode and reasons next to the exact source and runtime metadata.
+
+The snapshot is historical evidence. Later repository visibility or pull-request state changes do not rewrite it.
