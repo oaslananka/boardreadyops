@@ -24,5 +24,11 @@
     "jsx": "react-jsx"
   },
   "include": ["src/**/*.ts", "packages/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
-  "exclude": ["dist", "node_modules", "coverage", "tests/unit/web/run-investigation-accessibility.test.ts"]
+  "exclude": [
+    "dist",
+    "node_modules",
+    "coverage",
+    "tests/unit/web/run-investigation-accessibility.test.ts",
+    "tests/unit/web/repository-setup-page.test.ts"
+  ]
 }

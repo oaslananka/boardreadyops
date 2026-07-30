@@ -25,6 +25,7 @@ type DoctorSeverity = "pass" | "warn" | "fail" | "info";
 
 export interface DoctorCommandOptions {
   check?: string | undefined;
+  config?: string | undefined;
   format?: string | undefined;
 }
 
@@ -59,7 +60,7 @@ export async function doctorCommand(
   streams: { stdout: NodeJS.WritableStream },
 ): Promise<number> {
   const format = parseDoctorFormat(options.format);
-  const report = await createDoctorReport(options.check);
+  const report = await createDoctorReport(options.check, options.config);
   streams.stdout.write(
     format === "json"
       ? `${JSON.stringify(publicDoctorReport(report), null, 2)}\n`
@@ -68,14 +69,21 @@ export async function doctorCommand(
   return 0;
 }
 
-async function createDoctorReport(selected: string | undefined): Promise<DoctorReport> {
+async function createDoctorReport(
+  selected: string | undefined,
+  configInput: string | undefined,
+): Promise<DoctorReport> {
   const selectedCheck = parseDoctorCheck(selected);
   const checks = await Promise.all(
     [
       { name: "runtime" as const, title: "Runtime", run: runtimeCheck },
       { name: "kicad" as const, title: "KiCad", run: kicadCheck },
       { name: "adapters" as const, title: "Adapters", run: adaptersCheck },
-      { name: "repository" as const, title: "Repository", run: repositoryCheck },
+      {
+        name: "repository" as const,
+        title: "Repository",
+        run: (root: string) => repositoryCheck(root, configInput),
+      },
       { name: "suppressions" as const, title: "Suppressions", run: suppressionsCheck },
       { name: "action" as const, title: "Action / Workflow", run: actionCheck },
     ]
@@ -179,8 +187,8 @@ async function adaptersCheck(): Promise<DoctorItem[]> {
   ];
 }
 
-async function repositoryCheck(root: string): Promise<DoctorItem[]> {
-  const [loaded, projects] = await Promise.all([loadConfig(root), discoverProjects(root)]);
+async function repositoryCheck(root: string, configInput?: string): Promise<DoctorItem[]> {
+  const [loaded, projects] = await Promise.all([loadConfig(root, configInput), discoverProjects(root)]);
   const gerbers = await discoverGerberOutputs(root, projects);
   const items: DoctorItem[] = [];
   if (loaded.errors.length > 0) {

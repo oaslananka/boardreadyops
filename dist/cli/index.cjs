@@ -49551,21 +49551,25 @@ var doctorChecks = ["runtime", "kicad", "adapters", "repository", "suppressions"
 var supportedNodeMajors = /* @__PURE__ */ new Set([22, 24]);
 async function doctorCommand(options, streams) {
   const format = parseDoctorFormat(options.format);
-  const report = await createDoctorReport(options.check);
+  const report = await createDoctorReport(options.check, options.config);
   streams.stdout.write(
     format === "json" ? `${JSON.stringify(publicDoctorReport(report), null, 2)}
 ` : renderText(report, resolveLocale())
   );
   return 0;
 }
-async function createDoctorReport(selected) {
+async function createDoctorReport(selected, configInput) {
   const selectedCheck = parseDoctorCheck(selected);
   const checks = await Promise.all(
     [
       { name: "runtime", title: "Runtime", run: runtimeCheck },
       { name: "kicad", title: "KiCad", run: kicadCheck },
       { name: "adapters", title: "Adapters", run: adaptersCheck },
-      { name: "repository", title: "Repository", run: repositoryCheck },
+      {
+        name: "repository",
+        title: "Repository",
+        run: (root) => repositoryCheck(root, configInput)
+      },
       { name: "suppressions", title: "Suppressions", run: suppressionsCheck },
       { name: "action", title: "Action / Workflow", run: actionCheck }
     ].filter((check2) => !selectedCheck || check2.name === selectedCheck).map(async (check2) => ({
@@ -49657,8 +49661,8 @@ async function adaptersCheck() {
     })
   ];
 }
-async function repositoryCheck(root) {
-  const [loaded, projects] = await Promise.all([loadConfig(root), discoverProjects(root)]);
+async function repositoryCheck(root, configInput) {
+  const [loaded, projects] = await Promise.all([loadConfig(root, configInput), discoverProjects(root)]);
   const gerbers = await discoverGerberOutputs(root, projects);
   const items = [];
   if (loaded.errors.length > 0) {
@@ -56382,7 +56386,7 @@ function registerAllCommands(program2, streams) {
   program2.command("fix").argument("[path]", "directory to fix").option("--config <path>", "boardreadyops.yml location").option("--rule <id>", "restrict to rule", collectOption, []).option("--dry-run", "print planned diffs without writing files").option("--interactive", "prompt before applying planned diffs").option("--commit", "commit applied fixes with git").option("--allow-dirty", "allow fixes when the git workspace is dirty").option("--drc-report <path>", "KiCad DRC JSON report with suggested fixes").action(async (pathInput, options) => {
     process.exitCode = await fixCommand(pathInput, options, streams);
   });
-  program2.command("doctor").option("--format <format>", "text or json", "text").option("--check <name>", "run one doctor check").action(async (options) => {
+  program2.command("doctor").option("--format <format>", "text or json", "text").option("--check <name>", "run one doctor check").option("--config <path>", "boardreadyops.yml location").action(async (options) => {
     process.exitCode = await doctorCommand(options, streams);
   });
   program2.command("explain").argument("<rule-id>", "rule identifier").argument("[path]", "directory to inspect").action(async (ruleId6, pathInput) => {

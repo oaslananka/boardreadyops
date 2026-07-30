@@ -37,6 +37,7 @@ function token(
       repository_id: repositoryId,
       workflow_ref: workflowRef,
       ref: "refs/heads/main",
+      sha: "a".repeat(40),
       event_name: "workflow_dispatch",
       runner_environment: "github-hosted",
       run_id: "29121986402",
@@ -73,6 +74,7 @@ describe("GitHub Actions OIDC verification", () => {
         runId,
         executionAttemptId,
         repositoryId,
+        sha: "a".repeat(40),
         fetchImpl,
         now: () => nowMs,
       }),
@@ -81,6 +83,22 @@ describe("GitHub Actions OIDC verification", () => {
       "https://token.actions.githubusercontent.com/.well-known/jwks",
       expect.objectContaining({ cache: "no-store" }),
     );
+  });
+
+  it("accepts an explicit setup-probe audience while retaining repository claim binding", async () => {
+    const fetchImpl = jwksFetch();
+    const audience = `boardreadyops-setup:${runId}`;
+
+    await expect(
+      verifyGitHubActionsOidcToken(token({ aud: audience }), {
+        runId,
+        audience,
+        repositoryId,
+        sha: "a".repeat(40),
+        fetchImpl,
+        now: () => nowMs,
+      }),
+    ).resolves.toBe(true);
   });
 
   it("accepts the legacy run-only audience during the rolling upgrade", async () => {
@@ -102,6 +120,7 @@ describe("GitHub Actions OIDC verification", () => {
     ["repository ID", { repository_id: "111111111" }],
     ["workflow", { workflow_ref: `${repository}/.github/workflows/other.yml@refs/heads/main` }],
     ["ref", { ref: "refs/heads/feature" }],
+    ["sha", { sha: "b".repeat(40) }],
     ["event", { event_name: "pull_request" }],
     ["runner", { runner_environment: "self-hosted" }],
   ])("rejects a token with the wrong %s claim", async (_label, payloadOverrides) => {
@@ -112,6 +131,7 @@ describe("GitHub Actions OIDC verification", () => {
         runId,
         executionAttemptId,
         repositoryId,
+        sha: "a".repeat(40),
         fetchImpl,
         now: () => nowMs,
       }),
