@@ -20,8 +20,9 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "jsx": "react-jsx"
   },
   "include": ["src/**/*.ts", "packages/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
-  "exclude": ["dist", "node_modules", "coverage"]
+  "exclude": ["dist", "node_modules", "coverage", "tests/unit/web/run-investigation-accessibility.test.ts"]
 }

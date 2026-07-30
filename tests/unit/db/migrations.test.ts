@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(30);
+    expect(cloudDatabaseSchemaVersion).toBe(31);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -61,6 +61,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0028_guarded_runner_result_transition.sql",
       "0029_guarded_runner_lease_transitions.sql",
       "0030_artifact_deletion_jobs.sql",
+      "0031_run_investigation_indexes.sql",
     ]);
   });
 
@@ -300,6 +301,20 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("idempotency_key text unique");
     expect(sql).toContain("github_check_run_id bigint");
   });
+  it("indexes bounded run investigation queries in schema v31", async () => {
+    const sql = await readFile(join(migrationsDir, "0031_run_investigation_indexes.sql"), "utf8");
+
+    expect(sql).toContain("findings_run_severity_waiver_idx");
+    expect(sql).toContain("on findings(run_id, lower(severity), waived_at, rule_id, id)");
+    expect(sql).toContain("findings_run_rule_path_idx");
+    expect(sql).toContain("findings_run_path_rule_idx");
+    expect(sql).toContain("artifacts_run_uploaded_idx");
+    expect(sql).toContain("artifacts_run_name_idx");
+    expect(sql).toContain("artifacts_run_size_idx");
+    expect(sql).toContain("artifacts_run_role_kind_idx");
+    expect(sql).toContain("artifacts_run_kind_idx");
+  });
+
   it("stores durable tenant-scoped artifact deletion jobs in schema v30", async () => {
     const sql = await readFile(join(migrationsDir, "0030_artifact_deletion_jobs.sql"), "utf8");
 
