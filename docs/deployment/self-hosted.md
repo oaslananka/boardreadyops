@@ -254,6 +254,8 @@ ARTIFACT_DOWNLOAD_SIGNING_KEY=<generated-value>
 
 The artifact signer does not fall back to `SESSION_SECRET`. URLs are bound to the run ID, artifact ID, and expiry, and are accepted for at most 15 minutes. Rotating the key immediately invalidates previously issued links. Local-file downloads also verify the resolved filesystem path remains inside `ARTIFACT_STORAGE_ROOT` and that the stored byte count matches the file before streaming it.
 
+For a consolidated inventory of stored data, current defaults, deletion behavior, and known gaps, see [Data lifecycle and privacy](../security/data-lifecycle.md).
+
 ## Database bootstrap and migrations
 
 The self-hosted cloud control plane stores GitHub App installations, repositories, release runs, findings, artifacts, durable webhook jobs, and transactional outbox effects in PostgreSQL.
