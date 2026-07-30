@@ -1,23 +1,42 @@
-const endpoints = ["/api/health", "/api/github/webhook", "/api/v1/runs"];
+import Link from "next/link";
+import { AppShell } from "../components/ui.js";
 
 export default function HomePage() {
   return (
-    <main className="shell">
-      <section className="hero">
-        <p className="eyebrow">Self-hosted MVP</p>
-        <h1>BoardReadyOps Cloud</h1>
-        <p className="lede">Self-hosted control plane for BoardReadyOps release checks.</p>
-      </section>
-      <section className="panel">
-        <h2>API surface</h2>
-        <ul>
-          {endpoints.map((endpoint) => (
-            <li key={endpoint}>
-              <code>{endpoint}</code>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+    <AppShell>
+      <main className="shell" id="main-content">
+        <section className="home-hero">
+          <h1>Release evidence that leads to a decision.</h1>
+          <p>
+            BoardReadyOps turns normalized hardware checks into a traceable investigation: decision, execution attempts,
+            findings, artifacts, publication state, and privacy-bounded audit evidence.
+          </p>
+          <div>
+            <Link
+              className="button button-primary"
+              href="https://docs.boardreadyops.com/product/zero-config-onboarding/"
+            >
+              Connect a repository
+            </Link>
+          </div>
+        </section>
+        <section className="home-grid" aria-label="Investigation capabilities">
+          <article>
+            <h2>Decision first</h2>
+            <p>See the stable readiness result and the shortest next action before opening low-level evidence.</p>
+          </article>
+          <article>
+            <h2>Bounded investigation</h2>
+            <p>
+              Search and page through findings and artifacts without loading unbounded tenant data into the browser.
+            </p>
+          </article>
+          <article>
+            <h2>Authoritative sources</h2>
+            <p>Verify checksums, GitHub publication state, and repository-owned workflow evidence before release.</p>
+          </article>
+        </section>
+      </main>
+    </AppShell>
   );
 }

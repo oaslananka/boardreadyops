@@ -3,6 +3,8 @@ import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const css = fs.readFileSync("docs/stylesheets/accessibility.css", "utf8");
+const accessibilityDocumentation = fs.readFileSync("docs/accessibility.md", "utf8");
+const selfHostedDocumentation = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
 
 describe("documentation accessibility regressions", () => {
   it("keeps nav color overrides scoped to Material color schemes", () => {
@@ -19,6 +21,18 @@ describe("documentation accessibility regressions", () => {
     expect(contrastRatio("#d1d5db", "#111827")).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio("#ffffff", "#1f2937")).toBeGreaterThanOrEqual(4.5);
     expect(css).toContain(".md-header .md-source__fact");
+  });
+
+  it("documents the hosted investigation accessibility and bounded-data contract", () => {
+    expect(accessibilityDocumentation).toContain("hosted Next.js run investigation");
+    expect(accessibilityDocumentation).toContain("Status and severity always include a visible text label and an icon");
+    expect(accessibilityDocumentation).toContain("server-side, parameterized filtering and bounded pagination");
+    expect(accessibilityDocumentation).toContain("run-investigation-accessibility.test.ts");
+    expect(accessibilityDocumentation).toContain("run-design-system.test.ts");
+    expect(accessibilityDocumentation).toContain("structural visual-regression coverage");
+    expect(selfHostedDocumentation).toContain("summary, attempts, findings, artifacts, publication, and audit routes");
+    expect(selfHostedDocumentation).toContain("bounded PostgreSQL queries");
+    expect(selfHostedDocumentation).toContain("operator-authenticated export");
   });
 
   it("keeps the public docs navigation grouped into a small set of top-level tabs", () => {
