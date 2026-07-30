@@ -10,6 +10,9 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("BOARDREADYOPS_OPERATOR_API_TOKEN");
     expect(documentation).toContain("opaque `cursor`");
     expect(documentation).toContain("metadata allowlist");
+    expect(documentation).toContain("database-owned cascade");
+    expect(documentation).toContain("parent installation");
+    expect(documentation).toContain("does not expose installation erasure");
     expect(documentation).toContain("`repositoryId`");
     expect(documentation).toContain("`releaseRunId`");
     expect(documentation).toContain("`eventType`");
@@ -24,7 +27,7 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("URL signatures");
     expect(documentation).toContain("IP addresses");
   });
-  it("documents atomic artifact record deletion auditing without overclaiming storage erasure", async () => {
+  it("documents atomic artifact record deletion and durable physical deletion evidence", async () => {
     const documentation = await readFile(documentationUrl, "utf8");
     expect(documentation).toContain("`artifact.record.deleted`");
     expect(documentation).toContain("same PostgreSQL statement");
@@ -32,9 +35,13 @@ describe("audit log documentation", () => {
     expect(documentation).toContain("Artifact names");
     expect(documentation).toContain("storage paths");
     expect(documentation).toContain("surrounding result transaction rolls back");
-    expect(documentation).toContain("not claim that a backing storage object");
-    expect(documentation).toContain("was physically erased");
-    expect(documentation).toContain("storage-object deletion and expiry events");
+    expect(documentation).toContain("durable physical-deletion job");
+    expect(documentation).toContain("`artifact.object.deleted`");
+    expect(documentation).toContain("`outcome=deleted`");
+    expect(documentation).toContain("`outcome=missing`");
+    expect(documentation).toContain("unsupported storage drivers");
+    expect(documentation).toContain("general age-based artifact expiry");
+    expect(documentation).toContain("data-lifecycle.md");
   });
   it("documents privacy-safe release decision reconstruction", async () => {
     const documentation = await readFile(documentationUrl, "utf8");

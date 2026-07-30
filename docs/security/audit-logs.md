@@ -1,6 +1,6 @@
 # Tenant-scoped audit logs
 
-Issue: #43
+Related issues: #43 and #44
 
 ## Goal
 
@@ -50,9 +50,9 @@ Event, actor, and subject types use lowercase dot, underscore, or hyphen-delimit
 
 ## Append-only behavior
 
-`audit_events` is append-only at the database layer. PostgreSQL triggers reject direct `UPDATE` and `DELETE` operations, including mutations caused by deleting referenced resources. Resource deletion therefore requires an explicit audit-retention maintenance procedure rather than silently rewriting or removing audit history.
+`audit_events` is append-only at the database layer. PostgreSQL triggers reject direct `UPDATE` and `DELETE` operations. A database-owned cascade may remove installation-scoped audit rows only when the parent installation itself is deleted; repository, run, artifact, and runner references otherwise become nullable dimensions rather than rewriting event content.
 
-The initial foundation does not provide such a maintenance procedure. Operators must preserve the audit table and its backup before any exceptional database-level intervention.
+The current product does not expose installation erasure or an audit-retention maintenance workflow. Operators must not use direct database deletion as a substitute. A future lifecycle operation must define export, legal-hold, backup, and deletion-proof behavior before invoking any parent cascade.
 
 ## Query contract
 
@@ -186,9 +186,15 @@ insert fails, the surrounding result transaction rolls back, so artifact metadat
 cannot be deleted without its corresponding audit event. Exact result replay does
 not create another deletion event.
 
-This event proves deletion of the BoardReadyOps artifact metadata record. It does
-not claim that a backing storage object was physically erased; storage-object expiry
-and purge remain separate lifecycle work.
+This event proves deletion of the BoardReadyOps artifact metadata record. When the
+removed storage path is no longer referenced, the same result transaction also
+creates a tenant-scoped durable physical-deletion job. The local-storage worker later
+records `artifact.object.deleted` with `outcome=deleted` after removing the regular
+file or `outcome=missing` when the object was already absent. Unsafe paths,
+unsupported storage drivers, and exhausted retries instead produce bounded failure
+evidence. This replacement path does not implement general age-based artifact expiry.
+See [Data lifecycle and privacy](data-lifecycle.md) for the full storage-boundary and
+retention contract.
 
 ## Release decision reconstruction
 
@@ -219,8 +225,8 @@ upload, signed artifact download starts, artifact-record replacement deletions,
 dead-letter replay, and reconciliation operations. The
 authenticated operator export provides the first supported query surface.
 
-Issue #43 remains open for policy and waiver mutation event coverage, artifact
-storage-object deletion and expiry events, authenticated product UI or customer
-export, and retention controls. Result-level release decisions are reconstructable from the
+Issue #44 remains open for general age-based expiry, per-tenant retention controls,
+non-local storage deletion, authenticated customer export, erasure, uninstall, backup,
+and legal-hold behavior. Result-level release decisions are reconstructable from the
 existing tenant-scoped operator export; cross-resource reconstruction will expand as
-those remaining mutation surfaces are implemented.
+those remaining lifecycle surfaces are implemented.
