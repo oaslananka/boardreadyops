@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { createSqlRepositorySetupStore } from "../../packages/db/src/repository-setup-store.js";
+import { createSqlRetentionMaintenanceStore } from "../../packages/db/src/retention-maintenance-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
 const connectionString = getPostgresTestConnectionString();
@@ -245,6 +246,12 @@ describeDatabase("repository setup PostgreSQL integration", () => {
       id: () => expiredRevisionId,
       now: () => new Date("2026-07-30T06:20:00.000Z"),
     });
+    await expect(
+      createSqlRetentionMaintenanceStore(database(), {
+        now: () => new Date("2026-07-30T06:20:00.000Z"),
+      }).expireRepositorySetupProbes(),
+    ).resolves.toBe(1);
+
     const expiredInput = {
       probeId: expiredProbeId,
       workflowContractVersion: 1,

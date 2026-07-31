@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
+import { createSqlRetentionMaintenanceStore } from "../../packages/db/src/retention-maintenance-store.js";
 import { createSqlRunnerRegistrationEnrollmentStore } from "../../packages/db/src/runner-registration-enrollment-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
@@ -195,6 +196,11 @@ describeDatabase("self-hosted runner enrollment PostgreSQL lifecycle", () => {
 
       currentTime = new Date(currentTime.valueOf() + 61_000);
       await expect(
+        createSqlRetentionMaintenanceStore(executor, {
+          now: () => currentTime,
+        }).revokeExpiredRunnerRegistrationEnrollments(),
+      ).resolves.toBe(1);
+      await expect(
         store.activateRegistration({
           enrollmentToken: issued.enrollmentToken,
           publicKey: publicKey("expired-runner"),
@@ -210,6 +216,14 @@ describeDatabase("self-hosted runner enrollment PostgreSQL lifecycle", () => {
         status: "pending",
         public_key: null,
       });
+      const enrollmentResult = await executor.query(
+        "select consumed_at, revoked_at from runner_registration_enrollments where runner_registration_id = $1",
+        [issued.registrationId],
+      );
+      expect((enrollmentResult as { rows: Array<Record<string, unknown>> }).rows[0]).toMatchObject({
+        consumed_at: null,
+      });
+      expect((enrollmentResult as { rows: Array<Record<string, unknown>> }).rows[0]?.revoked_at).not.toBeNull();
     } finally {
       await cleanup(installationId);
     }

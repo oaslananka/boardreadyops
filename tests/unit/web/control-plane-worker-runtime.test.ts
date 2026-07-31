@@ -209,7 +209,13 @@ describe("control-plane worker runtime", () => {
     expect(source).toContain("createSqlRetentionMaintenanceStore");
     expect(source).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE");
     expect(source).toContain("purgeExpiredRunnerRequestNonces");
+    expect(source).toContain("expireArtifactUploadCapabilities");
+    expect(source).toContain("revokeExpiredRunnerRegistrationEnrollments");
+    expect(source).toContain("expireRepositorySetupProbes");
     expect(source).toContain("runnerRequestNoncesPurged");
+    expect(source).toContain("artifactUploadCapabilitiesExpired");
+    expect(source).toContain("runnerRegistrationEnrollmentsRevoked");
+    expect(source).toContain("repositorySetupProbesExpired");
     expect(source).toContain("lastSuccessfulRetentionCleanupAt");
     expect(source).toContain("cleanupBatchSize");
   });

@@ -1,44 +1,66 @@
 import { describe, expect, it, vi } from "vitest";
 import { runRetentionMaintenanceCleanup } from "../../../apps/web/lib/retention-maintenance-worker.js";
 
-describe("retention maintenance worker", () => {
-  it("reports aggregate purge counts when both cleanup scopes succeed", async () => {
-    const purgeWebhookInbox = vi.fn().mockResolvedValue(3);
-    const purgeRunnerRequestNonces = vi.fn().mockResolvedValue(7);
+function dependencies(overrides: Partial<Parameters<typeof runRetentionMaintenanceCleanup>[0]> = {}) {
+  return {
+    purgeWebhookInbox: vi.fn().mockResolvedValue(3),
+    purgeRunnerRequestNonces: vi.fn().mockResolvedValue(7),
+    expireArtifactUploadCapabilities: vi.fn().mockResolvedValue(5),
+    revokeExpiredRunnerRegistrationEnrollments: vi.fn().mockResolvedValue(2),
+    expireRepositorySetupProbes: vi.fn().mockResolvedValue(4),
+    ...overrides,
+  };
+}
 
-    await expect(runRetentionMaintenanceCleanup({ purgeWebhookInbox, purgeRunnerRequestNonces })).resolves.toEqual({
+describe("retention maintenance worker", () => {
+  it("reports aggregate cleanup counts when every scope succeeds", async () => {
+    await expect(runRetentionMaintenanceCleanup(dependencies())).resolves.toEqual({
       webhookInboxPurged: 3,
       runnerRequestNoncesPurged: 7,
+      artifactUploadCapabilitiesExpired: 5,
+      runnerRegistrationEnrollmentsRevoked: 2,
+      repositorySetupProbesExpired: 4,
       failures: [],
       completed: true,
     });
   });
 
-  it("continues nonce cleanup when webhook inbox cleanup fails", async () => {
-    const purgeWebhookInbox = vi.fn().mockRejectedValue(new TypeError("database timeout"));
-    const purgeRunnerRequestNonces = vi.fn().mockResolvedValue(5);
+  it("continues every independent cleanup scope when one scope fails", async () => {
+    const input = dependencies({ purgeWebhookInbox: vi.fn().mockRejectedValue(new TypeError("database timeout")) });
 
-    await expect(runRetentionMaintenanceCleanup({ purgeWebhookInbox, purgeRunnerRequestNonces })).resolves.toEqual({
+    await expect(runRetentionMaintenanceCleanup(input)).resolves.toEqual({
       webhookInboxPurged: 0,
-      runnerRequestNoncesPurged: 5,
+      runnerRequestNoncesPurged: 7,
+      artifactUploadCapabilitiesExpired: 5,
+      runnerRegistrationEnrollmentsRevoked: 2,
+      repositorySetupProbesExpired: 4,
       failures: [{ scope: "webhook_inbox", errorClass: "TypeError" }],
       completed: false,
     });
-    expect(purgeRunnerRequestNonces).toHaveBeenCalledOnce();
+    expect(input.purgeRunnerRequestNonces).toHaveBeenCalledOnce();
+    expect(input.expireArtifactUploadCapabilities).toHaveBeenCalledOnce();
+    expect(input.revokeExpiredRunnerRegistrationEnrollments).toHaveBeenCalledOnce();
+    expect(input.expireRepositorySetupProbes).toHaveBeenCalledOnce();
   });
 
-  it("continues webhook cleanup when nonce cleanup fails without exposing error text", async () => {
-    const purgeWebhookInbox = vi.fn().mockResolvedValue(4);
-    const purgeRunnerRequestNonces = vi.fn().mockRejectedValue("token=private-value");
+  it("reports content-free error classes for multiple failures", async () => {
+    const result = await runRetentionMaintenanceCleanup(
+      dependencies({
+        purgeRunnerRequestNonces: vi.fn().mockRejectedValue("token=private-value"),
+        expireRepositorySetupProbes: vi.fn().mockRejectedValue(new RangeError("repository private-name")),
+      }),
+    );
 
-    const result = await runRetentionMaintenanceCleanup({ purgeWebhookInbox, purgeRunnerRequestNonces });
-
-    expect(result).toEqual({
-      webhookInboxPurged: 4,
+    expect(result).toMatchObject({
       runnerRequestNoncesPurged: 0,
-      failures: [{ scope: "runner_request_nonces", errorClass: "UnknownError" }],
+      repositorySetupProbesExpired: 0,
+      failures: [
+        { scope: "runner_request_nonces", errorClass: "UnknownError" },
+        { scope: "repository_setup_probes", errorClass: "RangeError" },
+      ],
       completed: false,
     });
     expect(JSON.stringify(result)).not.toContain("private-value");
+    expect(JSON.stringify(result)).not.toContain("private-name");
   });
 });

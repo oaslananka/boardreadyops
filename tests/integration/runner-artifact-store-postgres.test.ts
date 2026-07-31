@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
+import { createSqlRetentionMaintenanceStore } from "../../packages/db/src/retention-maintenance-store.js";
 import { createSqlRunnerArtifactStore } from "../../packages/db/src/runner-artifact-store.js";
 import { createSqlRunnerLeaseStore } from "../../packages/db/src/runner-lease-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -260,6 +261,61 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
           storage_path: `${fixture.runId}/${fixture.attemptId}/${artifactId}.bin`,
         },
       ]);
+    } finally {
+      await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
+    }
+  });
+
+  it("expires a pending capability in bounded retention maintenance", async () => {
+    const fixture = await setup("artifact-test-maintenance-expiry");
+    const artifactId = randomUUID();
+    const uploadToken = token("maintenance-expiry");
+    const issueAt = at(fixture.base, 10);
+    const store = createSqlRunnerArtifactStore(requireExecutor(), {
+      now: () => issueAt,
+      id: () => artifactId,
+      uploadToken: () => uploadToken,
+      capabilityTtlSeconds: 30,
+    });
+
+    try {
+      const issued = await store.issueCapabilities({
+        workerClass: "managed",
+        managedRunnerIdentityId: fixture.managedIdentityId,
+        requestTimestamp: requestTimestamp(issueAt),
+        requestNonce: nonce("artifact-maintenance-expiry-issue"),
+        runId: fixture.runId,
+        executionAttemptId: fixture.attemptId,
+        leaseId: fixture.leaseId,
+        leaseToken: fixture.leaseToken,
+        artifacts: [{ kind: "report", name: "report.json", role: "machine", bytes: 42 }],
+      });
+      expect(issued.status).toBe("accepted");
+
+      const expiredAt = at(fixture.base, 41);
+      await expect(
+        createSqlRetentionMaintenanceStore(requireExecutor(), {
+          now: () => expiredAt,
+        }).expireArtifactUploadCapabilities(),
+      ).resolves.toBe(1);
+      await expect(
+        createSqlRunnerArtifactStore(requireExecutor(), { now: () => expiredAt }).beginUpload({
+          artifactId,
+          uploadToken,
+        }),
+      ).resolves.toEqual({ status: "expired" });
+
+      const state = rows(
+        await requireExecutor().query(
+          "select status, failed_at, failure_reason from runner_artifact_upload_capabilities where artifact_id = $1",
+          [artifactId],
+        ),
+      )[0];
+      expect(state).toMatchObject({
+        status: "expired",
+        failure_reason: "Artifact upload capability expired before use.",
+      });
+      expect(state?.failed_at).not.toBeNull();
     } finally {
       await cleanupTenant(fixture.tenant, fixture.managedIdentityId);
     }
