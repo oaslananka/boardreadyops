@@ -79,10 +79,10 @@ describe("control-plane transition writer boundary", () => {
     });
   });
 
-  it("accepts the repository setup migration as the guarded enqueue owner", () => {
+  it("accepts the trust-mode migration as the guarded enqueue owner", () => {
     const migrations = [
       source(
-        "packages/db/migrations/0032_repository_setup_flow.sql",
+        "packages/db/migrations/0033_release_run_trust_mode.sql",
         "create or replace function boardreadyops_enqueue_release_run_with_outbox() returns void language sql as $$ select 1 $$;",
       ),
     ];
