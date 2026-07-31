@@ -8,6 +8,7 @@ type FindingDetail = RunDetail["findings"][number];
 
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
 import { CopyButton } from "./copy-button.js";
+import { RunLiveRefresh } from "./run-live-refresh.js";
 import {
   Alert,
   AppShell,
@@ -80,7 +81,8 @@ export function RunPageFrame({
   run,
   active,
   children,
-}: Readonly<{ run: RunDetail; active: RunView; children: ReactNode }>) {
+  liveRefresh,
+}: Readonly<{ run: RunDetail; active: RunView; children: ReactNode; liveRefresh?: boolean }>) {
   const currentLabel = navigationItems.find((item) => item.view === active)?.label ?? "Run";
   return (
     <AppShell>
@@ -93,6 +95,7 @@ export function RunPageFrame({
           ]}
         />
         <RunHeader run={run} />
+        {liveRefresh ? <RunLiveRefresh enabled /> : null}
         <RunNavigation runId={run.id} active={active} />
         <RunStateNotice run={run} />
         <div className="page-content">{children}</div>

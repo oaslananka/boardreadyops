@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const component = readFileSync("apps/web/components/run-investigation.tsx", "utf8");
 const styles = readFileSync("apps/web/app/styles.css", "utf8");
+const liveRefreshComponent = existsSync("apps/web/components/run-live-refresh.tsx")
+  ? readFileSync("apps/web/components/run-live-refresh.tsx", "utf8")
+  : "";
+const lifecycleDocumentation = readFileSync("docs/product/run-lifecycle.md", "utf8");
 
 describe("run investigation routes", () => {
   it("provides route-level navigation and shared investigation components", () => {
@@ -16,6 +20,28 @@ describe("run investigation routes", () => {
     }
     expect(component).toContain("Lifecycle transitions");
     expect(component).toContain("No lifecycle transitions");
+  });
+
+  it("keeps active run pages current through reconnectable normalized refreshes", () => {
+    expect(liveRefreshComponent).toContain('"use client"');
+    expect(liveRefreshComponent).toContain("router.refresh()");
+    expect(liveRefreshComponent).toContain("Live status updates");
+    expect(component).toContain("RunLiveRefresh");
+    expect(component).toContain("liveRefresh");
+    expect(lifecycleDocumentation).toContain("five-second server refresh");
+    expect(lifecycleDocumentation).toContain("paused while the page is hidden or offline");
+    for (const route of [
+      "page.tsx",
+      "attempts/page.tsx",
+      "findings/page.tsx",
+      "artifacts/page.tsx",
+      "publication/page.tsx",
+      "audit/page.tsx",
+    ]) {
+      const page = readFileSync(`apps/web/app/runs/[runId]/${route}`, "utf8");
+      expect(page).toContain("shouldLiveRefreshRun");
+      expect(page).toContain("liveRefresh={");
+    }
   });
 
   it("uses semantic, non-color-only status and bounded investigation controls", () => {

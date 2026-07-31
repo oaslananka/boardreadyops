@@ -7,6 +7,7 @@ import {
   type SearchParameterMap,
 } from "../../../../components/run-investigation.js";
 import { loadRunDashboard } from "../../../../lib/run-dashboard.js";
+import { shouldLiveRefreshRun } from "../../../../lib/run-live-refresh.js";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function ArtifactsPage({ params, searchParams }: PageProps)
   if (result.state === "not-found") notFound();
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
   return (
-    <RunPageFrame run={result.run} active="artifacts">
+    <RunPageFrame run={result.run} active="artifacts" liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}>
       <ArtifactsView run={result.run} searchParameters={query} />
     </RunPageFrame>
   );
