@@ -23,6 +23,8 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("Plaintext capability, lease, enrollment, and nonce secrets are not persisted");
     expect(lifecycle).toContain("GitHub Actions execution boundary");
     expect(lifecycle).toContain("Customer self-hosted runner boundary");
+    expect(lifecycle).toContain("Private repository run dashboards fail closed");
+    expect(lifecycle).toContain("repository authorization");
     expect(lifecycle).toContain("organization, repository, or user erasure workflow is not implemented");
     expect(lifecycle).toContain("legal-hold workflow is not implemented");
     expect(lifecycle).toContain("backup and platform-log expiry remain operator responsibilities");

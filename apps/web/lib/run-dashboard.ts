@@ -161,6 +161,7 @@ type RunDashboardLoaderDependencies = Readonly<{
   artifactDownloadUrl: typeof artifactDownloadUrl;
   configuredArtifactDownloadSigningKey: typeof configuredArtifactDownloadSigningKey;
   createQueryExecutor: typeof createPgQueryExecutor;
+  authorizeRepository?: (repository: RunDashboardRepository) => boolean | Promise<boolean>;
 }>;
 
 const defaultRunDashboardLoaderDependencies: RunDashboardLoaderDependencies = {
@@ -170,8 +171,15 @@ const defaultRunDashboardLoaderDependencies: RunDashboardLoaderDependencies = {
   createQueryExecutor: createPgQueryExecutor,
 };
 
+type RunDashboardRepository = {
+  owner: string;
+  name: string;
+  private: boolean;
+};
+
 type RunDashboardOptions = {
   artifactDownloadUrl?: (input: { runId: string; artifactId: string }) => string | undefined;
+  authorizeRepository?: (repository: RunDashboardRepository) => boolean | Promise<boolean>;
   filters?: RunDashboardFilters;
   now?: () => Date;
 };
@@ -223,9 +231,11 @@ function numberValue(row: Record<string, unknown>, key: string): number | undefi
   return undefined;
 }
 
-function booleanValue(row: Record<string, unknown>, key: string): boolean {
+function repositoryPrivateValue(row: Record<string, unknown>, key: string): boolean {
   const value = row[key];
-  return value === true || value === "true" || value === "t";
+  if (value === false || value === 0) return false;
+  if (typeof value !== "string") return true;
+  return !["false", "f", "0"].includes(value.trim().toLowerCase());
 }
 
 function safeModeReasonsValue(row: Record<string, unknown>, key: string): RunSafeModeReason[] {
@@ -478,6 +488,15 @@ export async function lookupRunDashboard(
   const runRow = rows(runResult)[0];
   if (!runRow) return { state: "not-found" };
 
+  const repository: RunDashboardRepository = {
+    owner: requiredString(runRow, "owner"),
+    name: requiredString(runRow, "name"),
+    private: repositoryPrivateValue(runRow, "private"),
+  };
+  if (repository.private && !(await options.authorizeRepository?.(repository))) {
+    return { state: "not-found" };
+  }
+
   const findingScope = findingPredicates(runId, filters);
   const artifactScope = artifactPredicates(runId, filters);
 
@@ -637,8 +656,8 @@ export async function lookupRunDashboard(
       githubCheckPublishedAt: stringValue(runRow, "github_check_published_at"),
       githubCommentPublishedAt: stringValue(runRow, "github_comment_published_at"),
       lastPublicationError: stringValue(runRow, "last_publication_error"),
-      repository: `${requiredString(runRow, "owner")}/${requiredString(runRow, "name")}`,
-      repositoryPrivate: booleanValue(runRow, "private"),
+      repository: `${repository.owner}/${repository.name}`,
+      repositoryPrivate: repository.private,
       trustMode,
       safeModeReasons,
       ...(setupPreset ? { setupPreset } : {}),
@@ -688,6 +707,7 @@ export async function loadRunDashboard(
   try {
     return await lookupRunDashboard(runId, executor, {
       filters,
+      ...(dependencies.authorizeRepository ? { authorizeRepository: dependencies.authorizeRepository } : {}),
       ...(baseUrl && key && expiresAt
         ? {
             artifactDownloadUrl: ({ runId: resultRunId, artifactId }) =>

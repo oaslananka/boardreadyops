@@ -17,7 +17,7 @@ const dependencies = {
   createQueryExecutor: mocks.createQueryExecutor,
 };
 
-function runRow(): Record<string, unknown> {
+function runRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: "run-load",
     status: "completed",
@@ -47,6 +47,7 @@ function runRow(): Record<string, unknown> {
     reconciliation_count: 0,
     dead_letter_count: 0,
     last_activity_at: "2026-07-10T16:01:00.000Z",
+    ...overrides,
   };
 }
 
@@ -75,6 +76,44 @@ describe("run dashboard environment loader", () => {
       max: 5,
     });
     expect(mocks.artifactDownloadExpiry).not.toHaveBeenCalled();
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
+  it("fails private repository runs closed unless loader authorization is supplied", async () => {
+    mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);
+    mocks.query.mockResolvedValueOnce({ rows: [runRow({ private: true })] });
+
+    await expect(
+      loadRunDashboard("run-load", { DATABASE_URL: "postgresql://boardreadyops.test/database" }, {}, dependencies),
+    ).resolves.toEqual({ state: "not-found" });
+    expect(mocks.query).toHaveBeenCalledOnce();
+    expect(mocks.close).toHaveBeenCalledOnce();
+  });
+
+  it("passes an explicit repository authorization dependency to the dashboard lookup", async () => {
+    const authorizeRepository = vi.fn(async () => true);
+    mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);
+    for (const result of [
+      { rows: [runRow({ private: true, owner: "private-org", name: "board" })] },
+      { rows: [{ total: 0 }] },
+      { rows: [{ total: 0 }] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+    ]) {
+      mocks.query.mockResolvedValueOnce(result);
+    }
+
+    const result = await loadRunDashboard(
+      "run-load",
+      { DATABASE_URL: "postgresql://boardreadyops.test/database" },
+      {},
+      { ...dependencies, authorizeRepository },
+    );
+
+    expect(result).toMatchObject({ state: "found", run: { repository: "private-org/board", repositoryPrivate: true } });
+    expect(authorizeRepository).toHaveBeenCalledWith({ owner: "private-org", name: "board", private: true });
     expect(mocks.close).toHaveBeenCalledOnce();
   });
 
