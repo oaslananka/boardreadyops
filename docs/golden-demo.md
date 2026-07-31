@@ -2,6 +2,17 @@
 
 The golden demo is a tiny, self-contained corpus that shows BoardReadyOps catching realistic release problems on a broken board and then confirming a fixed board is clean. It ships in the repository under [`examples/golden-demo`](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo) and is part of the [BoardReadyOps v2 roadmap](https://github.com/oaslananka/boardreadyops/issues/192).
 
+## Live pull request demos
+
+Two public repositories turn the local fixture into a reviewable GitHub experience. Both contain synthetic CC0 hardware only, use SHA-pinned Actions, and publish JSON, SARIF, and Markdown workflow artifacts.
+
+| Repository | Pull request | Expected result | What it shows |
+| --- | --- | --- | --- |
+| [`oaslananka/boardreadyops-demo-pass`](https://github.com/oaslananka/boardreadyops-demo-pass) | [`demo/pass` PR #1](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) | **Expected pass** | A blocked baseline is repaired: the board outline, references, BOM data, and Gerber/drill/placement evidence become release-ready. |
+| [`oaslananka/boardreadyops-demo-fail`](https://github.com/oaslananka/boardreadyops-demo-fail) | [`demo/fail` PR #1](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) | **Expected fail** | A clean baseline gains understandable design, BOM, and missing-manufacturing-output blockers. |
+
+The passing PR posts a `100/100` release review. The failing PR posts a bounded list of blockers and still uploads the complete workflow artifacts so the remediation path remains inspectable. Each repository also includes the reviewed target-repository `readiness-runner.yml` used by the GitHub App setup flow.
+
 ## Run it in two commands
 
 ```bash
