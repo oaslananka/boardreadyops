@@ -123,12 +123,41 @@ function existingReadinessCheckRun(result, runId) {
   );
 }
 
+const queuedSafeModeReasonLabels = {
+  "draft-pull-request": "Draft pull request",
+  "fork-pull-request": "Fork pull request",
+  "private-repository": "Private repository",
+};
+
+function queuedTrustSummary(action) {
+  const safeMode = action.safeMode?.enabled === true;
+  const reasons = (action.safeMode?.reasons ?? [])
+    .flatMap((reason) => {
+      const label = queuedSafeModeReasonLabels[reason];
+      return typeof label === "string" ? [`${label} (\`${reason}\`)`] : [];
+    })
+    .join(" · ");
+  const lines = [`Trust mode: ${safeMode ? "Safe (restricted)" : "Standard"}`, `Trust reasons: ${reasons || "None"}`];
+  if (safeMode && (action.pullRequestDraft === true || action.pullRequestFromFork === true)) {
+    lines.push("Runner dispatch will be skipped; managed artifacts and result callback authority will not be granted.");
+  } else if (safeMode) {
+    lines.push("Applied restrictions: Managed evidence artifacts unavailable for this safe-mode execution");
+  } else {
+    lines.push("Applied restrictions: None");
+  }
+  return lines.join("\n");
+}
+
 function checkRunCreationBody(input) {
   const body = {
     name: readinessCheckName,
     head_sha: input.action.commitSha,
     status: "queued",
     external_id: input.runId,
+    output: {
+      title: "BoardReadyOps release readiness queued",
+      summary: queuedTrustSummary(input.action),
+    },
   };
   const url = detailsUrl(input.runId);
 

@@ -83,6 +83,14 @@ describe("control-plane operator documentation", () => {
     expect(safeMode).toContain("cryptographically binds the dispatch trust mode");
     expect(safeMode).toContain("exactly match the persisted immutable trust snapshot");
     expect(safeMode).toContain("Missing, changed, duplicated, or reordered trust metadata fails closed");
+    expect(safeMode).toContain(
+      "Queued and terminal GitHub Check Runs, plus readiness comments, show the persisted trust mode",
+    );
+    expect(safeMode).toContain("managed evidence artifacts were unavailable for that execution");
+    expect(safeMode).toContain(
+      "self-hosted runner telemetry separately proves artifact suppression and forced workspace cleanup",
+    );
+    expect(safeMode).toContain("no runner, managed artifact, or result-callback authority was granted");
   });
 
   it("documents durable physical deletion for replaced managed artifacts", () => {

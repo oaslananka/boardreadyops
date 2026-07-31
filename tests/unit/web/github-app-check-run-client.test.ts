@@ -85,6 +85,41 @@ describe("GitHub App Check Run ensure", () => {
         body: expect.stringContaining('"external_id":"run-1"'),
       }),
     );
+    const creationBody = JSON.parse(String(request.mock.calls[1]?.[1]?.body)) as {
+      output?: { title?: string; summary?: string };
+    };
+    expect(creationBody.output).toEqual({
+      title: "BoardReadyOps release readiness queued",
+      summary: expect.stringContaining("Trust mode: Standard"),
+    });
+  });
+
+  it("surfaces safe-mode reasons and enforced restrictions while the Check Run is queued", async () => {
+    request
+      .mockResolvedValueOnce(jsonResponse({ check_runs: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 89 }, 201));
+
+    await ensurePullRequestCheckRun({
+      apiBaseUrl: "https://github.test/api/v3",
+      token: "installation-token",
+      input: {
+        ...input,
+        action: {
+          ...input.action,
+          repository: { ...input.action.repository, private: true },
+          safeMode: { enabled: true, reasons: ["private-repository"] },
+        },
+      },
+      request,
+    });
+
+    const creationBody = JSON.parse(String(request.mock.calls[1]?.[1]?.body)) as {
+      output?: { summary?: string };
+    };
+    expect(creationBody.output?.summary).toContain("Trust mode: Safe (restricted)");
+    expect(creationBody.output?.summary).toContain("private-repository");
+    expect(creationBody.output?.summary).toContain("Managed evidence artifacts unavailable");
+    expect(creationBody.output?.summary).toContain("safe-mode execution");
   });
 });
 

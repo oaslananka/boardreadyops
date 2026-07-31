@@ -131,13 +131,18 @@ export function releaseRunIdempotencyKey(action: EnqueueReleaseRunInput): string
   return [action.repository.id, action.pullRequestNumber, action.commitSha].join(":");
 }
 
-function dispatchSkipReason(action: EnqueueReleaseRunInput): string | undefined {
+type DispatchSkipReason = {
+  id: "draft-pull-request" | "fork-pull-request";
+  label: string;
+};
+
+function dispatchSkipReason(action: EnqueueReleaseRunInput): DispatchSkipReason | undefined {
   if (action.pullRequestDraft) {
-    return "draft pull request";
+    return { id: "draft-pull-request", label: "draft pull request" };
   }
 
   if (action.pullRequestFromFork) {
-    return "fork pull request safe mode";
+    return { id: "fork-pull-request", label: "fork pull request safe mode" };
   }
 
   return undefined;
@@ -147,7 +152,7 @@ async function completeSkippedCheckRun(
   action: EnqueueReleaseRunInput,
   runId: string,
   checkRunId: number | string,
-  reason: string,
+  reason: DispatchSkipReason,
   completedAt: string,
   checkRunClient: GitHubAppCheckRunClient,
 ): Promise<void> {
@@ -163,7 +168,13 @@ async function completeSkippedCheckRun(
     runId,
     conclusion: "neutral",
     title: "BoardReadyOps release readiness skipped",
-    summary: `Runner dispatch was skipped by BoardReadyOps safe mode: ${reason}.`,
+    summary: [
+      "Trust mode: Safe (restricted).",
+      `Reason: ${reason.label} (${reason.id}).`,
+      "Runner dispatch: skipped.",
+      "Managed evidence artifacts: unavailable.",
+      "Result callback authority: unavailable.",
+    ].join("\n"),
     completedAt,
   });
 }

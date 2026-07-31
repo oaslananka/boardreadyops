@@ -130,6 +130,8 @@ describe("readiness result route authentication and publication", () => {
             owner: "octo-org",
             name: "hardware-board",
             github_installation_id: 12345,
+            trust_mode: "safe",
+            safe_mode_reasons: ["private-repository"],
           },
         ],
       })
@@ -162,7 +164,53 @@ describe("readiness result route authentication and publication", () => {
         completedAt: "2026-07-10T18:00:00.000Z",
       }),
     );
-    expect(createPullRequestComment).toHaveBeenCalledWith(expect.objectContaining({ pullRequestNumber: 42 }));
+    expect(completeCheckRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: expect.stringContaining("Safe (restricted)"),
+      }),
+    );
+    expect(createPullRequestComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pullRequestNumber: 42,
+        body: expect.stringContaining("Private repository"),
+      }),
+    );
+    const [persistenceSql] = query.mock.calls[0] as [string, unknown[]];
+    expect(persistenceSql).toContain("effective.trust_mode");
+    expect(persistenceSql).toContain("effective.safe_mode_reasons");
+  });
+
+  it("fails closed instead of publishing a misleading terminal trust snapshot", async () => {
+    const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            github_installation_id: 12345,
+            trust_mode: "standard",
+            safe_mode_reasons: ["private-repository"],
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      persisted: true,
+      publicationErrors: ["Release-run trust snapshot is invalid"],
+      checkRunUpdated: false,
+      pullRequestCommentCreated: false,
+    });
+    expect(completeCheckRun).not.toHaveBeenCalled();
+    expect(createPullRequestComment).not.toHaveBeenCalled();
   });
 
   it("publishes at-risk passing results as a neutral GitHub check with the warning template", async () => {
