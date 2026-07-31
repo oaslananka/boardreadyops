@@ -83,6 +83,47 @@ describe("run dashboard data", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    true,
+    null,
+    undefined,
+    "not-a-boolean",
+  ])("fails repository dashboards closed for private or malformed visibility %j", async (privateValue) => {
+    const { executor, query } = executorWithResults([{ rows: [baseRunRow({ private: privateValue })] }]);
+
+    await expect(lookupRunDashboard("private-run", executor)).resolves.toEqual({ state: "not-found" });
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([false, "false", "f", 0, "0"])("treats explicit public visibility %j as public", async (privateValue) => {
+    const { executor, query } = executorWithResults([
+      { rows: [baseRunRow({ private: privateValue })] },
+      ...emptyDashboardRows(),
+    ]);
+
+    const result = await lookupRunDashboard("public-run", executor);
+
+    expect(result).toMatchObject({ state: "found", run: { repositoryPrivate: false } });
+    expect(query).toHaveBeenCalledTimes(7);
+  });
+
+  it("loads a private repository dashboard only after explicit repository authorization", async () => {
+    const authorizeRepository = vi.fn(async () => true);
+    const { executor, query } = executorWithResults([
+      { rows: [baseRunRow({ private: true, owner: "private-org", name: "hardware" })] },
+      ...emptyDashboardRows(),
+    ]);
+
+    const result = await lookupRunDashboard("private-run", executor, { authorizeRepository });
+
+    expect(result).toMatchObject({
+      state: "found",
+      run: { repository: "private-org/hardware", repositoryPrivate: true },
+    });
+    expect(authorizeRepository).toHaveBeenCalledWith({ owner: "private-org", name: "hardware", private: true });
+    expect(query).toHaveBeenCalledTimes(7);
+  });
+
   it("normalizes malformed scalar, collection, and report-link values", async () => {
     const malformedRow = baseRunRow({
       github_check_run_id: BigInt(Number.MAX_SAFE_INTEGER) + 1n,
@@ -291,6 +332,7 @@ describe("run dashboard data", () => {
         pageSize: 10,
       },
       artifactDownloadUrl: ({ runId, artifactId }) => `https://boardreadyops.test/download/${runId}/${artifactId}`,
+      authorizeRepository: async () => true,
     });
 
     expect(result).toMatchObject({

@@ -76,6 +76,10 @@ object was removed or was already absent; the audit metadata distinguishes
 terminal failures are not reported as successful deletion. This behavior covers
 only artifacts replaced by a newer accepted result.
 
+### Run dashboard repository authorization
+
+Public repository run dashboards remain readable from their opaque run identifier. Private repository run dashboards fail closed as not found before findings, artifacts, attempts, or transition evidence is queried. A private run can be loaded only when the calling route supplies explicit repository authorization; the current public run routes do not grant that authorization. This boundary also prevents private runs from minting signed artifact links through an unauthenticated dashboard request.
+
 ### Tenant scope and auditability
 
 Installations are the top-level tenant boundary. Repository, run, artifact, runner,
