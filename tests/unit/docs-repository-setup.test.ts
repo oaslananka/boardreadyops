@@ -22,6 +22,9 @@ describe("repository setup documentation", () => {
       "missing configuration",
       "invalid configuration",
       "/api/v1/setup-probes/result",
+      "setup url",
+      "untrusted `installation_id`",
+      "first-result telemetry",
     ]) {
       expect(content.toLowerCase()).toContain(phrase.toLowerCase());
     }

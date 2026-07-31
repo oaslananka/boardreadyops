@@ -36,6 +36,8 @@ Do not place the workflow only on a pull request branch. GitHub's workflow-dispa
 
 The hosted setup preview is available at `/setup`. It presents four versioned policy presets—open-source hardware, prototype fabrication, production release, and contract-design handoff—plus the exact proposed `boardreadyops.yml`, workflow path, permissions, and review steps. Selecting or switching a preset appends a new setup revision; it never rewrites prior setup history.
 
+Configure `/setup` as the GitHub App [Setup URL](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-setup-url) and enable redirect-on-update. GitHub supplies an untrusted `installation_id` query parameter after installation or repository-selection changes. The public page never displays or authorizes from that value; repository-specific setup state remains behind the authenticated operator API.
+
 The operator API exposes the persisted setup state at:
 
 ```text

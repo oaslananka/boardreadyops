@@ -23,7 +23,9 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 export default async function SetupPage({ searchParams }: SetupPageProps) {
-  const selectedValue = first((await searchParams).preset);
+  const parameters = await searchParams;
+  const selectedValue = first(parameters.preset);
+  const hasInstallationHandoff = first(parameters.installation_id) !== undefined;
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
   const selected =
@@ -46,6 +48,20 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           </div>
           <StatusBadge value="preview" label="No repository changes are made here" />
         </header>
+
+        {hasInstallationHandoff ? (
+          <Alert title="GitHub App installation handoff" tone="success">
+            <p>
+              This URL includes the same <code>installation_id</code> parameter GitHub adds to its post-installation
+              handoff. It is an untrusted redirect parameter: this page never displays it, does not authorize repository
+              access from it, and does not load tenant data without authenticated control-plane access.
+            </p>
+            <p>
+              <a href="#policy-preset">Continue with repository setup</a> by choosing a preset and reviewing the two
+              repository-owned files below.
+            </p>
+          </Alert>
+        ) : null}
 
         <Alert title="Least privilege is preserved" tone="info">
           <p>
