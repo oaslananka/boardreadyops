@@ -4,6 +4,25 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.24.0](https://github.com/oaslananka/boardreadyops/compare/v1.23.0...v1.24.0) (2026-07-31)
+
+
+### Features
+
+* **core:** add reconnectable run refresh ([#273](https://github.com/oaslananka/boardreadyops/issues/273)) ([d3c1a01](https://github.com/oaslananka/boardreadyops/commit/d3c1a01263fd2be89968ee07bc217bfd158e04ad))
+* **core:** handle GitHub App setup handoff ([#274](https://github.com/oaslananka/boardreadyops/issues/274)) ([e8d01b1](https://github.com/oaslananka/boardreadyops/commit/e8d01b1d2b60bcae144cef871e030109b1b28608)), closes [#16](https://github.com/oaslananka/boardreadyops/issues/16)
+* **core:** persist release-run trust mode ([#272](https://github.com/oaslananka/boardreadyops/issues/272)) ([00a5c1b](https://github.com/oaslananka/boardreadyops/commit/00a5c1b992c8ae346aa9698a0fa25f22edc4e8b3))
+
+
+### Bug Fixes
+
+* **core:** bind callbacks to trust snapshots ([#281](https://github.com/oaslananka/boardreadyops/issues/281)) ([485ff4e](https://github.com/oaslananka/boardreadyops/commit/485ff4eb9bc8051d380802349a95cdde50500c19))
+* **core:** bind runner leases to trust snapshots ([#278](https://github.com/oaslananka/boardreadyops/issues/278)) ([a9691f0](https://github.com/oaslananka/boardreadyops/commit/a9691f0f8390887b6f8b4af11a20a4aa7150bd1a)), closes [#42](https://github.com/oaslananka/boardreadyops/issues/42)
+* **core:** expire stale control-plane credentials ([#280](https://github.com/oaslananka/boardreadyops/issues/280)) ([96013db](https://github.com/oaslananka/boardreadyops/commit/96013db3849011dc2a0eb258a535400691b1b590))
+* **core:** fail private dashboards closed ([#276](https://github.com/oaslananka/boardreadyops/issues/276)) ([cb9cfdc](https://github.com/oaslananka/boardreadyops/commit/cb9cfdce405d012715055fa16df26b6165f1db6e))
+* **core:** purge expired runner request nonces ([#277](https://github.com/oaslananka/boardreadyops/issues/277)) ([2d8ce0f](https://github.com/oaslananka/boardreadyops/commit/2d8ce0f52ea8befd9427f9c8ae5bad6e491a54e6)), closes [#44](https://github.com/oaslananka/boardreadyops/issues/44)
+* **core:** suppress safe-mode artifact uploads ([#279](https://github.com/oaslananka/boardreadyops/issues/279)) ([aa0a83d](https://github.com/oaslananka/boardreadyops/commit/aa0a83dad17e13179f72cf170a1f4e1ad9e8cc92)), closes [#42](https://github.com/oaslananka/boardreadyops/issues/42)
+
 ## [1.23.0](https://github.com/oaslananka/boardreadyops/compare/v1.22.0...v1.23.0) (2026-07-30)
 
 
