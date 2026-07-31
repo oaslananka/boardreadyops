@@ -91,6 +91,7 @@ Every newly enqueued release run snapshots its execution trust mode before any C
 - `safe` records the canonical reason set (`draft-pull-request`, `fork-pull-request`, and/or `private-repository`).
 - The enqueue transaction emits one tenant-scoped `release_run.trust_mode_selected` audit event for the new run; idempotent webhook replays do not create duplicate events.
 - The run investigation dashboard shows the persisted trust mode and reasons next to the exact source and runtime metadata.
+- Queued and terminal GitHub Check Runs, plus readiness comments, show the persisted trust mode, canonical reasons, and the restrictions actually enforced for that execution. Safe-mode terminal output states that managed evidence artifacts were unavailable for that execution; self-hosted runner telemetry separately proves artifact suppression and forced workspace cleanup. Fork/draft skips state that no runner, managed artifact, or result-callback authority was granted.
 
 The snapshot is historical evidence. Later repository visibility or pull-request state changes do not rewrite it.
 

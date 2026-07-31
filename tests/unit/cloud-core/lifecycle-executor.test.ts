@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GitHubAppLifecycleAction } from "../../../packages/cloud-core/src/lifecycle.js";
 import {
+  type CompleteGitHubCheckRunInput,
   createNoopGitHubAppLifecycleStore,
   type DispatchReleaseRunWorkflowInput,
   type EnqueueReleaseRunInput,
@@ -67,7 +68,7 @@ function lifecycleStore(overrides: Partial<GitHubAppLifecycleStore> = {}): GitHu
 function checkRunClient() {
   return {
     createPullRequestCheckRun: vi.fn(async () => ({ id: 555 })),
-    completeCheckRun: vi.fn(async () => undefined),
+    completeCheckRun: vi.fn(async (_input: CompleteGitHubCheckRunInput) => undefined),
   };
 }
 
@@ -246,6 +247,11 @@ describe("GitHub App lifecycle execution", () => {
         summary: expect.stringContaining(summary),
       }),
     );
+    const skippedSummary = checks.completeCheckRun.mock.calls[0]?.[0].summary ?? "";
+    expect(skippedSummary).toContain("Trust mode: Safe (restricted).");
+    expect(skippedSummary).toContain("Runner dispatch: skipped.");
+    expect(skippedSummary).toContain("Managed evidence artifacts: unavailable.");
+    expect(skippedSummary).toContain("Result callback authority: unavailable.");
     expect(result.workflowDispatchesCreated).toBe(0);
     expect(result.workflowDispatchesSkipped).toBe(1);
   });
