@@ -7,6 +7,12 @@ const severityLabels = {
   info: "Info",
 };
 
+const safeModeReasonLabels = {
+  "draft-pull-request": "Draft pull request",
+  "fork-pull-request": "Fork pull request",
+  "private-repository": "Private repository",
+};
+
 const terminalPresentations = {
   success: { emoji: "✅", label: "Ready to release" },
   warning: { emoji: "⚠️", label: "Review warnings" },
@@ -219,21 +225,59 @@ function waiverValue(input) {
   return `${activeWaivers(input).length} active · ${expiredWaivers(input).length} expired`;
 }
 
+function trustModeValue(input) {
+  if (input.trustMode === "safe") return "Safe (restricted)";
+  if (input.trustMode === "standard") return "Standard";
+  return undefined;
+}
+
+function trustReasonsValue(input) {
+  const reasons = (input.safeModeReasons ?? [])
+    .map((reason) => {
+      const label = safeModeReasonLabels[reason];
+      return typeof label === "string" ? `${label} (${code(reason)})` : undefined;
+    })
+    .filter((reason) => typeof reason === "string");
+  return reasons.length > 0 ? reasons.join(" · ") : "None";
+}
+
+function appliedRestrictionsValue(input) {
+  return input.trustMode === "safe" ? "Managed evidence artifacts unavailable for this safe-mode execution" : "None";
+}
+
+function appendTrustSummary(lines, input, style) {
+  const trustMode = trustModeValue(input);
+  if (!trustMode) return;
+  if (style === "table") {
+    lines.push(`| Trust mode | ${trustMode} |`);
+    lines.push(`| Trust reasons | ${trustReasonsValue(input)} |`);
+    lines.push(`| Applied restrictions | ${appliedRestrictionsValue(input)} |`);
+    return;
+  }
+  lines.push(`**Trust mode:** ${trustMode}`);
+  lines.push(`**Trust reasons:** ${trustReasonsValue(input)}`);
+  lines.push(`**Applied restrictions:** ${appliedRestrictionsValue(input)}`);
+}
+
 function summaryTable(input) {
   const outcome = presentation(input);
   const duration = durationMetric(input.metrics);
-  return [
+  const lines = [
     "| Field | Value |",
     "| --- | --- |",
     `| Outcome | ${outcome.emoji} ${outcome.label} |`,
     `| Status | ${statusLabel(input.status)} |`,
     `| Decision | ${decisionLabel(input.decision)} |`,
+  ];
+  appendTrustSummary(lines, input, "table");
+  lines.push(
     `| Readiness | ${readinessValue(input.readiness)} |`,
     `| Findings | ${findingsValue(input)} |`,
     `| Waivers | ${waiverValue(input)} |`,
     `| Artifacts | ${(input.artifacts ?? []).length} |`,
     `| Duration | ${duration === undefined ? "Not reported" : formatDuration(duration)} |`,
-  ];
+  );
+  return lines;
 }
 
 function appendFindingSections(lines, input, limit) {
@@ -338,9 +382,9 @@ function appendDashboard(lines, detailsUrl) {
 
 function checkSummary(input) {
   const duration = durationMetric(input.metrics);
-  const lines = [
-    `**Status:** ${statusLabel(input.status)}`,
-    `**Decision:** ${decisionLabel(input.decision)}`,
+  const lines = [`**Status:** ${statusLabel(input.status)}`, `**Decision:** ${decisionLabel(input.decision)}`];
+  appendTrustSummary(lines, input, "summary");
+  lines.push(
     `**Readiness:** ${readinessValue(input.readiness)}`,
     `**Findings:** ${(input.findings ?? []).length} (${findingsValue(input)})`,
     `**Artifacts:** ${(input.artifacts ?? []).length}`,
@@ -348,7 +392,7 @@ function checkSummary(input) {
     `**Waivers:** ${waiverValue(input)}`,
     `**Duration:** ${duration === undefined ? "Not reported" : formatDuration(duration)}`,
     `**Severity summary:** ${severitySummary(input.findings ?? [])}`,
-  ];
+  );
   appendFindingSections(lines, input, 5);
   appendReadinessNotes(lines, input.readiness);
   appendWaivers(lines, input);

@@ -39,6 +39,9 @@ export type WaiverTemplateInput = {
   matched: number;
 };
 
+export type RunTrustModeTemplateInput = "safe" | "standard";
+export type SafeModeReasonTemplateInput = "draft-pull-request" | "fork-pull-request" | "private-repository";
+
 export type ReadinessResultTemplateInput = {
   status: string;
   decision: string | null;
@@ -54,6 +57,8 @@ export type ReadinessResultTemplateInput = {
       }
     | undefined;
   detailsUrl?: string | undefined;
+  trustMode?: RunTrustModeTemplateInput | undefined;
+  safeModeReasons?: readonly SafeModeReasonTemplateInput[] | undefined;
 };
 
 export declare function buildReadinessCheckOutput(input: ReadinessResultTemplateInput): {

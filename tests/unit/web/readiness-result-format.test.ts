@@ -58,6 +58,30 @@ describe("readiness result formatting", () => {
     expect(output.summary).toContain("Open the hosted run dashboard: https://boardreadyops.test/runs/run-123");
   });
 
+  it("surfaces the execution trust snapshot and only the restrictions actually enforced", () => {
+    const input = {
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      artifacts: [],
+      trustMode: "safe" as const,
+      safeModeReasons: ["private-repository"] as const,
+    };
+
+    const output = buildReadinessCheckOutput(input);
+    const comment = buildReadinessPrComment(input);
+
+    for (const rendered of [output.summary, comment]) {
+      expect(rendered).toContain("Trust mode");
+      expect(rendered).toContain("Safe (restricted)");
+      expect(rendered).toContain("Private repository");
+      expect(rendered).toContain("Managed evidence artifacts unavailable");
+      expect(rendered).toContain("safe-mode execution");
+      expect(rendered).not.toContain("Network access blocked");
+      expect(rendered).not.toContain("Repository secrets blocked");
+    }
+  });
+
   it("renders a stable marker and bounded highest-priority list for PR upsert", () => {
     const manyFindings = Array.from({ length: 12 }, (_, index) => ({
       ruleId: `rule-${String(index).padStart(2, "0")}`,

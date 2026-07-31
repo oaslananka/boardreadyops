@@ -56,6 +56,40 @@ function numberCell(row: QueryRow, key: string): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
+type PublicationTrustMode = "safe" | "standard";
+type PublicationSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
+type PublicationTrustSnapshot = {
+  trustMode: PublicationTrustMode;
+  safeModeReasons: PublicationSafeModeReason[];
+};
+
+const publicationSafeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"] as const;
+const publicationSafeModeReasonSet = new Set<string>(publicationSafeModeReasonOrder);
+
+function publicationTrustSnapshot(row: QueryRow): PublicationTrustSnapshot | undefined {
+  const rawMode = row.trust_mode;
+  const rawReasons = row.safe_mode_reasons;
+  if (rawMode === undefined && rawReasons === undefined) {
+    return { trustMode: "standard", safeModeReasons: [] };
+  }
+  if ((rawMode !== "safe" && rawMode !== "standard") || !Array.isArray(rawReasons)) return undefined;
+  if (rawReasons.some((reason) => typeof reason !== "string" || !publicationSafeModeReasonSet.has(reason))) {
+    return undefined;
+  }
+  const uniqueReasons = new Set(rawReasons);
+  const safeModeReasons = publicationSafeModeReasonOrder.filter((reason) => uniqueReasons.has(reason));
+  if (
+    uniqueReasons.size !== rawReasons.length ||
+    safeModeReasons.length !== rawReasons.length ||
+    safeModeReasons.some((reason, index) => reason !== rawReasons[index]) ||
+    (rawMode === "standard" && safeModeReasons.length !== 0) ||
+    (rawMode === "safe" && safeModeReasons.length === 0)
+  ) {
+    return undefined;
+  }
+  return { trustMode: rawMode, safeModeReasons };
+}
+
 function numberLikeCell(row: QueryRow, key: string): number | string | undefined {
   const value = row[key];
   return typeof value === "number" || typeof value === "string" ? value : undefined;
@@ -448,6 +482,8 @@ export async function handleResultRequest(
               execution_attempt_id,
               terminal_result_digest,
               completed_at,
+              trust_mode,
+              safe_mode_reasons,
               (select release_run_attempts.status
                from release_run_attempts
                where release_run_attempts.id = release_runs.execution_attempt_id) as attempt_status,
@@ -812,6 +848,8 @@ export async function handleResultRequest(
             repositories.owner,
             repositories.name,
             installations.github_installation_id,
+            effective.trust_mode,
+            effective.safe_mode_reasons,
             coalesce(updated.completed_at, effective.completed_at) as completed_at,
             (select count(*) from inserted_findings) as inserted_finding_count,
             (select count(*) from inserted_artifacts) as inserted_artifact_count,
@@ -887,11 +925,20 @@ export async function handleResultRequest(
     const repositoryOwner = stringCell(row, "owner");
     const repositoryName = stringCell(row, "name");
     const runDetailsUrl = dependencies.detailsUrl(runId);
-    const checkOutput = buildReadinessCheckOutput({ ...parsed.data, detailsUrl: runDetailsUrl });
+    const trustSnapshot = publicationTrustSnapshot(row);
+    const publicationInput = trustSnapshot
+      ? { ...parsed.data, ...trustSnapshot, detailsUrl: runDetailsUrl }
+      : undefined;
+    const checkOutput = publicationInput ? buildReadinessCheckOutput(publicationInput) : undefined;
     const blockingPublicationErrors: string[] = [];
     let publicationConfigurationError = false;
 
-    if (githubCheckRunId) {
+    if (!trustSnapshot) {
+      blockingPublicationErrors.push("Release-run trust snapshot is invalid");
+      publicationConfigurationError = true;
+    }
+
+    if (githubCheckRunId && trustSnapshot && checkOutput) {
       if (!checkRunClient?.completeCheckRun || !installationId || !repositoryOwner || !repositoryName) {
         blockingPublicationErrors.push("GitHub check-run completion is not configured");
         publicationConfigurationError = true;
@@ -916,7 +963,7 @@ export async function handleResultRequest(
     }
 
     const pullRequestNumber = numberCell(row, "pull_request_number");
-    if (pullRequestNumber) {
+    if (pullRequestNumber && trustSnapshot && publicationInput) {
       if (!checkRunClient?.createPullRequestComment || !installationId || !repositoryOwner || !repositoryName) {
         publicationWarnings.push("GitHub pull-request comment publication is not configured");
       } else {
@@ -926,7 +973,7 @@ export async function handleResultRequest(
             repositoryOwner,
             repositoryName,
             pullRequestNumber,
-            body: buildReadinessPrComment({ ...parsed.data, detailsUrl: runDetailsUrl }),
+            body: buildReadinessPrComment(publicationInput),
           });
           pullRequestCommentCreated = true;
         } catch (error) {
