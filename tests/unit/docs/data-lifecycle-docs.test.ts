@@ -22,6 +22,9 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("15 minutes");
     expect(lifecycle).toContain("Plaintext capability, lease, enrollment, and nonce secrets are not persisted");
     expect(lifecycle).toContain("Expired runner request nonce digests are removed periodically in bounded batches");
+    expect(lifecycle).toContain("Pending artifact upload capabilities are marked expired");
+    expect(lifecycle).toContain("unconsumed enrollment tokens are revoked");
+    expect(lifecycle).toContain("Terminal credential rows remain for audit");
     expect(lifecycle).toContain("GitHub Actions execution boundary");
     expect(lifecycle).toContain("Customer self-hosted runner boundary");
     expect(lifecycle).toContain("Private repository run dashboards fail closed");

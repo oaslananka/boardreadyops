@@ -45,6 +45,10 @@ describe("control-plane operator documentation", () => {
     expect(deployment).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE");
     expect(deployment).toContain("1 through 10000 rows");
     expect(deployment).toContain("does not remove active nonce replay protection");
+    expect(deployment).toContain("Pending artifact upload capabilities become `expired`");
+    expect(deployment).toContain("unconsumed runner enrollment tokens become revoked");
+    expect(deployment).toContain("pending or dispatched repository setup probes become `expired`");
+    expect(deployment).toContain("Active uploads, consumed or already revoked enrollments");
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE=1000");
   });
 
