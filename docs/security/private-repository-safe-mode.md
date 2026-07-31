@@ -49,6 +49,10 @@ The workflow independently validates:
 
 Invalid input fails the runner preparation step. The OIDC-authenticated callback records an error result when the callback identity and run binding remain valid.
 
+## Callback trust binding
+
+The GitHub Actions callback cryptographically binds the dispatch trust mode and canonical safe-mode reason list into its OIDC audience and carries the same values in dedicated request headers. Before OIDC verification and result persistence, the callback route reloads the current release run and execution attempt, then requires those headers to exactly match the persisted immutable trust snapshot. Missing, changed, duplicated, or reordered trust metadata fails closed with the same generic authentication response as other callback-binding failures.
+
 ## Retry and idempotency behavior
 
 The lifecycle store returns the existing run status with the idempotent enqueue result.
@@ -77,7 +81,7 @@ Standard-mode runs continue to publish declared artifacts through lease-bound, s
 
 ## Current implementation slice
 
-The implementation provides detection, immutable trust snapshots, guarded runner-lease binding, validated workflow inputs, fail-safe dispatch policy, terminal skip consistency, retry behavior, and safe-mode artifact suppression. Policy evaluation and public Marketplace hardening remain separate runtime work.
+The implementation provides detection, immutable trust snapshots, guarded runner-lease binding, validated workflow inputs, callback trust binding, fail-safe dispatch policy, terminal skip consistency, retry behavior, and safe-mode artifact suppression. Policy evaluation and public Marketplace hardening remain separate runtime work.
 
 ## Durable trust-mode evidence
 

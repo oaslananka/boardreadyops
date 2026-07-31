@@ -5,6 +5,9 @@ import {
   githubActionsWorkflowRef,
 } from "./github-actions-workflow.js";
 
+type ResultTrustMode = "safe" | "standard";
+type ResultSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
+
 export type ResultOidcExpectations = {
   runId: string;
   executionAttemptId?: string;
@@ -12,9 +15,15 @@ export type ResultOidcExpectations = {
   repositoryId: string;
   workflowRef: string;
   ref: string;
+  audience: string;
+  trustMode: ResultTrustMode;
+  safeModeReasons: ResultSafeModeReason[];
 };
 
 type QueryRow = Record<string, unknown>;
+
+const safeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"] as const;
+const safeModeReasonSet = new Set<string>(safeModeReasonOrder);
 
 function rows(result: unknown): QueryRow[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
@@ -27,6 +36,26 @@ function stringCell(row: QueryRow, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function trustSnapshot(row: QueryRow): Pick<ResultOidcExpectations, "safeModeReasons" | "trustMode"> | undefined {
+  const trustMode = stringCell(row, "trust_mode");
+  const rawReasons = row.safe_mode_reasons;
+  if ((trustMode !== "standard" && trustMode !== "safe") || !Array.isArray(rawReasons)) return undefined;
+  if (rawReasons.some((reason) => typeof reason !== "string" || !safeModeReasonSet.has(reason))) return undefined;
+
+  const uniqueReasons = new Set(rawReasons as string[]);
+  if (uniqueReasons.size !== rawReasons.length) return undefined;
+  const safeModeReasons = safeModeReasonOrder.filter((reason) => uniqueReasons.has(reason));
+  if (
+    safeModeReasons.length !== rawReasons.length ||
+    safeModeReasons.some((reason, index) => reason !== rawReasons[index]) ||
+    (trustMode === "standard" && safeModeReasons.length !== 0) ||
+    (trustMode === "safe" && safeModeReasons.length === 0)
+  ) {
+    return undefined;
+  }
+  return { trustMode, safeModeReasons };
+}
+
 export async function resultOidcExpectations(
   executor: SqlQueryExecutor,
   runId: string,
@@ -36,7 +65,12 @@ export async function resultOidcExpectations(
   if (!workflow) return undefined;
 
   const result = await executor.query(
-    `select repositories.owner, repositories.name, repositories.github_repo_id, repositories.default_branch
+    `select repositories.owner,
+            repositories.name,
+            repositories.github_repo_id,
+            repositories.default_branch,
+            release_runs.trust_mode,
+            release_runs.safe_mode_reasons
      from release_runs
      join repositories on repositories.id = release_runs.repository_id
      join release_run_attempts
@@ -55,12 +89,16 @@ export async function resultOidcExpectations(
   const name = stringCell(row, "name");
   const repositoryId = stringCell(row, "github_repo_id");
   const defaultBranch = stringCell(row, "default_branch");
-  if (!owner || !name || !repositoryId || !defaultBranch) return undefined;
+  const trust = trustSnapshot(row);
+  if (!owner || !name || !repositoryId || !defaultBranch || !trust) return undefined;
 
   const repository = `${owner}/${name}`;
   const workflowRef = githubActionsWorkflowRef(repository, defaultBranch, workflow);
   const ref = githubActionsWorkflowGitRef(defaultBranch);
   if (!workflowRef || !ref) return undefined;
+  const audience = `boardreadyops-cloud:${runId}:${executionAttemptId ?? "none"}:${trust.trustMode}:${
+    trust.safeModeReasons.length > 0 ? trust.safeModeReasons.join(",") : "none"
+  }`;
 
   return {
     runId,
@@ -69,5 +107,7 @@ export async function resultOidcExpectations(
     repositoryId,
     workflowRef,
     ref,
+    audience,
+    ...trust,
   };
 }

@@ -179,6 +179,8 @@ jobs:
           EXECUTION_ATTEMPT_ID: ${{ inputs.execution_attempt_id }}
           RESULT_URL: ${{ inputs.result_url }}
           READINESS_OUTCOME: ${{ steps.readiness.outcome }}
+          SAFE_MODE: ${{ inputs.safe_mode }}
+          SAFE_MODE_REASONS: ${{ inputs.safe_mode_reasons }}
         with:
           script: |
             const fs = require("node:fs");
@@ -186,6 +188,8 @@ jobs:
             const executionAttemptId = process.env.EXECUTION_ATTEMPT_ID;
             const resultUrl = process.env.RESULT_URL;
             const readinessOutcome = process.env.READINESS_OUTCOME;
+            const trustMode = process.env.SAFE_MODE === "true" ? "safe" : "standard";
+            const safeModeReasons = process.env.SAFE_MODE_REASONS ?? "";
             const reportPath = "boardreadyops.findings.json";
 
             let report;
@@ -250,7 +254,7 @@ jobs:
             }
             payload.metrics.findings_transmitted = findings.length;
 
-            const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}`;
+            const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}:${trustMode}:${safeModeReasons || "none"}`;
             const oidcToken = await core.getIDToken(audience);
             let response;
             for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -259,6 +263,8 @@ jobs:
                 headers: {
                   authorization: `Bearer ${oidcToken}`,
                   "content-type": "application/json",
+                  "x-boardreadyops-trust-mode": trustMode,
+                  "x-boardreadyops-safe-mode-reasons": safeModeReasons,
                 },
                 body: JSON.stringify(payload),
               });
