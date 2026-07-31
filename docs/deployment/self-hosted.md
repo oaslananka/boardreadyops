@@ -238,7 +238,7 @@ BOARDREADYOPS_CLOUD_DRY_RUN=1 pnpm run cloud:deploy:self-hosted
 
 ## Signed artifact downloads
 
-Hosted run dashboards expose artifact metadata without revealing the internal storage path. The investigation surface is split into summary, attempts, findings, artifacts, publication, and audit routes. Findings and artifacts are filtered and paged with bounded PostgreSQL queries; the audit route explains the separate operator-authenticated export rather than embedding tenant audit records in the public run page. A download link is rendered only when both `NEXT_PUBLIC_APP_URL` (or `BOARDREADYOPS_PUBLIC_URL`) and a dedicated `ARTIFACT_DOWNLOAD_SIGNING_KEY` are configured.
+Hosted run dashboards expose artifact metadata without revealing the internal storage path. Public repository runs are readable from their opaque run identifier. Private repository runs fail closed before child evidence is queried unless the route supplies explicit repository authorization; the current public routes therefore return the same not-found surface for absent and unauthorized private runs. The investigation surface is split into summary, attempts, findings, artifacts, publication, and audit routes. Findings and artifacts are filtered and paged with bounded PostgreSQL queries; the audit route explains the separate operator-authenticated export rather than embedding tenant audit records in the public run page. A download link is rendered only when both `NEXT_PUBLIC_APP_URL` (or `BOARDREADYOPS_PUBLIC_URL`) and a dedicated `ARTIFACT_DOWNLOAD_SIGNING_KEY` are configured.
 
 Generate an independent key with at least 32 random bytes:
 
