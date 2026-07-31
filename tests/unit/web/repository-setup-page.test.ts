@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import SetupPage from "../../../apps/web/app/setup/page.js";
 
-async function render(preset?: string): Promise<string> {
-  return renderToStaticMarkup(await SetupPage({ searchParams: Promise.resolve(preset ? { preset } : {}) }));
+async function render(searchParams: Record<string, string> = {}): Promise<string> {
+  return renderToStaticMarkup(await SetupPage({ searchParams: Promise.resolve(searchParams) }));
 }
 
 async function axeViolations(markup: string): Promise<string[]> {
@@ -39,7 +39,7 @@ async function axeViolations(markup: string): Promise<string[]> {
 
 describe("repository setup preview page", () => {
   it("renders all presets, exact file paths, least privilege and validation steps", async () => {
-    const markup = await render("production");
+    const markup = await render({ preset: "production" });
     expect(markup).toContain("Open-source hardware");
     expect(markup).toContain("Prototype fabrication");
     expect(markup).toContain("Production release");
@@ -55,8 +55,20 @@ describe("repository setup preview page", () => {
     expect(markup).not.toContain("installation-token");
   });
 
+  it("treats the GitHub setup redirect as an untrusted installation handoff", async () => {
+    const markup = await render({
+      installation_id: "123456789",
+      setup_action: "install",
+    });
+    expect(markup).toContain("GitHub App installation handoff");
+    expect(markup).toContain("untrusted redirect parameter");
+    expect(markup).toContain("does not authorize repository access");
+    expect(markup).toContain("Continue with repository setup");
+    expect(markup).not.toContain("123456789");
+  });
+
   it("falls back safely and has no WCAG A/AA violations", async () => {
-    const markup = await render("not-a-preset");
+    const markup = await render({ preset: "not-a-preset" });
     expect(markup).toContain("Prototype fabrication");
     await expect(axeViolations(markup)).resolves.toEqual([]);
   });

@@ -15,6 +15,21 @@ boardreadyops.yml
 
 This is not zero-file onboarding. The workflow requirement is the least-privilege alternative to granting the GitHub App Contents write access.
 
+
+## GitHub App setup URL handoff
+
+The hosted `/setup` page is the post-installation [Setup URL](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-setup-url) for the GitHub App. Enable GitHub's redirect-on-update behavior so repository selection changes return the owner to the same reviewable setup flow.
+
+GitHub includes an `installation_id` query parameter in this redirect. Treat it as untrusted: the public setup page does not display the value, does not use it to authorize repository access, and does not query installation or repository state from it. Repository-specific reads and mutations remain behind the authenticated, tenant-scoped control-plane API.
+
+This handoff is intentionally informational. It leads the owner to preset selection, exact file review, and readiness validation without claiming that a spoofable redirect parameter proves installation ownership.
+
+## First-result telemetry
+
+First-result telemetry is derived from existing tenant-scoped, append-only operational evidence rather than a separate analytics payload. Setup changes, setup-probe requests, and validated setup revisions emit `github_app.repository.setup_changed`, `github_app.repository.setup_probe_requested`, and `github_app.repository.setup_validated` audit events. The accepted run, normalized result, Check Run publication, and bounded workflow identifiers continue through the normal run lifecycle evidence.
+
+These records contain stable identifiers, preset and contract versions, setup status, timestamps, and bounded publication state. They do not add repository source, finding contents, design paths, workflow logs, credentials, OIDC tokens, or artifact bytes to onboarding telemetry.
+
 ## First-result path
 
 1. Install the BoardReadyOps GitHub App.
