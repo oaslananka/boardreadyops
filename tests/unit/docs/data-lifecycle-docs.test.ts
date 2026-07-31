@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const lifecycleUrl = new URL("../../../docs/security/data-lifecycle.md", import.meta.url);
 const auditUrl = new URL("../../../docs/security/audit-logs.md", import.meta.url);
 const navigationUrl = new URL("../../../mkdocs.yml", import.meta.url);
+const selfHostedRunnerUrl = new URL("../../../docs/deployment/self-hosted-runner.md", import.meta.url);
 
 describe("data lifecycle documentation", () => {
   it("documents the implemented storage boundaries and lifecycle matrix without overclaiming erasure", async () => {
@@ -29,11 +30,21 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("does not remove release runs");
     expect(lifecycle).toContain("GitHub Actions execution boundary");
     expect(lifecycle).toContain("Customer self-hosted runner boundary");
+    expect(lifecycle).toContain("Safe-mode jobs always remove their temporary workspace");
+    expect(lifecycle).toContain("`--keep-workspace` is ignored");
     expect(lifecycle).toContain("Private repository run dashboards fail closed");
     expect(lifecycle).toContain("repository authorization");
     expect(lifecycle).toContain("organization, repository, or user erasure workflow is not implemented");
     expect(lifecycle).toContain("legal-hold workflow is not implemented");
     expect(lifecycle).toContain("backup and platform-log expiry remain operator responsibilities");
+  });
+
+  it("documents fail-closed safe-mode workspace cleanup", async () => {
+    const selfHostedRunner = await readFile(selfHostedRunnerUrl, "utf8");
+
+    expect(selfHostedRunner).toContain("Safe-mode jobs always remove their workspace");
+    expect(selfHostedRunner).toContain("`--keep-workspace` is ignored");
+    expect(selfHostedRunner).toContain("runner.workspace.retention_overridden");
   });
 
   it("keeps lifecycle navigation and audit claims aligned with physical deletion", async () => {
