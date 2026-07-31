@@ -28,7 +28,13 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("id-token: write");
     expect(workflow).toContain("const oidcToken = await core.getIDToken(audience)");
     expect(workflow).toContain("authorization: `Bearer $" + "{oidcToken}`");
-    expect(workflow).toContain("boardreadyops-cloud:$" + "{runId}:$" + "{executionAttemptId}");
+    expect(workflow).toContain(
+      "boardreadyops-cloud:$" +
+        "{runId}:$" +
+        "{executionAttemptId}:$" +
+        "{trustMode}:$" +
+        '{safeModeReasons || "none"}',
+    );
     expect(workflow).not.toContain("BRO_RUNNER_KEY");
     expect(workflow).not.toContain("BOARDREADYOPS_RUNNER_RESULT_KEY");
   });
@@ -80,5 +86,9 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("safe_mode=true requires at least one reason");
     expect(workflow).toContain("draft-pull-request|fork-pull-request|private-repository");
     expect(workflow).toContain("duplicate safe-mode reason");
+    expect(workflow).toContain("SAFE_MODE: $" + "{{ inputs.safe_mode }}");
+    expect(workflow).toContain("SAFE_MODE_REASONS: $" + "{{ inputs.safe_mode_reasons }}");
+    expect(workflow).toContain('"x-boardreadyops-trust-mode": trustMode');
+    expect(workflow).toContain('"x-boardreadyops-safe-mode-reasons": safeModeReasons');
   });
 });
