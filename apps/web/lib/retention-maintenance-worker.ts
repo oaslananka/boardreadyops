@@ -3,6 +3,9 @@ type RetentionCleanupScope =
   | "repository_setup_probes"
   | "runner_registration_enrollments"
   | "runner_request_nonces"
+  | "terminal_artifact_upload_capabilities"
+  | "terminal_repository_setup_probes"
+  | "terminal_runner_registration_enrollments"
   | "webhook_inbox";
 
 type RetentionCleanupFailure = {
@@ -16,6 +19,9 @@ export type RetentionCleanupResult = {
   artifactUploadCapabilitiesExpired: number;
   runnerRegistrationEnrollmentsRevoked: number;
   repositorySetupProbesExpired: number;
+  terminalArtifactUploadCapabilitiesPurged: number;
+  terminalRunnerRegistrationEnrollmentsPurged: number;
+  terminalRepositorySetupProbesPurged: number;
   failures: RetentionCleanupFailure[];
   completed: boolean;
 };
@@ -26,6 +32,9 @@ export type RetentionMaintenanceDependencies = {
   expireArtifactUploadCapabilities(): Promise<number>;
   revokeExpiredRunnerRegistrationEnrollments(): Promise<number>;
   expireRepositorySetupProbes(): Promise<number>;
+  purgeTerminalArtifactUploadCapabilities(): Promise<number>;
+  purgeTerminalRunnerRegistrationEnrollments(): Promise<number>;
+  purgeTerminalRepositorySetupProbes(): Promise<number>;
 };
 
 function errorClass(error: unknown): string {
@@ -41,12 +50,18 @@ export async function runRetentionMaintenanceCleanup(
     artifactUploadCapabilities,
     runnerRegistrationEnrollments,
     repositorySetupProbes,
+    terminalArtifactUploadCapabilities,
+    terminalRunnerRegistrationEnrollments,
+    terminalRepositorySetupProbes,
   ] = await Promise.allSettled([
     dependencies.purgeWebhookInbox(),
     dependencies.purgeRunnerRequestNonces(),
     dependencies.expireArtifactUploadCapabilities(),
     dependencies.revokeExpiredRunnerRegistrationEnrollments(),
     dependencies.expireRepositorySetupProbes(),
+    dependencies.purgeTerminalArtifactUploadCapabilities(),
+    dependencies.purgeTerminalRunnerRegistrationEnrollments(),
+    dependencies.purgeTerminalRepositorySetupProbes(),
   ]);
   const failures: RetentionCleanupFailure[] = [];
   const results = [
@@ -55,6 +70,9 @@ export async function runRetentionMaintenanceCleanup(
     ["artifact_upload_capabilities", artifactUploadCapabilities],
     ["runner_registration_enrollments", runnerRegistrationEnrollments],
     ["repository_setup_probes", repositorySetupProbes],
+    ["terminal_artifact_upload_capabilities", terminalArtifactUploadCapabilities],
+    ["terminal_runner_registration_enrollments", terminalRunnerRegistrationEnrollments],
+    ["terminal_repository_setup_probes", terminalRepositorySetupProbes],
   ] as const;
   for (const [scope, result] of results) {
     if (result.status === "rejected") failures.push({ scope, errorClass: errorClass(result.reason) });
@@ -67,6 +85,12 @@ export async function runRetentionMaintenanceCleanup(
     runnerRegistrationEnrollmentsRevoked:
       runnerRegistrationEnrollments.status === "fulfilled" ? runnerRegistrationEnrollments.value : 0,
     repositorySetupProbesExpired: repositorySetupProbes.status === "fulfilled" ? repositorySetupProbes.value : 0,
+    terminalArtifactUploadCapabilitiesPurged:
+      terminalArtifactUploadCapabilities.status === "fulfilled" ? terminalArtifactUploadCapabilities.value : 0,
+    terminalRunnerRegistrationEnrollmentsPurged:
+      terminalRunnerRegistrationEnrollments.status === "fulfilled" ? terminalRunnerRegistrationEnrollments.value : 0,
+    terminalRepositorySetupProbesPurged:
+      terminalRepositorySetupProbes.status === "fulfilled" ? terminalRepositorySetupProbes.value : 0,
     failures,
     completed: failures.length === 0,
   };

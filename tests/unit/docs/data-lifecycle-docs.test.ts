@@ -11,6 +11,7 @@ describe("data lifecycle documentation", () => {
 
     expect(lifecycle).toContain("BoardReadyOps does not persist the raw GitHub webhook body");
     expect(lifecycle).toContain("BOARDREADYOPS_WEBHOOK_RETENTION_DAYS");
+    expect(lifecycle).toContain("BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS");
     expect(lifecycle).toContain("30 days");
     expect(lifecycle).toContain("normalized actions are replaced with an empty array");
     expect(lifecycle).toContain("raw normalized runner result payload");
@@ -24,7 +25,8 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("Expired runner request nonce digests are removed periodically in bounded batches");
     expect(lifecycle).toContain("Pending artifact upload capabilities are marked expired");
     expect(lifecycle).toContain("unconsumed enrollment tokens are revoked");
-    expect(lifecycle).toContain("Terminal credential rows remain for audit");
+    expect(lifecycle).toContain("terminal artifact capability");
+    expect(lifecycle).toContain("does not remove release runs");
     expect(lifecycle).toContain("GitHub Actions execution boundary");
     expect(lifecycle).toContain("Customer self-hosted runner boundary");
     expect(lifecycle).toContain("Private repository run dashboards fail closed");

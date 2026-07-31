@@ -72,19 +72,25 @@ describe("cloud runtime persistence configuration", () => {
 });
 
 describe("control-plane webhook retention configuration", () => {
-  it("defaults terminal webhook inbox retention to 30 days", () => {
-    expect(resolveControlPlaneRetentionConfiguration({})).toEqual({ webhookInboxDays: 30 });
+  it("defaults terminal webhook inbox and ephemeral record retention to 30 days", () => {
+    expect(resolveControlPlaneRetentionConfiguration({})).toEqual({
+      webhookInboxDays: 30,
+      ephemeralRecordsDays: 30,
+    });
   });
 
   it("accepts an explicit bounded webhook inbox retention period", () => {
     expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: " 90 " })).toEqual({
       webhookInboxDays: 90,
+      ephemeralRecordsDays: 30,
     });
     expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: "1" })).toEqual({
       webhookInboxDays: 1,
+      ephemeralRecordsDays: 30,
     });
     expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: "3650" })).toEqual({
       webhookInboxDays: 3650,
+      ephemeralRecordsDays: 30,
     });
   });
 
@@ -92,6 +98,31 @@ describe("control-plane webhook retention configuration", () => {
     expect(() =>
       resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: value }),
     ).toThrowError(expect.objectContaining({ code: "invalid-webhook-retention-days" }));
+  });
+
+  it("accepts an explicit bounded terminal ephemeral record retention period", () => {
+    expect(
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: " 45 " }),
+    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 45 });
+    expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: "1" })).toEqual({
+      webhookInboxDays: 30,
+      ephemeralRecordsDays: 1,
+    });
+    expect(
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: "3650" }),
+    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 3650 });
+  });
+
+  it.each([
+    "0",
+    "3651",
+    "1.5",
+    "thirty",
+    "",
+  ])("rejects invalid terminal ephemeral record retention value %s", (value) => {
+    expect(() =>
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: value }),
+    ).toThrowError(expect.objectContaining({ code: "invalid-ephemeral-record-retention-days" }));
   });
 });
 

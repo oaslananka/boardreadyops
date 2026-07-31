@@ -5,6 +5,9 @@ export type RetentionMaintenanceStore = {
   expireArtifactUploadCapabilities(input?: { limit?: number }): Promise<number>;
   revokeExpiredRunnerRegistrationEnrollments(input?: { limit?: number }): Promise<number>;
   expireRepositorySetupProbes(input?: { limit?: number }): Promise<number>;
+  purgeTerminalArtifactUploadCapabilities(input: { retentionDays: number; limit?: number }): Promise<number>;
+  purgeTerminalRunnerRegistrationEnrollments(input: { retentionDays: number; limit?: number }): Promise<number>;
+  purgeTerminalRepositorySetupProbes(input: { retentionDays: number; limit?: number }): Promise<number>;
 };
 
 export type RetentionMaintenanceStoreOptions = {
@@ -13,6 +16,8 @@ export type RetentionMaintenanceStoreOptions = {
 };
 
 const maximumBatchSize = 10_000;
+const maximumRetentionDays = 3_650;
+const millisecondsPerDay = 86_400_000;
 
 function rows(result: unknown): readonly Record<string, unknown>[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
@@ -39,6 +44,16 @@ function boundedLimit(requestedLimit: number | undefined, fallback: number): num
   return Number.isSafeInteger(requestedLimit) && requestedLimit !== undefined && requestedLimit > 0
     ? Math.min(requestedLimit, maximumBatchSize)
     : fallback;
+}
+
+function retentionCutoff(at: Date, retentionDays: number): string {
+  if (!Number.isSafeInteger(retentionDays) || retentionDays <= 0) {
+    throw new Error("retentionDays must be a positive integer");
+  }
+  if (retentionDays > maximumRetentionDays) {
+    throw new Error(`retentionDays must be between 1 and ${maximumRetentionDays}`);
+  }
+  return new Date(at.getTime() - retentionDays * millisecondsPerDay).toISOString();
 }
 
 export function createSqlRetentionMaintenanceStore(
@@ -153,6 +168,95 @@ export function createSqlRetentionMaintenanceStore(
          )
          select count(*)::int as affected from updated`,
         [at, limit],
+      );
+      return nonNegativeInteger(rows(result)[0]?.affected);
+    },
+
+    async purgeTerminalArtifactUploadCapabilities(input) {
+      const cutoff = retentionCutoff(now(), input.retentionDays);
+      const limit = boundedLimit(input.limit, defaultBatchSize);
+      const result = await executor.query(
+        `with terminal as (
+           select runner_artifact_upload_capabilities.artifact_id
+           from runner_artifact_upload_capabilities
+           where runner_artifact_upload_capabilities.status in ('uploaded', 'failed', 'expired', 'revoked')
+             and coalesce(
+               runner_artifact_upload_capabilities.uploaded_at,
+               runner_artifact_upload_capabilities.failed_at
+             ) <= $1::timestamptz
+           order by coalesce(
+                      runner_artifact_upload_capabilities.uploaded_at,
+                      runner_artifact_upload_capabilities.failed_at
+                    ) asc,
+                    runner_artifact_upload_capabilities.artifact_id asc
+           for update skip locked
+           limit $2::integer
+         ), deleted as (
+           delete from runner_artifact_upload_capabilities
+           using terminal
+           where runner_artifact_upload_capabilities.artifact_id = terminal.artifact_id
+           returning runner_artifact_upload_capabilities.artifact_id
+         )
+         select count(*)::int as affected from deleted`,
+        [cutoff, limit],
+      );
+      return nonNegativeInteger(rows(result)[0]?.affected);
+    },
+
+    async purgeTerminalRunnerRegistrationEnrollments(input) {
+      const cutoff = retentionCutoff(now(), input.retentionDays);
+      const limit = boundedLimit(input.limit, defaultBatchSize);
+      const result = await executor.query(
+        `with terminal as (
+           select runner_registration_enrollments.id
+           from runner_registration_enrollments
+           where (
+               runner_registration_enrollments.consumed_at is not null
+               or runner_registration_enrollments.revoked_at is not null
+             )
+             and coalesce(
+               runner_registration_enrollments.consumed_at,
+               runner_registration_enrollments.revoked_at
+             ) <= $1::timestamptz
+           order by coalesce(
+                      runner_registration_enrollments.consumed_at,
+                      runner_registration_enrollments.revoked_at
+                    ) asc,
+                    runner_registration_enrollments.id asc
+           for update skip locked
+           limit $2::integer
+         ), deleted as (
+           delete from runner_registration_enrollments
+           using terminal
+           where runner_registration_enrollments.id = terminal.id
+           returning runner_registration_enrollments.id
+         )
+         select count(*)::int as affected from deleted`,
+        [cutoff, limit],
+      );
+      return nonNegativeInteger(rows(result)[0]?.affected);
+    },
+
+    async purgeTerminalRepositorySetupProbes(input) {
+      const cutoff = retentionCutoff(now(), input.retentionDays);
+      const limit = boundedLimit(input.limit, defaultBatchSize);
+      const result = await executor.query(
+        `with terminal as (
+           select repository_setup_probes.id
+           from repository_setup_probes
+           where repository_setup_probes.status in ('completed', 'failed', 'expired')
+             and repository_setup_probes.completed_at <= $1::timestamptz
+           order by repository_setup_probes.completed_at asc, repository_setup_probes.id asc
+           for update skip locked
+           limit $2::integer
+         ), deleted as (
+           delete from repository_setup_probes
+           using terminal
+           where repository_setup_probes.id = terminal.id
+           returning repository_setup_probes.id
+         )
+         select count(*)::int as affected from deleted`,
+        [cutoff, limit],
       );
       return nonNegativeInteger(rows(result)[0]?.affected);
     },
