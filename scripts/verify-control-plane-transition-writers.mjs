@@ -13,7 +13,7 @@ export const protectedFunctionOwners = Object.freeze({
   boardreadyops_enqueue_release_run_with_outbox: "0033_release_run_trust_mode.sql",
   boardreadyops_apply_runner_result_state: "0028_guarded_runner_result_transition.sql",
   boardreadyops_expire_runner_leases: "0029_guarded_runner_lease_transitions.sql",
-  boardreadyops_claim_runner_job: "0029_guarded_runner_lease_transitions.sql",
+  boardreadyops_claim_runner_job: "0034_runner_lease_trust_snapshot.sql",
   boardreadyops_heartbeat_runner_lease: "0029_guarded_runner_lease_transitions.sql",
   boardreadyops_relinquish_runner_lease: "0029_guarded_runner_lease_transitions.sql",
 });

@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(33);
+    expect(cloudDatabaseSchemaVersion).toBe(34);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -64,6 +64,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0031_run_investigation_indexes.sql",
       "0032_repository_setup_flow.sql",
       "0033_release_run_trust_mode.sql",
+      "0034_runner_lease_trust_snapshot.sql",
     ]);
   });
 
