@@ -69,6 +69,9 @@ describe("control-plane operator documentation", () => {
       "Draft and fork snapshots are excluded before any execution attempt or lease is created",
     );
     expect(safeMode).toContain("runner.lease.claimed");
+    expect(safeMode).toContain("does not request artifact upload capabilities or upload generated files");
+    expect(safeMode).toContain("publishing an empty artifact list");
+    expect(safeMode).toContain("runner.artifacts.suppressed");
   });
 
   it("documents durable physical deletion for replaced managed artifacts", () => {

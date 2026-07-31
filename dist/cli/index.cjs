@@ -54259,10 +54259,22 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
-    heartbeat.setStage("uploading_artifacts");
-    await heartbeat.pulse();
-    const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
-    heartbeat.assertLeaseActive();
+    let uploadedArtifacts = [];
+    if (job.safeMode.enabled) {
+      if (execution.artifacts.length > 0) {
+        dependencies.log("runner.artifacts.suppressed", {
+          run_id: job.runId,
+          execution_attempt_id: job.executionAttemptId,
+          artifacts: execution.artifacts.length,
+          safe_mode_reasons: [...job.safeMode.reasons]
+        });
+      }
+    } else {
+      heartbeat.setStage("uploading_artifacts");
+      await heartbeat.pulse();
+      uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
+      heartbeat.assertLeaseActive();
+    }
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
     const result = terminalResultFromExecution(job, execution, uploadedArtifacts);
@@ -54435,6 +54447,9 @@ function terminalResultFromExecution(job, execution, artifacts) {
       findings_medium: summary?.medium ?? 0,
       findings_low: summary?.low ?? 0,
       findings_info: summary?.info ?? 0,
+      artifacts_generated: execution.artifacts.length,
+      artifacts_uploaded: artifacts.length,
+      artifacts_suppressed: job.safeMode.enabled ? execution.artifacts.length : 0,
       ...execution.report?.readiness ? { readiness_score: execution.report.readiness.score } : {}
     },
     ...execution.report?.readiness ? { readiness: execution.report.readiness } : {},

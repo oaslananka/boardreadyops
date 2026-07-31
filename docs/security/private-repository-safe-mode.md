@@ -69,9 +69,15 @@ When safe mode is enabled, runners must:
 - prefer advisory findings unless policy explicitly enables enforcement,
 - preserve artifact and log isolation between installations.
 
+## Artifact publication boundary
+
+A self-hosted runner may still analyze a private same-repository checkout in safe mode, but it does not request artifact upload capabilities or upload generated files. The terminal result preserves bounded findings, readiness, waiver, and numeric metric evidence while publishing an empty artifact list. Numeric metrics record generated, uploaded, and suppressed artifact counts, and the runner emits only the run ID, execution-attempt ID, aggregate count, and canonical safe-mode reasons in `runner.artifacts.suppressed` telemetry.
+
+Standard-mode runs continue to publish declared artifacts through lease-bound, single-use upload capabilities. Draft and fork snapshots remain ineligible for runner leases, so untrusted fork code never reaches the artifact transport path.
+
 ## Current implementation slice
 
-This change provides detection, validated workflow inputs, fail-safe dispatch policy, terminal skip consistency, and retry behavior. Full repository checkout, policy evaluation, artifact production, and public Marketplace hardening remain separate runtime work.
+The implementation provides detection, immutable trust snapshots, guarded runner-lease binding, validated workflow inputs, fail-safe dispatch policy, terminal skip consistency, retry behavior, and safe-mode artifact suppression. Policy evaluation and public Marketplace hardening remain separate runtime work.
 
 ## Durable trust-mode evidence
 
