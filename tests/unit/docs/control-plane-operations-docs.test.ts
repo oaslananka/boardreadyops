@@ -76,6 +76,9 @@ describe("control-plane operator documentation", () => {
     expect(safeMode).toContain("does not request artifact upload capabilities or upload generated files");
     expect(safeMode).toContain("publishing an empty artifact list");
     expect(safeMode).toContain("runner.artifacts.suppressed");
+    expect(safeMode).toContain("cryptographically binds the dispatch trust mode");
+    expect(safeMode).toContain("exactly match the persisted immutable trust snapshot");
+    expect(safeMode).toContain("Missing, changed, duplicated, or reordered trust metadata fails closed");
   });
 
   it("documents durable physical deletion for replaced managed artifacts", () => {

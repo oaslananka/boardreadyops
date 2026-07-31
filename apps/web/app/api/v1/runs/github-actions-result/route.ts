@@ -12,6 +12,15 @@ function bearerToken(request: Request): string | undefined {
   return match?.[1];
 }
 
+function trustSnapshotMatches(
+  request: Request,
+  expectations: NonNullable<Awaited<ReturnType<typeof resultOidcExpectations>>>,
+): boolean {
+  const trustMode = request.headers.get("x-boardreadyops-trust-mode");
+  const safeModeReasons = request.headers.get("x-boardreadyops-safe-mode-reasons");
+  return trustMode === expectations.trustMode && safeModeReasons === expectations.safeModeReasons.join(",");
+}
+
 export async function POST(request: Request): Promise<Response> {
   const searchParams = new URL(request.url).searchParams;
   const runId = searchParams.get("run_id") ?? "";
@@ -40,7 +49,11 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "result authentication database lookup failed" }, { status: 503 });
   }
 
-  if (!expectations || !(await verifyGitHubActionsOidcToken(token, expectations))) {
+  if (
+    !expectations ||
+    !trustSnapshotMatches(request, expectations) ||
+    !(await verifyGitHubActionsOidcToken(token, expectations))
+  ) {
     return Response.json({ ok: false, error: "invalid GitHub Actions OIDC authentication" }, { status: 401 });
   }
 

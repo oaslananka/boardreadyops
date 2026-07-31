@@ -37,15 +37,31 @@ const expectations = {
   repositoryId: "98765",
   workflowRef: "octo-org/hardware-board/.github/workflows/readiness-runner.yml@refs/heads/main",
   ref: "refs/heads/main",
+  audience:
+    "boardreadyops-cloud:5dc4193b-5c7e-4df8-b86f-e4d3266fc22d:7559e99b-4998-4e02-a94a-7a7a4686ae11:safe:private-repository",
+  trustMode: "safe",
+  safeModeReasons: ["private-repository"],
 };
 const executor = { query: vi.fn() };
 
-function request(input: { runId?: string; attemptId?: string; token?: string } = {}): Request {
+function request(
+  input: {
+    runId?: string;
+    attemptId?: string;
+    token?: string;
+    trustMode?: string | null;
+    safeModeReasons?: string | null;
+  } = {},
+): Request {
   const url = new URL("https://boardreadyops.test/api/v1/runs/github-actions-result");
   url.searchParams.set("run_id", input.runId ?? runId);
   url.searchParams.set("attempt_id", input.attemptId ?? executionAttemptId);
   const headers = new Headers({ "content-type": "application/json" });
   if (input.token !== "") headers.set("authorization", `Bearer ${input.token ?? "header.payload.signature"}`);
+  if (input.trustMode !== null) headers.set("x-boardreadyops-trust-mode", input.trustMode ?? "safe");
+  if (input.safeModeReasons !== null) {
+    headers.set("x-boardreadyops-safe-mode-reasons", input.safeModeReasons ?? "private-repository");
+  }
   return new Request(url, { method: "POST", headers, body: "{}" });
 }
 
@@ -94,6 +110,36 @@ describe("GitHub Actions result route", () => {
     mocks.verifyGitHubActionsOidcToken.mockResolvedValueOnce(false);
     expect((await POST(request())).status).toBe(401);
     expect(mocks.handleResultRequest).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing, changed, or reordered trust metadata before OIDC verification", async () => {
+    for (const input of [
+      { trustMode: null },
+      { safeModeReasons: null },
+      { trustMode: "standard" },
+      { safeModeReasons: "fork-pull-request" },
+      { safeModeReasons: "private-repository,draft-pull-request" },
+    ]) {
+      mocks.verifyGitHubActionsOidcToken.mockClear();
+      mocks.handleResultRequest.mockClear();
+      expect((await POST(request(input))).status).toBe(401);
+      expect(mocks.verifyGitHubActionsOidcToken).not.toHaveBeenCalled();
+      expect(mocks.handleResultRequest).not.toHaveBeenCalled();
+    }
+  });
+
+  it("accepts an explicit standard-mode trust snapshot", async () => {
+    mocks.resultOidcExpectations.mockResolvedValueOnce({
+      ...expectations,
+      audience:
+        "boardreadyops-cloud:5dc4193b-5c7e-4df8-b86f-e4d3266fc22d:7559e99b-4998-4e02-a94a-7a7a4686ae11:standard:none",
+      trustMode: "standard",
+      safeModeReasons: [],
+    });
+
+    const response = await POST(request({ trustMode: "standard", safeModeReasons: "" }));
+    expect(response.status).toBe(202);
+    expect(mocks.verifyGitHubActionsOidcToken).toHaveBeenCalledOnce();
   });
 
   it("delegates an authenticated callback to the existing result persistence route", async () => {
