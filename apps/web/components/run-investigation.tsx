@@ -260,6 +260,10 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
           </Definition>
           <Definition label="BoardReadyOps">{run.boardReadyOpsVersion ?? "Not reported"}</Definition>
           <Definition label="KiCad">{run.kicadVersion ?? "Not reported"}</Definition>
+          <Definition label="Trust mode">{humanize(run.trustMode)}</Definition>
+          <Definition label="Safe-mode reasons">
+            {run.safeModeReasons.length > 0 ? run.safeModeReasons.map(humanize).join(" · ") : "None"}
+          </Definition>
           <Definition label="Policy preset">
             {run.setupPreset
               ? `${humanize(run.setupPreset)} v${run.setupPresetVersion ?? "?"} · revision ${run.setupRevision ?? "?"}`

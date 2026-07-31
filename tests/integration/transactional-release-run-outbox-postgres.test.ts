@@ -42,6 +42,10 @@ function action(commitSha: string) {
 type ReleaseAction = ReturnType<typeof action> & {
   pullRequestDraft?: boolean;
   pullRequestFromFork?: boolean;
+  safeMode?: {
+    enabled: boolean;
+    reasons: ("draft-pull-request" | "fork-pull-request" | "private-repository")[];
+  };
 };
 
 function idSequence(values: string[]): () => string {
@@ -191,6 +195,53 @@ describeDatabase("transactional release-run outbox producer", () => {
       payload_run_id: first.runId,
       outbox_key: `github.check_run.create:${first.runId}`,
       transition_events: 0,
+    });
+  });
+
+  it("persists and audits one immutable safe-mode trust snapshot across webhook replay", async () => {
+    const safeAction: ReleaseAction = {
+      ...action("9".repeat(40)),
+      pullRequestFromFork: true,
+      safeMode: { enabled: true, reasons: ["fork-pull-request"] },
+    };
+    const firstStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-safe-${suffix}`, `outbox-safe-${suffix}`]),
+      now: () => new Date("2026-07-22T02:05:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const replayStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-safe-replay-${suffix}`, `outbox-safe-replay-${suffix}`]),
+      now: () => new Date("2026-07-22T02:06:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+
+    const first = await firstStore.enqueueReleaseRunWithOutbox(safeAction);
+    const replay = await replayStore.enqueueReleaseRunWithOutbox(safeAction);
+    expect(replay).toEqual(first);
+
+    const state = rows(
+      await database().query(
+        `select release_runs.trust_mode,
+                release_runs.safe_mode_reasons,
+                (select count(*)::int
+                   from audit_events
+                  where audit_events.release_run_id = release_runs.id
+                    and audit_events.event_type = 'release_run.trust_mode_selected') as audit_count,
+                (select metadata
+                   from audit_events
+                  where audit_events.release_run_id = release_runs.id
+                    and audit_events.event_type = 'release_run.trust_mode_selected') as audit_metadata
+           from release_runs
+          where release_runs.id = $1`,
+        [first.runId],
+      ),
+    )[0];
+
+    expect(state).toEqual({
+      trust_mode: "safe",
+      safe_mode_reasons: ["fork-pull-request"],
+      audit_count: 1,
+      audit_metadata: { trustMode: "safe", safeModeReasons: ["fork-pull-request"] },
     });
   });
 
