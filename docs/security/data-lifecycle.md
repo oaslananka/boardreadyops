@@ -32,7 +32,9 @@ The customer self-hosted runner stores its Ed25519 identity under its configured
 identity directory and uses temporary source workspaces while a job runs. Temporary
 workspaces are removed by default. Enabling `--keep-workspace` deliberately retains
 source files for debugging and transfers responsibility for their deletion to the
-operator. Workspaces should not be included in general-purpose backups.
+operator for standard-trust jobs. Safe-mode jobs always remove their temporary workspace;
+`--keep-workspace` is ignored so reduced-trust source cannot be retained by that debug
+option. Workspaces should not be included in general-purpose backups.
 
 ## Current data lifecycle matrix
 

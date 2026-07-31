@@ -424,4 +424,28 @@ describe("runRunnerWorkerOnce", () => {
 
     expect(overrides.removeWorkspace).not.toHaveBeenCalled();
   });
+
+  it("forces workspace cleanup for safe-mode jobs even when retention is requested", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-safe-cleanup-"));
+    roots.push(workspace);
+    const safeJob = claimedJob("customer_checkout", {
+      enabled: true,
+      reasons: ["private-repository"],
+    });
+    const runnerClient = client(safeJob);
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(async () => ({ exitCode: 0, artifacts: [] })),
+    });
+
+    await runRunnerWorkerOnce({ identityFile: "/identity/runner.json", keepWorkspace: true }, overrides);
+
+    expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+    expect(overrides.log).toHaveBeenCalledWith("runner.workspace.retention_overridden", {
+      run_id: runId,
+      execution_attempt_id: attemptId,
+      safe_mode_reasons: ["private-repository"],
+    });
+  });
 });
