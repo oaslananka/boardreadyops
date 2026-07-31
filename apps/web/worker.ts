@@ -245,6 +245,7 @@ const healthServer = createServer(async (request, response) => {
         },
         retention: {
           webhookInboxDays: retention.webhookInboxDays,
+          ephemeralRecordsDays: retention.ephemeralRecordsDays,
           cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
           cleanupBatchSize: retentionCleanupBatchSize,
         },
@@ -316,6 +317,7 @@ async function startHealthServer(): Promise<void> {
     },
     retention: {
       webhookInboxDays: retention.webhookInboxDays,
+      ephemeralRecordsDays: retention.ephemeralRecordsDays,
       cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
       cleanupBatchSize: retentionCleanupBatchSize,
     },
@@ -422,6 +424,14 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
     expireArtifactUploadCapabilities: () => retentionMaintenance.expireArtifactUploadCapabilities(),
     revokeExpiredRunnerRegistrationEnrollments: () => retentionMaintenance.revokeExpiredRunnerRegistrationEnrollments(),
     expireRepositorySetupProbes: () => retentionMaintenance.expireRepositorySetupProbes(),
+    purgeTerminalArtifactUploadCapabilities: () =>
+      retentionMaintenance.purgeTerminalArtifactUploadCapabilities({ retentionDays: retention.ephemeralRecordsDays }),
+    purgeTerminalRunnerRegistrationEnrollments: () =>
+      retentionMaintenance.purgeTerminalRunnerRegistrationEnrollments({
+        retentionDays: retention.ephemeralRecordsDays,
+      }),
+    purgeTerminalRepositorySetupProbes: () =>
+      retentionMaintenance.purgeTerminalRepositorySetupProbes({ retentionDays: retention.ephemeralRecordsDays }),
   });
   for (const failure of result.failures) {
     log("warn", "worker.retention_cleanup_failed", failure);
@@ -431,7 +441,10 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
     result.runnerRequestNoncesPurged > 0 ||
     result.artifactUploadCapabilitiesExpired > 0 ||
     result.runnerRegistrationEnrollmentsRevoked > 0 ||
-    result.repositorySetupProbesExpired > 0
+    result.repositorySetupProbesExpired > 0 ||
+    result.terminalArtifactUploadCapabilitiesPurged > 0 ||
+    result.terminalRunnerRegistrationEnrollmentsPurged > 0 ||
+    result.terminalRepositorySetupProbesPurged > 0
   ) {
     log("info", "worker.retention_cleanup", {
       webhookInboxPurged: result.webhookInboxPurged,
@@ -439,6 +452,9 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       artifactUploadCapabilitiesExpired: result.artifactUploadCapabilitiesExpired,
       runnerRegistrationEnrollmentsRevoked: result.runnerRegistrationEnrollmentsRevoked,
       repositorySetupProbesExpired: result.repositorySetupProbesExpired,
+      terminalArtifactUploadCapabilitiesPurged: result.terminalArtifactUploadCapabilitiesPurged,
+      terminalRunnerRegistrationEnrollmentsPurged: result.terminalRunnerRegistrationEnrollmentsPurged,
+      terminalRepositorySetupProbesPurged: result.terminalRepositorySetupProbesPurged,
     });
   }
   if (result.completed) lastSuccessfulRetentionCleanupAt = new Date().toISOString();

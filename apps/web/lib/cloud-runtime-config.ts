@@ -5,6 +5,7 @@ export type CloudRuntimeConfigurationErrorCode =
   | "memory-persistence-not-allowed"
   | "missing-database-url"
   | "invalid-webhook-retention-days"
+  | "invalid-ephemeral-record-retention-days"
   | "invalid-artifact-capability-ttl-seconds";
 
 export class CloudRuntimeConfigurationError extends Error {
@@ -52,33 +53,48 @@ export function resolveCloudPersistenceConfiguration(
   return { mode, databaseUrl };
 }
 
-export type ControlPlaneRetentionConfiguration = { webhookInboxDays: number };
+export type ControlPlaneRetentionConfiguration = { webhookInboxDays: number; ephemeralRecordsDays: number };
+
+type RetentionConfigurationErrorCode = "invalid-webhook-retention-days" | "invalid-ephemeral-record-retention-days";
+
+function resolveRetentionDays(input: {
+  raw: string | undefined;
+  environmentName: string;
+  errorCode: RetentionConfigurationErrorCode;
+}): number {
+  if (input.raw === undefined) return 30;
+  const normalized = input.raw.trim();
+  if (!/^\d+$/u.test(normalized)) {
+    throw new CloudRuntimeConfigurationError(
+      input.errorCode,
+      `${input.environmentName} must be an integer between 1 and 3650`,
+    );
+  }
+  const days = Number(normalized);
+  if (!Number.isSafeInteger(days) || days < 1 || days > 3650) {
+    throw new CloudRuntimeConfigurationError(
+      input.errorCode,
+      `${input.environmentName} must be an integer between 1 and 3650`,
+    );
+  }
+  return days;
+}
 
 export function resolveControlPlaneRetentionConfiguration(
   environment: NodeJS.ProcessEnv = process.env,
 ): ControlPlaneRetentionConfiguration {
-  const raw = environment.BOARDREADYOPS_WEBHOOK_RETENTION_DAYS;
-  if (raw === undefined) {
-    return { webhookInboxDays: 30 };
-  }
-
-  const normalized = raw.trim();
-  if (!/^\d+$/u.test(normalized)) {
-    throw new CloudRuntimeConfigurationError(
-      "invalid-webhook-retention-days",
-      "BOARDREADYOPS_WEBHOOK_RETENTION_DAYS must be an integer between 1 and 3650",
-    );
-  }
-
-  const webhookInboxDays = Number(normalized);
-  if (!Number.isSafeInteger(webhookInboxDays) || webhookInboxDays < 1 || webhookInboxDays > 3650) {
-    throw new CloudRuntimeConfigurationError(
-      "invalid-webhook-retention-days",
-      "BOARDREADYOPS_WEBHOOK_RETENTION_DAYS must be an integer between 1 and 3650",
-    );
-  }
-
-  return { webhookInboxDays };
+  return {
+    webhookInboxDays: resolveRetentionDays({
+      raw: environment.BOARDREADYOPS_WEBHOOK_RETENTION_DAYS,
+      environmentName: "BOARDREADYOPS_WEBHOOK_RETENTION_DAYS",
+      errorCode: "invalid-webhook-retention-days",
+    }),
+    ephemeralRecordsDays: resolveRetentionDays({
+      raw: environment.BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS,
+      environmentName: "BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS",
+      errorCode: "invalid-ephemeral-record-retention-days",
+    }),
+  };
 }
 
 export type ArtifactCapabilityConfiguration = { uploadCapabilityTtlSeconds: number };

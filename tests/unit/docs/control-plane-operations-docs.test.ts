@@ -35,6 +35,8 @@ describe("control-plane operator documentation", () => {
     expect(deployment).toContain("processed, failed, or dead-letter");
     expect(deployment).toContain("in-flight rows are never purged");
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_WEBHOOK_RETENTION_DAYS=30");
+    expect(deployment).toContain("BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS=30");
   });
 
   it("documents bounded expiry cleanup for runner request nonce digests", () => {
@@ -48,7 +50,9 @@ describe("control-plane operator documentation", () => {
     expect(deployment).toContain("Pending artifact upload capabilities become `expired`");
     expect(deployment).toContain("unconsumed runner enrollment tokens become revoked");
     expect(deployment).toContain("pending or dispatched repository setup probes become `expired`");
-    expect(deployment).toContain("Active uploads, consumed or already revoked enrollments");
+    expect(deployment).toContain("Active uploads and in-flight probes are not deleted");
+    expect(deployment).toContain("terminal artifact capability rows");
+    expect(deployment).toContain("consumed or revoked enrollment rows");
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE=1000");
   });
 
