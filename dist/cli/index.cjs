@@ -54309,7 +54309,14 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     throw error51;
   } finally {
     await heartbeat.stop();
-    if (workspace && options.keepWorkspace !== true) {
+    if (workspace && (job.safeMode.enabled || options.keepWorkspace !== true)) {
+      if (job.safeMode.enabled && options.keepWorkspace === true) {
+        dependencies.log("runner.workspace.retention_overridden", {
+          run_id: job.runId,
+          execution_attempt_id: job.executionAttemptId,
+          safe_mode_reasons: [...job.safeMode.reasons]
+        });
+      }
       await dependencies.removeWorkspace(workspace);
     }
   }
