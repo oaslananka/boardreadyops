@@ -162,6 +162,13 @@ The `v1` and `latest` container tags resolve to the most recent release
 image. Check the [release channel verification](docs/release/channel-verification.md)
 for the current digest and manifest list.
 
+## Live demos
+
+- [Passing release-readiness PR](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) — expected pass after focused design, BOM, and manufacturing-output remediation.
+- [Failing release-readiness PR](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) — expected fail with clear annotations, a sticky review, and downloadable workflow artifacts.
+
+Both repositories contain synthetic public-domain KiCad fixtures and can be evaluated without customer data or secrets. See the [golden demo walkthrough](docs/golden-demo.md).
+
 ## CLI
 
 ```bash
