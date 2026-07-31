@@ -163,7 +163,7 @@ The command exits `0` both when one job completes and when the queue is empty. A
 3. `uploading_artifacts`;
 4. `reporting`.
 
-The worker runs the existing BoardReadyOps pipeline in enforce mode, writes JSON, SARIF, and Markdown reports, requests upload capabilities bound to the active lease, uploads the exact declared byte counts, and publishes a terminal result. Temporary workspaces are removed by default. `--keep-workspace` is intended only for controlled debugging and increases source-retention risk. Safe-mode jobs always remove their workspace; `--keep-workspace` is ignored for those jobs and the worker emits `runner.workspace.retention_overridden` without source content or credential values.
+The worker runs the existing BoardReadyOps pipeline in enforce mode, writes JSON, SARIF, and Markdown reports, requests upload capabilities bound to the active lease, uploads the exact declared byte counts, and publishes a terminal result. Safe-mode execution disables repository-provided plugins and notifier dispatch before analysis, so repository code cannot consume ambient notifier credentials or request plugin network/process permissions through the runner process. Temporary workspaces are removed by default. `--keep-workspace` is intended only for controlled debugging and increases source-retention risk. Safe-mode jobs always remove their workspace; `--keep-workspace` is ignored for those jobs and the worker emits `runner.workspace.retention_overridden` without source content or credential values.
 
 `kicad-cli` is required by default. Use `--no-require-kicad` only for a deliberate reduced-capability test runner.
 

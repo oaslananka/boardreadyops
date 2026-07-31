@@ -46554,7 +46554,7 @@ async function initializePipelineContext(input, logger) {
   };
 }
 async function discoverPhase(ctx) {
-  const pluginLoad = await loadPlugins(ctx.root, ctx.config);
+  const pluginLoad = ctx.options.executionPolicy === "safe" ? { specifiers: [], plugins: [], errors: [] } : await loadPlugins(ctx.root, ctx.config);
   const loadedWithPluginErrors = appendConfigErrors(ctx.loaded, pluginLoad.errors);
   const projects = await discoverConfiguredProjects(ctx.root, ctx.options);
   return {
@@ -46687,6 +46687,13 @@ function assembleRunResult(ctx, effectiveFindings, fabrication, readiness, summa
   };
 }
 async function dispatchNotificationsPhase(ctx, result) {
+  if (ctx.options.executionPolicy === "safe") {
+    ctx.logger.info("pipeline.execution.restricted", {
+      plugins: "disabled",
+      notifications: "disabled"
+    });
+    return [];
+  }
   return dispatchNotifications(
     ctx.config.notifiers,
     notificationPayloadFromResult(result, ctx.options.notificationLinks ?? {}),
@@ -46743,6 +46750,7 @@ function normalizeOptions(cwd, root, config2, input, gate, forceFailOn) {
     project: input.project,
     config: input.config,
     mode: gate ? "enforce" : input.mode ?? config2.mode ?? "warn",
+    executionPolicy: input.executionPolicy ?? "standard",
     releaseMode: input.releaseMode ?? config2.releaseMode,
     requireKicad: input.requireKicad ?? false,
     kicadCli: input.kicadCli,
@@ -49097,6 +49105,7 @@ function pipelineInputFromCli(root, options, annotations) {
     project: options.project,
     config: options.config,
     mode: options.mode ?? "warn",
+    executionPolicy: options.executionPolicy ?? "standard",
     releaseMode: options.releaseMode,
     requireKicad: options.requireKicad ?? false,
     kicadCli: options.kicadCli,
@@ -54551,6 +54560,7 @@ async function executeRunnerPipeline(workspace, job, options) {
     workspace,
     {
       mode: "enforce",
+      executionPolicy: job.safeMode.enabled ? "safe" : "standard",
       requireKicad: options.requireKicad,
       failOn: "high",
       json: targets[0].relative,

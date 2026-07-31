@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -124,6 +124,8 @@ function dependencies(clientValue: RunnerWorkerClient): Partial<RunnerWorkerDepe
 }
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -327,6 +329,68 @@ describe("runRunnerWorkerOnce", () => {
       artifacts: 1,
       safe_mode_reasons: ["private-repository"],
     });
+  });
+
+  it("runs the real safe-mode pipeline without importing repository plugins or dispatching notifiers", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-safe-pipeline-"));
+    roots.push(workspace);
+    await cp(path.resolve("tests/fixtures/projects/safe-basic"), workspace, { recursive: true });
+    await mkdir(path.join(workspace, "local-rules"), { recursive: true });
+    await writeFile(
+      path.join(workspace, "local-rules", "must-not-load.js"),
+      'throw new Error("safe runner imported repository plugin code");\n',
+      "utf8",
+    );
+    await writeFile(
+      path.join(workspace, "boardreadyops.yml"),
+      `version: 1
+mode: warn
+projects:
+  - path: .
+rules:
+  drc.kicad:
+    enabled: false
+  erc.kicad:
+    enabled: false
+  release.changelog-present:
+    enabled: false
+fail-on: high
+notifiers:
+  slack:
+    enabled: true
+    webhookEnv: SLACK_WEBHOOK_URL
+    minSeverity: high
+`,
+      "utf8",
+    );
+    vi.stubEnv("SLACK_WEBHOOK_URL", "https://hooks.slack.test/services/T000/B000/secret");
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", async (url: string | URL) => {
+      requests.push(String(url));
+      return new Response(null, { status: 204 });
+    });
+    const safeJob = claimedJob("customer_checkout", { enabled: true, reasons: ["private-repository"] });
+    const runnerClient = client(safeJob);
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: executeRunnerPipeline,
+    });
+
+    const result = await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", keepWorkspace: true, requireKicad: false },
+      overrides,
+    );
+
+    expect(result).toMatchObject({ status: "completed", decision: "pass" });
+    expect(requests).toEqual([]);
+    expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    expect(runnerClient.uploadArtifact).not.toHaveBeenCalled();
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result.artifacts).toEqual([]);
+    expect(terminal?.result.metrics).toMatchObject({ artifacts_generated: 3, artifacts_suppressed: 3 });
   });
 
   it("executes the real BoardReadyOps pipeline and publishes generated reports without a source archive", async () => {

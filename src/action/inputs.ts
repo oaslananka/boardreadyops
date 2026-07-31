@@ -33,6 +33,7 @@ export function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? pro
     project: optionalPath(root, core.getInput("project")),
     config: optionalPath(root, core.getInput("config") || "boardreadyops.yml"),
     mode: modeInput(core.getInput("mode") || "warn"),
+    executionPolicy: boolInput("safe-mode", false) ? "safe" : "standard",
     releaseMode: releaseModeInput(core.getInput("release-mode")),
     requireKicad: boolInput("require-kicad", false),
     kicadCli: empty(core.getInput("kicad-cli")),

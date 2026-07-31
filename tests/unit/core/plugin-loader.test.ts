@@ -90,6 +90,26 @@ describe("plugin loader", () => {
     ]);
   });
 
+  it("does not import repository plugins under the safe execution policy", async () => {
+    const root = await makeProjectRoot();
+    await fs.mkdir(path.join(root, "local-rules"), { recursive: true });
+    await fs.writeFile(
+      path.join(root, "local-rules", "must-not-load.js"),
+      'throw new Error("safe execution imported repository plugin code");\n',
+      "utf8",
+    );
+
+    const result = await runPipeline({
+      path: root,
+      executionPolicy: "safe",
+      failOn: "never",
+      rules: ["release.revision-set"],
+    });
+
+    expect(result.plugins).toEqual([]);
+    expect(result.findings.some((finding) => finding.message.includes("repository plugin code"))).toBe(false);
+  });
+
   it("loads node_modules plugin packages by naming convention", async () => {
     const root = await makeProjectRoot();
     const packageRoot = path.join(root, "node_modules", "boardreadyops-plugin-vendor");

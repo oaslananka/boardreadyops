@@ -64,17 +64,18 @@ export async function runAction(): Promise<void> {
   }
   setActionOutputs(result, written);
   await core.summary.addRaw(formatMarkdown(result)).write();
-  if (inputs.uploadArtifacts) {
+  const trustedWritesAllowed = inputs.executionPolicy !== "safe";
+  if (trustedWritesAllowed && inputs.uploadArtifacts) {
     await uploadArtifacts(
       inputs.artifactName,
       Object.values(written).filter((entry): entry is string => Boolean(entry)),
       workspace,
     );
   }
-  if (inputs.uploadSarif && written.sarif) {
+  if (trustedWritesAllowed && inputs.uploadSarif && written.sarif) {
     await uploadSarif(written.sarif);
   }
-  if (inputs.commentPr) {
+  if (trustedWritesAllowed && inputs.commentPr) {
     await upsertPullRequestComment(result, inputs.artifactName, inputs.commentFormat);
   }
   logger.info("action.finish", {

@@ -129,7 +129,10 @@ async function initializePipelineContext(
 }
 
 async function discoverPhase(ctx: PipelineContext) {
-  const pluginLoad = await loadPlugins(ctx.root, ctx.config);
+  const pluginLoad =
+    ctx.options.executionPolicy === "safe"
+      ? { specifiers: [], plugins: [], errors: [] }
+      : await loadPlugins(ctx.root, ctx.config);
   const loadedWithPluginErrors = appendConfigErrors(ctx.loaded, pluginLoad.errors);
   const projects = await discoverConfiguredProjects(ctx.root, ctx.options);
 
@@ -291,6 +294,13 @@ function assembleRunResult(
 }
 
 async function dispatchNotificationsPhase(ctx: PipelineContext, result: RunResult) {
+  if (ctx.options.executionPolicy === "safe") {
+    ctx.logger.info("pipeline.execution.restricted", {
+      plugins: "disabled",
+      notifications: "disabled",
+    });
+    return [];
+  }
   return dispatchNotifications(
     ctx.config.notifiers,
     notificationPayloadFromResult(result, ctx.options.notificationLinks ?? {}),
@@ -374,6 +384,7 @@ function normalizeOptions(
     project: input.project,
     config: input.config,
     mode: gate ? "enforce" : (input.mode ?? config.mode ?? "warn"),
+    executionPolicy: input.executionPolicy ?? "standard",
     releaseMode: input.releaseMode ?? config.releaseMode,
     requireKicad: input.requireKicad ?? false,
     kicadCli: input.kicadCli,

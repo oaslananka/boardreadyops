@@ -4,6 +4,7 @@ import type { FailOn } from "./findings.js";
 import type { Logger } from "./logger.js";
 
 type RunMode = "warn" | "enforce";
+export type ExecutionPolicy = "safe" | "standard";
 
 export interface ProjectContext {
   projectFile: string;
@@ -19,6 +20,7 @@ export interface PipelineOptions {
   project: string | undefined;
   config: string | undefined;
   mode: RunMode;
+  executionPolicy?: ExecutionPolicy | undefined;
   releaseMode?: ReleaseMode | undefined;
   requireKicad: boolean;
   kicadCli: string | undefined;

@@ -569,6 +569,41 @@ notifiers:
     expect(requests).toHaveLength(1);
     expect(JSON.stringify(requests[0]?.body)).toContain("https://github.com/o/r/actions/runs/1");
   });
+
+  it("does not read notifier secrets or make notifier calls under the safe execution policy", async () => {
+    const requests: string[] = [];
+    vi.stubEnv("SLACK_WEBHOOK_URL", "https://hooks.slack.test/services/T000/B000/secret");
+    vi.stubGlobal("fetch", async (url: string | URL) => {
+      requests.push(String(url));
+      return new Response(null, { status: 204 });
+    });
+    const root = await writeFixture({
+      "notified.kicad_pro": "{}",
+      "notified.kicad_sch": "(kicad_sch)",
+      "notified.kicad_pcb": '(kicad_pcb (title_block (rev "")))',
+      "boardreadyops.yml": `version: 1
+fail-on: never
+notifiers:
+  slack:
+    enabled: true
+    webhookEnv: SLACK_WEBHOOK_URL
+    minSeverity: high
+`,
+    });
+
+    const result = await runPipeline(
+      {
+        path: root,
+        executionPolicy: "safe",
+        rules: ["release.revision-set"],
+        failOn: "never",
+      },
+      createLogger("silent"),
+    );
+
+    expect(result.summary.total).toBeGreaterThan(0);
+    expect(requests).toEqual([]);
+  });
 });
 
 function samplePayload(): NotificationPayload {
