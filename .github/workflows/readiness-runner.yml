@@ -157,10 +157,11 @@ jobs:
       - name: Run BoardReadyOps
         id: readiness
         continue-on-error: true
-        uses: oaslananka/boardreadyops@155afd28bbbadf7d11723629b4f71675288a9e02 # v1.13.0
+        uses: oaslananka/boardreadyops@bf9ce0981c93c2d5bdafa80049fa5460c566013d # safe-mode runtime boundary
         with:
           project: ${{ vars.BOARDREADYOPS_PROJECT || '' }}
           config: ${{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}
+          safe-mode: ${{ inputs.safe_mode }}
           mode: enforce
           require-kicad: "true"
           fail-on: high
