@@ -79,6 +79,19 @@ describe("control-plane transition writer boundary", () => {
     });
   });
 
+  it("accepts the runner trust-snapshot migration as the guarded claim owner", () => {
+    const migrations = [
+      source(
+        "packages/db/migrations/0034_runner_lease_trust_snapshot.sql",
+        "create or replace function boardreadyops_claim_runner_job() returns void language sql as $$ select 1 $$;",
+      ),
+    ];
+
+    expect(findProtectedFunctionOwnershipViolations(migrations)).not.toContain(
+      expect.stringContaining("boardreadyops_claim_runner_job"),
+    );
+  });
+
   it("accepts the trust-mode migration as the guarded enqueue owner", () => {
     const migrations = [
       source(

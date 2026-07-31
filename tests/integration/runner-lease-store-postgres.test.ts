@@ -50,6 +50,7 @@ type TenantFixture = {
   repositoryId: string;
   owner: string;
   name: string;
+  privateRepository: boolean;
 };
 
 async function createTenant(label: string, privateRepository = true): Promise<TenantFixture> {
@@ -74,7 +75,7 @@ async function createTenant(label: string, privateRepository = true): Promise<Te
     [repositoryId, installationId, githubRepositoryId, owner, name, privateRepository],
   );
 
-  return { installationId, repositoryId, owner, name };
+  return { installationId, repositoryId, owner, name, privateRepository };
 }
 
 async function createQueuedRun(tenant: TenantFixture, startedAt: string): Promise<string> {
@@ -82,9 +83,20 @@ async function createQueuedRun(tenant: TenantFixture, startedAt: string): Promis
   const runId = randomUUID();
   await executor.query(
     `insert into release_runs (
-       id, repository_id, commit_sha, ref, pull_request_number, trigger_kind, status, started_at
-     ) values ($1, $2, $3, 'refs/pull/42/head', 42, 'pr', 'queued', $4::timestamptz)`,
-    [runId, tenant.repositoryId, fingerprint(runId).slice(0, 40), startedAt],
+       id, repository_id, commit_sha, ref, pull_request_number, trigger_kind, status, started_at,
+       trust_mode, safe_mode_reasons
+     ) values (
+       $1, $2, $3, 'refs/pull/42/head', 42, 'pr', 'queued', $4::timestamptz,
+       $5, $6::text[]
+     )`,
+    [
+      runId,
+      tenant.repositoryId,
+      fingerprint(runId).slice(0, 40),
+      startedAt,
+      tenant.privateRepository ? "safe" : "standard",
+      tenant.privateRepository ? ["private-repository"] : [],
+    ],
   );
   return runId;
 }
@@ -205,6 +217,87 @@ afterAll(async () => {
 });
 
 describeDatabase("runner lease PostgreSQL store", () => {
+  it("binds a claimed lease to the immutable run trust snapshot after visibility changes", async () => {
+    const now = testTime(-300);
+    const tenant = await createTenant("lease-test-trust-snapshot", true);
+    const runId = await createQueuedRun(tenant, now);
+    const managedIdentityId = await createManagedIdentity("lease-test-trust-snapshot", now);
+
+    try {
+      await databaseExecutor().query("update repositories set private = false where id = $1", [tenant.repositoryId]);
+      const job = claimed(
+        await fixedStore({
+          now,
+          ids: [randomUUID(), randomUUID()],
+          tokens: [token("trust-snapshot")],
+        }).claimJob({
+          workerClass: "managed",
+          managedRunnerIdentityId: managedIdentityId,
+          requestTimestamp: requestTimestamp(now),
+          requestNonce: nonce("trust-snapshot"),
+          capabilities: ["kicad:10"],
+        }),
+      );
+
+      expect(job.repository.private).toBe(false);
+      expect(job.safeMode).toEqual({ enabled: true, reasons: ["private-repository"] });
+      const audit = rows(
+        await databaseExecutor().query(
+          `select metadata->>'trustMode' as trust_mode,
+                  metadata->'safeModeReasons' as safe_mode_reasons
+             from audit_events
+            where release_run_id = $1
+              and event_type = 'runner.lease.claimed'`,
+          [runId],
+        ),
+      )[0];
+      expect(audit).toEqual({ trust_mode: "safe", safe_mode_reasons: ["private-repository"] });
+    } finally {
+      await cleanupTenant(tenant, managedIdentityId);
+    }
+  });
+
+  it.each([
+    "draft-pull-request",
+    "fork-pull-request",
+  ] as const)("does not create a runner lease for a %s trust snapshot", async (reason) => {
+    const now = testTime(-150);
+    const tenant = await createTenant(`lease-test-${reason}`, false);
+    const runId = await createQueuedRun(tenant, now);
+    const managedIdentityId = await createManagedIdentity(`lease-test-${reason}`, now);
+
+    try {
+      await databaseExecutor().query(
+        "update release_runs set trust_mode = 'safe', safe_mode_reasons = $2::text[] where id = $1",
+        [runId, [reason]],
+      );
+      const result = await fixedStore({
+        now,
+        ids: [randomUUID(), randomUUID()],
+        tokens: [token(reason)],
+      }).claimJob({
+        workerClass: "managed",
+        managedRunnerIdentityId: managedIdentityId,
+        requestTimestamp: requestTimestamp(now),
+        requestNonce: nonce(reason),
+        capabilities: ["kicad:10"],
+      });
+
+      expect(result).toEqual({ status: "empty", retryAfterSeconds: 15 });
+      const counts = rows(
+        await databaseExecutor().query(
+          `select
+               (select count(*)::int from release_run_attempts where run_id = $1) as attempts,
+               (select count(*)::int from runner_job_leases where run_id = $1) as leases`,
+          [runId],
+        ),
+      )[0];
+      expect(counts).toEqual({ attempts: 0, leases: 0 });
+    } finally {
+      await cleanupTenant(tenant, managedIdentityId);
+    }
+  });
+
   it("allows only one concurrent claim for one queued logical run", async () => {
     const now = testTime(0);
     const tenant = await createTenant("lease-test-race");

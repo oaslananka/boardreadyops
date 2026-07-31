@@ -83,3 +83,7 @@ Every newly enqueued release run snapshots its execution trust mode before any C
 - The run investigation dashboard shows the persisted trust mode and reasons next to the exact source and runtime metadata.
 
 The snapshot is historical evidence. Later repository visibility or pull-request state changes do not rewrite it.
+
+## Runner lease binding
+
+Runner claims use the persisted release-run trust snapshot rather than recalculating safe mode from current repository visibility. Draft and fork snapshots are excluded before any execution attempt or lease is created, closing the race between runner polling and neutral safe-mode completion. Private same-repository runs remain eligible and receive the exact persisted `private-repository` reason even if repository metadata later changes. The `runner.lease.claimed` audit event records only the trust mode and canonical reason identifiers; it does not include secrets or source content.
