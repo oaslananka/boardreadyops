@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(34);
+    expect(cloudDatabaseSchemaVersion).toBe(35);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -65,7 +65,19 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0032_repository_setup_flow.sql",
       "0033_release_run_trust_mode.sql",
       "0034_runner_lease_trust_snapshot.sql",
+      "0035_terminal_ephemeral_retention_indexes.sql",
     ]);
+  });
+
+  it("indexes terminal one-time records for bounded retention cleanup", async () => {
+    const sql = await readFile(join(migrationsDir, "0035_terminal_ephemeral_retention_indexes.sql"), "utf8");
+
+    expect(sql).toContain("runner_artifact_upload_capabilities_terminal_retention_idx");
+    expect(sql).toContain("where status in ('uploaded', 'failed', 'expired', 'revoked')");
+    expect(sql).toContain("runner_registration_enrollments_terminal_retention_idx");
+    expect(sql).toContain("where consumed_at is not null or revoked_at is not null");
+    expect(sql).toContain("repository_setup_probes_terminal_retention_idx");
+    expect(sql).toContain("where status in ('completed', 'failed', 'expired')");
   });
 
   it("stores versioned runner results and publication state", async () => {

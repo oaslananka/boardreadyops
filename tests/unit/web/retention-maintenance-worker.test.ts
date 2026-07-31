@@ -8,6 +8,9 @@ function dependencies(overrides: Partial<Parameters<typeof runRetentionMaintenan
     expireArtifactUploadCapabilities: vi.fn().mockResolvedValue(5),
     revokeExpiredRunnerRegistrationEnrollments: vi.fn().mockResolvedValue(2),
     expireRepositorySetupProbes: vi.fn().mockResolvedValue(4),
+    purgeTerminalArtifactUploadCapabilities: vi.fn().mockResolvedValue(6),
+    purgeTerminalRunnerRegistrationEnrollments: vi.fn().mockResolvedValue(5),
+    purgeTerminalRepositorySetupProbes: vi.fn().mockResolvedValue(3),
     ...overrides,
   };
 }
@@ -20,6 +23,9 @@ describe("retention maintenance worker", () => {
       artifactUploadCapabilitiesExpired: 5,
       runnerRegistrationEnrollmentsRevoked: 2,
       repositorySetupProbesExpired: 4,
+      terminalArtifactUploadCapabilitiesPurged: 6,
+      terminalRunnerRegistrationEnrollmentsPurged: 5,
+      terminalRepositorySetupProbesPurged: 3,
       failures: [],
       completed: true,
     });
@@ -34,6 +40,9 @@ describe("retention maintenance worker", () => {
       artifactUploadCapabilitiesExpired: 5,
       runnerRegistrationEnrollmentsRevoked: 2,
       repositorySetupProbesExpired: 4,
+      terminalArtifactUploadCapabilitiesPurged: 6,
+      terminalRunnerRegistrationEnrollmentsPurged: 5,
+      terminalRepositorySetupProbesPurged: 3,
       failures: [{ scope: "webhook_inbox", errorClass: "TypeError" }],
       completed: false,
     });
@@ -41,6 +50,9 @@ describe("retention maintenance worker", () => {
     expect(input.expireArtifactUploadCapabilities).toHaveBeenCalledOnce();
     expect(input.revokeExpiredRunnerRegistrationEnrollments).toHaveBeenCalledOnce();
     expect(input.expireRepositorySetupProbes).toHaveBeenCalledOnce();
+    expect(input.purgeTerminalArtifactUploadCapabilities).toHaveBeenCalledOnce();
+    expect(input.purgeTerminalRunnerRegistrationEnrollments).toHaveBeenCalledOnce();
+    expect(input.purgeTerminalRepositorySetupProbes).toHaveBeenCalledOnce();
   });
 
   it("reports content-free error classes for multiple failures", async () => {
@@ -48,19 +60,23 @@ describe("retention maintenance worker", () => {
       dependencies({
         purgeRunnerRequestNonces: vi.fn().mockRejectedValue("token=private-value"),
         expireRepositorySetupProbes: vi.fn().mockRejectedValue(new RangeError("repository private-name")),
+        purgeTerminalArtifactUploadCapabilities: vi.fn().mockRejectedValue(new Error("token=private-capability")),
       }),
     );
 
     expect(result).toMatchObject({
       runnerRequestNoncesPurged: 0,
       repositorySetupProbesExpired: 0,
+      terminalArtifactUploadCapabilitiesPurged: 0,
       failures: [
         { scope: "runner_request_nonces", errorClass: "UnknownError" },
         { scope: "repository_setup_probes", errorClass: "RangeError" },
+        { scope: "terminal_artifact_upload_capabilities", errorClass: "Error" },
       ],
       completed: false,
     });
     expect(JSON.stringify(result)).not.toContain("private-value");
     expect(JSON.stringify(result)).not.toContain("private-name");
+    expect(JSON.stringify(result)).not.toContain("private-capability");
   });
 });

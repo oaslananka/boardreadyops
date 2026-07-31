@@ -56,6 +56,61 @@ describe("retention maintenance store", () => {
     );
   });
 
+  it("purges terminal artifact capabilities only after the configured retention cutoff", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ affected: 6 }] });
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
+
+    await expect(store.purgeTerminalArtifactUploadCapabilities({ retentionDays: 30, limit: 25 })).resolves.toBe(6);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /status in \('uploaded', 'failed', 'expired', 'revoked'\)[\s\S]*coalesce\([\s\S]*uploaded_at,[\s\S]*failed_at[\s\S]*for update skip locked[\s\S]*delete from runner_artifact_upload_capabilities/u,
+      ),
+      ["2026-07-01T05:00:00.000Z", 25],
+    );
+  });
+
+  it("purges consumed or revoked enrollments only after the configured retention cutoff", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ affected: 5 }] });
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
+
+    await expect(store.purgeTerminalRunnerRegistrationEnrollments({ retentionDays: 7 })).resolves.toBe(5);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /consumed_at is not null[\s\S]*or runner_registration_enrollments.revoked_at is not null[\s\S]*coalesce\([\s\S]*consumed_at,[\s\S]*revoked_at[\s\S]*delete from runner_registration_enrollments/u,
+      ),
+      ["2026-07-24T05:00:00.000Z", 1_000],
+    );
+  });
+
+  it("purges completed setup probes only after the configured retention cutoff", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ affected: 4 }] });
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
+
+    await expect(store.purgeTerminalRepositorySetupProbes({ retentionDays: 1 })).resolves.toBe(4);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /status in \('completed', 'failed', 'expired'\)[\s\S]*completed_at <=[\s\S]*delete from repository_setup_probes/u,
+      ),
+      ["2026-07-30T05:00:00.000Z", 1_000],
+    );
+  });
+
+  it("rejects invalid terminal retention periods before querying", async () => {
+    const query = vi.fn();
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
+
+    await expect(store.purgeTerminalArtifactUploadCapabilities({ retentionDays: 0 })).rejects.toThrow(
+      "retentionDays must be a positive integer",
+    );
+    await expect(store.purgeTerminalRunnerRegistrationEnrollments({ retentionDays: 1.5 })).rejects.toThrow(
+      "retentionDays must be a positive integer",
+    );
+    await expect(store.purgeTerminalRepositorySetupProbes({ retentionDays: 3651 })).rejects.toThrow(
+      "retentionDays must be between 1 and 3650",
+    );
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("uses a safe default batch and normalizes malformed result counts", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [{ affected: "not-a-number" }] });
     const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
