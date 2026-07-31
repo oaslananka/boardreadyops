@@ -203,6 +203,17 @@ describe("control-plane worker runtime", () => {
     expect(source.match(/webhookInboxDays/gu)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
+  it("wires bounded expired runner nonce cleanup into retention maintenance", () => {
+    const source = workerSource();
+
+    expect(source).toContain("createSqlRetentionMaintenanceStore");
+    expect(source).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE");
+    expect(source).toContain("purgeExpiredRunnerRequestNonces");
+    expect(source).toContain("runnerRequestNoncesPurged");
+    expect(source).toContain("lastSuccessfulRetentionCleanupAt");
+    expect(source).toContain("cleanupBatchSize");
+  });
+
   it("wires durable artifact deletion without exposing storage paths in health", () => {
     const source = workerSource();
 

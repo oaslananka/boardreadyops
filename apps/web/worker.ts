@@ -15,6 +15,7 @@ import {
   createSqlControlPlaneOutboxStore,
 } from "@boardreadyops/db/control-plane-outbox-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { createSqlRetentionMaintenanceStore } from "@boardreadyops/db/retention-maintenance-store";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
 import { processArtifactDeletion } from "./lib/artifact-deletion-worker.js";
 import { resolveControlPlaneRetentionConfiguration } from "./lib/cloud-runtime-config.js";
@@ -35,6 +36,7 @@ import {
 } from "./lib/control-plane-worker-runtime.js";
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
 import { createGitHubWorkflowReconciliationClient } from "./lib/github-workflow-reconciliation-client.js";
+import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-worker.js";
 import { createRunnerClient } from "./lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mode.js";
 
@@ -125,6 +127,7 @@ const retentionCleanupIntervalMilliseconds = integerEnvironment(
   60_000,
   86_400_000,
 );
+const retentionCleanupBatchSize = integerEnvironment("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE", 1_000, 1, 10_000);
 const retention = resolveControlPlaneRetentionConfiguration();
 const healthPort = integerEnvironment("BOARDREADYOPS_WORKER_HEALTH_PORT", 3001, 1, 65_535);
 const databasePoolMaximum = integerEnvironment(
@@ -135,6 +138,9 @@ const databasePoolMaximum = integerEnvironment(
 );
 const executor = createPgQueryExecutor({ connectionString: databaseUrl, max: databasePoolMaximum });
 const jobs = createSqlControlPlaneJobStore(executor);
+const retentionMaintenance = createSqlRetentionMaintenanceStore(executor, {
+  defaultBatchSize: retentionCleanupBatchSize,
+});
 const operations = createSqlControlPlaneOperationsStore(executor);
 const controlPlaneSlo = createControlPlaneSloEvaluator();
 const outbox = createSqlControlPlaneOutboxStore(executor);
@@ -194,6 +200,7 @@ let lastSuccessfulCheckRunReconciliationAt: string | undefined;
 let lastSuccessfulJobAt: string | undefined;
 let lastSuccessfulOutboxEffectAt: string | undefined;
 let lastSuccessfulArtifactDeletionAt: string | undefined;
+let lastSuccessfulRetentionCleanupAt: string | undefined;
 let nextMetricsAt = 0;
 let nextRetentionCleanupAt = 0;
 let nextLifecycleReconciliationDetectionAt = 0;
@@ -239,6 +246,7 @@ const healthServer = createServer(async (request, response) => {
         retention: {
           webhookInboxDays: retention.webhookInboxDays,
           cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
+          cleanupBatchSize: retentionCleanupBatchSize,
         },
         lastPollAt,
         lastOutboxPollAt,
@@ -252,6 +260,7 @@ const healthServer = createServer(async (request, response) => {
         lastSuccessfulJobAt,
         lastSuccessfulOutboxEffectAt,
         lastSuccessfulArtifactDeletionAt,
+        lastSuccessfulRetentionCleanupAt,
         scopedConcurrency: {
           installationLimit: installationConcurrency,
           repositoryLimit: repositoryConcurrency,
@@ -308,6 +317,7 @@ async function startHealthServer(): Promise<void> {
     retention: {
       webhookInboxDays: retention.webhookInboxDays,
       cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
+      cleanupBatchSize: retentionCleanupBatchSize,
     },
   });
 }
@@ -402,15 +412,24 @@ async function detectCheckRunReconciliationCandidates(currentTime: number): Prom
   }
 }
 
-async function purgeExpiredInbox(currentTime: number): Promise<void> {
+async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
   if (currentTime < nextRetentionCleanupAt) return;
   nextRetentionCleanupAt = currentTime + retentionCleanupIntervalMilliseconds;
-  try {
-    const purged = await jobs.purgeExpired();
-    if (purged > 0) log("info", "worker.retention_cleanup", { purged });
-  } catch (error) {
-    log("warn", "worker.retention_cleanup_failed", { errorClass: errorClass(error) });
+
+  const result = await runRetentionMaintenanceCleanup({
+    purgeWebhookInbox: () => jobs.purgeExpired({ limit: retentionCleanupBatchSize }),
+    purgeRunnerRequestNonces: () => retentionMaintenance.purgeExpiredRunnerRequestNonces(),
+  });
+  for (const failure of result.failures) {
+    log("warn", "worker.retention_cleanup_failed", failure);
   }
+  if (result.webhookInboxPurged > 0 || result.runnerRequestNoncesPurged > 0) {
+    log("info", "worker.retention_cleanup", {
+      webhookInboxPurged: result.webhookInboxPurged,
+      runnerRequestNoncesPurged: result.runnerRequestNoncesPurged,
+    });
+  }
+  if (result.completed) lastSuccessfulRetentionCleanupAt = new Date().toISOString();
 }
 
 async function claimAvailableJobs(): Promise<ClaimedControlPlaneJob[]> {
@@ -723,7 +742,7 @@ async function runMaintenanceLoop(): Promise<void> {
     await detectLifecycleReconciliationCandidates(currentTime);
     await detectWorkflowReconciliationCandidates(currentTime);
     await detectCheckRunReconciliationCandidates(currentTime);
-    await purgeExpiredInbox(currentTime);
+    await purgeExpiredRetentionData(currentTime);
     await sleep(1000);
   }
 }

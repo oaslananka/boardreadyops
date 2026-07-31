@@ -81,6 +81,11 @@
       "import": "./src/control-plane-run-transition-store.ts",
       "default": "./src/control-plane-run-transition-store.ts"
     },
+    "./retention-maintenance-store": {
+      "types": "./src/retention-maintenance-store.ts",
+      "import": "./src/retention-maintenance-store.ts",
+      "default": "./src/retention-maintenance-store.ts"
+    },
     "./repository-setup-store": {
       "types": "./src/repository-setup-store.ts",
       "import": "./src/repository-setup-store.ts",
