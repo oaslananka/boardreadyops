@@ -61,6 +61,16 @@ describe("control-plane operator documentation", () => {
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS=900");
   });
 
+  it("documents immutable safe-mode binding for runner claims", () => {
+    const safeMode = fs.readFileSync("docs/security/private-repository-safe-mode.md", "utf8");
+
+    expect(safeMode).toContain("Runner claims use the persisted release-run trust snapshot");
+    expect(safeMode).toContain(
+      "Draft and fork snapshots are excluded before any execution attempt or lease is created",
+    );
+    expect(safeMode).toContain("runner.lease.claimed");
+  });
+
   it("documents durable physical deletion for replaced managed artifacts", () => {
     const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
     const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");

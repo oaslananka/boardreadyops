@@ -26,6 +26,8 @@ export type ClaimRunnerJobInput = RunnerWorkerIdentity &
     capabilities?: readonly string[];
   };
 
+export type RunnerSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
+
 export type ClaimedRunnerJob = {
   status: "claimed";
   leaseId: string;
@@ -43,7 +45,7 @@ export type ClaimedRunnerJob = {
   };
   safeMode: {
     enabled: boolean;
-    reasons: readonly "private-repository"[];
+    reasons: readonly RunnerSafeModeReason[];
   };
 };
 
@@ -112,6 +114,25 @@ function stringColumn(row: Record<string, unknown> | undefined, key: string): st
 function booleanColumn(row: Record<string, unknown> | undefined, key: string): boolean | undefined {
   const value = row?.[key];
   return typeof value === "boolean" ? value : undefined;
+}
+
+const safeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"] as const;
+const safeModeReasonSet = new Set<string>(safeModeReasonOrder);
+
+function trustSnapshot(
+  row: Record<string, unknown> | undefined,
+): { enabled: boolean; reasons: RunnerSafeModeReason[] } | undefined {
+  const mode = stringColumn(row, "trust_mode");
+  const rawReasons = row?.safe_mode_reasons;
+  if ((mode !== "standard" && mode !== "safe") || !Array.isArray(rawReasons)) return undefined;
+  if (rawReasons.some((reason) => typeof reason !== "string" || !safeModeReasonSet.has(reason))) return undefined;
+
+  const uniqueReasons = new Set(rawReasons as string[]);
+  const reasons = safeModeReasonOrder.filter((reason) => uniqueReasons.has(reason));
+  if (reasons.length !== rawReasons.length) return undefined;
+  if (mode === "standard" && reasons.length !== 0) return undefined;
+  if (mode === "safe" && reasons.length === 0) return undefined;
+  return { enabled: mode === "safe", reasons: [...reasons] };
 }
 
 function numberColumn(row: Record<string, unknown> | undefined, key: string): number | undefined {
@@ -287,6 +308,7 @@ export function createSqlRunnerLeaseStore(
       const name = stringColumn(row, "repository_name");
       const commitSha = stringColumn(row, "commit_sha");
       const privateRepository = booleanColumn(row, "repository_private");
+      const safeMode = trustSnapshot(row);
       if (
         !returnedLeaseId ||
         !runId ||
@@ -300,6 +322,9 @@ export function createSqlRunnerLeaseStore(
       ) {
         throw new Error("runner claim did not return a complete lease record");
       }
+      if (!safeMode) {
+        throw new Error("runner claim did not return a valid trust snapshot");
+      }
 
       return {
         status: "claimed",
@@ -311,10 +336,7 @@ export function createSqlRunnerLeaseStore(
         maximumLeaseExpiresAt,
         sourceMode: input.workerClass === "managed" ? "broker" : "customer_checkout",
         repository: { owner, name, commitSha, private: privateRepository },
-        safeMode: {
-          enabled: privateRepository,
-          reasons: privateRepository ? ["private-repository"] : [],
-        },
+        safeMode,
       };
     },
 
