@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { RunPageFrame, RunUnavailable, SummaryView } from "../../../components/run-investigation.js";
 import { loadRunDashboard } from "../../../lib/run-dashboard.js";
+import { shouldLiveRefreshRun } from "../../../lib/run-live-refresh.js";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function RunPage({ params }: RunPageProps) {
   if (result.state === "not-found") notFound();
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
   return (
-    <RunPageFrame run={result.run} active="summary">
+    <RunPageFrame run={result.run} active="summary" liveRefresh={shouldLiveRefreshRun(result.run.investigationState)}>
       <SummaryView run={result.run} />
     </RunPageFrame>
   );
