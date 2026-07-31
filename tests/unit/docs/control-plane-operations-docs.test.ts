@@ -37,6 +37,17 @@ describe("control-plane operator documentation", () => {
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_WEBHOOK_RETENTION_DAYS=30");
   });
 
+  it("documents bounded expiry cleanup for runner request nonce digests", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+    const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
+
+    expect(deployment).toContain("expired runner request nonce digests");
+    expect(deployment).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE");
+    expect(deployment).toContain("1 through 10000 rows");
+    expect(deployment).toContain("does not remove active nonce replay protection");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE=1000");
+  });
+
   it("documents bounded artifact upload capability expiry", () => {
     const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
     const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
