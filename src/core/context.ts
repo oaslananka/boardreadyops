@@ -4,7 +4,7 @@ import type { FailOn } from "./findings.js";
 import type { Logger } from "./logger.js";
 
 type RunMode = "warn" | "enforce";
-export type ExecutionPolicy = "safe" | "standard";
+type ExecutionPolicy = "safe" | "standard";
 
 export interface ProjectContext {
   projectFile: string;
