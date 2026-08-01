@@ -172,9 +172,16 @@ const defaultRunDashboardLoaderDependencies: RunDashboardLoaderDependencies = {
 };
 
 type RunDashboardRepository = {
+  id: string;
+  installationId: string;
   owner: string;
   name: string;
   private: boolean;
+};
+
+type RunDashboardScope = {
+  installationId: string;
+  repositoryId: string;
 };
 
 type RunDashboardOptions = {
@@ -182,6 +189,7 @@ type RunDashboardOptions = {
   authorizeRepository?: (repository: RunDashboardRepository) => boolean | Promise<boolean>;
   filters?: RunDashboardFilters;
   now?: () => Date;
+  scope?: RunDashboardScope;
 };
 
 type NormalizedFilters = Required<
@@ -204,6 +212,7 @@ const supportedSafeModeReasons = [
 const supportedFindingSeverities = new Set(["critical", "error", "high", "medium", "low", "info", "warning"]);
 const maximumSearchLength = 128;
 const facetPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const defaultPageSize = 25;
 const maximumPageSize = 100;
 
@@ -236,6 +245,15 @@ function repositoryPrivateValue(row: Record<string, unknown>, key: string): bool
   if (value === false || value === 0) return false;
   if (typeof value !== "string") return true;
   return !["false", "f", "0"].includes(value.trim().toLowerCase());
+}
+
+function uuidValue(row: Record<string, unknown>, key: string): string | undefined {
+  const value = stringValue(row, key);
+  return value && uuidPattern.test(value) ? value : undefined;
+}
+
+function validScope(scope: RunDashboardScope | undefined): boolean {
+  return scope === undefined || (uuidPattern.test(scope.installationId) && uuidPattern.test(scope.repositoryId));
 }
 
 function safeModeReasonsValue(row: Record<string, unknown>, key: string): RunSafeModeReason[] {
@@ -419,6 +437,10 @@ export async function lookupRunDashboard(
   options: RunDashboardOptions = {},
 ): Promise<RunLookupResult> {
   const filters = normalizeFilters(options.filters);
+  if (!validScope(options.scope)) return { state: "not-found" };
+  const runParameters: unknown[] = [runId];
+  const runScopePredicate = options.scope ? " and repositories.installation_id = $2 and repositories.id = $3" : "";
+  if (options.scope) runParameters.push(options.scope.installationId, options.scope.repositoryId);
   const runResult = await executor.query(
     `select
        release_runs.id,
@@ -445,6 +467,8 @@ export async function lookupRunDashboard(
        release_run_results.github_check_published_at,
        release_run_results.github_comment_published_at,
        release_run_results.last_publication_error,
+       repositories.id as repository_id,
+       repositories.installation_id,
        repositories.owner,
        repositories.name,
        repositories.private,
@@ -482,13 +506,18 @@ export async function lookupRunDashboard(
      left join release_run_results on release_run_results.run_id = release_runs.id
      left join repository_setup_revisions
        on repository_setup_revisions.id = release_runs.repository_setup_revision_id
-     where release_runs.id = $1`,
-    [runId],
+     where release_runs.id = $1${runScopePredicate}`,
+    runParameters,
   );
   const runRow = rows(runResult)[0];
   if (!runRow) return { state: "not-found" };
 
+  const repositoryId = uuidValue(runRow, "repository_id");
+  const installationId = uuidValue(runRow, "installation_id");
+  if (!repositoryId || !installationId) return { state: "not-found" };
   const repository: RunDashboardRepository = {
+    id: repositoryId,
+    installationId,
     owner: requiredString(runRow, "owner"),
     name: requiredString(runRow, "name"),
     private: repositoryPrivateValue(runRow, "private"),

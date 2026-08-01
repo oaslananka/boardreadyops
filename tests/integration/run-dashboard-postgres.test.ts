@@ -10,6 +10,8 @@ const executor = connectionString ? createPgQueryExecutor({ connectionString, ma
 const installationId = "7a000000-0000-4000-8000-000000000001";
 const repositoryId = "7a000000-0000-4000-8000-000000000002";
 const runId = "7a000000-0000-4000-8000-000000000003";
+const otherInstallationId = "7a000000-0000-4000-8000-000000000011";
+const otherRepositoryId = "7a000000-0000-4000-8000-000000000012";
 
 function database() {
   if (!executor) throw new Error("DATABASE_URL is required");
@@ -27,6 +29,16 @@ beforeAll(async () => {
     `insert into repositories (id, installation_id, github_repo_id, owner, name, default_branch, private)
      values ($1, $2, 47011, 'dashboard-integration', 'large-board', 'main', false)`,
     [repositoryId, installationId],
+  );
+  await database().query(
+    `insert into installations (id, github_installation_id, account_login, account_type)
+     values ($1, 47002, 'dashboard-other', 'Organization')`,
+    [otherInstallationId],
+  );
+  await database().query(
+    `insert into repositories (id, installation_id, github_repo_id, owner, name, default_branch, private)
+     values ($1, $2, 47012, 'dashboard-other', 'isolated-board', 'main', true)`,
+    [otherRepositoryId, otherInstallationId],
   );
   await database().query(
     `insert into release_runs (
@@ -62,11 +74,33 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!executor) return;
-  await database().query("delete from installations where id = $1", [installationId]);
+  await database().query("delete from installations where id in ($1, $2)", [installationId, otherInstallationId]);
   await executor.close();
 });
 
 describeDatabase("run dashboard PostgreSQL integration", () => {
+  it("fails closed when a run is presented under another installation or repository scope", async () => {
+    await expect(
+      lookupRunDashboard(runId, database(), {
+        scope: { installationId: otherInstallationId, repositoryId },
+      }),
+    ).resolves.toEqual({ state: "not-found" });
+
+    await expect(
+      lookupRunDashboard(runId, database(), {
+        scope: { installationId, repositoryId: otherRepositoryId },
+      }),
+    ).resolves.toEqual({ state: "not-found" });
+
+    const authorized = await lookupRunDashboard(runId, database(), {
+      scope: { installationId, repositoryId },
+    });
+    expect(authorized).toMatchObject({
+      state: "found",
+      run: { repository: "dashboard-integration/large-board" },
+    });
+  });
+
   it("filters, sorts, and pages large run-owned result sets without exposing storage paths", async () => {
     const result = await lookupRunDashboard(runId, database(), {
       filters: {
