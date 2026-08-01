@@ -172,8 +172,8 @@ function loadPrefix() {
   return `load-${randomUUID()}`;
 }
 
-function commitSha(prefix, repositoryIndex, runIndex) {
-  return createHash("sha1").update(`${prefix}:${repositoryIndex}:${runIndex}`).digest("hex");
+export function syntheticCommitSha(prefix, repositoryIndex, runIndex) {
+  return createHash("sha256").update(`${prefix}:${repositoryIndex}:${runIndex}`).digest("hex").slice(0, 40);
 }
 
 function webhookInput(prefix, index, installationExternalId) {
@@ -212,7 +212,7 @@ function releaseAction(repository, runIndex, prefix) {
     },
     pullRequestNumber,
     ref: `refs/pull/${pullRequestNumber}/head`,
-    commitSha: commitSha(prefix, repository.index, runIndex),
+    commitSha: syntheticCommitSha(prefix, repository.index, runIndex),
     triggerKind: "pr",
   };
 }

@@ -6,6 +6,7 @@ import {
   parseControlPlaneLoadConfiguration,
   percentile,
   summarizeDurations,
+  syntheticCommitSha,
 } from "../../../scripts/control-plane-load.mjs";
 
 const databaseUrl = "postgresql://load_user:load-secret@127.0.0.1:5432/boardreadyops_load";
@@ -87,6 +88,17 @@ describe("control-plane load configuration", () => {
         }),
       ),
     ).toThrow("duplicate deliveries cannot exceed unique deliveries");
+  });
+});
+
+describe("control-plane synthetic commit identifiers", () => {
+  it("derives deterministic 40-character identifiers without SHA-1", () => {
+    const first = syntheticCommitSha("scenario", 2, 7);
+    const second = syntheticCommitSha("scenario", 2, 7);
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[0-9a-f]{40}$/u);
+    expect(first).toBe("4eb1b82ef1d54b9ecbfb88e099d34b2b91a11914");
   });
 });
 

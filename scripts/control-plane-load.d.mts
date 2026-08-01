@@ -48,6 +48,7 @@ export type ControlPlaneLoadReport = {
 export function parseControlPlaneLoadConfiguration(
   environment?: Readonly<Record<string, string | undefined>>,
 ): ControlPlaneLoadConfiguration;
+export function syntheticCommitSha(prefix: string, repositoryIndex: number, runIndex: number): string;
 export function percentile(values: readonly number[], quantile: number): number;
 export function summarizeDurations(values: readonly number[], elapsedMs: number): ControlPlaneLoadMeasurement;
 export function mapWithConcurrency<Input, Output>(

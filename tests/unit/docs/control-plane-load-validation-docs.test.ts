@@ -28,6 +28,7 @@ describe("control-plane load validation documentation", () => {
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("postgres:16-alpine");
     expect(workflow).toContain("POSTGRES_HOST_AUTH_METHOD: trust");
+    expect(workflow).toContain("pnpm install --frozen-lockfile --ignore-scripts");
     expect(workflow).toContain("BOARDREADYOPS_LOAD_REPORT_PATH: control-plane-load-report.json");
     expect(workflow).toContain("retention-days: 30");
     expect(workflow).toContain("contents: read");

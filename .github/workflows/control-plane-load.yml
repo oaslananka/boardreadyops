@@ -78,7 +78,7 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: corepack install
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Apply cloud migrations
         run: pnpm --filter @boardreadyops/db db:migrate
       - name: Validate representative control-plane load
