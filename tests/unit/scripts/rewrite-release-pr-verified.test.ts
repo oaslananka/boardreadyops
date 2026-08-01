@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -18,6 +18,14 @@ afterEach(async () => {
 });
 
 describe("rewrite-release-pr-verified", () => {
+  it("uses an explicit path comparator and top-level await in the CLI entry point", async () => {
+    const source = await readFile(new URL("../../../scripts/rewrite-release-pr-verified.mjs", import.meta.url), "utf8");
+
+    expect(source).toContain(".sort(comparePaths)");
+    expect(source).toContain("await main()");
+    expect(source).not.toContain("main().catch");
+  });
+
   it("collects the complete desired release tree relative to main, including committed and regenerated changes", async () => {
     const root = await mkdtemp(join(tmpdir(), "boardreadyops-release-rewrite-"));
     tempDirectories.push(root);
