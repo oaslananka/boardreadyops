@@ -209,15 +209,68 @@ WantedBy=multi-user.target
 
 When private-repository credentials live outside `/var/lib/boardreadyops-runner`, grant only the minimum additional read access required by the selected credential helper or mirror.
 
-## Network policy
+## Deployment profiles
 
-No inbound port is required on the runner. Permit outbound connections only to:
+### Dedicated VM or bare-metal host
 
-- the BoardReadyOps control-plane HTTPS origin;
-- the customer Git host, or the local mirror endpoint;
-- package or operating-system update endpoints used by the customer's maintenance process.
+The systemd example is the recommended production baseline. Use one dedicated operating-system account per runner identity, encrypted local storage, a private identity directory, and a workspace filesystem that is excluded from backups. Run one worker process per identity.
+
+### Container
+
+A container deployment must preserve the same host boundary rather than weakening it:
+
+- run as a fixed non-root UID and GID;
+- use a read-only root filesystem;
+- mount the identity directory and Git credentials from a customer secret store with no group or other access;
+- mount a separate writable workspace volume or memory-backed filesystem that is destroyed with the container;
+- drop Linux capabilities, enable `no-new-privileges`, and do not mount the Docker socket, host PID namespace, host network namespace, or broad host paths;
+- install the exact approved BoardReadyOps, Node.js, Git, and KiCad versions in the image; and
+- emit only structured runner events to the container log driver.
+
+Do not bake `runner-private-key.pem`, enrollment tokens, Git credentials, or repository mirrors into an image layer. Use a fresh enrollment for each new identity and keep the same identity mounted when restarting the same logical runner.
+
+### Kubernetes
+
+Use a single-replica `StatefulSet` or an equivalent controller that guarantees one active pod per runner identity. Do not share one identity across concurrent replicas. No Kubernetes `Service` or `Ingress` is required.
+
+- Store the identity in a dedicated Secret or CSI secret volume; enable encryption at rest and restrict RBAC to the runner service account.
+- Use an `emptyDir`, generic ephemeral volume, or customer-managed encrypted ephemeral volume for workspaces. Never place workspaces in a retained shared PVC.
+- Set `runAsNonRoot`, a fixed UID/GID, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, and drop all capabilities.
+- Apply an egress-only `NetworkPolicy` for the control plane, Git or mirror endpoint, artifact endpoint, DNS, and approved update infrastructure.
+- Set a termination grace period long enough for the worker to stop polling, relinquish an active lease, and remove its workspace. The control plane remains authoritative if the pod is killed before cleanup completes.
+- Use a `PodDisruptionBudget` only when it does not encourage two pods to mount the same identity simultaneously.
+
+A horizontal replica increase requires separately enrolled identities and control-plane routing capacity; cloning a Secret to create more replicas is not a valid scaling method.
+
+### Restricted and disconnected environments
+
+A fully disconnected runner cannot participate because claim, heartbeat, lease, and result requests require the control plane. A restricted environment may use an outbound gateway and a customer-local Git mirror. Package and image promotion may be performed through an offline customer channel, but the installed artifacts must still be verified against the approved release digest or attestation before the worker is started.
+
+## Network and restricted-environment policy
+
+The runner opens outbound connections only; do not publish a Service, load balancer, ingress, SSH port, or callback listener for BoardReadyOps. The customer firewall and DNS policy should allow only the destinations required by the selected source and artifact modes:
+
+| Purpose | Required destination | Notes |
+| --- | --- | --- |
+| Control-plane protocol | The configured BoardReadyOps HTTPS origin on TCP 443 | Required for activation, claim, heartbeat, lease, capability, and result requests. |
+| Source checkout | The customer Git host on TCP 443, or a customer-local mirror | Not required when every assignment is served from a local mirror. |
+| Managed artifact upload | The HTTPS host embedded in a server-issued upload capability | The capability is short-lived and attempt-bound; do not broad-allow arbitrary object-storage endpoints. |
+| Updates | Customer-approved package, image, operating-system, and time-synchronization endpoints | Keep update traffic separate from the worker process where policy requires it. |
 
 The control plane uses Ed25519 signatures, a bounded timestamp window, and single-use nonces for runner mutations. Artifact uploads use short-lived, single-use HTTPS capabilities tied to the run, execution attempt, lease, artifact ID, declared byte count, and optional SHA-256 digest.
+
+DNS must resolve the control-plane and selected Git or artifact hosts. System time must remain synchronized because runner signatures use a bounded timestamp window. TLS interception is supported only when the customer explicitly trusts the intercepting CA at the operating-system or Node.js trust boundary and has verified that the proxy does not log authorization headers, signed request bodies, upload capabilities, or Git credentials. Disable TLS interception for the control-plane path when that guarantee cannot be made.
+
+Application-level `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` handling is not currently a supported runner contract. Restricted environments should use a transparent egress gateway, a customer-local Git mirror, or another network layer that does not require the runner process to understand proxy credentials. Treat proxy credentials as secrets and never place them in command-line arguments, identity JSON, unit files committed to source control, or diagnostic bundles.
+
+Commission a restricted-network installation by proving all of the following before enabling production routing:
+
+1. activation reaches the exact HTTPS origin and rejects a hostname or CA mismatch;
+2. `runner once` can claim an empty queue without any inbound listener;
+3. an exact-SHA checkout succeeds through the approved Git path;
+4. a capability-bound upload succeeds only to the expected artifact host;
+5. DNS, TLS, proxy, and firewall logs contain no enrollment token, signing key, Git credential, lease token, capability, source path, or finding payload; and
+6. removing any required egress rule fails closed and leaves the lease recoverable by expiry or relinquishment.
 
 ## Storage and retention
 
@@ -234,16 +287,25 @@ Back up the identity directory as a secret. Do not copy it into images, source r
 
 Uploaded report artifacts are stored by the control plane's configured artifact driver. They contain BoardReadyOps reports, not an automatic source archive. Findings may include repository-relative paths and diagnostic messages; treat them according to the tenant's engineering-data classification.
 
-## Update and rollback
+## Supported versions, update, and rollback
 
-Pin the runner to an exact BoardReadyOps release. Before updating:
+The production support contract is intentionally strict:
 
-1. stop the service;
-2. confirm no active lease remains for the registration;
-3. retain the previous binary or package artifact;
-4. install and verify the new exact version;
-5. run `runner once` as a commissioning check;
-6. restart the service and observe the first heartbeat and completed Check Run.
+- pin the runner to an exact BoardReadyOps release and record its digest or package provenance;
+- use Node.js 24 and a KiCad major supported by that BoardReadyOps release;
+- do not assume an older runner remains compatible with a newer control plane; and
+- until server-side minimum-version enforcement is implemented, treat the exact version validated with the deployed control-plane release as the only supported production version.
+
+Roll out an upgrade one identity at a time. Before updating:
+
+1. stop routing new work to the identity;
+2. wait for or relinquish the active lease;
+3. stop the worker service;
+4. retain the previous verified binary or image;
+5. install the new exact version and verify its digest or provenance;
+6. run `boardreadyops doctor`;
+7. run `runner once` against a commissioning repository; and
+8. restore normal routing only after the first heartbeat and terminal Check Run succeed.
 
 Example:
 
@@ -252,13 +314,16 @@ systemctl stop boardreadyops-runner
 boardreadyops --version
 # Install the approved exact release through the customer's package channel.
 boardreadyops --version
+boardreadyops doctor
 sudo -u boardreadyops-runner boardreadyops runner once \
   --identity /var/lib/boardreadyops-runner/identity/runner.json \
   --workspace-root /var/lib/boardreadyops-runner/workspaces
 systemctl start boardreadyops-runner
 ```
 
-Rollback by stopping the service, restoring the previous exact binary, and restarting. The persisted identity format is versioned; an unsupported version fails closed rather than silently regenerating credentials.
+Record the old and new versions, artifact digests, identity ID, timestamps, and commissioning run ID without recording credentials or source.
+
+Rollback uses the same drain-and-stop procedure, restores the previous verified binary or image, and reuses the existing identity only when its schema is still supported. If identity loading fails closed, do not edit the JSON or private key in place. Use the deployment's authorized control-plane administration procedure to disable the registration, create a new one-time enrollment, activate a new identity, and remove the superseded private key through the customer secret-destruction process. There is not yet a public self-service key-rotation or minimum-version administration command. Copying or regenerating a private key outside enrollment is not a supported rotation procedure.
 
 ## Private-repository acceptance evidence
 
