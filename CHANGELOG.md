@@ -4,6 +4,20 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.25.0](https://github.com/oaslananka/boardreadyops/compare/v1.24.1...v1.25.0) (2026-08-01)
+
+
+### Features
+
+* **core:** validate representative control-plane load ([#293](https://github.com/oaslananka/boardreadyops/issues/293)) ([75c38ea](https://github.com/oaslananka/boardreadyops/commit/75c38ea1546c2219af6c0f47dac5bd99450e41ed))
+* **core:** verify PostgreSQL backup restores ([#290](https://github.com/oaslananka/boardreadyops/issues/290)) ([ea38a8b](https://github.com/oaslananka/boardreadyops/commit/ea38a8b9a8e60fdf1064b0c4ae96a499b8164a96))
+
+
+### Bug Fixes
+
+* **ci:** pin readiness workflow to v1.24.1 ([#288](https://github.com/oaslananka/boardreadyops/issues/288)) ([1d8bd78](https://github.com/oaslananka/boardreadyops/commit/1d8bd78d5dafbbe03587b9114d5ce68f0d961378))
+* **core:** make backup verification CLI runnable ([#291](https://github.com/oaslananka/boardreadyops/issues/291)) ([01c42c3](https://github.com/oaslananka/boardreadyops/commit/01c42c389078b996a17a30a3688e5538b457291e))
+
 ## [1.24.1](https://github.com/oaslananka/boardreadyops/compare/v1.24.0...v1.24.1) (2026-08-01)
 
 
