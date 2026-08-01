@@ -21,6 +21,7 @@ export interface CommonCliOptions {
   config?: string;
   project?: string;
   mode?: "warn" | "enforce";
+  executionPolicy?: "safe" | "standard";
   releaseMode?: "prototype" | "pilot" | "production";
   requireKicad?: boolean;
   kicadCli?: string;
@@ -75,6 +76,7 @@ export function pipelineInputFromCli(
     project: options.project,
     config: options.config,
     mode: options.mode ?? "warn",
+    executionPolicy: options.executionPolicy ?? "standard",
     releaseMode: options.releaseMode,
     requireKicad: options.requireKicad ?? false,
     kicadCli: options.kicadCli,

@@ -29,6 +29,10 @@ inputs:
     description: Manufacturing release context. One of prototype, pilot, production. Empty disables release mode behavior.
     required: false
     default: ""
+  safe-mode:
+    description: Disable repository plugins, notifier dispatch, and trusted GitHub write operations for restricted execution.
+    required: false
+    default: "false"
   require-kicad:
     description: Fail when kicad-cli is not available.
     required: false

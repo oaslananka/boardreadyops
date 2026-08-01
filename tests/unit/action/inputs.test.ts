@@ -32,6 +32,7 @@ describe("action gate detection", () => {
     vi.stubEnv("INPUT_CONFIG", "config/custom.yml");
     vi.stubEnv("INPUT_MODE", "enforce");
     vi.stubEnv("INPUT_REQUIRE-KICAD", "yes");
+    vi.stubEnv("INPUT_SAFE-MODE", "true");
     vi.stubEnv("INPUT_KICAD-CLI", "kicad-cli");
     vi.stubEnv("INPUT_BOM", "bom/production.csv");
     vi.stubEnv("INPUT_PINMAP", "pinmaps/header.csv");
@@ -59,6 +60,7 @@ describe("action gate detection", () => {
       config: path.join(workspace, "config/custom.yml"),
       mode: "enforce",
       requireKicad: true,
+      executionPolicy: "safe",
       kicadCli: "kicad-cli",
       bom: path.join(workspace, "bom/production.csv"),
       pinmap: path.join(workspace, "pinmaps/header.csv"),
