@@ -95,6 +95,30 @@ describe("retention maintenance store", () => {
     );
   });
 
+  it("purges only old completed outbox effects that are not under active reconciliation", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ affected: 8 }] });
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
+
+    await expect(store.purgeCompletedControlPlaneOutbox({ retentionDays: 90, limit: 40 })).resolves.toBe(8);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("boardreadyops_purge_completed_control_plane_outbox"), [
+      "2026-05-02T05:00:00.000Z",
+      40,
+    ]);
+  });
+
+  it("purges only old completed reconciliation records", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ affected: 9 }] });
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
+
+    await expect(store.purgeCompletedControlPlaneReconciliationItems({ retentionDays: 90 })).resolves.toBe(9);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /control_plane_reconciliation_items[\s\S]*status = 'completed'[\s\S]*completed_at <=[\s\S]*for update skip locked[\s\S]*delete from control_plane_reconciliation_items/u,
+      ),
+      ["2026-05-02T05:00:00.000Z", 1_000],
+    );
+  });
+
   it("rejects invalid terminal retention periods before querying", async () => {
     const query = vi.fn();
     const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
@@ -106,6 +130,12 @@ describe("retention maintenance store", () => {
       "retentionDays must be a positive integer",
     );
     await expect(store.purgeTerminalRepositorySetupProbes({ retentionDays: 3651 })).rejects.toThrow(
+      "retentionDays must be between 1 and 3650",
+    );
+    await expect(store.purgeCompletedControlPlaneOutbox({ retentionDays: 0 })).rejects.toThrow(
+      "retentionDays must be a positive integer",
+    );
+    await expect(store.purgeCompletedControlPlaneReconciliationItems({ retentionDays: 3651 })).rejects.toThrow(
       "retentionDays must be between 1 and 3650",
     );
     expect(query).not.toHaveBeenCalled();
