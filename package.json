@@ -92,6 +92,7 @@
     "verify:control-plane-worker-boundary": "node scripts/verify-control-plane-worker-boundary.mjs",
     "cloud:dev": "pnpm --filter @boardreadyops/web dev",
     "cloud:deploy:self-hosted": "node scripts/deploy-cloud.mjs",
+    "cloud:backup:verify": "node scripts/postgres-backup-restore.mjs",
     "cloud:provision:admin-db-url": "node scripts/provision-admin-database-url.mjs",
     "toolchain:bootstrap": "node scripts/toolchain.mjs bootstrap",
     "toolchain:doctor": "node scripts/toolchain.mjs doctor --strict",
