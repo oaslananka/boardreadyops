@@ -41,6 +41,8 @@ function runRow(overrides: Record<string, unknown> = {}): Record<string, unknown
     github_check_published_at: null,
     github_comment_published_at: null,
     last_publication_error: null,
+    repository_id: "7c000000-0000-4000-8000-000000000002",
+    installation_id: "7c000000-0000-4000-8000-000000000001",
     owner: "octo",
     name: "board",
     private: false,
@@ -113,7 +115,13 @@ describe("run dashboard environment loader", () => {
     );
 
     expect(result).toMatchObject({ state: "found", run: { repository: "private-org/board", repositoryPrivate: true } });
-    expect(authorizeRepository).toHaveBeenCalledWith({ owner: "private-org", name: "board", private: true });
+    expect(authorizeRepository).toHaveBeenCalledWith({
+      id: "7c000000-0000-4000-8000-000000000002",
+      installationId: "7c000000-0000-4000-8000-000000000001",
+      owner: "private-org",
+      name: "board",
+      private: true,
+    });
     expect(mocks.close).toHaveBeenCalledOnce();
   });
 
