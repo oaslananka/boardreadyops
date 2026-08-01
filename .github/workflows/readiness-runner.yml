@@ -157,7 +157,7 @@ jobs:
       - name: Run BoardReadyOps
         id: readiness
         continue-on-error: true
-        uses: oaslananka/boardreadyops@bf9ce0981c93c2d5bdafa80049fa5460c566013d # safe-mode runtime boundary
+        uses: oaslananka/boardreadyops@ce925376bd71daf7e07f31fb1bb19a8bde30b172 # v1.24.1
         with:
           project: ${{ vars.BOARDREADYOPS_PROJECT || '' }}
           config: ${{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}
@@ -323,7 +323,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: oaslananka/boardreadyops
-          ref: e2c6136534d36b7abb57db6ef7a94b03038ad376 # v1.22.0
+          ref: ce925376bd71daf7e07f31fb1bb19a8bde30b172 # v1.24.1
           path: .boardreadyops-tool
           persist-credentials: false
           sparse-checkout: |
@@ -344,7 +344,7 @@ jobs:
           fi
 
           tool_version="$(node "$GITHUB_WORKSPACE/.boardreadyops-tool/dist/cli/index.cjs" --version)"
-          if [ "$tool_version" != "1.22.0" ]; then
+          if [ "$tool_version" != "1.24.1" ]; then
             echo "verified BoardReadyOps checkout returned unexpected version: $tool_version" >&2
             exit 1
           fi
