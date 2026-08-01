@@ -32,6 +32,7 @@ all current inputs.
 | `config` | `boardreadyops.yml` | Path to boardreadyops.yml. |
 | `mode` | `warn` | warn or enforce |
 | `release-mode` | `` | Manufacturing release context. One of prototype, pilot, production. Empty disables release mode behavior. |
+| `safe-mode` | `false` | Disable repository plugins, notifier dispatch, and trusted GitHub write operations for restricted execution. |
 | `require-kicad` | `false` | Fail when kicad-cli is not available. |
 | `kicad-cli` | `` | Explicit kicad-cli path. |
 | `bom` | `auto` | BOM source path or "auto". |

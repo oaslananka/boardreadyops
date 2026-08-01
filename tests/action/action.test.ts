@@ -117,6 +117,27 @@ describe("action bundle", () => {
     expect(await fs.stat(path.join(workspace, "boardreadyops.sarif.json"))).toBeTruthy();
   });
 
+  it("suppresses trusted write operations in safe mode even when requested", async () => {
+    const workspace = await workspaceFromFixture("safe-basic");
+    const result = runActionBundle(workspace, {
+      GITHUB_ACTIONS: "true",
+      GITHUB_REPOSITORY: "oaslananka/private-hardware",
+      GITHUB_REF: "refs/heads/feature",
+      GITHUB_SHA: "0123456789012345678901234567890123456789",
+      GITHUB_TOKEN: "must-not-be-used",
+      INPUT_PATH: ".",
+      INPUT_CONFIG: "boardreadyops.yml",
+      "INPUT_SAFE-MODE": "true",
+      "INPUT_UPLOAD-SARIF": "true",
+      "INPUT_UPLOAD-ARTIFACTS": "true",
+      "INPUT_COMMENT-PR": "true",
+      INPUT_ANNOTATIONS: "false",
+      "INPUT_FAIL-ON": "never",
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+  });
+
   it("fails the action when findings meet the configured threshold", async () => {
     const workspace = await workspaceFromFixture("bom-missing-mpn");
     const result = runActionBundle(workspace, {

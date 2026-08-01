@@ -16,7 +16,8 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain('require-kicad: "true"');
     expect(workflow).toContain("project: $" + "{{ vars.BOARDREADYOPS_PROJECT || '' }}");
     expect(workflow).toContain("config: $" + "{{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}");
-    expect(workflow).toContain("uses: oaslananka/boardreadyops@155afd28bbbadf7d11723629b4f71675288a9e02");
+    expect(workflow).toContain("uses: oaslananka/boardreadyops@bf9ce0981c93c2d5bdafa80049fa5460c566013d");
+    expect(workflow).toContain("safe-mode: $" + "{{ inputs.safe_mode }}");
     expect(workflow).not.toContain("runner-ready");
   });
 

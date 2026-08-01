@@ -69,6 +69,8 @@ When safe mode is enabled, runners must:
 - avoid privileged writes unless explicitly authorized by repository policy,
 - avoid exposing private artifacts,
 - never make installation or repository secrets available to untrusted fork code,
+- disable repository-provided plugins and notifier dispatch before analysis starts,
+- suppress Action artifact uploads, SARIF publication, and pull-request comments even if requested by configuration,
 - treat repository content as untrusted input,
 - prefer advisory findings unless policy explicitly enables enforcement,
 - preserve artifact and log isolation between installations.

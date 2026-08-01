@@ -40,6 +40,7 @@ export async function executeRunnerPipeline(
     workspace,
     {
       mode: "enforce",
+      executionPolicy: job.safeMode.enabled ? "safe" : "standard",
       requireKicad: options.requireKicad,
       failOn: "high",
       json: targets[0].relative,

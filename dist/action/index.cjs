@@ -102607,7 +102607,7 @@ async function initializePipelineContext(input, logger7) {
   };
 }
 async function discoverPhase(ctx) {
-  const pluginLoad = await loadPlugins(ctx.root, ctx.config);
+  const pluginLoad = ctx.options.executionPolicy === "safe" ? { specifiers: [], plugins: [], errors: [] } : await loadPlugins(ctx.root, ctx.config);
   const loadedWithPluginErrors = appendConfigErrors(ctx.loaded, pluginLoad.errors);
   const projects = await discoverConfiguredProjects(ctx.root, ctx.options);
   return {
@@ -102740,6 +102740,13 @@ function assembleRunResult(ctx, effectiveFindings, fabrication, readiness, summa
   };
 }
 async function dispatchNotificationsPhase(ctx, result) {
+  if (ctx.options.executionPolicy === "safe") {
+    ctx.logger.info("pipeline.execution.restricted", {
+      plugins: "disabled",
+      notifications: "disabled"
+    });
+    return [];
+  }
   return dispatchNotifications(
     ctx.config.notifiers,
     notificationPayloadFromResult(result, ctx.options.notificationLinks ?? {}),
@@ -102796,6 +102803,7 @@ function normalizeOptions(cwd, root, config2, input, gate, forceFailOn) {
     project: input.project,
     config: input.config,
     mode: gate ? "enforce" : input.mode ?? config2.mode ?? "warn",
+    executionPolicy: input.executionPolicy ?? "standard",
     releaseMode: input.releaseMode ?? config2.releaseMode,
     requireKicad: input.requireKicad ?? false,
     kicadCli: input.kicadCli,
@@ -143386,6 +143394,7 @@ function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cw
     project: optionalPath(root, getInput("project")),
     config: optionalPath(root, getInput("config") || "boardreadyops.yml"),
     mode: modeInput(getInput("mode") || "warn"),
+    executionPolicy: boolInput("safe-mode", false) ? "safe" : "standard",
     releaseMode: releaseModeInput(getInput("release-mode")),
     requireKicad: boolInput("require-kicad", false),
     kicadCli: empty(getInput("kicad-cli")),
@@ -143631,17 +143640,18 @@ async function runAction() {
   }
   setActionOutputs(result, written);
   await summary.addRaw(formatMarkdown(result)).write();
-  if (inputs.uploadArtifacts) {
+  const trustedWritesAllowed = inputs.executionPolicy !== "safe";
+  if (trustedWritesAllowed && inputs.uploadArtifacts) {
     await uploadArtifacts(
       inputs.artifactName,
       Object.values(written).filter((entry) => Boolean(entry)),
       workspace
     );
   }
-  if (inputs.uploadSarif && written.sarif) {
+  if (trustedWritesAllowed && inputs.uploadSarif && written.sarif) {
     await uploadSarif(written.sarif);
   }
-  if (inputs.commentPr) {
+  if (trustedWritesAllowed && inputs.commentPr) {
     await upsertPullRequestComment(result, inputs.artifactName, inputs.commentFormat);
   }
   logger7.info("action.finish", {
