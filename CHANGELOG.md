@@ -11,8 +11,8 @@ All notable changes to BoardReadyOps are recorded here.
 
 * **core:** force safe-mode workspace cleanup ([#284](https://github.com/oaslananka/boardreadyops/issues/284)) ([a4e7a0f](https://github.com/oaslananka/boardreadyops/commit/a4e7a0fbec26fa65f845752bbf3f654a707758e2))
 * **core:** purge terminal ephemeral records ([#282](https://github.com/oaslananka/boardreadyops/issues/282)) ([27b1de4](https://github.com/oaslananka/boardreadyops/commit/27b1de465d08b5ac99b5820ef74e1059f9a4e566))
-* **core:** restrict safe-mode runtime extensions ([#286](https://github.com/oaslananka/boardreadyops/issues/286)) ([5d49715](https://github.com/oaslananka/boardreadyops/commit/5d4971591bf14db43ac04f0b84f01c6bbc61139b)), closes [#42](https://github.com/oaslananka/boardreadyops/issues/42)
-* **core:** surface trust restrictions in GitHub ([#285](https://github.com/oaslananka/boardreadyops/issues/285)) ([8eb870d](https://github.com/oaslananka/boardreadyops/commit/8eb870d675663e70a40cf87970253908e7871ea7)), closes [#42](https://github.com/oaslananka/boardreadyops/issues/42)
+* **core:** restrict safe-mode runtime extensions ([#286](https://github.com/oaslananka/boardreadyops/issues/286)) ([5d49715](https://github.com/oaslananka/boardreadyops/commit/5d4971591bf14db43ac04f0b84f01c6bbc61139b)), refs [#42](https://github.com/oaslananka/boardreadyops/issues/42)
+* **core:** surface trust restrictions in GitHub ([#285](https://github.com/oaslananka/boardreadyops/issues/285)) ([8eb870d](https://github.com/oaslananka/boardreadyops/commit/8eb870d675663e70a40cf87970253908e7871ea7)), refs [#42](https://github.com/oaslananka/boardreadyops/issues/42)
 * **web:** bind dashboard reads to tenant scope ([#287](https://github.com/oaslananka/boardreadyops/issues/287)) ([6812cef](https://github.com/oaslananka/boardreadyops/commit/6812cefdf22a941fcda48923e1d9e804903a7538))
 
 ## [1.24.0](https://github.com/oaslananka/boardreadyops/compare/v1.23.0...v1.24.0) (2026-07-31)
