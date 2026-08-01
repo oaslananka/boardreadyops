@@ -14,7 +14,9 @@ export async function collectDesiredTreeChanges(root = process.cwd(), baseRef = 
   const untracked = splitNul(await git(root, "ls-files", "--others", "--exclude-standard", "-z"));
   const deleted = splitNul(await git(root, "diff", "--name-only", "--diff-filter=D", "-z", baseRef, "--"));
   const deletionSet = new Set(deleted);
-  const additionPaths = [...new Set([...changed, ...untracked])].filter((path) => !deletionSet.has(path)).sort();
+  const additionPaths = [...new Set([...changed, ...untracked])]
+    .filter((path) => !deletionSet.has(path))
+    .sort(comparePaths);
 
   const additions = [];
   for (const path of additionPaths) {
@@ -33,7 +35,7 @@ export async function collectDesiredTreeChanges(root = process.cwd(), baseRef = 
     baseOid,
     branchHeadOid,
     additions,
-    deletions: deleted.sort().map((path) => ({ path })),
+    deletions: deleted.sort(comparePaths).map((path) => ({ path })),
   };
 }
 
@@ -271,6 +273,16 @@ function splitNul(value) {
   return value.split("\0").filter(Boolean);
 }
 
+function comparePaths(left, right) {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+
 function resolveRepositoryPath(root, path) {
   if (!path || path.includes("\0")) {
     throw new Error("release rewrite returned an invalid repository path");
@@ -335,8 +347,10 @@ function requireSafeIdentifier(env, name) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
-  });
+  }
 }
