@@ -106,7 +106,8 @@
     "coverage:all": "pnpm run coverage:core && pnpm run coverage:cloud",
     "verify:summary": "node scripts/verification-summary.mjs",
     "test:int:monorepo": "node scripts/run-monorepo-integration.mjs",
-    "verify:transition-writers": "node scripts/verify-control-plane-transition-writers.mjs"
+    "verify:transition-writers": "node scripts/verify-control-plane-transition-writers.mjs",
+    "cloud:load:verify": "node scripts/control-plane-load.mjs"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [

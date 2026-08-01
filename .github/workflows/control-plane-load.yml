@@ -1,0 +1,93 @@
+name: control-plane-load
+
+on:
+  workflow_dispatch:
+    inputs:
+      unique_deliveries:
+        description: Unique webhook deliveries
+        required: true
+        default: "200"
+        type: string
+      duplicate_deliveries:
+        description: Duplicate webhook replays
+        required: true
+        default: "50"
+        type: string
+      repositories:
+        description: Isolated tenant repositories
+        required: true
+        default: "4"
+        type: string
+      runs_per_repository:
+        description: Release runs per repository
+        required: true
+        default: "20"
+        type: string
+      concurrency:
+        description: Concurrent database operations
+        required: true
+        default: "20"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-load-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_load
+      BOARDREADYOPS_LOAD_CONFIRMATION: isolated-disposable-database
+      BOARDREADYOPS_LOAD_UNIQUE_DELIVERIES: ${{ inputs.unique_deliveries }}
+      BOARDREADYOPS_LOAD_DUPLICATE_DELIVERIES: ${{ inputs.duplicate_deliveries }}
+      BOARDREADYOPS_LOAD_REPOSITORIES: ${{ inputs.repositories }}
+      BOARDREADYOPS_LOAD_RUNS_PER_REPOSITORY: ${{ inputs.runs_per_repository }}
+      BOARDREADYOPS_LOAD_CONCURRENCY: ${{ inputs.concurrency }}
+      BOARDREADYOPS_LOAD_INTAKE_P95_MS: "1000"
+      BOARDREADYOPS_LOAD_LIFECYCLE_P95_MS: "1500"
+      BOARDREADYOPS_LOAD_DASHBOARD_P95_MS: "1000"
+      BOARDREADYOPS_LOAD_MINIMUM_THROUGHPUT_PER_SECOND: "10"
+      BOARDREADYOPS_LOAD_REPORT_PATH: control-plane-load-report.json
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: boardreadyops
+          POSTGRES_DB: boardreadyops_load
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boardreadyops -d boardreadyops_load"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile
+      - name: Apply cloud migrations
+        run: pnpm --filter @boardreadyops/db db:migrate
+      - name: Validate representative control-plane load
+        run: pnpm run cloud:load:verify
+      - name: Upload privacy-safe load report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: control-plane-load-report
+          path: control-plane-load-report.json
+          if-no-files-found: warn
+          retention-days: 30
