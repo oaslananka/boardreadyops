@@ -2,8 +2,10 @@ import { spawnSync } from "node:child_process";
 import { lstat, open, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import pg from "pg";
 import { listMigrationFiles } from "../packages/db/scripts/apply-migrations.mjs";
-import { createPgQueryExecutor } from "../packages/db/src/pg-executor.js";
+
+const { Pool } = pg;
 
 export const BACKUP_RESTORE_CONFIRMATION = "isolated-empty-database";
 
@@ -97,7 +99,15 @@ export function buildPostgresBackupRestorePlan({
 }
 
 function createExecutor(connectionString) {
-  return createPgQueryExecutor({ connectionString, max: 1 });
+  const pool = new Pool({ connectionString, max: 1 });
+  return {
+    async query(sql, params = []) {
+      return await pool.query(sql, [...params]);
+    },
+    async close() {
+      await pool.end();
+    },
+  };
 }
 
 async function publicTables(executor) {
