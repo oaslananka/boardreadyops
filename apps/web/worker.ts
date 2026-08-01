@@ -246,6 +246,7 @@ const healthServer = createServer(async (request, response) => {
         retention: {
           webhookInboxDays: retention.webhookInboxDays,
           ephemeralRecordsDays: retention.ephemeralRecordsDays,
+          controlPlaneHistoryDays: retention.controlPlaneHistoryDays,
           cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
           cleanupBatchSize: retentionCleanupBatchSize,
         },
@@ -318,6 +319,7 @@ async function startHealthServer(): Promise<void> {
     retention: {
       webhookInboxDays: retention.webhookInboxDays,
       ephemeralRecordsDays: retention.ephemeralRecordsDays,
+      controlPlaneHistoryDays: retention.controlPlaneHistoryDays,
       cleanupIntervalMilliseconds: retentionCleanupIntervalMilliseconds,
       cleanupBatchSize: retentionCleanupBatchSize,
     },
@@ -432,6 +434,14 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       }),
     purgeTerminalRepositorySetupProbes: () =>
       retentionMaintenance.purgeTerminalRepositorySetupProbes({ retentionDays: retention.ephemeralRecordsDays }),
+    purgeCompletedControlPlaneOutbox: () =>
+      retentionMaintenance.purgeCompletedControlPlaneOutbox({
+        retentionDays: retention.controlPlaneHistoryDays,
+      }),
+    purgeCompletedControlPlaneReconciliationItems: () =>
+      retentionMaintenance.purgeCompletedControlPlaneReconciliationItems({
+        retentionDays: retention.controlPlaneHistoryDays,
+      }),
   });
   for (const failure of result.failures) {
     log("warn", "worker.retention_cleanup_failed", failure);
@@ -444,7 +454,9 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
     result.repositorySetupProbesExpired > 0 ||
     result.terminalArtifactUploadCapabilitiesPurged > 0 ||
     result.terminalRunnerRegistrationEnrollmentsPurged > 0 ||
-    result.terminalRepositorySetupProbesPurged > 0
+    result.terminalRepositorySetupProbesPurged > 0 ||
+    result.completedControlPlaneOutboxPurged > 0 ||
+    result.completedControlPlaneReconciliationItemsPurged > 0
   ) {
     log("info", "worker.retention_cleanup", {
       webhookInboxPurged: result.webhookInboxPurged,
@@ -455,6 +467,8 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       terminalArtifactUploadCapabilitiesPurged: result.terminalArtifactUploadCapabilitiesPurged,
       terminalRunnerRegistrationEnrollmentsPurged: result.terminalRunnerRegistrationEnrollmentsPurged,
       terminalRepositorySetupProbesPurged: result.terminalRepositorySetupProbesPurged,
+      completedControlPlaneOutboxPurged: result.completedControlPlaneOutboxPurged,
+      completedControlPlaneReconciliationItemsPurged: result.completedControlPlaneReconciliationItemsPurged,
     });
   }
   if (result.completed) lastSuccessfulRetentionCleanupAt = new Date().toISOString();

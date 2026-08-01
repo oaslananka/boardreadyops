@@ -223,6 +223,11 @@ describe("control-plane worker runtime", () => {
     expect(source).toContain("terminalArtifactUploadCapabilitiesPurged");
     expect(source).toContain("terminalRunnerRegistrationEnrollmentsPurged");
     expect(source).toContain("terminalRepositorySetupProbesPurged");
+    expect(source).toContain("controlPlaneHistoryDays");
+    expect(source).toContain("purgeCompletedControlPlaneOutbox");
+    expect(source).toContain("purgeCompletedControlPlaneReconciliationItems");
+    expect(source).toContain("completedControlPlaneOutboxPurged");
+    expect(source).toContain("completedControlPlaneReconciliationItemsPurged");
     expect(source).toContain("lastSuccessfulRetentionCleanupAt");
     expect(source).toContain("cleanupBatchSize");
   });

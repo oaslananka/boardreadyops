@@ -11,6 +11,8 @@ function dependencies(overrides: Partial<Parameters<typeof runRetentionMaintenan
     purgeTerminalArtifactUploadCapabilities: vi.fn().mockResolvedValue(6),
     purgeTerminalRunnerRegistrationEnrollments: vi.fn().mockResolvedValue(5),
     purgeTerminalRepositorySetupProbes: vi.fn().mockResolvedValue(3),
+    purgeCompletedControlPlaneOutbox: vi.fn().mockResolvedValue(8),
+    purgeCompletedControlPlaneReconciliationItems: vi.fn().mockResolvedValue(9),
     ...overrides,
   };
 }
@@ -26,6 +28,8 @@ describe("retention maintenance worker", () => {
       terminalArtifactUploadCapabilitiesPurged: 6,
       terminalRunnerRegistrationEnrollmentsPurged: 5,
       terminalRepositorySetupProbesPurged: 3,
+      completedControlPlaneOutboxPurged: 8,
+      completedControlPlaneReconciliationItemsPurged: 9,
       failures: [],
       completed: true,
     });
@@ -43,6 +47,8 @@ describe("retention maintenance worker", () => {
       terminalArtifactUploadCapabilitiesPurged: 6,
       terminalRunnerRegistrationEnrollmentsPurged: 5,
       terminalRepositorySetupProbesPurged: 3,
+      completedControlPlaneOutboxPurged: 8,
+      completedControlPlaneReconciliationItemsPurged: 9,
       failures: [{ scope: "webhook_inbox", errorClass: "TypeError" }],
       completed: false,
     });
@@ -53,6 +59,8 @@ describe("retention maintenance worker", () => {
     expect(input.purgeTerminalArtifactUploadCapabilities).toHaveBeenCalledOnce();
     expect(input.purgeTerminalRunnerRegistrationEnrollments).toHaveBeenCalledOnce();
     expect(input.purgeTerminalRepositorySetupProbes).toHaveBeenCalledOnce();
+    expect(input.purgeCompletedControlPlaneOutbox).toHaveBeenCalledOnce();
+    expect(input.purgeCompletedControlPlaneReconciliationItems).toHaveBeenCalledOnce();
   });
 
   it("reports content-free error classes for multiple failures", async () => {
@@ -61,6 +69,7 @@ describe("retention maintenance worker", () => {
         purgeRunnerRequestNonces: vi.fn().mockRejectedValue("token=private-value"),
         expireRepositorySetupProbes: vi.fn().mockRejectedValue(new RangeError("repository private-name")),
         purgeTerminalArtifactUploadCapabilities: vi.fn().mockRejectedValue(new Error("token=private-capability")),
+        purgeCompletedControlPlaneOutbox: vi.fn().mockRejectedValue(new SyntaxError("private payload")),
       }),
     );
 
@@ -68,15 +77,18 @@ describe("retention maintenance worker", () => {
       runnerRequestNoncesPurged: 0,
       repositorySetupProbesExpired: 0,
       terminalArtifactUploadCapabilitiesPurged: 0,
+      completedControlPlaneOutboxPurged: 0,
       failures: [
         { scope: "runner_request_nonces", errorClass: "UnknownError" },
         { scope: "repository_setup_probes", errorClass: "RangeError" },
         { scope: "terminal_artifact_upload_capabilities", errorClass: "Error" },
+        { scope: "completed_control_plane_outbox", errorClass: "SyntaxError" },
       ],
       completed: false,
     });
     expect(JSON.stringify(result)).not.toContain("private-value");
     expect(JSON.stringify(result)).not.toContain("private-name");
     expect(JSON.stringify(result)).not.toContain("private-capability");
+    expect(JSON.stringify(result)).not.toContain("private payload");
   });
 });

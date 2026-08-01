@@ -6,6 +6,7 @@ export type CloudRuntimeConfigurationErrorCode =
   | "missing-database-url"
   | "invalid-webhook-retention-days"
   | "invalid-ephemeral-record-retention-days"
+  | "invalid-control-plane-history-retention-days"
   | "invalid-artifact-capability-ttl-seconds";
 
 export class CloudRuntimeConfigurationError extends Error {
@@ -53,16 +54,24 @@ export function resolveCloudPersistenceConfiguration(
   return { mode, databaseUrl };
 }
 
-export type ControlPlaneRetentionConfiguration = { webhookInboxDays: number; ephemeralRecordsDays: number };
+export type ControlPlaneRetentionConfiguration = {
+  webhookInboxDays: number;
+  ephemeralRecordsDays: number;
+  controlPlaneHistoryDays: number;
+};
 
-type RetentionConfigurationErrorCode = "invalid-webhook-retention-days" | "invalid-ephemeral-record-retention-days";
+type RetentionConfigurationErrorCode =
+  | "invalid-webhook-retention-days"
+  | "invalid-ephemeral-record-retention-days"
+  | "invalid-control-plane-history-retention-days";
 
 function resolveRetentionDays(input: {
   raw: string | undefined;
   environmentName: string;
   errorCode: RetentionConfigurationErrorCode;
+  defaultDays: number;
 }): number {
-  if (input.raw === undefined) return 30;
+  if (input.raw === undefined) return input.defaultDays;
   const normalized = input.raw.trim();
   if (!/^\d+$/u.test(normalized)) {
     throw new CloudRuntimeConfigurationError(
@@ -88,11 +97,19 @@ export function resolveControlPlaneRetentionConfiguration(
       raw: environment.BOARDREADYOPS_WEBHOOK_RETENTION_DAYS,
       environmentName: "BOARDREADYOPS_WEBHOOK_RETENTION_DAYS",
       errorCode: "invalid-webhook-retention-days",
+      defaultDays: 30,
     }),
     ephemeralRecordsDays: resolveRetentionDays({
       raw: environment.BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS,
       environmentName: "BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS",
       errorCode: "invalid-ephemeral-record-retention-days",
+      defaultDays: 30,
+    }),
+    controlPlaneHistoryDays: resolveRetentionDays({
+      raw: environment.BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS,
+      environmentName: "BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS",
+      errorCode: "invalid-control-plane-history-retention-days",
+      defaultDays: 90,
     }),
   };
 }
