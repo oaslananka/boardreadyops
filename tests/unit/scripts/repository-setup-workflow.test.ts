@@ -16,7 +16,7 @@ describe("repository setup workflow probe", () => {
   it("validates the default-branch config and publishes a run-bound OIDC result", async () => {
     const source = await readFile(workflow, "utf8");
     expect(source).toContain("repository: oaslananka/boardreadyops");
-    expect(source).toContain("ref: e2c6136534d36b7abb57db6ef7a94b03038ad376 # v1.22.0");
+    expect(source).toContain("ref: ce925376bd71daf7e07f31fb1bb19a8bde30b172 # v1.24.1");
     expect(source).toContain(
       'node "$GITHUB_WORKSPACE/.boardreadyops-tool/dist/cli/index.cjs" doctor --check repository --format json',
     );
