@@ -157,6 +157,25 @@ ${operations}`;
     expect(combined).toContain("does not affect worker readiness");
     expect(combined).toContain("worker restart resets");
   });
+  it("documents isolated PostgreSQL backup verification and recovery objectives", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+
+    expect(deployment).toContain("PostgreSQL backup verification and restore drill");
+    expect(deployment).toContain("15-minute recovery point objective");
+    expect(deployment).toContain("60-minute recovery time objective");
+    expect(deployment).toContain("BOARDREADYOPS_BACKUP_SOURCE_DATABASE_URL");
+    expect(deployment).toContain("BOARDREADYOPS_BACKUP_RESTORE_DATABASE_URL");
+    expect(deployment).toContain("BOARDREADYOPS_BACKUP_RESTORE_CONFIRMATION=isolated-empty-database");
+    expect(deployment).toContain("pnpm run cloud:backup:verify");
+    expect(deployment).toContain("must be empty");
+    expect(deployment).toContain("Passwords are passed through PostgreSQL client environment variables");
+    expect(deployment).toContain("mode `0600`");
+    expect(deployment).toContain("without inheriting unrelated service secrets");
+    expect(deployment).toContain("representative row counts");
+    expect(deployment).toContain("/api/health/ready");
+    expect(deployment).toContain("does not verify optional managed artifact bytes");
+  });
+
   it("documents guarded runner lease lifecycle transitions", () => {
     const lifecycle = fs.readFileSync("docs/product/run-lifecycle.md", "utf8");
 
