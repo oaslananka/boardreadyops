@@ -44,6 +44,8 @@ function baseRunRow(overrides: Record<string, unknown> = {}): Record<string, unk
     github_check_published_at: null,
     github_comment_published_at: null,
     last_publication_error: null,
+    repository_id: "7b000000-0000-4000-8000-000000000002",
+    installation_id: "7b000000-0000-4000-8000-000000000001",
     owner: "octo",
     name: "board",
     private: false,
@@ -83,6 +85,35 @@ describe("run dashboard data", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it("binds the initial run lookup to an explicit installation and repository scope", async () => {
+    const installationId = "7b000000-0000-4000-8000-000000000011";
+    const repositoryId = "7b000000-0000-4000-8000-000000000012";
+    const { executor, query } = executorWithResults([{ rows: [] }]);
+
+    await expect(
+      lookupRunDashboard("run-scoped", executor, { scope: { installationId, repositoryId } }),
+    ).resolves.toEqual({ state: "not-found" });
+
+    expect(String(query.mock.calls[0]?.[0])).toContain("repositories.installation_id = $2");
+    expect(String(query.mock.calls[0]?.[0])).toContain("repositories.id = $3");
+    expect(query.mock.calls[0]?.[1]).toEqual(["run-scoped", installationId, repositoryId]);
+  });
+
+  it("rejects malformed dashboard scopes before database access", async () => {
+    const { executor, query } = executorWithResults([]);
+
+    await expect(
+      lookupRunDashboard("run-scoped", executor, {
+        scope: {
+          installationId: "not-a-uuid",
+          repositoryId: "7b000000-0000-4000-8000-000000000012",
+        },
+      }),
+    ).resolves.toEqual({ state: "not-found" });
+
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it.each([
     true,
     null,
@@ -120,7 +151,13 @@ describe("run dashboard data", () => {
       state: "found",
       run: { repository: "private-org/hardware", repositoryPrivate: true },
     });
-    expect(authorizeRepository).toHaveBeenCalledWith({ owner: "private-org", name: "hardware", private: true });
+    expect(authorizeRepository).toHaveBeenCalledWith({
+      id: "7b000000-0000-4000-8000-000000000002",
+      installationId: "7b000000-0000-4000-8000-000000000001",
+      owner: "private-org",
+      name: "hardware",
+      private: true,
+    });
     expect(query).toHaveBeenCalledTimes(7);
   });
 
