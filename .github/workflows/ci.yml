@@ -187,6 +187,7 @@ jobs:
     timeout-minutes: 25
     env:
       BOARDREADYOPS_POSTGRES_TESTS: "true"
+      BOARDREADYOPS_BACKUP_RESTORE_TESTS: "true"
       DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_test
     services:
       postgres:
@@ -234,6 +235,8 @@ jobs:
             echo "::error::Expected KiCad ${{ matrix.kicad-version }}.*, got ${version}"
             exit 1
           fi
+      - name: Install PostgreSQL client
+        run: sudo apt-get install --yes postgresql-client
       - run: pnpm install --frozen-lockfile
       - name: Apply cloud migrations
         run: pnpm --filter @boardreadyops/db db:migrate

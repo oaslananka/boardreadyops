@@ -277,3 +277,33 @@ pnpm --filter @boardreadyops/db db:migrate:dry-run
 ```
 
 The migration runner records applied versions in `cloud_schema_migrations`; migrations are designed to be idempotent and safe to re-run.
+
+## PostgreSQL backup verification and restore drill
+
+The initial GitHub Cloud GA engineering targets are a **15-minute recovery point objective** for PostgreSQL state and a **60-minute recovery time objective** from incident declaration to an isolated, database-backed ready service. These are validation targets, not a contractual service-level agreement. They must be revisited after measured backup duration, restore duration, database size, and queue-recovery evidence are available.
+
+`pnpm run cloud:backup:verify` creates a native custom-format PostgreSQL backup and restores it into a separately provisioned database. The restore database must be empty, must not be the source database, and should use the same PostgreSQL major version as production. The verifier refuses a relative backup path, an existing backup file, a non-empty target, a source schema that is behind the repository migration set, or a restore whose migrations, public tables, or representative row counts differ from the source.
+
+Create a fresh isolated target database with dedicated credentials. Do not point the verifier at a shared staging database, a production replica, or any database containing retained data. Supply database URLs at execution time from Doppler or an equivalent restricted secret injection path; do not add these one-shot values to `deploy/.env`, repository files, shell history, CI artifacts, or logs. Passwords are passed through PostgreSQL client environment variables and are not included in `pg_dump` or `pg_restore` command arguments.
+
+```bash
+export BOARDREADYOPS_BACKUP_SOURCE_DATABASE_URL='<injected-source-url>'
+export BOARDREADYOPS_BACKUP_RESTORE_DATABASE_URL='<injected-empty-restore-url>'
+export BOARDREADYOPS_BACKUP_PATH='/restricted/boardreadyops-control-plane.dump'
+export BOARDREADYOPS_BACKUP_RESTORE_CONFIRMATION=isolated-empty-database
+pnpm run cloud:backup:verify
+```
+
+The command requires `pg_dump` and `pg_restore`, uses `--format=custom`, `--no-owner`, `--no-privileges`, and `--exit-on-error`, creates the dump with mode `0600` without inheriting unrelated service secrets, and emits only a bounded JSON summary containing backup size, migration count, public-table count, and aggregate representative row counts. It does not print connection strings, tenant identifiers, repository names, findings, payloads, artifact paths, or database command output.
+
+After the automated restore succeeds, complete the service-readiness portion of the drill in the isolated environment:
+
+1. Point an isolated web and worker deployment at `BOARDREADYOPS_BACKUP_RESTORE_DATABASE_URL`; do not change the production deployment.
+2. Run `pnpm --filter @boardreadyops/db db:migrate:dry-run` and require no unexpected pending or divergent migration.
+3. Start the isolated web and worker processes from the same immutable release image as production.
+4. Require the web health endpoint and worker `/api/health/ready` response to report ready.
+5. Verify a known restored run and attempt through tenant-scoped database or dashboard access without exposing private findings or source content.
+6. Record backup age, dump duration, restore duration, readiness duration, database size, and any reconciliation backlog in the private operational evidence system.
+7. Destroy the isolated database and restricted backup file after evidence capture unless a documented retention or legal-hold requirement applies.
+
+This verifier covers PostgreSQL schema and representative control-plane state. It does not verify optional managed artifact bytes, local artifact-volume snapshots, external object storage, reverse-proxy logs, platform logs, or backup-provider retention. Those storage classes require separate encrypted backup, restore, expiry, and deletion-proof drills before issue #222 can be closed.
