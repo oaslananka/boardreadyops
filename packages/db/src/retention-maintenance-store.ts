@@ -8,6 +8,8 @@ export type RetentionMaintenanceStore = {
   purgeTerminalArtifactUploadCapabilities(input: { retentionDays: number; limit?: number }): Promise<number>;
   purgeTerminalRunnerRegistrationEnrollments(input: { retentionDays: number; limit?: number }): Promise<number>;
   purgeTerminalRepositorySetupProbes(input: { retentionDays: number; limit?: number }): Promise<number>;
+  purgeCompletedControlPlaneOutbox(input: { retentionDays: number; limit?: number }): Promise<number>;
+  purgeCompletedControlPlaneReconciliationItems(input: { retentionDays: number; limit?: number }): Promise<number>;
 };
 
 export type RetentionMaintenanceStoreOptions = {
@@ -254,6 +256,44 @@ export function createSqlRetentionMaintenanceStore(
            using terminal
            where repository_setup_probes.id = terminal.id
            returning repository_setup_probes.id
+         )
+         select count(*)::int as affected from deleted`,
+        [cutoff, limit],
+      );
+      return nonNegativeInteger(rows(result)[0]?.affected);
+    },
+
+    async purgeCompletedControlPlaneOutbox(input) {
+      const cutoff = retentionCutoff(now(), input.retentionDays);
+      const limit = boundedLimit(input.limit, defaultBatchSize);
+      const result = await executor.query(
+        `select boardreadyops_purge_completed_control_plane_outbox(
+           $1::timestamptz,
+           $2::integer
+         )::int as affected`,
+        [cutoff, limit],
+      );
+      return nonNegativeInteger(rows(result)[0]?.affected);
+    },
+
+    async purgeCompletedControlPlaneReconciliationItems(input) {
+      const cutoff = retentionCutoff(now(), input.retentionDays);
+      const limit = boundedLimit(input.limit, defaultBatchSize);
+      const result = await executor.query(
+        `with terminal as (
+           select control_plane_reconciliation_items.id
+           from control_plane_reconciliation_items
+           where control_plane_reconciliation_items.status = 'completed'
+             and control_plane_reconciliation_items.completed_at <= $1::timestamptz
+           order by control_plane_reconciliation_items.completed_at asc,
+                    control_plane_reconciliation_items.id asc
+           for update skip locked
+           limit $2::integer
+         ), deleted as (
+           delete from control_plane_reconciliation_items
+           using terminal
+           where control_plane_reconciliation_items.id = terminal.id
+           returning control_plane_reconciliation_items.id
          )
          select count(*)::int as affected from deleted`,
         [cutoff, limit],

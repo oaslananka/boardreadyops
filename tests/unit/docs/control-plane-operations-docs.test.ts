@@ -56,6 +56,19 @@ describe("control-plane operator documentation", () => {
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE=1000");
   });
 
+  it("documents bounded completed control-plane history retention", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+    const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
+
+    expect(deployment).toContain("BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS");
+    expect(deployment).toContain("defaults to 90 days");
+    expect(deployment).toContain("completed outbox effects");
+    expect(deployment).toContain("completed reconciliation items");
+    expect(deployment).toContain("dead-letter and reconciliation-required records");
+    expect(deployment).toContain("retained reconciliation references");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS=90");
+  });
+
   it("documents bounded artifact upload capability expiry", () => {
     const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
     const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");

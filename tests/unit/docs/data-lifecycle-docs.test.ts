@@ -27,6 +27,10 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("Pending artifact upload capabilities are marked expired");
     expect(lifecycle).toContain("unconsumed enrollment tokens are revoked");
     expect(lifecycle).toContain("terminal artifact capability");
+    expect(lifecycle).toContain("BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS");
+    expect(lifecycle).toContain("completed outbox effects");
+    expect(lifecycle).toContain("completed reconciliation items");
+    expect(lifecycle).toContain("dead-letter and reconciliation-required records are preserved");
     expect(lifecycle).toContain("does not remove release runs");
     expect(lifecycle).toContain("GitHub Actions execution boundary");
     expect(lifecycle).toContain("Customer self-hosted runner boundary");

@@ -76,6 +76,7 @@ describe("control-plane webhook retention configuration", () => {
     expect(resolveControlPlaneRetentionConfiguration({})).toEqual({
       webhookInboxDays: 30,
       ephemeralRecordsDays: 30,
+      controlPlaneHistoryDays: 90,
     });
   });
 
@@ -83,14 +84,17 @@ describe("control-plane webhook retention configuration", () => {
     expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: " 90 " })).toEqual({
       webhookInboxDays: 90,
       ephemeralRecordsDays: 30,
+      controlPlaneHistoryDays: 90,
     });
     expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: "1" })).toEqual({
       webhookInboxDays: 1,
       ephemeralRecordsDays: 30,
+      controlPlaneHistoryDays: 90,
     });
     expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_WEBHOOK_RETENTION_DAYS: "3650" })).toEqual({
       webhookInboxDays: 3650,
       ephemeralRecordsDays: 30,
+      controlPlaneHistoryDays: 90,
     });
   });
 
@@ -103,14 +107,15 @@ describe("control-plane webhook retention configuration", () => {
   it("accepts an explicit bounded terminal ephemeral record retention period", () => {
     expect(
       resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: " 45 " }),
-    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 45 });
+    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 45, controlPlaneHistoryDays: 90 });
     expect(resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: "1" })).toEqual({
       webhookInboxDays: 30,
       ephemeralRecordsDays: 1,
+      controlPlaneHistoryDays: 90,
     });
     expect(
       resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: "3650" }),
-    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 3650 });
+    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 3650, controlPlaneHistoryDays: 90 });
   });
 
   it.each([
@@ -123,6 +128,30 @@ describe("control-plane webhook retention configuration", () => {
     expect(() =>
       resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: value }),
     ).toThrowError(expect.objectContaining({ code: "invalid-ephemeral-record-retention-days" }));
+  });
+
+  it("accepts an explicit bounded completed control-plane history retention period", () => {
+    expect(
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS: " 180 " }),
+    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 30, controlPlaneHistoryDays: 180 });
+    expect(
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS: "1" }),
+    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 30, controlPlaneHistoryDays: 1 });
+    expect(
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS: "3650" }),
+    ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 30, controlPlaneHistoryDays: 3650 });
+  });
+
+  it.each([
+    "0",
+    "3651",
+    "1.5",
+    "ninety",
+    "",
+  ])("rejects invalid completed control-plane history retention value %s", (value) => {
+    expect(() =>
+      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS: value }),
+    ).toThrowError(expect.objectContaining({ code: "invalid-control-plane-history-retention-days" }));
   });
 });
 
