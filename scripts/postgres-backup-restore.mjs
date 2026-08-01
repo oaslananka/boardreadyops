@@ -141,7 +141,9 @@ function sameArray(left, right) {
 }
 
 function sameCounts(left, right) {
-  const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])].sort();
+  const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])].sort((leftKey, rightKey) =>
+    leftKey.localeCompare(rightKey),
+  );
   return keys.every((key) => left[key] === right[key]);
 }
 
@@ -278,10 +280,12 @@ async function main() {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(
       `${error instanceof Error ? error.message : "PostgreSQL backup restore verification failed"}\n`,
     );
     process.exitCode = 1;
-  });
+  }
 }
