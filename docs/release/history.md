@@ -8,6 +8,15 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.25.1](https://github.com/oaslananka/boardreadyops/compare/v1.25.0...v1.25.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **ci:** keep release pull request history verified ([#298](https://github.com/oaslananka/boardreadyops/issues/298)) ([a00cde0](https://github.com/oaslananka/boardreadyops/commit/a00cde09085e5101cd2298a54e5bfa5f84c1b982))
+* **ci:** satisfy release rewrite reliability checks ([#299](https://github.com/oaslananka/boardreadyops/issues/299)) ([4b89274](https://github.com/oaslananka/boardreadyops/commit/4b8927488fcffa27ea68063242186a420848b8ca))
+* **core:** retain bounded control-plane history ([#295](https://github.com/oaslananka/boardreadyops/issues/295)) ([7218206](https://github.com/oaslananka/boardreadyops/commit/72182064909328b373beb745bec3b6feb327cfaa))
+
 ## [1.25.0](https://github.com/oaslananka/boardreadyops/compare/v1.24.1...v1.25.0) (2026-08-01)
 
 
