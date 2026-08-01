@@ -16,9 +16,16 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain('require-kicad: "true"');
     expect(workflow).toContain("project: $" + "{{ vars.BOARDREADYOPS_PROJECT || '' }}");
     expect(workflow).toContain("config: $" + "{{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}");
-    expect(workflow).toContain("uses: oaslananka/boardreadyops@bf9ce0981c93c2d5bdafa80049fa5460c566013d");
+    expect(workflow).toContain("uses: oaslananka/boardreadyops@ce925376bd71daf7e07f31fb1bb19a8bde30b172");
     expect(workflow).toContain("safe-mode: $" + "{{ inputs.safe_mode }}");
     expect(workflow).not.toContain("runner-ready");
+  });
+
+  it("pins the setup probe to the current verified release", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain("ref: ce925376bd71daf7e07f31fb1bb19a8bde30b172 # v1.24.1");
+    expect(workflow).toContain('if [ "$tool_version" != "1.24.1" ]');
   });
 
   it("uses GitHub OIDC without a shared cloud secret", async () => {
