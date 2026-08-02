@@ -10,7 +10,12 @@ export type ControlPlaneLoadThresholds = {
 
 export type ControlPlaneLoadConfiguration = {
   databaseUrl: string;
-  profile: "representative" | "soak-recovery" | "database-interruption" | "worker-process-interruption";
+  profile:
+    | "representative"
+    | "soak-recovery"
+    | "database-interruption"
+    | "worker-process-interruption"
+    | "github-api-interruption";
   recoveryRounds: number;
   uniqueDeliveries: number;
   duplicateDeliveries: number;
@@ -64,6 +69,17 @@ export type ControlPlaneLoadWorkerProcessRecoveryReport = {
   maximumConvergenceMs: number;
 };
 
+export type ControlPlaneLoadGitHubApiRecoveryReport = {
+  roundsRequested: number;
+  roundsCompleted: number;
+  serviceUnavailableResponses: number;
+  rateLimitResponses: number;
+  retriesScheduled: number;
+  successfulConvergences: number;
+  requestsObserved: number;
+  maximumConvergenceMs: number;
+};
+
 export type ControlPlaneLoadReport = {
   event: "control_plane_load_verified";
   scenario: Omit<ControlPlaneLoadConfiguration, "databaseUrl" | "thresholds">;
@@ -73,6 +89,7 @@ export type ControlPlaneLoadReport = {
   recovery?: ControlPlaneLoadRecoveryReport;
   databaseRecovery?: ControlPlaneLoadDatabaseRecoveryReport;
   workerProcessRecovery?: ControlPlaneLoadWorkerProcessRecoveryReport;
+  githubApiRecovery?: ControlPlaneLoadGitHubApiRecoveryReport;
   signals: readonly string[];
   invariants: {
     acceptedDeliveries: number;
@@ -117,6 +134,7 @@ export type ControlPlaneLoadDependencies = {
   createSqlRunnerTerminalResultAuthorizer: typeof import("../packages/db/src/runner-terminal-result-store.js").createSqlRunnerTerminalResultAuthorizer;
   createSqlTransactionalGitHubAppLifecycleStore: typeof import("../packages/db/src/transactional-lifecycle-store.js").createSqlTransactionalGitHubAppLifecycleStore;
   processControlPlaneWorkflowReconciliation: typeof import("../apps/web/lib/control-plane-reconciliation-worker.js").processControlPlaneWorkflowReconciliation;
+  readGitHubWorkflowRun: typeof import("../apps/web/lib/github-workflow-reconciliation-client.js").readGitHubWorkflowRun;
   lookupRunDashboard: typeof import("../apps/web/lib/run-dashboard.js").lookupRunDashboard;
 };
 

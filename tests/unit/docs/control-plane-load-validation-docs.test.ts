@@ -25,6 +25,10 @@ describe("control-plane load validation documentation", () => {
     expect(documentation).toContain("soak-recovery");
     expect(documentation).toContain("database-interruption");
     expect(documentation).toContain("worker-process-interruption");
+    expect(documentation).toContain("github-api-interruption");
+    expect(documentation).toContain("503");
+    expect(documentation).toContain("429");
+    expect(documentation).toContain("loopback HTTP");
     expect(documentation).toContain("SIGKILL");
     expect(documentation).toContain("child process");
     expect(documentation).toContain("lease reclaim");
@@ -43,6 +47,7 @@ describe("control-plane load validation documentation", () => {
     expect(workflow).toContain("recovery_rounds:");
     expect(workflow).toContain("database-interruption");
     expect(workflow).toContain("worker-process-interruption");
+    expect(workflow).toContain("github-api-interruption");
     expect(workflow).toContain("BOARDREADYOPS_LOAD_PROFILE");
     expect(workflow).toContain("postgres:16-alpine");
     expect(workflow).toContain("POSTGRES_HOST_AUTH_METHOD: trust");

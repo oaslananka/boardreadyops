@@ -77,6 +77,20 @@ describe("control-plane load configuration", () => {
     });
   });
 
+  it("accepts an explicit GitHub API interruption profile", () => {
+    expect(
+      parseControlPlaneLoadConfiguration(
+        configuredEnvironment({
+          BOARDREADYOPS_LOAD_PROFILE: "github-api-interruption",
+          BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "2",
+        }),
+      ),
+    ).toMatchObject({
+      profile: "github-api-interruption",
+      recoveryRounds: 2,
+    });
+  });
+
   it("accepts an explicit worker-process-interruption profile", () => {
     expect(
       parseControlPlaneLoadConfiguration(
@@ -120,7 +134,7 @@ describe("control-plane load configuration", () => {
     expect(() =>
       parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_PROFILE: "chaos" })),
     ).toThrow(
-      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, or worker-process-interruption",
+      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, worker-process-interruption, or github-api-interruption",
     );
 
     expect(() =>
@@ -458,6 +472,76 @@ describe("control-plane worker process interruption evidence", () => {
       "worker_process_lease_reclaim_incomplete",
       "worker_process_completion_incomplete",
       "worker_process_recovery_convergence_exceeded",
+    ]);
+  });
+});
+
+describe("control-plane GitHub API interruption evidence", () => {
+  it("rejects incomplete GitHub API recovery with stable signal names", () => {
+    const report = {
+      event: "control_plane_load_verified" as const,
+      scenario: {
+        profile: "github-api-interruption" as const,
+        recoveryRounds: 2,
+        uniqueDeliveries: 20,
+        duplicateDeliveries: 5,
+        repositoryCount: 2,
+        runsPerRepository: 5,
+        concurrency: 4,
+      },
+      intake: { count: 25, elapsedMs: 100, throughputPerSecond: 250, p50Ms: 2, p95Ms: 5, p99Ms: 7, maximumMs: 8 },
+      lifecycle: { count: 30, elapsedMs: 120, throughputPerSecond: 250, p50Ms: 2, p95Ms: 6, p99Ms: 8, maximumMs: 9 },
+      dashboard: { count: 4, elapsedMs: 20, throughputPerSecond: 200, p50Ms: 2, p95Ms: 4, p99Ms: 4, maximumMs: 4 },
+      recovery: {
+        roundsRequested: 2,
+        roundsCompleted: 2,
+        jobLeaseRecoveries: 2,
+        staleJobCompletionsRejected: 2,
+        outboxRetries: 2,
+        uncertainOutboxQuarantines: 2,
+        delayedCallbackRepairs: 2,
+        staleAttemptResultsRejected: 2,
+        maximumConvergenceMs: 50,
+        deadLetters: 0,
+        ambiguousNonterminalStates: 0,
+      },
+      githubApiRecovery: {
+        roundsRequested: 2,
+        roundsCompleted: 1,
+        serviceUnavailableResponses: 1,
+        rateLimitResponses: 1,
+        retriesScheduled: 2,
+        successfulConvergences: 1,
+        requestsObserved: 3,
+        maximumConvergenceMs: 6_000,
+      },
+      invariants: {
+        acceptedDeliveries: 20,
+        duplicateDeliveries: 5,
+        completedJobs: 20,
+        releaseRuns: 10,
+        completedOutboxEffects: 10,
+        scopedDashboardReads: 4,
+        crossTenantMismatches: 0,
+      },
+    };
+
+    expect(
+      evaluateControlPlaneLoadReport(report, {
+        intakeP95Ms: 1_000,
+        lifecycleP95Ms: 1_500,
+        dashboardP95Ms: 1_000,
+        minimumThroughputPerSecond: 10,
+        recoveryMaxConvergenceMs: 5_000,
+      }),
+    ).toEqual([
+      "github_api_recovery_rounds_incomplete",
+      "github_api_service_unavailable_incomplete",
+      "github_api_rate_limit_incomplete",
+      "github_api_retries_incomplete",
+      "github_api_convergence_incomplete",
+      "github_api_requests_incomplete",
+      "github_api_recovery_convergence_exceeded",
     ]);
   });
 });
