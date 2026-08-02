@@ -151,6 +151,14 @@ interface Policy {
 ---
 
 
+### RunnerRegistration and RunnerJobLease
+
+A customer-hosted runner registration is tenant-scoped through `installationId`. It stores lifecycle state, capability and repository-scope policy, the public verification key, `lastHeartbeatAt`, and the last successfully reported strict `major.minor.patch` agent version. The private signing key and enrollment token are never stored in the control-plane data model.
+
+A valid signed claim poll updates `lastHeartbeatAt` and, when supplied, the reported version even when no job is available. Replay, invalid identity, capability mismatch, and rejected minimum-version requests do not update presence. `RunnerJobLease` remains bound to one release run, current execution attempt, worker identity, bounded expiry, and hashed lease token.
+
+The operator fleet-health read model is computed per installation from aggregate registration presence, self-hosted-policy queue age, active unexpired leases, and version counts. It does not select repository names, source metadata, allowed-repository patterns, key material, fingerprints, or individual runner identifiers.
+
 ### WebhookInbox
 
 A minimized, durable record of one verified provider delivery. `(provider, deliveryId)` is unique. It stores routing metadata, the raw-body SHA-256 digest, and bounded normalized lifecycle actions; it never stores webhook signatures, authorization headers, or raw request bodies.
@@ -191,7 +199,7 @@ No artifact binary content passes through the API server on download.
 
 The data model is designed to be database-agnostic (no PostgreSQL-specific types in the schema above). Migration considerations:
 
-- **Schema versioning**: additive SQL migrations are recorded in `cloud_schema_migrations`; schema version 15 introduces the durable webhook inbox and control-plane jobs.
+- **Schema versioning**: additive SQL migrations are recorded in `cloud_schema_migrations`; schema version 37 includes aggregate runner-fleet visibility and last-reported agent versions; earlier migrations remain additive and ordered.
 - **Multi-region**: findings and artifacts are append-only; replication to read replicas is straightforward.
 - **Tenant isolation**: all queries filter by `installationId`; adding row-level security (RLS) in PostgreSQL does not require schema changes.
 - **Artifact store swap**: `storagePath` is internal. Switching from Vercel Blob to R2 or S3 requires a data migration script but no schema change.

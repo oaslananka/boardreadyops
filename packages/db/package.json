@@ -46,6 +46,11 @@
       "import": "./src/runner-artifact-store.ts",
       "default": "./src/runner-artifact-store.ts"
     },
+    "./runner-fleet-health-store": {
+      "types": "./src/runner-fleet-health-store.ts",
+      "import": "./src/runner-fleet-health-store.ts",
+      "default": "./src/runner-fleet-health-store.ts"
+    },
     "./runner-lease-store": {
       "types": "./src/runner-lease-store.ts",
       "import": "./src/runner-lease-store.ts",
