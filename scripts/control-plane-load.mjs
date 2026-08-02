@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 
 export const CONTROL_PLANE_LOAD_CONFIRMATION = "isolated-disposable-database";
@@ -47,10 +48,11 @@ export function parseControlPlaneLoadConfiguration(environment = process.env) {
     profile !== "representative" &&
     profile !== "soak-recovery" &&
     profile !== "database-interruption" &&
-    profile !== "worker-process-interruption"
+    profile !== "worker-process-interruption" &&
+    profile !== "github-api-interruption"
   ) {
     throw new Error(
-      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, or worker-process-interruption",
+      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, worker-process-interruption, or github-api-interruption",
     );
   }
 
@@ -161,6 +163,9 @@ export function evaluateControlPlaneLoadReport(report, thresholds = defaultThres
   if (report.scenario.profile === "worker-process-interruption") {
     signals.push(...evaluateWorkerProcessRecoveryEvidence(report, thresholds));
   }
+  if (report.scenario.profile === "github-api-interruption") {
+    signals.push(...evaluateGitHubApiRecoveryEvidence(report, thresholds));
+  }
   return signals;
 }
 
@@ -209,6 +214,21 @@ function evaluateWorkerProcessRecoveryEvidence(report, thresholds) {
       "worker_process_recovery_convergence_exceeded",
       recovery?.maximumConvergenceMs <= thresholds.recoveryMaxConvergenceMs,
     ],
+  ];
+  return checks.filter(([, passed]) => !passed).map(([signal]) => signal);
+}
+
+function evaluateGitHubApiRecoveryEvidence(report, thresholds) {
+  const recovery = report.githubApiRecovery;
+  const rounds = report.scenario.recoveryRounds;
+  const checks = [
+    ["github_api_recovery_rounds_incomplete", recovery?.roundsCompleted >= rounds],
+    ["github_api_service_unavailable_incomplete", recovery?.serviceUnavailableResponses >= rounds],
+    ["github_api_rate_limit_incomplete", recovery?.rateLimitResponses >= rounds],
+    ["github_api_retries_incomplete", recovery?.retriesScheduled >= rounds * 2],
+    ["github_api_convergence_incomplete", recovery?.successfulConvergences >= rounds],
+    ["github_api_requests_incomplete", recovery?.requestsObserved >= rounds * 3],
+    ["github_api_recovery_convergence_exceeded", recovery?.maximumConvergenceMs <= thresholds.recoveryMaxConvergenceMs],
   ];
   return checks.filter(([, passed]) => !passed).map(([signal]) => signal);
 }
@@ -615,7 +635,91 @@ async function validateOutboxRecovery(input) {
   return { outboxRetries: 1, uncertainOutboxQuarantines: 1 };
 }
 
-async function validateDelayedCallbackRecovery(input) {
+function listenOnLoopback(server) {
+  return new Promise((resolve, reject) => {
+    const onError = (error) => {
+      server.removeListener("listening", onListening);
+      reject(error);
+    };
+    const onListening = () => {
+      server.removeListener("error", onError);
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        reject(new Error("GitHub API fault server did not expose a TCP address"));
+        return;
+      }
+      resolve(`http://127.0.0.1:${address.port}`);
+    };
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(0, "127.0.0.1");
+  });
+}
+
+function closeLoopbackServer(server) {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+async function withGitHubApiFaultServer(operation) {
+  const evidence = {
+    serviceUnavailableResponses: 0,
+    rateLimitResponses: 0,
+    requestsObserved: 0,
+  };
+  const server = createServer((request, response) => {
+    evidence.requestsObserved += 1;
+    response.setHeader("content-type", "application/json");
+    if (request.method !== "GET" || !request.url?.includes("/actions/runs/")) {
+      response.statusCode = 400;
+      response.end(JSON.stringify({ message: "unsupported synthetic request" }));
+      return;
+    }
+    if (evidence.requestsObserved === 1) {
+      evidence.serviceUnavailableResponses += 1;
+      response.statusCode = 503;
+      response.end(JSON.stringify({ message: "token=do-not-report private repository unavailable" }));
+      return;
+    }
+    if (evidence.requestsObserved === 2) {
+      evidence.rateLimitResponses += 1;
+      response.statusCode = 429;
+      response.setHeader("retry-after", "1");
+      response.end(JSON.stringify({ message: "private rate-limit detail must not be persisted" }));
+      return;
+    }
+    if (evidence.requestsObserved === 3) {
+      response.statusCode = 200;
+      response.end(
+        JSON.stringify({
+          status: "completed",
+          conclusion: "success",
+          html_url: "https://github.invalid/private/run",
+          head_commit: { message: "private commit message" },
+        }),
+      );
+      return;
+    }
+    response.statusCode = 500;
+    response.end(JSON.stringify({ message: "unexpected synthetic request count" }));
+  });
+  const apiBaseUrl = await listenOnLoopback(server);
+  try {
+    const result = await operation(apiBaseUrl);
+    if (evidence.requestsObserved !== 3) {
+      throw new Error("GitHub API fault server observed an unexpected request count");
+    }
+    return { ...result, ...evidence };
+  } finally {
+    await closeLoopbackServer(server);
+  }
+}
+
+async function seedWorkflowReconciliationSubject(input, label, commitOffset, workflowRunId) {
   const releaseRunId = randomUUID();
   const executionAttemptId = randomUUID();
   const staleAt = offsetDate(input.baseTime, -10 * 60_000);
@@ -628,8 +732,8 @@ async function validateDelayedCallbackRecovery(input) {
     [
       releaseRunId,
       input.repository.repositoryId,
-      `${input.prefix}:recovery-callback:${input.round}`,
-      syntheticCommitSha(input.prefix, input.repository.index, 30_000 + input.round),
+      `${input.prefix}:recovery-${label}:${input.round}`,
+      syntheticCommitSha(input.prefix, input.repository.index, commitOffset + input.round),
       staleAt.toISOString(),
       executionAttemptId,
     ],
@@ -640,7 +744,150 @@ async function validateDelayedCallbackRecovery(input) {
        dispatch_requested_at, dispatched_at, github_workflow_dispatch_id
      ) values ($1, $2, 1, 'dispatched', $3::timestamptz,
        $3::timestamptz, $3::timestamptz, $4)`,
-    [executionAttemptId, releaseRunId, staleAt.toISOString(), String(9_600_000_000 + input.round)],
+    [executionAttemptId, releaseRunId, staleAt.toISOString(), String(workflowRunId)],
+  );
+  return { releaseRunId, executionAttemptId };
+}
+
+async function assertWorkflowReconciliationConverged(input, releaseRunId) {
+  const state = databaseRows(
+    await input.executor.query(
+      `select rr.status as run_status, rra.status as attempt_status,
+              cpri.status as reconciliation_status, cpri.repaired
+         from release_runs rr
+         join release_run_attempts rra on rra.id = rr.execution_attempt_id
+         join control_plane_reconciliation_items cpri on cpri.release_run_id = rr.id
+        where rr.id = $1`,
+      [releaseRunId],
+    ),
+  )[0];
+  if (
+    state?.run_status !== "failed" ||
+    state?.attempt_status !== "failed" ||
+    state?.reconciliation_status !== "completed" ||
+    state?.repaired !== true
+  ) {
+    throw new Error("workflow reconciliation left ambiguous state");
+  }
+}
+
+async function validateGitHubApiRecoveryRound(input) {
+  const { releaseRunId } = await seedWorkflowReconciliationSubject(
+    input,
+    "github-api",
+    50_000,
+    9_700_000_000 + input.round,
+  );
+  const readGitHubWorkflowRun = requiredRecoveryDependency(input, "readGitHubWorkflowRun");
+  return withGitHubApiFaultServer(async (apiBaseUrl) => {
+    let now = input.baseTime;
+    const github = {
+      readWorkflowRun(scope) {
+        return readGitHubWorkflowRun({
+          apiBaseUrl,
+          token: syntheticSecret(`${input.prefix}:github-api:${input.round}`),
+          repositoryOwner: scope.repositoryOwner,
+          repositoryName: scope.repositoryName,
+          workflowRunId: scope.workflowRunId,
+        });
+      },
+    };
+    const createOperations = () =>
+      input.createSqlControlPlaneOperationsStore(input.executor, {
+        now: () => now,
+        leaseSeconds: 60,
+        retryBaseSeconds: 1,
+      });
+    let operations = createOperations();
+    const detected = await operations.detectWorkflowReconciliationCandidates({
+      observationDelaySeconds: 300,
+      terminalDeadlineSeconds: 1_800,
+      limit: 10,
+    });
+    if (detected !== 1) throw new Error("GitHub API recovery candidate was not detected");
+
+    const processAttempt = async (workerId, expectedAttemptCount) => {
+      operations = createOperations();
+      const item = (await operations.claimWorkflowReconciliationItems({ workerId, limit: 1 }))[0];
+      if (!item || item.releaseRunId !== releaseRunId || item.attemptCount !== expectedAttemptCount) {
+        throw new Error("GitHub API recovery item was not claimed at the expected attempt");
+      }
+      return input.processControlPlaneWorkflowReconciliation(item, {
+        workerId,
+        operations,
+        github,
+        now: () => now,
+        nextCheckSeconds: 1,
+      });
+    };
+
+    const first = await processAttempt(`${input.prefix}-github-api-503-${input.round}`, 1);
+    if (first.status !== "retry" || first.outcomeCode !== "github_lookup_failed") {
+      throw new Error("GitHub API 503 did not enter bounded retry");
+    }
+    now = offsetDate(input.baseTime, 2_000);
+    const second = await processAttempt(`${input.prefix}-github-api-429-${input.round}`, 2);
+    if (second.status !== "retry" || second.outcomeCode !== "github_lookup_failed") {
+      throw new Error("GitHub API 429 did not enter bounded retry");
+    }
+    now = offsetDate(input.baseTime, 1_300_000);
+    const final = await processAttempt(`${input.prefix}-github-api-success-${input.round}`, 3);
+    if (final.status !== "applied" || final.outcomeCode !== "github_result_callback_missing") {
+      throw new Error("GitHub API recovery did not converge after transient failures");
+    }
+    await assertWorkflowReconciliationConverged(input, releaseRunId);
+    return { retriesScheduled: 2, successfulConvergences: 1 };
+  });
+}
+
+async function runGitHubApiInterruptionValidation(configuration, input) {
+  const githubApiRecovery = {
+    roundsRequested: configuration.recoveryRounds,
+    roundsCompleted: 0,
+    serviceUnavailableResponses: 0,
+    rateLimitResponses: 0,
+    retriesScheduled: 0,
+    successfulConvergences: 0,
+    requestsObserved: 0,
+    maximumConvergenceMs: 0,
+  };
+  for (let round = 0; round < configuration.recoveryRounds; round += 1) {
+    const startedAt = performance.now();
+    const evidence = await validateGitHubApiRecoveryRound({
+      ...input,
+      round,
+      baseTime: new Date(Date.now() + 30_000 + round * 10_000),
+      repository: input.repositories[round % input.repositories.length],
+      createSqlControlPlaneOperationsStore: requiredRecoveryDependency(
+        input.dependencies,
+        "createSqlControlPlaneOperationsStore",
+      ),
+      processControlPlaneWorkflowReconciliation: requiredRecoveryDependency(
+        input.dependencies,
+        "processControlPlaneWorkflowReconciliation",
+      ),
+      readGitHubWorkflowRun: requiredRecoveryDependency(input.dependencies, "readGitHubWorkflowRun"),
+    });
+    githubApiRecovery.roundsCompleted += 1;
+    githubApiRecovery.serviceUnavailableResponses += evidence.serviceUnavailableResponses;
+    githubApiRecovery.rateLimitResponses += evidence.rateLimitResponses;
+    githubApiRecovery.retriesScheduled += evidence.retriesScheduled;
+    githubApiRecovery.successfulConvergences += evidence.successfulConvergences;
+    githubApiRecovery.requestsObserved += evidence.requestsObserved;
+    githubApiRecovery.maximumConvergenceMs = Math.max(
+      githubApiRecovery.maximumConvergenceMs,
+      rounded(performance.now() - startedAt),
+    );
+  }
+  return githubApiRecovery;
+}
+
+async function validateDelayedCallbackRecovery(input) {
+  const { releaseRunId } = await seedWorkflowReconciliationSubject(
+    input,
+    "callback",
+    30_000,
+    9_600_000_000 + input.round,
   );
 
   const workerId = `${input.prefix}-callback-${input.round}`;
@@ -687,25 +934,7 @@ async function validateDelayedCallbackRecovery(input) {
   if (repaired.status !== "applied" || repaired.outcomeCode !== "github_result_callback_missing") {
     throw new Error("delayed callback reconciliation did not converge");
   }
-  const state = databaseRows(
-    await input.executor.query(
-      `select rr.status as run_status, rra.status as attempt_status,
-              cpri.status as reconciliation_status, cpri.repaired
-         from release_runs rr
-         join release_run_attempts rra on rra.id = rr.execution_attempt_id
-         join control_plane_reconciliation_items cpri on cpri.release_run_id = rr.id
-        where rr.id = $1`,
-      [releaseRunId],
-    ),
-  )[0];
-  if (
-    state?.run_status !== "failed" ||
-    state?.attempt_status !== "failed" ||
-    state?.reconciliation_status !== "completed" ||
-    state?.repaired !== true
-  ) {
-    throw new Error("delayed callback reconciliation left ambiguous state");
-  }
+  await assertWorkflowReconciliationConverged(input, releaseRunId);
   return { delayedCallbackRepairs: 1 };
 }
 
@@ -1256,6 +1485,15 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
       configuration.concurrency,
       lookupRunDashboard,
     );
+    const githubApiRecovery =
+      configuration.profile === "github-api-interruption"
+        ? await runGitHubApiInterruptionValidation(configuration, {
+            executor,
+            prefix,
+            repositories,
+            dependencies,
+          })
+        : undefined;
     const workerProcessRecovery =
       configuration.profile === "worker-process-interruption"
         ? await runWorkerProcessInterruptionValidation(configuration, {
@@ -1320,6 +1558,7 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
       ...(recovery ? { recovery } : {}),
       ...(databaseRecovery ? { databaseRecovery } : {}),
       ...(workerProcessRecovery ? { workerProcessRecovery } : {}),
+      ...(githubApiRecovery ? { githubApiRecovery } : {}),
       invariants: {
         ...state,
         scopedDashboardReads: dashboard.scopedDashboardReads,
