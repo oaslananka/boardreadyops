@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.28.0](https://github.com/oaslananka/boardreadyops/compare/v1.27.1...v1.28.0) (2026-08-02)
+
+
+### Features
+
+* **cloud:** expose aggregate runner fleet health ([#314](https://github.com/oaslananka/boardreadyops/issues/314)) ([71e0f3b](https://github.com/oaslananka/boardreadyops/commit/71e0f3b9ae1ac7c9cc9e18e5b4b2f1e22a107b20)), refs [#41](https://github.com/oaslananka/boardreadyops/issues/41)
+
 ## [1.27.1](https://github.com/oaslananka/boardreadyops/compare/v1.27.0...v1.27.1) (2026-08-02)
 
 
