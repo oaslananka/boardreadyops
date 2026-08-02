@@ -4,6 +4,14 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.27.1](https://github.com/oaslananka/boardreadyops/compare/v1.27.0...v1.27.1) (2026-08-02)
+
+
+### Bug Fixes
+
+* **release:** make binary uploads resumable ([#311](https://github.com/oaslananka/boardreadyops/issues/311)) ([e026df9](https://github.com/oaslananka/boardreadyops/commit/e026df9107e1f9c8565a26ae98110b140f33f37b)), closes [#310](https://github.com/oaslananka/boardreadyops/issues/310)
+* **release:** repair assets for older tags ([#313](https://github.com/oaslananka/boardreadyops/issues/313)) ([df3186b](https://github.com/oaslananka/boardreadyops/commit/df3186bd6c45440086a4470b724057688792d4a3)), closes [#310](https://github.com/oaslananka/boardreadyops/issues/310)
+
 ## [1.27.0](https://github.com/oaslananka/boardreadyops/compare/v1.26.1...v1.27.0) (2026-08-02)
 
 
