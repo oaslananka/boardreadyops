@@ -10,7 +10,7 @@ export type ControlPlaneLoadThresholds = {
 
 export type ControlPlaneLoadConfiguration = {
   databaseUrl: string;
-  profile: "representative" | "soak-recovery" | "database-interruption";
+  profile: "representative" | "soak-recovery" | "database-interruption" | "worker-process-interruption";
   recoveryRounds: number;
   uniqueDeliveries: number;
   duplicateDeliveries: number;
@@ -54,6 +54,16 @@ export type ControlPlaneLoadDatabaseRecoveryReport = {
   maximumConvergenceMs: number;
 };
 
+export type ControlPlaneLoadWorkerProcessRecoveryReport = {
+  roundsRequested: number;
+  roundsCompleted: number;
+  childProcessesStarted: number;
+  childProcessesKilled: number;
+  abandonedLeasesReclaimed: number;
+  replacementCompletions: number;
+  maximumConvergenceMs: number;
+};
+
 export type ControlPlaneLoadReport = {
   event: "control_plane_load_verified";
   scenario: Omit<ControlPlaneLoadConfiguration, "databaseUrl" | "thresholds">;
@@ -62,6 +72,7 @@ export type ControlPlaneLoadReport = {
   dashboard: ControlPlaneLoadMeasurement;
   recovery?: ControlPlaneLoadRecoveryReport;
   databaseRecovery?: ControlPlaneLoadDatabaseRecoveryReport;
+  workerProcessRecovery?: ControlPlaneLoadWorkerProcessRecoveryReport;
   signals: readonly string[];
   invariants: {
     acceptedDeliveries: number;

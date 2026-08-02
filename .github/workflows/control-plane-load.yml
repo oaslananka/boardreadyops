@@ -12,8 +12,9 @@ on:
           - representative
           - soak-recovery
           - database-interruption
+          - worker-process-interruption
       recovery_rounds:
-        description: Bounded recovery rounds for soak-recovery
+        description: Bounded rounds for failure-recovery profiles
         required: true
         default: "3"
         type: string
