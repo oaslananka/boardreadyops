@@ -1,6 +1,7 @@
 import path from "node:path";
 import { issueRunnerEnrollment } from "../../../packages/db/src/runner-enrollment-admin.js";
 import type { RunnerRegistrationScope } from "../../../packages/db/src/runner-registration-enrollment-store.js";
+import { boardReadyVersion } from "../../generated/version.js";
 import { activateRunnerIdentity, defaultRunnerIdentityDirectory } from "../../runner/identity.js";
 import {
   defaultRunnerWorkspaceRoot,
@@ -165,6 +166,7 @@ export async function runnerServeCommand(options: RunnerWorkCliOptions, streams:
 function workerOptions(options: RunnerWorkCliOptions): RunnerWorkerOptions {
   return {
     identityFile: identityPath(options),
+    runnerVersion: boardReadyVersion,
     workspaceRoot: workspacePath(options),
     ...(options.repositoryMirrorRoot === undefined
       ? {}

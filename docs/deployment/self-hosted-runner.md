@@ -293,8 +293,10 @@ The production support contract is intentionally strict:
 
 - pin the runner to an exact BoardReadyOps release and record its digest or package provenance;
 - use Node.js 24 and a KiCad major supported by that BoardReadyOps release;
-- do not assume an older runner remains compatible with a newer control plane; and
-- until server-side minimum-version enforcement is implemented, treat the exact version validated with the deployed control-plane release as the only supported production version.
+- treat the exact version validated with the deployed control-plane release as the supported production version; and
+- configure `BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION` on the control plane when new claim requests from older runners must be rejected.
+
+The runner sends its strict `major.minor.patch` version with a dedicated Ed25519 extension signature while retaining the legacy primary signature for control-plane rollback compatibility. When the minimum is configured, a missing or lower version receives HTTP 426 before any lease or execution attempt is created. Managed-runner claims are unaffected. Enforcement is intentionally claim-time only: existing leases may drain through heartbeat, artifact, result, and relinquish requests during an upgrade. An invalid configured minimum makes `/api/health/ready` fail closed. This setting is deployment-wide; there is not yet a public per-registration minimum-version administration command.
 
 Roll out an upgrade one identity at a time. Before updating:
 
@@ -323,7 +325,7 @@ systemctl start boardreadyops-runner
 
 Record the old and new versions, artifact digests, identity ID, timestamps, and commissioning run ID without recording credentials or source.
 
-Rollback uses the same drain-and-stop procedure, restores the previous verified binary or image, and reuses the existing identity only when its schema is still supported. If identity loading fails closed, do not edit the JSON or private key in place. Use the deployment's authorized control-plane administration procedure to disable the registration, create a new one-time enrollment, activate a new identity, and remove the superseded private key through the customer secret-destruction process. There is not yet a public self-service key-rotation or minimum-version administration command. Copying or regenerating a private key outside enrollment is not a supported rotation procedure.
+Rollback uses the same drain-and-stop procedure, restores the previous verified binary or image, and reuses the existing identity only when its schema is still supported. If identity loading fails closed, do not edit the JSON or private key in place. Use the deployment's authorized control-plane administration procedure to disable the registration, create a new one-time enrollment, activate a new identity, and remove the superseded private key through the customer secret-destruction process. There is not yet a public self-service key-rotation or per-registration minimum-version administration command. Copying or regenerating a private key outside enrollment is not a supported rotation procedure.
 
 ## Private-repository acceptance evidence
 

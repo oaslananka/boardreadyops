@@ -15,6 +15,7 @@ import {
   runnerLeaseHeartbeatResponseSchema,
   runnerMutationResponseSchema,
   runnerRegistrationActivationResponseSchema,
+  runnerVersionSchema,
 } from "../../packages/contracts/src/index.js";
 
 export type RunnerFetch = typeof fetch;
@@ -22,6 +23,7 @@ export type RunnerFetch = typeof fetch;
 export type RunnerControlPlaneClientOptions = {
   baseUrl: string;
   runnerId: string;
+  runnerVersion: string;
   privateKey: KeyLike;
   fetch?: RunnerFetch;
   now?: () => Date;
@@ -51,6 +53,8 @@ const runnerProtocolHeaderNames = {
   algorithm: "x-boardreadyops-runner-algorithm",
   workerClass: "x-boardreadyops-runner-worker-class",
   runnerId: "x-boardreadyops-runner-id",
+  runnerVersion: "x-boardreadyops-runner-version",
+  runnerVersionSignature: "x-boardreadyops-runner-version-signature",
   timestamp: "x-boardreadyops-runner-timestamp",
   nonce: "x-boardreadyops-runner-nonce",
   signature: "x-boardreadyops-runner-signature",
@@ -71,6 +75,7 @@ export class RunnerControlPlaneError extends Error {
 export class RunnerControlPlaneClient {
   readonly baseUrl: URL;
   readonly runnerId: string;
+  readonly runnerVersion: string;
   readonly privateKey: KeyLike;
   readonly fetchImpl: RunnerFetch;
   readonly now: () => Date;
@@ -80,6 +85,7 @@ export class RunnerControlPlaneClient {
   constructor(options: RunnerControlPlaneClientOptions) {
     this.baseUrl = normalizeControlPlaneUrl(options.baseUrl);
     this.runnerId = options.runnerId;
+    this.runnerVersion = runnerVersionSchema.parse(options.runnerVersion);
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => new Date());
@@ -144,16 +150,21 @@ export class RunnerControlPlaneClient {
     const timestamp = Math.floor(this.now().valueOf() / 1000);
     const nonce = this.nonce();
     const canonicalPath = `${target.pathname}${target.search}`;
-    const signature = signRunnerRequest({
+    const signatureInput = {
       method: "POST",
       path: canonicalPath,
       timestamp,
       nonce,
-      workerClass: "self_hosted",
+      workerClass: "self_hosted" as const,
       runnerId: this.runnerId,
       body,
       privateKey: this.privateKey,
       ...context,
+    };
+    const signature = signRunnerRequest(signatureInput);
+    const runnerVersionSignature = signRunnerRequest({
+      ...signatureInput,
+      runnerVersion: this.runnerVersion,
     });
     const response = await this.fetchImpl(target, {
       method: "POST",
@@ -165,6 +176,8 @@ export class RunnerControlPlaneClient {
         [runnerProtocolHeaderNames.algorithm]: "ed25519",
         [runnerProtocolHeaderNames.workerClass]: "self_hosted",
         [runnerProtocolHeaderNames.runnerId]: this.runnerId,
+        [runnerProtocolHeaderNames.runnerVersion]: this.runnerVersion,
+        [runnerProtocolHeaderNames.runnerVersionSignature]: runnerVersionSignature,
         [runnerProtocolHeaderNames.timestamp]: String(timestamp),
         [runnerProtocolHeaderNames.nonce]: nonce,
         [runnerProtocolHeaderNames.signature]: signature,

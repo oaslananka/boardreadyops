@@ -5,6 +5,7 @@ const base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
 const capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
 const githubOwnerPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 const githubRepositoryPattern = /^[A-Za-z0-9_.-]{1,100}$/u;
+const strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 
 export const runnerProtocolVersionSchema = z.literal(1);
 export const runnerWorkerClassSchema = z.enum(["managed", "self_hosted"]);
@@ -13,6 +14,14 @@ export const runnerIdentifierSchema = z.string().regex(lowercaseUuidPattern, "id
 export const runnerRequestTimestampSchema = z.number().int().nonnegative().max(9_999_999_999);
 export const runnerRequestNonceSchema = z.string().min(22).max(128).regex(base64UrlPattern);
 export const runnerRequestSignatureSchema = z.string().length(86).regex(base64UrlPattern);
+export const runnerVersionSchema = z
+  .string()
+  .max(64)
+  .regex(strictVersionPattern)
+  .refine(
+    (value) => value.split(".").every((component) => Number.isSafeInteger(Number(component))),
+    "version components must be safe integers",
+  );
 export const runnerLeaseSecretSchema = z.string().min(43).max(256).regex(base64UrlPattern);
 export const runnerEnrollmentTokenSchema = z.string().min(43).max(256).regex(base64UrlPattern);
 export const runnerCapabilitySchema = z.string().trim().min(1).max(128).regex(capabilityPattern);
@@ -24,11 +33,22 @@ export const runnerSignedRequestEnvelopeSchema = z
     algorithm: runnerSigningAlgorithmSchema,
     workerClass: runnerWorkerClassSchema,
     runnerId: runnerIdentifierSchema,
+    runnerVersion: runnerVersionSchema.optional(),
+    runnerVersionSignature: runnerRequestSignatureSchema.optional(),
     timestamp: runnerRequestTimestampSchema,
     nonce: runnerRequestNonceSchema,
     signature: runnerRequestSignatureSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if ((value.runnerVersion === undefined) !== (value.runnerVersionSignature === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: [value.runnerVersion === undefined ? "runnerVersion" : "runnerVersionSignature"],
+        message: "runner version and version signature must be supplied together",
+      });
+    }
+  });
 
 export const runnerClaimRequestSchema = z
   .object({

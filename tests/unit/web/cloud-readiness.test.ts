@@ -25,6 +25,7 @@ describe("cloud readiness", () => {
           DATABASE_URL: "postgresql://example.invalid/boardreadyops",
           GITHUB_WEBHOOK_SECRET: "secret",
           BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "120",
+          BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: "1.26.1",
         },
         query,
       }),
@@ -38,6 +39,7 @@ describe("cloud readiness", () => {
       },
       effectiveConfiguration: {
         artifactCapabilityTtlSeconds: 120,
+        selfHostedRunnerMinimumVersion: "1.26.1",
       },
     });
     expect(query).toHaveBeenCalledWith("select 1 as ready");
@@ -53,6 +55,28 @@ describe("cloud readiness", () => {
           DATABASE_URL: "postgresql://example.invalid/boardreadyops",
           GITHUB_WEBHOOK_SECRET: "secret",
           BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: "0",
+        },
+        query,
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      service: "boardreadyops-cloud",
+      check: "readiness",
+      reason: "missing-configuration",
+    });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("fails readiness before PostgreSQL when the minimum runner version is invalid", async () => {
+    const query = vi.fn();
+
+    await expect(
+      checkCloudReadiness({
+        environment: {
+          NODE_ENV: "production",
+          DATABASE_URL: "postgresql://example.invalid/boardreadyops",
+          GITHUB_WEBHOOK_SECRET: "secret",
+          BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: "1.26",
         },
         query,
       }),

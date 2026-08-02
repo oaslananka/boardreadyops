@@ -33,7 +33,9 @@ describe("self-hosted runner deployment documentation", () => {
     const runner = await readFile(runnerUrl, "utf8");
 
     expect(runner).toContain("exact version validated with the deployed control-plane release");
-    expect(runner).toContain("server-side minimum-version enforcement is implemented");
+    expect(runner).toContain("BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION");
+    expect(runner).toContain("new claim requests");
+    expect(runner).toContain("existing leases may drain");
     expect(runner).toContain("Roll out an upgrade one identity at a time");
     expect(runner).toContain("run `boardreadyops doctor`");
     expect(runner).toContain("authorized control-plane administration procedure to disable the registration");

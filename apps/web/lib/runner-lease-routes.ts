@@ -13,12 +13,18 @@ import {
   type RunnerLeaseStore,
   type RunnerWorkerIdentity,
 } from "@boardreadyops/db/runner-lease-store";
+import {
+  CloudRuntimeConfigurationError,
+  compareStrictVersions,
+  resolveSelfHostedRunnerVersionConfiguration,
+} from "./cloud-runtime-config.js";
 import { authenticateRunnerRequest } from "./runner-request-auth.js";
 
 export type RunnerLeaseRouteDependencies = {
   queryExecutor: () => SqlQueryExecutor | undefined;
   createLeaseStore: (executor: SqlQueryExecutor) => RunnerLeaseStore;
   now: () => Date;
+  environment: Readonly<Record<string, string | undefined>>;
 };
 
 type ParsedBody = { ok: true; text: string; value: unknown } | { ok: false; response: Response };
@@ -66,6 +72,7 @@ const defaultDependencies: RunnerLeaseRouteDependencies = {
   queryExecutor: createDefaultQueryExecutor,
   createLeaseStore: (executor) => createSqlRunnerLeaseStore(executor),
   now: () => new Date(),
+  environment: process.env,
 };
 
 function unavailable(): Response {
@@ -97,6 +104,14 @@ export async function handleRunnerClaimRequest(
     return jsonResponse({ ok: false, error: "invalid runner claim request" }, 400);
   }
 
+  let versionConfiguration: ReturnType<typeof resolveSelfHostedRunnerVersionConfiguration>;
+  try {
+    versionConfiguration = resolveSelfHostedRunnerVersionConfiguration(dependencies.environment);
+  } catch (error) {
+    if (error instanceof CloudRuntimeConfigurationError) return unavailable();
+    throw error;
+  }
+
   const executor = dependencies.queryExecutor();
   if (!executor) return unavailable();
 
@@ -109,6 +124,19 @@ export async function handleRunnerClaimRequest(
   if (!authenticated) return unauthorized();
   if (!identityMatchesWorkerClass(authenticated.identity, parsed.data.workerClass)) {
     return jsonResponse({ ok: false, error: "runner worker class does not match the signed identity" }, 400);
+  }
+  if (parsed.data.workerClass === "self_hosted" && versionConfiguration.minimumVersion !== undefined) {
+    const runnerVersion = authenticated.envelope.runnerVersion;
+    if (runnerVersion === undefined || compareStrictVersions(runnerVersion, versionConfiguration.minimumVersion) < 0) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: "runner version is not supported",
+          minimumVersion: versionConfiguration.minimumVersion,
+        },
+        426,
+      );
+    }
   }
 
   const capabilities = eligibilityCapabilities(parsed.data.capabilities, parsed.data.labels);

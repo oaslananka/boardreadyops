@@ -16,6 +16,7 @@ import { checkoutRunnerSource } from "./source.js";
 
 export type RunnerWorkerOptions = {
   identityFile: string;
+  runnerVersion: string;
   workspaceRoot?: string;
   repositoryMirrorRoot?: string;
   heartbeatSeconds?: number;
@@ -76,6 +77,7 @@ export type RunnerWorkerDependencies = {
   createClient: (
     identity: LoadedRunnerIdentity,
     privateKey: Awaited<ReturnType<typeof loadRunnerPrivateKey>>,
+    runnerVersion: string,
   ) => RunnerWorkerClient;
   checkoutSource: typeof checkoutRunnerSource;
   executePipeline: (
@@ -91,10 +93,11 @@ export type RunnerWorkerDependencies = {
 const defaultDependencies: RunnerWorkerDependencies = {
   loadIdentity: loadRunnerIdentity,
   loadPrivateKey: loadRunnerPrivateKey,
-  createClient: (identity, privateKey) =>
+  createClient: (identity, privateKey, runnerVersion) =>
     new RunnerControlPlaneClient({
       baseUrl: identity.controlPlaneUrl,
       runnerId: identity.runnerId,
+      runnerVersion,
       privateKey,
     }),
   checkoutSource: checkoutRunnerSource,
@@ -117,7 +120,7 @@ export async function runRunnerWorkerOnce(
   const dependencies = { ...defaultDependencies, ...overrides };
   const identity = await dependencies.loadIdentity(options.identityFile);
   const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
-  const client = dependencies.createClient(identity, privateKey);
+  const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
   const workspaceRoot = path.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
   const claim = await client.claim({

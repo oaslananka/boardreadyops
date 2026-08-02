@@ -1,5 +1,8 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
+import { handleRunnerClaimRequest, type RunnerLeaseRouteDependencies } from "../../apps/web/lib/runner-lease-routes.js";
+import { runnerProtocolHeaderNames } from "../../apps/web/lib/runner-request-auth.js";
+import { signRunnerRequest } from "../../packages/cloud-core/src/runner-request-signature.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import {
   type ClaimRunnerJobResult,
@@ -144,6 +147,7 @@ async function createSelfHostedRunner(
   label: string,
   now: string,
   allowedRepositories: readonly string[],
+  publicKey = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA1111111111111111111111111111111111111111111=\n-----END PUBLIC KEY-----",
 ): Promise<string> {
   if (!executor) throw new Error("DATABASE_URL is required");
   const runnerId = randomUUID();
@@ -161,12 +165,57 @@ async function createSelfHostedRunner(
       `self-${label}-${runnerId}`,
       [...allowedRepositories],
       fingerprint(runnerId).slice(0, 32),
-      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA1111111111111111111111111111111111111111111=\n-----END PUBLIC KEY-----",
+      publicKey,
       JSON.stringify(["kicad:10"]),
       now,
     ],
   );
   return runnerId;
+}
+
+function signedSelfHostedClaim(input: {
+  runnerId: string;
+  privateKey: ReturnType<typeof generateKeyPairSync>["privateKey"];
+  now: string;
+  nonce: string;
+  runnerVersion?: string;
+}): Request {
+  const path = "/api/v1/runner/jobs/claim";
+  const body = JSON.stringify({
+    protocolVersion: 1,
+    workerClass: "self_hosted",
+    capabilities: ["kicad:10"],
+    labels: [],
+  });
+  const timestamp = requestTimestamp(input.now);
+  const signatureInput = {
+    method: "POST",
+    path,
+    timestamp,
+    nonce: input.nonce,
+    workerClass: "self_hosted" as const,
+    runnerId: input.runnerId,
+    body,
+    privateKey: input.privateKey,
+  };
+  const signature = signRunnerRequest(signatureInput);
+  const runnerVersionSignature =
+    input.runnerVersion === undefined
+      ? undefined
+      : signRunnerRequest({ ...signatureInput, runnerVersion: input.runnerVersion });
+  const headers = new Headers({ "content-type": "application/json" });
+  headers.set(runnerProtocolHeaderNames.protocolVersion, "1");
+  headers.set(runnerProtocolHeaderNames.algorithm, "ed25519");
+  headers.set(runnerProtocolHeaderNames.workerClass, "self_hosted");
+  headers.set(runnerProtocolHeaderNames.runnerId, input.runnerId);
+  if (input.runnerVersion !== undefined) {
+    headers.set(runnerProtocolHeaderNames.runnerVersion, input.runnerVersion);
+    headers.set(runnerProtocolHeaderNames.runnerVersionSignature, runnerVersionSignature ?? "");
+  }
+  headers.set(runnerProtocolHeaderNames.timestamp, String(timestamp));
+  headers.set(runnerProtocolHeaderNames.nonce, input.nonce);
+  headers.set(runnerProtocolHeaderNames.signature, signature);
+  return new Request(`https://boardreadyops.test${path}`, { method: "POST", headers, body });
 }
 
 function fixedStore(input: {
@@ -488,6 +537,91 @@ describeDatabase("runner lease PostgreSQL store", () => {
       ]);
     } finally {
       await cleanupTenant(tenant, managedIdentityId);
+    }
+  });
+
+  it("rejects an outdated signed self-hosted runner before PostgreSQL lease mutation", async () => {
+    const claimedAt = testTime(1500);
+    const tenant = await createTenant("lease-test-min-version", false);
+    const runId = await createQueuedRun(tenant, claimedAt);
+    await setExecutionPolicy(tenant, "self_hosted_required");
+    const keys = generateKeyPairSync("ed25519");
+    const publicKey = keys.publicKey.export({ type: "spki", format: "pem" }).toString();
+    const runnerId = await createSelfHostedRunner(
+      tenant,
+      "lease-test-min-version",
+      claimedAt,
+      [`${tenant.owner}/${tenant.name}`],
+      publicKey,
+    );
+    const attemptId = randomUUID();
+    const leaseId = randomUUID();
+    const leaseSecret = token("minimum-version");
+    const dependencies: RunnerLeaseRouteDependencies = {
+      queryExecutor: () => databaseExecutor(),
+      createLeaseStore: () => fixedStore({ now: claimedAt, ids: [attemptId, leaseId], tokens: [leaseSecret] }),
+      now: () => new Date(claimedAt),
+      environment: { BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: "1.26.1" },
+    };
+
+    try {
+      const rejected = await handleRunnerClaimRequest(
+        signedSelfHostedClaim({
+          runnerId,
+          privateKey: keys.privateKey,
+          now: claimedAt,
+          nonce: nonce("minimum-version-rejected"),
+          runnerVersion: "1.26.0",
+        }),
+        dependencies,
+      );
+      expect(rejected.status).toBe(426);
+      await expect(rejected.json()).resolves.toEqual({
+        ok: false,
+        error: "runner version is not supported",
+        minimumVersion: "1.26.1",
+      });
+
+      const rejectedState = rows(
+        await databaseExecutor().query(
+          `select
+             (select count(*)::int from release_run_attempts where run_id = $1) as attempts,
+             (select count(*)::int from runner_job_leases where run_id = $1) as leases,
+             (select count(*)::int from runner_request_nonces where runner_registration_id = $2) as nonces`,
+          [runId, runnerId],
+        ),
+      )[0];
+      expect(rejectedState).toEqual({ attempts: 0, leases: 0, nonces: 0 });
+
+      const accepted = await handleRunnerClaimRequest(
+        signedSelfHostedClaim({
+          runnerId,
+          privateKey: keys.privateKey,
+          now: claimedAt,
+          nonce: nonce("minimum-version-accepted"),
+          runnerVersion: "1.26.1",
+        }),
+        dependencies,
+      );
+      expect(accepted.status).toBe(200);
+      await expect(accepted.json()).resolves.toMatchObject({
+        protocolVersion: 1,
+        status: "claimed",
+        job: { runId, executionAttemptId: attemptId, leaseId, sourceMode: "customer_checkout" },
+      });
+
+      const acceptedState = rows(
+        await databaseExecutor().query(
+          `select
+             (select count(*)::int from release_run_attempts where run_id = $1) as attempts,
+             (select count(*)::int from runner_job_leases where run_id = $1) as leases,
+             (select count(*)::int from runner_request_nonces where runner_registration_id = $2) as nonces`,
+          [runId, runnerId],
+        ),
+      )[0];
+      expect(acceptedState).toEqual({ attempts: 1, leases: 1, nonces: 1 });
+    } finally {
+      await cleanupTenant(tenant);
     }
   });
 

@@ -74,12 +74,14 @@ describe("control-plane operator documentation", () => {
     const deploymentEnvironment = fs.readFileSync("deploy/env.example", "utf8");
 
     expect(deployment).toContain("BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS");
+    expect(deployment).toContain("BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION");
     expect(deployment).toContain("defaults to 900 seconds");
     expect(deployment).toContain("60 through 3600 seconds");
     expect(deployment).toContain("does not rewrite persisted `expires_at` deadlines");
     expect(deployment).toContain("already issued capabilities");
     expect(deployment).toContain("artifactCapabilityTtlSeconds");
     expect(deploymentEnvironment).toContain("BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS=900");
+    expect(deploymentEnvironment).toContain("BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION=1.26.1");
   });
 
   it("documents immutable safe-mode binding for runner claims", () => {

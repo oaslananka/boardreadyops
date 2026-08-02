@@ -3,7 +3,12 @@ import { GET as getLive } from "../../../apps/web/app/api/health/live/route.js";
 import { GET as getReady } from "../../../apps/web/app/api/health/ready/route.js";
 import { GET as getHealth } from "../../../apps/web/app/api/health/route.js";
 
-const trackedEnvironmentNames = ["DATABASE_URL", "GITHUB_WEBHOOK_SECRET", "BOARDREADYOPS_PERSISTENCE_MODE"] as const;
+const trackedEnvironmentNames = [
+  "DATABASE_URL",
+  "GITHUB_WEBHOOK_SECRET",
+  "BOARDREADYOPS_PERSISTENCE_MODE",
+  "BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION",
+] as const;
 const originalEnvironment = new Map(trackedEnvironmentNames.map((name) => [name, process.env[name]]));
 
 afterEach(() => {
