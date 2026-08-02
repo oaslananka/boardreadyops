@@ -9,9 +9,35 @@ describe("runner CLI surface", () => {
 
     expect(streams.stdoutText()).toContain("issue-enrollment");
     expect(streams.stdoutText()).toContain("activate");
+    expect(streams.stdoutText()).toContain("revoke-registration");
+    expect(streams.stdoutText()).not.toContain("reissue-enrollment");
     expect(streams.stdoutText()).toContain("once");
     expect(streams.stdoutText()).toContain("serve");
     expect(streams.stdoutText()).toContain("customer-controlled self-hosted worker");
+  });
+
+  it("rejects free-form revocation reasons as usage errors", async () => {
+    const streams = captureStreams();
+    expect(
+      await runCli(
+        [
+          "runner",
+          "revoke-registration",
+          "--database-url-file",
+          "/tmp/database-url",
+          "--installation-id",
+          "11111111-1111-4111-8111-111111111111",
+          "--registration-id",
+          "22222222-2222-4222-8222-222222222222",
+          "--actor-id",
+          "operator:release-engineering",
+          "--reason",
+          "free-form-incident-detail",
+        ],
+        streams,
+      ),
+    ).toBe(2);
+    expect(streams.stderrText()).toContain("Runner revocation reason must be one of");
   });
 
   it("rejects runner intervals greater than five minutes as usage errors", async () => {

@@ -12,11 +12,12 @@ const publicKey = `-----BEGIN PUBLIC KEY-----\n${"A".repeat(44)}\n-----END PUBLI
 const query = vi.fn();
 const issueEnrollment = vi.fn();
 const activateRegistration = vi.fn();
+const revokeRegistration = vi.fn();
 const queryExecutor = vi.fn(() => ({ query }));
 
 const dependencies: RunnerRegistrationActivationRouteDependencies = {
   queryExecutor,
-  createEnrollmentStore: () => ({ issueEnrollment, activateRegistration }),
+  createEnrollmentStore: () => ({ issueEnrollment, activateRegistration, revokeRegistration }),
 };
 
 function activationBody(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -45,6 +46,7 @@ beforeEach(() => {
   query.mockReset();
   issueEnrollment.mockReset();
   activateRegistration.mockReset();
+  revokeRegistration.mockReset();
   queryExecutor.mockClear();
   activateRegistration.mockResolvedValue({
     status: "accepted",

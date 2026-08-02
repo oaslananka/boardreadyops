@@ -80,6 +80,26 @@ Scopes:
 
 Enrollment tokens expire after 15 minutes by default and may be configured up to one hour. The output file is created exclusively with mode `0600`; an existing file is never overwritten. Transfer it through an approved secret-delivery channel and remove the administrative copy after activation.
 
+
+## Permanently revoke and replace a runner identity
+
+Run revocation only from the trusted Linux control-plane administration host. The database URL remains in the root-only file; the command returns only the result status, registration ID, revoked pending-token count, and revocation timestamp.
+
+```bash
+boardreadyops runner revoke-registration \
+  --database-url-file /var/lib/boardreadyops-admin/database-url \
+  --installation-id 11111111-1111-4111-8111-111111111111 \
+  --registration-id 22222222-2222-4222-8222-222222222222 \
+  --actor-id operator:release-engineering \
+  --reason suspected-compromise
+```
+
+Accepted reasons are `credential-rotation`, `host-decommissioned`, `policy-change`, `operator-request`, and `suspected-compromise`. Keep incident details in the restricted incident system rather than the reason or actor fields.
+
+Revocation is tenant-scoped, idempotent, and permanent. It disables the registration, revokes every unconsumed enrollment token, and appends one audit event. The revoked registration is never reactivated: its public key, fingerprint, capabilities, activation timestamp, leases, results, and audit history remain attached to the disabled registration for investigation and retention processing. Existing active leases are not reassigned in place; they converge through normal result, relinquishment, expiry, and reconciliation paths.
+
+For planned credential rotation, issue and activate the replacement first with `boardreadyops runner issue-enrollment`, using a new unique runner name. Commission the replacement, switch routing, drain the old identity, then revoke the old registration. For suspected compromise, revoke the old registration first and then issue a replacement. In both cases the replacement receives a new registration ID; never copy, regenerate, or edit the old private key or identity JSON to simulate rotation.
+
 ## Activate the customer runner
 
 Create a private token file on the customer runner host, then activate once:
@@ -368,7 +388,7 @@ systemctl start boardreadyops-runner
 
 Record the old and new versions, artifact digests, identity ID, timestamps, and commissioning run ID without recording credentials or source.
 
-Rollback uses the same drain-and-stop procedure, restores the previous verified binary or image, and reuses the existing identity only when its schema is still supported. If identity loading fails closed, do not edit the JSON or private key in place. Use the deployment's authorized control-plane administration procedure to disable the registration, create a new one-time enrollment, activate a new identity, and remove the superseded private key through the customer secret-destruction process. There is not yet a public self-service key-rotation or per-registration minimum-version administration command. Copying or regenerating a private key outside enrollment is not a supported rotation procedure.
+Rollback uses the same drain-and-stop procedure, restores the previous verified binary or image, and reuses the existing identity only when its schema is still supported. If identity loading fails closed, do not edit the JSON or private key in place. Issue a replacement under a new unique runner name, activate and commission its new registration ID, then use `boardreadyops runner revoke-registration` for the superseded registration and remove the old private key through the customer secret-destruction process. There is no public self-service key-rotation or per-registration minimum-version administration command. Copying or regenerating a private key outside enrollment is not a supported rotation procedure.
 
 ## Private-repository acceptance evidence
 

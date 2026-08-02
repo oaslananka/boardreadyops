@@ -6,6 +6,7 @@ import path from "node:path";
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 import {
   createSqlRunnerRegistrationEnrollmentStore,
+  type RunnerRegistrationRevocationReason,
   type RunnerRegistrationScope,
 } from "./runner-registration-enrollment-store.js";
 
@@ -23,6 +24,21 @@ export type IssuedRunnerEnrollment = {
   registrationId: string;
   expiresAt: string;
   tokenOutputFile: string;
+};
+
+export type RevokeRunnerRegistrationOptions = {
+  databaseUrlFile: string;
+  installationId: string;
+  registrationId: string;
+  actorId: string;
+  reason: RunnerRegistrationRevocationReason;
+};
+
+export type RevokedRunnerRegistration = {
+  status: "accepted" | "replayed";
+  registrationId: string;
+  revokedEnrollmentCount: number;
+  revokedAt: string;
 };
 
 export type IssueRunnerEnrollmentDependencies = {
@@ -88,10 +104,32 @@ export async function issueRunnerEnrollment(
   }
 }
 
-async function executePsqlQuery(databaseUrl: string, sql: string, params: readonly unknown[]): Promise<SqlQueryResult> {
-  if (!sql.includes("boardreadyops_issue_runner_registration_enrollment") || params.length !== 9) {
-    throw new Error("runner enrollment administration received an unsupported database query");
+export async function revokeRunnerRegistration(
+  options: RevokeRunnerRegistrationOptions,
+  overrides: Partial<Pick<IssueRunnerEnrollmentDependencies, "query">> = {},
+): Promise<RevokedRunnerRegistration> {
+  const dependencies = { ...defaultDependencies, ...overrides };
+  const databaseUrlFile = path.resolve(options.databaseUrlFile);
+  await assertPrivateFile(databaseUrlFile, "database URL file");
+  const databaseUrl = (await readFile(databaseUrlFile, "utf8")).trim();
+  validateDatabaseUrl(databaseUrl);
+  const executor: SqlQueryExecutor = {
+    query: async (sql, params = []) => await dependencies.query(databaseUrl, sql, params),
+  };
+  const result = await createSqlRunnerRegistrationEnrollmentStore(executor).revokeRegistration({
+    installationId: options.installationId,
+    registrationId: options.registrationId,
+    actorId: options.actorId,
+    reason: options.reason,
+  });
+  if (result.status === "stale") {
+    throw new Error("runner registration revocation was rejected as invalid or stale");
   }
+  return result;
+}
+
+async function executePsqlQuery(databaseUrl: string, sql: string, params: readonly unknown[]): Promise<SqlQueryResult> {
+  const invocation = psqlInvocation(sql, params);
   const connection = parseDatabaseConnection(databaseUrl);
   const secretDirectory = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-psql-"));
   const passwordFile = path.join(secretDirectory, "pgpass");
@@ -107,7 +145,6 @@ async function executePsqlQuery(databaseUrl: string, sql: string, params: readon
       },
     );
     if (process.platform !== "win32") await chmod(passwordFile, 0o600);
-    const variables = psqlVariables(params);
     const result = await runPsql({
       environment: {
         ...process.env,
@@ -118,7 +155,8 @@ async function executePsqlQuery(databaseUrl: string, sql: string, params: readon
         PGPASSFILE: passwordFile,
         ...connection.environment,
       },
-      variables,
+      variables: invocation.variables,
+      statement: invocation.statement,
     });
     let row: unknown;
     try {
@@ -138,30 +176,10 @@ async function executePsqlQuery(databaseUrl: string, sql: string, params: readon
 async function runPsql(input: {
   environment: NodeJS.ProcessEnv;
   variables: Readonly<Record<string, string>>;
+  statement: string;
 }): Promise<{ stdout: string; stderr: string }> {
   const args = ["--no-psqlrc", "--quiet", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1"];
   for (const [name, value] of Object.entries(input.variables)) args.push(`--set=${name}=${value}`);
-  const statement = `
-with issued as (
-  select * from boardreadyops_issue_runner_registration_enrollment(
-    :'issued_at'::timestamptz,
-    :'installation_id',
-    :'registration_id',
-    :'enrollment_id',
-    :'registration_name',
-    :'registration_scope',
-    array(select jsonb_array_elements_text(:'allowed_repositories'::jsonb)),
-    :'token_digest',
-    :'expires_at'::timestamptz
-  )
-)
-select json_build_object(
-  'outcome', outcome,
-  'registration_id', registration_id,
-  'effective_expires_at', effective_expires_at
-)::text
-from issued;
-`;
   return await new Promise((resolve, reject) => {
     const environment = fixedPsqlEnvironment(input.environment);
     const child = spawnPsql(args, environment);
@@ -201,7 +219,7 @@ from issued;
       }
       resolve({ stdout, stderr });
     });
-    child.stdin.end(statement);
+    child.stdin.end(input.statement);
   });
 }
 
@@ -223,7 +241,22 @@ function spawnPsql(args: readonly string[], environment: NodeJS.ProcessEnv): Chi
   });
 }
 
-function psqlVariables(params: readonly unknown[]): Record<string, string> {
+type PsqlInvocation = {
+  variables: Readonly<Record<string, string>>;
+  statement: string;
+};
+
+function psqlInvocation(sql: string, params: readonly unknown[]): PsqlInvocation {
+  if (sql.includes("boardreadyops_issue_runner_registration_enrollment") && params.length === 9) {
+    return issuePsqlInvocation(params);
+  }
+  if (sql.includes("boardreadyops_revoke_runner_registration") && params.length === 5) {
+    return revokePsqlInvocation(params);
+  }
+  throw new Error("runner enrollment administration received an unsupported database query");
+}
+
+function issuePsqlInvocation(params: readonly unknown[]): PsqlInvocation {
   const [issuedAt, installationId, registrationId, enrollmentId, name, scope, repositories, digest, expiresAt] = params;
   if (
     typeof issuedAt !== "string" ||
@@ -240,15 +273,78 @@ function psqlVariables(params: readonly unknown[]): Record<string, string> {
     throw new Error("runner enrollment database parameters were invalid");
   }
   return {
-    issued_at: issuedAt,
-    installation_id: installationId,
-    registration_id: registrationId,
-    enrollment_id: enrollmentId,
-    registration_name: name,
-    registration_scope: scope,
-    allowed_repositories: JSON.stringify(repositories),
-    token_digest: digest,
-    expires_at: expiresAt,
+    variables: {
+      issued_at: issuedAt,
+      installation_id: installationId,
+      registration_id: registrationId,
+      enrollment_id: enrollmentId,
+      registration_name: name,
+      registration_scope: scope,
+      allowed_repositories: JSON.stringify(repositories),
+      token_digest: digest,
+      expires_at: expiresAt,
+    },
+    statement: `
+with issued as (
+  select * from boardreadyops_issue_runner_registration_enrollment(
+    :'issued_at'::timestamptz,
+    :'installation_id',
+    :'registration_id',
+    :'enrollment_id',
+    :'registration_name',
+    :'registration_scope',
+    array(select jsonb_array_elements_text(:'allowed_repositories'::jsonb)),
+    :'token_digest',
+    :'expires_at'::timestamptz
+  )
+)
+select json_build_object(
+  'outcome', outcome,
+  'registration_id', registration_id,
+  'effective_expires_at', effective_expires_at
+)::text
+from issued;
+`,
+  };
+}
+
+function revokePsqlInvocation(params: readonly unknown[]): PsqlInvocation {
+  const [revokedAt, installationId, registrationId, actorId, reason] = params;
+  if (
+    typeof revokedAt !== "string" ||
+    typeof installationId !== "string" ||
+    typeof registrationId !== "string" ||
+    typeof actorId !== "string" ||
+    typeof reason !== "string"
+  ) {
+    throw new Error("runner revocation database parameters were invalid");
+  }
+  return {
+    variables: {
+      revoked_at: revokedAt,
+      installation_id: installationId,
+      registration_id: registrationId,
+      actor_id: actorId,
+      reason,
+    },
+    statement: `
+with revoked as (
+  select * from boardreadyops_revoke_runner_registration(
+    :'revoked_at'::timestamptz,
+    :'installation_id',
+    :'registration_id',
+    :'actor_id',
+    :'reason'
+  )
+)
+select json_build_object(
+  'outcome', outcome,
+  'registration_id', registration_id,
+  'revoked_enrollment_count', revoked_enrollment_count,
+  'revoked_at', revoked_at
+)::text
+from revoked;
+`,
   };
 }
 
