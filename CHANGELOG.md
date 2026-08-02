@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.29.0](https://github.com/oaslananka/boardreadyops/compare/v1.28.0...v1.29.0) (2026-08-02)
+
+
+### Features
+
+* **core:** permanently revoke runner registrations ([#316](https://github.com/oaslananka/boardreadyops/issues/316)) ([7a21f27](https://github.com/oaslananka/boardreadyops/commit/7a21f27d515b60efcd6ec3e2f4ca793ea1b254a6)), closes [#41](https://github.com/oaslananka/boardreadyops/issues/41)
+
 ## [1.28.0](https://github.com/oaslananka/boardreadyops/compare/v1.27.1...v1.28.0) (2026-08-02)
 
 
