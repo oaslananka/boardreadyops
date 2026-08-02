@@ -1,0 +1,99 @@
+name: control-plane-scale-envelope
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-scale-envelope-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate (${{ matrix.preset }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [baseline, medium, high]
+    env:
+      DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_scale
+      BOARDREADYOPS_LOAD_CONFIRMATION: isolated-disposable-database
+      BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "3"
+      BOARDREADYOPS_LOAD_INTAKE_P95_MS: "1000"
+      BOARDREADYOPS_LOAD_LIFECYCLE_P95_MS: "1500"
+      BOARDREADYOPS_LOAD_DASHBOARD_P95_MS: "1000"
+      BOARDREADYOPS_LOAD_MINIMUM_THROUGHPUT_PER_SECOND: "10"
+      BOARDREADYOPS_LOAD_RECOVERY_MAX_CONVERGENCE_MS: "5000"
+      BOARDREADYOPS_LOAD_REPORT_PATH: control-plane-load-report.json
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: boardreadyops
+          POSTGRES_DB: boardreadyops_scale
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boardreadyops -d boardreadyops_scale"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Configure measured scale preset
+        run: node scripts/control-plane-scale-envelope.mjs env "${{ matrix.preset }}" "$GITHUB_ENV"
+      - name: Apply cloud migrations
+        run: pnpm --filter @boardreadyops/db db:migrate
+      - name: Validate scale preset
+        run: pnpm run cloud:load:verify
+      - name: Upload tier report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: control-plane-scale-${{ matrix.preset }}
+          path: control-plane-load-report.json
+          if-no-files-found: error
+          retention-days: 30
+
+  summarize:
+    name: summarize
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: control-plane-scale-*
+          path: scale-reports
+      - name: Build aggregate scale evidence
+        run: >-
+          node scripts/control-plane-scale-envelope.mjs summarize
+          scale-reports control-plane-scale-envelope.json
+      - name: Upload aggregate scale evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: control-plane-scale-envelope
+          path: control-plane-scale-envelope.json
+          if-no-files-found: error
+          retention-days: 30
