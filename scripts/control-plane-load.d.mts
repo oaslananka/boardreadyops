@@ -10,7 +10,7 @@ export type ControlPlaneLoadThresholds = {
 
 export type ControlPlaneLoadConfiguration = {
   databaseUrl: string;
-  profile: "representative" | "soak-recovery";
+  profile: "representative" | "soak-recovery" | "database-interruption";
   recoveryRounds: number;
   uniqueDeliveries: number;
   duplicateDeliveries: number;
@@ -44,6 +44,16 @@ export type ControlPlaneLoadRecoveryReport = {
   ambiguousNonterminalStates: number;
 };
 
+export type ControlPlaneLoadDatabaseRecoveryReport = {
+  roundsRequested: number;
+  roundsCompleted: number;
+  backendTerminations: number;
+  interruptedTransactionsRejected: number;
+  transactionRollbacksVerified: number;
+  replacementConnectionsEstablished: number;
+  maximumConvergenceMs: number;
+};
+
 export type ControlPlaneLoadReport = {
   event: "control_plane_load_verified";
   scenario: Omit<ControlPlaneLoadConfiguration, "databaseUrl" | "thresholds">;
@@ -51,6 +61,7 @@ export type ControlPlaneLoadReport = {
   lifecycle: ControlPlaneLoadMeasurement;
   dashboard: ControlPlaneLoadMeasurement;
   recovery?: ControlPlaneLoadRecoveryReport;
+  databaseRecovery?: ControlPlaneLoadDatabaseRecoveryReport;
   signals: readonly string[];
   invariants: {
     acceptedDeliveries: number;
@@ -78,7 +89,15 @@ export function evaluateControlPlaneLoadReport(
   report: Omit<ControlPlaneLoadReport, "signals">,
   thresholds?: ControlPlaneLoadThresholds,
 ): string[];
+export type PostgresInterruptionClient = {
+  connect(): Promise<void>;
+  query(sql: string, params?: unknown[]): Promise<{ rows?: Array<Record<string, unknown>> }>;
+  end(): Promise<void>;
+  on(event: "error", listener: (error: Error) => void): unknown;
+};
+
 export type ControlPlaneLoadDependencies = {
+  createPostgresClient?: (options: { connectionString: string }) => PostgresInterruptionClient;
   createPgQueryExecutor: typeof import("../packages/db/src/pg-executor.js").createPgQueryExecutor;
   createSqlControlPlaneJobStore: typeof import("../packages/db/src/control-plane-job-store.js").createSqlControlPlaneJobStore;
   createSqlControlPlaneOutboxStore: typeof import("../packages/db/src/control-plane-outbox-store.js").createSqlControlPlaneOutboxStore;

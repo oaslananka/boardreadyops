@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { processControlPlaneWorkflowReconciliation } from "../../apps/web/lib/control-plane-reconciliation-worker.js";
 import { lookupRunDashboard } from "../../apps/web/lib/run-dashboard.js";
@@ -15,6 +16,18 @@ import {
 } from "../../scripts/control-plane-load.mjs";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
+type InterruptionClient = {
+  connect(): Promise<void>;
+  query(sql: string, params?: unknown[]): Promise<{ rows?: Array<Record<string, unknown>> }>;
+  end(): Promise<void>;
+  on(event: "error", listener: (error: Error) => void): unknown;
+};
+
+const require = createRequire(import.meta.url);
+const { Client } = require("pg") as {
+  Client: new (options: { connectionString: string }) => InterruptionClient;
+};
+
 const connectionString = getPostgresTestConnectionString();
 const loadValidationEnabled = process.env.BOARDREADYOPS_CONTROL_PLANE_LOAD_TESTS === "true";
 const describeLoad = connectionString && loadValidationEnabled ? describe : describe.skip;
@@ -27,6 +40,7 @@ describeLoad("control-plane PostgreSQL load validation", () => {
       DATABASE_URL: connectionString,
     });
     const report = await runControlPlaneLoadValidation(configuration, {
+      createPostgresClient: (options) => new Client(options),
       createPgQueryExecutor,
       createSqlControlPlaneJobStore,
       createSqlControlPlaneOutboxStore,
@@ -53,7 +67,7 @@ describeLoad("control-plane PostgreSQL load validation", () => {
       scopedDashboardReads: configuration.repositoryCount * 2,
       crossTenantMismatches: 0,
     });
-    if (configuration.profile === "soak-recovery") {
+    if (configuration.profile !== "representative") {
       expect(report.recovery).toEqual(
         expect.objectContaining({
           roundsRequested: configuration.recoveryRounds,
@@ -71,6 +85,21 @@ describeLoad("control-plane PostgreSQL load validation", () => {
       expect(report.recovery?.maximumConvergenceMs).toBeGreaterThanOrEqual(0);
     } else {
       expect(report.recovery).toBeUndefined();
+    }
+    if (configuration.profile === "database-interruption") {
+      expect(report.databaseRecovery).toEqual(
+        expect.objectContaining({
+          roundsRequested: configuration.recoveryRounds,
+          roundsCompleted: configuration.recoveryRounds,
+          backendTerminations: configuration.recoveryRounds,
+          interruptedTransactionsRejected: configuration.recoveryRounds,
+          transactionRollbacksVerified: configuration.recoveryRounds,
+          replacementConnectionsEstablished: configuration.recoveryRounds,
+        }),
+      );
+      expect(report.databaseRecovery?.maximumConvergenceMs).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(report.databaseRecovery).toBeUndefined();
     }
   }, 120_000);
 });
