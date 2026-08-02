@@ -65,9 +65,127 @@ describe("binary build scripts", () => {
     expect(releaseAssetsJob).not.toContain("pnpm run build:binary -- --target");
     expect(releaseAssetsJob).toContain("pnpm run build:binary:assets");
     expect(releaseAssetsJob).toContain("Verify release asset publication");
-    expect(releaseAssetsJob).toContain("gh release upload");
-    expect(releaseAssetsJob).toContain("gh release create");
+    expect(releaseAssetsJob).toContain("pnpm run build:binary:publish");
+    expect(releaseAssetsJob).not.toContain("gh release upload");
+    expect(releaseAssetsJob).not.toContain("gh release create");
     expect(releaseAssetsJob).not.toContain("softprops/action-gh-release");
+  });
+
+  it("publishes release assets with bounded concurrency, idempotent clobber, and bounded retry", async () => {
+    const root = await makeBinaryAssetFixture();
+    await writeFile(path.join(root, "SHA256SUMS"), "checksums");
+    await writeFile(path.join(root, "sbom.cyclonedx.json"), "sbom");
+
+    try {
+      const { publishBinaryReleaseAssets } = await import("../../../scripts/publish-binary-release-assets.mjs");
+      const calls: string[][] = [];
+      const attempts = new Map<string, number>();
+      let active = 0;
+      let maximumActive = 0;
+
+      const result = await publishBinaryReleaseAssets({
+        root,
+        releaseTag: "v1.27.0",
+        concurrency: 3,
+        maxAttempts: 3,
+        sleep: async () => undefined,
+        runGh: async (args: string[]) => {
+          calls.push(args);
+          if (args[1] === "view") throw new Error("release not found");
+          if (args[1] === "create") return;
+          const asset = path.basename(args[3] ?? "");
+          const attempt = (attempts.get(asset) ?? 0) + 1;
+          attempts.set(asset, attempt);
+          active += 1;
+          maximumActive = Math.max(maximumActive, active);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          active -= 1;
+          if (asset === "boardreadyops-linux-x64" && attempt === 1) {
+            throw new Error("transient upload failure");
+          }
+        },
+      });
+
+      expect(calls.filter((args) => args[1] === "create")).toHaveLength(1);
+      expect(calls.filter((args) => args[1] === "upload")).toHaveLength(8);
+      expect(calls.filter((args) => args[1] === "upload").every((args) => args.includes("--clobber"))).toBe(true);
+      expect(maximumActive).toBeGreaterThan(1);
+      expect(maximumActive).toBeLessThanOrEqual(3);
+      expect(attempts.get("boardreadyops-linux-x64")).toBe(2);
+      expect(result).toEqual({ uploaded: 7, attempts: 8, maximumConcurrency: 3 });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("recovers when a transient release lookup races with an already-existing release", async () => {
+    const root = await makeBinaryAssetFixture();
+    await writeFile(path.join(root, "SHA256SUMS"), "checksums");
+    await writeFile(path.join(root, "sbom.cyclonedx.json"), "sbom");
+
+    try {
+      const { publishBinaryReleaseAssets } = await import("../../../scripts/publish-binary-release-assets.mjs");
+      let views = 0;
+      let creates = 0;
+      let uploads = 0;
+
+      await expect(
+        publishBinaryReleaseAssets({
+          root,
+          releaseTag: "v1.27.0",
+          concurrency: 2,
+          maxAttempts: 2,
+          sleep: async () => undefined,
+          runGh: async (args: string[]) => {
+            if (args[1] === "view") {
+              views += 1;
+              if (views === 1) throw new Error("transient release lookup failure");
+              return;
+            }
+            if (args[1] === "create") {
+              creates += 1;
+              throw new Error("release already exists");
+            }
+            if (args[1] === "upload") uploads += 1;
+          },
+        }),
+      ).resolves.toMatchObject({ uploaded: 7 });
+      expect(views).toBe(2);
+      expect(creates).toBe(1);
+      expect(uploads).toBe(7);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails after the configured upload attempt limit", async () => {
+    const root = await makeBinaryAssetFixture();
+    await writeFile(path.join(root, "SHA256SUMS"), "checksums");
+    await writeFile(path.join(root, "sbom.cyclonedx.json"), "sbom");
+
+    try {
+      const { publishBinaryReleaseAssets } = await import("../../../scripts/publish-binary-release-assets.mjs");
+      let uploadAttempts = 0;
+      await expect(
+        publishBinaryReleaseAssets({
+          root,
+          releaseTag: "v1.27.0",
+          concurrency: 1,
+          maxAttempts: 2,
+          sleep: async () => undefined,
+          runGh: async (args: string[]) => {
+            if (args[1] === "view") return;
+            if (args[1] === "upload") {
+              uploadAttempts += 1;
+              throw new Error("persistent upload failure");
+            }
+          },
+        }),
+      ).rejects.toThrow("failed to upload boardreadyops-linux-x64 after 2 attempts");
+      expect(uploadAttempts).toBe(2);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("generates checksums for every expected release asset", async () => {
