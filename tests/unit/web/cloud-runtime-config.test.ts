@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   CloudRuntimeConfigurationError,
+  compareStrictVersions,
   resolveArtifactCapabilityConfiguration,
   resolveCloudPersistenceConfiguration,
   resolveControlPlaneRetentionConfiguration,
+  resolveSelfHostedRunnerVersionConfiguration,
 } from "../../../apps/web/lib/cloud-runtime-config.js";
 
 describe("cloud runtime persistence configuration", () => {
@@ -176,5 +178,33 @@ describe("artifact upload capability configuration", () => {
     expect(() =>
       resolveArtifactCapabilityConfiguration({ BOARDREADYOPS_ARTIFACT_CAPABILITY_TTL_SECONDS: value }),
     ).toThrowError(expect.objectContaining({ code: "invalid-artifact-capability-ttl-seconds" }));
+  });
+});
+
+describe("self-hosted runner minimum-version configuration", () => {
+  it("keeps minimum-version enforcement disabled unless explicitly configured", () => {
+    expect(resolveSelfHostedRunnerVersionConfiguration({})).toEqual({ minimumVersion: undefined });
+  });
+
+  it("accepts strict stable semantic versions and compares numeric components", () => {
+    expect(
+      resolveSelfHostedRunnerVersionConfiguration({ BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: " 1.26.1 " }),
+    ).toEqual({ minimumVersion: "1.26.1" });
+    expect(compareStrictVersions("1.26.1", "1.26.1")).toBe(0);
+    expect(compareStrictVersions("1.27.0", "1.26.9")).toBeGreaterThan(0);
+    expect(compareStrictVersions("2.0.0", "10.0.0")).toBeLessThan(0);
+  });
+
+  it.each([
+    "",
+    "1.26",
+    "v1.26.1",
+    "01.26.1",
+    "1.26.1-beta.1",
+    "1.26.1+build",
+  ])("rejects invalid minimum runner version %s", (value) => {
+    expect(() =>
+      resolveSelfHostedRunnerVersionConfiguration({ BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: value }),
+    ).toThrowError(expect.objectContaining({ code: "invalid-self-hosted-runner-minimum-version" }));
   });
 });

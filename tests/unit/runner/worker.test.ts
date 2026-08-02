@@ -134,7 +134,10 @@ describe("runRunnerWorkerOnce", () => {
     const runnerClient = client(null);
     const overrides = dependencies(runnerClient.value);
 
-    const result = await runRunnerWorkerOnce({ identityFile: "/identity/runner.json" }, overrides);
+    const result = await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1" },
+      overrides,
+    );
 
     expect(result).toEqual({ status: "empty", retryAfterSeconds: 17 });
     expect(overrides.checkoutSource).not.toHaveBeenCalled();
@@ -209,7 +212,12 @@ describe("runRunnerWorkerOnce", () => {
     });
 
     const result = await runRunnerWorkerOnce(
-      { identityFile: "/identity/runner.json", workspaceRoot: "/workspaces", heartbeatSeconds: 30 },
+      {
+        identityFile: "/identity/runner.json",
+        runnerVersion: "1.26.1",
+        workspaceRoot: "/workspaces",
+        heartbeatSeconds: 30,
+      },
       overrides,
     );
 
@@ -308,7 +316,10 @@ describe("runRunnerWorkerOnce", () => {
       executePipeline: vi.fn(async () => execution),
     });
 
-    const result = await runRunnerWorkerOnce({ identityFile: "/identity/runner.json" }, overrides);
+    const result = await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1" },
+      overrides,
+    );
 
     expect(result).toMatchObject({ status: "completed", decision: "pass" });
     expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
@@ -378,7 +389,7 @@ notifiers:
     });
 
     const result = await runRunnerWorkerOnce(
-      { identityFile: "/identity/runner.json", keepWorkspace: true, requireKicad: false },
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", keepWorkspace: true, requireKicad: false },
       overrides,
     );
 
@@ -416,7 +427,7 @@ notifiers:
     });
 
     const result = await runRunnerWorkerOnce(
-      { identityFile: "/identity/runner.json", keepWorkspace: true, requireKicad: false },
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", keepWorkspace: true, requireKicad: false },
       overrides,
     );
 
@@ -438,9 +449,9 @@ notifiers:
     const runnerClient = client(claimedJob("broker"));
     const overrides = dependencies(runnerClient.value);
 
-    await expect(runRunnerWorkerOnce({ identityFile: "/identity/runner.json" }, overrides)).rejects.toThrow(
-      /managed source boundary/u,
-    );
+    await expect(
+      runRunnerWorkerOnce({ identityFile: "/identity/runner.json", runnerVersion: "1.26.1" }, overrides),
+    ).rejects.toThrow(/managed source boundary/u);
 
     expect(overrides.checkoutSource).not.toHaveBeenCalled();
     expect(runnerClient.relinquish).toHaveBeenCalledWith(
@@ -463,9 +474,9 @@ notifiers:
       }),
     });
 
-    await expect(runRunnerWorkerOnce({ identityFile: "/identity/runner.json" }, overrides)).rejects.toThrow(
-      /local analyzer failed/u,
-    );
+    await expect(
+      runRunnerWorkerOnce({ identityFile: "/identity/runner.json", runnerVersion: "1.26.1" }, overrides),
+    ).rejects.toThrow(/local analyzer failed/u);
 
     expect(runnerClient.relinquish).toHaveBeenCalledWith(
       expect.objectContaining({ reason: "job_error", message: "local analyzer failed" }),
@@ -484,7 +495,10 @@ notifiers:
       executePipeline: vi.fn(async () => ({ exitCode: 0, artifacts: [] })),
     });
 
-    await runRunnerWorkerOnce({ identityFile: "/identity/runner.json", keepWorkspace: true }, overrides);
+    await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", keepWorkspace: true },
+      overrides,
+    );
 
     expect(overrides.removeWorkspace).not.toHaveBeenCalled();
   });
@@ -503,7 +517,10 @@ notifiers:
       executePipeline: vi.fn(async () => ({ exitCode: 0, artifacts: [] })),
     });
 
-    await runRunnerWorkerOnce({ identityFile: "/identity/runner.json", keepWorkspace: true }, overrides);
+    await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", keepWorkspace: true },
+      overrides,
+    );
 
     expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
     expect(overrides.log).toHaveBeenCalledWith("runner.workspace.retention_overridden", {

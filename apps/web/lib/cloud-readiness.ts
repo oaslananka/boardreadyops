@@ -3,6 +3,7 @@ import {
   CloudRuntimeConfigurationError,
   resolveArtifactCapabilityConfiguration,
   resolveCloudPersistenceConfiguration,
+  resolveSelfHostedRunnerVersionConfiguration,
 } from "./cloud-runtime-config.js";
 
 const service = "boardreadyops-cloud" as const;
@@ -19,6 +20,7 @@ export type CloudReadinessResult =
       };
       effectiveConfiguration: {
         artifactCapabilityTtlSeconds: number;
+        selfHostedRunnerMinimumVersion?: string;
       };
     }
   | {
@@ -82,9 +84,11 @@ export async function checkCloudReadiness(
 
   let configuration: ReturnType<typeof resolveCloudPersistenceConfiguration>;
   let artifactCapabilityConfiguration: ReturnType<typeof resolveArtifactCapabilityConfiguration>;
+  let runnerVersionConfiguration: ReturnType<typeof resolveSelfHostedRunnerVersionConfiguration>;
   try {
     configuration = resolveCloudPersistenceConfiguration(environment);
     artifactCapabilityConfiguration = resolveArtifactCapabilityConfiguration(environment);
+    runnerVersionConfiguration = resolveSelfHostedRunnerVersionConfiguration(environment);
   } catch (error) {
     if (error instanceof CloudRuntimeConfigurationError) {
       return {
@@ -128,6 +132,9 @@ export async function checkCloudReadiness(
       },
       effectiveConfiguration: {
         artifactCapabilityTtlSeconds: artifactCapabilityConfiguration.uploadCapabilityTtlSeconds,
+        ...(runnerVersionConfiguration.minimumVersion === undefined
+          ? {}
+          : { selfHostedRunnerMinimumVersion: runnerVersionConfiguration.minimumVersion }),
       },
     };
   } catch (error) {

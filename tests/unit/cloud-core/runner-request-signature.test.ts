@@ -34,6 +34,32 @@ describe("runner request signature protocol v1", () => {
     ).toBe(true);
   });
 
+  it("cryptographically binds an optional strict runner version without changing legacy vectors", () => {
+    const request = vectorRequest();
+    const versioned = { ...request, runnerVersion: "1.26.1" };
+    const signature = signRunnerRequest({ ...versioned, privateKey: vector.privateKeyPem });
+
+    expect(canonicalRunnerRequest(request)).toBe(vector.expectedCanonical);
+    expect(canonicalRunnerRequest(versioned)).toContain("runner-version:1.26.1");
+    expect(signature).not.toBe(vector.expectedSignature);
+    expect(
+      verifyRunnerRequestSignature({
+        ...versioned,
+        publicKey: vector.publicKeyPem,
+        signature,
+      }),
+    ).toBe(true);
+    expect(
+      verifyRunnerRequestSignature({
+        ...versioned,
+        runnerVersion: "1.26.0",
+        publicKey: vector.publicKeyPem,
+        signature,
+      }),
+    ).toBe(false);
+    expect(() => canonicalRunnerRequest({ ...request, runnerVersion: "1.26" })).toThrow(/runner version/i);
+  });
+
   it("binds signatures to the body and normalized request path", () => {
     const request = vectorRequest();
 

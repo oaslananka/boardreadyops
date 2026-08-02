@@ -4,6 +4,7 @@ const canonicalPrefix = "boardreadyops-runner-request-v1";
 const canonicalBaseUrl = "https://boardreadyops.invalid";
 const lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
+const strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 
 export type RunnerRequestWorkerClass = "managed" | "self_hosted";
 
@@ -14,6 +15,7 @@ export type CanonicalRunnerRequestInput = {
   nonce: string;
   workerClass: RunnerRequestWorkerClass;
   runnerId: string;
+  runnerVersion?: string;
   runId?: string;
   executionAttemptId?: string;
   leaseId?: string;
@@ -46,6 +48,17 @@ function assertLowercaseUuid(name: string, value: string | undefined): string {
   }
   if (!lowercaseUuidPattern.test(value)) {
     throw new Error(`${name} must be a lowercase UUID`);
+  }
+  return value;
+}
+
+function assertRunnerVersion(value: string): string {
+  if (
+    value.length > 64 ||
+    !strictVersionPattern.test(value) ||
+    value.split(".").some((component) => !Number.isSafeInteger(Number(component)))
+  ) {
+    throw new Error("runner version must be a strict major.minor.patch version");
   }
   return value;
 }
@@ -111,7 +124,7 @@ export function canonicalRunnerRequest(input: CanonicalRunnerRequestInput): stri
     throw new Error("unsupported runner worker class");
   }
 
-  return [
+  const fields = [
     canonicalPrefix,
     method,
     normalizeRunnerRequestPath(input.path),
@@ -122,8 +135,12 @@ export function canonicalRunnerRequest(input: CanonicalRunnerRequestInput): stri
     assertLowercaseUuid("runId", input.runId),
     assertLowercaseUuid("executionAttemptId", input.executionAttemptId),
     assertLowercaseUuid("leaseId", input.leaseId),
-    runnerRequestBodyDigest(input.body),
-  ].join("\n");
+  ];
+  if (input.runnerVersion !== undefined) {
+    fields.push(`runner-version:${assertRunnerVersion(input.runnerVersion)}`);
+  }
+  fields.push(runnerRequestBodyDigest(input.body));
+  return fields.join("\n");
 }
 
 export function signRunnerRequest(input: SignRunnerRequestInput): string {
