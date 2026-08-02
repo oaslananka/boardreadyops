@@ -107,7 +107,8 @@
     "verify:summary": "node scripts/verification-summary.mjs",
     "test:int:monorepo": "node scripts/run-monorepo-integration.mjs",
     "verify:transition-writers": "node scripts/verify-control-plane-transition-writers.mjs",
-    "cloud:load:verify": "node scripts/control-plane-load.mjs"
+    "cloud:load:verify": "node scripts/control-plane-load.mjs",
+    "cloud:isolation:verify": "vitest run --no-file-parallelism tests/integration/github-actions-result-isolation-postgres.test.ts && node scripts/target-repository-isolation.mjs"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [
