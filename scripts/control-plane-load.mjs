@@ -9,11 +9,13 @@ const defaultThresholds = Object.freeze({
   lifecycleP95Ms: 1_500,
   dashboardP95Ms: 1_000,
   minimumThroughputPerSecond: 10,
+  recoveryMaxConvergenceMs: 5_000,
 });
 
 const isolatedTables = Object.freeze([
   "installations",
   "repositories",
+  "managed_runner_identities",
   "release_runs",
   "webhook_inbox",
   "control_plane_jobs",
@@ -40,6 +42,10 @@ export function parseControlPlaneLoadConfiguration(environment = process.env) {
   }
   const databaseUrl = environment.DATABASE_URL?.trim();
   if (!databaseUrl) throw new Error("DATABASE_URL is required for control-plane load validation");
+  const profile = environment.BOARDREADYOPS_LOAD_PROFILE?.trim() || "representative";
+  if (profile !== "representative" && profile !== "soak-recovery") {
+    throw new Error("BOARDREADYOPS_LOAD_PROFILE must be representative or soak-recovery");
+  }
 
   const uniqueDeliveries = boundedInteger(environment, "BOARDREADYOPS_LOAD_UNIQUE_DELIVERIES", 200, 10, 5_000);
   const duplicateDeliveries = boundedInteger(environment, "BOARDREADYOPS_LOAD_DUPLICATE_DELIVERIES", 50, 0, 5_000);
@@ -49,6 +55,8 @@ export function parseControlPlaneLoadConfiguration(environment = process.env) {
 
   return {
     databaseUrl,
+    profile,
+    recoveryRounds: boundedInteger(environment, "BOARDREADYOPS_LOAD_RECOVERY_ROUNDS", 3, 1, 20),
     uniqueDeliveries,
     duplicateDeliveries,
     repositoryCount: boundedInteger(environment, "BOARDREADYOPS_LOAD_REPOSITORIES", 4, 2, 20),
@@ -64,6 +72,13 @@ export function parseControlPlaneLoadConfiguration(environment = process.env) {
         10,
         1,
         10_000,
+      ),
+      recoveryMaxConvergenceMs: boundedInteger(
+        environment,
+        "BOARDREADYOPS_LOAD_RECOVERY_MAX_CONVERGENCE_MS",
+        5_000,
+        100,
+        60_000,
       ),
     },
   };
@@ -129,7 +144,29 @@ export function evaluateControlPlaneLoadReport(report, thresholds = defaultThres
       signals.push(`${name}_throughput_below_minimum`);
     }
   }
+
+  if (report.scenario.profile === "soak-recovery") {
+    signals.push(...evaluateRecoveryEvidence(report, thresholds));
+  }
   return signals;
+}
+
+function evaluateRecoveryEvidence(report, thresholds) {
+  const recovery = report.recovery;
+  const rounds = report.scenario.recoveryRounds;
+  const checks = [
+    ["recovery_rounds_incomplete", recovery?.roundsCompleted >= rounds],
+    ["recovery_job_lease_incomplete", recovery?.jobLeaseRecoveries >= rounds],
+    ["recovery_stale_job_rejection_incomplete", recovery?.staleJobCompletionsRejected >= rounds],
+    ["recovery_outbox_retry_incomplete", recovery?.outboxRetries >= rounds],
+    ["recovery_uncertain_outbox_quarantine_incomplete", recovery?.uncertainOutboxQuarantines >= rounds],
+    ["recovery_delayed_callback_incomplete", recovery?.delayedCallbackRepairs >= rounds],
+    ["recovery_stale_attempt_rejection_incomplete", recovery?.staleAttemptResultsRejected >= rounds],
+    ["recovery_convergence_exceeded", recovery?.maximumConvergenceMs <= thresholds.recoveryMaxConvergenceMs],
+    ["recovery_dead_letters_detected", recovery?.deadLetters === 0],
+    ["recovery_ambiguous_state_detected", recovery?.ambiguousNonterminalStates === 0],
+  ];
+  return checks.filter(([, passed]) => !passed).map(([signal]) => signal);
 }
 
 function databaseRows(result) {
@@ -387,9 +424,415 @@ function assertExpectedState(actual, expected) {
   }
 }
 
+function offsetDate(value, milliseconds) {
+  return new Date(value.valueOf() + milliseconds);
+}
+
+function requestTimestamp(value) {
+  return Math.floor(value.valueOf() / 1_000);
+}
+
+function syntheticSecret(value) {
+  return createHash("sha256").update(value).digest("base64url");
+}
+
+function requiredRecoveryDependency(dependencies, name) {
+  const dependency = dependencies[name];
+  if (typeof dependency !== "function") throw new Error(`soak-recovery dependency is required: ${name}`);
+  return dependency;
+}
+
+async function validateJobLeaseRecovery(input) {
+  let now = input.baseTime;
+  const store = input.createSqlControlPlaneJobStore(input.executor, {
+    now: () => now,
+    leaseSeconds: 1,
+    maximumAttempts: 4,
+    retryBaseSeconds: 1,
+  });
+  const webhook = webhookInput(`${input.prefix}-recovery-job-${input.round}`, 0, input.repository.githubInstallationId);
+  const accepted = await store.acceptGitHubWebhook(webhook);
+  if (accepted.outcome !== "accepted") throw new Error("recovery job intake was not accepted");
+
+  const abandonedWorker = `${input.prefix}-job-abandoned-${input.round}`;
+  const abandoned = (await store.claimJobs({ workerId: abandonedWorker, limit: 1 }))[0];
+  if (abandoned?.attemptCount !== 1) throw new Error("recovery job lease was not claimed");
+
+  now = offsetDate(now, 2_000);
+  const recoveryWorker = `${input.prefix}-job-recovery-${input.round}`;
+  const recovered = (await store.claimJobs({ workerId: recoveryWorker, limit: 1 }))[0];
+  if (!recovered || recovered.jobId !== abandoned.jobId || recovered.attemptCount !== 2) {
+    throw new Error("expired recovery job lease was not reclaimed");
+  }
+  const staleCompletion = await store.completeJob({ jobId: abandoned.jobId, workerId: abandonedWorker });
+  if (staleCompletion !== "stale") throw new Error("abandoned job completion was not rejected as stale");
+  const completion = await store.completeJob({ jobId: recovered.jobId, workerId: recoveryWorker });
+  if (completion !== "completed") throw new Error("reclaimed recovery job did not complete");
+  return { jobLeaseRecoveries: 1, staleJobCompletionsRejected: 1 };
+}
+
+async function enqueueRecoveryReleaseRun(input, label, runIndex) {
+  const lifecycle = input.createSqlTransactionalGitHubAppLifecycleStore(input.executor, {
+    releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+  });
+  const result = await lifecycle.enqueueReleaseRunWithOutbox(
+    releaseAction(input.repository, runIndex, `${input.prefix}-recovery-${label}-${input.round}`),
+  );
+  if (!result.runId) throw new Error(`recovery ${label} run was not enqueued`);
+  return result.runId;
+}
+
+async function validateOutboxRecovery(input) {
+  let now = offsetDate(input.baseTime, 5_000);
+  const retryRunId = await enqueueRecoveryReleaseRun(input, "retry", 10_000 + input.round * 10);
+  const retryStore = input.createSqlControlPlaneOutboxStore(input.executor, {
+    now: () => now,
+    leaseSeconds: 1,
+    retryBaseSeconds: 1,
+  });
+  const retryWorker = `${input.prefix}-outbox-retry-${input.round}`;
+  const first = (await retryStore.claimEffects({ workerId: retryWorker, limit: 1 }))[0];
+  if (!first || first.releaseRunId !== retryRunId) throw new Error("recovery retry effect was not claimed");
+  const retryOutcome = await retryStore.failEffect({
+    outboxId: first.outboxId,
+    workerId: retryWorker,
+    attemptCount: first.attemptCount,
+    errorClass: "SyntheticTransientFailure",
+    errorMessage: "Synthetic transient delivery failure.",
+  });
+  if (retryOutcome !== "retry") throw new Error("transient recovery effect was not scheduled for retry");
+
+  now = offsetDate(now, 2_000);
+  const retryRecoveryWorker = `${input.prefix}-outbox-retry-recovery-${input.round}`;
+  const retried = (await retryStore.claimEffects({ workerId: retryRecoveryWorker, limit: 1 }))[0];
+  if (!retried || retried.outboxId !== first.outboxId || retried.attemptCount !== 2) {
+    throw new Error("transient recovery effect was not reclaimed");
+  }
+  const retryCompletion = await retryStore.completeCheckRunCreateEffect({
+    effect: retried,
+    workerId: retryRecoveryWorker,
+    githubCheckRunId: 9_400_000_000 + input.round,
+    dispatchMode: "none",
+  });
+  if (retryCompletion.outcome !== "completed") throw new Error("retried recovery effect did not complete");
+
+  const uncertainRunId = await enqueueRecoveryReleaseRun(input, "uncertain", 20_000 + input.round * 10);
+  const uncertainCreateWorker = `${input.prefix}-outbox-create-${input.round}`;
+  const createEffect = (await retryStore.claimEffects({ workerId: uncertainCreateWorker, limit: 1 }))[0];
+  if (!createEffect || createEffect.releaseRunId !== uncertainRunId) {
+    throw new Error("uncertain-delivery creation effect was not claimed");
+  }
+  const dispatchOutboxId = randomUUID();
+  const executionAttemptId = randomUUID();
+  const createCompletion = await retryStore.completeCheckRunCreateEffect({
+    effect: createEffect,
+    workerId: uncertainCreateWorker,
+    githubCheckRunId: 9_500_000_000 + input.round,
+    dispatchMode: "github-actions",
+    executionAttemptId,
+    nextOutboxId: dispatchOutboxId,
+  });
+  if (createCompletion.outcome !== "completed" || createCompletion.nextOutboxId !== dispatchOutboxId) {
+    throw new Error("uncertain-delivery dispatch effect was not created");
+  }
+
+  const dispatchWorker = `${input.prefix}-outbox-dispatch-${input.round}`;
+  const dispatchEffect = (await retryStore.claimEffects({ workerId: dispatchWorker, limit: 1 }))[0];
+  if (
+    !dispatchEffect ||
+    dispatchEffect.outboxId !== dispatchOutboxId ||
+    dispatchEffect.effectType !== "github.workflow.dispatch"
+  ) {
+    throw new Error("uncertain workflow dispatch effect was not claimed");
+  }
+  if ((await retryStore.markDeliveryStarted({ outboxId: dispatchOutboxId, workerId: dispatchWorker })) !== "started") {
+    throw new Error("uncertain workflow dispatch did not record delivery start");
+  }
+  const quarantine = await retryStore.failEffect({
+    outboxId: dispatchOutboxId,
+    workerId: dispatchWorker,
+    attemptCount: dispatchEffect.attemptCount,
+    errorClass: "SyntheticTransportInterruption",
+    errorMessage: "Synthetic transport interruption after dispatch began.",
+    deliveryUncertain: true,
+  });
+  if (quarantine !== "reconciliation_required") {
+    throw new Error("uncertain workflow dispatch was not quarantined for reconciliation");
+  }
+  const quarantineState = databaseRows(
+    await input.executor.query(
+      "select status, completed_at is not null as terminal from control_plane_outbox where id = $1",
+      [dispatchOutboxId],
+    ),
+  )[0];
+  if (quarantineState?.status !== "reconciliation_required" || quarantineState?.terminal !== true) {
+    throw new Error("uncertain workflow dispatch quarantine state was ambiguous");
+  }
+  return { outboxRetries: 1, uncertainOutboxQuarantines: 1 };
+}
+
+async function validateDelayedCallbackRecovery(input) {
+  const releaseRunId = randomUUID();
+  const executionAttemptId = randomUUID();
+  const staleAt = offsetDate(input.baseTime, -10 * 60_000);
+  await input.executor.query(
+    `insert into release_runs (
+       id, repository_id, idempotency_key, commit_sha, ref, trigger_kind,
+       status, started_at, execution_attempt_id, execution_attempt_started_at
+     ) values ($1, $2, $3, $4, 'refs/heads/main', 'push',
+       'dispatched', $5::timestamptz, $6, $5::timestamptz)`,
+    [
+      releaseRunId,
+      input.repository.repositoryId,
+      `${input.prefix}:recovery-callback:${input.round}`,
+      syntheticCommitSha(input.prefix, input.repository.index, 30_000 + input.round),
+      staleAt.toISOString(),
+      executionAttemptId,
+    ],
+  );
+  await input.executor.query(
+    `insert into release_run_attempts (
+       id, run_id, attempt_number, status, created_at,
+       dispatch_requested_at, dispatched_at, github_workflow_dispatch_id
+     ) values ($1, $2, 1, 'dispatched', $3::timestamptz,
+       $3::timestamptz, $3::timestamptz, $4)`,
+    [executionAttemptId, releaseRunId, staleAt.toISOString(), String(9_600_000_000 + input.round)],
+  );
+
+  const workerId = `${input.prefix}-callback-${input.round}`;
+  let now = input.baseTime;
+  let operations = input.createSqlControlPlaneOperationsStore(input.executor, { now: () => now, leaseSeconds: 60 });
+  const detected = await operations.detectWorkflowReconciliationCandidates({
+    observationDelaySeconds: 300,
+    terminalDeadlineSeconds: 1_800,
+    limit: 10,
+  });
+  if (detected !== 1) throw new Error("delayed callback reconciliation candidate was not detected");
+  const first = (await operations.claimWorkflowReconciliationItems({ workerId, limit: 1 }))[0];
+  if (!first || first.releaseRunId !== releaseRunId) throw new Error("delayed callback item was not claimed");
+  const pending = await input.processControlPlaneWorkflowReconciliation(first, {
+    workerId,
+    operations,
+    github: {
+      async readWorkflowRun() {
+        return { kind: "pending", status: "in_progress" };
+      },
+    },
+    now: () => now,
+    nextCheckSeconds: 1,
+  });
+  if (pending.status !== "rescheduled") throw new Error("delayed callback item was not rescheduled");
+
+  now = offsetDate(input.baseTime, 1_300_000);
+  const terminalWorker = `${input.prefix}-callback-terminal-${input.round}`;
+  operations = input.createSqlControlPlaneOperationsStore(input.executor, { now: () => now, leaseSeconds: 60 });
+  const second = (await operations.claimWorkflowReconciliationItems({ workerId: terminalWorker, limit: 1 }))[0];
+  if (!second || second.reconciliationId !== first.reconciliationId) {
+    throw new Error("delayed callback item was not reclaimed after reschedule");
+  }
+  const repaired = await input.processControlPlaneWorkflowReconciliation(second, {
+    workerId: terminalWorker,
+    operations,
+    github: {
+      async readWorkflowRun() {
+        return { kind: "completed", conclusion: "success" };
+      },
+    },
+    now: () => now,
+  });
+  if (repaired.status !== "applied" || repaired.outcomeCode !== "github_result_callback_missing") {
+    throw new Error("delayed callback reconciliation did not converge");
+  }
+  const state = databaseRows(
+    await input.executor.query(
+      `select rr.status as run_status, rra.status as attempt_status,
+              cpri.status as reconciliation_status, cpri.repaired
+         from release_runs rr
+         join release_run_attempts rra on rra.id = rr.execution_attempt_id
+         join control_plane_reconciliation_items cpri on cpri.release_run_id = rr.id
+        where rr.id = $1`,
+      [releaseRunId],
+    ),
+  )[0];
+  if (
+    state?.run_status !== "failed" ||
+    state?.attempt_status !== "failed" ||
+    state?.reconciliation_status !== "completed" ||
+    state?.repaired !== true
+  ) {
+    throw new Error("delayed callback reconciliation left ambiguous state");
+  }
+  return { delayedCallbackRepairs: 1 };
+}
+
+async function validateStaleAttemptRejection(input) {
+  const managedRunnerIdentityId = randomUUID();
+  const releaseRunId = randomUUID();
+  const startedAt = offsetDate(input.baseTime, -86_400_000 - input.round * 1_000);
+  const identityName = `${input.prefix}-managed-${input.round}`;
+  await input.executor.query(
+    `insert into managed_runner_identities (
+       id, name, public_key, public_key_fingerprint, capabilities, status,
+       created_at, activated_at, last_heartbeat_at
+     ) values ($1, $2, $3, $4, $5::jsonb, 'active',
+       $6::timestamptz, $6::timestamptz, $6::timestamptz)`,
+    [
+      managedRunnerIdentityId,
+      identityName,
+      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA4444444444444444444444444444444444444444444=\n-----END PUBLIC KEY-----",
+      createHash("sha256").update(managedRunnerIdentityId).digest("hex"),
+      JSON.stringify(["kicad:10"]),
+      startedAt.toISOString(),
+    ],
+  );
+  await input.executor.query(
+    `insert into release_runs (
+       id, repository_id, idempotency_key, commit_sha, ref, trigger_kind, status, started_at
+     ) values ($1, $2, $3, $4, 'refs/heads/main', 'push', 'queued', $5::timestamptz)`,
+    [
+      releaseRunId,
+      input.repository.repositoryId,
+      `${input.prefix}:recovery-stale-attempt:${input.round}`,
+      syntheticCommitSha(input.prefix, input.repository.index, 40_000 + input.round),
+      startedAt.toISOString(),
+    ],
+  );
+
+  const attemptId = randomUUID();
+  const leaseId = randomUUID();
+  const leaseToken = syntheticSecret(`${input.prefix}:lease:${input.round}`);
+  const claimAt = input.baseTime;
+  const ids = [attemptId, leaseId];
+  const leaseStore = input.createSqlRunnerLeaseStore(input.executor, {
+    now: () => claimAt,
+    id: () => ids.shift() ?? randomUUID(),
+    leaseToken: () => leaseToken,
+    leaseDurationSeconds: 120,
+    maximumLeaseDurationSeconds: 600,
+  });
+  const claimed = await leaseStore.claimJob({
+    workerClass: "managed",
+    managedRunnerIdentityId,
+    requestTimestamp: requestTimestamp(claimAt),
+    requestNonce: syntheticSecret(`${input.prefix}:claim:${input.round}`),
+    capabilities: ["kicad:10"],
+  });
+  if (claimed.status !== "claimed" || claimed.runId !== releaseRunId) {
+    throw new Error("stale-attempt recovery fixture was not claimed");
+  }
+
+  const replacementAttemptId = randomUUID();
+  const movedAt = offsetDate(claimAt, 1_000);
+  await input.executor.query(
+    `insert into release_run_attempts (
+       id, run_id, attempt_number, status, created_at, started_at, heartbeat_at
+     ) values ($1, $2, 2, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
+    [replacementAttemptId, releaseRunId, movedAt.toISOString()],
+  );
+  await input.executor.query(
+    `update release_runs
+        set execution_attempt_id = $1, execution_attempt_started_at = $2::timestamptz, status = 'running'
+      where id = $3`,
+    [replacementAttemptId, movedAt.toISOString(), releaseRunId],
+  );
+
+  const authorization = await input
+    .createSqlRunnerTerminalResultAuthorizer(input.executor, {
+      now: () => offsetDate(claimAt, 2_000),
+    })
+    .authorize({
+      workerClass: "managed",
+      managedRunnerIdentityId,
+      requestTimestamp: requestTimestamp(offsetDate(claimAt, 2_000)),
+      requestNonce: syntheticSecret(`${input.prefix}:result:${input.round}`),
+      runId: releaseRunId,
+      executionAttemptId: claimed.executionAttemptId,
+      leaseId: claimed.leaseId,
+      leaseToken: claimed.leaseToken,
+      requestBody: JSON.stringify({ protocolVersion: 1, result: { status: "completed", decision: "pass" } }),
+    });
+  if (authorization.status !== "stale") throw new Error("stale attempt terminal result was not rejected");
+  return { staleAttemptResultsRejected: 1 };
+}
+
+function incrementRecoveryEvidence(recovery, evidence) {
+  for (const [name, value] of Object.entries(evidence)) recovery[name] += value;
+}
+
+async function runSoakRecoveryValidation(configuration, input) {
+  const createSqlControlPlaneOperationsStore = requiredRecoveryDependency(
+    input.dependencies,
+    "createSqlControlPlaneOperationsStore",
+  );
+  const createSqlRunnerLeaseStore = requiredRecoveryDependency(input.dependencies, "createSqlRunnerLeaseStore");
+  const createSqlRunnerTerminalResultAuthorizer = requiredRecoveryDependency(
+    input.dependencies,
+    "createSqlRunnerTerminalResultAuthorizer",
+  );
+  const processControlPlaneWorkflowReconciliation = requiredRecoveryDependency(
+    input.dependencies,
+    "processControlPlaneWorkflowReconciliation",
+  );
+  const recovery = {
+    roundsRequested: configuration.recoveryRounds,
+    roundsCompleted: 0,
+    jobLeaseRecoveries: 0,
+    staleJobCompletionsRejected: 0,
+    outboxRetries: 0,
+    uncertainOutboxQuarantines: 0,
+    delayedCallbackRepairs: 0,
+    staleAttemptResultsRejected: 0,
+    maximumConvergenceMs: 0,
+    deadLetters: 0,
+    ambiguousNonterminalStates: 0,
+  };
+
+  for (let round = 0; round < configuration.recoveryRounds; round += 1) {
+    const startedAt = performance.now();
+    const repository = input.repositories[round % input.repositories.length];
+    const baseTime = new Date(Date.now() + 60_000 + round * 2_000_000);
+    const common = {
+      executor: input.executor,
+      prefix: input.prefix,
+      round,
+      baseTime,
+      repository,
+      createSqlControlPlaneJobStore: input.dependencies.createSqlControlPlaneJobStore,
+      createSqlControlPlaneOutboxStore: input.dependencies.createSqlControlPlaneOutboxStore,
+      createSqlControlPlaneOperationsStore,
+      createSqlRunnerLeaseStore,
+      createSqlRunnerTerminalResultAuthorizer,
+      createSqlTransactionalGitHubAppLifecycleStore: input.dependencies.createSqlTransactionalGitHubAppLifecycleStore,
+      processControlPlaneWorkflowReconciliation,
+    };
+    incrementRecoveryEvidence(recovery, await validateJobLeaseRecovery(common));
+    incrementRecoveryEvidence(recovery, await validateOutboxRecovery(common));
+    incrementRecoveryEvidence(recovery, await validateDelayedCallbackRecovery(common));
+    incrementRecoveryEvidence(recovery, await validateStaleAttemptRejection(common));
+    recovery.roundsCompleted += 1;
+    recovery.maximumConvergenceMs = Math.max(recovery.maximumConvergenceMs, rounded(performance.now() - startedAt));
+  }
+
+  const recoveryJobs = databaseRows(
+    await input.executor.query(
+      `select
+         count(*) filter (where cpj.status = 'dead_letter')::int as dead_letters,
+         count(*) filter (where cpj.status <> 'completed')::int as ambiguous
+       from control_plane_jobs cpj
+       join webhook_inbox wi on wi.id = cpj.inbox_id
+      where wi.delivery_id like $1`,
+      [`${input.prefix}-recovery-job-%`],
+    ),
+  )[0];
+  recovery.deadLetters = integerColumn(recoveryJobs, "dead_letters");
+  recovery.ambiguousNonterminalStates = integerColumn(recoveryJobs, "ambiguous");
+  return recovery;
+}
+
 async function cleanupScenario(executor, prefix) {
-  await executor.query("delete from webhook_inbox where delivery_id like $1", [`${prefix}-delivery-%`]);
+  await executor.query("delete from webhook_inbox where delivery_id like $1", [`${prefix}%`]);
   await executor.query("delete from installations where account_login like $1", [`${prefix}-owner-%`]);
+  await executor.query("delete from managed_runner_identities where name like $1", [`${prefix}-managed-%`]);
 }
 
 export async function runControlPlaneLoadValidation(configuration, dependencies) {
@@ -455,6 +898,15 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
       configuration.concurrency,
       lookupRunDashboard,
     );
+    const recovery =
+      configuration.profile === "soak-recovery"
+        ? await runSoakRecoveryValidation(configuration, {
+            executor,
+            prefix,
+            repositories,
+            dependencies,
+          })
+        : undefined;
     const state = await exactState(executor, prefix, persistedRunIds);
     const databaseMismatches = await crossTenantMismatchCount(executor, persistedRunIds);
     const expectedRuns = configuration.repositoryCount * configuration.runsPerRepository;
@@ -472,6 +924,8 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
     const report = {
       event: "control_plane_load_verified",
       scenario: {
+        profile: configuration.profile,
+        recoveryRounds: configuration.recoveryRounds,
         uniqueDeliveries: configuration.uniqueDeliveries,
         duplicateDeliveries: configuration.duplicateDeliveries,
         repositoryCount: configuration.repositoryCount,
@@ -487,6 +941,7 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
         jobs.elapsedMs + enqueued.elapsedMs + outbox.elapsedMs,
       ),
       dashboard: summarizeDurations(dashboard.durations, dashboard.elapsedMs),
+      ...(recovery ? { recovery } : {}),
       invariants: {
         ...state,
         scopedDashboardReads: dashboard.scopedDashboardReads,
