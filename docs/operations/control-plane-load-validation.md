@@ -91,6 +91,26 @@ Set `BOARDREADYOPS_LOAD_PROFILE=worker-process-interruption` to run a real child
 
 Set `BOARDREADYOPS_LOAD_PROFILE=github-api-interruption` to run the real reconciliation HTTP reader against the loopback fault server. Every round must record one `503`, one `429`, two scheduled retries, three observed requests, and one successful convergence. This proves bounded handling of status-level GitHub API interruptions; it does not exercise GitHub production infrastructure, real installation authentication, or organization-level rate-limit sharing.
 
+## Measured scaling envelope
+
+On 2026-08-02, the representative profile was measured at three increasing tiers on GitHub-hosted Ubuntu runners with isolated PostgreSQL 16 services. All runs used commit `f357592ed52c90cfc66d8dc41eeec79a756a830f`, produced zero threshold signals and zero cross-tenant mismatches, and converged to the exact expected delivery, job, release-run, and outbox counts.
+
+- **Baseline:** 200 unique and 50 duplicate deliveries, 4 repositories, 80 release runs, concurrency 20; intake p95 65.631 ms, lifecycle p95 74.119 ms, dashboard p95 42.139 ms; evidence run `30731094803`.
+- **Medium:** 500 unique and 100 duplicate deliveries, 8 repositories, 240 release runs, concurrency 40; intake p95 67.630 ms, lifecycle p95 130.246 ms, dashboard p95 44.938 ms; evidence run `30731144759`.
+- **High:** 1,000 unique and 200 duplicate deliveries, 12 repositories, 600 release runs, concurrency 80; intake p95 116.451 ms, lifecycle p95 127.909 ms, dashboard p95 109.367 ms; evidence run `30731105219`.
+
+The high tier is the current validated engineering envelope: **1,000 unique deliveries**, 200 duplicate replays, **600 release runs**, 12 tenant repositories, and concurrency 80 through the harness's 50-connection database-pool cap. It is not a production capacity guarantee, sustained requests-per-second claim, or substitute for an hours-long soak on the intended deployment shape. Treat any workload above this tier as unvalidated until the `control-plane-scale-envelope` workflow passes on the target commit and infrastructure.
+
+Capacity decisions remain tied to the authoritative `github-cloud-ga-v1` SLO policy rather than to a new parallel threshold set:
+
+- webhook acceptance p95 above 1,000 ms for five minutes opens capacity triage;
+- lifecycle queue age or outbox lag above 60 seconds for five minutes requires incident response and, when PostgreSQL and GitHub are healthy, worker-capacity review;
+- reconciliation backlog above 20 immediately or increasing for three snapshots requires reconciliation-capacity review;
+- stale attempts above zero for two snapshots or terminal failure rate above 500 basis points with at least 20 terminal runs blocks blind scale-out and requires failure analysis;
+- a failed high-tier envelope, any threshold signal, invariant drift, or cross-tenant mismatch blocks raising the validated envelope.
+
+The manual `control-plane-scale-envelope` workflow runs baseline, medium, and high tiers against separate disposable PostgreSQL 16 services and creates one mode `0600`, aggregate-only `control-plane-scale-envelope.json` artifact. The report contains preset counts and aggregate timings only; it excludes database URLs, tenant identifiers, payloads, response bodies, credentials, and raw errors.
+
 ## GitHub Actions evidence
 
 Run the `control-plane-load` workflow manually. It provisions an isolated PostgreSQL 16 service, applies every repository migration, executes the selected scenario, and uploads `control-plane-load-report.json` for 30 days. The workflow uses no repository secret and has read-only repository permissions.
