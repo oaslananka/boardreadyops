@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.27.0](https://github.com/oaslananka/boardreadyops/compare/v1.26.1...v1.27.0) (2026-08-02)
+
+
+### Features
+
+* **runner:** enforce signed minimum versions ([#308](https://github.com/oaslananka/boardreadyops/issues/308)) ([f70c10a](https://github.com/oaslananka/boardreadyops/commit/f70c10a3c62f89712eee9303d7d20f54ffe8786b)), refs [#41](https://github.com/oaslananka/boardreadyops/issues/41)
+
 ## [1.26.1](https://github.com/oaslananka/boardreadyops/compare/v1.26.0...v1.26.1) (2026-08-02)
 
 
