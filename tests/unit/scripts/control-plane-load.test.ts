@@ -77,6 +77,20 @@ describe("control-plane load configuration", () => {
     });
   });
 
+  it("accepts an explicit database-interruption profile", () => {
+    expect(
+      parseControlPlaneLoadConfiguration(
+        configuredEnvironment({
+          BOARDREADYOPS_LOAD_PROFILE: "database-interruption",
+          BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "2",
+        }),
+      ),
+    ).toMatchObject({
+      profile: "database-interruption",
+      recoveryRounds: 2,
+    });
+  });
+
   it("requires a disposable database confirmation and valid bounded integers", () => {
     expect(() =>
       parseControlPlaneLoadConfiguration({
@@ -91,7 +105,7 @@ describe("control-plane load configuration", () => {
 
     expect(() =>
       parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_PROFILE: "chaos" })),
-    ).toThrow("BOARDREADYOPS_LOAD_PROFILE must be representative or soak-recovery");
+    ).toThrow("BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, or database-interruption");
 
     expect(() =>
       parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "0" })),
@@ -292,6 +306,74 @@ describe("control-plane load measurements", () => {
       "recovery_convergence_exceeded",
       "recovery_dead_letters_detected",
       "recovery_ambiguous_state_detected",
+    ]);
+  });
+});
+
+describe("control-plane database interruption evidence", () => {
+  it("rejects incomplete database interruption recovery with stable signal names", () => {
+    const report = {
+      event: "control_plane_load_verified" as const,
+      scenario: {
+        profile: "database-interruption" as const,
+        recoveryRounds: 2,
+        uniqueDeliveries: 20,
+        duplicateDeliveries: 5,
+        repositoryCount: 2,
+        runsPerRepository: 5,
+        concurrency: 4,
+      },
+      intake: { count: 25, elapsedMs: 100, throughputPerSecond: 250, p50Ms: 2, p95Ms: 5, p99Ms: 7, maximumMs: 8 },
+      lifecycle: { count: 30, elapsedMs: 120, throughputPerSecond: 250, p50Ms: 2, p95Ms: 6, p99Ms: 8, maximumMs: 9 },
+      dashboard: { count: 4, elapsedMs: 20, throughputPerSecond: 200, p50Ms: 2, p95Ms: 4, p99Ms: 4, maximumMs: 4 },
+      recovery: {
+        roundsRequested: 2,
+        roundsCompleted: 2,
+        jobLeaseRecoveries: 2,
+        staleJobCompletionsRejected: 2,
+        outboxRetries: 2,
+        uncertainOutboxQuarantines: 2,
+        delayedCallbackRepairs: 2,
+        staleAttemptResultsRejected: 2,
+        maximumConvergenceMs: 50,
+        deadLetters: 0,
+        ambiguousNonterminalStates: 0,
+      },
+      databaseRecovery: {
+        roundsRequested: 2,
+        roundsCompleted: 1,
+        backendTerminations: 1,
+        interruptedTransactionsRejected: 1,
+        transactionRollbacksVerified: 0,
+        replacementConnectionsEstablished: 1,
+        maximumConvergenceMs: 6_000,
+      },
+      invariants: {
+        acceptedDeliveries: 20,
+        duplicateDeliveries: 5,
+        completedJobs: 20,
+        releaseRuns: 10,
+        completedOutboxEffects: 10,
+        scopedDashboardReads: 4,
+        crossTenantMismatches: 0,
+      },
+    };
+
+    expect(
+      evaluateControlPlaneLoadReport(report, {
+        intakeP95Ms: 1_000,
+        lifecycleP95Ms: 1_500,
+        dashboardP95Ms: 1_000,
+        minimumThroughputPerSecond: 10,
+        recoveryMaxConvergenceMs: 5_000,
+      }),
+    ).toEqual([
+      "database_recovery_rounds_incomplete",
+      "database_backend_termination_incomplete",
+      "database_interrupted_transaction_rejection_incomplete",
+      "database_transaction_rollback_incomplete",
+      "database_replacement_connection_incomplete",
+      "database_recovery_convergence_exceeded",
     ]);
   });
 });

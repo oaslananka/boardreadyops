@@ -11,6 +11,7 @@ on:
         options:
           - representative
           - soak-recovery
+          - database-interruption
       recovery_rounds:
         description: Bounded recovery rounds for soak-recovery
         required: true
