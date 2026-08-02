@@ -65,7 +65,15 @@ describe("binary build scripts", () => {
     expect(releaseAssetsJob).not.toContain("pnpm run build:binary -- --target");
     expect(releaseAssetsJob).toContain("pnpm run build:binary:assets");
     expect(releaseAssetsJob).toContain("Verify release asset publication");
-    expect(releaseAssetsJob).toContain("pnpm run build:binary:publish");
+    expect(releaseAssetsJob).toContain("name: Checkout current release publisher");
+    const workflowShaRef = "ref: $" + "{{ github.sha }}";
+    expect(releaseAssetsJob).toContain(workflowShaRef);
+    expect(releaseAssetsJob).toContain("path: .release-publisher");
+    const releaseTagVariable = "$" + "{RELEASE_TAG}";
+    expect(releaseAssetsJob).toContain(
+      `node .release-publisher/scripts/publish-binary-release-assets.mjs --tag "${releaseTagVariable}"`,
+    );
+    expect(releaseAssetsJob).not.toContain("pnpm run build:binary:publish");
     expect(releaseAssetsJob).not.toContain("gh release upload");
     expect(releaseAssetsJob).not.toContain("gh release create");
     expect(releaseAssetsJob).not.toContain("softprops/action-gh-release");

@@ -60,7 +60,9 @@ describe("dependency and security automation configuration", () => {
     const selfValidation = await repositoryFile(".github/workflows/self-validation.yml");
 
     expect(binary.match(/retention-days: 1/gu) ?? []).toHaveLength(2);
-    expect(binary).toContain("pnpm run build:binary:publish");
+    expect(binary).toContain("name: Checkout current release publisher");
+    expect(binary).toContain("path: .release-publisher");
+    expect(binary).toContain("node .release-publisher/scripts/publish-binary-release-assets.mjs");
     expect(binaryPublisher).toMatch(/"release",\s*"upload"/u);
     expect(binaryPublisher).toMatch(/"release",\s*"create"/u);
     expect(binaryPublisher).toContain('"--clobber"');
