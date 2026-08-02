@@ -79,10 +79,10 @@ describe("control-plane transition writer boundary", () => {
     });
   });
 
-  it("accepts the runner trust-snapshot migration as the guarded claim owner", () => {
+  it("accepts the runner fleet-health migration as the guarded claim owner", () => {
     const migrations = [
       source(
-        "packages/db/migrations/0034_runner_lease_trust_snapshot.sql",
+        "packages/db/migrations/0037_runner_fleet_health.sql",
         "create or replace function boardreadyops_claim_runner_job() returns void language sql as $$ select 1 $$;",
       ),
     ];

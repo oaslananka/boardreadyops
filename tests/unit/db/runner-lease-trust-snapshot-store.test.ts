@@ -82,6 +82,17 @@ describe("runner lease trust snapshot", () => {
     });
   });
 
+  it("rejects an unsafe runner version before querying PostgreSQL", async () => {
+    const query = vi.fn();
+    const store = createSqlRunnerLeaseStore({ query }, { now: () => now });
+
+    await expect(store.claimJob({ ...input, runnerVersion: "9007199254740992.0.0" })).resolves.toEqual({
+      status: "rejected",
+      reason: "invalid_request",
+    });
+    expect(query).not.toHaveBeenCalled();
+  });
+
   it("rejects an inconsistent trust snapshot returned by the database", async () => {
     const { store } = storeFor(claimRow({ trust_mode: "standard", safe_mode_reasons: ["private-repository"] }));
 

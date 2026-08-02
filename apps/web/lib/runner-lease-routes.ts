@@ -150,6 +150,9 @@ export async function handleRunnerClaimRequest(
       requestTimestamp: authenticated.envelope.timestamp,
       requestNonce: authenticated.envelope.nonce,
       capabilities,
+      ...(authenticated.envelope.runnerVersion === undefined
+        ? {}
+        : { runnerVersion: authenticated.envelope.runnerVersion }),
     });
 
     if (result.status === "claimed") {

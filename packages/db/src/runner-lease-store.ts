@@ -24,6 +24,7 @@ export type RunnerSignedMutation = {
 export type ClaimRunnerJobInput = RunnerWorkerIdentity &
   RunnerSignedMutation & {
     capabilities?: readonly string[];
+    runnerVersion?: string;
   };
 
 export type RunnerSafeModeReason = "draft-pull-request" | "fork-pull-request" | "private-repository";
@@ -92,6 +93,15 @@ export type RunnerLeaseStore = {
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
 const capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
+const runnerVersionPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
+
+function validRunnerVersion(value: string): boolean {
+  return (
+    value.length <= 64 &&
+    runnerVersionPattern.test(value) &&
+    value.split(".").every((component) => Number.isSafeInteger(Number(component)))
+  );
+}
 const leaseStages = new Set<RunnerLeaseStage>([
   "claimed",
   "preparing_source",
@@ -243,7 +253,11 @@ export function createSqlRunnerLeaseStore(
     async claimJob(input) {
       const at = now();
       const capabilities = normalizedCapabilities(input.capabilities);
-      if (!validIdentity(input) || capabilities === undefined) {
+      if (
+        !validIdentity(input) ||
+        capabilities === undefined ||
+        (input.runnerVersion !== undefined && !validRunnerVersion(input.runnerVersion))
+      ) {
         return { status: "rejected", reason: "invalid_request" };
       }
       if (!validSignedMutation(input, at, requestToleranceSeconds)) {
@@ -275,7 +289,7 @@ export function createSqlRunnerLeaseStore(
       const result = await executor.query(
         `select * from boardreadyops_claim_runner_job(
            $1::timestamptz, $2, $3, $4, $5::jsonb, $6, $7::timestamptz,
-           $8::timestamptz, $9, $10, $11, $12::timestamptz, $13::timestamptz
+           $8::timestamptz, $9, $10, $11, $12::timestamptz, $13::timestamptz, $14
          )`,
         [
           at.toISOString(),
@@ -291,6 +305,7 @@ export function createSqlRunnerLeaseStore(
           digest(token),
           expiresAt.toISOString(),
           maximumExpiresAt.toISOString(),
+          input.runnerVersion ?? null,
         ],
       );
 
