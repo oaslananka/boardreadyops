@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.26.0](https://github.com/oaslananka/boardreadyops/compare/v1.25.1...v1.26.0) (2026-08-02)
+
+
+### Features
+
+* **cloud:** add bounded soak recovery validation ([#300](https://github.com/oaslananka/boardreadyops/issues/300)) ([dab4b6e](https://github.com/oaslananka/boardreadyops/commit/dab4b6e3199cb361be5bc93f8d3bbbb388128427)), refs [#222](https://github.com/oaslananka/boardreadyops/issues/222)
+
 ## [1.25.1](https://github.com/oaslananka/boardreadyops/compare/v1.25.0...v1.25.1) (2026-08-01)
 
 
