@@ -19,6 +19,7 @@ describe("result OIDC repository binding", () => {
           name: "hardware-board",
           github_repo_id: "98765",
           default_branch: "trunk",
+          commit_sha: "a".repeat(40),
           trust_mode: "safe",
           safe_mode_reasons: ["private-repository"],
         },
@@ -30,6 +31,7 @@ describe("result OIDC repository binding", () => {
       executionAttemptId,
       repository: "octo-org/hardware-board",
       repositoryId: "98765",
+      sha: "a".repeat(40),
       workflowRef: "octo-org/hardware-board/.github/workflows/readiness-runner.yml@refs/heads/trunk",
       ref: "refs/heads/trunk",
       audience:
@@ -53,6 +55,7 @@ describe("result OIDC repository binding", () => {
       name: "hardware-board",
       github_repo_id: "98765",
       default_branch: "trunk",
+      commit_sha: "a".repeat(40),
     };
 
     query.mockResolvedValueOnce({ rows: [{ ...baseRow, trust_mode: "standard", safe_mode_reasons: [] }] });
@@ -73,6 +76,24 @@ describe("result OIDC repository binding", () => {
       query.mockResolvedValueOnce({ rows: [{ ...baseRow, ...trust }] });
       await expect(resultOidcExpectations({ query }, runId, executionAttemptId)).resolves.toBeUndefined();
     }
+  });
+
+  it("fails closed when the persisted commit SHA is not exact", async () => {
+    const query = vi.fn(async () => ({
+      rows: [
+        {
+          owner: "octo-org",
+          name: "hardware-board",
+          github_repo_id: "98765",
+          default_branch: "trunk",
+          commit_sha: "main",
+          trust_mode: "standard",
+          safe_mode_reasons: [],
+        },
+      ],
+    }));
+
+    await expect(resultOidcExpectations({ query }, runId, executionAttemptId)).resolves.toBeUndefined();
   });
 
   it("fails closed for an unknown run or invalid workflow configuration", async () => {

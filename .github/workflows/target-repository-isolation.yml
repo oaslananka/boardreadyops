@@ -1,0 +1,57 @@
+name: target-repository-isolation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: target-repository-isolation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_isolation
+      BOARDREADYOPS_POSTGRES_TESTS: "true"
+      BOARDREADYOPS_ISOLATION_EVIDENCE_PATH: target-repository-isolation-evidence.json
+      BOARDREADYOPS_ISOLATION_REPORT_PATH: target-repository-isolation-report.json
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: boardreadyops
+          POSTGRES_DB: boardreadyops_isolation
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boardreadyops -d boardreadyops_isolation"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: corepack install
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Apply cloud migrations
+        run: pnpm --filter @boardreadyops/db db:migrate
+      - name: Validate two-installation callback isolation
+        run: pnpm run cloud:isolation:verify
+      - name: Upload aggregate isolation evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: target-repository-isolation
+          path: target-repository-isolation-report.json
+          if-no-files-found: error
+          retention-days: 30
