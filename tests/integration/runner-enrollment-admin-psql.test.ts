@@ -4,9 +4,11 @@ import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { issueRunnerEnrollment } from "../../packages/db/src/runner-enrollment-admin.js";
+import { issueRunnerEnrollment, revokeRunnerRegistration } from "../../packages/db/src/runner-enrollment-admin.js";
 
-const databaseUrl = "postgresql://postgres@127.0.0.1:55432/boardreadyops";
+const postgresPort = process.env.BOARDREADYOPS_PSQL_TEST_PORT ?? "55432";
+const postgresContainer = process.env.BOARDREADYOPS_PSQL_TEST_CONTAINER ?? "boardreadyops-enrollment-psql-test";
+const databaseUrl = `postgresql://postgres@127.0.0.1:${postgresPort}/boardreadyops`;
 const enabled = process.env.BOARDREADYOPS_PSQL_TEST === "1";
 const suite = enabled ? describe : describe.skip;
 
@@ -21,8 +23,8 @@ suite("runner enrollment admin psql integration", () => {
     const shim = path.join(shimRoot, process.platform === "win32" ? "psql.cmd" : "psql");
     const shimContent =
       process.platform === "win32"
-        ? "@docker exec -i boardreadyops-enrollment-psql-test psql -U postgres -d boardreadyops %*\r\n"
-        : '#!/bin/sh\nexec docker exec -i boardreadyops-enrollment-psql-test psql -U postgres -d boardreadyops "$@"\n';
+        ? `@docker exec -i ${postgresContainer} psql -U postgres -d boardreadyops %*\r\n`
+        : `#!/bin/sh\nexec docker exec -i ${postgresContainer} psql -U postgres -d boardreadyops "$@"\n`;
     await writeFile(shim, shimContent, { mode: 0o755 });
     if (process.platform !== "win32") await chmod(shim, 0o755);
     process.env.PATH = `${shimRoot}${path.delimiter}${originalPath ?? ""}`;
@@ -102,6 +104,79 @@ suite("runner enrollment admin psql integration", () => {
       event_type: "runner.registration.enrollment_issued",
     });
   });
+
+  it("permanently revokes a registration through the hardened psql client", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-revoke-psql-"));
+    roots.push(root);
+    const databaseUrlFile = path.join(root, "database-url");
+    const tokenOutputFile = path.join(root, "runner.token");
+    await writeFile(databaseUrlFile, `${databaseUrl}\n`, { mode: 0o600 });
+    if (process.platform !== "win32") await chmod(databaseUrlFile, 0o600);
+
+    const issued = await issueRunnerEnrollment(
+      {
+        databaseUrlFile,
+        installationId,
+        name: "psql-revocation-runner",
+        scope: "installation",
+        allowedRepositories: [],
+        tokenOutputFile,
+        ttlSeconds: 900,
+      },
+      { token: () => "r".repeat(43) },
+    );
+
+    const revoked = await revokeRunnerRegistration({
+      databaseUrlFile,
+      installationId,
+      registrationId: issued.registrationId,
+      actorId: "operator:release-engineering",
+      reason: "operator-request",
+    });
+    expect(revoked).toMatchObject({
+      status: "accepted",
+      registrationId: issued.registrationId,
+      revokedEnrollmentCount: 1,
+    });
+    expect(revoked.revokedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
+
+    await expect(
+      revokeRunnerRegistration({
+        databaseUrlFile,
+        installationId,
+        registrationId: issued.registrationId,
+        actorId: "operator:release-engineering",
+        reason: "operator-request",
+      }),
+    ).resolves.toEqual({ ...revoked, status: "replayed", revokedEnrollmentCount: 0 });
+
+    const stored = JSON.parse(
+      psql(
+        `select json_build_object(
+           'status', registration.status,
+           'disabled_at', registration.disabled_at,
+           'revoked_at', enrollment.revoked_at,
+           'audit_count', count(distinct audit.id),
+           'reason', min(audit.metadata->>'reason')
+         )::text
+         from runner_registrations as registration
+         join runner_registration_enrollments as enrollment
+           on enrollment.runner_registration_id = registration.id
+         join audit_events as audit
+           on audit.runner_registration_id = registration.id
+          and audit.event_type = 'runner.registration.revoked'
+         where registration.id = '${issued.registrationId}'
+         group by registration.id, enrollment.id;`,
+      ),
+    ) as Record<string, unknown>;
+    expect(stored).toMatchObject({
+      status: "disabled",
+      audit_count: 1,
+      reason: "operator-request",
+    });
+    expect(stored.disabled_at).not.toBeNull();
+    expect(stored.revoked_at).not.toBeNull();
+  });
 });
 
 function psql(statement: string, allowFailure = false): string {
@@ -109,7 +184,7 @@ function psql(statement: string, allowFailure = false): string {
     env: {
       ...process.env,
       PGHOST: "127.0.0.1",
-      PGPORT: "55432",
+      PGPORT: postgresPort,
       PGUSER: "postgres",
       PGDATABASE: "boardreadyops",
     },

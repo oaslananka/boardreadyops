@@ -54,6 +54,7 @@ describe("complete monorepo integration", () => {
     expect(plan.postgresTests).toContain("tests/integration/postgres-backup-restore.test.ts");
     expect(plan.postgresTests).toContain("tests/integration/control-plane-history-retention-postgres.test.ts");
     expect(plan.postgresTests).toContain("tests/integration/github-actions-result-isolation-postgres.test.ts");
+    expect(plan.postgresTests).toContain("tests/integration/runner-registration-revocation-postgres.test.ts");
     expect(plan.postgresTests).toContain("tests/integration/versioned-release-run-transitions-postgres.test.ts");
     expect(plan.kicad.status).toBe("tested");
   });

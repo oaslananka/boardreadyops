@@ -2,7 +2,7 @@ import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { issueRunnerEnrollment } from "../../../packages/db/src/runner-enrollment-admin.js";
+import { issueRunnerEnrollment, revokeRunnerRegistration } from "../../../packages/db/src/runner-enrollment-admin.js";
 
 const roots: string[] = [];
 const installationId = "11111111-1111-4111-8111-111111111111";
@@ -193,5 +193,56 @@ describe("issueRunnerEnrollment", () => {
       ),
     ).rejects.toThrow(/already uses this name or scope/u);
     await expect(readFile(tokenOutputFile)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+describe("revokeRunnerRegistration", () => {
+  it("uses the private database URL and returns non-sensitive revocation metadata", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-revocation-"));
+    roots.push(root);
+    const databaseUrl = "postgresql://user:placeholder@db.example/boardreadyops";
+    const databaseUrlFile = await privateFile(root, "database-url", `${databaseUrl}\n`);
+    const revokedAt = "2026-08-02T12:10:00.000Z";
+    const query = vi.fn(async (_url: string, sql: string, params: readonly unknown[]) => {
+      expect(sql).toContain("boardreadyops_revoke_runner_registration");
+      expect(params).toEqual([
+        expect.any(String),
+        installationId,
+        registrationId,
+        "operator:release-engineering",
+        "suspected-compromise",
+      ]);
+      return {
+        rows: [
+          {
+            outcome: "accepted",
+            registration_id: registrationId,
+            revoked_enrollment_count: 1,
+            revoked_at: revokedAt,
+          },
+        ],
+      };
+    });
+
+    const result = await revokeRunnerRegistration(
+      {
+        databaseUrlFile,
+        installationId,
+        registrationId,
+        actorId: "operator:release-engineering",
+        reason: "suspected-compromise",
+      },
+      { query },
+    );
+
+    expect(query).toHaveBeenCalledOnce();
+    expect(query.mock.calls[0]?.[0]).toBe(databaseUrl);
+    expect(result).toEqual({
+      status: "accepted",
+      registrationId,
+      revokedEnrollmentCount: 1,
+      revokedAt,
+    });
+    expect(JSON.stringify(result)).not.toContain("placeholder");
   });
 });

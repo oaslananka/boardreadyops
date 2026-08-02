@@ -31,9 +31,33 @@ export type ActivateRunnerRegistrationResult =
   | { status: "accepted" | "replayed"; registrationId: string; installationId: string }
   | { status: "conflict" | "stale"; registrationId?: string; installationId?: string };
 
+export type RunnerRegistrationRevocationReason =
+  | "credential-rotation"
+  | "host-decommissioned"
+  | "policy-change"
+  | "operator-request"
+  | "suspected-compromise";
+
+export type RevokeRunnerRegistrationInput = {
+  installationId: string;
+  registrationId: string;
+  actorId: string;
+  reason: RunnerRegistrationRevocationReason;
+};
+
+export type RevokeRunnerRegistrationResult =
+  | {
+      status: "accepted" | "replayed";
+      registrationId: string;
+      revokedEnrollmentCount: number;
+      revokedAt: string;
+    }
+  | { status: "stale" };
+
 export type RunnerRegistrationEnrollmentStore = {
   issueEnrollment(input: IssueRunnerRegistrationEnrollmentInput): Promise<IssueRunnerRegistrationEnrollmentResult>;
   activateRegistration(input: ActivateRunnerRegistrationInput): Promise<ActivateRunnerRegistrationResult>;
+  revokeRegistration(input: RevokeRunnerRegistrationInput): Promise<RevokeRunnerRegistrationResult>;
 };
 
 export type RunnerRegistrationEnrollmentStoreOptions = {
@@ -56,6 +80,14 @@ function rows(result: unknown): readonly Record<string, unknown>[] {
 function stringColumn(row: Record<string, unknown> | undefined, key: string): string | undefined {
   const value = row?.[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function integerColumn(row: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = row?.[key];
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
+  if (typeof value !== "string" || !/^\d+$/u.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function isoColumn(row: Record<string, unknown> | undefined, key: string): string | undefined {
@@ -99,6 +131,18 @@ function normalizeUniqueStrings(
 
 function validSecret(value: string): boolean {
   return value.length >= 43 && value.length <= 256 && base64UrlPattern.test(value);
+}
+
+const revocationReasons = new Set<RunnerRegistrationRevocationReason>([
+  "credential-rotation",
+  "host-decommissioned",
+  "policy-change",
+  "operator-request",
+  "suspected-compromise",
+]);
+
+function validActorId(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$/u.test(value);
 }
 
 export function createSqlRunnerRegistrationEnrollmentStore(
@@ -214,6 +258,42 @@ export function createSqlRunnerRegistrationEnrollmentStore(
         ...(registrationId === undefined ? {} : { registrationId }),
         ...(installationId === undefined ? {} : { installationId }),
       };
+    },
+
+    async revokeRegistration(input) {
+      const at = now();
+      if (
+        !uuidPattern.test(input.installationId) ||
+        !uuidPattern.test(input.registrationId) ||
+        !validActorId(input.actorId) ||
+        !revocationReasons.has(input.reason)
+      ) {
+        return { status: "stale" };
+      }
+      const result = await executor.query(
+        `select * from boardreadyops_revoke_runner_registration(
+           $1::timestamptz,
+           $2,
+           $3,
+           $4,
+           $5
+         )`,
+        [at.toISOString(), input.installationId, input.registrationId, input.actorId, input.reason],
+      );
+      const row = rows(result)[0];
+      const outcome = stringColumn(row, "outcome");
+      const registrationId = stringColumn(row, "registration_id");
+      const revokedEnrollmentCount = integerColumn(row, "revoked_enrollment_count");
+      const revokedAt = isoColumn(row, "revoked_at");
+      if (
+        (outcome === "accepted" || outcome === "replayed") &&
+        registrationId &&
+        revokedEnrollmentCount !== undefined &&
+        revokedAt
+      ) {
+        return { status: outcome, registrationId, revokedEnrollmentCount, revokedAt };
+      }
+      return { status: "stale" };
     },
   };
 }

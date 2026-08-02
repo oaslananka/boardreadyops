@@ -1,6 +1,9 @@
 import path from "node:path";
-import { issueRunnerEnrollment } from "../../../packages/db/src/runner-enrollment-admin.js";
-import type { RunnerRegistrationScope } from "../../../packages/db/src/runner-registration-enrollment-store.js";
+import { issueRunnerEnrollment, revokeRunnerRegistration } from "../../../packages/db/src/runner-enrollment-admin.js";
+import type {
+  RunnerRegistrationRevocationReason,
+  RunnerRegistrationScope,
+} from "../../../packages/db/src/runner-registration-enrollment-store.js";
 import { boardReadyVersion } from "../../generated/version.js";
 import { activateRunnerIdentity, defaultRunnerIdentityDirectory } from "../../runner/identity.js";
 import {
@@ -21,6 +24,15 @@ export type RunnerIssueEnrollmentCliOptions = {
   repository?: string[];
   tokenOutput: string;
   ttlSeconds?: number;
+  format?: RunnerOutputFormat;
+};
+
+export type RunnerRevokeRegistrationCliOptions = {
+  databaseUrlFile: string;
+  installationId: string;
+  registrationId: string;
+  actorId: string;
+  reason: RunnerRegistrationRevocationReason;
   format?: RunnerOutputFormat;
 };
 
@@ -74,6 +86,31 @@ export async function runnerIssueEnrollmentCommand(
     return 0;
   } catch (error) {
     streams.stderr.write(`Runner enrollment issuance failed: ${safeMessage(error)}\n`);
+    return 4;
+  }
+}
+
+export async function runnerRevokeRegistrationCommand(
+  options: RunnerRevokeRegistrationCliOptions,
+  streams: RunnerStreams,
+): Promise<number> {
+  try {
+    const revoked = await revokeRunnerRegistration({
+      databaseUrlFile: path.resolve(options.databaseUrlFile),
+      installationId: options.installationId,
+      registrationId: options.registrationId,
+      actorId: options.actorId,
+      reason: options.reason,
+    });
+    writeRunnerOutput(
+      streams.stdout,
+      options.format,
+      revoked,
+      `Runner ${revoked.registrationId} ${revoked.status} at ${revoked.revokedAt}; revoked ${revoked.revokedEnrollmentCount} pending enrollment token(s).`,
+    );
+    return 0;
+  } catch (error) {
+    streams.stderr.write(`Runner registration revocation failed: ${safeMessage(error)}\n`);
     return 4;
   }
 }
