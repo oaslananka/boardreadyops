@@ -52,6 +52,7 @@ describe("dependency and security automation configuration", () => {
 
   it("bounds Actions evidence while durable binaries stay in GitHub Releases", async () => {
     const binary = await repositoryFile(".github/workflows/binary-build.yml");
+    const binaryPublisher = await repositoryFile("scripts/publish-binary-release-assets.mjs");
     const ci = await repositoryFile(".github/workflows/ci.yml");
     const benchmark = await repositoryFile(".github/workflows/benchmark.yml");
     const mutation = await repositoryFile(".github/workflows/mutation-nightly.yml");
@@ -59,8 +60,10 @@ describe("dependency and security automation configuration", () => {
     const selfValidation = await repositoryFile(".github/workflows/self-validation.yml");
 
     expect(binary.match(/retention-days: 1/gu) ?? []).toHaveLength(2);
-    expect(binary).toContain("gh release upload");
-    expect(binary).toContain("gh release create");
+    expect(binary).toContain("pnpm run build:binary:publish");
+    expect(binaryPublisher).toMatch(/"release",\s*"upload"/u);
+    expect(binaryPublisher).toMatch(/"release",\s*"create"/u);
+    expect(binaryPublisher).toContain('"--clobber"');
     expect(ci).toContain("Upload bounded coverage evidence");
     expect(ci).toContain(
       "if: $" + "{{ failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}",
