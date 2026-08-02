@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.26.1](https://github.com/oaslananka/boardreadyops/compare/v1.26.0...v1.26.1) (2026-08-02)
+
+
+### Bug Fixes
+
+* **cloud:** bind target callbacks to exact revision ([#306](https://github.com/oaslananka/boardreadyops/issues/306)) ([8f8c476](https://github.com/oaslananka/boardreadyops/commit/8f8c4764ce561bb26da2ffae063d50ba00bc246c)), refs [#154](https://github.com/oaslananka/boardreadyops/issues/154)
+
 ## [1.26.0](https://github.com/oaslananka/boardreadyops/compare/v1.25.1...v1.26.0) (2026-08-02)
 
 
