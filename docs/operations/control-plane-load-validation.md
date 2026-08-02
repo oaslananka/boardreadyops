@@ -15,6 +15,8 @@ The validation creates synthetic installation and repository scopes, then measur
 
 The scenario persists only generated identifiers and synthetic metadata. It does not read workflow logs, source, findings, artifacts, tenant payloads, or credentials. External GitHub effects are not emitted; Check Run creation effects are completed locally with synthetic identifiers.
 
+The optional `soak-recovery` profile repeats a bounded recovery round against the same disposable database. Each round proves an abandoned lifecycle-job lease can be reclaimed while the old worker is rejected, a transient outbox failure can retry, an uncertain delivery is quarantined as `reconciliation_required`, a delayed callback converges through workflow reconciliation, and a stale attempt terminal result is rejected after the current-attempt pointer changes. No GitHub API call is made; the workflow observation is deterministic synthetic input to the real reconciliation worker and PostgreSQL store.
+
 ## Default engineering baseline
 
 The default manual workflow runs this scenario:
@@ -30,6 +32,8 @@ The default manual workflow runs this scenario:
 | Lifecycle p95 limit | 1,500 ms |
 | Dashboard p95 limit | 1,000 ms |
 | Minimum throughput per phase | 10 operations/second |
+| Recovery rounds | 3 |
+| Maximum recovery-round convergence | 5,000 ms |
 
 Crossing a latency or throughput limit fails the run with a stable signal name. Treat a failure as a capacity or architecture-review trigger until repeated measurements show that the regression is environmental rather than systemic.
 
@@ -47,6 +51,7 @@ Confirm the destructive test boundary and run the baseline:
 ```bash
 export BOARDREADYOPS_LOAD_CONFIRMATION=isolated-disposable-database
 export BOARDREADYOPS_LOAD_REPORT_PATH=control-plane-load-report.json
+export BOARDREADYOPS_LOAD_PROFILE=representative
 pnpm run cloud:load:verify
 ```
 
@@ -55,6 +60,8 @@ The command refuses to start without the exact confirmation value. It also refus
 Optional bounded overrides are:
 
 ```dotenv
+BOARDREADYOPS_LOAD_PROFILE=representative
+BOARDREADYOPS_LOAD_RECOVERY_ROUNDS=3
 BOARDREADYOPS_LOAD_UNIQUE_DELIVERIES=200
 BOARDREADYOPS_LOAD_DUPLICATE_DELIVERIES=50
 BOARDREADYOPS_LOAD_REPOSITORIES=4
@@ -64,12 +71,15 @@ BOARDREADYOPS_LOAD_INTAKE_P95_MS=1000
 BOARDREADYOPS_LOAD_LIFECYCLE_P95_MS=1500
 BOARDREADYOPS_LOAD_DASHBOARD_P95_MS=1000
 BOARDREADYOPS_LOAD_MINIMUM_THROUGHPUT_PER_SECOND=10
+BOARDREADYOPS_LOAD_RECOVERY_MAX_CONVERGENCE_MS=5000
 ```
 
-The generated report is mode `0600` and contains aggregate timing, throughput, stable threshold signals, scenario counts, and invariant results only. It is written before threshold assertions so a failed capacity gate still leaves reviewable evidence.
+The generated report is mode `0600` and contains aggregate timing, throughput, stable threshold signals, scenario counts, and invariant results only. A `soak-recovery` report adds only aggregate recovery counters, maximum convergence time, dead-letter count, and ambiguous non-terminal-state count. It never includes tenant identifiers, payloads, lease tokens, request nonces, or simulated failure text. It is written before threshold assertions so a failed capacity gate still leaves reviewable evidence.
+
+To run the bounded recovery profile locally, set `BOARDREADYOPS_LOAD_PROFILE=soak-recovery`. `BOARDREADYOPS_LOAD_RECOVERY_ROUNDS` accepts 1 through 20; the default is 3. Every round must produce one lease recovery, stale job-completion rejection, outbox retry, uncertain delivery quarantine, delayed-callback repair, and stale attempt result rejection. A missing proof, a dead letter, ambiguous non-terminal state, or convergence above the configured maximum fails with a stable signal.
 
 ## GitHub Actions evidence
 
 Run the `control-plane-load` workflow manually. It provisions an isolated PostgreSQL 16 service, applies every repository migration, executes the selected scenario, and uploads `control-plane-load-report.json` for 30 days. The workflow uses no repository secret and has read-only repository permissions.
 
-Keep the report with the GA-readiness evidence for issue #222. This validation covers representative load and tenant isolation; it does not by itself satisfy sustained soak, worker termination, database interruption, delayed callback, transient GitHub API failure, or full reconciliation-recovery acceptance criteria.
+Keep the report with the GA-readiness evidence for issue #222. The representative profile covers bounded load and tenant isolation. The `soak-recovery` profile adds bounded repeated worker-lease expiry, transient delivery retry, uncertain-delivery classification, delayed callback convergence, and stale-attempt rejection. It does not by itself satisfy hours-long soak, real process termination, PostgreSQL interruption, external GitHub API fault injection, or final GA sign-off.

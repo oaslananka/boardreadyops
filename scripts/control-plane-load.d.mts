@@ -5,10 +5,13 @@ export type ControlPlaneLoadThresholds = {
   lifecycleP95Ms: number;
   dashboardP95Ms: number;
   minimumThroughputPerSecond: number;
+  recoveryMaxConvergenceMs: number;
 };
 
 export type ControlPlaneLoadConfiguration = {
   databaseUrl: string;
+  profile: "representative" | "soak-recovery";
+  recoveryRounds: number;
   uniqueDeliveries: number;
   duplicateDeliveries: number;
   repositoryCount: number;
@@ -27,12 +30,27 @@ export type ControlPlaneLoadMeasurement = {
   maximumMs: number;
 };
 
+export type ControlPlaneLoadRecoveryReport = {
+  roundsRequested: number;
+  roundsCompleted: number;
+  jobLeaseRecoveries: number;
+  staleJobCompletionsRejected: number;
+  outboxRetries: number;
+  uncertainOutboxQuarantines: number;
+  delayedCallbackRepairs: number;
+  staleAttemptResultsRejected: number;
+  maximumConvergenceMs: number;
+  deadLetters: number;
+  ambiguousNonterminalStates: number;
+};
+
 export type ControlPlaneLoadReport = {
   event: "control_plane_load_verified";
   scenario: Omit<ControlPlaneLoadConfiguration, "databaseUrl" | "thresholds">;
   intake: ControlPlaneLoadMeasurement;
   lifecycle: ControlPlaneLoadMeasurement;
   dashboard: ControlPlaneLoadMeasurement;
+  recovery?: ControlPlaneLoadRecoveryReport;
   signals: readonly string[];
   invariants: {
     acceptedDeliveries: number;
@@ -64,7 +82,11 @@ export type ControlPlaneLoadDependencies = {
   createPgQueryExecutor: typeof import("../packages/db/src/pg-executor.js").createPgQueryExecutor;
   createSqlControlPlaneJobStore: typeof import("../packages/db/src/control-plane-job-store.js").createSqlControlPlaneJobStore;
   createSqlControlPlaneOutboxStore: typeof import("../packages/db/src/control-plane-outbox-store.js").createSqlControlPlaneOutboxStore;
+  createSqlControlPlaneOperationsStore: typeof import("../packages/db/src/control-plane-operations-store.js").createSqlControlPlaneOperationsStore;
+  createSqlRunnerLeaseStore: typeof import("../packages/db/src/runner-lease-store.js").createSqlRunnerLeaseStore;
+  createSqlRunnerTerminalResultAuthorizer: typeof import("../packages/db/src/runner-terminal-result-store.js").createSqlRunnerTerminalResultAuthorizer;
   createSqlTransactionalGitHubAppLifecycleStore: typeof import("../packages/db/src/transactional-lifecycle-store.js").createSqlTransactionalGitHubAppLifecycleStore;
+  processControlPlaneWorkflowReconciliation: typeof import("../apps/web/lib/control-plane-reconciliation-worker.js").processControlPlaneWorkflowReconciliation;
   lookupRunDashboard: typeof import("../apps/web/lib/run-dashboard.js").lookupRunDashboard;
 };
 

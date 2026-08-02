@@ -3,6 +3,19 @@ name: control-plane-load
 on:
   workflow_dispatch:
     inputs:
+      profile:
+        description: Validation profile
+        required: true
+        default: "representative"
+        type: choice
+        options:
+          - representative
+          - soak-recovery
+      recovery_rounds:
+        description: Bounded recovery rounds for soak-recovery
+        required: true
+        default: "3"
+        type: string
       unique_deliveries:
         description: Unique webhook deliveries
         required: true
@@ -44,6 +57,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_load
       BOARDREADYOPS_LOAD_CONFIRMATION: isolated-disposable-database
+      BOARDREADYOPS_LOAD_PROFILE: ${{ inputs.profile }}
+      BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: ${{ inputs.recovery_rounds }}
       BOARDREADYOPS_LOAD_UNIQUE_DELIVERIES: ${{ inputs.unique_deliveries }}
       BOARDREADYOPS_LOAD_DUPLICATE_DELIVERIES: ${{ inputs.duplicate_deliveries }}
       BOARDREADYOPS_LOAD_REPOSITORIES: ${{ inputs.repositories }}
@@ -53,6 +68,7 @@ jobs:
       BOARDREADYOPS_LOAD_LIFECYCLE_P95_MS: "1500"
       BOARDREADYOPS_LOAD_DASHBOARD_P95_MS: "1000"
       BOARDREADYOPS_LOAD_MINIMUM_THROUGHPUT_PER_SECOND: "10"
+      BOARDREADYOPS_LOAD_RECOVERY_MAX_CONVERGENCE_MS: "5000"
       BOARDREADYOPS_LOAD_REPORT_PATH: control-plane-load-report.json
     services:
       postgres:
@@ -81,7 +97,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Apply cloud migrations
         run: pnpm --filter @boardreadyops/db db:migrate
-      - name: Validate representative control-plane load
+      - name: Validate selected control-plane load profile
         run: pnpm run cloud:load:verify
       - name: Upload privacy-safe load report
         if: always()
