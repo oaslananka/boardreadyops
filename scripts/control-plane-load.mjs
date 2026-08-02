@@ -43,8 +43,8 @@ export function parseControlPlaneLoadConfiguration(environment = process.env) {
   const databaseUrl = environment.DATABASE_URL?.trim();
   if (!databaseUrl) throw new Error("DATABASE_URL is required for control-plane load validation");
   const profile = environment.BOARDREADYOPS_LOAD_PROFILE?.trim() || "representative";
-  if (profile !== "representative" && profile !== "soak-recovery") {
-    throw new Error("BOARDREADYOPS_LOAD_PROFILE must be representative or soak-recovery");
+  if (profile !== "representative" && profile !== "soak-recovery" && profile !== "database-interruption") {
+    throw new Error("BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, or database-interruption");
   }
 
   const uniqueDeliveries = boundedInteger(environment, "BOARDREADYOPS_LOAD_UNIQUE_DELIVERIES", 200, 10, 5_000);
@@ -145,8 +145,11 @@ export function evaluateControlPlaneLoadReport(report, thresholds = defaultThres
     }
   }
 
-  if (report.scenario.profile === "soak-recovery") {
+  if (report.scenario.profile !== "representative") {
     signals.push(...evaluateRecoveryEvidence(report, thresholds));
+  }
+  if (report.scenario.profile === "database-interruption") {
+    signals.push(...evaluateDatabaseRecoveryEvidence(report, thresholds));
   }
   return signals;
 }
@@ -165,6 +168,20 @@ function evaluateRecoveryEvidence(report, thresholds) {
     ["recovery_convergence_exceeded", recovery?.maximumConvergenceMs <= thresholds.recoveryMaxConvergenceMs],
     ["recovery_dead_letters_detected", recovery?.deadLetters === 0],
     ["recovery_ambiguous_state_detected", recovery?.ambiguousNonterminalStates === 0],
+  ];
+  return checks.filter(([, passed]) => !passed).map(([signal]) => signal);
+}
+
+function evaluateDatabaseRecoveryEvidence(report, thresholds) {
+  const recovery = report.databaseRecovery;
+  const rounds = report.scenario.recoveryRounds;
+  const checks = [
+    ["database_recovery_rounds_incomplete", recovery?.roundsCompleted >= rounds],
+    ["database_backend_termination_incomplete", recovery?.backendTerminations >= rounds],
+    ["database_interrupted_transaction_rejection_incomplete", recovery?.interruptedTransactionsRejected >= rounds],
+    ["database_transaction_rollback_incomplete", recovery?.transactionRollbacksVerified >= rounds],
+    ["database_replacement_connection_incomplete", recovery?.replacementConnectionsEstablished >= rounds],
+    ["database_recovery_convergence_exceeded", recovery?.maximumConvergenceMs <= thresholds.recoveryMaxConvergenceMs],
   ];
   return checks.filter(([, passed]) => !passed).map(([signal]) => signal);
 }
@@ -759,6 +776,104 @@ function incrementRecoveryEvidence(recovery, evidence) {
   for (const [name, value] of Object.entries(evidence)) recovery[name] += value;
 }
 
+function requiredDatabaseInterruptionDependency(dependencies, name) {
+  const dependency = dependencies[name];
+  if (typeof dependency !== "function") {
+    throw new Error(`database-interruption dependency is required: ${name}`);
+  }
+  return dependency;
+}
+
+async function closeInterruptedPostgresClient(client) {
+  try {
+    await client.end();
+  } catch {
+    // A backend terminated by PostgreSQL may already have closed the socket.
+  }
+}
+
+async function runDatabaseInterruptionValidation(configuration, input) {
+  const createPostgresClient = requiredDatabaseInterruptionDependency(input.dependencies, "createPostgresClient");
+  const databaseRecovery = {
+    roundsRequested: configuration.recoveryRounds,
+    roundsCompleted: 0,
+    backendTerminations: 0,
+    interruptedTransactionsRejected: 0,
+    transactionRollbacksVerified: 0,
+    replacementConnectionsEstablished: 0,
+    maximumConvergenceMs: 0,
+  };
+
+  for (let round = 0; round < configuration.recoveryRounds; round += 1) {
+    const startedAt = performance.now();
+    const repository = input.repositories[round % input.repositories.length];
+    const interruptedName = `${input.prefix}-interrupted-${round}`;
+    const interruptedClient = createPostgresClient({ connectionString: configuration.databaseUrl });
+    let connectionErrorObserved = false;
+    interruptedClient.on("error", () => {
+      connectionErrorObserved = true;
+    });
+
+    try {
+      await interruptedClient.connect();
+      await interruptedClient.query("begin");
+      await interruptedClient.query("update repositories set name = $1 where id = $2", [
+        interruptedName,
+        repository.repositoryId,
+      ]);
+      const backend = databaseRows(await interruptedClient.query("select pg_backend_pid()::int as pid"))[0];
+      const backendPid = integerColumn(backend, "pid");
+      if (backendPid < 1) throw new Error("database interruption backend pid was unavailable");
+
+      const termination = databaseRows(
+        await input.executor.query("select pg_terminate_backend($1)::boolean as terminated", [backendPid]),
+      )[0];
+      if (termination?.terminated !== true) throw new Error("PostgreSQL backend termination was not acknowledged");
+      databaseRecovery.backendTerminations += 1;
+
+      try {
+        await interruptedClient.query("select 1");
+      } catch {
+        connectionErrorObserved = true;
+      }
+      if (!connectionErrorObserved) throw new Error("interrupted PostgreSQL transaction remained usable");
+      databaseRecovery.interruptedTransactionsRejected += 1;
+    } finally {
+      await closeInterruptedPostgresClient(interruptedClient);
+    }
+
+    const persisted = databaseRows(
+      await input.executor.query("select name from repositories where id = $1", [repository.repositoryId]),
+    )[0];
+    if (persisted?.name !== repository.name) {
+      throw new Error("interrupted PostgreSQL transaction did not roll back atomically");
+    }
+    databaseRecovery.transactionRollbacksVerified += 1;
+
+    const replacementClient = createPostgresClient({ connectionString: configuration.databaseUrl });
+    try {
+      await replacementClient.connect();
+      const replacement = databaseRows(
+        await replacementClient.query("select name from repositories where id = $1", [repository.repositoryId]),
+      )[0];
+      if (replacement?.name !== repository.name) {
+        throw new Error("replacement PostgreSQL connection observed inconsistent state");
+      }
+      databaseRecovery.replacementConnectionsEstablished += 1;
+    } finally {
+      await replacementClient.end();
+    }
+
+    databaseRecovery.roundsCompleted += 1;
+    databaseRecovery.maximumConvergenceMs = Math.max(
+      databaseRecovery.maximumConvergenceMs,
+      rounded(performance.now() - startedAt),
+    );
+  }
+
+  return databaseRecovery;
+}
+
 async function runSoakRecoveryValidation(configuration, input) {
   const createSqlControlPlaneOperationsStore = requiredRecoveryDependency(
     input.dependencies,
@@ -898,8 +1013,17 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
       configuration.concurrency,
       lookupRunDashboard,
     );
+    const databaseRecovery =
+      configuration.profile === "database-interruption"
+        ? await runDatabaseInterruptionValidation(configuration, {
+            executor,
+            prefix,
+            repositories,
+            dependencies,
+          })
+        : undefined;
     const recovery =
-      configuration.profile === "soak-recovery"
+      configuration.profile !== "representative"
         ? await runSoakRecoveryValidation(configuration, {
             executor,
             prefix,
@@ -942,6 +1066,7 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
       ),
       dashboard: summarizeDurations(dashboard.durations, dashboard.elapsedMs),
       ...(recovery ? { recovery } : {}),
+      ...(databaseRecovery ? { databaseRecovery } : {}),
       invariants: {
         ...state,
         scopedDashboardReads: dashboard.scopedDashboardReads,

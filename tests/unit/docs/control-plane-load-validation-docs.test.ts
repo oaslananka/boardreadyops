@@ -23,6 +23,10 @@ describe("control-plane load validation documentation", () => {
     expect(documentation).toContain("10 operations/second");
     expect(documentation).toContain("mode `0600`");
     expect(documentation).toContain("soak-recovery");
+    expect(documentation).toContain("database-interruption");
+    expect(documentation).toContain("pg_terminate_backend");
+    expect(documentation).toContain("transaction rollback");
+    expect(documentation).toContain("replacement connection");
     expect(documentation).toContain("BOARDREADYOPS_LOAD_RECOVERY_ROUNDS");
     expect(documentation).toContain("stale attempt");
     expect(documentation).toContain("uncertain delivery");
@@ -33,6 +37,7 @@ describe("control-plane load validation documentation", () => {
     expect(workflow).toContain("profile:");
     expect(workflow).toContain('default: "representative"');
     expect(workflow).toContain("recovery_rounds:");
+    expect(workflow).toContain("database-interruption");
     expect(workflow).toContain("BOARDREADYOPS_LOAD_PROFILE");
     expect(workflow).toContain("postgres:16-alpine");
     expect(workflow).toContain("POSTGRES_HOST_AUTH_METHOD: trust");
