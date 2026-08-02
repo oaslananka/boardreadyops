@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import { processControlPlaneWorkflowReconciliation } from "../../apps/web/lib/control-plane-reconciliation-worker.js";
+import { readGitHubWorkflowRun } from "../../apps/web/lib/github-workflow-reconciliation-client.js";
 import { lookupRunDashboard } from "../../apps/web/lib/run-dashboard.js";
 import { createSqlControlPlaneJobStore } from "../../packages/db/src/control-plane-job-store.js";
 import { createSqlControlPlaneOperationsStore } from "../../packages/db/src/control-plane-operations-store.js";
@@ -49,6 +50,7 @@ describeLoad("control-plane PostgreSQL load validation", () => {
       createSqlRunnerTerminalResultAuthorizer,
       createSqlTransactionalGitHubAppLifecycleStore,
       processControlPlaneWorkflowReconciliation,
+      readGitHubWorkflowRun,
       lookupRunDashboard,
     });
     const expectedRuns = configuration.repositoryCount * configuration.runsPerRepository;
@@ -85,6 +87,22 @@ describeLoad("control-plane PostgreSQL load validation", () => {
       expect(report.recovery?.maximumConvergenceMs).toBeGreaterThanOrEqual(0);
     } else {
       expect(report.recovery).toBeUndefined();
+    }
+    if (configuration.profile === "github-api-interruption") {
+      expect(report.githubApiRecovery).toEqual(
+        expect.objectContaining({
+          roundsRequested: configuration.recoveryRounds,
+          roundsCompleted: configuration.recoveryRounds,
+          serviceUnavailableResponses: configuration.recoveryRounds,
+          rateLimitResponses: configuration.recoveryRounds,
+          retriesScheduled: configuration.recoveryRounds * 2,
+          successfulConvergences: configuration.recoveryRounds,
+          requestsObserved: configuration.recoveryRounds * 3,
+        }),
+      );
+      expect(report.githubApiRecovery?.maximumConvergenceMs).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(report.githubApiRecovery).toBeUndefined();
     }
     if (configuration.profile === "worker-process-interruption") {
       expect(report.workerProcessRecovery).toEqual(
