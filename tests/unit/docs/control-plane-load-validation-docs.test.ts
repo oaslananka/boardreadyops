@@ -3,14 +3,17 @@ import { describe, expect, it } from "vitest";
 
 const documentationPath = "docs/operations/control-plane-load-validation.md";
 const workflowPath = ".github/workflows/control-plane-load.yml";
+const scaleWorkflowPath = ".github/workflows/control-plane-scale-envelope.yml";
 
 describe("control-plane load validation documentation", () => {
   it("documents the isolated scenario, thresholds, evidence, and remaining GA boundaries", () => {
     expect(fs.existsSync(documentationPath)).toBe(true);
     expect(fs.existsSync(workflowPath)).toBe(true);
+    expect(fs.existsSync(scaleWorkflowPath)).toBe(true);
 
     const documentation = fs.readFileSync(documentationPath, "utf8");
     const workflow = fs.readFileSync(workflowPath, "utf8");
+    const scaleWorkflow = fs.readFileSync(scaleWorkflowPath, "utf8");
     const navigation = fs.readFileSync("mkdocs.yml", "utf8");
     const packageJson = fs.readFileSync("package.json", "utf8");
 
@@ -39,6 +42,12 @@ describe("control-plane load validation documentation", () => {
     expect(documentation).toContain("stale attempt");
     expect(documentation).toContain("uncertain delivery");
     expect(documentation).toContain("does not by itself satisfy hours-long soak");
+    expect(documentation).toContain("Measured scaling envelope");
+    expect(documentation).toContain("1,000 unique deliveries");
+    expect(documentation).toContain("600 release runs");
+    expect(documentation).toContain("127.909 ms");
+    expect(documentation).toContain("github-cloud-ga-v1");
+    expect(documentation).toContain("not a production capacity guarantee");
     expect(documentation).toContain("issue #222");
 
     expect(workflow).toContain("workflow_dispatch:");
@@ -56,6 +65,16 @@ describe("control-plane load validation documentation", () => {
     expect(workflow).toContain("retention-days: 30");
     expect(workflow).toContain("contents: read");
     expect(workflow).not.toContain("secrets.");
+
+    expect(scaleWorkflow).toContain("workflow_dispatch:");
+    expect(scaleWorkflow).toContain("preset: [baseline, medium, high]");
+    expect(scaleWorkflow).toContain("postgres:16-alpine");
+    expect(scaleWorkflow).toContain("control-plane-scale-envelope.mjs env");
+    expect(scaleWorkflow).toContain("control-plane-scale-envelope.mjs summarize");
+    expect(scaleWorkflow).toContain("actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c");
+    expect(scaleWorkflow).toContain("retention-days: 30");
+    expect(scaleWorkflow).toContain("contents: read");
+    expect(scaleWorkflow).not.toContain("secrets.");
 
     expect(navigation).toContain("Control-plane Load Validation: operations/control-plane-load-validation.md");
     expect(packageJson).toContain('"cloud:load:verify": "node scripts/control-plane-load.mjs"');
