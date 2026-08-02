@@ -53282,6 +53282,7 @@ var base64UrlPattern2 = /^[A-Za-z0-9_-]+$/u;
 var capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
 var githubOwnerPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 var githubRepositoryPattern = /^[A-Za-z0-9_.-]{1,100}$/u;
+var strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 var runnerProtocolVersionSchema = external_exports.literal(1);
 var runnerWorkerClassSchema = external_exports.enum(["managed", "self_hosted"]);
 var runnerSigningAlgorithmSchema = external_exports.literal("ed25519");
@@ -53289,6 +53290,10 @@ var runnerIdentifierSchema = external_exports.string().regex(lowercaseUuidPatter
 var runnerRequestTimestampSchema = external_exports.number().int().nonnegative().max(9999999999);
 var runnerRequestNonceSchema = external_exports.string().min(22).max(128).regex(base64UrlPattern2);
 var runnerRequestSignatureSchema = external_exports.string().length(86).regex(base64UrlPattern2);
+var runnerVersionSchema = external_exports.string().max(64).regex(strictVersionPattern).refine(
+  (value) => value.split(".").every((component) => Number.isSafeInteger(Number(component))),
+  "version components must be safe integers"
+);
 var runnerLeaseSecretSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
 var runnerEnrollmentTokenSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
 var runnerCapabilitySchema = external_exports.string().trim().min(1).max(128).regex(capabilityPattern);
@@ -53298,10 +53303,20 @@ var runnerSignedRequestEnvelopeSchema = external_exports.object({
   algorithm: runnerSigningAlgorithmSchema,
   workerClass: runnerWorkerClassSchema,
   runnerId: runnerIdentifierSchema,
+  runnerVersion: runnerVersionSchema.optional(),
+  runnerVersionSignature: runnerRequestSignatureSchema.optional(),
   timestamp: runnerRequestTimestampSchema,
   nonce: runnerRequestNonceSchema,
   signature: runnerRequestSignatureSchema
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.runnerVersion === void 0 !== (value.runnerVersionSignature === void 0)) {
+    context.addIssue({
+      code: "custom",
+      path: [value.runnerVersion === void 0 ? "runnerVersion" : "runnerVersionSignature"],
+      message: "runner version and version signature must be supplied together"
+    });
+  }
+});
 var runnerClaimRequestSchema = external_exports.object({
   protocolVersion: runnerProtocolVersionSchema,
   workerClass: runnerWorkerClassSchema,
@@ -53571,6 +53586,7 @@ var canonicalPrefix = "boardreadyops-runner-request-v1";
 var canonicalBaseUrl = "https://boardreadyops.invalid";
 var lowercaseUuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
+var strictVersionPattern2 = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -53586,6 +53602,12 @@ function assertLowercaseUuid(name, value) {
   }
   if (!lowercaseUuidPattern2.test(value)) {
     throw new Error(`${name} must be a lowercase UUID`);
+  }
+  return value;
+}
+function assertRunnerVersion(value) {
+  if (value.length > 64 || !strictVersionPattern2.test(value) || value.split(".").some((component) => !Number.isSafeInteger(Number(component)))) {
+    throw new Error("runner version must be a strict major.minor.patch version");
   }
   return value;
 }
@@ -53638,7 +53660,7 @@ function canonicalRunnerRequest(input) {
   if (input.workerClass !== "managed" && input.workerClass !== "self_hosted") {
     throw new Error("unsupported runner worker class");
   }
-  return [
+  const fields = [
     canonicalPrefix,
     method,
     normalizeRunnerRequestPath(input.path),
@@ -53648,9 +53670,13 @@ function canonicalRunnerRequest(input) {
     assertLowercaseUuid("runnerId", input.runnerId),
     assertLowercaseUuid("runId", input.runId),
     assertLowercaseUuid("executionAttemptId", input.executionAttemptId),
-    assertLowercaseUuid("leaseId", input.leaseId),
-    runnerRequestBodyDigest(input.body)
-  ].join("\n");
+    assertLowercaseUuid("leaseId", input.leaseId)
+  ];
+  if (input.runnerVersion !== void 0) {
+    fields.push(`runner-version:${assertRunnerVersion(input.runnerVersion)}`);
+  }
+  fields.push(runnerRequestBodyDigest(input.body));
+  return fields.join("\n");
 }
 function signRunnerRequest(input) {
   return (0, import_node_crypto11.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
@@ -53663,6 +53689,8 @@ var runnerProtocolHeaderNames = {
   algorithm: "x-boardreadyops-runner-algorithm",
   workerClass: "x-boardreadyops-runner-worker-class",
   runnerId: "x-boardreadyops-runner-id",
+  runnerVersion: "x-boardreadyops-runner-version",
+  runnerVersionSignature: "x-boardreadyops-runner-version-signature",
   timestamp: "x-boardreadyops-runner-timestamp",
   nonce: "x-boardreadyops-runner-nonce",
   signature: "x-boardreadyops-runner-signature"
@@ -53680,6 +53708,7 @@ var RunnerControlPlaneError = class extends Error {
 var RunnerControlPlaneClient = class {
   baseUrl;
   runnerId;
+  runnerVersion;
   privateKey;
   fetchImpl;
   now;
@@ -53688,6 +53717,7 @@ var RunnerControlPlaneClient = class {
   constructor(options) {
     this.baseUrl = normalizeControlPlaneUrl(options.baseUrl);
     this.runnerId = options.runnerId;
+    this.runnerVersion = runnerVersionSchema.parse(options.runnerVersion);
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
@@ -53745,7 +53775,7 @@ var RunnerControlPlaneClient = class {
     const timestamp = Math.floor(this.now().valueOf() / 1e3);
     const nonce = this.nonce();
     const canonicalPath = `${target.pathname}${target.search}`;
-    const signature = signRunnerRequest({
+    const signatureInput = {
       method: "POST",
       path: canonicalPath,
       timestamp,
@@ -53755,6 +53785,11 @@ var RunnerControlPlaneClient = class {
       body,
       privateKey: this.privateKey,
       ...context
+    };
+    const signature = signRunnerRequest(signatureInput);
+    const runnerVersionSignature = signRunnerRequest({
+      ...signatureInput,
+      runnerVersion: this.runnerVersion
     });
     const response = await this.fetchImpl(target, {
       method: "POST",
@@ -53766,6 +53801,8 @@ var RunnerControlPlaneClient = class {
         [runnerProtocolHeaderNames.algorithm]: "ed25519",
         [runnerProtocolHeaderNames.workerClass]: "self_hosted",
         [runnerProtocolHeaderNames.runnerId]: this.runnerId,
+        [runnerProtocolHeaderNames.runnerVersion]: this.runnerVersion,
+        [runnerProtocolHeaderNames.runnerVersionSignature]: runnerVersionSignature,
         [runnerProtocolHeaderNames.timestamp]: String(timestamp),
         [runnerProtocolHeaderNames.nonce]: nonce,
         [runnerProtocolHeaderNames.signature]: signature
@@ -54194,9 +54231,10 @@ function sanitizedGitEnvironment(environment) {
 var defaultDependencies2 = {
   loadIdentity: loadRunnerIdentity,
   loadPrivateKey: loadRunnerPrivateKey,
-  createClient: (identity, privateKey) => new RunnerControlPlaneClient({
+  createClient: (identity, privateKey, runnerVersion) => new RunnerControlPlaneClient({
     baseUrl: identity.controlPlaneUrl,
     runnerId: identity.runnerId,
+    runnerVersion,
     privateKey
   }),
   checkoutSource: checkoutRunnerSource,
@@ -54214,7 +54252,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
   const identity = await dependencies.loadIdentity(options.identityFile);
   const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
-  const client = dependencies.createClient(identity, privateKey);
+  const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
   const workspaceRoot = import_node_path62.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
   const claim = await client.claim({
@@ -54752,6 +54790,7 @@ async function runnerServeCommand(options, streams) {
 function workerOptions(options) {
   return {
     identityFile: identityPath(options),
+    runnerVersion: boardReadyVersion,
     workspaceRoot: workspacePath(options),
     ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path64.default.resolve(options.repositoryMirrorRoot) },
     ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },

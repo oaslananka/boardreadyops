@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { verifyRunnerRequestSignature } from "../../../packages/cloud-core/src/runner-request-signature.js";
+import { boardReadyVersion } from "../../../src/generated/version.js";
 import {
   activateRunner,
   normalizeControlPlaneUrl,
@@ -33,7 +34,10 @@ describe("RunnerControlPlaneClient", () => {
       const body = String(init?.body ?? "");
       const timestamp = Number(headers.get("x-boardreadyops-runner-timestamp"));
       const signature = headers.get("x-boardreadyops-runner-signature") ?? "";
+      const runnerVersion = headers.get("x-boardreadyops-runner-version") ?? "";
+      const runnerVersionSignature = headers.get("x-boardreadyops-runner-version-signature") ?? "";
       expect(target.pathname).toBe("/api/v1/runner/jobs/claim");
+      expect(runnerVersion).toBe(boardReadyVersion);
       expect(headers.get("x-boardreadyops-runner-worker-class")).toBe("self_hosted");
       expect(headers.get("x-boardreadyops-runner-id")).toBe(runnerId);
       expect(
@@ -47,6 +51,20 @@ describe("RunnerControlPlaneClient", () => {
           body,
           publicKey: keys.publicKey,
           signature,
+        }),
+      ).toBe(true);
+      expect(
+        verifyRunnerRequestSignature({
+          method: "POST",
+          path: target.pathname,
+          timestamp,
+          nonce,
+          workerClass: "self_hosted",
+          runnerId,
+          runnerVersion,
+          body,
+          publicKey: keys.publicKey,
+          signature: runnerVersionSignature,
         }),
       ).toBe(true);
       expect(JSON.parse(body)).toEqual({
@@ -79,6 +97,7 @@ describe("RunnerControlPlaneClient", () => {
     const client = new RunnerControlPlaneClient({
       baseUrl: "https://control.example",
       runnerId,
+      runnerVersion: boardReadyVersion,
       privateKey: keys.privateKey,
       fetch: fetchMock as typeof fetch,
       now: () => now,
@@ -101,20 +120,30 @@ describe("RunnerControlPlaneClient", () => {
       const target = new URL(String(input));
       const headers = new Headers(init?.headers);
       const body = String(init?.body ?? "");
+      const signatureInput = {
+        method: "POST",
+        path: target.pathname,
+        timestamp: Number(headers.get("x-boardreadyops-runner-timestamp")),
+        nonce,
+        workerClass: "self_hosted" as const,
+        runnerId,
+        runId,
+        executionAttemptId: attemptId,
+        leaseId,
+        body,
+        publicKey: keys.publicKey,
+      };
       expect(
         verifyRunnerRequestSignature({
-          method: "POST",
-          path: target.pathname,
-          timestamp: Number(headers.get("x-boardreadyops-runner-timestamp")),
-          nonce,
-          workerClass: "self_hosted",
-          runnerId,
-          runId,
-          executionAttemptId: attemptId,
-          leaseId,
-          body,
-          publicKey: keys.publicKey,
+          ...signatureInput,
           signature: headers.get("x-boardreadyops-runner-signature") ?? "",
+        }),
+      ).toBe(true);
+      expect(
+        verifyRunnerRequestSignature({
+          ...signatureInput,
+          runnerVersion: headers.get("x-boardreadyops-runner-version") ?? "",
+          signature: headers.get("x-boardreadyops-runner-version-signature") ?? "",
         }),
       ).toBe(true);
       return Response.json({
@@ -127,6 +156,7 @@ describe("RunnerControlPlaneClient", () => {
     const client = new RunnerControlPlaneClient({
       baseUrl: "https://control.example",
       runnerId,
+      runnerVersion: boardReadyVersion,
       privateKey: keys.privateKey,
       fetch: fetchMock as typeof fetch,
       now: () => now,
@@ -183,6 +213,7 @@ describe("RunnerControlPlaneClient", () => {
     const client = new RunnerControlPlaneClient({
       baseUrl: "https://control.example",
       runnerId,
+      runnerVersion: boardReadyVersion,
       privateKey: keys.privateKey,
       fetch: fetchMock as typeof fetch,
     });
@@ -197,6 +228,7 @@ describe("RunnerControlPlaneClient", () => {
     const client = new RunnerControlPlaneClient({
       baseUrl: "https://control.example",
       runnerId,
+      runnerVersion: boardReadyVersion,
       privateKey: keys.privateKey,
       fetch: vi.fn(async () => new Response('{"error":"denied"}', { status: 401 })) as typeof fetch,
     });

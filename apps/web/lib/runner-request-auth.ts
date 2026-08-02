@@ -7,6 +7,8 @@ export const runnerProtocolHeaderNames = {
   algorithm: "x-boardreadyops-runner-algorithm",
   workerClass: "x-boardreadyops-runner-worker-class",
   runnerId: "x-boardreadyops-runner-id",
+  runnerVersion: "x-boardreadyops-runner-version",
+  runnerVersionSignature: "x-boardreadyops-runner-version-signature",
   timestamp: "x-boardreadyops-runner-timestamp",
   nonce: "x-boardreadyops-runner-nonce",
   signature: "x-boardreadyops-runner-signature",
@@ -64,6 +66,8 @@ function parseRunnerSignedRequestEnvelope(headers: Headers): RunnerSignedRequest
     algorithm: headers.get(runnerProtocolHeaderNames.algorithm) ?? undefined,
     workerClass: headers.get(runnerProtocolHeaderNames.workerClass) ?? undefined,
     runnerId: headers.get(runnerProtocolHeaderNames.runnerId) ?? undefined,
+    runnerVersion: headers.get(runnerProtocolHeaderNames.runnerVersion) ?? undefined,
+    runnerVersionSignature: headers.get(runnerProtocolHeaderNames.runnerVersionSignature) ?? undefined,
     timestamp,
     nonce: headers.get(runnerProtocolHeaderNames.nonce) ?? undefined,
     signature: headers.get(runnerProtocolHeaderNames.signature) ?? undefined,
@@ -120,7 +124,7 @@ export async function authenticateRunnerRequest(
   if (!publicKey) return undefined;
 
   const context = input.context ?? {};
-  const verified = verifyRunnerRequestSignature({
+  const signatureInput = {
     method: input.request.method,
     path: canonicalPath(input.request),
     timestamp: envelope.timestamp,
@@ -129,12 +133,21 @@ export async function authenticateRunnerRequest(
     runnerId: envelope.runnerId,
     body: input.body,
     publicKey,
-    signature: envelope.signature,
     ...(context.runId === undefined ? {} : { runId: context.runId }),
     ...(context.executionAttemptId === undefined ? {} : { executionAttemptId: context.executionAttemptId }),
     ...(context.leaseId === undefined ? {} : { leaseId: context.leaseId }),
-  });
-  if (!verified) return undefined;
+  };
+  if (!verifyRunnerRequestSignature({ ...signatureInput, signature: envelope.signature })) return undefined;
+  if (
+    envelope.runnerVersion !== undefined &&
+    !verifyRunnerRequestSignature({
+      ...signatureInput,
+      runnerVersion: envelope.runnerVersion,
+      signature: envelope.runnerVersionSignature ?? "",
+    })
+  ) {
+    return undefined;
+  }
 
   return {
     envelope,

@@ -7,6 +7,7 @@ import {
   runnerLeaseHeartbeatRequestSchema,
   runnerRegistrationActivationRequestSchema,
   runnerRegistrationActivationResponseSchema,
+  runnerSignedRequestEnvelopeSchema,
   runnerTerminalResultRequestSchema,
 } from "../../../packages/contracts/src/index.js";
 
@@ -32,6 +33,47 @@ function leaseContext() {
 }
 
 describe("runner protocol contracts", () => {
+  it("accepts only strict optional runner versions in signed envelopes", () => {
+    const base = {
+      protocolVersion: 1,
+      algorithm: "ed25519",
+      workerClass: "self_hosted",
+      runnerId: runId,
+      timestamp: 1_785_640_000,
+      nonce: "n".repeat(32),
+      signature: "s".repeat(86),
+    };
+
+    expect(runnerSignedRequestEnvelopeSchema.safeParse(base).success).toBe(true);
+    expect(
+      runnerSignedRequestEnvelopeSchema.safeParse({
+        ...base,
+        runnerVersion: "1.26.1",
+        runnerVersionSignature: "v".repeat(86),
+      }).success,
+    ).toBe(true);
+    expect(runnerSignedRequestEnvelopeSchema.safeParse({ ...base, runnerVersion: "1.26.1" }).success).toBe(false);
+    expect(
+      runnerSignedRequestEnvelopeSchema.safeParse({ ...base, runnerVersionSignature: "v".repeat(86) }).success,
+    ).toBe(false);
+    for (const runnerVersion of [
+      "1.26",
+      "v1.26.1",
+      "1.26.1-beta.1",
+      "01.26.1",
+      "1.26.1+build",
+      "9007199254740992.0.0",
+    ]) {
+      expect(
+        runnerSignedRequestEnvelopeSchema.safeParse({
+          ...base,
+          runnerVersion,
+          runnerVersionSignature: "v".repeat(86),
+        }).success,
+      ).toBe(false);
+    }
+  });
+
   it("keeps claim requests capability-only and rejects caller-selected tenant work", () => {
     expect(
       runnerClaimRequestSchema.parse({

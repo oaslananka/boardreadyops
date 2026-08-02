@@ -34,6 +34,7 @@ const dependencies: RunnerLeaseRouteDependencies = {
   queryExecutor: () => ({ query }),
   createLeaseStore: () => store,
   now: () => now,
+  environment: {},
 };
 
 type SignedRequestInput = {
@@ -42,6 +43,8 @@ type SignedRequestInput = {
   workerClass?: "managed" | "self_hosted";
   runnerId?: string;
   requestTimestamp?: number;
+  runnerVersion?: string;
+  signedRunnerVersion?: string;
   signedBody?: string;
   context?: {
     runId?: string;
@@ -57,7 +60,7 @@ function signedRequest(input: SignedRequestInput): Request {
   const body = JSON.stringify(input.body);
   const signedBody = input.signedBody ?? body;
   const privateKey = workerClass === "managed" ? managedKeys.privateKey : selfHostedKeys.privateKey;
-  const signature = signRunnerRequest({
+  const signatureInput = {
     method: "POST",
     path: input.path,
     timestamp: requestTimestamp,
@@ -71,12 +74,22 @@ function signedRequest(input: SignedRequestInput): Request {
       ? {}
       : { executionAttemptId: input.context.executionAttemptId }),
     ...(input.context?.leaseId === undefined ? {} : { leaseId: input.context.leaseId }),
-  });
+  };
+  const signature = signRunnerRequest(signatureInput);
+  const signedRunnerVersion = input.signedRunnerVersion ?? input.runnerVersion;
+  const runnerVersionSignature =
+    signedRunnerVersion === undefined
+      ? undefined
+      : signRunnerRequest({ ...signatureInput, runnerVersion: signedRunnerVersion });
   const headers = new Headers({ "content-type": "application/json" });
   headers.set(runnerProtocolHeaderNames.protocolVersion, "1");
   headers.set(runnerProtocolHeaderNames.algorithm, "ed25519");
   headers.set(runnerProtocolHeaderNames.workerClass, workerClass);
   headers.set(runnerProtocolHeaderNames.runnerId, runnerId);
+  if (input.runnerVersion !== undefined) {
+    headers.set(runnerProtocolHeaderNames.runnerVersion, input.runnerVersion);
+    headers.set(runnerProtocolHeaderNames.runnerVersionSignature, runnerVersionSignature ?? "");
+  }
   headers.set(runnerProtocolHeaderNames.timestamp, String(requestTimestamp));
   headers.set(runnerProtocolHeaderNames.nonce, nonce);
   headers.set(runnerProtocolHeaderNames.signature, signature);
@@ -170,6 +183,83 @@ describe("signed runner lease routes", () => {
       capabilities: ["kicad:10", "linux-x64"],
     });
     expect(query.mock.calls[0]?.[0]).toContain("managed_runner_identities");
+  });
+
+  it("enforces a signed minimum self-hosted version before lease creation", async () => {
+    const versionedDependencies: RunnerLeaseRouteDependencies = {
+      ...dependencies,
+      environment: { BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: "1.26.1" },
+    };
+
+    for (const runnerVersion of [undefined, "1.26.0"]) {
+      const response = await handleRunnerClaimRequest(
+        signedRequest({
+          path: "/api/v1/runner/jobs/claim",
+          body: claimBody("self_hosted"),
+          workerClass: "self_hosted",
+          ...(runnerVersion === undefined ? {} : { runnerVersion }),
+        }),
+        versionedDependencies,
+      );
+      expect(response.status).toBe(426);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: "runner version is not supported",
+        minimumVersion: "1.26.1",
+      });
+    }
+    expect(claimJob).not.toHaveBeenCalled();
+
+    claimJob.mockResolvedValue({ status: "empty", retryAfterSeconds: 15 });
+    const accepted = await handleRunnerClaimRequest(
+      signedRequest({
+        path: "/api/v1/runner/jobs/claim",
+        body: claimBody("self_hosted"),
+        workerClass: "self_hosted",
+        runnerVersion: "1.26.1",
+      }),
+      versionedDependencies,
+    );
+    expect(accepted.status).toBe(200);
+    expect(claimJob).toHaveBeenCalledOnce();
+  });
+
+  it("rejects runner-version header tampering through signature authentication", async () => {
+    const response = await handleRunnerClaimRequest(
+      signedRequest({
+        path: "/api/v1/runner/jobs/claim",
+        body: claimBody("self_hosted"),
+        workerClass: "self_hosted",
+        runnerVersion: "1.26.1",
+        signedRunnerVersion: "1.26.0",
+      }),
+      { ...dependencies, environment: { BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: "1.26.1" } },
+    );
+
+    expect(response.status).toBe(401);
+    expect(claimJob).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on invalid minimum-version configuration without identity lookup", async () => {
+    const response = await handleRunnerClaimRequest(
+      signedRequest({ path: "/api/v1/runner/jobs/claim", body: claimBody() }),
+      { ...dependencies, environment: { BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: "1.26" } },
+    );
+
+    expect(response.status).toBe(503);
+    expect(query).not.toHaveBeenCalled();
+    expect(claimJob).not.toHaveBeenCalled();
+  });
+
+  it("does not apply the self-hosted minimum version to managed claims", async () => {
+    claimJob.mockResolvedValue({ status: "empty", retryAfterSeconds: 15 });
+    const response = await handleRunnerClaimRequest(
+      signedRequest({ path: "/api/v1/runner/jobs/claim", body: claimBody("managed") }),
+      { ...dependencies, environment: { BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: "99.0.0" } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(claimJob).toHaveBeenCalledOnce();
   });
 
   it("rejects strict claim fields before identity lookup", async () => {
