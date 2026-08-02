@@ -34,6 +34,20 @@ boardreadyops runner issue-enrollment \
   --token-output /secure-transfer/factory-runner-01.token
 ```
 
+
+A trusted operator permanently revokes a registration and any unconsumed enrollment token with an allowlisted reason:
+
+```bash
+boardreadyops runner revoke-registration \
+  --database-url-file /run/secrets/boardreadyops-database-url \
+  --installation-id 11111111-1111-4111-8111-111111111111 \
+  --registration-id 22222222-2222-4222-8222-222222222222 \
+  --actor-id operator:release-engineering \
+  --reason credential-rotation
+```
+
+A revoked registration cannot return to `pending` or `active`. Create any replacement with `runner issue-enrollment`, a new unique runner name, and therefore a new registration ID.
+
 The customer host activates an Ed25519 identity without sending the generated private key to the control plane:
 
 ```bash

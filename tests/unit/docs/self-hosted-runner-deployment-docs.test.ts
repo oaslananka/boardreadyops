@@ -38,7 +38,12 @@ describe("self-hosted runner deployment documentation", () => {
     expect(runner).toContain("existing leases may drain");
     expect(runner).toContain("Roll out an upgrade one identity at a time");
     expect(runner).toContain("run `boardreadyops doctor`");
-    expect(runner).toContain("authorized control-plane administration procedure to disable the registration");
+    expect(runner).toContain("boardreadyops runner revoke-registration");
+    expect(runner).toContain("revoked registration is never reactivated");
+    expect(runner).toContain("new unique runner name");
+    expect(runner).toContain("new registration ID");
+    expect(runner).toContain("active leases are not reassigned");
+    expect(runner).not.toContain("boardreadyops runner reissue-enrollment");
     expect(runner).toContain(
       "Copying or regenerating a private key outside enrollment is not a supported rotation procedure",
     );

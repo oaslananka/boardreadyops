@@ -34,10 +34,12 @@ import {
   type RunnerActivateCliOptions,
   type RunnerIssueEnrollmentCliOptions,
   type RunnerOutputFormat,
+  type RunnerRevokeRegistrationCliOptions,
   type RunnerWorkCliOptions,
   runnerActivateCommand,
   runnerIssueEnrollmentCommand,
   runnerOnceCommand,
+  runnerRevokeRegistrationCommand,
   runnerServeCommand,
 } from "./commands/runner.js";
 import { type SbomCliOptions, sbomCommand } from "./commands/sbom.js";
@@ -252,6 +254,18 @@ export function registerAllCommands(
       process.exitCode = await runnerIssueEnrollmentCommand(options, streams);
     });
   runner
+    .command("revoke-registration")
+    .description("permanently revoke a runner registration and pending enrollment tokens")
+    .requiredOption("--database-url-file <path>", "root-readable file containing the PostgreSQL URL")
+    .requiredOption("--installation-id <uuid>", "tenant installation UUID")
+    .requiredOption("--registration-id <uuid>", "runner registration UUID")
+    .requiredOption("--actor-id <id>", "stable auditable operator identity")
+    .requiredOption("--reason <code>", "allowlisted revocation reason", runnerRevocationReason)
+    .option("--format <format>", "text or json", runnerOutputFormat, "text")
+    .action(async (options: RunnerRevokeRegistrationCliOptions) => {
+      process.exitCode = await runnerRevokeRegistrationCommand(options, streams);
+    });
+  runner
     .command("activate")
     .description("activate a runner identity using a one-time enrollment token file")
     .requiredOption("--url <url>", "BoardReadyOps control-plane origin")
@@ -321,6 +335,20 @@ function runnerSeconds(value: string): number {
     throw new InvalidArgumentError("Runner interval must not exceed 300 seconds.");
   }
   return parsed;
+}
+
+function runnerRevocationReason(value: string): RunnerRevokeRegistrationCliOptions["reason"] {
+  const values = [
+    "credential-rotation",
+    "host-decommissioned",
+    "policy-change",
+    "operator-request",
+    "suspected-compromise",
+  ] as const;
+  if (!values.includes(value as (typeof values)[number])) {
+    throw new InvalidArgumentError(`Runner revocation reason must be one of: ${values.join(", ")}.`);
+  }
+  return value as RunnerRevokeRegistrationCliOptions["reason"];
 }
 
 function runnerOutputFormat(value: string): RunnerOutputFormat {

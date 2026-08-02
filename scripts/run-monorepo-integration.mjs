@@ -30,6 +30,7 @@ export const POSTGRES_INTEGRATION_TESTS = [
   "tests/integration/run-dashboard-postgres.test.ts",
   "tests/integration/runner-lease-store-postgres.test.ts",
   "tests/integration/runner-registration-enrollment-postgres.test.ts",
+  "tests/integration/runner-registration-revocation-postgres.test.ts",
   "tests/integration/runner-result-postgres.test.ts",
   "tests/integration/runner-routing-policy-postgres.test.ts",
   "tests/integration/runner-terminal-result-authorizer-postgres.test.ts",
