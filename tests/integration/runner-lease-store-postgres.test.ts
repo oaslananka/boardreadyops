@@ -4,6 +4,7 @@ import { handleRunnerClaimRequest, type RunnerLeaseRouteDependencies } from "../
 import { runnerProtocolHeaderNames } from "../../apps/web/lib/runner-request-auth.js";
 import { signRunnerRequest } from "../../packages/cloud-core/src/runner-request-signature.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
+import { createSqlRunnerFleetHealthStore } from "../../packages/db/src/runner-fleet-health-store.js";
 import {
   type ClaimRunnerJobResult,
   createSqlRunnerLeaseStore,
@@ -620,6 +621,168 @@ describeDatabase("runner lease PostgreSQL store", () => {
         ),
       )[0];
       expect(acceptedState).toEqual({ attempts: 1, leases: 1, nonces: 1 });
+    } finally {
+      await cleanupTenant(tenant);
+    }
+  });
+
+  it("refreshes self-hosted presence and version on valid empty polls but not replay or capability mismatch", async () => {
+    const initialAt = testTime(1600);
+    const pollAt = testTime(1800);
+    const replayAt = testTime(1830);
+    const mismatchAt = testTime(1860);
+    const tenant = await createTenant("lease-test-presence", false);
+    const runnerId = await createSelfHostedRunner(tenant, "lease-test-presence", initialAt, []);
+    const claimInput = {
+      workerClass: "self_hosted" as const,
+      runnerRegistrationId: runnerId,
+      requestTimestamp: requestTimestamp(pollAt),
+      requestNonce: nonce("presence-empty"),
+      runnerVersion: "1.27.1",
+      capabilities: ["kicad:10"],
+    };
+
+    try {
+      await expect(
+        fixedStore({ now: pollAt, ids: [randomUUID(), randomUUID()], tokens: [token("presence")] }).claimJob(
+          claimInput,
+        ),
+      ).resolves.toEqual({
+        status: "empty",
+        retryAfterSeconds: 15,
+      });
+      const afterPoll = rows(
+        await databaseExecutor().query(
+          `select last_heartbeat_at, last_runner_version,
+                  (select count(*)::int from runner_request_nonces where runner_registration_id = $1) as nonces
+             from runner_registrations
+            where id = $1`,
+          [runnerId],
+        ),
+      )[0];
+      expect((afterPoll?.last_heartbeat_at as Date).toISOString()).toBe(pollAt);
+      expect(afterPoll?.last_runner_version).toBe("1.27.1");
+      expect(afterPoll?.nonces).toBe(1);
+
+      await expect(
+        fixedStore({ now: replayAt, ids: [randomUUID(), randomUUID()], tokens: [token("presence-legacy")] }).claimJob({
+          workerClass: claimInput.workerClass,
+          runnerRegistrationId: claimInput.runnerRegistrationId,
+          requestTimestamp: requestTimestamp(replayAt),
+          requestNonce: nonce("presence-legacy"),
+          capabilities: claimInput.capabilities,
+        }),
+      ).resolves.toEqual({ status: "empty", retryAfterSeconds: 15 });
+
+      const afterLegacyPoll = rows(
+        await databaseExecutor().query(
+          `select last_heartbeat_at, last_runner_version,
+                  (select count(*)::int from runner_request_nonces where runner_registration_id = $1) as nonces
+             from runner_registrations
+            where id = $1`,
+          [runnerId],
+        ),
+      )[0];
+      expect((afterLegacyPoll?.last_heartbeat_at as Date).toISOString()).toBe(replayAt);
+      expect(afterLegacyPoll?.last_runner_version).toBe("1.27.1");
+      expect(afterLegacyPoll?.nonces).toBe(2);
+
+      await expect(
+        fixedStore({ now: replayAt, ids: [randomUUID(), randomUUID()], tokens: [token("presence-replay")] }).claimJob({
+          ...claimInput,
+          runnerVersion: "9.9.9",
+        }),
+      ).resolves.toEqual({ status: "replayed" });
+
+      await expect(
+        fixedStore({
+          now: mismatchAt,
+          ids: [randomUUID(), randomUUID()],
+          tokens: [token("presence-mismatch")],
+        }).claimJob({
+          ...claimInput,
+          requestTimestamp: requestTimestamp(mismatchAt),
+          requestNonce: nonce("presence-mismatch"),
+          runnerVersion: "9.9.9",
+          capabilities: ["unsupported"],
+        }),
+      ).resolves.toEqual({ status: "empty", retryAfterSeconds: 15 });
+
+      const afterRejectedMutations = rows(
+        await databaseExecutor().query(
+          `select last_heartbeat_at, last_runner_version,
+                  (select count(*)::int from runner_request_nonces where runner_registration_id = $1) as nonces
+             from runner_registrations
+            where id = $1`,
+          [runnerId],
+        ),
+      )[0];
+      expect((afterRejectedMutations?.last_heartbeat_at as Date).toISOString()).toBe(replayAt);
+      expect(afterRejectedMutations?.last_runner_version).toBe("1.27.1");
+      expect(afterRejectedMutations?.nonces).toBe(2);
+    } finally {
+      await cleanupTenant(tenant);
+    }
+  });
+
+  it("reports tenant-scoped aggregate fleet health, queue age, active leases, and versions", async () => {
+    const observedAt = testTime(2400);
+    const staleAt = testTime(1800);
+    const firstQueuedAt = testTime(2100);
+    const secondQueuedAt = testTime(2250);
+    const tenant = await createTenant("lease-test-fleet-health", false);
+    await setExecutionPolicy(tenant, "self_hosted_required");
+    const firstRunId = await createQueuedRun(tenant, firstQueuedAt);
+    await createQueuedRun(tenant, secondQueuedAt);
+    const onlineRunnerId = await createSelfHostedRunner(tenant, "fleet-online", staleAt, []);
+    const staleRunnerId = await createSelfHostedRunner(tenant, "fleet-stale", staleAt, []);
+    await databaseExecutor().query("update runner_registrations set last_runner_version = '1.26.1' where id = $1", [
+      staleRunnerId,
+    ]);
+    const attemptId = randomUUID();
+    const leaseId = randomUUID();
+
+    try {
+      const result = claimed(
+        await fixedStore({
+          now: observedAt,
+          ids: [attemptId, leaseId],
+          tokens: [token("fleet-health")],
+          leaseDurationSeconds: 120,
+        }).claimJob({
+          workerClass: "self_hosted",
+          runnerRegistrationId: onlineRunnerId,
+          requestTimestamp: requestTimestamp(observedAt),
+          requestNonce: nonce("fleet-health-claim"),
+          runnerVersion: "1.27.1",
+          capabilities: ["kicad:10"],
+        }),
+      );
+      expect(result.runId).toBe(firstRunId);
+
+      const snapshot = await createSqlRunnerFleetHealthStore(databaseExecutor()).readFleetHealth({
+        installationId: tenant.installationId,
+        observedAt: new Date(observedAt),
+        observationWindowSeconds: 300,
+      });
+      expect(snapshot).toEqual({
+        observedAt,
+        observationWindowSeconds: 300,
+        status: "degraded",
+        registrations: {
+          active: 2,
+          online: 1,
+          stale: 1,
+          versionUnreported: 0,
+          lastSeenAt: observedAt,
+        },
+        queue: { pendingJobs: 1, oldestAgeSeconds: 150 },
+        leases: { active: 1, earliestExpirySeconds: 120 },
+        versions: [
+          { version: "1.27.1", registrations: 1 },
+          { version: "1.26.1", registrations: 1 },
+        ],
+      });
     } finally {
       await cleanupTenant(tenant);
     }

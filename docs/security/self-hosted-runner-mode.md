@@ -36,6 +36,7 @@ A runner registration should include:
 - public key or shared signing key fingerprint,
 - allowed repository patterns,
 - last heartbeat time,
+- last successfully reported strict agent version,
 - disabled time,
 - created time.
 
@@ -57,6 +58,8 @@ A private repository run may dispatch to a self-hosted runner only when:
 - Runner logs must not expose repository secrets.
 - A disabled runner must stop receiving jobs immediately.
 - A stale runner heartbeat should remove it from dispatch eligibility.
+- A valid signed claim poll, including an empty-queue response, refreshes presence and, when supplied, the last reported agent version. Replayed requests, unsupported capabilities, invalid signatures, and minimum-version rejections do not refresh presence.
+- Fleet visibility must remain installation-scoped and aggregate-only; it must not expose repository names, allowed-repository patterns, source paths, public keys, fingerprints, or individual runner identifiers.
 
 ## Acceptance criteria
 

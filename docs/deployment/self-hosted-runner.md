@@ -178,7 +178,50 @@ sudo -u boardreadyops-runner boardreadyops runner serve \
   --format json
 ```
 
-`serve` handles `SIGINT` and `SIGTERM`, stops polling, and relinquishes a claimed lease when shutdown interrupts execution. Transient claim errors are logged and retried after the configured poll interval.
+`serve` handles `SIGINT` and `SIGTERM`, stops polling, and relinquishes a claimed lease when shutdown interrupts execution. Transient claim errors are logged and retried after the configured poll interval. A valid signed claim poll refreshes the registration presence timestamp and, when supplied, the last reported strict agent version even when the queue is empty. A replayed request, a capability mismatch, an invalid signature, or a minimum-version rejection does not refresh presence.
+
+## Operator fleet visibility
+
+An authenticated control-plane operator can read one installation's aggregate customer-runner state:
+
+```http
+GET /api/v1/operator/installations/{installationId}/runner-fleet
+Authorization: Bearer <operator-token>
+```
+
+The response uses a fixed five-minute reporting window and contains only aggregate values:
+
+```json
+{
+  "ok": true,
+  "fleet": {
+    "observedAt": "2026-08-02T09:30:00.000Z",
+    "observationWindowSeconds": 300,
+    "status": "degraded",
+    "registrations": {
+      "active": 3,
+      "online": 2,
+      "stale": 1,
+      "versionUnreported": 0,
+      "lastSeenAt": "2026-08-02T09:29:55.000Z"
+    },
+    "queue": { "pendingJobs": 4, "oldestAgeSeconds": 600 },
+    "leases": { "active": 2, "earliestExpirySeconds": 90 },
+    "versions": [{ "version": "1.27.1", "registrations": 2 }]
+  }
+}
+```
+
+Status meanings:
+
+- `not_configured`: no active self-hosted registrations exist for the installation;
+- `healthy`: every active registration reported within the five-minute observation window;
+- `degraded`: at least one, but not every, active registration reported within the window;
+- `offline`: active registrations exist but none reported within the window.
+
+The five-minute window is an operator reporting convention, not the repository routing policy. Claim eligibility continues to use each effective runner policy's `self_hosted_offline_after_seconds` value. Queue age includes only tenant runs that are currently eligible for a self-hosted policy and do not carry draft- or fork-PR safe-mode reasons. Active lease counts include only unexpired self-hosted leases. Version groups are sorted by numeric `major.minor.patch` order.
+
+The endpoint never returns repository owner/name, commit SHA, source or workspace paths, allowed-repository patterns, public keys, fingerprints, enrollment data, lease tokens, or individual runner identifiers. Responses are `no-store`; operator authentication and the installation identifier are validated before PostgreSQL access.
 
 ## systemd example
 

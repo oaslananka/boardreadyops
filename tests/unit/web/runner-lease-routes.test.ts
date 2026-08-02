@@ -221,7 +221,14 @@ describe("signed runner lease routes", () => {
       versionedDependencies,
     );
     expect(accepted.status).toBe(200);
-    expect(claimJob).toHaveBeenCalledOnce();
+    expect(claimJob).toHaveBeenCalledWith({
+      workerClass: "self_hosted",
+      runnerRegistrationId: selfHostedRunnerId,
+      requestTimestamp: timestamp,
+      requestNonce: nonce,
+      runnerVersion: "1.26.1",
+      capabilities: ["kicad:10", "linux-x64"],
+    });
   });
 
   it("rejects runner-version header tampering through signature authentication", async () => {
