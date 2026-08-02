@@ -26,7 +26,10 @@ vi.mock("../../../apps/web/lib/github-actions-oidc.js", () => ({
   verifyGitHubActionsOidcToken: mocks.verifyGitHubActionsOidcToken,
 }));
 
-import { POST } from "../../../apps/web/app/api/v1/runs/github-actions-result/route.js";
+import {
+  handleGitHubActionsResultRequest,
+  POST,
+} from "../../../apps/web/app/api/v1/runs/github-actions-result/route.js";
 
 const runId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
 const executionAttemptId = "7559e99b-4998-4e02-a94a-7a7a4686ae11";
@@ -35,6 +38,7 @@ const expectations = {
   executionAttemptId,
   repository: "octo-org/hardware-board",
   repositoryId: "98765",
+  sha: "a".repeat(40),
   workflowRef: "octo-org/hardware-board/.github/workflows/readiness-runner.yml@refs/heads/main",
   ref: "refs/heads/main",
   audience:
@@ -140,6 +144,32 @@ describe("GitHub Actions result route", () => {
     const response = await POST(request({ trustMode: "standard", safeModeReasons: "" }));
     expect(response.status).toBe(202);
     expect(mocks.verifyGitHubActionsOidcToken).toHaveBeenCalledOnce();
+  });
+
+  it("supports an injected end-to-end authentication boundary without consulting module defaults", async () => {
+    const incoming = request();
+    const injectedExecutor = { query: vi.fn() };
+    const response = await handleGitHubActionsResultRequest(incoming, {
+      queryExecutor: () => injectedExecutor,
+      loadExpectations: mocks.resultOidcExpectations,
+      verifyOidcToken: mocks.verifyGitHubActionsOidcToken,
+      handleResult: mocks.handleResultRequest,
+      resultDependencies: {
+        queryExecutor: () => undefined,
+        checkRunClient: vi.fn(),
+        detailsUrl: vi.fn(),
+        now: vi.fn(),
+        verifyOidcToken: vi.fn(),
+      },
+    });
+
+    expect(response.status).toBe(202);
+    expect(mocks.resultOidcExpectations).toHaveBeenCalledWith(injectedExecutor, runId, executionAttemptId);
+    expect(mocks.verifyGitHubActionsOidcToken).toHaveBeenCalledWith("header.payload.signature", expectations);
+    expect(mocks.handleResultRequest).toHaveBeenCalledWith(
+      incoming,
+      expect.objectContaining({ authenticationVerified: true, queryExecutor: expect.any(Function) }),
+    );
   });
 
   it("delegates an authenticated callback to the existing result persistence route", async () => {

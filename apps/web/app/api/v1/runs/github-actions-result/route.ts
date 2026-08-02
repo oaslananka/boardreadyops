@@ -21,7 +21,26 @@ function trustSnapshotMatches(
   return trustMode === expectations.trustMode && safeModeReasons === expectations.safeModeReasons.join(",");
 }
 
-export async function POST(request: Request): Promise<Response> {
+export type GitHubActionsResultRouteDependencies = {
+  queryExecutor: typeof defaultResultRouteDependencies.queryExecutor;
+  loadExpectations: typeof resultOidcExpectations;
+  verifyOidcToken: typeof verifyGitHubActionsOidcToken;
+  handleResult: typeof handleResultRequest;
+  resultDependencies: typeof defaultResultRouteDependencies;
+};
+
+const defaultGitHubActionsResultRouteDependencies: GitHubActionsResultRouteDependencies = {
+  queryExecutor: defaultResultRouteDependencies.queryExecutor,
+  loadExpectations: resultOidcExpectations,
+  verifyOidcToken: verifyGitHubActionsOidcToken,
+  handleResult: handleResultRequest,
+  resultDependencies: defaultResultRouteDependencies,
+};
+
+export async function handleGitHubActionsResultRequest(
+  request: Request,
+  dependencies: GitHubActionsResultRouteDependencies = defaultGitHubActionsResultRouteDependencies,
+): Promise<Response> {
   const searchParams = new URL(request.url).searchParams;
   const runId = searchParams.get("run_id") ?? "";
   const executionAttemptId = searchParams.get("attempt_id") ?? "";
@@ -37,14 +56,14 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "GitHub Actions OIDC authentication is required" }, { status: 401 });
   }
 
-  const executor = defaultResultRouteDependencies.queryExecutor();
+  const executor = dependencies.queryExecutor();
   if (!executor) {
     return Response.json({ ok: false, error: "database is not configured" }, { status: 503 });
   }
 
   let expectations: Awaited<ReturnType<typeof resultOidcExpectations>>;
   try {
-    expectations = await resultOidcExpectations(executor, runId, executionAttemptId);
+    expectations = await dependencies.loadExpectations(executor, runId, executionAttemptId);
   } catch {
     return Response.json({ ok: false, error: "result authentication database lookup failed" }, { status: 503 });
   }
@@ -52,14 +71,18 @@ export async function POST(request: Request): Promise<Response> {
   if (
     !expectations ||
     !trustSnapshotMatches(request, expectations) ||
-    !(await verifyGitHubActionsOidcToken(token, expectations))
+    !(await dependencies.verifyOidcToken(token, expectations))
   ) {
     return Response.json({ ok: false, error: "invalid GitHub Actions OIDC authentication" }, { status: 401 });
   }
 
-  return handleResultRequest(request, {
-    ...defaultResultRouteDependencies,
+  return dependencies.handleResult(request, {
+    ...dependencies.resultDependencies,
     queryExecutor: () => executor,
     authenticationVerified: true,
   });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return await handleGitHubActionsResultRequest(request);
 }

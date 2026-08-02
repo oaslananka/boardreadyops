@@ -102,7 +102,15 @@ The callback endpoint is:
 POST /api/v1/runs/github-actions-result?run_id=<uuid>&attempt_id=<uuid>
 ```
 
-The endpoint accepts GitHub Actions OIDC only. It resolves the expected repository, workflow file, default branch, run ID, and execution-attempt ID from PostgreSQL before verifying the token. It then delegates to the normal result persistence and Check Run publication path.
+The endpoint accepts GitHub Actions OIDC only. It resolves the expected repository, numeric repository ID, workflow file, default branch, exact commit SHA, run ID, execution-attempt ID, and immutable trust snapshot from PostgreSQL before verifying the token. It then delegates to the normal result persistence and Check Run publication path.
+
+## Two-installation adversarial validation
+
+The manual `target-repository-isolation` workflow provides the bounded database-backed adversarial proof required by ADR-0010 and the Cloud Control Plane Reliability milestone. It provisions an isolated PostgreSQL 16 service, creates two unrelated installations and repositories, signs short-lived test OIDC tokens with a disposable in-memory RSA key, and exercises the real GitHub Actions result callback and result-publication path. Run it from GitHub Actions or reproduce the same contract with `pnpm run cloud:isolation:verify` after applying migrations to a disposable database.
+
+The validation proves that both installations can independently persist a result and complete only their own Check Run. It then rejects cross-installation run/attempt use, a stale attempt, modified repository, numeric repository ID, workflow, default-branch ref, exact commit SHA, event, runner-environment, and trust-snapshot claims. Rejected callbacks must produce zero database mutations, zero Check Run publication calls, and no other-tenant values in the response. The optional pull request comment path is deliberately unavailable for one fixture while Check Run completion succeeds with a non-blocking warning.
+
+The uploaded `target-repository-isolation-report.json` is mode `0600` and aggregate-only. It records proof counts and invariant totals, never installation IDs, repository names, commit values, tokens, payloads, findings, artifacts, database URLs, or raw errors. This synthetic proof does not replace the live two-owner/two-installation commissioning run or least-privilege GitHub App permission evidence. Those production checks remain blocked by the re-authorization rollout tracked in issue #88; issue #154 stays open until that live evidence is complete.
 
 ## Execution behavior
 

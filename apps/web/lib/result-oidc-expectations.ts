@@ -13,6 +13,7 @@ export type ResultOidcExpectations = {
   executionAttemptId?: string;
   repository: string;
   repositoryId: string;
+  sha: string;
   workflowRef: string;
   ref: string;
   audience: string;
@@ -23,6 +24,7 @@ export type ResultOidcExpectations = {
 type QueryRow = Record<string, unknown>;
 
 const safeModeReasonOrder = ["draft-pull-request", "fork-pull-request", "private-repository"] as const;
+const exactCommitShaPattern = /^[0-9a-f]{40}$/u;
 const safeModeReasonSet = new Set<string>(safeModeReasonOrder);
 
 function rows(result: unknown): QueryRow[] {
@@ -69,6 +71,7 @@ export async function resultOidcExpectations(
             repositories.name,
             repositories.github_repo_id,
             repositories.default_branch,
+            release_runs.commit_sha,
             release_runs.trust_mode,
             release_runs.safe_mode_reasons
      from release_runs
@@ -89,8 +92,11 @@ export async function resultOidcExpectations(
   const name = stringCell(row, "name");
   const repositoryId = stringCell(row, "github_repo_id");
   const defaultBranch = stringCell(row, "default_branch");
+  const sha = stringCell(row, "commit_sha");
   const trust = trustSnapshot(row);
-  if (!owner || !name || !repositoryId || !defaultBranch || !trust) return undefined;
+  if (!owner || !name || !repositoryId || !defaultBranch || !sha || !exactCommitShaPattern.test(sha) || !trust) {
+    return undefined;
+  }
 
   const repository = `${owner}/${name}`;
   const workflowRef = githubActionsWorkflowRef(repository, defaultBranch, workflow);
@@ -105,6 +111,7 @@ export async function resultOidcExpectations(
     ...(executionAttemptId === undefined ? {} : { executionAttemptId }),
     repository,
     repositoryId,
+    sha,
     workflowRef,
     ref,
     audience,
