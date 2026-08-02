@@ -19,6 +19,8 @@ The optional `soak-recovery` profile repeats a bounded recovery round against th
 
 The explicit `database-interruption` profile additionally opens a real PostgreSQL transaction, changes a synthetic repository row, and terminates that backend with `pg_terminate_backend`. It requires the interrupted transaction to reject further work, verifies transaction rollback from an independent executor, establishes a replacement connection, and then runs the normal bounded recovery proofs. This profile must run only with a disposable PostgreSQL role allowed to terminate its own test backends.
 
+The explicit `worker-process-interruption` profile starts a separate Node child process that uses the real PostgreSQL job store to claim a one-second lifecycle lease. The parent waits for the claim, terminates that child process with `SIGKILL`, and proves lease reclaim plus completion by a replacement worker before running the normal bounded recovery proofs. The report records only aggregate process, reclaim, completion, and convergence counters; it never includes process IDs, job IDs, worker IDs, lease material, database URLs, or child output.
+
 ## Default engineering baseline
 
 The default manual workflow runs this scenario:
@@ -54,7 +56,7 @@ Confirm the destructive test boundary and run the baseline:
 export BOARDREADYOPS_LOAD_CONFIRMATION=isolated-disposable-database
 export BOARDREADYOPS_LOAD_REPORT_PATH=control-plane-load-report.json
 export BOARDREADYOPS_LOAD_PROFILE=representative
-# Alternative explicit profiles: soak-recovery or database-interruption
+# Alternative explicit profiles: soak-recovery, database-interruption, or worker-process-interruption
 pnpm run cloud:load:verify
 ```
 
@@ -83,8 +85,10 @@ To run the bounded recovery profile locally, set `BOARDREADYOPS_LOAD_PROFILE=soa
 
 Set `BOARDREADYOPS_LOAD_PROFILE=database-interruption` to run the same recovery proofs after real backend interruption. Each round must record one backend termination, interrupted-transaction rejection, transaction rollback proof, and replacement connection. The aggregate report contains only those counters and maximum convergence time; it never includes backend process identifiers, connection strings, SQL error text, or synthetic repository identifiers. This proves session interruption and reconnect behavior, not a complete managed-cluster or regional outage.
 
+Set `BOARDREADYOPS_LOAD_PROFILE=worker-process-interruption` to run a real child process claim and `SIGKILL` cycle. Each round must record one child process start, forced termination, abandoned lease reclaim, and replacement completion. This proves bounded process-death recovery for a lifecycle job. It does not prove host, container runtime, availability-zone, or full worker-fleet failure.
+
 ## GitHub Actions evidence
 
 Run the `control-plane-load` workflow manually. It provisions an isolated PostgreSQL 16 service, applies every repository migration, executes the selected scenario, and uploads `control-plane-load-report.json` for 30 days. The workflow uses no repository secret and has read-only repository permissions.
 
-Keep the report with the GA-readiness evidence for issue #222. The representative profile covers bounded load and tenant isolation. The `soak-recovery` profile adds bounded repeated worker-lease expiry, transient delivery retry, uncertain-delivery classification, delayed callback convergence, and stale-attempt rejection. The `database-interruption` profile adds real PostgreSQL backend termination, atomic rollback, replacement connection, and post-interruption convergence. The `database-interruption` profile does not by itself satisfy hours-long soak, real worker process termination, whole-service or regional PostgreSQL outage, external GitHub API fault injection, or final GA sign-off; neither does the bounded `soak-recovery` profile.
+Keep the report with the GA-readiness evidence for issue #222. The representative profile covers bounded load and tenant isolation. The `soak-recovery` profile adds bounded repeated worker-lease expiry, transient delivery retry, uncertain-delivery classification, delayed callback convergence, and stale-attempt rejection. The `database-interruption` profile adds real PostgreSQL backend termination, atomic rollback, replacement connection, and post-interruption convergence. The `worker-process-interruption` profile covers bounded child-process death and lease reclaim. This evidence does not by itself satisfy hours-long soak, host or full worker-fleet termination, whole-service or regional PostgreSQL outage, external GitHub API fault injection, or final GA sign-off.
