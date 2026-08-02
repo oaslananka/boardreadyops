@@ -23,6 +23,8 @@ describe("control-plane load configuration", () => {
   it("uses a bounded engineering baseline by default", () => {
     expect(parseControlPlaneLoadConfiguration(configuredEnvironment())).toEqual({
       databaseUrl,
+      profile: "representative",
+      recoveryRounds: 3,
       uniqueDeliveries: 200,
       duplicateDeliveries: 50,
       repositoryCount: 4,
@@ -33,6 +35,7 @@ describe("control-plane load configuration", () => {
         lifecycleP95Ms: 1_500,
         dashboardP95Ms: 1_000,
         minimumThroughputPerSecond: 10,
+        recoveryMaxConvergenceMs: 5_000,
       },
     });
   });
@@ -41,6 +44,8 @@ describe("control-plane load configuration", () => {
     expect(
       parseControlPlaneLoadConfiguration(
         configuredEnvironment({
+          BOARDREADYOPS_LOAD_PROFILE: "soak-recovery",
+          BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "5",
           BOARDREADYOPS_LOAD_UNIQUE_DELIVERIES: "500",
           BOARDREADYOPS_LOAD_DUPLICATE_DELIVERIES: "125",
           BOARDREADYOPS_LOAD_REPOSITORIES: "8",
@@ -50,10 +55,13 @@ describe("control-plane load configuration", () => {
           BOARDREADYOPS_LOAD_LIFECYCLE_P95_MS: "1200",
           BOARDREADYOPS_LOAD_DASHBOARD_P95_MS: "500",
           BOARDREADYOPS_LOAD_MINIMUM_THROUGHPUT_PER_SECOND: "25",
+          BOARDREADYOPS_LOAD_RECOVERY_MAX_CONVERGENCE_MS: "2500",
         }),
       ),
     ).toEqual({
       databaseUrl,
+      profile: "soak-recovery",
+      recoveryRounds: 5,
       uniqueDeliveries: 500,
       duplicateDeliveries: 125,
       repositoryCount: 8,
@@ -64,6 +72,7 @@ describe("control-plane load configuration", () => {
         lifecycleP95Ms: 1_200,
         dashboardP95Ms: 500,
         minimumThroughputPerSecond: 25,
+        recoveryMaxConvergenceMs: 2_500,
       },
     });
   });
@@ -79,6 +88,14 @@ describe("control-plane load configuration", () => {
     expect(() =>
       parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_CONCURRENCY: "0" })),
     ).toThrow("BOARDREADYOPS_LOAD_CONCURRENCY must be an integer between 1 and 100");
+
+    expect(() =>
+      parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_PROFILE: "chaos" })),
+    ).toThrow("BOARDREADYOPS_LOAD_PROFILE must be representative or soak-recovery");
+
+    expect(() =>
+      parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "0" })),
+    ).toThrow("BOARDREADYOPS_LOAD_RECOVERY_ROUNDS must be an integer between 1 and 20");
 
     expect(() =>
       parseControlPlaneLoadConfiguration(
@@ -136,6 +153,8 @@ describe("control-plane load measurements", () => {
     const report = {
       event: "control_plane_load_verified" as const,
       scenario: {
+        profile: "representative" as const,
+        recoveryRounds: 3,
         uniqueDeliveries: 200,
         duplicateDeliveries: 50,
         repositoryCount: 4,
@@ -186,7 +205,93 @@ describe("control-plane load measurements", () => {
         lifecycleP95Ms: 1_500,
         dashboardP95Ms: 1_000,
         minimumThroughputPerSecond: 10,
+        recoveryMaxConvergenceMs: 5_000,
       }),
     ).toEqual(["intake_p95_exceeded", "dashboard_p95_exceeded", "dashboard_throughput_below_minimum"]);
+  });
+
+  it("rejects incomplete or ambiguous recovery evidence with stable signal names", () => {
+    const report = {
+      event: "control_plane_load_verified" as const,
+      scenario: {
+        profile: "soak-recovery" as const,
+        recoveryRounds: 3,
+        uniqueDeliveries: 20,
+        duplicateDeliveries: 5,
+        repositoryCount: 2,
+        runsPerRepository: 5,
+        concurrency: 4,
+      },
+      intake: {
+        count: 25,
+        elapsedMs: 100,
+        throughputPerSecond: 250,
+        p50Ms: 2,
+        p95Ms: 5,
+        p99Ms: 7,
+        maximumMs: 8,
+      },
+      lifecycle: {
+        count: 30,
+        elapsedMs: 120,
+        throughputPerSecond: 250,
+        p50Ms: 2,
+        p95Ms: 6,
+        p99Ms: 8,
+        maximumMs: 9,
+      },
+      dashboard: {
+        count: 4,
+        elapsedMs: 20,
+        throughputPerSecond: 200,
+        p50Ms: 2,
+        p95Ms: 4,
+        p99Ms: 4,
+        maximumMs: 4,
+      },
+      recovery: {
+        roundsRequested: 3,
+        roundsCompleted: 2,
+        jobLeaseRecoveries: 2,
+        staleJobCompletionsRejected: 2,
+        outboxRetries: 2,
+        uncertainOutboxQuarantines: 2,
+        delayedCallbackRepairs: 2,
+        staleAttemptResultsRejected: 2,
+        maximumConvergenceMs: 6_000,
+        deadLetters: 1,
+        ambiguousNonterminalStates: 1,
+      },
+      invariants: {
+        acceptedDeliveries: 20,
+        duplicateDeliveries: 5,
+        completedJobs: 20,
+        releaseRuns: 10,
+        completedOutboxEffects: 10,
+        scopedDashboardReads: 4,
+        crossTenantMismatches: 0,
+      },
+    };
+
+    expect(
+      evaluateControlPlaneLoadReport(report, {
+        intakeP95Ms: 1_000,
+        lifecycleP95Ms: 1_500,
+        dashboardP95Ms: 1_000,
+        minimumThroughputPerSecond: 10,
+        recoveryMaxConvergenceMs: 5_000,
+      }),
+    ).toEqual([
+      "recovery_rounds_incomplete",
+      "recovery_job_lease_incomplete",
+      "recovery_stale_job_rejection_incomplete",
+      "recovery_outbox_retry_incomplete",
+      "recovery_uncertain_outbox_quarantine_incomplete",
+      "recovery_delayed_callback_incomplete",
+      "recovery_stale_attempt_rejection_incomplete",
+      "recovery_convergence_exceeded",
+      "recovery_dead_letters_detected",
+      "recovery_ambiguous_state_detected",
+    ]);
   });
 });

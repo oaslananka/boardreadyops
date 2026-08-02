@@ -1,9 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { processControlPlaneWorkflowReconciliation } from "../../apps/web/lib/control-plane-reconciliation-worker.js";
 import { lookupRunDashboard } from "../../apps/web/lib/run-dashboard.js";
 import { createSqlControlPlaneJobStore } from "../../packages/db/src/control-plane-job-store.js";
+import { createSqlControlPlaneOperationsStore } from "../../packages/db/src/control-plane-operations-store.js";
 import { createSqlControlPlaneOutboxStore } from "../../packages/db/src/control-plane-outbox-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
+import { createSqlRunnerLeaseStore } from "../../packages/db/src/runner-lease-store.js";
+import { createSqlRunnerTerminalResultAuthorizer } from "../../packages/db/src/runner-terminal-result-store.js";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "../../packages/db/src/transactional-lifecycle-store.js";
 import {
   parseControlPlaneLoadConfiguration,
@@ -16,7 +20,7 @@ const loadValidationEnabled = process.env.BOARDREADYOPS_CONTROL_PLANE_LOAD_TESTS
 const describeLoad = connectionString && loadValidationEnabled ? describe : describe.skip;
 
 describeLoad("control-plane PostgreSQL load validation", () => {
-  it("keeps representative concurrent work within thresholds and tenant boundaries", async () => {
+  it("keeps the selected load profile within thresholds and tenant boundaries", async () => {
     if (!connectionString) throw new Error("DATABASE_URL is required");
     const configuration = parseControlPlaneLoadConfiguration({
       ...process.env,
@@ -26,7 +30,11 @@ describeLoad("control-plane PostgreSQL load validation", () => {
       createPgQueryExecutor,
       createSqlControlPlaneJobStore,
       createSqlControlPlaneOutboxStore,
+      createSqlControlPlaneOperationsStore,
+      createSqlRunnerLeaseStore,
+      createSqlRunnerTerminalResultAuthorizer,
       createSqlTransactionalGitHubAppLifecycleStore,
+      processControlPlaneWorkflowReconciliation,
       lookupRunDashboard,
     });
     const expectedRuns = configuration.repositoryCount * configuration.runsPerRepository;
@@ -45,5 +53,24 @@ describeLoad("control-plane PostgreSQL load validation", () => {
       scopedDashboardReads: configuration.repositoryCount * 2,
       crossTenantMismatches: 0,
     });
+    if (configuration.profile === "soak-recovery") {
+      expect(report.recovery).toEqual(
+        expect.objectContaining({
+          roundsRequested: configuration.recoveryRounds,
+          roundsCompleted: configuration.recoveryRounds,
+          jobLeaseRecoveries: configuration.recoveryRounds,
+          staleJobCompletionsRejected: configuration.recoveryRounds,
+          outboxRetries: configuration.recoveryRounds,
+          uncertainOutboxQuarantines: configuration.recoveryRounds,
+          delayedCallbackRepairs: configuration.recoveryRounds,
+          staleAttemptResultsRejected: configuration.recoveryRounds,
+          deadLetters: 0,
+          ambiguousNonterminalStates: 0,
+        }),
+      );
+      expect(report.recovery?.maximumConvergenceMs).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(report.recovery).toBeUndefined();
+    }
   }, 120_000);
 });
