@@ -25,6 +25,7 @@ describe("control-plane load configuration", () => {
       databaseUrl,
       profile: "representative",
       recoveryRounds: 3,
+      workerFleetSize: 3,
       uniqueDeliveries: 200,
       duplicateDeliveries: 50,
       repositoryCount: 4,
@@ -62,6 +63,7 @@ describe("control-plane load configuration", () => {
       databaseUrl,
       profile: "soak-recovery",
       recoveryRounds: 5,
+      workerFleetSize: 3,
       uniqueDeliveries: 500,
       duplicateDeliveries: 125,
       repositoryCount: 8,
@@ -105,6 +107,22 @@ describe("control-plane load configuration", () => {
     });
   });
 
+  it("accepts an explicit bounded worker-fleet-interruption profile", () => {
+    expect(
+      parseControlPlaneLoadConfiguration(
+        configuredEnvironment({
+          BOARDREADYOPS_LOAD_PROFILE: "worker-fleet-interruption",
+          BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "2",
+          BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE: "4",
+        }),
+      ),
+    ).toMatchObject({
+      profile: "worker-fleet-interruption",
+      recoveryRounds: 2,
+      workerFleetSize: 4,
+    });
+  });
+
   it("accepts an explicit database-interruption profile", () => {
     expect(
       parseControlPlaneLoadConfiguration(
@@ -134,12 +152,20 @@ describe("control-plane load configuration", () => {
     expect(() =>
       parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_PROFILE: "chaos" })),
     ).toThrow(
-      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, worker-process-interruption, or github-api-interruption",
+      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, worker-process-interruption, worker-fleet-interruption, or github-api-interruption",
     );
 
     expect(() =>
       parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: "0" })),
     ).toThrow("BOARDREADYOPS_LOAD_RECOVERY_ROUNDS must be an integer between 1 and 20");
+
+    expect(() =>
+      parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE: "1" })),
+    ).toThrow("BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE must be an integer between 2 and 20");
+
+    expect(() =>
+      parseControlPlaneLoadConfiguration(configuredEnvironment({ BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE: "21" })),
+    ).toThrow("BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE must be an integer between 2 and 20");
 
     expect(() =>
       parseControlPlaneLoadConfiguration(
@@ -199,6 +225,7 @@ describe("control-plane load measurements", () => {
       scenario: {
         profile: "representative" as const,
         recoveryRounds: 3,
+        workerFleetSize: 3,
         uniqueDeliveries: 200,
         duplicateDeliveries: 50,
         repositoryCount: 4,
@@ -260,6 +287,7 @@ describe("control-plane load measurements", () => {
       scenario: {
         profile: "soak-recovery" as const,
         recoveryRounds: 3,
+        workerFleetSize: 3,
         uniqueDeliveries: 20,
         duplicateDeliveries: 5,
         repositoryCount: 2,
@@ -347,6 +375,7 @@ describe("control-plane database interruption evidence", () => {
       scenario: {
         profile: "database-interruption" as const,
         recoveryRounds: 2,
+        workerFleetSize: 3,
         uniqueDeliveries: 20,
         duplicateDeliveries: 5,
         repositoryCount: 2,
@@ -415,6 +444,7 @@ describe("control-plane worker process interruption evidence", () => {
       scenario: {
         profile: "worker-process-interruption" as const,
         recoveryRounds: 2,
+        workerFleetSize: 3,
         uniqueDeliveries: 20,
         duplicateDeliveries: 5,
         repositoryCount: 2,
@@ -476,6 +506,76 @@ describe("control-plane worker process interruption evidence", () => {
   });
 });
 
+describe("control-plane worker fleet interruption evidence", () => {
+  it("rejects incomplete full-fleet recovery with stable signal names", () => {
+    const report = {
+      event: "control_plane_load_verified" as const,
+      scenario: {
+        profile: "worker-fleet-interruption" as const,
+        recoveryRounds: 2,
+        workerFleetSize: 3,
+        uniqueDeliveries: 20,
+        duplicateDeliveries: 5,
+        repositoryCount: 2,
+        runsPerRepository: 5,
+        concurrency: 4,
+      },
+      intake: { count: 25, elapsedMs: 100, throughputPerSecond: 250, p50Ms: 2, p95Ms: 5, p99Ms: 7, maximumMs: 8 },
+      lifecycle: { count: 30, elapsedMs: 120, throughputPerSecond: 250, p50Ms: 2, p95Ms: 6, p99Ms: 8, maximumMs: 9 },
+      dashboard: { count: 4, elapsedMs: 20, throughputPerSecond: 200, p50Ms: 2, p95Ms: 4, p99Ms: 4, maximumMs: 4 },
+      recovery: {
+        roundsRequested: 2,
+        roundsCompleted: 2,
+        jobLeaseRecoveries: 2,
+        staleJobCompletionsRejected: 2,
+        outboxRetries: 2,
+        uncertainOutboxQuarantines: 2,
+        delayedCallbackRepairs: 2,
+        staleAttemptResultsRejected: 2,
+        maximumConvergenceMs: 50,
+        deadLetters: 0,
+        ambiguousNonterminalStates: 0,
+      },
+      workerFleetRecovery: {
+        roundsRequested: 2,
+        roundsCompleted: 1,
+        fleetSize: 3,
+        childProcessesStarted: 5,
+        childProcessesKilled: 4,
+        abandonedLeasesReclaimed: 4,
+        replacementCompletions: 3,
+        maximumConvergenceMs: 6_000,
+      },
+      invariants: {
+        acceptedDeliveries: 20,
+        duplicateDeliveries: 5,
+        completedJobs: 20,
+        releaseRuns: 10,
+        completedOutboxEffects: 10,
+        scopedDashboardReads: 4,
+        crossTenantMismatches: 0,
+      },
+    };
+
+    expect(
+      evaluateControlPlaneLoadReport(report, {
+        intakeP95Ms: 1_000,
+        lifecycleP95Ms: 1_500,
+        dashboardP95Ms: 1_000,
+        minimumThroughputPerSecond: 10,
+        recoveryMaxConvergenceMs: 5_000,
+      }),
+    ).toEqual([
+      "worker_fleet_recovery_rounds_incomplete",
+      "worker_fleet_start_incomplete",
+      "worker_fleet_kill_incomplete",
+      "worker_fleet_lease_reclaim_incomplete",
+      "worker_fleet_completion_incomplete",
+      "worker_fleet_recovery_convergence_exceeded",
+    ]);
+  });
+});
+
 describe("control-plane GitHub API interruption evidence", () => {
   it("rejects incomplete GitHub API recovery with stable signal names", () => {
     const report = {
@@ -483,6 +583,7 @@ describe("control-plane GitHub API interruption evidence", () => {
       scenario: {
         profile: "github-api-interruption" as const,
         recoveryRounds: 2,
+        workerFleetSize: 3,
         uniqueDeliveries: 20,
         duplicateDeliveries: 5,
         repositoryCount: 2,

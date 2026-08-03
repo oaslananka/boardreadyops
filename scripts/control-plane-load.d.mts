@@ -15,8 +15,10 @@ export type ControlPlaneLoadConfiguration = {
     | "soak-recovery"
     | "database-interruption"
     | "worker-process-interruption"
+    | "worker-fleet-interruption"
     | "github-api-interruption";
   recoveryRounds: number;
+  workerFleetSize: number;
   uniqueDeliveries: number;
   duplicateDeliveries: number;
   repositoryCount: number;
@@ -69,6 +71,17 @@ export type ControlPlaneLoadWorkerProcessRecoveryReport = {
   maximumConvergenceMs: number;
 };
 
+export type ControlPlaneLoadWorkerFleetRecoveryReport = {
+  roundsRequested: number;
+  roundsCompleted: number;
+  fleetSize: number;
+  childProcessesStarted: number;
+  childProcessesKilled: number;
+  abandonedLeasesReclaimed: number;
+  replacementCompletions: number;
+  maximumConvergenceMs: number;
+};
+
 export type ControlPlaneLoadGitHubApiRecoveryReport = {
   roundsRequested: number;
   roundsCompleted: number;
@@ -89,6 +102,7 @@ export type ControlPlaneLoadReport = {
   recovery?: ControlPlaneLoadRecoveryReport;
   databaseRecovery?: ControlPlaneLoadDatabaseRecoveryReport;
   workerProcessRecovery?: ControlPlaneLoadWorkerProcessRecoveryReport;
+  workerFleetRecovery?: ControlPlaneLoadWorkerFleetRecoveryReport;
   githubApiRecovery?: ControlPlaneLoadGitHubApiRecoveryReport;
   signals: readonly string[];
   invariants: {

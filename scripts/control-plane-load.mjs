@@ -49,10 +49,11 @@ export function parseControlPlaneLoadConfiguration(environment = process.env) {
     profile !== "soak-recovery" &&
     profile !== "database-interruption" &&
     profile !== "worker-process-interruption" &&
+    profile !== "worker-fleet-interruption" &&
     profile !== "github-api-interruption"
   ) {
     throw new Error(
-      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, worker-process-interruption, or github-api-interruption",
+      "BOARDREADYOPS_LOAD_PROFILE must be representative, soak-recovery, database-interruption, worker-process-interruption, worker-fleet-interruption, or github-api-interruption",
     );
   }
 
@@ -66,6 +67,7 @@ export function parseControlPlaneLoadConfiguration(environment = process.env) {
     databaseUrl,
     profile,
     recoveryRounds: boundedInteger(environment, "BOARDREADYOPS_LOAD_RECOVERY_ROUNDS", 3, 1, 20),
+    workerFleetSize: boundedInteger(environment, "BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE", 3, 2, 20),
     uniqueDeliveries,
     duplicateDeliveries,
     repositoryCount: boundedInteger(environment, "BOARDREADYOPS_LOAD_REPOSITORIES", 4, 2, 20),
@@ -163,6 +165,9 @@ export function evaluateControlPlaneLoadReport(report, thresholds = defaultThres
   if (report.scenario.profile === "worker-process-interruption") {
     signals.push(...evaluateWorkerProcessRecoveryEvidence(report, thresholds));
   }
+  if (report.scenario.profile === "worker-fleet-interruption") {
+    signals.push(...evaluateWorkerFleetRecoveryEvidence(report, thresholds));
+  }
   if (report.scenario.profile === "github-api-interruption") {
     signals.push(...evaluateGitHubApiRecoveryEvidence(report, thresholds));
   }
@@ -212,6 +217,25 @@ function evaluateWorkerProcessRecoveryEvidence(report, thresholds) {
     ["worker_process_completion_incomplete", recovery?.replacementCompletions >= rounds],
     [
       "worker_process_recovery_convergence_exceeded",
+      recovery?.maximumConvergenceMs <= thresholds.recoveryMaxConvergenceMs,
+    ],
+  ];
+  return checks.filter(([, passed]) => !passed).map(([signal]) => signal);
+}
+
+function evaluateWorkerFleetRecoveryEvidence(report, thresholds) {
+  const recovery = report.workerFleetRecovery;
+  const rounds = report.scenario.recoveryRounds;
+  const fleetSize = report.scenario.workerFleetSize;
+  const expectedActions = rounds * fleetSize;
+  const checks = [
+    ["worker_fleet_recovery_rounds_incomplete", recovery?.roundsCompleted >= rounds],
+    ["worker_fleet_start_incomplete", recovery?.childProcessesStarted >= expectedActions],
+    ["worker_fleet_kill_incomplete", recovery?.childProcessesKilled >= expectedActions],
+    ["worker_fleet_lease_reclaim_incomplete", recovery?.abandonedLeasesReclaimed >= expectedActions],
+    ["worker_fleet_completion_incomplete", recovery?.replacementCompletions >= expectedActions],
+    [
+      "worker_fleet_recovery_convergence_exceeded",
       recovery?.maximumConvergenceMs <= thresholds.recoveryMaxConvergenceMs,
     ],
   ];
@@ -1162,9 +1186,9 @@ async function cleanupWorkerProcess(child) {
   await exited;
 }
 
-async function runWorkerProcessInterruptionValidation(configuration, input) {
-  const workerProcessRecovery = {
-    roundsRequested: configuration.recoveryRounds,
+function createWorkerInterruptionRecovery(roundsRequested) {
+  return {
+    roundsRequested,
     roundsCompleted: 0,
     childProcessesStarted: 0,
     childProcessesKilled: 0,
@@ -1172,18 +1196,39 @@ async function runWorkerProcessInterruptionValidation(configuration, input) {
     replacementCompletions: 0,
     maximumConvergenceMs: 0,
   };
+}
+
+function createWorkerInterruptionStore(input, now) {
+  return input.dependencies.createSqlControlPlaneJobStore(input.executor, {
+    now,
+    leaseSeconds: 1,
+    maximumAttempts: 4,
+    retryBaseSeconds: 1,
+  });
+}
+
+function spawnWorkerFixture(configuration, repositoryRoot, baseTime, workerId) {
+  return spawn(process.execPath, ["--input-type=module", "--eval", workerProcessFixtureSource], {
+    cwd: repositoryRoot,
+    env: {
+      DATABASE_URL: configuration.databaseUrl,
+      BOARDREADYOPS_WORKER_FIXTURE_ROOT: repositoryRoot,
+      BOARDREADYOPS_WORKER_FIXTURE_CLAIM_AT: baseTime.toISOString(),
+      BOARDREADYOPS_WORKER_FIXTURE_ID: workerId,
+    },
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+}
+
+async function runWorkerProcessInterruptionValidation(configuration, input) {
+  const workerProcessRecovery = createWorkerInterruptionRecovery(configuration.recoveryRounds);
   const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 
   for (let round = 0; round < configuration.recoveryRounds; round += 1) {
     const startedAt = performance.now();
     const baseTime = new Date(Date.now() + 60_000 + round * 10_000);
     let now = baseTime;
-    const store = input.dependencies.createSqlControlPlaneJobStore(input.executor, {
-      now: () => now,
-      leaseSeconds: 1,
-      maximumAttempts: 4,
-      retryBaseSeconds: 1,
-    });
+    const store = createWorkerInterruptionStore(input, () => now);
     const deliveryId = `${input.prefix}-worker-process-${round}`;
     const accepted = await store.acceptGitHubWebhook({
       deliveryId,
@@ -1210,16 +1255,7 @@ async function runWorkerProcessInterruptionValidation(configuration, input) {
     const abandonedWorker = `${input.prefix}-process-abandoned-${round}`;
     let child;
     try {
-      child = spawn(process.execPath, ["--input-type=module", "--eval", workerProcessFixtureSource], {
-        cwd: repositoryRoot,
-        env: {
-          DATABASE_URL: configuration.databaseUrl,
-          BOARDREADYOPS_WORKER_FIXTURE_ROOT: repositoryRoot,
-          BOARDREADYOPS_WORKER_FIXTURE_CLAIM_AT: baseTime.toISOString(),
-          BOARDREADYOPS_WORKER_FIXTURE_ID: abandonedWorker,
-        },
-        stdio: ["ignore", "pipe", "ignore"],
-      });
+      child = spawnWorkerFixture(configuration, repositoryRoot, baseTime, abandonedWorker);
       workerProcessRecovery.childProcessesStarted += 1;
       await waitForWorkerClaim(child, accepted.jobId);
       await terminateWorkerProcess(child);
@@ -1246,6 +1282,95 @@ async function runWorkerProcessInterruptionValidation(configuration, input) {
     );
   }
   return workerProcessRecovery;
+}
+
+async function runWorkerFleetInterruptionValidation(configuration, input) {
+  const workerFleetRecovery = {
+    ...createWorkerInterruptionRecovery(configuration.recoveryRounds),
+    fleetSize: configuration.workerFleetSize,
+  };
+  const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
+
+  for (let round = 0; round < configuration.recoveryRounds; round += 1) {
+    const startedAt = performance.now();
+    const baseTime = new Date(Date.now() + 60_000 + round * 10_000);
+    let now = baseTime;
+    const store = createWorkerInterruptionStore(input, () => now);
+    const children = [];
+    const expectedJobIds = [];
+
+    try {
+      for (let workerIndex = 0; workerIndex < configuration.workerFleetSize; workerIndex += 1) {
+        const repository =
+          input.repositories[(round * configuration.workerFleetSize + workerIndex) % input.repositories.length];
+        const deliveryId = `${input.prefix}-worker-fleet-${round}-${workerIndex}`;
+        const accepted = await store.acceptGitHubWebhook({
+          deliveryId,
+          eventType: "installation",
+          eventAction: "created",
+          installationExternalId: repository.githubInstallationId,
+          payloadSha256: createHash("sha256").update(deliveryId).digest("hex"),
+          actions: [
+            {
+              type: "installation.upsert",
+              installation: {
+                id: repository.githubInstallationId,
+                accountLogin: `${input.prefix}-worker-fleet-account`,
+                accountType: "Organization",
+              },
+            },
+          ],
+          receivedAt: baseTime,
+        });
+        if (accepted.outcome !== "accepted" || !accepted.jobId) {
+          throw new Error("worker fleet interruption fixture was not accepted");
+        }
+
+        const workerId = `${input.prefix}-fleet-abandoned-${round}-${workerIndex}`;
+        const child = spawnWorkerFixture(configuration, repositoryRoot, baseTime, workerId);
+        children.push(child);
+        workerFleetRecovery.childProcessesStarted += 1;
+        await waitForWorkerClaim(child, accepted.jobId);
+        expectedJobIds.push(accepted.jobId);
+      }
+
+      await Promise.all(
+        children.map(async (child) => {
+          await terminateWorkerProcess(child);
+          workerFleetRecovery.childProcessesKilled += 1;
+        }),
+      );
+    } finally {
+      await Promise.all(children.map((child) => cleanupWorkerProcess(child)));
+    }
+
+    now = offsetDate(baseTime, 2_000);
+    const reclaimedIds = new Set();
+    for (let workerIndex = 0; workerIndex < configuration.workerFleetSize; workerIndex += 1) {
+      const replacementWorker = `${input.prefix}-fleet-replacement-${round}-${workerIndex}`;
+      const reclaimed = (await store.claimJobs({ workerId: replacementWorker, limit: 1 }))[0];
+      if (!reclaimed || !expectedJobIds.includes(reclaimed.jobId) || reclaimed.attemptCount !== 2) {
+        throw new Error("terminated worker fleet lease was not reclaimed");
+      }
+      if (reclaimedIds.has(reclaimed.jobId)) throw new Error("terminated worker fleet job was reclaimed twice");
+      reclaimedIds.add(reclaimed.jobId);
+      workerFleetRecovery.abandonedLeasesReclaimed += 1;
+      if ((await store.completeJob({ jobId: reclaimed.jobId, workerId: replacementWorker })) !== "completed") {
+        throw new Error("replacement worker fleet did not complete a reclaimed job");
+      }
+      workerFleetRecovery.replacementCompletions += 1;
+    }
+    if (reclaimedIds.size !== expectedJobIds.length) {
+      throw new Error("replacement worker fleet did not reclaim every abandoned job");
+    }
+
+    workerFleetRecovery.roundsCompleted += 1;
+    workerFleetRecovery.maximumConvergenceMs = Math.max(
+      workerFleetRecovery.maximumConvergenceMs,
+      rounded(performance.now() - startedAt),
+    );
+  }
+  return workerFleetRecovery;
 }
 
 function requiredDatabaseInterruptionDependency(dependencies, name) {
@@ -1503,6 +1628,15 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
             dependencies,
           })
         : undefined;
+    const workerFleetRecovery =
+      configuration.profile === "worker-fleet-interruption"
+        ? await runWorkerFleetInterruptionValidation(configuration, {
+            executor,
+            prefix,
+            repositories,
+            dependencies,
+          })
+        : undefined;
     const databaseRecovery =
       configuration.profile === "database-interruption"
         ? await runDatabaseInterruptionValidation(configuration, {
@@ -1540,6 +1674,7 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
       scenario: {
         profile: configuration.profile,
         recoveryRounds: configuration.recoveryRounds,
+        workerFleetSize: configuration.workerFleetSize,
         uniqueDeliveries: configuration.uniqueDeliveries,
         duplicateDeliveries: configuration.duplicateDeliveries,
         repositoryCount: configuration.repositoryCount,
@@ -1558,6 +1693,7 @@ export async function runControlPlaneLoadValidation(configuration, dependencies)
       ...(recovery ? { recovery } : {}),
       ...(databaseRecovery ? { databaseRecovery } : {}),
       ...(workerProcessRecovery ? { workerProcessRecovery } : {}),
+      ...(workerFleetRecovery ? { workerFleetRecovery } : {}),
       ...(githubApiRecovery ? { githubApiRecovery } : {}),
       invariants: {
         ...state,
