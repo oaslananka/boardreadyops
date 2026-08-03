@@ -524,7 +524,7 @@ function configForProject(root: string, config: BoardReadyOpsConfig, project: Pr
     const cv = config.vendor;
     const ov = override.vendor;
     projectConfig.vendor = {
-      ...(cv ?? {}),
+      ...(cv || undefined),
       ...ov,
       board: cv?.board || ov.board ? { ...cv?.board, ...ov.board } : undefined,
       assembly: cv?.assembly || ov.assembly ? { ...cv?.assembly, ...ov.assembly } : undefined,

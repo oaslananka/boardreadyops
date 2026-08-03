@@ -136,7 +136,9 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
 
   const artifactHealth: ArtifactHealthDataPoint[] = runs.map((run) => ({
     generatedAt: run.generatedAt,
-    presentKinds: [...new Set(run.fabrication.outputs.map((output) => output.kind))].sort(),
+    presentKinds: [...new Set(run.fabrication.outputs.map((output) => output.kind))].sort((left, right) =>
+      left.localeCompare(right),
+    ),
   }));
 
   return {
@@ -151,25 +153,35 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
   };
 }
 
+function processRunFindings(
+  run: RunResult,
+  ruleTotalCounts: Map<string, number>,
+  ruleMaxSeverity: Map<string, string>,
+): Set<string> {
+  const rulesThisRun = new Set<string>();
+  for (const finding of run.findings) {
+    if (finding.suppressed) {
+      continue;
+    }
+    rulesThisRun.add(finding.ruleId);
+    ruleTotalCounts.set(finding.ruleId, (ruleTotalCounts.get(finding.ruleId) ?? 0) + 1);
+    const current = ruleMaxSeverity.get(finding.ruleId);
+    const currentRank = current ? SEVERITY_RANK[current] || 0 : -1;
+    const newRank = SEVERITY_RANK[finding.severity] || 0;
+    if (newRank > currentRank) {
+      ruleMaxSeverity.set(finding.ruleId, finding.severity);
+    }
+  }
+  return rulesThisRun;
+}
+
 function buildRecurringFindings(runs: RunResult[]): RecurringFinding[] {
   const ruleRunCounts = new Map<string, number>();
   const ruleTotalCounts = new Map<string, number>();
   const ruleMaxSeverity = new Map<string, string>();
 
   for (const run of runs) {
-    const rulesThisRun = new Set<string>();
-    for (const finding of run.findings) {
-      if (!finding.suppressed) {
-        rulesThisRun.add(finding.ruleId);
-        ruleTotalCounts.set(finding.ruleId, (ruleTotalCounts.get(finding.ruleId) ?? 0) + 1);
-        const current = ruleMaxSeverity.get(finding.ruleId);
-        const currentRank = current ? SEVERITY_RANK[current] || 0 : -1;
-        const newRank = SEVERITY_RANK[finding.severity] || 0;
-        if (newRank > currentRank) {
-          ruleMaxSeverity.set(finding.ruleId, finding.severity);
-        }
-      }
-    }
+    const rulesThisRun = processRunFindings(run, ruleTotalCounts, ruleMaxSeverity);
     for (const ruleId of rulesThisRun) {
       ruleRunCounts.set(ruleId, (ruleRunCounts.get(ruleId) || 0) + 1);
     }

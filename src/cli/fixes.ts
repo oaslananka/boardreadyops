@@ -467,6 +467,7 @@ async function planProjectBoardRevisions(
     }
     if (ruleIds.length > 0) {
       const after = setRevision(before, candidate, "kicad_pcb");
+      const revisionLabel = revision ? `"${revision}"` : "metadata";
       addTextChange({
         plan,
         virtualTexts,
@@ -475,7 +476,7 @@ async function planProjectBoardRevisions(
         before,
         after,
         ruleIds,
-        summary: `Rewrite PCB revision ${revision ? `"${revision}"` : "metadata"} to ${candidate}.`,
+        summary: `Rewrite PCB revision ${revisionLabel} to ${candidate}.`,
       });
     }
   }

@@ -42684,7 +42684,7 @@ async function loadArduinoPinContract(file2) {
   const pins = [];
   for (const line of text.split(/\r?\n/)) {
     const parsed = parseDefineLine(line);
-    if (!parsed || !parsed.signal || !parsed.hardware) {
+    if (!parsed?.signal || !parsed.hardware) {
       continue;
     }
     const meta3 = parseMeta(parsed.comment);
@@ -42708,7 +42708,7 @@ function parseDefineLine(line) {
   }
   const [code, ...commentParts] = trimmed.split("//");
   const match = /^#\s*define\s+([A-Za-z_]\w*)\s+(\S+)/.exec(code?.trim() ?? "");
-  if (!match || !match[1] || !match[2]) {
+  if (!match?.[1] || !match[2]) {
     return null;
   }
   return { signal: match[1], hardware: match[2], comment: commentParts.join("//").trim() };
@@ -45262,7 +45262,7 @@ var versionFormatRule = rule(
       return [];
     }
     const rawPattern = configFor(context, "release.version-format").pattern;
-    const pattern = typeof rawPattern === "string" ? rawPattern : "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$";
+    const pattern = typeof rawPattern === "string" ? rawPattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
     const regex = compilePattern(pattern);
     if (!regex) {
       return [
@@ -45278,41 +45278,47 @@ var versionFormatRule = rule(
     }
     const output = [];
     for (const project of context.projects) {
-      for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path37.default.resolve(context.root, board))).revision;
-        if (revision2 && !regex.test(revision2)) {
-          output.push(
-            finding(context, {
-              ruleId: "release.version-format",
-              severity: configuredSeverity(context, "release.version-format", "low"),
-              message: `PCB revision ${revision2} does not match ${pattern}.`,
-              path: board,
-              kind: "pcb",
-              details: { revision: revision2, pattern }
-            })
-          );
-        }
-      }
-      for (const schematic of project.schematicFiles) {
-        const text = await readDesignFile(import_node_path37.default.resolve(context.root, schematic)) ?? "";
-        const revision2 = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
-        if (revision2 && !regex.test(revision2)) {
-          output.push(
-            finding(context, {
-              ruleId: "release.version-format",
-              severity: configuredSeverity(context, "release.version-format", "low"),
-              message: `Schematic revision ${revision2} does not match ${pattern}.`,
-              path: schematic,
-              kind: "schematic",
-              details: { revision: revision2, pattern }
-            })
-          );
-        }
-      }
+      await checkProjectBoards(context, project, regex, pattern, output);
+      await checkProjectSchematics(context, project, regex, pattern, output);
     }
     return output;
   }
 );
+async function checkProjectBoards(context, project, regex, pattern, output) {
+  for (const board of project.boardFiles) {
+    const revision2 = (await parsePcb(import_node_path37.default.resolve(context.root, board))).revision;
+    if (revision2 && !regex.test(revision2)) {
+      output.push(
+        finding(context, {
+          ruleId: "release.version-format",
+          severity: configuredSeverity(context, "release.version-format", "low"),
+          message: `PCB revision ${revision2} does not match ${pattern}.`,
+          path: board,
+          kind: "pcb",
+          details: { revision: revision2, pattern }
+        })
+      );
+    }
+  }
+}
+async function checkProjectSchematics(context, project, regex, pattern, output) {
+  for (const schematic of project.schematicFiles) {
+    const text = await readDesignFile(import_node_path37.default.resolve(context.root, schematic)) ?? "";
+    const revision2 = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
+    if (revision2 && !regex.test(revision2)) {
+      output.push(
+        finding(context, {
+          ruleId: "release.version-format",
+          severity: configuredSeverity(context, "release.version-format", "low"),
+          message: `Schematic revision ${revision2} does not match ${pattern}.`,
+          path: schematic,
+          kind: "schematic",
+          details: { revision: revision2, pattern }
+        })
+      );
+    }
+  }
+}
 function compilePattern(pattern) {
   try {
     return new RegExp(pattern);
@@ -45505,7 +45511,7 @@ function bomRiskSummaryFromFindings(findings) {
     const d = f.details;
     const factors = d.factors || {};
     return {
-      reference: String(d.reference || ""),
+      reference: typeof d.reference === "string" ? d.reference : String(d.reference ?? ""),
       mpn: typeof d.mpn === "string" ? d.mpn : void 0,
       manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : void 0,
       riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,
@@ -46918,7 +46924,7 @@ function configForProject(root, config2, project) {
     const cv = config2.vendor;
     const ov = override.vendor;
     projectConfig.vendor = {
-      ...cv ?? {},
+      ...cv || void 0,
       ...ov,
       board: cv?.board || ov.board ? { ...cv?.board, ...ov.board } : void 0,
       assembly: cv?.assembly || ov.assembly ? { ...cv?.assembly, ...ov.assembly } : void 0
@@ -47668,7 +47674,7 @@ function reportCoordinate(value) {
   if (Number.isInteger(value)) {
     return value.toString();
   }
-  return value.toFixed(6).replace(/\.?0+$/, "");
+  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
 }
 function reportCoordinateWithUnits(value, units) {
   return `${reportCoordinate(value)}${units}`;
@@ -50586,6 +50592,7 @@ async function planProjectBoardRevisions(root, project, opts) {
     }
     if (ruleIds.length > 0) {
       const after = setRevision(before, candidate, "kicad_pcb");
+      const revisionLabel = revision2 ? `"${revision2}"` : "metadata";
       addTextChange({
         plan,
         virtualTexts,
@@ -50594,7 +50601,7 @@ async function planProjectBoardRevisions(root, project, opts) {
         before,
         after,
         ruleIds,
-        summary: `Rewrite PCB revision ${revision2 ? `"${revision2}"` : "metadata"} to ${candidate}.`
+        summary: `Rewrite PCB revision ${revisionLabel} to ${candidate}.`
       });
     }
   }

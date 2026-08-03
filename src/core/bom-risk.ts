@@ -79,7 +79,7 @@ export function bomRiskSummaryFromFindings(
     const d = f.details!;
     const factors = (d.factors || {}) as BomRiskFactors;
     return {
-      reference: String(d.reference || ""),
+      reference: typeof d.reference === "string" ? d.reference : String(d.reference ?? ""),
       mpn: typeof d.mpn === "string" ? d.mpn : undefined,
       manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : undefined,
       riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,

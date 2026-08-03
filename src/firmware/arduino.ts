@@ -16,7 +16,7 @@ export async function loadArduinoPinContract(file: string): Promise<LoadedFirmwa
   const pins: FirmwarePinAssignment[] = [];
   for (const line of text.split(/\r?\n/)) {
     const parsed = parseDefineLine(line);
-    if (!parsed || !parsed.signal || !parsed.hardware) {
+    if (!parsed?.signal || !parsed.hardware) {
       continue;
     }
     const meta = parseMeta(parsed.comment);
@@ -41,7 +41,7 @@ function parseDefineLine(line: string): { signal: string; hardware: string; comm
   }
   const [code, ...commentParts] = trimmed.split("//");
   const match = /^#\s*define\s+([A-Za-z_]\w*)\s+(\S+)/.exec(code?.trim() ?? "");
-  if (!match || !match[1] || !match[2]) {
+  if (!match?.[1] || !match[2]) {
     return null;
   }
   return { signal: match[1], hardware: match[2], comment: commentParts.join("//").trim() };

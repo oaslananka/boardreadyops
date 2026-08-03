@@ -55,7 +55,7 @@ export function reportCoordinate(value: number): string {
   if (Number.isInteger(value)) {
     return value.toString();
   }
-  return value.toFixed(6).replace(/\.?0+$/, "");
+  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 export function reportCoordinateWithUnits(value: number, units: "mm" | "in"): string {
