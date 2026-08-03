@@ -13,7 +13,7 @@ All notable changes to BoardReadyOps are recorded here.
 
 ### Features
 
-* **ci:** validate full worker fleet recovery ([#318](https://github.com/oaslananka/boardreadyops/issues/318)) ([3818d8f](https://github.com/oaslananka/boardreadyops/commit/3818d8f969fdbfe567da4e04f0939c31a2f9239b)), closes [#222](https://github.com/oaslananka/boardreadyops/issues/222)
+* **ci:** validate full worker fleet recovery ([#318](https://github.com/oaslananka/boardreadyops/issues/318)) ([3818d8f](https://github.com/oaslananka/boardreadyops/commit/3818d8f969fdbfe567da4e04f0939c31a2f9239b)), refs [#222](https://github.com/oaslananka/boardreadyops/issues/222)
 
 ## [1.29.0](https://github.com/oaslananka/boardreadyops/compare/v1.28.0...v1.29.0) (2026-08-02)
 
