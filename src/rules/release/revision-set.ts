@@ -21,7 +21,7 @@ export const revisionSetRule = rule(
     const output = [];
     const config = configFor(context, "release.revision-set");
     const tagPattern =
-      typeof config["tag-pattern"] === "string" ? config["tag-pattern"] : String.raw`^v?\d+\.\d+(?:\.\d+)?$`;
+      typeof config["tag-pattern"] === "string" ? config["tag-pattern"] : "^v?\\d+\\.\\d+(?:\\.\\d+)?$";
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context.projects) {
       for (const board of project.boardFiles) {

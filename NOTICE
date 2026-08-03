@@ -206,6 +206,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `webdriver-bidi-protocol@0.4.1`, `webdriver-bidi-protocol@0.4.2`
   - Homepage: https://github.com/GoogleChromeLabs/webdriver-bidi-protocol#readme
 
+## Apache-2.0 AND LGPL-3.0-or-later
+
+
 ## BlueOak-1.0.0
 
 - `glob@13.0.6`
@@ -405,9 +408,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Description: Pa11y is your automated accessibility testing pal
   - Homepage: https://github.com/pa11y/pa11y
 
-## LGPL-3.0-or-later
-
-
 ## MIT
 
 - `@actions/artifact@6.2.1`
@@ -566,8 +566,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@bcoe/v8-coverage@1.0.2`
   - Description: Helper functions for V8 coverage files.
   - Homepage: https://github.com/bcoe/v8-coverage#readme
-- `@codecov/bundler-plugin-core@2.0.1`
-  - Description: Official Codecov Bundler Plugin Core
 - `@commitlint/cli@21.1.0`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
@@ -889,9 +887,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@vitest/spy@4.1.9`
   - Description: Lightweight Jest compatible spy implementation
   - Homepage: https://vitest.dev/api/mock
-- `@vitest/utils@4.1.9`
-  - Description: Shared Vitest utility functions
-  - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/utils
 - `abort-controller@3.0.0`
   - Description: An implementation of WHATWG AbortController interface.
   - Homepage: https://github.com/mysticatea/abort-controller#readme
@@ -999,7 +994,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `chai@6.2.2`
   - Description: BDD/TDD assertion library for node.js and the browser. Test framework agnostic.
   - Homepage: http://chaijs.com
-- `chalk@4.1.2`, `chalk@5.6.2`
+- `chalk@5.6.2`
   - Description: Terminal string styling done right
   - Homepage: https://github.com/chalk/chalk#readme
 - `chardet@2.1.1`
@@ -1795,9 +1790,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `universal-github-app-jwt@2.2.2`
   - Description: Calculate GitHub App bearer tokens for Node & modern browsers
   - Homepage: https://github.com/gr2m/universal-github-app-jwt#readme
-- `unplugin@1.16.1`
-  - Description: Unified plugin system for build tools
-  - Homepage: https://github.com/unjs/unplugin#readme
 - `unzip-stream@0.3.4`
   - Description: Process zip files using streaming API
   - Homepage: https://github.com/mhr3/unzip-stream#readme
@@ -1816,9 +1808,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `vitest@4.1.9`
   - Description: Next generation testing framework powered by Vite
   - Homepage: https://vitest.dev
-- `webpack-virtual-modules@0.6.2`
-  - Description: Webpack Virtual Modules
-  - Homepage: https://github.com/sysgears/webpack-virtual-modules#readme
 - `whatwg-mimetype@3.0.0`
   - Description: Parses, serializes, and manipulates MIME types, according to the WHATWG MIME Sniffing Standard
   - Homepage: https://github.com/jsdom/whatwg-mimetype#readme

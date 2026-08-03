@@ -20,7 +20,7 @@ export const versionFormatRule = rule(
       return [];
     }
     const rawPattern = configFor(context, "release.version-format").pattern;
-    const pattern = typeof rawPattern === "string" ? rawPattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
+    const pattern = typeof rawPattern === "string" ? rawPattern : "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$";
     const regex = compilePattern(pattern);
     if (!regex) {
       return [

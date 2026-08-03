@@ -101404,7 +101404,7 @@ var revisionSetRule = rule(
     }
     const output = [];
     const config2 = configFor(context5, "release.revision-set");
-    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : String.raw`^v?\d+\.\d+(?:\.\d+)?$`;
+    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : "^v?\\d+\\.\\d+(?:\\.\\d+)?$";
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
@@ -101500,7 +101500,7 @@ var versionFormatRule = rule(
       return [];
     }
     const rawPattern = configFor(context5, "release.version-format").pattern;
-    const pattern = typeof rawPattern === "string" ? rawPattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
+    const pattern = typeof rawPattern === "string" ? rawPattern : "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$";
     const regex = compilePattern(pattern);
     if (!regex) {
       return [
@@ -101839,7 +101839,7 @@ var import_node_path39 = __toESM(require("node:path"), 1);
 async function discoverProjects(root, explicitProject) {
   const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path39.default.resolve(file2));
   const contexts = [];
-  const projectFilesSorted = projectFiles.toSorted((a, b) => a.localeCompare(b));
+  const projectFilesSorted = [...projectFiles].sort((a, b) => a.localeCompare(b));
   for (const projectFile of projectFilesSorted) {
     contexts.push(await projectContext(root, projectFile));
   }
@@ -102418,7 +102418,32 @@ function computeReadiness(input) {
   const missingRequired = required2.filter((output) => !input.presentOutputs.has(output));
   const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
   const expiredWaivers = input.expiredWaivers ?? 0;
-  const { blocking, nonBlocking } = countFindings(input.findings, input.failOn);
+  let blocking = 0;
+  let nonBlocking = 0;
+  for (const finding2 of input.findings) {
+    if (!finding2.suppressed && finding2.severity !== "info") {
+      if (isBlocking(finding2, input.failOn)) {
+        blocking += 1;
+      } else {
+        nonBlocking += 1;
+      }
+    }
+  }
+  const warnings = [];
+  for (const output of missingRequired) {
+    warnings.push(`Required output ${output} is missing.`);
+  }
+  for (const output of missingRecommended) {
+    warnings.push(
+      isProduction ? `Recommended output ${output} is required in production mode.` : `Recommended output ${output} is missing.`
+    );
+  }
+  if (blocking > 0) {
+    warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
+  }
+  if (isProduction && expiredWaivers > 0) {
+    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
+  }
   const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
   const score = clampScore(
     100 - missingRequired.length * REQUIRED_PENALTY - missingRecommended.length * RECOMMENDED_PENALTY - blocking * BLOCKING_PENALTY - nonBlocking * NON_BLOCKING_PENALTY - productionBlockers * REQUIRED_PENALTY
@@ -102436,13 +102461,6 @@ function computeReadiness(input) {
       present: input.presentOutputs.has(output)
     }))
   ].sort((left, right) => left.output.localeCompare(right.output));
-  const warnings = buildWarnings({
-    missingRequired,
-    missingRecommended,
-    blocking,
-    isProduction,
-    expiredWaivers
-  });
   return {
     profile: input.profile,
     score,
@@ -102454,41 +102472,6 @@ function computeReadiness(input) {
     missingRecommended,
     warnings
   };
-}
-function countFindings(findings, failOn) {
-  let blocking = 0;
-  let nonBlocking = 0;
-  for (const finding2 of findings) {
-    if (finding2.suppressed || finding2.severity === "info") {
-      continue;
-    }
-    if (isBlocking(finding2, failOn)) {
-      blocking += 1;
-    } else {
-      nonBlocking += 1;
-    }
-  }
-  return { blocking, nonBlocking };
-}
-function buildWarnings(params) {
-  const warnings = [];
-  for (const output of params.missingRequired) {
-    warnings.push(`Required output ${output} is missing.`);
-  }
-  for (const output of params.missingRecommended) {
-    if (params.isProduction) {
-      warnings.push(`Recommended output ${output} is required in production mode.`);
-    } else {
-      warnings.push(`Recommended output ${output} is missing.`);
-    }
-  }
-  if (params.blocking > 0) {
-    warnings.push(`${params.blocking} blocking finding(s) must be resolved before release.`);
-  }
-  if (params.isProduction && params.expiredWaivers > 0) {
-    warnings.push(`${params.expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
-  }
-  return warnings;
 }
 
 // src/core/suppressions.ts
@@ -102772,14 +102755,7 @@ async function postProcessPhase(ctx, findings, projects) {
     expiredWaivers: waiverResult.expired.length,
     staleWaivers: waiverResult.active.filter((waiver) => waiver.stale).length
   }) : void 0;
-  return {
-    effectiveFindings,
-    fabrication,
-    readiness,
-    summary: summary2,
-    waiverResult,
-    policy
-  };
+  return { effectiveFindings, fabrication, readiness, summary: summary2, waiverResult, policy };
 }
 function assembleRunResult({
   ctx,

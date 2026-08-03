@@ -253,14 +253,7 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
       })
     : undefined;
 
-  return {
-    effectiveFindings,
-    fabrication,
-    readiness,
-    summary,
-    waiverResult,
-    policy,
-  };
+  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy };
 }
 
 interface AssembleRunResultOptions {

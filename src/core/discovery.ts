@@ -9,7 +9,7 @@ export async function discoverProjects(root: string, explicitProject?: string): 
     ? await explicitProjectFiles(root, explicitProject)
     : (await globFiles(root, ["**/*.kicad_pro"])).map((file) => path.resolve(file));
   const contexts: ProjectContext[] = [];
-  const projectFilesSorted = projectFiles.toSorted((a, b) => a.localeCompare(b));
+  const projectFilesSorted = [...projectFiles].sort((a, b) => a.localeCompare(b));
   for (const projectFile of projectFilesSorted) {
     contexts.push(await projectContext(root, projectFile));
   }

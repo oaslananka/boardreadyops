@@ -409,15 +409,13 @@ async function planReleaseRevisions(
     const projectRevisionAllowed =
       revisionAllowed && isRuleEnabledForProjectContext(root, config, project, revisionRule);
     if (projectVersionAllowed || projectRevisionAllowed) {
-      await planProjectBoardRevisions({
-        root,
-        project,
-        projectVersionAllowed,
-        projectRevisionAllowed,
-        versionRule,
-        revisionRule,
-        versionRegex,
-        tagRegex,
+      await planProjectBoardRevisions(root, project, {
+        vAllowed: projectVersionAllowed,
+        rAllowed: projectRevisionAllowed,
+        vRule: versionRule,
+        rRule: revisionRule,
+        vRegex: versionRegex,
+        rRegex: tagRegex,
         plan,
         virtualTexts,
       });
@@ -435,52 +433,37 @@ async function planReleaseRevisions(
   }
 }
 
-async function planProjectBoardRevisions(params: {
-  root: string;
-  project: ProjectContext;
-  projectVersionAllowed: boolean;
-  projectRevisionAllowed: boolean;
-  versionRule: string;
-  revisionRule: string;
-  versionRegex: RegExp | undefined;
-  tagRegex: RegExp | undefined;
-  plan: MutablePlan;
-  virtualTexts: Map<string, string>;
-}): Promise<void> {
-  const {
-    root,
-    project,
-    projectVersionAllowed,
-    projectRevisionAllowed,
-    versionRule,
-    revisionRule,
-    versionRegex,
-    tagRegex,
-    plan,
-    virtualTexts,
-  } = params;
+async function planProjectBoardRevisions(
+  root: string,
+  project: ProjectContext,
+  opts: {
+    vAllowed: boolean;
+    rAllowed: boolean;
+    vRule: string;
+    rRule: string;
+    vRegex?: RegExp | undefined;
+    rRegex?: RegExp | undefined;
+    plan: MutablePlan;
+    virtualTexts: Map<string, string>;
+  },
+): Promise<void> {
+  const { vAllowed, rAllowed, vRule, rRule, vRegex, rRegex, plan, virtualTexts } = opts;
   for (const board of project.boardFiles) {
     const file = path.resolve(root, board);
     const before = await readVirtualText(file, virtualTexts);
     const revision = revisionFromText(before);
     const candidate = coerceSemver(revision);
     const ruleIds = [];
-    if (
-      projectVersionAllowed &&
-      revision &&
-      versionRegex &&
-      !versionRegex.test(revision) &&
-      versionRegex.test(candidate)
-    ) {
-      ruleIds.push(versionRule);
+    if (vAllowed && revision && vRegex && !vRegex.test(revision) && vRegex.test(candidate)) {
+      ruleIds.push(vRule);
     }
     if (
-      projectRevisionAllowed &&
-      tagRegex &&
-      (!revision || (!tagRegex.test(revision) && !tagRegex.test(`v${revision}`))) &&
-      (tagRegex.test(candidate) || tagRegex.test(`v${candidate}`))
+      rAllowed &&
+      rRegex &&
+      (!revision || (!rRegex.test(revision) && !rRegex.test(`v${revision}`))) &&
+      (rRegex.test(candidate) || rRegex.test(`v${candidate}`))
     ) {
-      ruleIds.push(revisionRule);
+      ruleIds.push(rRule);
     }
     if (ruleIds.length > 0) {
       const after = setRevision(before, candidate, "kicad_pcb");

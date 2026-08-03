@@ -4,6 +4,7 @@ import type { ReadinessScore } from "../core/readiness.js";
 import type { RunResult } from "../core/result.js";
 import { type Locale, type MessageKey, t } from "../i18n/t.js";
 import { outputChangeSummary } from "./fabrication-summary.js";
+import { reportCoordinate as formatNumber } from "./finding-context.js";
 
 const severities: Severity[] = ["critical", "high", "medium", "low", "info"];
 
@@ -542,16 +543,6 @@ export function emptyPanel(message: string): string {
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
-}
-
-function formatNumber(value: number): string {
-  if (Object.is(value, -0)) {
-    return "0";
-  }
-  if (Number.isInteger(value)) {
-    return value.toString();
-  }
-  return value.toFixed(6).replace(/\.?0+$/, "");
 }
 
 function attr(value: string): string {

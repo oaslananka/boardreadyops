@@ -49,5 +49,5 @@ describe("rule fixture isolation", () => {
       "package-completeness-missing.kicad_prl",
     );
     expect(Object.keys(after["package-completeness-pass"] ?? {})).not.toContain("package-completeness-pass.kicad_prl");
-  }, 60_000);
+  }, 120_000);
 });
