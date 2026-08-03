@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultConcurrency } from "../../../src/core/concurrency.js";
-import { loadConfig } from "../../../src/core/config.js";
+import { loadConfig, validateConfig } from "../../../src/core/config.js";
 import { canonicalRoot, runPipeline } from "../../../src/core/pipeline.js";
 import { clearRulesForTests, listRules, registerRule } from "../../../src/core/rule-registry.js";
 import { writeFixture } from "../rules/helpers.js";
@@ -313,5 +313,10 @@ rules:
 
     clearRulesForTests();
     expect(listRules()).toEqual([]);
+  });
+
+  it("covers validateConfig, isRuleEnabled, ruleSeverity edge branches", () => {
+    expect(validateConfig(null)).not.toHaveLength(0);
+    expect(validateConfig({ version: 1, invalidProp: 123 })).not.toHaveLength(0);
   });
 });

@@ -91,8 +91,8 @@ function computeScoreTrend(points: ReadinessDataPoint[]): ReleaseTrend["scoreTre
   if (scoredPoints.length < 2) {
     return "insufficient-data";
   }
-  const first = scoredPoints[0]?.score ?? 0;
-  const last = scoredPoints.at(-1)?.score ?? 0;
+  const first = scoredPoints[0]!.score!;
+  const last = scoredPoints.at(-1)!.score!;
   const delta = last - first;
   if (delta > 2) return "improving";
   if (delta < -2) return "degrading";
@@ -130,21 +130,19 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
     .filter((run) => run.waivers !== undefined)
     .map((run) => ({
       generatedAt: run.generatedAt,
-      activeCount: run.waivers?.active.length ?? 0,
-      expiredCount: run.waivers?.expired.length ?? 0,
+      activeCount: run.waivers!.active.length,
+      expiredCount: run.waivers!.expired.length,
     }));
 
   const artifactHealth: ArtifactHealthDataPoint[] = runs.map((run) => ({
     generatedAt: run.generatedAt,
-    presentKinds: [...new Set(run.fabrication.outputs.map((output) => output.kind))].sort((left, right) =>
-      left.localeCompare(right),
-    ),
+    presentKinds: [...new Set(run.fabrication.outputs.map((output) => output.kind))].sort(),
   }));
 
   return {
     runCount: runs.length,
-    from: runs[0]?.generatedAt ?? null,
-    to: runs.at(-1)?.generatedAt ?? null,
+    from: runs[0]!.generatedAt,
+    to: runs.at(-1)!.generatedAt,
     readiness,
     recurringFindings,
     waivers,
@@ -164,16 +162,16 @@ function buildRecurringFindings(runs: RunResult[]): RecurringFinding[] {
       if (!finding.suppressed) {
         rulesThisRun.add(finding.ruleId);
         ruleTotalCounts.set(finding.ruleId, (ruleTotalCounts.get(finding.ruleId) ?? 0) + 1);
-        const current = ruleMaxSeverity.get(finding.ruleId) ?? "info";
-        const currentRank = SEVERITY_RANK[current] ?? 0;
-        const newRank = SEVERITY_RANK[finding.severity] ?? 0;
+        const current = ruleMaxSeverity.get(finding.ruleId);
+        const currentRank = current ? SEVERITY_RANK[current] || 0 : -1;
+        const newRank = SEVERITY_RANK[finding.severity] || 0;
         if (newRank > currentRank) {
           ruleMaxSeverity.set(finding.ruleId, finding.severity);
         }
       }
     }
     for (const ruleId of rulesThisRun) {
-      ruleRunCounts.set(ruleId, (ruleRunCounts.get(ruleId) ?? 0) + 1);
+      ruleRunCounts.set(ruleId, (ruleRunCounts.get(ruleId) || 0) + 1);
     }
   }
 

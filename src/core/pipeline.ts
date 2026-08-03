@@ -524,16 +524,10 @@ function configForProject(root: string, config: BoardReadyOpsConfig, project: Pr
     const cv = config.vendor;
     const ov = override.vendor;
     projectConfig.vendor = {
-      ...(cv ?? emptyObj),
+      ...(cv ?? {}),
       ...ov,
-      board: {
-        ...(cv?.board ?? emptyObj),
-        ...(ov.board ?? emptyObj),
-      },
-      assembly: {
-        ...(cv?.assembly ?? emptyObj),
-        ...(ov.assembly ?? emptyObj),
-      },
+      board: cv?.board || ov.board ? { ...cv?.board, ...ov.board } : undefined,
+      assembly: cv?.assembly || ov.assembly ? { ...cv?.assembly, ...ov.assembly } : undefined,
     };
   }
   if (override.rules) {

@@ -82043,13 +82043,12 @@ async function loadConfig(root, configInput) {
   }
 }
 function validateConfig(config2) {
-  const valid = validate(config2);
-  if (valid) {
+  if (validate(config2)) {
     return [];
   }
-  return (validate.errors ?? []).map((error52) => {
+  return (validate.errors || []).map((error52) => {
     const pointer = error52.instancePath || "/";
-    return `${pointer}: ${error52.message ?? "invalid value"}`;
+    return `${pointer}: ${error52.message || "invalid value"}`;
   });
 }
 function isRuleEnabled(config2, ruleId6) {
@@ -101779,14 +101778,14 @@ function bomRiskSummaryFromFindings(findings) {
   if (riskFindings.length === 0) {
     return void 0;
   }
-  const firstDetails = riskFindings[0]?.details ?? {};
+  const firstDetails = riskFindings[0].details;
   const totalComponents = typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
   const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
   const components = riskFindings.map((f) => {
-    const d = f.details ?? {};
-    const factors = d.factors ?? {};
+    const d = f.details;
+    const factors = d.factors || {};
     return {
-      reference: String(d.reference ?? ""),
+      reference: String(d.reference || ""),
       mpn: typeof d.mpn === "string" ? d.mpn : void 0,
       manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : void 0,
       riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,
@@ -101830,7 +101829,7 @@ async function mapLimit(items, limit, worker) {
 
 // src/core/concurrency.ts
 function defaultConcurrency() {
-  return Math.max(1, import_node_os2.default.availableParallelism?.() ?? import_node_os2.default.cpus().length ?? 1);
+  return Math.max(1, typeof import_node_os2.default.availableParallelism === "function" ? import_node_os2.default.availableParallelism() : import_node_os2.default.cpus().length);
 }
 
 // src/core/discovery.ts
@@ -101863,8 +101862,8 @@ async function projectContext(root, projectFile) {
   const entries = await safeReadDir(projectRoot);
   const schematicFiles = entries.filter(
     (file2) => file2.endsWith(".kicad_sch") && (import_node_path39.default.basename(file2, ".kicad_sch") === base || entries.length === 1)
-  ).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort((a, b) => a.localeCompare(b));
-  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path39.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort((a, b) => a.localeCompare(b));
+  ).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort();
+  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path39.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort();
   const jobsetFiles = await discoverJobsets(projectRoot);
   return {
     projectFile: normalizeRelative(root, projectFile),
@@ -102972,16 +102971,10 @@ function configForProject(root, config2, project) {
     const cv = config2.vendor;
     const ov = override.vendor;
     projectConfig.vendor = {
-      ...cv ?? emptyObj,
+      ...cv ?? {},
       ...ov,
-      board: {
-        ...cv?.board ?? emptyObj,
-        ...ov.board ?? emptyObj
-      },
-      assembly: {
-        ...cv?.assembly ?? emptyObj,
-        ...ov.assembly ?? emptyObj
-      }
+      board: cv?.board || ov.board ? { ...cv?.board, ...ov.board } : void 0,
+      assembly: cv?.assembly || ov.assembly ? { ...cv?.assembly, ...ov.assembly } : void 0
     };
   }
   if (override.rules) {
