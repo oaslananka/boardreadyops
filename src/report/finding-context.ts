@@ -20,7 +20,8 @@ function reportLocation(finding: Finding): string {
   const base = finding.resource.path;
   if (finding.location?.region) {
     const region = finding.location.region;
-    const start = `:${region.startLine}${region.startColumn ? `:${region.startColumn}` : ""}`;
+    const colSuffix = region.startColumn ? `:${region.startColumn}` : "";
+    const start = `:${region.startLine}${colSuffix}`;
     const end = region.endLine !== region.startLine ? `-${region.endLine}` : "";
     return `${base}${start}${end}`;
   }

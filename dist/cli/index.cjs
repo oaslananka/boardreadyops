@@ -25184,10 +25184,10 @@ var config_schema_default = {
 var import_promises3 = __toESM(require("node:fs/promises"), 1);
 var import_node_path4 = __toESM(require("node:path"), 1);
 function toPosixPath(value) {
-  return value.replace(/\\/g, "/");
+  return value.replaceAll("\\", "/");
 }
 function normalizePathInput(value) {
-  return import_node_path4.default.sep === "\\" ? value.replace(/\//g, "\\") : value.replace(/\\/g, "/");
+  return import_node_path4.default.sep === "\\" ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/");
 }
 function normalizeRelative(root, target) {
   const relative = import_node_path4.default.relative(root, target);
@@ -25199,7 +25199,7 @@ function matchesProjectScope(resourcePath, configuredProject) {
   return !normalizedProject || normalizedProject === "." || normalizedResource === normalizedProject || normalizedResource.startsWith(`${normalizedProject}/`);
 }
 function normalizeResourcePath(value) {
-  return import_node_path4.default.posix.normalize(value.replace(/\\/g, "/")).replace(/^\.\//, "");
+  return import_node_path4.default.posix.normalize(value.replaceAll("\\", "/")).replace(/^\.\//, "");
 }
 function isInside(parent, child) {
   const relative = import_node_path4.default.relative(parent, child);
@@ -25223,7 +25223,7 @@ async function resolveExistingPathAlias(target) {
   while (true) {
     try {
       const real = await import_promises3.default.realpath(current);
-      return missingSegments.length > 0 ? import_node_path4.default.join(real, ...missingSegments.reverse()) : real;
+      return missingSegments.length > 0 ? import_node_path4.default.join(real, ...missingSegments.toReversed()) : real;
     } catch {
       const parent = import_node_path4.default.dirname(current);
       if (parent === current) {
@@ -25250,7 +25250,7 @@ function stableStringify(value) {
 }
 function redactControlCharacters(value) {
   return [...value].filter((char) => {
-    const code = char.charCodeAt(0);
+    const code = char.codePointAt(0) ?? 0;
     return code === 9 || code === 10 || code === 13 || code >= 32 && code !== 127;
   }).join("");
 }
@@ -25367,13 +25367,12 @@ async function loadConfig(root, configInput) {
   }
 }
 function validateConfig(config2) {
-  const valid = validate(config2);
-  if (valid) {
+  if (validate(config2)) {
     return [];
   }
-  return (validate.errors ?? []).map((error51) => {
+  return (validate.errors || []).map((error51) => {
     const pointer = error51.instancePath || "/";
-    return `${pointer}: ${error51.message ?? "invalid value"}`;
+    return `${pointer}: ${error51.message || "invalid value"}`;
   });
 }
 function isRuleEnabled(config2, ruleId6) {
@@ -25895,7 +25894,7 @@ function refIgnored(reference, patterns) {
   return patterns.some((pattern) => typeof pattern === "string" && globLike(pattern, reference));
 }
 function globLike(pattern, value) {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
   return new RegExp(`^${escaped}$`, "i").test(value);
 }
 
@@ -26087,40 +26086,7 @@ function parseSexprDocument(text) {
     if (char === void 0) {
       break;
     }
-    if (/\s/.test(char)) {
-      advance(position, char);
-      continue;
-    }
-    if (char === ";") {
-      skipComment(text, position);
-      continue;
-    }
-    if (char === "(") {
-      const start = mark(position);
-      advance(position, char);
-      appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
-      const list = lastList(stack, nodes);
-      if (list) {
-        stack.push(list);
-      }
-      continue;
-    }
-    if (char === ")") {
-      const start = mark(position);
-      advance(position, char);
-      const list = stack.pop();
-      if (!list) {
-        errors.push({ message: "Unexpected closing parenthesis", span: { start, end: mark(position) } });
-      } else {
-        list.span.end = mark(position);
-      }
-      continue;
-    }
-    if (char === '"') {
-      appendNode(nodes, stack, parseString(text, position, errors));
-      continue;
-    }
-    appendNode(nodes, stack, parseAtom(text, position));
+    processSexprToken(text, char, position, nodes, stack, errors);
   }
   const end = mark(position);
   for (const list of stack.reverse()) {
@@ -26300,6 +26266,42 @@ function advance(position, char) {
     return;
   }
   position.column += 1;
+}
+function processSexprToken(text, char, position, nodes, stack, errors) {
+  if (/\s/.test(char)) {
+    advance(position, char);
+    return;
+  }
+  if (char === ";") {
+    skipComment(text, position);
+    return;
+  }
+  if (char === "(") {
+    const start = mark(position);
+    advance(position, char);
+    appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
+    const list = lastList(stack, nodes);
+    if (list) {
+      stack.push(list);
+    }
+    return;
+  }
+  if (char === ")") {
+    const start = mark(position);
+    advance(position, char);
+    const list = stack.pop();
+    if (!list) {
+      errors.push({ message: "Unexpected closing parenthesis", span: { start, end: mark(position) } });
+    } else {
+      list.span.end = mark(position);
+    }
+    return;
+  }
+  if (char === '"') {
+    appendNode(nodes, stack, parseString(text, position, errors));
+    return;
+  }
+  appendNode(nodes, stack, parseAtom(text, position));
 }
 
 // src/kicad/variants.ts
@@ -26968,68 +26970,79 @@ var identityConflictsRule = rule(
       return [];
     }
     const { bomRows, schematicRows } = await loadBomContext(context);
-    const findings = [];
-    const bomByRef = /* @__PURE__ */ new Map();
-    for (const row of bomRows) {
-      if (!row.reference || row.dnp) continue;
-      const existing = bomByRef.get(row.reference) ?? [];
-      existing.push({ mpn: row.mpn ?? "", line: row.line, path: row.sourcePath });
-      bomByRef.set(row.reference, existing);
-    }
-    for (const [reference, entries] of bomByRef) {
-      const uniqueMpns = new Set(entries.map((entry) => entry.mpn.toLowerCase()));
-      if (uniqueMpns.size > 1) {
-        const first = entries[0];
-        findings.push(
-          finding(context, {
-            ruleId: "bom.identity-conflicts",
-            severity: configuredSeverity(context, "bom.identity-conflicts", "high"),
-            message: `${reference} appears ${entries.length} times in the BOM with conflicting MPNs: ${[...uniqueMpns].join(", ")}.`,
-            path: first?.path ?? "",
-            kind: "bom",
-            line: first?.line,
-            details: {
-              reference,
-              conflictType: "within-bom",
-              mpns: [...uniqueMpns]
-            }
-          })
-        );
-      }
-    }
-    if (bomRows.length > 0 && schematicRows.length > 0) {
-      const schematicMpn = /* @__PURE__ */ new Map();
-      for (const row of schematicRows) {
-        if (row.mpn) {
-          schematicMpn.set(row.reference, row.mpn);
-        }
-      }
-      for (const row of bomRows) {
-        if (!row.mpn || row.dnp) continue;
-        const schemMpn = schematicMpn.get(row.reference);
-        if (schemMpn && schemMpn.toLowerCase() !== row.mpn.toLowerCase()) {
-          findings.push(
-            finding(context, {
-              ruleId: "bom.identity-conflicts",
-              severity: configuredSeverity(context, "bom.identity-conflicts", "high"),
-              message: `${row.reference} has MPN "${row.mpn}" in the BOM but "${schemMpn}" in the schematic.`,
-              path: row.sourcePath,
-              kind: "bom",
-              line: row.line,
-              details: {
-                reference: row.reference,
-                conflictType: "bom-schematic",
-                bomMpn: row.mpn,
-                schematicMpn: schemMpn
-              }
-            })
-          );
-        }
-      }
-    }
-    return findings;
+    return [
+      ...checkBomInternalConflicts(context, bomRows),
+      ...checkBomSchematicConflicts(context, bomRows, schematicRows)
+    ];
   }
 );
+function checkBomInternalConflicts(context, bomRows) {
+  const findings = [];
+  const bomByRef = /* @__PURE__ */ new Map();
+  for (const row of bomRows) {
+    if (!row.reference || row.dnp) continue;
+    const existing = bomByRef.get(row.reference) ?? [];
+    existing.push({ mpn: row.mpn ?? "", line: row.line, path: row.sourcePath });
+    bomByRef.set(row.reference, existing);
+  }
+  for (const [reference, entries] of bomByRef) {
+    const uniqueMpns = new Set(entries.map((entry) => entry.mpn.toLowerCase()));
+    if (uniqueMpns.size > 1) {
+      const first = entries[0];
+      findings.push(
+        finding(context, {
+          ruleId: "bom.identity-conflicts",
+          severity: configuredSeverity(context, "bom.identity-conflicts", "high"),
+          message: `${reference} appears ${entries.length} times in the BOM with conflicting MPNs: ${[...uniqueMpns].join(", ")}.`,
+          path: first?.path ?? "",
+          kind: "bom",
+          line: first?.line,
+          details: {
+            reference,
+            conflictType: "within-bom",
+            mpns: [...uniqueMpns]
+          }
+        })
+      );
+    }
+  }
+  return findings;
+}
+function checkBomSchematicConflicts(context, bomRows, schematicRows) {
+  if (bomRows.length === 0 || schematicRows.length === 0) {
+    return [];
+  }
+  const findings = [];
+  const schematicMpn = /* @__PURE__ */ new Map();
+  for (const row of schematicRows) {
+    if (row.mpn) {
+      schematicMpn.set(row.reference, row.mpn);
+    }
+  }
+  for (const row of bomRows) {
+    if (!row.mpn || row.dnp) continue;
+    const schemMpn = schematicMpn.get(row.reference);
+    if (schemMpn && schemMpn.toLowerCase() !== row.mpn.toLowerCase()) {
+      findings.push(
+        finding(context, {
+          ruleId: "bom.identity-conflicts",
+          severity: configuredSeverity(context, "bom.identity-conflicts", "high"),
+          message: `${row.reference} has MPN "${row.mpn}" in the BOM but "${schemMpn}" in the schematic.`,
+          path: row.sourcePath,
+          kind: "bom",
+          line: row.line,
+          details: {
+            reference: row.reference,
+            conflictType: "bom-schematic",
+            bomMpn: row.mpn,
+            schematicMpn: schemMpn
+          }
+        })
+      );
+    }
+  }
+  return findings;
+}
 
 // src/rules/bom/lifecycle.ts
 var import_promises5 = __toESM(require("node:fs/promises"), 1);
@@ -27454,55 +27467,58 @@ var variantConsistencyRule = rule(
     }
     const output = [];
     for (const project of context.projects) {
-      const projectConfig = context.config.projects?.find((candidate) => {
-        const candidateRoot = import_node_path10.default.resolve(context.root, candidate.path);
-        const projectRoot = import_node_path10.default.resolve(context.root, project.root);
-        return candidateRoot === projectRoot;
-      });
-      let configuredVariants = (projectConfig?.variants ?? []).filter(
-        (variant) => !context.options.variant || variant.name === context.options.variant
-      );
-      if (configuredVariants.length === 0 && context.options.variant && context.options.bom && context.options.bom !== "auto") {
-        configuredVariants = [{ name: context.options.variant, bom: context.options.bom }];
-      }
-      if (configuredVariants.length === 0) {
-        continue;
-      }
-      const parsedVariants = parseVariants(
-        await readDesignFile(import_node_path10.default.resolve(context.root, project.projectFile)) ?? ""
-      );
-      for (const configuredVariant of configuredVariants) {
-        const parsedVariant = parsedVariants.find((variant) => variant.name === configuredVariant.name);
-        if (!parsedVariant || !configuredVariant.bom) {
-          continue;
-        }
-        const rows2 = await loadBom(import_node_path10.default.resolve(context.root, configuredVariant.bom));
-        const activeDnp = new Set(
-          activeVariantDnpRefs(
-            parsedVariant,
-            rows2.map((row) => row.reference)
-          )
-        );
-        for (const row of rows2) {
-          if (!row.dnp && activeDnp.has(row.reference)) {
-            output.push(
-              finding(context, {
-                ruleId: "bom.variant-consistency",
-                severity: configuredSeverity(context, "bom.variant-consistency", "high"),
-                message: `${row.reference} is DNP in variant ${configuredVariant.name} but appears populated in its BOM.`,
-                path: row.sourcePath,
-                kind: "bom",
-                line: row.line,
-                details: { variant: configuredVariant.name, reference: row.reference }
-              })
-            );
-          }
-        }
-      }
+      output.push(...await checkProjectVariants(context, project));
     }
     return output;
   }
 );
+async function checkProjectVariants(context, project) {
+  const output = [];
+  const projectConfig = context.config.projects?.find((candidate) => {
+    const candidateRoot = import_node_path10.default.resolve(context.root, candidate.path);
+    const projectRoot = import_node_path10.default.resolve(context.root, project.root);
+    return candidateRoot === projectRoot;
+  });
+  let configuredVariants = (projectConfig?.variants ?? []).filter(
+    (variant) => !context.options.variant || variant.name === context.options.variant
+  );
+  if (configuredVariants.length === 0 && context.options.variant && context.options.bom && context.options.bom !== "auto") {
+    configuredVariants = [{ name: context.options.variant, bom: context.options.bom }];
+  }
+  if (configuredVariants.length === 0) {
+    return [];
+  }
+  const parsedVariants = parseVariants(await readDesignFile(import_node_path10.default.resolve(context.root, project.projectFile)) ?? "");
+  for (const configuredVariant of configuredVariants) {
+    const parsedVariant = parsedVariants.find((variant) => variant.name === configuredVariant.name);
+    if (!parsedVariant || !configuredVariant.bom) {
+      continue;
+    }
+    const rows2 = await loadBom(import_node_path10.default.resolve(context.root, configuredVariant.bom));
+    const activeDnp = new Set(
+      activeVariantDnpRefs(
+        parsedVariant,
+        rows2.map((row) => row.reference)
+      )
+    );
+    for (const row of rows2) {
+      if (!row.dnp && activeDnp.has(row.reference)) {
+        output.push(
+          finding(context, {
+            ruleId: "bom.variant-consistency",
+            severity: configuredSeverity(context, "bom.variant-consistency", "high"),
+            message: `${row.reference} is DNP in variant ${configuredVariant.name} but appears populated in its BOM.`,
+            path: row.sourcePath,
+            kind: "bom",
+            line: row.line,
+            details: { variant: configuredVariant.name, reference: row.reference }
+          })
+        );
+      }
+    }
+  }
+  return output;
+}
 
 // src/rules/design/board-outline.ts
 var import_node_path11 = __toESM(require("node:path"), 1);
@@ -27567,32 +27583,37 @@ var copperBalanceRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path12.default.resolve(context.root, board));
-        if (!parsed.boardArea || parsed.boardArea <= 0) {
-          continue;
-        }
-        const layers = parsed.copperLayers.length > 0 ? parsed.copperLayers : [...parsed.copperAreas.keys()];
-        for (const layer of layers) {
-          const area = parsed.copperAreas.get(layer) ?? 0;
-          const coveragePercent = area / parsed.boardArea * 100;
-          if (coveragePercent < minimum) {
-            output.push(
-              finding(context, {
-                ruleId: "design.copper-balance",
-                severity: configuredSeverity(context, "design.copper-balance", "low"),
-                message: `${layer} copper coverage is ${coveragePercent.toFixed(1)}%, below ${minimum}%.`,
-                path: board,
-                kind: "pcb",
-                details: { layer, coveragePercent, minimum }
-              })
-            );
-          }
-        }
+        output.push(...await checkBoardCopperBalance(context, board, minimum));
       }
     }
     return output;
   }
 );
+async function checkBoardCopperBalance(context, board, minimum) {
+  const output = [];
+  const parsed = await parsePcb(import_node_path12.default.resolve(context.root, board));
+  if (!parsed.boardArea || parsed.boardArea <= 0) {
+    return [];
+  }
+  const layers = parsed.copperLayers.length > 0 ? parsed.copperLayers : [...parsed.copperAreas.keys()];
+  for (const layer of layers) {
+    const area = parsed.copperAreas.get(layer) ?? 0;
+    const coveragePercent = area / parsed.boardArea * 100;
+    if (coveragePercent < minimum) {
+      output.push(
+        finding(context, {
+          ruleId: "design.copper-balance",
+          severity: configuredSeverity(context, "design.copper-balance", "low"),
+          message: `${layer} copper coverage is ${coveragePercent.toFixed(1)}%, below ${minimum}%.`,
+          path: board,
+          kind: "pcb",
+          details: { layer, coveragePercent, minimum }
+        })
+      );
+    }
+  }
+  return output;
+}
 
 // src/rules/design/unique-references.ts
 var import_node_path13 = __toESM(require("node:path"), 1);
@@ -27619,34 +27640,39 @@ var uniqueReferencesRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path13.default.resolve(context.root, board));
-        const counts = /* @__PURE__ */ new Map();
-        for (const footprint of parsed.footprints) {
-          if (refIgnored(footprint.reference, config2["ignore-refs"])) {
-            continue;
-          }
-          const key = footprint.reference.toUpperCase();
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-        for (const [reference, count] of [...counts].sort((left, right) => left[0].localeCompare(right[0]))) {
-          if (count > 1) {
-            output.push(
-              finding(context, {
-                ruleId: "design.unique-references",
-                severity: configuredSeverity(context, "design.unique-references", "high"),
-                message: `Reference designator ${reference} is used ${count} times; designators must be unique.`,
-                path: board,
-                kind: "pcb",
-                details: { reference, count }
-              })
-            );
-          }
-        }
+        output.push(...await checkBoardUniqueReferences(context, board, config2));
       }
     }
     return output;
   }
 );
+async function checkBoardUniqueReferences(context, board, config2) {
+  const output = [];
+  const parsed = await parsePcb(import_node_path13.default.resolve(context.root, board));
+  const counts = /* @__PURE__ */ new Map();
+  for (const footprint of parsed.footprints) {
+    if (refIgnored(footprint.reference, config2["ignore-refs"])) {
+      continue;
+    }
+    const key = footprint.reference.toUpperCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const [reference, count] of [...counts].sort((left, right) => left[0].localeCompare(right[0]))) {
+    if (count > 1) {
+      output.push(
+        finding(context, {
+          ruleId: "design.unique-references",
+          severity: configuredSeverity(context, "design.unique-references", "high"),
+          message: `Reference designator ${reference} is used ${count} times; designators must be unique.`,
+          path: board,
+          kind: "pcb",
+          details: { reference, count }
+        })
+      );
+    }
+  }
+  return output;
+}
 
 // src/rules/kicad-report.ts
 var import_node_path16 = __toESM(require("node:path"), 1);
@@ -27714,10 +27740,10 @@ function runProcess(command, args, options = {}) {
 }
 function trustedCmdExe() {
   const systemRoot = process.env.SystemRoot;
-  if (systemRoot && /^[A-Za-z]:\\Windows$/i.test(systemRoot)) {
+  if (systemRoot && /^[a-z]:\\Windows$/i.test(systemRoot)) {
     return (0, import_node_path14.join)(systemRoot, "System32", "cmd.exe");
   }
-  return "C:\\Windows\\System32\\cmd.exe";
+  return String.raw`C:\Windows\System32\cmd.exe`;
 }
 function buildCmdLine(command, args) {
   return [quoteCmdToken(command), ...args.map(quoteCmdToken)].join(" ");
@@ -27727,7 +27753,7 @@ function quoteCmdToken(value) {
     return '""';
   }
   const sanitized = value.replace(/[\r\n]/g, "");
-  return `"${sanitized.replace(/"/g, '""')}"`;
+  return `"${sanitized.replaceAll('"', '""')}"`;
 }
 function appendBounded(current, next, limit) {
   if (current.length >= limit) {
@@ -42491,41 +42517,42 @@ async function runKicadReportRule(context, options) {
   for (const project of context.projects) {
     for (const designFile of options.files(project)) {
       const absoluteFile = import_node_path16.default.resolve(context.root, designFile);
-      const result = await runKicadReport(cli.path, options.command, absoluteFile, {
-        ...context.options.variant ? { variant: context.options.variant } : {},
-        ...cli.version ? { version: cli.version } : {}
-      });
-      for (const diagnostic of result.diagnostics) {
-        const severity = options.severity(
-          context,
-          diagnostic.ruleId,
-          kicadSeverityToFindingSeverity(diagnostic.severity)
-        );
-        output.push(
-          finding(context, {
-            ruleId: `${options.command}.${diagnostic.ruleId ?? "violation"}`,
-            severity,
-            message: diagnostic.message,
-            path: diagnostic.file ?? absoluteFile,
-            kind: options.resourceKind,
-            line: diagnostic.line,
-            column: diagnostic.column,
-            details: diagnostic.raw
-          })
-        );
-      }
-      if (result.status === "failed" && result.diagnostics.length === 0 && result.error) {
-        output.push(
-          finding(context, {
-            ruleId: options.groupRuleId,
-            severity: configuredSeverity(context, options.groupRuleId, "high"),
-            message: result.error,
-            path: absoluteFile,
-            kind: options.resourceKind
-          })
-        );
-      }
+      output.push(...await processDesignFileReport(context, cli.path, cli.version, options, absoluteFile));
     }
+  }
+  return output;
+}
+async function processDesignFileReport(context, cliPath, cliVersion, options, absoluteFile) {
+  const output = [];
+  const result = await runKicadReport(cliPath, options.command, absoluteFile, {
+    ...context.options.variant ? { variant: context.options.variant } : {},
+    ...cliVersion ? { version: cliVersion } : {}
+  });
+  for (const diagnostic of result.diagnostics) {
+    const severity = options.severity(context, diagnostic.ruleId, kicadSeverityToFindingSeverity(diagnostic.severity));
+    output.push(
+      finding(context, {
+        ruleId: `${options.command}.${diagnostic.ruleId ?? "violation"}`,
+        severity,
+        message: diagnostic.message,
+        path: diagnostic.file ?? absoluteFile,
+        kind: options.resourceKind,
+        line: diagnostic.line,
+        column: diagnostic.column,
+        details: diagnostic.raw
+      })
+    );
+  }
+  if (result.status === "failed" && result.diagnostics.length === 0 && result.error) {
+    output.push(
+      finding(context, {
+        ruleId: options.groupRuleId,
+        severity: configuredSeverity(context, options.groupRuleId, "high"),
+        message: result.error,
+        path: absoluteFile,
+        kind: options.resourceKind
+      })
+    );
   }
   return output;
 }
@@ -42647,7 +42674,6 @@ function compareFirmwareContract(pins, hardwareBySignal) {
 }
 
 // src/firmware/arduino.ts
-var DEFINE_PATTERN = /^\s*#\s*define\s+([A-Za-z_]\w*)\s+([^\s/]+)\s*(?:\/\/\s*(.*))?$/;
 async function loadArduinoPinContract(file2) {
   let text;
   try {
@@ -42657,18 +42683,14 @@ async function loadArduinoPinContract(file2) {
   }
   const pins = [];
   for (const line of text.split(/\r?\n/)) {
-    const match = DEFINE_PATTERN.exec(line);
-    if (!match) {
+    const parsed = parseDefineLine(line);
+    if (!parsed?.signal || !parsed.hardware) {
       continue;
     }
-    const [, signal, hardware, comment] = match;
-    if (!signal || !hardware) {
-      continue;
-    }
-    const meta3 = parseMeta(comment ?? "");
+    const meta3 = parseMeta(parsed.comment);
     pins.push({
-      signal,
-      hardware: normalizeHardwareKey(hardware),
+      signal: parsed.signal,
+      hardware: normalizeHardwareKey(parsed.hardware),
       ...meta3.net ? { net: meta3.net } : {},
       ...meta3.pin ? { pin: meta3.pin } : {},
       ...meta3.environment ? { environment: meta3.environment } : {}
@@ -42678,6 +42700,18 @@ async function loadArduinoPinContract(file2) {
     return { errors: ["Arduino pin header has no #define pin assignments"] };
   }
   return { document: { version: 1, pins }, errors: [] };
+}
+function parseDefineLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("#")) {
+    return null;
+  }
+  const [code, ...commentParts] = trimmed.split("//");
+  const match = /^#\s*define\s+([A-Za-z_]\w*)\s+(\S+)/.exec(code?.trim() ?? "");
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+  return { signal: match[1], hardware: match[2], comment: commentParts.join("//").trim() };
 }
 var arduinoAdapter = {
   id: "arduino",
@@ -42774,40 +42808,7 @@ async function buildSchematicNetGraph(rootFiles) {
       continue;
     }
     visited.add(file2);
-    const parsed = await parseSchematic(file2);
-    const sheet = {
-      file: file2,
-      parentFile: next.parentFile,
-      sheetName: next.sheetName,
-      sheetPins: [...new Set(next.sheetPins)],
-      localLabels: parsed.localLabels,
-      globalLabels: parsed.globalLabels,
-      hierarchicalLabels: parsed.hierarchicalLabels
-    };
-    sheets.push(sheet);
-    for (const pin of sheet.sheetPins) {
-      if (!sheet.hierarchicalLabels.has(pin)) {
-        unresolvedSheetPins.push({
-          parentFile: next.parentFile ?? file2,
-          childFile: file2,
-          sheetName: next.sheetName,
-          pin
-        });
-      }
-    }
-    for (const reference of parsed.sheetReferences) {
-      const resolvedPath = import_node_path17.default.resolve(import_node_path17.default.dirname(file2), reference.fileName);
-      if (!await fileExists(resolvedPath)) {
-        missingSheets.push(missingSheet(file2, reference, resolvedPath));
-        continue;
-      }
-      queue.push({
-        file: resolvedPath,
-        parentFile: file2,
-        sheetName: reference.sheetName,
-        sheetPins: reference.pins
-      });
-    }
+    await processSheetQueueItem(file2, next, sheets, missingSheets, unresolvedSheetPins, queue);
   }
   const rootSet = new Set(normalizedRoots);
   const visibleNetLabels = /* @__PURE__ */ new Set();
@@ -42828,6 +42829,42 @@ async function buildSchematicNetGraph(rootFiles) {
     }
   }
   return { rootFiles: normalizedRoots, sheets, visibleNetLabels, allNetLabels, missingSheets, unresolvedSheetPins };
+}
+async function processSheetQueueItem(file2, next, sheets, missingSheets, unresolvedSheetPins, queue) {
+  const parsed = await parseSchematic(file2);
+  const sheet = {
+    file: file2,
+    parentFile: next.parentFile,
+    sheetName: next.sheetName,
+    sheetPins: [...new Set(next.sheetPins)],
+    localLabels: parsed.localLabels,
+    globalLabels: parsed.globalLabels,
+    hierarchicalLabels: parsed.hierarchicalLabels
+  };
+  sheets.push(sheet);
+  for (const pin of sheet.sheetPins) {
+    if (!sheet.hierarchicalLabels.has(pin)) {
+      unresolvedSheetPins.push({
+        parentFile: next.parentFile ?? file2,
+        childFile: file2,
+        sheetName: next.sheetName,
+        pin
+      });
+    }
+  }
+  for (const reference of parsed.sheetReferences) {
+    const resolvedPath = import_node_path17.default.resolve(import_node_path17.default.dirname(file2), reference.fileName);
+    if (!await fileExists(resolvedPath)) {
+      missingSheets.push(missingSheet(file2, reference, resolvedPath));
+      continue;
+    }
+    queue.push({
+      file: resolvedPath,
+      parentFile: file2,
+      sheetName: reference.sheetName,
+      sheetPins: reference.pins
+    });
+  }
 }
 function missingSheet(parentFile, reference, resolvedPath) {
   const result = { parentFile, fileName: reference.fileName, resolvedPath };
@@ -42940,11 +42977,12 @@ async function runFirmwareContractRule(context, options) {
     );
   }
   for (const { assignment, hardware } of comparison.mismatches) {
+    const netSuffix = assignment.net ? ` / ${assignment.net}` : "";
     output.push(
       finding(context, {
         ruleId: ruleId6,
         severity,
-        message: `Firmware signal ${assignment.signal} maps to ${assignment.hardware}${assignment.net ? ` / ${assignment.net}` : ""}, but hardware pinmap expects ${hardware.hardware} / ${hardware.net}.`,
+        message: `Firmware signal ${assignment.signal} maps to ${assignment.hardware}${netSuffix}, but hardware pinmap expects ${hardware.hardware} / ${hardware.net}.`,
         path: contractPath,
         kind: "firmware",
         line: 1,
@@ -43139,7 +43177,7 @@ var import_node_path23 = __toESM(require("node:path"), 1);
 
 // src/firmware/stm32cubemx.ts
 var import_promises11 = __toESM(require("node:fs/promises"), 1);
-var IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.([\w_]+)=(.+)$/;
+var IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.(\w+)=(.+)$/;
 async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   let text;
   try {
@@ -43147,6 +43185,24 @@ async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   } catch (error51) {
     return { errors: [error51 instanceof Error ? error51.message : "STM32CubeMX .ioc file could not be loaded"] };
   }
+  const { pinLabels, pinNets } = parseIocLines(text);
+  if (pinLabels.size === 0) {
+    return {
+      errors: ["STM32CubeMX .ioc file has no GPIO_Label entries; add labels in the Pinout view to map signals"]
+    };
+  }
+  const pins = [];
+  for (const [pinId, label] of pinLabels) {
+    const net2 = pinNets.get(pinId);
+    pins.push({
+      signal: label,
+      hardware: normalizeHardwareKey(`${mcuDesignator}.${pinId}`),
+      ...net2 ? { net: net2 } : {}
+    });
+  }
+  return { document: { version: 1, pins }, errors: [] };
+}
+function parseIocLines(text) {
   const pinLabels = /* @__PURE__ */ new Map();
   const pinNets = /* @__PURE__ */ new Map();
   for (const line of text.split(/\r?\n/)) {
@@ -43164,21 +43220,7 @@ async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
       pinNets.set(pinId, value.trim());
     }
   }
-  if (pinLabels.size === 0) {
-    return {
-      errors: ["STM32CubeMX .ioc file has no GPIO_Label entries; add labels in the Pinout view to map signals"]
-    };
-  }
-  const pins = [];
-  for (const [pinId, label] of pinLabels) {
-    const net2 = pinNets.get(pinId);
-    pins.push({
-      signal: label,
-      hardware: normalizeHardwareKey(`${mcuDesignator}.${pinId}`),
-      ...net2 ? { net: net2 } : {}
-    });
-  }
-  return { document: { version: 1, pins }, errors: [] };
+  return { pinLabels, pinNets };
 }
 var stm32CubeMxAdapter = {
   id: "stm32cubemx",
@@ -43329,7 +43371,7 @@ function projectOutputSearchRoots(context) {
 }
 function normalizedSearchRoots(searchRoots) {
   const roots = searchRoots.length > 0 ? searchRoots : ["."];
-  return [...new Set(roots.map((entry) => entry === "." ? "." : entry.replace(/\\/g, "/")))];
+  return [...new Set(roots.map((entry) => entry === "." ? "." : entry.replaceAll("\\", "/")))];
 }
 function defaultPositionPatterns() {
   return ["**/*.pos", "**/*pos*.csv", "**/*position*.csv", "**/*positions*.csv", "**/*cpl*.csv", "**/*centroid*.csv"];
@@ -43641,7 +43683,7 @@ var jobsetOutputsRule = rule(
       for (const jobset of project.jobsetFiles) {
         const parsed = await parseJobset(import_node_path29.default.resolve(context.root, jobset));
         for (const job of parsed.jobs.filter((entry) => entry.enabled)) {
-          const outputPath = (job.destinationPath ? import_node_path29.default.join(job.destinationPath, job.outputPath) : job.outputPath).replace(/\\/g, "/");
+          const outputPath = (job.destinationPath ? import_node_path29.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
           const absoluteOutput = import_node_path29.default.resolve(context.root, project.root, outputPath);
           if (!await pathExists(absoluteOutput)) {
             output.push(
@@ -45219,7 +45261,8 @@ var versionFormatRule = rule(
     if (!shouldRun(context, "release.version-format")) {
       return [];
     }
-    const pattern = String(configFor(context, "release.version-format").pattern ?? "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$");
+    const rawPattern = configFor(context, "release.version-format").pattern;
+    const pattern = typeof rawPattern === "string" ? rawPattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
     const regex = compilePattern(pattern);
     if (!regex) {
       return [
@@ -45235,41 +45278,47 @@ var versionFormatRule = rule(
     }
     const output = [];
     for (const project of context.projects) {
-      for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path37.default.resolve(context.root, board))).revision;
-        if (revision2 && !regex.test(revision2)) {
-          output.push(
-            finding(context, {
-              ruleId: "release.version-format",
-              severity: configuredSeverity(context, "release.version-format", "low"),
-              message: `PCB revision ${revision2} does not match ${pattern}.`,
-              path: board,
-              kind: "pcb",
-              details: { revision: revision2, pattern }
-            })
-          );
-        }
-      }
-      for (const schematic of project.schematicFiles) {
-        const text = await readDesignFile(import_node_path37.default.resolve(context.root, schematic)) ?? "";
-        const revision2 = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
-        if (revision2 && !regex.test(revision2)) {
-          output.push(
-            finding(context, {
-              ruleId: "release.version-format",
-              severity: configuredSeverity(context, "release.version-format", "low"),
-              message: `Schematic revision ${revision2} does not match ${pattern}.`,
-              path: schematic,
-              kind: "schematic",
-              details: { revision: revision2, pattern }
-            })
-          );
-        }
-      }
+      await checkProjectBoards(context, project, regex, pattern, output);
+      await checkProjectSchematics(context, project, regex, pattern, output);
     }
     return output;
   }
 );
+async function checkProjectBoards(context, project, regex, pattern, output) {
+  for (const board of project.boardFiles) {
+    const revision2 = (await parsePcb(import_node_path37.default.resolve(context.root, board))).revision;
+    if (revision2 && !regex.test(revision2)) {
+      output.push(
+        finding(context, {
+          ruleId: "release.version-format",
+          severity: configuredSeverity(context, "release.version-format", "low"),
+          message: `PCB revision ${revision2} does not match ${pattern}.`,
+          path: board,
+          kind: "pcb",
+          details: { revision: revision2, pattern }
+        })
+      );
+    }
+  }
+}
+async function checkProjectSchematics(context, project, regex, pattern, output) {
+  for (const schematic of project.schematicFiles) {
+    const text = await readDesignFile(import_node_path37.default.resolve(context.root, schematic)) ?? "";
+    const revision2 = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
+    if (revision2 && !regex.test(revision2)) {
+      output.push(
+        finding(context, {
+          ruleId: "release.version-format",
+          severity: configuredSeverity(context, "release.version-format", "low"),
+          message: `Schematic revision ${revision2} does not match ${pattern}.`,
+          path: schematic,
+          kind: "schematic",
+          details: { revision: revision2, pattern }
+        })
+      );
+    }
+  }
+}
 function compilePattern(pattern) {
   try {
     return new RegExp(pattern);
@@ -45355,8 +45404,8 @@ async function captureFabricationSnapshot(root, projects, options, config2) {
     ].filter((entry) => Boolean(entry))
   );
   return {
-    bom: snapshotBom.sort(compareSnapshotBomRows),
-    outputs: outputs.sort((a, b) => a.kind.localeCompare(b.kind))
+    bom: snapshotBom.toSorted(compareSnapshotBomRows),
+    outputs: outputs.toSorted((a, b) => a.kind.localeCompare(b.kind))
   };
 }
 async function resolveBomPaths(root, options, config2) {
@@ -45455,14 +45504,14 @@ function bomRiskSummaryFromFindings(findings) {
   if (riskFindings.length === 0) {
     return void 0;
   }
-  const firstDetails = riskFindings[0]?.details ?? {};
+  const firstDetails = riskFindings[0].details;
   const totalComponents = typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
   const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
   const components = riskFindings.map((f) => {
-    const d = f.details ?? {};
-    const factors = d.factors ?? {};
+    const d = f.details;
+    const factors = d.factors || {};
     return {
-      reference: String(d.reference ?? ""),
+      reference: typeof d.reference === "string" ? d.reference : String(d.reference ?? ""),
       mpn: typeof d.mpn === "string" ? d.mpn : void 0,
       manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : void 0,
       riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,
@@ -45506,7 +45555,7 @@ async function mapLimit(items, limit, worker) {
 
 // src/core/concurrency.ts
 function defaultConcurrency() {
-  return Math.max(1, import_node_os2.default.availableParallelism?.() ?? import_node_os2.default.cpus().length ?? 1);
+  return Math.max(1, typeof import_node_os2.default.availableParallelism === "function" ? import_node_os2.default.availableParallelism() : import_node_os2.default.cpus().length);
 }
 
 // src/core/discovery.ts
@@ -45515,7 +45564,8 @@ var import_node_path39 = __toESM(require("node:path"), 1);
 async function discoverProjects(root, explicitProject) {
   const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path39.default.resolve(file2));
   const contexts = [];
-  for (const projectFile of projectFiles.sort()) {
+  const projectFilesSorted = [...projectFiles].sort((a, b) => a.localeCompare(b));
+  for (const projectFile of projectFilesSorted) {
     contexts.push(await projectContext(root, projectFile));
   }
   return contexts;
@@ -46315,22 +46365,36 @@ function clampScore(value) {
 }
 function computeReadiness(input) {
   const isProduction = input.releaseMode === "production";
-  const required2 = [...new Set(input.requiredOutputs)].sort();
-  const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required2.includes(output)).sort();
+  const required2 = [...new Set(input.requiredOutputs)].sort((a, b) => a.localeCompare(b));
+  const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required2.includes(output)).sort((a, b) => a.localeCompare(b));
   const missingRequired = required2.filter((output) => !input.presentOutputs.has(output));
   const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
   const expiredWaivers = input.expiredWaivers ?? 0;
   let blocking = 0;
   let nonBlocking = 0;
   for (const finding2 of input.findings) {
-    if (finding2.suppressed || finding2.severity === "info") {
-      continue;
+    if (!finding2.suppressed && finding2.severity !== "info") {
+      if (isBlocking(finding2, input.failOn)) {
+        blocking += 1;
+      } else {
+        nonBlocking += 1;
+      }
     }
-    if (isBlocking(finding2, input.failOn)) {
-      blocking += 1;
-    } else {
-      nonBlocking += 1;
-    }
+  }
+  const warnings = [];
+  for (const output of missingRequired) {
+    warnings.push(`Required output ${output} is missing.`);
+  }
+  for (const output of missingRecommended) {
+    warnings.push(
+      isProduction ? `Recommended output ${output} is required in production mode.` : `Recommended output ${output} is missing.`
+    );
+  }
+  if (blocking > 0) {
+    warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
+  }
+  if (isProduction && expiredWaivers > 0) {
+    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
   }
   const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
   const score = clampScore(
@@ -46349,23 +46413,6 @@ function computeReadiness(input) {
       present: input.presentOutputs.has(output)
     }))
   ].sort((left, right) => left.output.localeCompare(right.output));
-  const warnings = [];
-  for (const output of missingRequired) {
-    warnings.push(`Required output ${output} is missing.`);
-  }
-  for (const output of missingRecommended) {
-    if (isProduction) {
-      warnings.push(`Recommended output ${output} is required in production mode.`);
-    } else {
-      warnings.push(`Recommended output ${output} is missing.`);
-    }
-  }
-  if (blocking > 0) {
-    warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
-  }
-  if (isProduction && expiredWaivers > 0) {
-    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
-  }
   return {
     profile: input.profile,
     score,
@@ -46505,22 +46552,18 @@ async function runPipeline(input = {}, logger) {
   });
   const { pluginLoad, loadedWithPluginErrors, projects } = await discoverPhase(ctx);
   const findings = await validatePhase(ctx, loadedWithPluginErrors, projects);
-  const { effectiveFindings, fabrication, readiness, summary, waiverResult, policy } = await postProcessPhase(
+  const postProcessed = await postProcessPhase(ctx, findings, projects);
+  const result = assembleRunResult({
     ctx,
-    findings,
-    projects
-  );
-  const result = assembleRunResult(
-    ctx,
-    effectiveFindings,
-    fabrication,
-    readiness,
-    summary,
-    waiverResult,
-    policy,
+    effectiveFindings: postProcessed.effectiveFindings,
+    fabrication: postProcessed.fabrication,
+    readiness: postProcessed.readiness,
+    summary: postProcessed.summary,
+    waiverResult: postProcessed.waiverResult,
+    policy: postProcessed.policy,
     pluginLoad,
     projects
-  );
+  });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
   ctx.logger.debug("pipeline.finish", {
     latency_ms: Math.round(performance.now() - pipelineStart),
@@ -46541,7 +46584,13 @@ async function initializePipelineContext(input, logger) {
   }
   const config2 = gate ? applyGateRequirements(loadedConfig, gate) : loadedConfig;
   const options = normalizeOptions(cwd, root, config2, input, gate, missingExplicitGate ? "critical" : void 0);
-  const activeLogger = logger ?? createLogger(options.quiet ? "silent" : options.verbose ? "debug" : "info");
+  let logLevel = "info";
+  if (options.quiet) {
+    logLevel = "silent";
+  } else if (options.verbose) {
+    logLevel = "debug";
+  }
+  const activeLogger = logger ?? createLogger(logLevel);
   return {
     cwd,
     root,
@@ -46564,15 +46613,14 @@ async function discoverPhase(ctx) {
   };
 }
 async function validatePhase(ctx, loadedWithPluginErrors, projects) {
-  const findings = [];
-  findings.push(
+  const findings = [
     ...configFindings(
       ctx.root,
       loadedWithPluginErrors,
       ctx.missingExplicitGate ? /* @__PURE__ */ new Set([ctx.missingExplicitGate]) : void 0
-    )
-  );
-  findings.push(...projectShapeFindings(projects));
+    ),
+    ...projectShapeFindings(projects)
+  ];
   const activeRules = listRules().filter((rule2) => {
     if (ctx.options.rules.length > 0 && !ctx.options.rules.includes(rule2.meta.id)) {
       return false;
@@ -46655,16 +46703,19 @@ async function postProcessPhase(ctx, findings, projects) {
     expiredWaivers: waiverResult.expired.length,
     staleWaivers: waiverResult.active.filter((waiver) => waiver.stale).length
   }) : void 0;
-  return {
-    effectiveFindings,
-    fabrication,
-    readiness,
-    summary,
-    waiverResult,
-    policy
-  };
+  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy };
 }
-function assembleRunResult(ctx, effectiveFindings, fabrication, readiness, summary, waiverResult, policy, pluginLoad, projects) {
+function assembleRunResult({
+  ctx,
+  effectiveFindings,
+  fabrication,
+  readiness,
+  summary,
+  waiverResult,
+  policy,
+  pluginLoad,
+  projects
+}) {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   const releaseMode = ctx.options.releaseMode;
   return {
@@ -46817,8 +46868,9 @@ function enableRule(ruleConfig2) {
   };
 }
 function ruleObjectConfig(ruleConfig2) {
-  return typeof ruleConfig2 === "object" && ruleConfig2 !== null ? ruleConfig2 : {};
+  return typeof ruleConfig2 === "object" && ruleConfig2 !== null ? ruleConfig2 : emptyObj;
 }
+var emptyObj = Object.freeze({});
 function configForProject(root, config2, project) {
   const override = config2.projects?.find((candidate) => {
     const target = import_node_path42.default.resolve(root, normalizePathInput(candidate.path));
@@ -46841,43 +46893,41 @@ function configForProject(root, config2, project) {
     projectConfig.releaseMode = override.releaseMode;
   }
   if (override.firmware) {
+    const cf = config2.firmware;
+    const of = override.firmware;
     projectConfig.firmware = {
-      ...config2.firmware ?? {},
-      ...override.firmware,
+      ...cf ?? emptyObj,
+      ...of,
       platformio: {
-        ...config2.firmware?.platformio ?? {},
-        ...override.firmware.platformio ?? {}
+        ...cf?.platformio ?? emptyObj,
+        ...of.platformio ?? emptyObj
       },
       arduino: {
-        ...config2.firmware?.arduino ?? {},
-        ...override.firmware.arduino ?? {}
+        ...cf?.arduino ?? emptyObj,
+        ...of.arduino ?? emptyObj
       },
       zephyr: {
-        ...config2.firmware?.zephyr ?? {},
-        ...override.firmware.zephyr ?? {}
+        ...cf?.zephyr ?? emptyObj,
+        ...of.zephyr ?? emptyObj
       },
       "esp-idf": {
-        ...config2.firmware?.["esp-idf"] ?? {},
-        ...override.firmware["esp-idf"] ?? {}
+        ...cf?.["esp-idf"] ?? emptyObj,
+        ...of["esp-idf"] ?? emptyObj
       },
       stm32cubemx: {
-        ...config2.firmware?.stm32cubemx ?? {},
-        ...override.firmware.stm32cubemx ?? {}
+        ...cf?.stm32cubemx ?? emptyObj,
+        ...of.stm32cubemx ?? emptyObj
       }
     };
   }
   if (override.vendor) {
+    const cv = config2.vendor;
+    const ov = override.vendor;
     projectConfig.vendor = {
-      ...config2.vendor ?? {},
-      ...override.vendor,
-      board: {
-        ...config2.vendor?.board ?? {},
-        ...override.vendor.board ?? {}
-      },
-      assembly: {
-        ...config2.vendor?.assembly ?? {},
-        ...override.vendor.assembly ?? {}
-      }
+      ...cv || void 0,
+      ...ov,
+      board: cv?.board || ov.board ? { ...cv?.board, ...ov.board } : void 0,
+      assembly: cv?.assembly || ov.assembly ? { ...cv?.assembly, ...ov.assembly } : void 0
     };
   }
   if (override.rules) {
@@ -46886,7 +46936,7 @@ function configForProject(root, config2, project) {
   return projectConfig;
 }
 function mergeRules(rules, overrides) {
-  const merged = { ...rules ?? {} };
+  const merged = { ...rules ?? emptyObj };
   for (const [id, override] of Object.entries(overrides)) {
     const current = merged[id];
     merged[id] = isRuleConfig(current) && isRuleConfig(override) ? {
@@ -46906,7 +46956,7 @@ function configFindings(root, loaded, criticalErrors = /* @__PURE__ */ new Set()
       severity: criticalErrors.has(error51) ? "critical" : "high",
       message: `Configuration is invalid: ${error51}`,
       resource: {
-        path: loaded.path ? import_node_path42.default.relative(root, loaded.path).replace(/\\/g, "/") : "boardreadyops.yml",
+        path: loaded.path ? import_node_path42.default.relative(root, loaded.path).replaceAll("\\", "/") : "boardreadyops.yml",
         kind: "manifest"
       },
       location: { line: 1, column: 1 },
@@ -47081,7 +47131,7 @@ var import_node_path45 = __toESM(require("node:path"), 1);
 
 // src/report/annotations.ts
 function formatAnnotation(finding2) {
-  const command = finding2.severity === "critical" || finding2.severity === "high" ? "error" : finding2.severity === "medium" || finding2.severity === "low" ? "warning" : "notice";
+  const command = severityToAnnotationCommand(finding2.severity);
   const params = [
     `file=${escapeProperty(finding2.resource.path)}`,
     finding2.location?.line ? `line=${finding2.location.line}` : void 0,
@@ -47090,6 +47140,15 @@ function formatAnnotation(finding2) {
   ].filter(Boolean);
   return `::${command} ${params.join(",")}::${escapeData(finding2.message)}`;
 }
+function severityToAnnotationCommand(severity) {
+  if (severity === "critical" || severity === "high") {
+    return "error";
+  }
+  if (severity === "medium" || severity === "low") {
+    return "warning";
+  }
+  return "notice";
+}
 function emitAnnotations(findings, stream = process.stdout) {
   for (const finding2 of findings) {
     stream.write(`${formatAnnotation(finding2)}
@@ -47097,10 +47156,10 @@ function emitAnnotations(findings, stream = process.stdout) {
   }
 }
 function escapeData(value) {
-  return value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  return value.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
 }
 function escapeProperty(value) {
-  return escapeData(value).replace(/:/g, "%3A").replace(/,/g, "%2C");
+  return escapeData(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
 }
 
 // node_modules/mustache/mustache.mjs
@@ -47582,7 +47641,8 @@ function reportLocation(finding2) {
   const base = finding2.resource.path;
   if (finding2.location?.region) {
     const region = finding2.location.region;
-    const start = `:${region.startLine}${region.startColumn ? `:${region.startColumn}` : ""}`;
+    const colSuffix = region.startColumn ? `:${region.startColumn}` : "";
+    const start = `:${region.startLine}${colSuffix}`;
     const end = region.endLine !== region.startLine ? `-${region.endLine}` : "";
     return `${base}${start}${end}`;
   }
@@ -48269,9 +48329,12 @@ function renderDecisionSection(result, locale) {
     locale
   );
   const readinessLine = result.readiness ? `<p class="muted">${escapeHtml2(t("report.decision.readiness", { score: result.readiness.score }, locale))}</p>` : "";
-  const policyBadge = result.policy ? `<span class="badge decision-badge-${result.policy.status === "fail" ? "fail" : "pass"}">${escapeHtml2(
-    t(result.policy.status === "fail" ? "report.decision.policyFail" : "report.decision.policyPass", {}, locale)
-  )}</span>` : "";
+  let policyBadge = "";
+  if (result.policy) {
+    const policyKey = result.policy.status === "fail" ? "report.decision.policyFail" : "report.decision.policyPass";
+    const policyClass = result.policy.status === "fail" ? "fail" : "pass";
+    policyBadge = `<span class="badge decision-badge-${policyClass}">${escapeHtml2(t(policyKey, {}, locale))}</span>`;
+  }
   return `<section class="decision decision-${status}" aria-labelledby="decision-heading">
       <h2 id="decision-heading">${escapeHtml2(t("report.decision.title", {}, locale))}</h2>
       <p class="decision-status">
@@ -48596,7 +48659,7 @@ function locationHtml(finding2, locale) {
   if (finding2.location?.boardCoordinates) {
     const coordinates = finding2.location.boardCoordinates;
     values.push(
-      `${coordinates.layer ?? t("report.location.board", {}, locale)} (${formatNumber(coordinates.x)}${coordinates.units}, ${formatNumber(
+      `${coordinates.layer ?? t("report.location.board", {}, locale)} (${reportCoordinate(coordinates.x)}${coordinates.units}, ${reportCoordinate(
         coordinates.y
       )}${coordinates.units})`
     );
@@ -48620,7 +48683,8 @@ function fixHtml(finding2, locale) {
       t("report.noFix", {}, locale)
     )}</p></section>`;
   }
-  const steps = finding2.fix.steps && finding2.fix.steps.length > 0 ? `<ol>${finding2.fix.steps.map((step) => `<li>${escapeHtml2(step)}</li>`).join("")}</ol>` : "";
+  const stepList = finding2.fix.steps?.map((step) => `<li>${escapeHtml2(step)}</li>`).join("") ?? "";
+  const steps = stepList.length > 0 ? `<ol>${stepList}</ol>` : "";
   return `<section>
                     <h3>${escapeHtml2(t("report.fix", {}, locale))}</h3>
                     <p>${escapeHtml2(finding2.fix.description)}</p>
@@ -48700,14 +48764,11 @@ function emptyPanel(message) {
 function uniqueSorted(values) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
-function formatNumber(value) {
-  return Object.is(value, -0) ? "0" : Number.isInteger(value) ? value.toString() : value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
-}
 function attr(value) {
-  return escapeHtml2(value).replace(/'/g, "&#39;");
+  return escapeHtml2(value).replaceAll("'", "&#39;");
 }
 function escapeHtml2(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 function findingWord2(count, locale) {
   return count === 1 ? t("report.finding.word", {}, locale) : t("report.finding.word.plural", {}, locale);
@@ -48853,14 +48914,14 @@ function formatHtml(result, locale = "en", artifacts = [], fabrication) {
 </body>
 </html>
 `;
-  return `${html.replace(/[ \t]+$/gm, "").trimEnd()}
+  return `${html.split("\n").map((line) => line.trimEnd()).join("\n").trimEnd()}
 `;
 }
 function htmlEscape(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 function htmlAttr(value) {
-  return htmlEscape(value).replace(/'/g, "&#39;");
+  return htmlEscape(value).replaceAll("'", "&#39;");
 }
 
 // src/report/json.ts
@@ -48883,7 +48944,7 @@ function formatJunit(result) {
 `;
 }
 function xml(value) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 function failureBody(finding2, context) {
   const details = finding2.details ?? {};
@@ -49073,8 +49134,8 @@ function htmlArtifactLinks(root, targets, htmlTarget) {
   return artifacts;
 }
 function configOutput(loaded, key) {
-  const configured = loaded.config.report?.[key];
-  return configured ? configured : void 0;
+  const val = loaded.config.report?.[key];
+  return typeof val === "string" ? val : void 0;
 }
 async function writeOrStdout(root, target, content, stdout) {
   if (target === "-") {
@@ -49709,9 +49770,7 @@ async function repositoryCheck(root, configInput) {
         messageKey: "doctor.repository.projectsDiscovered",
         messageParams: { count: projects.length }
       }
-    )
-  );
-  items.push(
+    ),
     gerbers.length === 0 ? item("fail", "No Gerber outputs found.", {
       recommendation: "Generate Gerber outputs from KiCad before CI.",
       messageKey: "doctor.repository.noGerbers",
@@ -50459,16 +50518,16 @@ async function planBomMissingMpn(root, config2, allowed, plan, virtualTexts) {
       continue;
     }
     const after = writeDelimitedDocument(document);
-    addTextChange(
+    addTextChange({
       plan,
       virtualTexts,
       root,
-      bomPath,
+      file: bomPath,
       before,
       after,
-      [ruleId6],
-      `Fill ${fixed} missing BOM MPN value(s).`
-    );
+      ruleIds: [ruleId6],
+      summary: `Fill ${fixed} missing BOM MPN value(s).`
+    });
   }
 }
 async function planReleaseRevisions(root, config2, projects, allowed, plan, virtualTexts) {
@@ -50493,61 +50552,84 @@ async function planReleaseRevisions(root, config2, projects, allowed, plan, virt
   for (const project of projects) {
     const projectVersionAllowed = versionAllowed && isRuleEnabledForProjectContext(root, config2, project, versionRule);
     const projectRevisionAllowed = revisionAllowed && isRuleEnabledForProjectContext(root, config2, project, revisionRule);
-    if (!projectVersionAllowed && !projectRevisionAllowed) {
-      continue;
-    }
-    for (const board of project.boardFiles) {
-      const file2 = import_node_path49.default.resolve(root, board);
-      const before = await readVirtualText(file2, virtualTexts);
-      const revision2 = revisionFromText(before);
-      const candidate = coerceSemver(revision2);
-      const ruleIds = [];
-      if (projectVersionAllowed && revision2 && versionRegex && !versionRegex.test(revision2) && versionRegex.test(candidate)) {
-        ruleIds.push(versionRule);
-      }
-      if (projectRevisionAllowed && tagRegex && (!revision2 || !tagRegex.test(revision2) && !tagRegex.test(`v${revision2}`)) && (tagRegex.test(candidate) || tagRegex.test(`v${candidate}`))) {
-        ruleIds.push(revisionRule);
-      }
-      if (ruleIds.length > 0) {
-        const after = setRevision(before, candidate, "kicad_pcb");
-        addTextChange(
-          plan,
-          virtualTexts,
+    if (projectVersionAllowed || projectRevisionAllowed) {
+      await planProjectBoardRevisions(root, project, {
+        vAllowed: projectVersionAllowed,
+        rAllowed: projectRevisionAllowed,
+        vRule: versionRule,
+        rRule: revisionRule,
+        vRegex: versionRegex,
+        rRegex: tagRegex,
+        plan,
+        virtualTexts
+      });
+      if (projectVersionAllowed && versionRegex) {
+        await planProjectSchematicRevisions({
           root,
-          file2,
-          before,
-          after,
-          ruleIds,
-          `Rewrite PCB revision ${revision2 ? `"${revision2}"` : "metadata"} to ${candidate}.`
-        );
+          project,
+          versionRule,
+          versionRegex,
+          plan,
+          virtualTexts
+        });
       }
     }
-    if (!projectVersionAllowed || !versionRegex) {
-      continue;
+  }
+}
+async function planProjectBoardRevisions(root, project, opts) {
+  const { vAllowed, rAllowed, vRule, rRule, vRegex, rRegex, plan, virtualTexts } = opts;
+  for (const board of project.boardFiles) {
+    const file2 = import_node_path49.default.resolve(root, board);
+    const before = await readVirtualText(file2, virtualTexts);
+    const revision2 = revisionFromText(before);
+    const candidate = coerceSemver(revision2);
+    const ruleIds = [];
+    if (vAllowed && revision2 && vRegex && !vRegex.test(revision2) && vRegex.test(candidate)) {
+      ruleIds.push(vRule);
     }
-    for (const schematic of project.schematicFiles) {
-      const file2 = import_node_path49.default.resolve(root, schematic);
-      const before = await readVirtualText(file2, virtualTexts);
-      const revision2 = revisionFromText(before);
-      if (!revision2 || versionRegex.test(revision2)) {
-        continue;
-      }
-      const candidate = coerceSemver(revision2);
-      if (!versionRegex.test(candidate)) {
-        continue;
-      }
-      const after = setRevision(before, candidate, "kicad_sch");
-      addTextChange(
+    if (rAllowed && rRegex && (!revision2 || !rRegex.test(revision2) && !rRegex.test(`v${revision2}`)) && (rRegex.test(candidate) || rRegex.test(`v${candidate}`))) {
+      ruleIds.push(rRule);
+    }
+    if (ruleIds.length > 0) {
+      const after = setRevision(before, candidate, "kicad_pcb");
+      const revisionLabel = revision2 ? `"${revision2}"` : "metadata";
+      addTextChange({
         plan,
         virtualTexts,
         root,
-        file2,
+        file: file2,
         before,
         after,
-        [versionRule],
-        `Rewrite schematic revision "${revision2}" to ${candidate}.`
-      );
+        ruleIds,
+        summary: `Rewrite PCB revision ${revisionLabel} to ${candidate}.`
+      });
     }
+  }
+}
+async function planProjectSchematicRevisions(params) {
+  const { root, project, versionRule, versionRegex, plan, virtualTexts } = params;
+  for (const schematic of project.schematicFiles) {
+    const file2 = import_node_path49.default.resolve(root, schematic);
+    const before = await readVirtualText(file2, virtualTexts);
+    const revision2 = revisionFromText(before);
+    if (!revision2 || versionRegex.test(revision2)) {
+      continue;
+    }
+    const candidate = coerceSemver(revision2);
+    if (!versionRegex.test(candidate)) {
+      continue;
+    }
+    const after = setRevision(before, candidate, "kicad_sch");
+    addTextChange({
+      plan,
+      virtualTexts,
+      root,
+      file: file2,
+      before,
+      after,
+      ruleIds: [versionRule],
+      summary: `Rewrite schematic revision "${revision2}" to ${candidate}.`
+    });
   }
 }
 async function planChangelog(root, config2, projects, allowed, plan, virtualTexts) {
@@ -50583,16 +50665,16 @@ async function planChangelog(root, config2, projects, allowed, plan, virtualText
     return;
   }
   const after = before ? appendChangelogEntries(before, missing) : createChangelog(missing);
-  addTextChange(
+  addTextChange({
     plan,
     virtualTexts,
     root,
-    changelog,
+    file: changelog,
     before,
     after,
-    [ruleId6],
-    `Add CHANGELOG.md release entr${missing.length === 1 ? "y" : "ies"} for ${missing.join(", ")}.`
-  );
+    ruleIds: [ruleId6],
+    summary: `Add CHANGELOG.md release entr${missing.length === 1 ? "y" : "ies"} for ${missing.join(", ")}.`
+  });
 }
 async function planFabNotes(root, config2, allowed, plan, virtualTexts) {
   const ruleId6 = "manufacturing.fab-notes";
@@ -50607,7 +50689,16 @@ async function planFabNotes(root, config2, allowed, plan, virtualTexts) {
     }
   }
   const target = import_node_path49.default.resolve(root, "fab/README.md");
-  addTextChange(plan, virtualTexts, root, target, void 0, defaultFabNotes, [ruleId6], "Create fab/README.md.");
+  addTextChange({
+    plan,
+    virtualTexts,
+    root,
+    file: target,
+    before: void 0,
+    after: defaultFabNotes,
+    ruleIds: [ruleId6],
+    summary: "Create fab/README.md."
+  });
 }
 async function planDnpConsistency(root, config2, selectedRules, projects, plan) {
   if (!shouldSurfaceRule(dnpConsistencyRule2, selectedRules) || !isRuleEnabledForAnyConfiguredProject(config2, dnpConsistencyRule2)) {
@@ -50622,15 +50713,7 @@ async function planDnpConsistency(root, config2, selectedRules, projects, plan) 
       continue;
     }
     const projectContexts = contextsForBomTarget(root, target, config2, projects);
-    const footprints2 = /* @__PURE__ */ new Map();
-    for (const project of projectContexts) {
-      for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path49.default.resolve(root, board));
-        for (const footprint of parsed.footprints) {
-          footprints2.set(footprint.reference, footprint.dnp);
-        }
-      }
-    }
+    const footprints2 = await collectProjectFootprintDnp(root, projectContexts);
     const bomPath = target.path;
     const text = await readTextFile(bomPath);
     const document = parseDelimitedDocument(text, bomPath);
@@ -50652,6 +50735,18 @@ async function planDnpConsistency(root, config2, selectedRules, projects, plan) 
       }
     }
   }
+}
+async function collectProjectFootprintDnp(root, projects) {
+  const footprints2 = /* @__PURE__ */ new Map();
+  for (const project of projects) {
+    for (const board of project.boardFiles) {
+      const parsed = await parsePcb(import_node_path49.default.resolve(root, board));
+      for (const footprint of parsed.footprints) {
+        footprints2.set(footprint.reference, footprint.dnp);
+      }
+    }
+  }
+  return footprints2;
 }
 async function planDrcSuggestions(root, selectedRules, drcReport, plan) {
   if (!drcReport || !shouldSurfaceDrc(selectedRules)) {
@@ -50752,7 +50847,8 @@ async function readOptionalVirtualText(file2, virtualTexts) {
   }
   return readTextFile(file2);
 }
-function addTextChange(plan, virtualTexts, root, file2, before, after, ruleIds, summary) {
+function addTextChange(params) {
+  const { plan, virtualTexts, root, file: file2, before, after, ruleIds, summary } = params;
   if (before === after) {
     return;
   }
@@ -50761,10 +50857,15 @@ function addTextChange(plan, virtualTexts, root, file2, before, after, ruleIds, 
   const existing = plan.changes.find((change) => change.path === relative);
   if (existing) {
     existing.after = after;
-    existing.ruleIds = [.../* @__PURE__ */ new Set([...existing.ruleIds, ...ruleIds])].sort();
+    existing.ruleIds = [.../* @__PURE__ */ new Set([...existing.ruleIds, ...ruleIds])].sort((a, b) => a.localeCompare(b));
     existing.summary = `${existing.summary} ${summary}`;
   } else {
-    const change = { ruleIds: [...new Set(ruleIds)].sort(), path: relative, after, summary };
+    const change = {
+      ruleIds: [...new Set(ruleIds)].sort((a, b) => a.localeCompare(b)),
+      path: relative,
+      after,
+      summary
+    };
     if (before !== void 0) {
       change.before = before;
     }
@@ -51422,34 +51523,11 @@ async function initCommand(cwd, options, streams) {
   let mode;
   let failOn;
   if (options.interactive) {
-    const rl = import_node_readline.default.createInterface({
-      input: process.stdin,
-      output: streams.stdout
-      // ensure compatibility with readline
-    });
-    const askQuestion = (query, defaultValue) => {
-      return new Promise((resolve) => {
-        rl.question(`${query} [\x1B[36m${defaultValue}\x1B[0m]: `, (answer) => {
-          resolve(answer.trim() || defaultValue);
-        });
-      });
-    };
-    try {
-      streams.stdout.write("\n\u2728 \x1B[35mWelcome to the BoardReadyOps Config Wizard!\x1B[0m \u2728\n\n");
-      const modeAns = await askQuestion("Select mode (warn / enforce)", "warn");
-      mode = modeAns === "enforce" ? "enforce" : "warn";
-      const failOnAns = await askQuestion("Fail-on level (never / critical / high / medium / low)", "high");
-      failOn = failOnAns;
-      const profileAns = await askQuestion("Choose base rule profile (basic / ci / manufacturing / strict)", "basic");
-      profile = ["basic", "ci", "manufacturing", "strict"].includes(profileAns) ? profileAns : "basic";
-      const workflowAns = await askQuestion("Generate GitHub Actions workflow? (y / n)", "y");
-      if (workflowAns.toLowerCase().startsWith("y")) {
-        workflow = "github";
-      }
-      streams.stdout.write("\n");
-    } finally {
-      rl.close();
-    }
+    const wizardResult = await runInteractiveWizard(streams);
+    mode = wizardResult.mode;
+    failOn = wizardResult.failOn;
+    profile = wizardResult.profile;
+    workflow = wizardResult.workflow;
   }
   const baseConfig = profiles2[profile];
   if (!baseConfig) {
@@ -51487,6 +51565,36 @@ async function initCommand(cwd, options, streams) {
     }
   }
   return 0;
+}
+async function runInteractiveWizard(streams) {
+  const rl = import_node_readline.default.createInterface({
+    input: process.stdin,
+    output: streams.stdout
+  });
+  const askQuestion = (query, defaultValue) => {
+    return new Promise((resolve) => {
+      rl.question(`${query} [\x1B[36m${defaultValue}\x1B[0m]: `, (answer) => {
+        resolve(answer.trim() || defaultValue);
+      });
+    });
+  };
+  try {
+    streams.stdout.write("\n\u2728 \x1B[35mWelcome to the BoardReadyOps Config Wizard!\x1B[0m \u2728\n\n");
+    const modeAns = await askQuestion("Select mode (warn / enforce)", "warn");
+    const mode = modeAns === "enforce" ? "enforce" : "warn";
+    const failOn = await askQuestion("Fail-on level (never / critical / high / medium / low)", "high");
+    const profileAns = await askQuestion("Choose base rule profile (basic / ci / manufacturing / strict)", "basic");
+    const profile = ["basic", "ci", "manufacturing", "strict"].includes(profileAns) ? profileAns : "basic";
+    let workflow;
+    const workflowAns = await askQuestion("Generate GitHub Actions workflow? (y / n)", "y");
+    if (workflowAns.toLowerCase().startsWith("y")) {
+      workflow = "github";
+    }
+    streams.stdout.write("\n");
+    return { mode, failOn, profile, workflow };
+  } finally {
+    rl.close();
+  }
 }
 
 // src/cli/commands/plan.ts
@@ -51815,8 +51923,8 @@ function diffReadiness(previous, current) {
     previousStatus: previous?.status,
     currentStatus: current?.status,
     statusChanged: previous?.status !== current?.status,
-    newlyMissingRequired: [...currentMissing].filter((output) => !previousMissing.has(output)).sort(),
-    resolvedRequired: [...previousMissing].filter((output) => !currentMissing.has(output)).sort()
+    newlyMissingRequired: [...currentMissing].filter((output) => !previousMissing.has(output)).sort((a, b) => a.localeCompare(b)),
+    resolvedRequired: [...previousMissing].filter((output) => !currentMissing.has(output)).sort((a, b) => a.localeCompare(b))
   };
 }
 function formatReleaseDiffText(diff) {
@@ -52115,7 +52223,7 @@ function baseName(source) {
 function planHandoffPackage(outputs, profile) {
   const orderedKinds = [
     ...profile.requiredOutputs,
-    ...Object.keys(outputs).filter((kind) => !profile.requiredOutputs.includes(kind)).sort()
+    ...Object.keys(outputs).filter((kind) => !profile.requiredOutputs.includes(kind)).sort((left, right) => left.localeCompare(right))
   ];
   const assignedSources = /* @__PURE__ */ new Set();
   const usedTargets = /* @__PURE__ */ new Set();
@@ -52134,8 +52242,8 @@ function planHandoffPackage(outputs, profile) {
   files.sort((left, right) => left.target.localeCompare(right.target) || left.source.localeCompare(right.source));
   return {
     files,
-    includedOutputs: [...present].sort(),
-    missingOutputs: profile.requiredOutputs.filter((kind) => !present.has(kind)).sort()
+    includedOutputs: [...present].sort((left, right) => left.localeCompare(right)),
+    missingOutputs: profile.requiredOutputs.filter((kind) => !present.has(kind)).sort((left, right) => left.localeCompare(right))
   };
 }
 function uniqueTarget(directory, name, used) {
@@ -52161,60 +52269,48 @@ function buildHandoffManifest(profile, plan, files, generatedAt) {
       status: plan.missingOutputs.length === 0 ? "ready" : "incomplete",
       missingOutputs: plan.missingOutputs
     },
-    requiredOutputs: [...profile.requiredOutputs].sort(),
+    requiredOutputs: [...profile.requiredOutputs].sort((left, right) => left.localeCompare(right)),
     includedOutputs: plan.includedOutputs,
     assumptions: profile.assumptions,
     files: [...files].sort((left, right) => left.target.localeCompare(right.target))
   };
 }
 function renderHandoffReadme(profile, plan, generatedAt) {
-  const lines = [];
-  lines.push(`# ${profile.name} manufacturer handoff package`);
-  lines.push("");
-  lines.push(`Generated by BoardReadyOps ${boardReadyVersion} on ${generatedAt}.`);
-  lines.push("");
-  lines.push(`- Vendor profile: \`${profile.id}\` (${profile.name})`);
-  lines.push(`- Service: ${profile.service}`);
-  lines.push(
-    `- Status: ${plan.missingOutputs.length === 0 ? "ready" : `incomplete (missing ${plan.missingOutputs.join(", ")})`}`
-  );
-  lines.push("");
-  lines.push("## Contents");
-  lines.push("");
+  const lines = [
+    `# ${profile.name} manufacturer handoff package`,
+    "",
+    `Generated by BoardReadyOps ${boardReadyVersion} on ${generatedAt}.`,
+    "",
+    `- Vendor profile: \`${profile.id}\` (${profile.name})`,
+    `- Service: ${profile.service}`,
+    `- Status: ${plan.missingOutputs.length === 0 ? "ready" : `incomplete (missing ${plan.missingOutputs.join(", ")})`}`,
+    "",
+    "## Contents",
+    ""
+  ];
   if (plan.files.length === 0) {
     lines.push("No manufacturing outputs were discovered for this package.");
   } else {
-    lines.push("| Output | File |");
-    lines.push("| --- | --- |");
+    lines.push("| Output | File |", "| --- | --- |");
     for (const file2 of plan.files) {
       lines.push(`| ${file2.output} | \`${file2.target}\` |`);
     }
   }
   if (plan.missingOutputs.length > 0) {
-    lines.push("");
-    lines.push("## Missing required outputs");
-    lines.push("");
-    lines.push("The following outputs are required by this vendor profile but were not found:");
-    lines.push("");
-    for (const output of plan.missingOutputs) {
-      lines.push(`- ${output}`);
-    }
+    lines.push(
+      "",
+      "## Missing required outputs",
+      "",
+      "The following outputs are required by this vendor profile but were not found:",
+      "",
+      ...plan.missingOutputs.map((output) => `- ${output}`)
+    );
   }
   if (profile.assumptions.length > 0) {
-    lines.push("");
-    lines.push("## Assumptions");
-    lines.push("");
-    for (const assumption of profile.assumptions) {
-      lines.push(`- ${assumption}`);
-    }
+    lines.push("", "## Assumptions", "", ...profile.assumptions.map((assumption) => `- ${assumption}`));
   }
   if (profile.caveats.length > 0) {
-    lines.push("");
-    lines.push("## Caveats");
-    lines.push("");
-    for (const caveat of profile.caveats) {
-      lines.push(`- ${caveat}`);
-    }
+    lines.push("", "## Caveats", "", ...profile.caveats.map((caveat) => `- ${caveat}`));
   }
   return `${lines.join("\n")}
 `;
@@ -52404,8 +52500,7 @@ function createZipBuffer(entries, date5 = /* @__PURE__ */ new Date()) {
     localHeader.writeUInt16LE(nameBytes.length, 26);
     localHeader.writeUInt16LE(0, 28);
     nameBytes.copy(localHeader, 30);
-    parts.push(localHeader);
-    parts.push(compressedData);
+    parts.push(localHeader, compressedData);
     centralEntries.push({
       name: nameBytes,
       crc32: checksum,
@@ -56493,8 +56588,17 @@ var pinmap_schema_default = {
 };
 
 // src/cli/commands/schema.ts
+var SCHEMAS = {
+  "agent-plan": agent_plan_schema_default,
+  plan: agent_plan_schema_default,
+  doctor: doctor_schema_default,
+  findings: findings_schema_default,
+  hbom: hbom_schema_default,
+  pinmap: pinmap_schema_default,
+  generate: generate_recipe_schema_default
+};
 function schemaCommand(name, streams) {
-  const schema = name === "agent-plan" || name === "plan" ? agent_plan_schema_default : name === "doctor" ? doctor_schema_default : name === "findings" ? findings_schema_default : name === "hbom" ? hbom_schema_default : name === "pinmap" ? pinmap_schema_default : name === "generate" ? generate_recipe_schema_default : config_schema_default;
+  const schema = (name ? SCHEMAS[name] : void 0) ?? config_schema_default;
   streams.stdout.write(`${JSON.stringify(schema, null, 2)}
 `);
   return 0;
@@ -56734,10 +56838,11 @@ function runnerEnrollmentScope(value) {
 }
 
 // src/cli/index.ts
-async function runCli(argv, streams = {
+var defaultStreams = {
   stdout: process.stdout,
   stderr: process.stderr
-}) {
+};
+async function runCli(argv, streams = defaultStreams) {
   const program2 = new Command();
   program2.name("boardreadyops").description("BoardReadyOps - CI preflight for production-ready PCBs.").version(boardReadyVersion).exitOverride();
   program2.configureOutput({

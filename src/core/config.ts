@@ -70,13 +70,12 @@ export async function loadConfig(root: string, configInput?: string): Promise<Lo
 }
 
 export function validateConfig(config: unknown): string[] {
-  const valid = validate(config);
-  if (valid) {
+  if (validate(config)) {
     return [];
   }
-  return (validate.errors ?? []).map((error: ErrorObject) => {
+  return (validate.errors || []).map((error: ErrorObject) => {
     const pointer = error.instancePath || "/";
-    return `${pointer}: ${error.message ?? "invalid value"}`;
+    return `${pointer}: ${error.message || "invalid value"}`;
   });
 }
 

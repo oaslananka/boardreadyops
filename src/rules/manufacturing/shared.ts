@@ -77,7 +77,7 @@ export function projectOutputSearchRoots(context: RuleContext): string[] {
 
 function normalizedSearchRoots(searchRoots: string[]): string[] {
   const roots = searchRoots.length > 0 ? searchRoots : ["."];
-  return [...new Set(roots.map((entry) => (entry === "." ? "." : entry.replace(/\\/g, "/"))))];
+  return [...new Set(roots.map((entry) => (entry === "." ? "." : entry.replaceAll("\\", "/"))))];
 }
 
 function defaultPositionPatterns(): string[] {

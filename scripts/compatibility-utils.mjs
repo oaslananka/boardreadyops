@@ -57,7 +57,7 @@ export function optionValue(args, name) {
 }
 
 export function parseSeries(value) {
-  const match = String(value).match(/^(\d+)\.(\d+)$/);
+  const match = /^(\d+)\.(\d+)$/.exec(String(value));
   if (!match) {
     throw new Error(`Expected major.minor series, got ${value}`);
   }

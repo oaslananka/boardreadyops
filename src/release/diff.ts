@@ -85,8 +85,12 @@ function diffReadiness(
     previousStatus: previous?.status,
     currentStatus: current?.status,
     statusChanged: previous?.status !== current?.status,
-    newlyMissingRequired: [...currentMissing].filter((output) => !previousMissing.has(output)).sort(),
-    resolvedRequired: [...previousMissing].filter((output) => !currentMissing.has(output)).sort(),
+    newlyMissingRequired: [...currentMissing]
+      .filter((output) => !previousMissing.has(output))
+      .sort((a, b) => a.localeCompare(b)),
+    resolvedRequired: [...previousMissing]
+      .filter((output) => !currentMissing.has(output))
+      .sort((a, b) => a.localeCompare(b)),
   };
 }
 

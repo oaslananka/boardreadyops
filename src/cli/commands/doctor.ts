@@ -229,8 +229,6 @@ async function repositoryCheck(root: string, configInput?: string): Promise<Doct
             messageParams: { count: projects.length },
           },
         ),
-  );
-  items.push(
     gerbers.length === 0
       ? item("fail", "No Gerber outputs found.", {
           recommendation: "Generate Gerber outputs from KiCad before CI.",

@@ -5,12 +5,14 @@ import { boardReadyVersion } from "../generated/version.js";
 import { t } from "../i18n/t.js";
 import { registerAllCommands } from "./commands.js";
 
+const defaultStreams = {
+  stdout: process.stdout,
+  stderr: process.stderr,
+};
+
 export async function runCli(
   argv: string[],
-  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream } = {
-    stdout: process.stdout,
-    stderr: process.stderr,
-  },
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream } = defaultStreams,
 ): Promise<number> {
   const program = new Command();
   program

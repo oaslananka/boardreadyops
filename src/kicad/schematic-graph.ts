@@ -67,42 +67,7 @@ export async function buildSchematicNetGraph(rootFiles: string[]): Promise<Schem
       continue;
     }
     visited.add(file);
-    const parsed = await parseSchematic(file);
-    const sheet: SchematicGraphSheet = {
-      file,
-      parentFile: next.parentFile,
-      sheetName: next.sheetName,
-      sheetPins: [...new Set(next.sheetPins)],
-      localLabels: parsed.localLabels,
-      globalLabels: parsed.globalLabels,
-      hierarchicalLabels: parsed.hierarchicalLabels,
-    };
-    sheets.push(sheet);
-
-    for (const pin of sheet.sheetPins) {
-      if (!sheet.hierarchicalLabels.has(pin)) {
-        unresolvedSheetPins.push({
-          parentFile: next.parentFile ?? file,
-          childFile: file,
-          sheetName: next.sheetName,
-          pin,
-        });
-      }
-    }
-
-    for (const reference of parsed.sheetReferences) {
-      const resolvedPath = path.resolve(path.dirname(file), reference.fileName);
-      if (!(await fileExists(resolvedPath))) {
-        missingSheets.push(missingSheet(file, reference, resolvedPath));
-        continue;
-      }
-      queue.push({
-        file: resolvedPath,
-        parentFile: file,
-        sheetName: reference.sheetName,
-        sheetPins: reference.pins,
-      });
-    }
+    await processSheetQueueItem(file, next, sheets, missingSheets, unresolvedSheetPins, queue);
   }
 
   const rootSet = new Set(normalizedRoots);
@@ -125,6 +90,52 @@ export async function buildSchematicNetGraph(rootFiles: string[]): Promise<Schem
   }
 
   return { rootFiles: normalizedRoots, sheets, visibleNetLabels, allNetLabels, missingSheets, unresolvedSheetPins };
+}
+
+async function processSheetQueueItem(
+  file: string,
+  next: PendingSheet,
+  sheets: SchematicGraphSheet[],
+  missingSheets: MissingSchematicSheet[],
+  unresolvedSheetPins: UnresolvedSheetPin[],
+  queue: PendingSheet[],
+): Promise<void> {
+  const parsed = await parseSchematic(file);
+  const sheet: SchematicGraphSheet = {
+    file,
+    parentFile: next.parentFile,
+    sheetName: next.sheetName,
+    sheetPins: [...new Set(next.sheetPins)],
+    localLabels: parsed.localLabels,
+    globalLabels: parsed.globalLabels,
+    hierarchicalLabels: parsed.hierarchicalLabels,
+  };
+  sheets.push(sheet);
+
+  for (const pin of sheet.sheetPins) {
+    if (!sheet.hierarchicalLabels.has(pin)) {
+      unresolvedSheetPins.push({
+        parentFile: next.parentFile ?? file,
+        childFile: file,
+        sheetName: next.sheetName,
+        pin,
+      });
+    }
+  }
+
+  for (const reference of parsed.sheetReferences) {
+    const resolvedPath = path.resolve(path.dirname(file), reference.fileName);
+    if (!(await fileExists(resolvedPath))) {
+      missingSheets.push(missingSheet(file, reference, resolvedPath));
+      continue;
+    }
+    queue.push({
+      file: resolvedPath,
+      parentFile: file,
+      sheetName: reference.sheetName,
+      sheetPins: reference.pins,
+    });
+  }
 }
 
 function missingSheet(

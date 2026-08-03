@@ -239,13 +239,13 @@ export async function runCommand(
 
 class Spinner {
   private timer: NodeJS.Timeout | null = null;
-  private frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  private readonly frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   private idx = 0;
-  private isTTY: boolean;
+  private readonly isTTY: boolean;
 
   constructor(
-    private stream: NodeJS.WritableStream,
-    private text: string,
+    private readonly stream: NodeJS.WritableStream,
+    private readonly text: string,
   ) {
     this.isTTY = "isTTY" in stream && (stream as { isTTY?: boolean }).isTTY === true;
   }

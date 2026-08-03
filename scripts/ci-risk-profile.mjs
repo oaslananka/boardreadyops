@@ -101,7 +101,7 @@ function matchesAny(path, patterns) {
 }
 
 function uniqueCleanFiles(files) {
-  return [...new Set(files.map((file) => file.trim()).filter(Boolean))].sort();
+  return [...new Set(files.map((file) => file.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
 function isDocsOnlyFile(file) {
@@ -140,7 +140,7 @@ export function classifyChangedFiles(files, options = {}) {
     forceFull ||
     ruleChanged ||
     parserModelChanged ||
-    changedFiles.some((file) => /^src\/core\//.test(file) || /^scripts\/check-mutation-thresholds\.mjs$/.test(file));
+    changedFiles.some((file) => file.startsWith("src/core/") || file === "scripts/check-mutation-thresholds.mjs");
 
   return {
     changed_files: changedFiles.join(","),

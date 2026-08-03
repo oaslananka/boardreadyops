@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { RuleContext } from "../../core/context.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -23,29 +24,35 @@ export const copperBalanceRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(path.resolve(context.root, board));
-        if (!parsed.boardArea || parsed.boardArea <= 0) {
-          continue;
-        }
-        const layers = parsed.copperLayers.length > 0 ? parsed.copperLayers : [...parsed.copperAreas.keys()];
-        for (const layer of layers) {
-          const area = parsed.copperAreas.get(layer) ?? 0;
-          const coveragePercent = (area / parsed.boardArea) * 100;
-          if (coveragePercent < minimum) {
-            output.push(
-              finding(context, {
-                ruleId: "design.copper-balance",
-                severity: configuredSeverity(context, "design.copper-balance", "low"),
-                message: `${layer} copper coverage is ${coveragePercent.toFixed(1)}%, below ${minimum}%.`,
-                path: board,
-                kind: "pcb",
-                details: { layer, coveragePercent, minimum },
-              }),
-            );
-          }
-        }
+        output.push(...(await checkBoardCopperBalance(context, board, minimum)));
       }
     }
     return output;
   },
 );
+
+async function checkBoardCopperBalance(context: RuleContext, board: string, minimum: number) {
+  const output = [];
+  const parsed = await parsePcb(path.resolve(context.root, board));
+  if (!parsed.boardArea || parsed.boardArea <= 0) {
+    return [];
+  }
+  const layers = parsed.copperLayers.length > 0 ? parsed.copperLayers : [...parsed.copperAreas.keys()];
+  for (const layer of layers) {
+    const area = parsed.copperAreas.get(layer) ?? 0;
+    const coveragePercent = (area / parsed.boardArea) * 100;
+    if (coveragePercent < minimum) {
+      output.push(
+        finding(context, {
+          ruleId: "design.copper-balance",
+          severity: configuredSeverity(context, "design.copper-balance", "low"),
+          message: `${layer} copper coverage is ${coveragePercent.toFixed(1)}%, below ${minimum}%.`,
+          path: board,
+          kind: "pcb",
+          details: { layer, coveragePercent, minimum },
+        }),
+      );
+    }
+  }
+  return output;
+}

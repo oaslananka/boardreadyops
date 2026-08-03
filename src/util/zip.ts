@@ -80,8 +80,7 @@ export function createZipBuffer(entries: ZipEntry[], date = new Date()): Buffer 
     localHeader.writeUInt16LE(0, 28); // extra field length
     nameBytes.copy(localHeader, 30);
 
-    parts.push(localHeader);
-    parts.push(compressedData);
+    parts.push(localHeader, compressedData);
 
     centralEntries.push({
       name: nameBytes,
