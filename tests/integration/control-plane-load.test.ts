@@ -119,6 +119,23 @@ describeLoad("control-plane PostgreSQL load validation", () => {
     } else {
       expect(report.workerProcessRecovery).toBeUndefined();
     }
+    if (configuration.profile === "worker-fleet-interruption") {
+      const expectedFleetActions = configuration.recoveryRounds * configuration.workerFleetSize;
+      expect(report.workerFleetRecovery).toEqual(
+        expect.objectContaining({
+          roundsRequested: configuration.recoveryRounds,
+          roundsCompleted: configuration.recoveryRounds,
+          fleetSize: configuration.workerFleetSize,
+          childProcessesStarted: expectedFleetActions,
+          childProcessesKilled: expectedFleetActions,
+          abandonedLeasesReclaimed: expectedFleetActions,
+          replacementCompletions: expectedFleetActions,
+        }),
+      );
+      expect(report.workerFleetRecovery?.maximumConvergenceMs).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(report.workerFleetRecovery).toBeUndefined();
+    }
     if (configuration.profile === "database-interruption") {
       expect(report.databaseRecovery).toEqual(
         expect.objectContaining({
