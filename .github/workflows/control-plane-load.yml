@@ -13,9 +13,15 @@ on:
           - soak-recovery
           - database-interruption
           - worker-process-interruption
+          - worker-fleet-interruption
           - github-api-interruption
       recovery_rounds:
         description: Bounded rounds for failure-recovery profiles
+        required: true
+        default: "3"
+        type: string
+      worker_fleet_size:
+        description: Worker processes in the bounded full-fleet interruption profile
         required: true
         default: "3"
         type: string
@@ -62,6 +68,7 @@ jobs:
       BOARDREADYOPS_LOAD_CONFIRMATION: isolated-disposable-database
       BOARDREADYOPS_LOAD_PROFILE: ${{ inputs.profile }}
       BOARDREADYOPS_LOAD_RECOVERY_ROUNDS: ${{ inputs.recovery_rounds }}
+      BOARDREADYOPS_LOAD_WORKER_FLEET_SIZE: ${{ inputs.worker_fleet_size }}
       BOARDREADYOPS_LOAD_UNIQUE_DELIVERIES: ${{ inputs.unique_deliveries }}
       BOARDREADYOPS_LOAD_DUPLICATE_DELIVERIES: ${{ inputs.duplicate_deliveries }}
       BOARDREADYOPS_LOAD_REPOSITORIES: ${{ inputs.repositories }}
