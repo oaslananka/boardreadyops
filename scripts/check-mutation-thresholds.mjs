@@ -40,7 +40,7 @@ const parserModelMutationFiles = new Set([
   "src/kicad/schematic-graph.ts",
 ]);
 const requiredMutationFiles = new Map([
-  ["src/kicad/parser-model", [...parserModelMutationFiles].sort()],
+  ["src/kicad/parser-model", [...parserModelMutationFiles].sort((a, b) => a.localeCompare(b))],
   [
     "src/rules/manufacturing/**",
     [
@@ -51,12 +51,12 @@ const requiredMutationFiles = new Map([
       "src/rules/manufacturing/position-coverage.ts",
       "src/rules/manufacturing/shared.ts",
       "src/rules/manufacturing/tooling-holes.ts",
-    ].sort(),
+    ].sort((a, b) => a.localeCompare(b)),
   ],
 ]);
 
 export function normalizeFile(file) {
-  return file.split(path.sep).join("/").replace(/\\/g, "/");
+  return file.split(path.sep).join("/").replaceAll("\\", "/");
 }
 
 export function calculateMutationMetrics(report, matches = () => true) {
@@ -72,23 +72,26 @@ export function calculateMutationMetrics(report, matches = () => true) {
     mutationScore: Number.NaN,
   };
   for (const [file, result] of Object.entries(report.files ?? {})) {
-    if (!matches(file)) {
-      continue;
-    }
-    counts.files += 1;
-    for (const mutant of result.mutants ?? []) {
-      if (detectedStatuses.has(mutant.status)) {
-        counts.totalDetected += 1;
-        counts[mutant.status === "Killed" ? "killed" : "timeout"] += 1;
-      } else if (undetectedStatuses.has(mutant.status)) {
-        counts.totalUndetected += 1;
-        counts[mutant.status === "Survived" ? "survived" : "noCoverage"] += 1;
-      }
+    if (matches(file)) {
+      counts.files += 1;
+      processMutants(result.mutants ?? [], counts);
     }
   }
   counts.totalValid = counts.totalDetected + counts.totalUndetected;
   counts.mutationScore = counts.totalValid > 0 ? (counts.totalDetected / counts.totalValid) * 100 : Number.NaN;
   return counts;
+}
+
+function processMutants(mutants, counts) {
+  for (const mutant of mutants) {
+    if (detectedStatuses.has(mutant.status)) {
+      counts.totalDetected += 1;
+      counts[mutant.status === "Killed" ? "killed" : "timeout"] += 1;
+    } else if (undetectedStatuses.has(mutant.status)) {
+      counts.totalUndetected += 1;
+      counts[mutant.status === "Survived" ? "survived" : "noCoverage"] += 1;
+    }
+  }
 }
 
 export function checkMutationThresholds(report, thresholds = defaultMutationThresholds) {
@@ -146,7 +149,10 @@ export function formatFailures(results) {
 
 export async function expectedCoreMutationFiles(root = process.cwd()) {
   const files = await glob("src/core/**/*.ts", { cwd: root, onlyFiles: true });
-  return files.map(normalizeFile).filter(isExecutableMutationFile).sort();
+  return files
+    .map(normalizeFile)
+    .filter(isExecutableMutationFile)
+    .sort((a, b) => a.localeCompare(b));
 }
 
 export function missingMutationFiles(report, expectedFiles) {

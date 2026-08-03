@@ -102,11 +102,12 @@ export async function runFirmwareContractRule(
     );
   }
   for (const { assignment, hardware } of comparison.mismatches) {
+    const netSuffix = assignment.net ? ` / ${assignment.net}` : "";
     output.push(
       finding(context, {
         ruleId,
         severity,
-        message: `Firmware signal ${assignment.signal} maps to ${assignment.hardware}${assignment.net ? ` / ${assignment.net}` : ""}, but hardware pinmap expects ${hardware.hardware} / ${hardware.net}.`,
+        message: `Firmware signal ${assignment.signal} maps to ${assignment.hardware}${netSuffix}, but hardware pinmap expects ${hardware.hardware} / ${hardware.net}.`,
         path: contractPath,
         kind: "firmware",
         line: 1,

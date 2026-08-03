@@ -359,4 +359,29 @@ describe("buildReleaseTrends", () => {
     expect(trend.waivers[1]?.activeCount).toBe(0);
     expect(trend.waivers[1]?.expiredCount).toBe(1);
   });
+
+  it("updates maxSeverity when higher severity finding occurs for recurring rule", () => {
+    const lowFinding = createFinding({
+      ruleId: "bom.missing-mpn",
+      severity: "low",
+      message: "R1 low",
+      resource: { path: "bom.csv", kind: "bom" },
+    });
+    const criticalFinding = createFinding({
+      ruleId: "bom.missing-mpn",
+      severity: "critical",
+      message: "R1 critical",
+      resource: { path: "bom.csv", kind: "bom" },
+    });
+
+    const runs = [makeRun({ findings: [lowFinding] }), makeRun({ findings: [criticalFinding] })];
+
+    const trend = buildReleaseTrends(runs);
+
+    expect(trend.recurringFindings[0]).toMatchObject({
+      ruleId: "bom.missing-mpn",
+      runCount: 2,
+      maxSeverity: "critical",
+    });
+  });
 });

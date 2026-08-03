@@ -22,12 +22,12 @@ export async function findI18nProblems(root = process.cwd(), options = {}) {
     return ["src/i18n/en.ts: source catalog not found"];
   }
   for (const catalog of catalogs.filter((entry) => !entry.source)) {
-    for (const key of [...sourceCatalog.keys].sort()) {
+    for (const key of [...sourceCatalog.keys].sort((a, b) => a.localeCompare(b))) {
       if (!catalog.keys.has(key)) {
         problems.push(`${catalog.file}: missing key "${key}"`);
       }
     }
-    for (const key of [...catalog.keys].sort()) {
+    for (const key of [...catalog.keys].sort((a, b) => a.localeCompare(b))) {
       if (!sourceCatalog.keys.has(key)) {
         problems.push(`${catalog.file}: unexpected key "${key}"`);
       }
@@ -39,7 +39,7 @@ export async function findI18nProblems(root = process.cwd(), options = {}) {
     ignore: ["dist/**", "coverage/**", "node_modules/**", ".stryker-tmp/**"],
     onlyFiles: true,
   });
-  for (const file of files.sort()) {
+  for (const file of files.sort((a, b) => a.localeCompare(b))) {
     const source = await readFile(path.join(root, file), "utf8");
     for (const call of extractLiteralTCalls(file, source)) {
       if (!sourceCatalog.keys.has(call.key)) {
@@ -53,7 +53,8 @@ export async function findI18nProblems(root = process.cwd(), options = {}) {
 export async function main(root = process.cwd()) {
   const problems = await findI18nProblems(root);
   if (problems.length > 0) {
-    throw new Error(`i18n catalog check failed:\n${problems.map((problem) => `- ${problem}`).join("\n")}`);
+    const formatted = problems.map((problem) => `- ${problem}`).join("\n");
+    throw new Error(`i18n catalog check failed:\n${formatted}`);
   }
 }
 

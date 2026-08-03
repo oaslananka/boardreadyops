@@ -176,13 +176,17 @@ export function formatHtml(
 </body>
 </html>
 `;
-  return `${html.replace(/[ \t]+$/gm, "").trimEnd()}\n`;
+  return `${html
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trimEnd()}\n`;
 }
 
 function htmlEscape(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
 function htmlAttr(value: string): string {
-  return htmlEscape(value).replace(/'/g, "&#39;");
+  return htmlEscape(value).replaceAll("'", "&#39;");
 }

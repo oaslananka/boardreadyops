@@ -6,15 +6,6 @@ import {
   normalizeHardwareKey,
 } from "./contract.js";
 
-const DEFINE_PATTERN = /^\s*#\s*define\s+([A-Za-z_]\w*)\s+([^\s/]+)\s*(?:\/\/\s*(.*))?$/;
-
-/**
- * Parse an Arduino / C firmware header that maps signal macros to hardware pins, e.g.
- *
- *   #define LED_STATUS U1.PA1   // net=LED_STATUS pin=GPIO2 env=esp32
- *
- * The optional trailing comment carries `net=`, `pin=`, and `env=`/`environment=` metadata.
- */
 export async function loadArduinoPinContract(file: string): Promise<LoadedFirmwareContract> {
   let text: string;
   try {
@@ -24,18 +15,14 @@ export async function loadArduinoPinContract(file: string): Promise<LoadedFirmwa
   }
   const pins: FirmwarePinAssignment[] = [];
   for (const line of text.split(/\r?\n/)) {
-    const match = DEFINE_PATTERN.exec(line);
-    if (!match) {
+    const parsed = parseDefineLine(line);
+    if (!parsed?.signal || !parsed.hardware) {
       continue;
     }
-    const [, signal, hardware, comment] = match;
-    if (!signal || !hardware) {
-      continue;
-    }
-    const meta = parseMeta(comment ?? "");
+    const meta = parseMeta(parsed.comment);
     pins.push({
-      signal,
-      hardware: normalizeHardwareKey(hardware),
+      signal: parsed.signal,
+      hardware: normalizeHardwareKey(parsed.hardware),
       ...(meta.net ? { net: meta.net } : {}),
       ...(meta.pin ? { pin: meta.pin } : {}),
       ...(meta.environment ? { environment: meta.environment } : {}),
@@ -45,6 +32,19 @@ export async function loadArduinoPinContract(file: string): Promise<LoadedFirmwa
     return { errors: ["Arduino pin header has no #define pin assignments"] };
   }
   return { document: { version: 1, pins }, errors: [] };
+}
+
+function parseDefineLine(line: string): { signal: string; hardware: string; comment: string } | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("#")) {
+    return null;
+  }
+  const [code, ...commentParts] = trimmed.split("//");
+  const match = /^#\s*define\s+([A-Za-z_]\w*)\s+(\S+)/.exec(code?.trim() ?? "");
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+  return { signal: match[1], hardware: match[2], comment: commentParts.join("//").trim() };
 }
 
 export const arduinoAdapter: FirmwareContractAdapter = {

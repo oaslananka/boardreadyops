@@ -4,6 +4,7 @@ import type { ReadinessScore } from "../core/readiness.js";
 import type { RunResult } from "../core/result.js";
 import { type Locale, type MessageKey, t } from "../i18n/t.js";
 import { outputChangeSummary } from "./fabrication-summary.js";
+import { reportCoordinate as formatNumber } from "./finding-context.js";
 
 const severities: Severity[] = ["critical", "high", "medium", "low", "info"];
 
@@ -40,11 +41,12 @@ export function renderDecisionSection(result: RunResult, locale: Locale): string
   const readinessLine = result.readiness
     ? `<p class="muted">${escapeHtml(t("report.decision.readiness", { score: result.readiness.score }, locale))}</p>`
     : "";
-  const policyBadge = result.policy
-    ? `<span class="badge decision-badge-${result.policy.status === "fail" ? "fail" : "pass"}">${escapeHtml(
-        t(result.policy.status === "fail" ? "report.decision.policyFail" : "report.decision.policyPass", {}, locale),
-      )}</span>`
-    : "";
+  let policyBadge = "";
+  if (result.policy) {
+    const policyKey = result.policy.status === "fail" ? "report.decision.policyFail" : "report.decision.policyPass";
+    const policyClass = result.policy.status === "fail" ? "fail" : "pass";
+    policyBadge = `<span class="badge decision-badge-${policyClass}">${escapeHtml(t(policyKey, {}, locale))}</span>`;
+  }
   return `<section class="decision decision-${status}" aria-labelledby="decision-heading">
       <h2 id="decision-heading">${escapeHtml(t("report.decision.title", {}, locale))}</h2>
       <p class="decision-status">
@@ -444,10 +446,8 @@ function fixHtml(finding: Finding, locale: Locale): string {
       t("report.noFix", {}, locale),
     )}</p></section>`;
   }
-  const steps =
-    finding.fix.steps && finding.fix.steps.length > 0
-      ? `<ol>${finding.fix.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>`
-      : "";
+  const stepList = finding.fix.steps?.map((step) => `<li>${escapeHtml(step)}</li>`).join("") ?? "";
+  const steps = stepList.length > 0 ? `<ol>${stepList}</ol>` : "";
   return `<section>
                     <h3>${escapeHtml(t("report.fix", {}, locale))}</h3>
                     <p>${escapeHtml(finding.fix.description)}</p>
@@ -545,20 +545,12 @@ function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
-function formatNumber(value: number): string {
-  return Object.is(value, -0)
-    ? "0"
-    : Number.isInteger(value)
-      ? value.toString()
-      : value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
-}
-
 function attr(value: string): string {
-  return escapeHtml(value).replace(/'/g, "&#39;");
+  return escapeHtml(value).replaceAll("'", "&#39;");
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
 function findingWord(count: number, locale: Locale): string {

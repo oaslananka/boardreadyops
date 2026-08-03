@@ -20,7 +20,7 @@ export function formatJunit(result: RunResult): string {
 }
 
 function xml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
 function failureBody(finding: Finding, context: ReturnType<typeof reportFindingContext>): string {

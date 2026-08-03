@@ -2,11 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 export function toPosixPath(value: string): string {
-  return value.replace(/\\/g, "/");
+  return value.replaceAll("\\", "/");
 }
 
 export function normalizePathInput(value: string): string {
-  return path.sep === "\\" ? value.replace(/\//g, "\\") : value.replace(/\\/g, "/");
+  return path.sep === "\\" ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/");
 }
 
 export function normalizeRelative(root: string, target: string): string {
@@ -26,7 +26,7 @@ export function matchesProjectScope(resourcePath: string, configuredProject: str
 }
 
 function normalizeResourcePath(value: string): string {
-  return path.posix.normalize(value.replace(/\\/g, "/")).replace(/^\.\//, "");
+  return path.posix.normalize(value.replaceAll("\\", "/")).replace(/^\.\//, "");
 }
 
 export function isInside(parent: string, child: string): boolean {
@@ -53,7 +53,7 @@ export async function resolveExistingPathAlias(target: string): Promise<string> 
   while (true) {
     try {
       const real = await fs.realpath(current);
-      return missingSegments.length > 0 ? path.join(real, ...missingSegments.reverse()) : real;
+      return missingSegments.length > 0 ? path.join(real, ...missingSegments.toReversed()) : real;
     } catch {
       const parent = path.dirname(current);
       if (parent === current) {

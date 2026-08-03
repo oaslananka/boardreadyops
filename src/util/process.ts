@@ -76,10 +76,10 @@ export function runProcess(command: string, args: string[], options: ProcessOpti
 
 function trustedCmdExe(): string {
   const systemRoot = process.env.SystemRoot;
-  if (systemRoot && /^[A-Za-z]:\\Windows$/i.test(systemRoot)) {
+  if (systemRoot && /^[a-z]:\\Windows$/i.test(systemRoot)) {
     return join(systemRoot, "System32", "cmd.exe");
   }
-  return "C:\\Windows\\System32\\cmd.exe";
+  return String.raw`C:\Windows\System32\cmd.exe`;
 }
 
 function buildCmdLine(command: string, args: string[]): string {
@@ -91,7 +91,7 @@ function quoteCmdToken(value: string): string {
     return '""';
   }
   const sanitized = value.replace(/[\r\n]/g, "");
-  return `"${sanitized.replace(/"/g, '""')}"`;
+  return `"${sanitized.replaceAll('"', '""')}"`;
 }
 
 function appendBounded(current: string, next: string, limit: number): string {

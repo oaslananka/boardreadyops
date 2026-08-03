@@ -25,7 +25,7 @@ export function checkPack(root = process.cwd()) {
   if (missing.length > 0) {
     throw new Error(`npm pack is missing required files: ${missing.join(", ")}`);
   }
-  return [...files].sort();
+  return [...files].sort((a, b) => a.localeCompare(b));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -49,8 +49,10 @@ function clampScore(value: number): number {
 
 export function computeReadiness(input: ReadinessInput): ReadinessScore {
   const isProduction = input.releaseMode === "production";
-  const required = [...new Set(input.requiredOutputs)].sort();
-  const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required.includes(output)).sort();
+  const required = [...new Set(input.requiredOutputs)].sort((a, b) => a.localeCompare(b));
+  const recommended = [...new Set(input.recommendedOutputs)]
+    .filter((output) => !required.includes(output))
+    .sort((a, b) => a.localeCompare(b));
 
   const missingRequired = required.filter((output) => !input.presentOutputs.has(output));
   const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
@@ -59,19 +61,34 @@ export function computeReadiness(input: ReadinessInput): ReadinessScore {
   let blocking = 0;
   let nonBlocking = 0;
   for (const finding of input.findings) {
-    if (finding.suppressed || finding.severity === "info") {
-      continue;
-    }
-    if (isBlocking(finding, input.failOn)) {
-      blocking += 1;
-    } else {
-      nonBlocking += 1;
+    if (!finding.suppressed && finding.severity !== "info") {
+      if (isBlocking(finding, input.failOn)) {
+        blocking += 1;
+      } else {
+        nonBlocking += 1;
+      }
     }
   }
 
-  // In production mode, missing recommended outputs and expired waivers are treated as blocking.
-  const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
+  const warnings: string[] = [];
+  for (const output of missingRequired) {
+    warnings.push(`Required output ${output} is missing.`);
+  }
+  for (const output of missingRecommended) {
+    warnings.push(
+      isProduction
+        ? `Recommended output ${output} is required in production mode.`
+        : `Recommended output ${output} is missing.`,
+    );
+  }
+  if (blocking > 0) {
+    warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
+  }
+  if (isProduction && expiredWaivers > 0) {
+    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
+  }
 
+  const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
   const score = clampScore(
     100 -
       missingRequired.length * REQUIRED_PENALTY -
@@ -80,14 +97,12 @@ export function computeReadiness(input: ReadinessInput): ReadinessScore {
       nonBlocking * NON_BLOCKING_PENALTY -
       productionBlockers * REQUIRED_PENALTY,
   );
-
   const status: ReadinessScore["status"] =
     missingRequired.length > 0 || blocking > 0 || productionBlockers > 0
       ? "blocked"
       : missingRecommended.length > 0 || nonBlocking > 0
         ? "at-risk"
         : "ready";
-
   const evidence: ReadinessEvidence[] = [
     ...required.map((output) => ({
       output,
@@ -100,24 +115,6 @@ export function computeReadiness(input: ReadinessInput): ReadinessScore {
       present: input.presentOutputs.has(output),
     })),
   ].sort((left, right) => left.output.localeCompare(right.output));
-
-  const warnings: string[] = [];
-  for (const output of missingRequired) {
-    warnings.push(`Required output ${output} is missing.`);
-  }
-  for (const output of missingRecommended) {
-    if (isProduction) {
-      warnings.push(`Recommended output ${output} is required in production mode.`);
-    } else {
-      warnings.push(`Recommended output ${output} is missing.`);
-    }
-  }
-  if (blocking > 0) {
-    warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
-  }
-  if (isProduction && expiredWaivers > 0) {
-    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
-  }
 
   return {
     profile: input.profile,

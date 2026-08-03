@@ -10,7 +10,7 @@ import {
  * Pattern that matches a KV line in a STM32CubeMX .ioc file.
  * e.g. `PA0.GPIO_Label=BTN_USER` or `PB6.Signal=USART1_TX`
  */
-const IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.([\w_]+)=(.+)$/;
+const IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.(\w+)=(.+)$/;
 
 /**
  * Parse a STM32CubeMX `.ioc` project file and extract pin-to-signal mappings.
@@ -26,25 +26,7 @@ export async function loadStm32CubeMxContract(file: string, mcuDesignator = "U1"
     return { errors: [error instanceof Error ? error.message : "STM32CubeMX .ioc file could not be loaded"] };
   }
 
-  const pinLabels = new Map<string, string>();
-  const pinNets = new Map<string, string>();
-
-  for (const line of text.split(/\r?\n/)) {
-    const match = IOC_LINE_PATTERN.exec(line.trim());
-    if (!match) {
-      continue;
-    }
-    const [, pinId, key, value] = match;
-    if (!pinId || !key || !value) {
-      continue;
-    }
-    if (key === "GPIO_Label") {
-      pinLabels.set(pinId, value.trim());
-    } else if (key === "Signal" && value.trim() !== "GPIO_Input" && value.trim() !== "GPIO_Output") {
-      // Record peripheral signals (e.g. USART1_TX) as net hints
-      pinNets.set(pinId, value.trim());
-    }
-  }
+  const { pinLabels, pinNets } = parseIocLines(text);
 
   if (pinLabels.size === 0) {
     return {
@@ -63,6 +45,29 @@ export async function loadStm32CubeMxContract(file: string, mcuDesignator = "U1"
   }
 
   return { document: { version: 1, pins }, errors: [] };
+}
+
+function parseIocLines(text: string): { pinLabels: Map<string, string>; pinNets: Map<string, string> } {
+  const pinLabels = new Map<string, string>();
+  const pinNets = new Map<string, string>();
+
+  for (const line of text.split(/\r?\n/)) {
+    const match = IOC_LINE_PATTERN.exec(line.trim());
+    if (!match) {
+      continue;
+    }
+    const [, pinId, key, value] = match;
+    if (!pinId || !key || !value) {
+      continue;
+    }
+    if (key === "GPIO_Label") {
+      pinLabels.set(pinId, value.trim());
+    } else if (key === "Signal" && value.trim() !== "GPIO_Input" && value.trim() !== "GPIO_Output") {
+      pinNets.set(pinId, value.trim());
+    }
+  }
+
+  return { pinLabels, pinNets };
 }
 
 export const stm32CubeMxAdapter: FirmwareContractAdapter = {

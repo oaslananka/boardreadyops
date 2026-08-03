@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { Finding } from "../../core/findings.js";
 import { readDesignFile } from "../../kicad/parsers/project-files.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
@@ -19,7 +20,8 @@ export const versionFormatRule = rule(
     if (!shouldRun(context, "release.version-format")) {
       return [];
     }
-    const pattern = String(configFor(context, "release.version-format").pattern ?? "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$");
+    const rawPattern = configFor(context, "release.version-format").pattern;
+    const pattern = typeof rawPattern === "string" ? rawPattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
     const regex = compilePattern(pattern);
     if (!regex) {
       return [
@@ -33,43 +35,63 @@ export const versionFormatRule = rule(
         }),
       ];
     }
-    const output = [];
+    const output: Finding[] = [];
     for (const project of context.projects) {
-      for (const board of project.boardFiles) {
-        const revision = (await parsePcb(path.resolve(context.root, board))).revision;
-        if (revision && !regex.test(revision)) {
-          output.push(
-            finding(context, {
-              ruleId: "release.version-format",
-              severity: configuredSeverity(context, "release.version-format", "low"),
-              message: `PCB revision ${revision} does not match ${pattern}.`,
-              path: board,
-              kind: "pcb",
-              details: { revision, pattern },
-            }),
-          );
-        }
-      }
-      for (const schematic of project.schematicFiles) {
-        const text = (await readDesignFile(path.resolve(context.root, schematic))) ?? "";
-        const revision = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
-        if (revision && !regex.test(revision)) {
-          output.push(
-            finding(context, {
-              ruleId: "release.version-format",
-              severity: configuredSeverity(context, "release.version-format", "low"),
-              message: `Schematic revision ${revision} does not match ${pattern}.`,
-              path: schematic,
-              kind: "schematic",
-              details: { revision, pattern },
-            }),
-          );
-        }
-      }
+      await checkProjectBoards(context, project, regex, pattern, output);
+      await checkProjectSchematics(context, project, regex, pattern, output);
     }
     return output;
   },
 );
+
+async function checkProjectBoards(
+  context: Parameters<Parameters<typeof rule>[1]>[0],
+  project: (typeof context.projects)[number],
+  regex: RegExp,
+  pattern: string,
+  output: ReturnType<typeof finding>[],
+): Promise<void> {
+  for (const board of project.boardFiles) {
+    const revision = (await parsePcb(path.resolve(context.root, board))).revision;
+    if (revision && !regex.test(revision)) {
+      output.push(
+        finding(context, {
+          ruleId: "release.version-format",
+          severity: configuredSeverity(context, "release.version-format", "low"),
+          message: `PCB revision ${revision} does not match ${pattern}.`,
+          path: board,
+          kind: "pcb",
+          details: { revision, pattern },
+        }),
+      );
+    }
+  }
+}
+
+async function checkProjectSchematics(
+  context: Parameters<Parameters<typeof rule>[1]>[0],
+  project: (typeof context.projects)[number],
+  regex: RegExp,
+  pattern: string,
+  output: ReturnType<typeof finding>[],
+): Promise<void> {
+  for (const schematic of project.schematicFiles) {
+    const text = (await readDesignFile(path.resolve(context.root, schematic))) ?? "";
+    const revision = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
+    if (revision && !regex.test(revision)) {
+      output.push(
+        finding(context, {
+          ruleId: "release.version-format",
+          severity: configuredSeverity(context, "release.version-format", "low"),
+          message: `Schematic revision ${revision} does not match ${pattern}.`,
+          path: schematic,
+          kind: "schematic",
+          details: { revision, pattern },
+        }),
+      );
+    }
+  }
+}
 
 function compilePattern(pattern: string): RegExp | undefined {
   try {

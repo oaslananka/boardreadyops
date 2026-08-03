@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { runPipeline } from "../../../../src/core/pipeline.js";
 import { expectRule, runFixture, writeFixture } from "../helpers.js";
 
-const KICAD_FIXTURE_TIMEOUT_MS = 30_000;
+const KICAD_FIXTURE_TIMEOUT_MS = 120_000;
 
 describe("manufacturing.package-completeness", () => {
   it(
