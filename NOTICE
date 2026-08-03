@@ -889,9 +889,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@vitest/spy@4.1.9`
   - Description: Lightweight Jest compatible spy implementation
   - Homepage: https://vitest.dev/api/mock
-- `@vitest/utils@4.1.9`
-  - Description: Shared Vitest utility functions
-  - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/utils
 - `abort-controller@3.0.0`
   - Description: An implementation of WHATWG AbortController interface.
   - Homepage: https://github.com/mysticatea/abort-controller#readme

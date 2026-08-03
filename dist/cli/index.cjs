@@ -46547,19 +46547,15 @@ async function runPipeline(input = {}, logger) {
   });
   const { pluginLoad, loadedWithPluginErrors, projects } = await discoverPhase(ctx);
   const findings = await validatePhase(ctx, loadedWithPluginErrors, projects);
-  const { effectiveFindings, fabrication, readiness, summary, waiverResult, policy } = await postProcessPhase(
-    ctx,
-    findings,
-    projects
-  );
+  const postProcessed = await postProcessPhase(ctx, findings, projects);
   const result = assembleRunResult({
     ctx,
-    effectiveFindings,
-    fabrication,
-    readiness,
-    summary,
-    waiverResult,
-    policy,
+    effectiveFindings: postProcessed.effectiveFindings,
+    fabrication: postProcessed.fabrication,
+    readiness: postProcessed.readiness,
+    summary: postProcessed.summary,
+    waiverResult: postProcessed.waiverResult,
+    policy: postProcessed.policy,
     pluginLoad,
     projects
   });
