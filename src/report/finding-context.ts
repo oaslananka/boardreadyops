@@ -20,7 +20,8 @@ function reportLocation(finding: Finding): string {
   const base = finding.resource.path;
   if (finding.location?.region) {
     const region = finding.location.region;
-    const start = `:${region.startLine}${region.startColumn ? `:${region.startColumn}` : ""}`;
+    const colSuffix = region.startColumn ? `:${region.startColumn}` : "";
+    const start = `:${region.startLine}${colSuffix}`;
     const end = region.endLine !== region.startLine ? `-${region.endLine}` : "";
     return `${base}${start}${end}`;
   }
@@ -54,7 +55,7 @@ export function reportCoordinate(value: number): string {
   if (Number.isInteger(value)) {
     return value.toString();
   }
-  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  return value.toFixed(6).replace(/\.?0+$/, "");
 }
 
 export function reportCoordinateWithUnits(value: number, units: "mm" | "in"): string {

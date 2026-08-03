@@ -32,41 +32,49 @@ export async function runKicadReportRule(context: RuleContext, options: KicadRep
   for (const project of context.projects) {
     for (const designFile of options.files(project)) {
       const absoluteFile = path.resolve(context.root, designFile);
-      const result = await runKicadReport(cli.path, options.command, absoluteFile, {
-        ...(context.options.variant ? { variant: context.options.variant } : {}),
-        ...(cli.version ? { version: cli.version } : {}),
-      });
-      for (const diagnostic of result.diagnostics) {
-        const severity = options.severity(
-          context,
-          diagnostic.ruleId,
-          kicadSeverityToFindingSeverity(diagnostic.severity),
-        );
-        output.push(
-          finding(context, {
-            ruleId: `${options.command}.${diagnostic.ruleId ?? "violation"}`,
-            severity,
-            message: diagnostic.message,
-            path: diagnostic.file ?? absoluteFile,
-            kind: options.resourceKind,
-            line: diagnostic.line,
-            column: diagnostic.column,
-            details: diagnostic.raw,
-          }),
-        );
-      }
-      if (result.status === "failed" && result.diagnostics.length === 0 && result.error) {
-        output.push(
-          finding(context, {
-            ruleId: options.groupRuleId,
-            severity: configuredSeverity(context, options.groupRuleId, "high"),
-            message: result.error,
-            path: absoluteFile,
-            kind: options.resourceKind,
-          }),
-        );
-      }
+      output.push(...(await processDesignFileReport(context, cli.path, cli.version, options, absoluteFile)));
     }
+  }
+  return output;
+}
+
+async function processDesignFileReport(
+  context: RuleContext,
+  cliPath: string,
+  cliVersion: string | undefined,
+  options: KicadReportRuleOptions,
+  absoluteFile: string,
+): Promise<Finding[]> {
+  const output: Finding[] = [];
+  const result = await runKicadReport(cliPath, options.command, absoluteFile, {
+    ...(context.options.variant ? { variant: context.options.variant } : {}),
+    ...(cliVersion ? { version: cliVersion } : {}),
+  });
+  for (const diagnostic of result.diagnostics) {
+    const severity = options.severity(context, diagnostic.ruleId, kicadSeverityToFindingSeverity(diagnostic.severity));
+    output.push(
+      finding(context, {
+        ruleId: `${options.command}.${diagnostic.ruleId ?? "violation"}`,
+        severity,
+        message: diagnostic.message,
+        path: diagnostic.file ?? absoluteFile,
+        kind: options.resourceKind,
+        line: diagnostic.line,
+        column: diagnostic.column,
+        details: diagnostic.raw,
+      }),
+    );
+  }
+  if (result.status === "failed" && result.diagnostics.length === 0 && result.error) {
+    output.push(
+      finding(context, {
+        ruleId: options.groupRuleId,
+        severity: configuredSeverity(context, options.groupRuleId, "high"),
+        message: result.error,
+        path: absoluteFile,
+        kind: options.resourceKind,
+      }),
+    );
   }
   return output;
 }

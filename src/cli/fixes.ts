@@ -364,16 +364,16 @@ async function planBomMissingMpn(
       continue;
     }
     const after = writeDelimitedDocument(document);
-    addTextChange(
+    addTextChange({
       plan,
       virtualTexts,
       root,
-      bomPath,
+      file: bomPath,
       before,
       after,
-      [ruleId],
-      `Fill ${fixed} missing BOM MPN value(s).`,
-    );
+      ruleIds: [ruleId],
+      summary: `Fill ${fixed} missing BOM MPN value(s).`,
+    });
   }
 }
 
@@ -408,73 +408,127 @@ async function planReleaseRevisions(
     const projectVersionAllowed = versionAllowed && isRuleEnabledForProjectContext(root, config, project, versionRule);
     const projectRevisionAllowed =
       revisionAllowed && isRuleEnabledForProjectContext(root, config, project, revisionRule);
-    if (!projectVersionAllowed && !projectRevisionAllowed) {
-      continue;
-    }
-    for (const board of project.boardFiles) {
-      const file = path.resolve(root, board);
-      const before = await readVirtualText(file, virtualTexts);
-      const revision = revisionFromText(before);
-      const candidate = coerceSemver(revision);
-      const ruleIds = [];
-      if (
-        projectVersionAllowed &&
-        revision &&
-        versionRegex &&
-        !versionRegex.test(revision) &&
-        versionRegex.test(candidate)
-      ) {
-        ruleIds.push(versionRule);
-      }
-      if (
-        projectRevisionAllowed &&
-        tagRegex &&
-        (!revision || (!tagRegex.test(revision) && !tagRegex.test(`v${revision}`))) &&
-        (tagRegex.test(candidate) || tagRegex.test(`v${candidate}`))
-      ) {
-        ruleIds.push(revisionRule);
-      }
-      if (ruleIds.length > 0) {
-        const after = setRevision(before, candidate, "kicad_pcb");
-        addTextChange(
+    if (projectVersionAllowed || projectRevisionAllowed) {
+      await planProjectBoardRevisions({
+        root,
+        project,
+        projectVersionAllowed,
+        projectRevisionAllowed,
+        versionRule,
+        revisionRule,
+        versionRegex,
+        tagRegex,
+        plan,
+        virtualTexts,
+      });
+      if (projectVersionAllowed && versionRegex) {
+        await planProjectSchematicRevisions({
+          root,
+          project,
+          versionRule,
+          versionRegex,
           plan,
           virtualTexts,
-          root,
-          file,
-          before,
-          after,
-          ruleIds,
-          `Rewrite PCB revision ${revision ? `"${revision}"` : "metadata"} to ${candidate}.`,
-        );
+        });
       }
     }
+  }
+}
 
-    if (!projectVersionAllowed || !versionRegex) {
-      continue;
+async function planProjectBoardRevisions(params: {
+  root: string;
+  project: ProjectContext;
+  projectVersionAllowed: boolean;
+  projectRevisionAllowed: boolean;
+  versionRule: string;
+  revisionRule: string;
+  versionRegex: RegExp | undefined;
+  tagRegex: RegExp | undefined;
+  plan: MutablePlan;
+  virtualTexts: Map<string, string>;
+}): Promise<void> {
+  const {
+    root,
+    project,
+    projectVersionAllowed,
+    projectRevisionAllowed,
+    versionRule,
+    revisionRule,
+    versionRegex,
+    tagRegex,
+    plan,
+    virtualTexts,
+  } = params;
+  for (const board of project.boardFiles) {
+    const file = path.resolve(root, board);
+    const before = await readVirtualText(file, virtualTexts);
+    const revision = revisionFromText(before);
+    const candidate = coerceSemver(revision);
+    const ruleIds = [];
+    if (
+      projectVersionAllowed &&
+      revision &&
+      versionRegex &&
+      !versionRegex.test(revision) &&
+      versionRegex.test(candidate)
+    ) {
+      ruleIds.push(versionRule);
     }
-    for (const schematic of project.schematicFiles) {
-      const file = path.resolve(root, schematic);
-      const before = await readVirtualText(file, virtualTexts);
-      const revision = revisionFromText(before);
-      if (!revision || versionRegex.test(revision)) {
-        continue;
-      }
-      const candidate = coerceSemver(revision);
-      if (!versionRegex.test(candidate)) {
-        continue;
-      }
-      const after = setRevision(before, candidate, "kicad_sch");
-      addTextChange(
+    if (
+      projectRevisionAllowed &&
+      tagRegex &&
+      (!revision || (!tagRegex.test(revision) && !tagRegex.test(`v${revision}`))) &&
+      (tagRegex.test(candidate) || tagRegex.test(`v${candidate}`))
+    ) {
+      ruleIds.push(revisionRule);
+    }
+    if (ruleIds.length > 0) {
+      const after = setRevision(before, candidate, "kicad_pcb");
+      addTextChange({
         plan,
         virtualTexts,
         root,
         file,
         before,
         after,
-        [versionRule],
-        `Rewrite schematic revision "${revision}" to ${candidate}.`,
-      );
+        ruleIds,
+        summary: `Rewrite PCB revision ${revision ? `"${revision}"` : "metadata"} to ${candidate}.`,
+      });
     }
+  }
+}
+
+async function planProjectSchematicRevisions(params: {
+  root: string;
+  project: ProjectContext;
+  versionRule: string;
+  versionRegex: RegExp;
+  plan: MutablePlan;
+  virtualTexts: Map<string, string>;
+}): Promise<void> {
+  const { root, project, versionRule, versionRegex, plan, virtualTexts } = params;
+  for (const schematic of project.schematicFiles) {
+    const file = path.resolve(root, schematic);
+    const before = await readVirtualText(file, virtualTexts);
+    const revision = revisionFromText(before);
+    if (!revision || versionRegex.test(revision)) {
+      continue;
+    }
+    const candidate = coerceSemver(revision);
+    if (!versionRegex.test(candidate)) {
+      continue;
+    }
+    const after = setRevision(before, candidate, "kicad_sch");
+    addTextChange({
+      plan,
+      virtualTexts,
+      root,
+      file,
+      before,
+      after,
+      ruleIds: [versionRule],
+      summary: `Rewrite schematic revision "${revision}" to ${candidate}.`,
+    });
   }
 }
 
@@ -519,16 +573,16 @@ async function planChangelog(
     return;
   }
   const after = before ? appendChangelogEntries(before, missing) : createChangelog(missing);
-  addTextChange(
+  addTextChange({
     plan,
     virtualTexts,
     root,
-    changelog,
+    file: changelog,
     before,
     after,
-    [ruleId],
-    `Add CHANGELOG.md release entr${missing.length === 1 ? "y" : "ies"} for ${missing.join(", ")}.`,
-  );
+    ruleIds: [ruleId],
+    summary: `Add CHANGELOG.md release entr${missing.length === 1 ? "y" : "ies"} for ${missing.join(", ")}.`,
+  });
 }
 
 async function planFabNotes(
@@ -550,7 +604,16 @@ async function planFabNotes(
     }
   }
   const target = path.resolve(root, "fab/README.md");
-  addTextChange(plan, virtualTexts, root, target, undefined, defaultFabNotes, [ruleId], "Create fab/README.md.");
+  addTextChange({
+    plan,
+    virtualTexts,
+    root,
+    file: target,
+    before: undefined,
+    after: defaultFabNotes,
+    ruleIds: [ruleId],
+    summary: "Create fab/README.md.",
+  });
 }
 
 async function planDnpConsistency(
@@ -575,15 +638,7 @@ async function planDnpConsistency(
       continue;
     }
     const projectContexts = contextsForBomTarget(root, target, config, projects);
-    const footprints = new Map<string, boolean>();
-    for (const project of projectContexts) {
-      for (const board of project.boardFiles) {
-        const parsed = await parsePcb(path.resolve(root, board));
-        for (const footprint of parsed.footprints) {
-          footprints.set(footprint.reference, footprint.dnp);
-        }
-      }
-    }
+    const footprints = await collectProjectFootprintDnp(root, projectContexts);
     const bomPath = target.path;
     const text = await readTextFile(bomPath);
     const document = parseDelimitedDocument(text, bomPath);
@@ -605,6 +660,19 @@ async function planDnpConsistency(
       }
     }
   }
+}
+
+async function collectProjectFootprintDnp(root: string, projects: ProjectContext[]): Promise<Map<string, boolean>> {
+  const footprints = new Map<string, boolean>();
+  for (const project of projects) {
+    for (const board of project.boardFiles) {
+      const parsed = await parsePcb(path.resolve(root, board));
+      for (const footprint of parsed.footprints) {
+        footprints.set(footprint.reference, footprint.dnp);
+      }
+    }
+  }
+  return footprints;
 }
 
 async function planDrcSuggestions(
@@ -739,16 +807,19 @@ async function readOptionalVirtualText(file: string, virtualTexts: Map<string, s
   return readTextFile(file);
 }
 
-function addTextChange(
-  plan: MutablePlan,
-  virtualTexts: Map<string, string>,
-  root: string,
-  file: string,
-  before: string | undefined,
-  after: string,
-  ruleIds: string[],
-  summary: string,
-): void {
+interface TextChangeParams {
+  plan: MutablePlan;
+  virtualTexts: Map<string, string>;
+  root: string;
+  file: string;
+  before: string | undefined;
+  after: string;
+  ruleIds: string[];
+  summary: string;
+}
+
+function addTextChange(params: TextChangeParams): void {
+  const { plan, virtualTexts, root, file, before, after, ruleIds, summary } = params;
   if (before === after) {
     return;
   }
@@ -757,10 +828,15 @@ function addTextChange(
   const existing = plan.changes.find((change) => change.path === relative);
   if (existing) {
     existing.after = after;
-    existing.ruleIds = [...new Set([...existing.ruleIds, ...ruleIds])].sort();
+    existing.ruleIds = [...new Set([...existing.ruleIds, ...ruleIds])].sort((a, b) => a.localeCompare(b));
     existing.summary = `${existing.summary} ${summary}`;
   } else {
-    const change: FixChange = { ruleIds: [...new Set(ruleIds)].sort(), path: relative, after, summary };
+    const change: FixChange = {
+      ruleIds: [...new Set(ruleIds)].sort((a, b) => a.localeCompare(b)),
+      path: relative,
+      after,
+      summary,
+    };
     if (before !== undefined) {
       change.before = before;
     }

@@ -78462,7 +78462,7 @@ function stableStringify(value) {
 }
 function redactControlCharacters(value) {
   return [...value].filter((char) => {
-    const code = char.charCodeAt(0);
+    const code = char.codePointAt(0) ?? 0;
     return code === 9 || code === 10 || code === 13 || code >= 32 && code !== 127;
   }).join("");
 }
@@ -81954,10 +81954,10 @@ async function fileMtimeMs(file2) {
 var import_promises2 = __toESM(require("node:fs/promises"), 1);
 var import_node_path3 = __toESM(require("node:path"), 1);
 function toPosixPath2(value) {
-  return value.replace(/\\/g, "/");
+  return value.replaceAll("\\", "/");
 }
 function normalizePathInput(value) {
-  return import_node_path3.default.sep === "\\" ? value.replace(/\//g, "\\") : value.replace(/\\/g, "/");
+  return import_node_path3.default.sep === "\\" ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/");
 }
 function normalizeRelative(root, target) {
   const relative = import_node_path3.default.relative(root, target);
@@ -81969,7 +81969,7 @@ function matchesProjectScope(resourcePath, configuredProject) {
   return !normalizedProject || normalizedProject === "." || normalizedResource === normalizedProject || normalizedResource.startsWith(`${normalizedProject}/`);
 }
 function normalizeResourcePath(value) {
-  return import_node_path3.default.posix.normalize(value.replace(/\\/g, "/")).replace(/^\.\//, "");
+  return import_node_path3.default.posix.normalize(value.replaceAll("\\", "/")).replace(/^\.\//, "");
 }
 function isInside(parent, child) {
   const relative = import_node_path3.default.relative(parent, child);
@@ -81993,7 +81993,7 @@ async function resolveExistingPathAlias(target) {
   while (true) {
     try {
       const real = await import_promises2.default.realpath(current);
-      return missingSegments.length > 0 ? import_node_path3.default.join(real, ...missingSegments.reverse()) : real;
+      return missingSegments.length > 0 ? import_node_path3.default.join(real, ...missingSegments.toReversed()) : real;
     } catch {
       const parent = import_node_path3.default.dirname(current);
       if (parent === current) {
@@ -82148,7 +82148,7 @@ function refIgnored(reference, patterns) {
   return patterns.some((pattern) => typeof pattern === "string" && globLike(pattern, reference));
 }
 function globLike(pattern, value) {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
   return new RegExp(`^${escaped}$`, "i").test(value);
 }
 
@@ -82340,40 +82340,7 @@ function parseSexprDocument(text) {
     if (char === void 0) {
       break;
     }
-    if (/\s/.test(char)) {
-      advance(position, char);
-      continue;
-    }
-    if (char === ";") {
-      skipComment(text, position);
-      continue;
-    }
-    if (char === "(") {
-      const start = mark(position);
-      advance(position, char);
-      appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
-      const list = lastList(stack, nodes);
-      if (list) {
-        stack.push(list);
-      }
-      continue;
-    }
-    if (char === ")") {
-      const start = mark(position);
-      advance(position, char);
-      const list = stack.pop();
-      if (!list) {
-        errors.push({ message: "Unexpected closing parenthesis", span: { start, end: mark(position) } });
-      } else {
-        list.span.end = mark(position);
-      }
-      continue;
-    }
-    if (char === '"') {
-      appendNode(nodes, stack, parseString(text, position, errors));
-      continue;
-    }
-    appendNode(nodes, stack, parseAtom(text, position));
+    processSexprToken(text, char, position, nodes, stack, errors);
   }
   const end = mark(position);
   for (const list of stack.reverse()) {
@@ -82553,6 +82520,42 @@ function advance(position, char) {
     return;
   }
   position.column += 1;
+}
+function processSexprToken(text, char, position, nodes, stack, errors) {
+  if (/\s/.test(char)) {
+    advance(position, char);
+    return;
+  }
+  if (char === ";") {
+    skipComment(text, position);
+    return;
+  }
+  if (char === "(") {
+    const start = mark(position);
+    advance(position, char);
+    appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
+    const list = lastList(stack, nodes);
+    if (list) {
+      stack.push(list);
+    }
+    return;
+  }
+  if (char === ")") {
+    const start = mark(position);
+    advance(position, char);
+    const list = stack.pop();
+    if (!list) {
+      errors.push({ message: "Unexpected closing parenthesis", span: { start, end: mark(position) } });
+    } else {
+      list.span.end = mark(position);
+    }
+    return;
+  }
+  if (char === '"') {
+    appendNode(nodes, stack, parseString(text, position, errors));
+    return;
+  }
+  appendNode(nodes, stack, parseAtom(text, position));
 }
 
 // src/kicad/variants.ts
@@ -83221,68 +83224,79 @@ var identityConflictsRule = rule(
       return [];
     }
     const { bomRows, schematicRows } = await loadBomContext(context5);
-    const findings = [];
-    const bomByRef = /* @__PURE__ */ new Map();
-    for (const row of bomRows) {
-      if (!row.reference || row.dnp) continue;
-      const existing = bomByRef.get(row.reference) ?? [];
-      existing.push({ mpn: row.mpn ?? "", line: row.line, path: row.sourcePath });
-      bomByRef.set(row.reference, existing);
-    }
-    for (const [reference, entries] of bomByRef) {
-      const uniqueMpns = new Set(entries.map((entry) => entry.mpn.toLowerCase()));
-      if (uniqueMpns.size > 1) {
-        const first = entries[0];
-        findings.push(
-          finding(context5, {
-            ruleId: "bom.identity-conflicts",
-            severity: configuredSeverity(context5, "bom.identity-conflicts", "high"),
-            message: `${reference} appears ${entries.length} times in the BOM with conflicting MPNs: ${[...uniqueMpns].join(", ")}.`,
-            path: first?.path ?? "",
-            kind: "bom",
-            line: first?.line,
-            details: {
-              reference,
-              conflictType: "within-bom",
-              mpns: [...uniqueMpns]
-            }
-          })
-        );
-      }
-    }
-    if (bomRows.length > 0 && schematicRows.length > 0) {
-      const schematicMpn = /* @__PURE__ */ new Map();
-      for (const row of schematicRows) {
-        if (row.mpn) {
-          schematicMpn.set(row.reference, row.mpn);
-        }
-      }
-      for (const row of bomRows) {
-        if (!row.mpn || row.dnp) continue;
-        const schemMpn = schematicMpn.get(row.reference);
-        if (schemMpn && schemMpn.toLowerCase() !== row.mpn.toLowerCase()) {
-          findings.push(
-            finding(context5, {
-              ruleId: "bom.identity-conflicts",
-              severity: configuredSeverity(context5, "bom.identity-conflicts", "high"),
-              message: `${row.reference} has MPN "${row.mpn}" in the BOM but "${schemMpn}" in the schematic.`,
-              path: row.sourcePath,
-              kind: "bom",
-              line: row.line,
-              details: {
-                reference: row.reference,
-                conflictType: "bom-schematic",
-                bomMpn: row.mpn,
-                schematicMpn: schemMpn
-              }
-            })
-          );
-        }
-      }
-    }
-    return findings;
+    return [
+      ...checkBomInternalConflicts(context5, bomRows),
+      ...checkBomSchematicConflicts(context5, bomRows, schematicRows)
+    ];
   }
 );
+function checkBomInternalConflicts(context5, bomRows) {
+  const findings = [];
+  const bomByRef = /* @__PURE__ */ new Map();
+  for (const row of bomRows) {
+    if (!row.reference || row.dnp) continue;
+    const existing = bomByRef.get(row.reference) ?? [];
+    existing.push({ mpn: row.mpn ?? "", line: row.line, path: row.sourcePath });
+    bomByRef.set(row.reference, existing);
+  }
+  for (const [reference, entries] of bomByRef) {
+    const uniqueMpns = new Set(entries.map((entry) => entry.mpn.toLowerCase()));
+    if (uniqueMpns.size > 1) {
+      const first = entries[0];
+      findings.push(
+        finding(context5, {
+          ruleId: "bom.identity-conflicts",
+          severity: configuredSeverity(context5, "bom.identity-conflicts", "high"),
+          message: `${reference} appears ${entries.length} times in the BOM with conflicting MPNs: ${[...uniqueMpns].join(", ")}.`,
+          path: first?.path ?? "",
+          kind: "bom",
+          line: first?.line,
+          details: {
+            reference,
+            conflictType: "within-bom",
+            mpns: [...uniqueMpns]
+          }
+        })
+      );
+    }
+  }
+  return findings;
+}
+function checkBomSchematicConflicts(context5, bomRows, schematicRows) {
+  if (bomRows.length === 0 || schematicRows.length === 0) {
+    return [];
+  }
+  const findings = [];
+  const schematicMpn = /* @__PURE__ */ new Map();
+  for (const row of schematicRows) {
+    if (row.mpn) {
+      schematicMpn.set(row.reference, row.mpn);
+    }
+  }
+  for (const row of bomRows) {
+    if (!row.mpn || row.dnp) continue;
+    const schemMpn = schematicMpn.get(row.reference);
+    if (schemMpn && schemMpn.toLowerCase() !== row.mpn.toLowerCase()) {
+      findings.push(
+        finding(context5, {
+          ruleId: "bom.identity-conflicts",
+          severity: configuredSeverity(context5, "bom.identity-conflicts", "high"),
+          message: `${row.reference} has MPN "${row.mpn}" in the BOM but "${schemMpn}" in the schematic.`,
+          path: row.sourcePath,
+          kind: "bom",
+          line: row.line,
+          details: {
+            reference: row.reference,
+            conflictType: "bom-schematic",
+            bomMpn: row.mpn,
+            schematicMpn: schemMpn
+          }
+        })
+      );
+    }
+  }
+  return findings;
+}
 
 // src/rules/bom/lifecycle.ts
 var import_promises4 = __toESM(require("node:fs/promises"), 1);
@@ -83707,55 +83721,58 @@ var variantConsistencyRule = rule(
     }
     const output = [];
     for (const project of context5.projects) {
-      const projectConfig = context5.config.projects?.find((candidate) => {
-        const candidateRoot = import_node_path9.default.resolve(context5.root, candidate.path);
-        const projectRoot = import_node_path9.default.resolve(context5.root, project.root);
-        return candidateRoot === projectRoot;
-      });
-      let configuredVariants = (projectConfig?.variants ?? []).filter(
-        (variant) => !context5.options.variant || variant.name === context5.options.variant
-      );
-      if (configuredVariants.length === 0 && context5.options.variant && context5.options.bom && context5.options.bom !== "auto") {
-        configuredVariants = [{ name: context5.options.variant, bom: context5.options.bom }];
-      }
-      if (configuredVariants.length === 0) {
-        continue;
-      }
-      const parsedVariants = parseVariants(
-        await readDesignFile(import_node_path9.default.resolve(context5.root, project.projectFile)) ?? ""
-      );
-      for (const configuredVariant of configuredVariants) {
-        const parsedVariant = parsedVariants.find((variant) => variant.name === configuredVariant.name);
-        if (!parsedVariant || !configuredVariant.bom) {
-          continue;
-        }
-        const rows = await loadBom(import_node_path9.default.resolve(context5.root, configuredVariant.bom));
-        const activeDnp = new Set(
-          activeVariantDnpRefs(
-            parsedVariant,
-            rows.map((row) => row.reference)
-          )
-        );
-        for (const row of rows) {
-          if (!row.dnp && activeDnp.has(row.reference)) {
-            output.push(
-              finding(context5, {
-                ruleId: "bom.variant-consistency",
-                severity: configuredSeverity(context5, "bom.variant-consistency", "high"),
-                message: `${row.reference} is DNP in variant ${configuredVariant.name} but appears populated in its BOM.`,
-                path: row.sourcePath,
-                kind: "bom",
-                line: row.line,
-                details: { variant: configuredVariant.name, reference: row.reference }
-              })
-            );
-          }
-        }
-      }
+      output.push(...await checkProjectVariants(context5, project));
     }
     return output;
   }
 );
+async function checkProjectVariants(context5, project) {
+  const output = [];
+  const projectConfig = context5.config.projects?.find((candidate) => {
+    const candidateRoot = import_node_path9.default.resolve(context5.root, candidate.path);
+    const projectRoot = import_node_path9.default.resolve(context5.root, project.root);
+    return candidateRoot === projectRoot;
+  });
+  let configuredVariants = (projectConfig?.variants ?? []).filter(
+    (variant) => !context5.options.variant || variant.name === context5.options.variant
+  );
+  if (configuredVariants.length === 0 && context5.options.variant && context5.options.bom && context5.options.bom !== "auto") {
+    configuredVariants = [{ name: context5.options.variant, bom: context5.options.bom }];
+  }
+  if (configuredVariants.length === 0) {
+    return [];
+  }
+  const parsedVariants = parseVariants(await readDesignFile(import_node_path9.default.resolve(context5.root, project.projectFile)) ?? "");
+  for (const configuredVariant of configuredVariants) {
+    const parsedVariant = parsedVariants.find((variant) => variant.name === configuredVariant.name);
+    if (!parsedVariant || !configuredVariant.bom) {
+      continue;
+    }
+    const rows = await loadBom(import_node_path9.default.resolve(context5.root, configuredVariant.bom));
+    const activeDnp = new Set(
+      activeVariantDnpRefs(
+        parsedVariant,
+        rows.map((row) => row.reference)
+      )
+    );
+    for (const row of rows) {
+      if (!row.dnp && activeDnp.has(row.reference)) {
+        output.push(
+          finding(context5, {
+            ruleId: "bom.variant-consistency",
+            severity: configuredSeverity(context5, "bom.variant-consistency", "high"),
+            message: `${row.reference} is DNP in variant ${configuredVariant.name} but appears populated in its BOM.`,
+            path: row.sourcePath,
+            kind: "bom",
+            line: row.line,
+            details: { variant: configuredVariant.name, reference: row.reference }
+          })
+        );
+      }
+    }
+  }
+  return output;
+}
 
 // src/rules/design/board-outline.ts
 var import_node_path10 = __toESM(require("node:path"), 1);
@@ -83820,32 +83837,37 @@ var copperBalanceRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path11.default.resolve(context5.root, board));
-        if (!parsed.boardArea || parsed.boardArea <= 0) {
-          continue;
-        }
-        const layers = parsed.copperLayers.length > 0 ? parsed.copperLayers : [...parsed.copperAreas.keys()];
-        for (const layer of layers) {
-          const area = parsed.copperAreas.get(layer) ?? 0;
-          const coveragePercent = area / parsed.boardArea * 100;
-          if (coveragePercent < minimum) {
-            output.push(
-              finding(context5, {
-                ruleId: "design.copper-balance",
-                severity: configuredSeverity(context5, "design.copper-balance", "low"),
-                message: `${layer} copper coverage is ${coveragePercent.toFixed(1)}%, below ${minimum}%.`,
-                path: board,
-                kind: "pcb",
-                details: { layer, coveragePercent, minimum }
-              })
-            );
-          }
-        }
+        output.push(...await checkBoardCopperBalance(context5, board, minimum));
       }
     }
     return output;
   }
 );
+async function checkBoardCopperBalance(context5, board, minimum) {
+  const output = [];
+  const parsed = await parsePcb(import_node_path11.default.resolve(context5.root, board));
+  if (!parsed.boardArea || parsed.boardArea <= 0) {
+    return [];
+  }
+  const layers = parsed.copperLayers.length > 0 ? parsed.copperLayers : [...parsed.copperAreas.keys()];
+  for (const layer of layers) {
+    const area = parsed.copperAreas.get(layer) ?? 0;
+    const coveragePercent = area / parsed.boardArea * 100;
+    if (coveragePercent < minimum) {
+      output.push(
+        finding(context5, {
+          ruleId: "design.copper-balance",
+          severity: configuredSeverity(context5, "design.copper-balance", "low"),
+          message: `${layer} copper coverage is ${coveragePercent.toFixed(1)}%, below ${minimum}%.`,
+          path: board,
+          kind: "pcb",
+          details: { layer, coveragePercent, minimum }
+        })
+      );
+    }
+  }
+  return output;
+}
 
 // src/rules/design/unique-references.ts
 var import_node_path12 = __toESM(require("node:path"), 1);
@@ -83872,34 +83894,39 @@ var uniqueReferencesRule = rule(
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path12.default.resolve(context5.root, board));
-        const counts = /* @__PURE__ */ new Map();
-        for (const footprint of parsed.footprints) {
-          if (refIgnored(footprint.reference, config2["ignore-refs"])) {
-            continue;
-          }
-          const key = footprint.reference.toUpperCase();
-          counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-        for (const [reference, count] of [...counts].sort((left, right) => left[0].localeCompare(right[0]))) {
-          if (count > 1) {
-            output.push(
-              finding(context5, {
-                ruleId: "design.unique-references",
-                severity: configuredSeverity(context5, "design.unique-references", "high"),
-                message: `Reference designator ${reference} is used ${count} times; designators must be unique.`,
-                path: board,
-                kind: "pcb",
-                details: { reference, count }
-              })
-            );
-          }
-        }
+        output.push(...await checkBoardUniqueReferences(context5, board, config2));
       }
     }
     return output;
   }
 );
+async function checkBoardUniqueReferences(context5, board, config2) {
+  const output = [];
+  const parsed = await parsePcb(import_node_path12.default.resolve(context5.root, board));
+  const counts = /* @__PURE__ */ new Map();
+  for (const footprint of parsed.footprints) {
+    if (refIgnored(footprint.reference, config2["ignore-refs"])) {
+      continue;
+    }
+    const key = footprint.reference.toUpperCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  for (const [reference, count] of [...counts].sort((left, right) => left[0].localeCompare(right[0]))) {
+    if (count > 1) {
+      output.push(
+        finding(context5, {
+          ruleId: "design.unique-references",
+          severity: configuredSeverity(context5, "design.unique-references", "high"),
+          message: `Reference designator ${reference} is used ${count} times; designators must be unique.`,
+          path: board,
+          kind: "pcb",
+          details: { reference, count }
+        })
+      );
+    }
+  }
+  return output;
+}
 
 // src/rules/kicad-report.ts
 var import_node_path15 = __toESM(require("node:path"), 1);
@@ -83967,10 +83994,10 @@ function runProcess(command, args, options = {}) {
 }
 function trustedCmdExe() {
   const systemRoot = process.env.SystemRoot;
-  if (systemRoot && /^[A-Za-z]:\\Windows$/i.test(systemRoot)) {
+  if (systemRoot && /^[a-z]:\\Windows$/i.test(systemRoot)) {
     return (0, import_node_path13.join)(systemRoot, "System32", "cmd.exe");
   }
-  return "C:\\Windows\\System32\\cmd.exe";
+  return String.raw`C:\Windows\System32\cmd.exe`;
 }
 function buildCmdLine(command, args) {
   return [quoteCmdToken(command), ...args.map(quoteCmdToken)].join(" ");
@@ -83980,7 +84007,7 @@ function quoteCmdToken(value) {
     return '""';
   }
   const sanitized = value.replace(/[\r\n]/g, "");
-  return `"${sanitized.replace(/"/g, '""')}"`;
+  return `"${sanitized.replaceAll('"', '""')}"`;
 }
 function appendBounded(current, next, limit) {
   if (current.length >= limit) {
@@ -98744,41 +98771,42 @@ async function runKicadReportRule(context5, options) {
   for (const project of context5.projects) {
     for (const designFile of options.files(project)) {
       const absoluteFile = import_node_path15.default.resolve(context5.root, designFile);
-      const result = await runKicadReport(cli.path, options.command, absoluteFile, {
-        ...context5.options.variant ? { variant: context5.options.variant } : {},
-        ...cli.version ? { version: cli.version } : {}
-      });
-      for (const diagnostic of result.diagnostics) {
-        const severity = options.severity(
-          context5,
-          diagnostic.ruleId,
-          kicadSeverityToFindingSeverity(diagnostic.severity)
-        );
-        output.push(
-          finding(context5, {
-            ruleId: `${options.command}.${diagnostic.ruleId ?? "violation"}`,
-            severity,
-            message: diagnostic.message,
-            path: diagnostic.file ?? absoluteFile,
-            kind: options.resourceKind,
-            line: diagnostic.line,
-            column: diagnostic.column,
-            details: diagnostic.raw
-          })
-        );
-      }
-      if (result.status === "failed" && result.diagnostics.length === 0 && result.error) {
-        output.push(
-          finding(context5, {
-            ruleId: options.groupRuleId,
-            severity: configuredSeverity(context5, options.groupRuleId, "high"),
-            message: result.error,
-            path: absoluteFile,
-            kind: options.resourceKind
-          })
-        );
-      }
+      output.push(...await processDesignFileReport(context5, cli.path, cli.version, options, absoluteFile));
     }
+  }
+  return output;
+}
+async function processDesignFileReport(context5, cliPath, cliVersion, options, absoluteFile) {
+  const output = [];
+  const result = await runKicadReport(cliPath, options.command, absoluteFile, {
+    ...context5.options.variant ? { variant: context5.options.variant } : {},
+    ...cliVersion ? { version: cliVersion } : {}
+  });
+  for (const diagnostic of result.diagnostics) {
+    const severity = options.severity(context5, diagnostic.ruleId, kicadSeverityToFindingSeverity(diagnostic.severity));
+    output.push(
+      finding(context5, {
+        ruleId: `${options.command}.${diagnostic.ruleId ?? "violation"}`,
+        severity,
+        message: diagnostic.message,
+        path: diagnostic.file ?? absoluteFile,
+        kind: options.resourceKind,
+        line: diagnostic.line,
+        column: diagnostic.column,
+        details: diagnostic.raw
+      })
+    );
+  }
+  if (result.status === "failed" && result.diagnostics.length === 0 && result.error) {
+    output.push(
+      finding(context5, {
+        ruleId: options.groupRuleId,
+        severity: configuredSeverity(context5, options.groupRuleId, "high"),
+        message: result.error,
+        path: absoluteFile,
+        kind: options.resourceKind
+      })
+    );
   }
   return output;
 }
@@ -98900,7 +98928,6 @@ function compareFirmwareContract(pins, hardwareBySignal) {
 }
 
 // src/firmware/arduino.ts
-var DEFINE_PATTERN = /^\s*#\s*define\s+([A-Za-z_]\w*)\s+([^\s/]+)\s*(?:\/\/\s*(.*))?$/;
 async function loadArduinoPinContract(file2) {
   let text;
   try {
@@ -98910,18 +98937,14 @@ async function loadArduinoPinContract(file2) {
   }
   const pins = [];
   for (const line of text.split(/\r?\n/)) {
-    const match = DEFINE_PATTERN.exec(line);
-    if (!match) {
+    const parsed = parseDefineLine(line);
+    if (!parsed || !parsed.signal || !parsed.hardware) {
       continue;
     }
-    const [, signal, hardware, comment] = match;
-    if (!signal || !hardware) {
-      continue;
-    }
-    const meta3 = parseMeta(comment ?? "");
+    const meta3 = parseMeta(parsed.comment);
     pins.push({
-      signal,
-      hardware: normalizeHardwareKey(hardware),
+      signal: parsed.signal,
+      hardware: normalizeHardwareKey(parsed.hardware),
       ...meta3.net ? { net: meta3.net } : {},
       ...meta3.pin ? { pin: meta3.pin } : {},
       ...meta3.environment ? { environment: meta3.environment } : {}
@@ -98931,6 +98954,18 @@ async function loadArduinoPinContract(file2) {
     return { errors: ["Arduino pin header has no #define pin assignments"] };
   }
   return { document: { version: 1, pins }, errors: [] };
+}
+function parseDefineLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("#")) {
+    return null;
+  }
+  const [code, ...commentParts] = trimmed.split("//");
+  const match = /^#\s*define\s+([A-Za-z_]\w*)\s+(\S+)/.exec(code?.trim() ?? "");
+  if (!match || !match[1] || !match[2]) {
+    return null;
+  }
+  return { signal: match[1], hardware: match[2], comment: commentParts.join("//").trim() };
 }
 var arduinoAdapter = {
   id: "arduino",
@@ -99027,40 +99062,7 @@ async function buildSchematicNetGraph(rootFiles) {
       continue;
     }
     visited.add(file2);
-    const parsed = await parseSchematic(file2);
-    const sheet = {
-      file: file2,
-      parentFile: next.parentFile,
-      sheetName: next.sheetName,
-      sheetPins: [...new Set(next.sheetPins)],
-      localLabels: parsed.localLabels,
-      globalLabels: parsed.globalLabels,
-      hierarchicalLabels: parsed.hierarchicalLabels
-    };
-    sheets.push(sheet);
-    for (const pin of sheet.sheetPins) {
-      if (!sheet.hierarchicalLabels.has(pin)) {
-        unresolvedSheetPins.push({
-          parentFile: next.parentFile ?? file2,
-          childFile: file2,
-          sheetName: next.sheetName,
-          pin
-        });
-      }
-    }
-    for (const reference of parsed.sheetReferences) {
-      const resolvedPath = import_node_path16.default.resolve(import_node_path16.default.dirname(file2), reference.fileName);
-      if (!await fileExists(resolvedPath)) {
-        missingSheets.push(missingSheet(file2, reference, resolvedPath));
-        continue;
-      }
-      queue.push({
-        file: resolvedPath,
-        parentFile: file2,
-        sheetName: reference.sheetName,
-        sheetPins: reference.pins
-      });
-    }
+    await processSheetQueueItem(file2, next, sheets, missingSheets, unresolvedSheetPins, queue);
   }
   const rootSet = new Set(normalizedRoots);
   const visibleNetLabels = /* @__PURE__ */ new Set();
@@ -99081,6 +99083,42 @@ async function buildSchematicNetGraph(rootFiles) {
     }
   }
   return { rootFiles: normalizedRoots, sheets, visibleNetLabels, allNetLabels, missingSheets, unresolvedSheetPins };
+}
+async function processSheetQueueItem(file2, next, sheets, missingSheets, unresolvedSheetPins, queue) {
+  const parsed = await parseSchematic(file2);
+  const sheet = {
+    file: file2,
+    parentFile: next.parentFile,
+    sheetName: next.sheetName,
+    sheetPins: [...new Set(next.sheetPins)],
+    localLabels: parsed.localLabels,
+    globalLabels: parsed.globalLabels,
+    hierarchicalLabels: parsed.hierarchicalLabels
+  };
+  sheets.push(sheet);
+  for (const pin of sheet.sheetPins) {
+    if (!sheet.hierarchicalLabels.has(pin)) {
+      unresolvedSheetPins.push({
+        parentFile: next.parentFile ?? file2,
+        childFile: file2,
+        sheetName: next.sheetName,
+        pin
+      });
+    }
+  }
+  for (const reference of parsed.sheetReferences) {
+    const resolvedPath = import_node_path16.default.resolve(import_node_path16.default.dirname(file2), reference.fileName);
+    if (!await fileExists(resolvedPath)) {
+      missingSheets.push(missingSheet(file2, reference, resolvedPath));
+      continue;
+    }
+    queue.push({
+      file: resolvedPath,
+      parentFile: file2,
+      sheetName: reference.sheetName,
+      sheetPins: reference.pins
+    });
+  }
 }
 function missingSheet(parentFile, reference, resolvedPath) {
   const result = { parentFile, fileName: reference.fileName, resolvedPath };
@@ -99193,11 +99231,12 @@ async function runFirmwareContractRule(context5, options) {
     );
   }
   for (const { assignment, hardware } of comparison.mismatches) {
+    const netSuffix = assignment.net ? ` / ${assignment.net}` : "";
     output.push(
       finding(context5, {
         ruleId: ruleId6,
         severity,
-        message: `Firmware signal ${assignment.signal} maps to ${assignment.hardware}${assignment.net ? ` / ${assignment.net}` : ""}, but hardware pinmap expects ${hardware.hardware} / ${hardware.net}.`,
+        message: `Firmware signal ${assignment.signal} maps to ${assignment.hardware}${netSuffix}, but hardware pinmap expects ${hardware.hardware} / ${hardware.net}.`,
         path: contractPath,
         kind: "firmware",
         line: 1,
@@ -99392,7 +99431,7 @@ var import_node_path22 = __toESM(require("node:path"), 1);
 
 // src/firmware/stm32cubemx.ts
 var import_promises10 = __toESM(require("node:fs/promises"), 1);
-var IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.([\w_]+)=(.+)$/;
+var IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.(\w+)=(.+)$/;
 async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   let text;
   try {
@@ -99400,6 +99439,24 @@ async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   } catch (error52) {
     return { errors: [error52 instanceof Error ? error52.message : "STM32CubeMX .ioc file could not be loaded"] };
   }
+  const { pinLabels, pinNets } = parseIocLines(text);
+  if (pinLabels.size === 0) {
+    return {
+      errors: ["STM32CubeMX .ioc file has no GPIO_Label entries; add labels in the Pinout view to map signals"]
+    };
+  }
+  const pins = [];
+  for (const [pinId, label] of pinLabels) {
+    const net2 = pinNets.get(pinId);
+    pins.push({
+      signal: label,
+      hardware: normalizeHardwareKey(`${mcuDesignator}.${pinId}`),
+      ...net2 ? { net: net2 } : {}
+    });
+  }
+  return { document: { version: 1, pins }, errors: [] };
+}
+function parseIocLines(text) {
   const pinLabels = /* @__PURE__ */ new Map();
   const pinNets = /* @__PURE__ */ new Map();
   for (const line of text.split(/\r?\n/)) {
@@ -99417,21 +99474,7 @@ async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
       pinNets.set(pinId, value.trim());
     }
   }
-  if (pinLabels.size === 0) {
-    return {
-      errors: ["STM32CubeMX .ioc file has no GPIO_Label entries; add labels in the Pinout view to map signals"]
-    };
-  }
-  const pins = [];
-  for (const [pinId, label] of pinLabels) {
-    const net2 = pinNets.get(pinId);
-    pins.push({
-      signal: label,
-      hardware: normalizeHardwareKey(`${mcuDesignator}.${pinId}`),
-      ...net2 ? { net: net2 } : {}
-    });
-  }
-  return { document: { version: 1, pins }, errors: [] };
+  return { pinLabels, pinNets };
 }
 var stm32CubeMxAdapter = {
   id: "stm32cubemx",
@@ -99582,7 +99625,7 @@ function projectOutputSearchRoots(context5) {
 }
 function normalizedSearchRoots(searchRoots) {
   const roots = searchRoots.length > 0 ? searchRoots : ["."];
-  return [...new Set(roots.map((entry) => entry === "." ? "." : entry.replace(/\\/g, "/")))];
+  return [...new Set(roots.map((entry) => entry === "." ? "." : entry.replaceAll("\\", "/")))];
 }
 function defaultPositionPatterns() {
   return ["**/*.pos", "**/*pos*.csv", "**/*position*.csv", "**/*positions*.csv", "**/*cpl*.csv", "**/*centroid*.csv"];
@@ -99881,7 +99924,7 @@ var jobsetOutputsRule = rule(
       for (const jobset of project.jobsetFiles) {
         const parsed = await parseJobset(import_node_path28.default.resolve(context5.root, jobset));
         for (const job of parsed.jobs.filter((entry) => entry.enabled)) {
-          const outputPath = (job.destinationPath ? import_node_path28.default.join(job.destinationPath, job.outputPath) : job.outputPath).replace(/\\/g, "/");
+          const outputPath = (job.destinationPath ? import_node_path28.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
           const absoluteOutput = import_node_path28.default.resolve(context5.root, project.root, outputPath);
           if (!await pathExists(absoluteOutput)) {
             output.push(
@@ -101361,7 +101404,7 @@ var revisionSetRule = rule(
     }
     const output = [];
     const config2 = configFor(context5, "release.revision-set");
-    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : "^v?\\d+\\.\\d+(?:\\.\\d+)?$";
+    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : String.raw`^v?\d+\.\d+(?:\.\d+)?$`;
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
@@ -101456,7 +101499,8 @@ var versionFormatRule = rule(
     if (!shouldRun(context5, "release.version-format")) {
       return [];
     }
-    const pattern = String(configFor(context5, "release.version-format").pattern ?? "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$");
+    const rawPattern = configFor(context5, "release.version-format").pattern;
+    const pattern = typeof rawPattern === "string" ? rawPattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
     const regex = compilePattern(pattern);
     if (!regex) {
       return [
@@ -101592,8 +101636,8 @@ async function captureFabricationSnapshot(root, projects, options, config2) {
     ].filter((entry) => Boolean(entry))
   );
   return {
-    bom: snapshotBom.sort(compareSnapshotBomRows),
-    outputs: outputs.sort((a, b) => a.kind.localeCompare(b.kind))
+    bom: snapshotBom.toSorted(compareSnapshotBomRows),
+    outputs: outputs.toSorted((a, b) => a.kind.localeCompare(b.kind))
   };
 }
 async function resolveBomPaths(root, options, config2) {
@@ -101795,7 +101839,8 @@ var import_node_path39 = __toESM(require("node:path"), 1);
 async function discoverProjects(root, explicitProject) {
   const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path39.default.resolve(file2));
   const contexts = [];
-  for (const projectFile of projectFiles.sort()) {
+  const projectFilesSorted = projectFiles.toSorted((a, b) => a.localeCompare(b));
+  for (const projectFile of projectFilesSorted) {
     contexts.push(await projectContext(root, projectFile));
   }
   return contexts;
@@ -101818,8 +101863,8 @@ async function projectContext(root, projectFile) {
   const entries = await safeReadDir(projectRoot);
   const schematicFiles = entries.filter(
     (file2) => file2.endsWith(".kicad_sch") && (import_node_path39.default.basename(file2, ".kicad_sch") === base || entries.length === 1)
-  ).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort();
-  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path39.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort();
+  ).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort((a, b) => a.localeCompare(b));
+  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path39.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort((a, b) => a.localeCompare(b));
   const jobsetFiles = await discoverJobsets(projectRoot);
   return {
     projectFile: normalizeRelative(root, projectFile),
@@ -102368,23 +102413,12 @@ function clampScore(value) {
 }
 function computeReadiness(input) {
   const isProduction = input.releaseMode === "production";
-  const required2 = [...new Set(input.requiredOutputs)].sort();
-  const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required2.includes(output)).sort();
+  const required2 = [...new Set(input.requiredOutputs)].sort((a, b) => a.localeCompare(b));
+  const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required2.includes(output)).sort((a, b) => a.localeCompare(b));
   const missingRequired = required2.filter((output) => !input.presentOutputs.has(output));
   const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
   const expiredWaivers = input.expiredWaivers ?? 0;
-  let blocking = 0;
-  let nonBlocking = 0;
-  for (const finding2 of input.findings) {
-    if (finding2.suppressed || finding2.severity === "info") {
-      continue;
-    }
-    if (isBlocking(finding2, input.failOn)) {
-      blocking += 1;
-    } else {
-      nonBlocking += 1;
-    }
-  }
+  const { blocking, nonBlocking } = countFindings(input.findings, input.failOn);
   const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
   const score = clampScore(
     100 - missingRequired.length * REQUIRED_PENALTY - missingRecommended.length * RECOMMENDED_PENALTY - blocking * BLOCKING_PENALTY - nonBlocking * NON_BLOCKING_PENALTY - productionBlockers * REQUIRED_PENALTY
@@ -102402,23 +102436,13 @@ function computeReadiness(input) {
       present: input.presentOutputs.has(output)
     }))
   ].sort((left, right) => left.output.localeCompare(right.output));
-  const warnings = [];
-  for (const output of missingRequired) {
-    warnings.push(`Required output ${output} is missing.`);
-  }
-  for (const output of missingRecommended) {
-    if (isProduction) {
-      warnings.push(`Recommended output ${output} is required in production mode.`);
-    } else {
-      warnings.push(`Recommended output ${output} is missing.`);
-    }
-  }
-  if (blocking > 0) {
-    warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
-  }
-  if (isProduction && expiredWaivers > 0) {
-    warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
-  }
+  const warnings = buildWarnings({
+    missingRequired,
+    missingRecommended,
+    blocking,
+    isProduction,
+    expiredWaivers
+  });
   return {
     profile: input.profile,
     score,
@@ -102430,6 +102454,41 @@ function computeReadiness(input) {
     missingRecommended,
     warnings
   };
+}
+function countFindings(findings, failOn) {
+  let blocking = 0;
+  let nonBlocking = 0;
+  for (const finding2 of findings) {
+    if (finding2.suppressed || finding2.severity === "info") {
+      continue;
+    }
+    if (isBlocking(finding2, failOn)) {
+      blocking += 1;
+    } else {
+      nonBlocking += 1;
+    }
+  }
+  return { blocking, nonBlocking };
+}
+function buildWarnings(params) {
+  const warnings = [];
+  for (const output of params.missingRequired) {
+    warnings.push(`Required output ${output} is missing.`);
+  }
+  for (const output of params.missingRecommended) {
+    if (params.isProduction) {
+      warnings.push(`Recommended output ${output} is required in production mode.`);
+    } else {
+      warnings.push(`Recommended output ${output} is missing.`);
+    }
+  }
+  if (params.blocking > 0) {
+    warnings.push(`${params.blocking} blocking finding(s) must be resolved before release.`);
+  }
+  if (params.isProduction && params.expiredWaivers > 0) {
+    warnings.push(`${params.expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
+  }
+  return warnings;
 }
 
 // src/core/suppressions.ts
@@ -102563,17 +102622,17 @@ async function runPipeline(input = {}, logger7) {
     findings,
     projects
   );
-  const result = assembleRunResult(
+  const result = assembleRunResult({
     ctx,
     effectiveFindings,
     fabrication,
     readiness,
-    summary2,
+    summary: summary2,
     waiverResult,
     policy,
     pluginLoad,
     projects
-  );
+  });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
   ctx.logger.debug("pipeline.finish", {
     latency_ms: Math.round(performance.now() - pipelineStart),
@@ -102594,7 +102653,13 @@ async function initializePipelineContext(input, logger7) {
   }
   const config2 = gate ? applyGateRequirements(loadedConfig, gate) : loadedConfig;
   const options = normalizeOptions(cwd, root, config2, input, gate, missingExplicitGate ? "critical" : void 0);
-  const activeLogger = logger7 ?? createLogger(options.quiet ? "silent" : options.verbose ? "debug" : "info");
+  let logLevel = "info";
+  if (options.quiet) {
+    logLevel = "silent";
+  } else if (options.verbose) {
+    logLevel = "debug";
+  }
+  const activeLogger = logger7 ?? createLogger(logLevel);
   return {
     cwd,
     root,
@@ -102617,15 +102682,14 @@ async function discoverPhase(ctx) {
   };
 }
 async function validatePhase(ctx, loadedWithPluginErrors, projects) {
-  const findings = [];
-  findings.push(
+  const findings = [
     ...configFindings(
       ctx.root,
       loadedWithPluginErrors,
       ctx.missingExplicitGate ? /* @__PURE__ */ new Set([ctx.missingExplicitGate]) : void 0
-    )
-  );
-  findings.push(...projectShapeFindings(projects));
+    ),
+    ...projectShapeFindings(projects)
+  ];
   const activeRules = listRules().filter((rule2) => {
     if (ctx.options.rules.length > 0 && !ctx.options.rules.includes(rule2.meta.id)) {
       return false;
@@ -102717,7 +102781,17 @@ async function postProcessPhase(ctx, findings, projects) {
     policy
   };
 }
-function assembleRunResult(ctx, effectiveFindings, fabrication, readiness, summary2, waiverResult, policy, pluginLoad, projects) {
+function assembleRunResult({
+  ctx,
+  effectiveFindings,
+  fabrication,
+  readiness,
+  summary: summary2,
+  waiverResult,
+  policy,
+  pluginLoad,
+  projects
+}) {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   const releaseMode = ctx.options.releaseMode;
   return {
@@ -102870,8 +102944,9 @@ function enableRule(ruleConfig2) {
   };
 }
 function ruleObjectConfig(ruleConfig2) {
-  return typeof ruleConfig2 === "object" && ruleConfig2 !== null ? ruleConfig2 : {};
+  return typeof ruleConfig2 === "object" && ruleConfig2 !== null ? ruleConfig2 : emptyObj;
 }
+var emptyObj = Object.freeze({});
 function configForProject(root, config2, project) {
   const override = config2.projects?.find((candidate) => {
     const target = import_node_path41.default.resolve(root, normalizePathInput(candidate.path));
@@ -102894,42 +102969,46 @@ function configForProject(root, config2, project) {
     projectConfig.releaseMode = override.releaseMode;
   }
   if (override.firmware) {
+    const cf = config2.firmware;
+    const of = override.firmware;
     projectConfig.firmware = {
-      ...config2.firmware ?? {},
-      ...override.firmware,
+      ...cf ?? emptyObj,
+      ...of,
       platformio: {
-        ...config2.firmware?.platformio ?? {},
-        ...override.firmware.platformio ?? {}
+        ...cf?.platformio ?? emptyObj,
+        ...of.platformio ?? emptyObj
       },
       arduino: {
-        ...config2.firmware?.arduino ?? {},
-        ...override.firmware.arduino ?? {}
+        ...cf?.arduino ?? emptyObj,
+        ...of.arduino ?? emptyObj
       },
       zephyr: {
-        ...config2.firmware?.zephyr ?? {},
-        ...override.firmware.zephyr ?? {}
+        ...cf?.zephyr ?? emptyObj,
+        ...of.zephyr ?? emptyObj
       },
       "esp-idf": {
-        ...config2.firmware?.["esp-idf"] ?? {},
-        ...override.firmware["esp-idf"] ?? {}
+        ...cf?.["esp-idf"] ?? emptyObj,
+        ...of["esp-idf"] ?? emptyObj
       },
       stm32cubemx: {
-        ...config2.firmware?.stm32cubemx ?? {},
-        ...override.firmware.stm32cubemx ?? {}
+        ...cf?.stm32cubemx ?? emptyObj,
+        ...of.stm32cubemx ?? emptyObj
       }
     };
   }
   if (override.vendor) {
+    const cv = config2.vendor;
+    const ov = override.vendor;
     projectConfig.vendor = {
-      ...config2.vendor ?? {},
-      ...override.vendor,
+      ...cv ?? emptyObj,
+      ...ov,
       board: {
-        ...config2.vendor?.board ?? {},
-        ...override.vendor.board ?? {}
+        ...cv?.board ?? emptyObj,
+        ...ov.board ?? emptyObj
       },
       assembly: {
-        ...config2.vendor?.assembly ?? {},
-        ...override.vendor.assembly ?? {}
+        ...cv?.assembly ?? emptyObj,
+        ...ov.assembly ?? emptyObj
       }
     };
   }
@@ -102939,7 +103018,7 @@ function configForProject(root, config2, project) {
   return projectConfig;
 }
 function mergeRules(rules, overrides) {
-  const merged = { ...rules ?? {} };
+  const merged = { ...rules ?? emptyObj };
   for (const [id, override] of Object.entries(overrides)) {
     const current = merged[id];
     merged[id] = isRuleConfig(current) && isRuleConfig(override) ? {
@@ -102959,7 +103038,7 @@ function configFindings(root, loaded, criticalErrors = /* @__PURE__ */ new Set()
       severity: criticalErrors.has(error52) ? "critical" : "high",
       message: `Configuration is invalid: ${error52}`,
       resource: {
-        path: loaded.path ? import_node_path41.default.relative(root, loaded.path).replace(/\\/g, "/") : "boardreadyops.yml",
+        path: loaded.path ? import_node_path41.default.relative(root, loaded.path).replaceAll("\\", "/") : "boardreadyops.yml",
         kind: "manifest"
       },
       location: { line: 1, column: 1 },
@@ -103031,7 +103110,7 @@ function projectShapeFindings(projects) {
 
 // src/report/annotations.ts
 function formatAnnotation(finding2) {
-  const command = finding2.severity === "critical" || finding2.severity === "high" ? "error" : finding2.severity === "medium" || finding2.severity === "low" ? "warning" : "notice";
+  const command = severityToAnnotationCommand(finding2.severity);
   const params = [
     `file=${escapeProperty2(finding2.resource.path)}`,
     finding2.location?.line ? `line=${finding2.location.line}` : void 0,
@@ -103040,6 +103119,15 @@ function formatAnnotation(finding2) {
   ].filter(Boolean);
   return `::${command} ${params.join(",")}::${escapeData2(finding2.message)}`;
 }
+function severityToAnnotationCommand(severity) {
+  if (severity === "critical" || severity === "high") {
+    return "error";
+  }
+  if (severity === "medium" || severity === "low") {
+    return "warning";
+  }
+  return "notice";
+}
 function emitAnnotations(findings, stream4 = process.stdout) {
   for (const finding2 of findings) {
     stream4.write(`${formatAnnotation(finding2)}
@@ -103047,10 +103135,10 @@ function emitAnnotations(findings, stream4 = process.stdout) {
   }
 }
 function escapeData2(value) {
-  return value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  return value.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A");
 }
 function escapeProperty2(value) {
-  return escapeData2(value).replace(/:/g, "%3A").replace(/,/g, "%2C");
+  return escapeData2(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
 }
 
 // src/report/hbom.ts
@@ -103875,7 +103963,8 @@ function reportLocation(finding2) {
   const base = finding2.resource.path;
   if (finding2.location?.region) {
     const region = finding2.location.region;
-    const start = `:${region.startLine}${region.startColumn ? `:${region.startColumn}` : ""}`;
+    const colSuffix = region.startColumn ? `:${region.startColumn}` : "";
+    const start = `:${region.startLine}${colSuffix}`;
     const end = region.endLine !== region.startLine ? `-${region.endLine}` : "";
     return `${base}${start}${end}`;
   }
@@ -103907,7 +103996,7 @@ function reportCoordinate(value) {
   if (Number.isInteger(value)) {
     return value.toString();
   }
-  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  return value.toFixed(6).replace(/\.?0+$/, "");
 }
 function reportCoordinateWithUnits(value, units) {
   return `${reportCoordinate(value)}${units}`;
@@ -108025,9 +108114,17 @@ function outputStatus(previous, current, changed, added, removed) {
 var SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"];
 var TOP_PER_SEVERITY = 3;
 function formatReviewComment(result, reports = [], locale = "en") {
-  const lines = [stickyMarker, "", "## BoardReadyOps release review", "", decisionLine(result), ""];
-  lines.push(...severityTable(result, locale), "");
-  lines.push(...topFindings2(result, locale));
+  const lines = [
+    stickyMarker,
+    "",
+    "## BoardReadyOps release review",
+    "",
+    decisionLine(result),
+    "",
+    ...severityTable(result, locale),
+    "",
+    ...topFindings2(result, locale)
+  ];
   if (result.bomRisk && result.bomRisk.overallRiskScore > 0) {
     lines.push("", ...bomRiskSection(result.bomRisk));
   }

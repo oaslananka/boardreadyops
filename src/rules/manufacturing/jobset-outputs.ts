@@ -26,7 +26,7 @@ export const jobsetOutputsRule = rule(
         for (const job of parsed.jobs.filter((entry) => entry.enabled)) {
           const outputPath = (
             job.destinationPath ? path.join(job.destinationPath, job.outputPath) : job.outputPath
-          ).replace(/\\/g, "/");
+          ).replaceAll("\\", "/");
           const absoluteOutput = path.resolve(context.root, project.root, outputPath);
           if (!(await pathExists(absoluteOutput))) {
             output.push(

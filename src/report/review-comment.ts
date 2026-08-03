@@ -23,9 +23,17 @@ export function formatReviewComment(
   reports: ReviewReportLink[] = [],
   locale: Locale = "en",
 ): string {
-  const lines: string[] = [stickyMarker, "", "## BoardReadyOps release review", "", decisionLine(result), ""];
-  lines.push(...severityTable(result, locale), "");
-  lines.push(...topFindings(result, locale));
+  const lines: string[] = [
+    stickyMarker,
+    "",
+    "## BoardReadyOps release review",
+    "",
+    decisionLine(result),
+    "",
+    ...severityTable(result, locale),
+    "",
+    ...topFindings(result, locale),
+  ];
   if (result.bomRisk && result.bomRisk.overallRiskScore > 0) {
     lines.push("", ...bomRiskSection(result.bomRisk));
   }

@@ -71,7 +71,7 @@ export async function runPipeline(
   );
 
   // 5. Dispatch Phase
-  const result = assembleRunResult(
+  const result = assembleRunResult({
     ctx,
     effectiveFindings,
     fabrication,
@@ -81,7 +81,7 @@ export async function runPipeline(
     policy,
     pluginLoad,
     projects,
-  );
+  });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
 
   ctx.logger.debug("pipeline.finish", {
@@ -114,7 +114,13 @@ async function initializePipelineContext(
 
   const config = gate ? applyGateRequirements(loadedConfig, gate) : loadedConfig;
   const options = normalizeOptions(cwd, root, config, input, gate, missingExplicitGate ? "critical" : undefined);
-  const activeLogger = logger ?? createLogger(options.quiet ? "silent" : options.verbose ? "debug" : "info");
+  let logLevel: "silent" | "debug" | "info" = "info";
+  if (options.quiet) {
+    logLevel = "silent";
+  } else if (options.verbose) {
+    logLevel = "debug";
+  }
+  const activeLogger = logger ?? createLogger(logLevel);
 
   return {
     cwd,
@@ -148,15 +154,14 @@ async function validatePhase(
   loadedWithPluginErrors: LoadedConfig,
   projects: ProjectContext[],
 ): Promise<Finding[]> {
-  const findings: Finding[] = [];
-  findings.push(
+  const findings: Finding[] = [
     ...configFindings(
       ctx.root,
       loadedWithPluginErrors,
       ctx.missingExplicitGate ? new Set([ctx.missingExplicitGate]) : undefined,
     ),
-  );
-  findings.push(...projectShapeFindings(projects));
+    ...projectShapeFindings(projects),
+  ];
 
   const activeRules = listRules().filter((rule) => {
     if (ctx.options.rules.length > 0 && !ctx.options.rules.includes(rule.meta.id)) {
@@ -258,17 +263,29 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
   };
 }
 
-function assembleRunResult(
-  ctx: PipelineContext,
-  effectiveFindings: Finding[],
-  fabrication: Awaited<ReturnType<typeof captureFabricationSnapshot>>,
-  readiness: ReadinessScore,
-  summary: ReturnType<typeof summarizeFindings>,
-  waiverResult: ReturnType<typeof applyWaivers>,
-  policy: ReturnType<typeof evaluatePolicy> | undefined,
-  pluginLoad: Awaited<ReturnType<typeof loadPlugins>>,
-  projects: ProjectContext[],
-): RunResult {
+interface AssembleRunResultOptions {
+  ctx: PipelineContext;
+  effectiveFindings: Finding[];
+  fabrication: Awaited<ReturnType<typeof captureFabricationSnapshot>>;
+  readiness: ReadinessScore;
+  summary: ReturnType<typeof summarizeFindings>;
+  waiverResult: ReturnType<typeof applyWaivers>;
+  policy: ReturnType<typeof evaluatePolicy> | undefined;
+  pluginLoad: Awaited<ReturnType<typeof loadPlugins>>;
+  projects: ProjectContext[];
+}
+
+function assembleRunResult({
+  ctx,
+  effectiveFindings,
+  fabrication,
+  readiness,
+  summary,
+  waiverResult,
+  policy,
+  pluginLoad,
+  projects,
+}: AssembleRunResultOptions): RunResult {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   const releaseMode = ctx.options.releaseMode;
   return {
@@ -450,16 +467,20 @@ function appendConfigErrors(loaded: LoadedConfig, errors: string[]): LoadedConfi
   };
 }
 
-function enableRule(ruleConfig: RuleConfig | boolean | undefined): RuleConfig {
+type RuleConfigInput = RuleConfig | boolean | undefined;
+
+function enableRule(ruleConfig: RuleConfigInput): RuleConfig {
   return {
     ...ruleObjectConfig(ruleConfig),
     enabled: true,
   };
 }
 
-function ruleObjectConfig(ruleConfig: RuleConfig | boolean | undefined): RuleConfig {
-  return typeof ruleConfig === "object" && ruleConfig !== null ? ruleConfig : {};
+function ruleObjectConfig(ruleConfig: RuleConfigInput): RuleConfig {
+  return typeof ruleConfig === "object" && ruleConfig !== null ? ruleConfig : emptyObj;
 }
+
+const emptyObj: Record<string, never> = Object.freeze({});
 
 function configForProject(root: string, config: BoardReadyOpsConfig, project: ProjectContext): BoardReadyOpsConfig {
   const override = config.projects?.find((candidate) => {
@@ -483,42 +504,46 @@ function configForProject(root: string, config: BoardReadyOpsConfig, project: Pr
     projectConfig.releaseMode = override.releaseMode;
   }
   if (override.firmware) {
+    const cf = config.firmware;
+    const of = override.firmware;
     projectConfig.firmware = {
-      ...(config.firmware ?? {}),
-      ...override.firmware,
+      ...(cf ?? emptyObj),
+      ...of,
       platformio: {
-        ...(config.firmware?.platformio ?? {}),
-        ...(override.firmware.platformio ?? {}),
+        ...(cf?.platformio ?? emptyObj),
+        ...(of.platformio ?? emptyObj),
       },
       arduino: {
-        ...(config.firmware?.arduino ?? {}),
-        ...(override.firmware.arduino ?? {}),
+        ...(cf?.arduino ?? emptyObj),
+        ...(of.arduino ?? emptyObj),
       },
       zephyr: {
-        ...(config.firmware?.zephyr ?? {}),
-        ...(override.firmware.zephyr ?? {}),
+        ...(cf?.zephyr ?? emptyObj),
+        ...(of.zephyr ?? emptyObj),
       },
       "esp-idf": {
-        ...(config.firmware?.["esp-idf"] ?? {}),
-        ...(override.firmware["esp-idf"] ?? {}),
+        ...(cf?.["esp-idf"] ?? emptyObj),
+        ...(of["esp-idf"] ?? emptyObj),
       },
       stm32cubemx: {
-        ...(config.firmware?.stm32cubemx ?? {}),
-        ...(override.firmware.stm32cubemx ?? {}),
+        ...(cf?.stm32cubemx ?? emptyObj),
+        ...(of.stm32cubemx ?? emptyObj),
       },
     };
   }
   if (override.vendor) {
+    const cv = config.vendor;
+    const ov = override.vendor;
     projectConfig.vendor = {
-      ...(config.vendor ?? {}),
-      ...override.vendor,
+      ...(cv ?? emptyObj),
+      ...ov,
       board: {
-        ...(config.vendor?.board ?? {}),
-        ...(override.vendor.board ?? {}),
+        ...(cv?.board ?? emptyObj),
+        ...(ov.board ?? emptyObj),
       },
       assembly: {
-        ...(config.vendor?.assembly ?? {}),
-        ...(override.vendor.assembly ?? {}),
+        ...(cv?.assembly ?? emptyObj),
+        ...(ov.assembly ?? emptyObj),
       },
     };
   }
@@ -532,7 +557,7 @@ function mergeRules(
   rules: BoardReadyOpsConfig["rules"],
   overrides: NonNullable<NonNullable<BoardReadyOpsConfig["projects"]>[number]["rules"]>,
 ): NonNullable<BoardReadyOpsConfig["rules"]> {
-  const merged = { ...(rules ?? {}) };
+  const merged = { ...(rules ?? emptyObj) };
   for (const [id, override] of Object.entries(overrides)) {
     const current = merged[id];
     merged[id] =
@@ -557,7 +582,7 @@ function configFindings(root: string, loaded: LoadedConfig, criticalErrors = new
       severity: criticalErrors.has(error) ? "critical" : "high",
       message: `Configuration is invalid: ${error}`,
       resource: {
-        path: loaded.path ? path.relative(root, loaded.path).replace(/\\/g, "/") : "boardreadyops.yml",
+        path: loaded.path ? path.relative(root, loaded.path).replaceAll("\\", "/") : "boardreadyops.yml",
         kind: "manifest",
       },
       location: { line: 1, column: 1 },

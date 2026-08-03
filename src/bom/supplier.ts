@@ -135,6 +135,13 @@ export interface SupplierIntelligenceSummary {
   }>;
 }
 
+function computeFreshness(hasFreshness: boolean, allFresh: boolean): "fresh" | "stale" | "unknown" {
+  if (!hasFreshness) {
+    return "unknown";
+  }
+  return allFresh ? "fresh" : "stale";
+}
+
 export function buildSupplierIntelligenceSummary(
   results: SupplierIntelligenceResult[],
   providerCount: number,
@@ -184,7 +191,7 @@ export function buildSupplierIntelligenceSummary(
     providerCount,
     recordCount: mergedRecords.size,
     warnings: allWarnings,
-    freshness: !hasFreshness ? "unknown" : allFresh ? "fresh" : "stale",
+    freshness: computeFreshness(hasFreshness, allFresh),
     components,
   };
 }

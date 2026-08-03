@@ -191,39 +191,11 @@ export async function initCommand(
   let failOn: string | undefined;
 
   if (options.interactive) {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: streams.stdout as NodeJS.WritableStream & { fd: 1 }, // ensure compatibility with readline
-    });
-
-    const askQuestion = (query: string, defaultValue: string): Promise<string> => {
-      return new Promise((resolve) => {
-        rl.question(`${query} [\x1b[36m${defaultValue}\x1b[0m]: `, (answer) => {
-          resolve(answer.trim() || defaultValue);
-        });
-      });
-    };
-
-    try {
-      streams.stdout.write("\n✨ \x1b[35mWelcome to the BoardReadyOps Config Wizard!\x1b[0m ✨\n\n");
-
-      const modeAns = await askQuestion("Select mode (warn / enforce)", "warn");
-      mode = modeAns === "enforce" ? "enforce" : "warn";
-
-      const failOnAns = await askQuestion("Fail-on level (never / critical / high / medium / low)", "high");
-      failOn = failOnAns;
-
-      const profileAns = await askQuestion("Choose base rule profile (basic / ci / manufacturing / strict)", "basic");
-      profile = (["basic", "ci", "manufacturing", "strict"].includes(profileAns) ? profileAns : "basic") as Profile;
-
-      const workflowAns = await askQuestion("Generate GitHub Actions workflow? (y / n)", "y");
-      if (workflowAns.toLowerCase().startsWith("y")) {
-        workflow = "github";
-      }
-      streams.stdout.write("\n");
-    } finally {
-      rl.close();
-    }
+    const wizardResult = await runInteractiveWizard(streams);
+    mode = wizardResult.mode;
+    failOn = wizardResult.failOn;
+    profile = wizardResult.profile;
+    workflow = wizardResult.workflow;
   }
 
   const baseConfig = profiles[profile];
@@ -265,4 +237,46 @@ export async function initCommand(
   }
 
   return 0;
+}
+
+async function runInteractiveWizard(streams: { stdout: NodeJS.WritableStream }): Promise<{
+  mode: string;
+  failOn: string;
+  profile: Profile;
+  workflow: "github" | undefined;
+}> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: streams.stdout as NodeJS.WritableStream & { fd: 1 },
+  });
+
+  const askQuestion = (query: string, defaultValue: string): Promise<string> => {
+    return new Promise((resolve) => {
+      rl.question(`${query} [\x1b[36m${defaultValue}\x1b[0m]: `, (answer) => {
+        resolve(answer.trim() || defaultValue);
+      });
+    });
+  };
+
+  try {
+    streams.stdout.write("\n✨ \x1b[35mWelcome to the BoardReadyOps Config Wizard!\x1b[0m ✨\n\n");
+
+    const modeAns = await askQuestion("Select mode (warn / enforce)", "warn");
+    const mode = modeAns === "enforce" ? "enforce" : "warn";
+
+    const failOn = await askQuestion("Fail-on level (never / critical / high / medium / low)", "high");
+
+    const profileAns = await askQuestion("Choose base rule profile (basic / ci / manufacturing / strict)", "basic");
+    const profile = (["basic", "ci", "manufacturing", "strict"].includes(profileAns) ? profileAns : "basic") as Profile;
+
+    let workflow: "github" | undefined;
+    const workflowAns = await askQuestion("Generate GitHub Actions workflow? (y / n)", "y");
+    if (workflowAns.toLowerCase().startsWith("y")) {
+      workflow = "github";
+    }
+    streams.stdout.write("\n");
+    return { mode, failOn, profile, workflow };
+  } finally {
+    rl.close();
+  }
 }

@@ -18,14 +18,11 @@ const HOST_NATIVE_PACKAGE_PATTERNS = Object.freeze([
 function readLockfilePlatformPackages(root) {
   const lockfilePath = path.join(root, "pnpm-lock.yaml");
   const content = readFileSync(lockfilePath, "utf8");
-  const lines = content.split("\n");
-
   const platformPackages = new Set();
   let currentName = null;
   let hasOsOrCpu = false;
 
-  for (const line of lines) {
-    // Package entry: two spaces, single-quoted name@version':
+  for (const line of content.split("\n")) {
     const pkgMatch = line.match(/^ {2}'(.+)@(.+)':\s*$/);
     if (pkgMatch) {
       if (currentName !== null && hasOsOrCpu) {
@@ -33,22 +30,17 @@ function readLockfilePlatformPackages(root) {
       }
       currentName = pkgMatch[1];
       hasOsOrCpu = false;
-      continue;
-    }
-
-    if (currentName !== null) {
-      if (/^\s{4}os:/.test(line) || /^\s{4}cpu:/.test(line)) {
+    } else if (currentName !== null) {
+      if (/^\s{4}(?:os|cpu):/.test(line)) {
         hasOsOrCpu = true;
-      }
-      if (line.trim() === "") {
-        if (hasOsOrCpu) platformPackages.add(currentName);
+      } else if (line.trim() === "" && hasOsOrCpu) {
+        platformPackages.add(currentName);
         currentName = null;
         hasOsOrCpu = false;
       }
     }
   }
 
-  // Handle last entry
   if (currentName !== null && hasOsOrCpu) {
     platformPackages.add(currentName);
   }

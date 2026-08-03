@@ -43,7 +43,7 @@ async function checkGeneratedDrift(before) {
     }
   }
   if (changed.length > 0) {
-    failures.push(`generated documentation is stale:\n${changed.sort().join("\n")}`);
+    failures.push(`generated documentation is stale:\n${changed.toSorted((a, b) => a.localeCompare(b)).join("\n")}`);
   }
 }
 
@@ -134,5 +134,5 @@ function isAllowedDuplicate(block) {
 }
 
 function relative(file) {
-  return path.relative(root, file).replace(/\\/g, "/");
+  return path.relative(root, file).replaceAll("\\", "/");
 }

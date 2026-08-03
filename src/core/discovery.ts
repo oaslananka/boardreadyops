@@ -9,7 +9,8 @@ export async function discoverProjects(root: string, explicitProject?: string): 
     ? await explicitProjectFiles(root, explicitProject)
     : (await globFiles(root, ["**/*.kicad_pro"])).map((file) => path.resolve(file));
   const contexts: ProjectContext[] = [];
-  for (const projectFile of projectFiles.sort()) {
+  const projectFilesSorted = projectFiles.toSorted((a, b) => a.localeCompare(b));
+  for (const projectFile of projectFilesSorted) {
     contexts.push(await projectContext(root, projectFile));
   }
   return contexts;
@@ -38,11 +39,11 @@ async function projectContext(root: string, projectFile: string): Promise<Projec
       (file) => file.endsWith(".kicad_sch") && (path.basename(file, ".kicad_sch") === base || entries.length === 1),
     )
     .map((file) => path.join(projectRoot, file))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
   const boardFiles = entries
     .filter((file) => file.endsWith(".kicad_pcb") && path.basename(file, ".kicad_pcb") === base)
     .map((file) => path.join(projectRoot, file))
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
   const jobsetFiles = await discoverJobsets(projectRoot);
   return {
     projectFile: normalizeRelative(root, projectFile),

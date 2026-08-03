@@ -91,11 +91,8 @@ function computeScoreTrend(points: ReadinessDataPoint[]): ReleaseTrend["scoreTre
   if (scoredPoints.length < 2) {
     return "insufficient-data";
   }
-  // scoredPoints has ≥ 2 entries after the guard above
-  // biome-ignore lint/style/noNonNullAssertion: guarded by length check above
-  const first = scoredPoints[0]!.score ?? 0;
-  // biome-ignore lint/style/noNonNullAssertion: guarded by length check above
-  const last = scoredPoints[scoredPoints.length - 1]!.score ?? 0;
+  const first = scoredPoints[0]?.score ?? 0;
+  const last = scoredPoints.at(-1)?.score ?? 0;
   const delta = last - first;
   if (delta > 2) return "improving";
   if (delta < -2) return "degrading";
@@ -128,59 +125,13 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
     passed: run.status === "passed",
   }));
 
-  // Recurring findings: count per ruleId across runs
-  const ruleRunCounts = new Map<string, number>();
-  const ruleTotalCounts = new Map<string, number>();
-  const ruleMaxSeverity = new Map<string, string>();
-
-  for (const run of runs) {
-    const rulesThisRun = new Set<string>();
-    for (const finding of run.findings) {
-      if (!finding.suppressed) {
-        rulesThisRun.add(finding.ruleId);
-        ruleTotalCounts.set(finding.ruleId, (ruleTotalCounts.get(finding.ruleId) ?? 0) + 1);
-      }
-    }
-    for (const ruleId of rulesThisRun) {
-      ruleRunCounts.set(ruleId, (ruleRunCounts.get(ruleId) ?? 0) + 1);
-    }
-    // Compute max severity per rule across all runs
-    for (const finding of run.findings) {
-      if (!finding.suppressed) {
-        const current = ruleMaxSeverity.get(finding.ruleId) ?? "info";
-        const currentRank = SEVERITY_RANK[current] ?? 0;
-        const newRank = SEVERITY_RANK[finding.severity] ?? 0;
-        if (newRank > currentRank) {
-          ruleMaxSeverity.set(finding.ruleId, finding.severity);
-        }
-      }
-    }
-  }
-
-  const recurringFindings: RecurringFinding[] = [...ruleRunCounts.entries()]
-    .filter(([, runCount]) => runCount > 1)
-    .map(([ruleId, runCount]) => ({
-      ruleId,
-      runCount,
-      // ruleId is in ruleRunCounts only because it appeared in rulesThisRun,
-      // which requires at least one unsuppressed finding — so both maps always
-      // have an entry for this ruleId at this point.
-      // biome-ignore lint/style/noNonNullAssertion: see above
-      totalCount: ruleTotalCounts.get(ruleId)!,
-      // biome-ignore lint/style/noNonNullAssertion: see above
-      maxSeverity: ruleMaxSeverity.get(ruleId)!,
-    }))
-    .sort((left, right) => right.runCount - left.runCount || left.ruleId.localeCompare(right.ruleId));
-
+  const recurringFindings = buildRecurringFindings(runs);
   const waivers: WaiverDataPoint[] = runs
     .filter((run) => run.waivers !== undefined)
     .map((run) => ({
       generatedAt: run.generatedAt,
-      // run.waivers is defined here (filtered above); optional chain satisfies TS narrowing
-      // biome-ignore lint/style/noNonNullAssertion: filtered to non-undefined above
-      activeCount: run.waivers!.active.length,
-      // biome-ignore lint/style/noNonNullAssertion: filtered to non-undefined above
-      expiredCount: run.waivers!.expired.length,
+      activeCount: run.waivers?.active.length ?? 0,
+      expiredCount: run.waivers?.expired.length ?? 0,
     }));
 
   const artifactHealth: ArtifactHealthDataPoint[] = runs.map((run) => ({
@@ -192,14 +143,47 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
 
   return {
     runCount: runs.length,
-    // biome-ignore lint/style/noNonNullAssertion: guarded by runs.length > 0 check above
-    from: runs[0]!.generatedAt,
-    // biome-ignore lint/style/noNonNullAssertion: guarded by runs.length > 0 check above
-    to: runs[runs.length - 1]!.generatedAt,
+    from: runs[0]?.generatedAt ?? null,
+    to: runs.at(-1)?.generatedAt ?? null,
     readiness,
     recurringFindings,
     waivers,
     artifactHealth,
     scoreTrend: computeScoreTrend(readiness),
   };
+}
+
+function buildRecurringFindings(runs: RunResult[]): RecurringFinding[] {
+  const ruleRunCounts = new Map<string, number>();
+  const ruleTotalCounts = new Map<string, number>();
+  const ruleMaxSeverity = new Map<string, string>();
+
+  for (const run of runs) {
+    const rulesThisRun = new Set<string>();
+    for (const finding of run.findings) {
+      if (!finding.suppressed) {
+        rulesThisRun.add(finding.ruleId);
+        ruleTotalCounts.set(finding.ruleId, (ruleTotalCounts.get(finding.ruleId) ?? 0) + 1);
+        const current = ruleMaxSeverity.get(finding.ruleId) ?? "info";
+        const currentRank = SEVERITY_RANK[current] ?? 0;
+        const newRank = SEVERITY_RANK[finding.severity] ?? 0;
+        if (newRank > currentRank) {
+          ruleMaxSeverity.set(finding.ruleId, finding.severity);
+        }
+      }
+    }
+    for (const ruleId of rulesThisRun) {
+      ruleRunCounts.set(ruleId, (ruleRunCounts.get(ruleId) ?? 0) + 1);
+    }
+  }
+
+  return [...ruleRunCounts.entries()]
+    .filter(([, runCount]) => runCount > 1)
+    .map(([ruleId, runCount]) => ({
+      ruleId,
+      runCount,
+      totalCount: ruleTotalCounts.get(ruleId) ?? 0,
+      maxSeverity: ruleMaxSeverity.get(ruleId) ?? "info",
+    }))
+    .sort((left, right) => right.runCount - left.runCount || left.ruleId.localeCompare(right.ruleId));
 }

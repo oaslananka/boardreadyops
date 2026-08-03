@@ -52,40 +52,7 @@ export function parseSexprDocument(text: string): SexprDocument {
     if (char === undefined) {
       break;
     }
-    if (/\s/.test(char)) {
-      advance(position, char);
-      continue;
-    }
-    if (char === ";") {
-      skipComment(text, position);
-      continue;
-    }
-    if (char === "(") {
-      const start = mark(position);
-      advance(position, char);
-      appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
-      const list = lastList(stack, nodes);
-      if (list) {
-        stack.push(list);
-      }
-      continue;
-    }
-    if (char === ")") {
-      const start = mark(position);
-      advance(position, char);
-      const list = stack.pop();
-      if (!list) {
-        errors.push({ message: "Unexpected closing parenthesis", span: { start, end: mark(position) } });
-      } else {
-        list.span.end = mark(position);
-      }
-      continue;
-    }
-    if (char === '"') {
-      appendNode(nodes, stack, parseString(text, position, errors));
-      continue;
-    }
-    appendNode(nodes, stack, parseAtom(text, position));
+    processSexprToken(text, char, position, nodes, stack, errors);
   }
 
   const end = mark(position);
@@ -292,4 +259,48 @@ function advance(position: MutablePosition, char: string): void {
     return;
   }
   position.column += 1;
+}
+
+function processSexprToken(
+  text: string,
+  char: string,
+  position: MutablePosition,
+  nodes: SexprNode[],
+  stack: SexprListNode[],
+  errors: SexprParseError[],
+): void {
+  if (/\s/.test(char)) {
+    advance(position, char);
+    return;
+  }
+  if (char === ";") {
+    skipComment(text, position);
+    return;
+  }
+  if (char === "(") {
+    const start = mark(position);
+    advance(position, char);
+    appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
+    const list = lastList(stack, nodes);
+    if (list) {
+      stack.push(list);
+    }
+    return;
+  }
+  if (char === ")") {
+    const start = mark(position);
+    advance(position, char);
+    const list = stack.pop();
+    if (!list) {
+      errors.push({ message: "Unexpected closing parenthesis", span: { start, end: mark(position) } });
+    } else {
+      list.span.end = mark(position);
+    }
+    return;
+  }
+  if (char === '"') {
+    appendNode(nodes, stack, parseString(text, position, errors));
+    return;
+  }
+  appendNode(nodes, stack, parseAtom(text, position));
 }

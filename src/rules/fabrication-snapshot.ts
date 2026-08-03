@@ -35,8 +35,8 @@ export async function captureFabricationSnapshot(
   );
 
   return {
-    bom: snapshotBom.sort(compareSnapshotBomRows),
-    outputs: outputs.sort((a, b) => a.kind.localeCompare(b.kind)),
+    bom: snapshotBom.toSorted(compareSnapshotBomRows),
+    outputs: outputs.toSorted((a, b) => a.kind.localeCompare(b.kind)),
   };
 }
 

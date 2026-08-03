@@ -93,8 +93,8 @@ function htmlArtifactLinks(
 }
 
 function configOutput(loaded: LoadedConfig, key: "json" | "sarif" | "markdown" | "junit" | "html"): string | undefined {
-  const configured = loaded.config.report?.[key];
-  return configured ? configured : undefined;
+  const val = loaded.config.report?.[key];
+  return typeof val === "string" ? val : undefined;
 }
 
 async function writeOrStdout(
