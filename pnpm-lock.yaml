@@ -21,7 +21,7 @@ overrides:
   vite@<=6.4.1: '>=6.4.2'
   vite@^8.0.0: 8.0.16
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
-  brace-expansion@>=5 <5.0.8: 5.0.8
+  brace-expansion@>=5 <5.0.8: 5.0.9
   fast-uri@>=3 <3.1.4: 3.1.4
   js-yaml@>=4 <4.3.0: 4.3.0
   linkify-it@>=5 <5.0.2: 5.0.2
@@ -2101,8 +2101,8 @@ packages:
   bottleneck@2.19.5:
     resolution: {integrity: sha512-VHiNCbI1lKdl44tGrhNfU3lup0Tj/ZBMJB5/2ZbNXRCPuRCO7ed2mgcK4r17y+KB2EfuYuRaVlwNbAeaWGSpbw==}
 
-  brace-expansion@5.0.8:
-    resolution: {integrity: sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==}
+  brace-expansion@5.0.9:
+    resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
     engines: {node: 20 || >=22}
 
   braces@3.0.3:
@@ -5833,7 +5833,7 @@ snapshots:
 
   bottleneck@2.19.5: {}
 
-  brace-expansion@5.0.8:
+  brace-expansion@5.0.9:
     dependencies:
       balanced-match: 4.0.4
 
@@ -6705,7 +6705,7 @@ snapshots:
 
   minimatch@10.2.5:
     dependencies:
-      brace-expansion: 5.0.8
+      brace-expansion: 5.0.9
 
   minimist@1.2.8: {}
 
