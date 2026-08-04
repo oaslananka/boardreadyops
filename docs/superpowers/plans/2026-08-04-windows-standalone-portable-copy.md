@@ -111,10 +111,10 @@ Insert a job after the existing Linux `build` job. It checks out without persist
     runs-on: windows-2025-vs2026
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # actions/checkout pinned SHA
         with:
           persist-credentials: false
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # actions/setup-node pinned SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
