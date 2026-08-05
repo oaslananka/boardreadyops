@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   collectDesiredTreeChanges,
+  gitConfigNullDevice,
   rewriteReleaseBranchWithVerifiedCommit,
 } from "../../../scripts/rewrite-release-pr-verified.mjs";
 import { isolatedGitEnvironment } from "../../helpers/git-environment.js";
@@ -18,6 +19,11 @@ afterEach(async () => {
 });
 
 describe("rewrite-release-pr-verified", () => {
+  it("uses Git-compatible null config paths across platforms", () => {
+    expect(gitConfigNullDevice("win32")).toBe("NUL");
+    expect(gitConfigNullDevice("linux")).toBe("/dev/null");
+  });
+
   it("uses an explicit path comparator and top-level await in the CLI entry point", async () => {
     const source = await readFile(new URL("../../../scripts/rewrite-release-pr-verified.mjs", import.meta.url), "utf8");
 

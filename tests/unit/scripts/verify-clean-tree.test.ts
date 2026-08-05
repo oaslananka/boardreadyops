@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { isolatedGitEnvironment } from "../../helpers/git-environment.js";
+import { gitConfigNullDevice, isolatedGitEnvironment } from "../../helpers/git-environment.js";
 
 const scriptPath = path.join(process.cwd(), "scripts", "verify-clean-tree.mjs");
 const roots: string[] = [];
@@ -14,6 +14,11 @@ afterEach(async () => {
 });
 
 describe("verify-clean-tree", () => {
+  it("uses Git-compatible null config paths across platforms", () => {
+    expect(gitConfigNullDevice("win32")).toBe("NUL");
+    expect(gitConfigNullDevice("linux")).toBe("/dev/null");
+  });
+
   it("accepts ignored dependencies, public owner guards, mirror terminology, and generated NOTICE text", async () => {
     const root = await createRepository();
     await mkdir(path.join(root, "node_modules", "example"), { recursive: true });
