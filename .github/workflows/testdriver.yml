@@ -1,0 +1,47 @@
+name: TestDriver.ai Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "testdriver/**"
+      - ".github/workflows/testdriver.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "testdriver/**"
+      - ".github/workflows/testdriver.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required to mint an OIDC token for TestDriver auth
+      contents: read
+
+    defaults:
+      run:
+        working-directory: testdriver
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install TestDriver test dependencies
+        run: npm install
+
+      # Recommended: authenticate via GitHub OIDC — no TD_API_KEY secret to store
+      # or rotate. One-time setup: authorize the TestDriver GitHub App for the org
+      # at https://console.testdriver.ai. The `api-key` input below is only a
+      # fallback for runners where OIDC isn't available.
+      - name: Authenticate to TestDriver
+        uses: testdriverai/action@test
+        with:
+          api-key: ${{ secrets.TD_API_KEY }}
+
+      - name: Run TestDriver.ai tests
+        run: npx vitest run
