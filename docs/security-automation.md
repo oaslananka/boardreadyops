@@ -40,9 +40,13 @@ The pinned hook recursively scans supported manifests and lockfiles from the rep
 
 ## OSV CI
 
-The aggregate security workflow calls the official OSV reusable workflows through an immutable v2.3.8 commit SHA. Dependency-changing pull requests run a differential scan with SARIF upload disabled so fork pull requests remain tokenless and read-only. Trusted pushes, schedules, and manual runs use the full recursive scan.
+The aggregate security workflow calls the official OSV reusable workflows through an immutable v2.3.8 commit SHA. Dependency-changing pull requests run a differential scan with SARIF upload disabled so fork pull requests remain tokenless and read-only. Trusted pushes and manually dispatched aggregate runs use the full recursive scan, and `security / gate` owns the merge decision.
 
-`.github/workflows/osv.yml` remains a specialist defense-in-depth workflow for GitHub Code Scanning publication. It is path-filtered for package manifests, lockfiles, workspace configuration, Python requirement files, and its own workflow definition. Scheduled scans still detect newly disclosed vulnerabilities even when dependencies have not changed. The specialist workflow is not a branch-protection context; `security / gate` owns the merge decision.
+`.github/workflows/osv.yml` is the single scheduled specialist advisory scan and publishes the full recursive result to GitHub Code Scanning. It does not run on pull requests or pushes, so the same OSV inventory is not scanned twice for an automatic repository event. A maintainer may still dispatch the specialist workflow manually when independent SARIF evidence is required.
+
+## Security dependency updates and release quarantine
+
+Routine dependency releases remain quarantined for seven days by Renovate, `.npmrc`, and pnpm workspace policy. Renovate vulnerability alerts explicitly bypass that waiting period, remain manual-review only, and request the lowest known-safe version. Exact safe versions needed to regenerate the lockfile are listed in `minimumReleaseAgeExclude`; bounded override selectors apply only below the safe floor, so a future parent dependency that already resolves a safe version is not forced backward.
 
 ## Package-manager supply-chain policy
 

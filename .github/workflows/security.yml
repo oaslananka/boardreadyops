@@ -115,7 +115,7 @@ jobs:
   osv-full:
     needs: policy
     name: security / osv full scan
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name != 'pull_request'
+    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
     with:
       scan-args: |-

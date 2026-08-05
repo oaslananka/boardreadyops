@@ -92,8 +92,8 @@ describe("security aggregate gate", () => {
     expect(result.summary).toContain("| Gitleaks | Required | success |");
   });
 
-  it("uses the full OSV result outside pull requests", () => {
-    const input = passingInput({ eventName: "schedule" });
+  it("uses the full OSV result on trusted pushes", () => {
+    const input = passingInput({ eventName: "push" });
     input.results.osvPullRequest = "skipped";
     input.results.osvFull = "success";
     const result = evaluateSecurityGate(input);
@@ -101,6 +101,17 @@ describe("security aggregate gate", () => {
     expect(result.ok).toBe(true);
     expect(result.summary).toContain("| OSV full scan | Required | success |");
     expect(result.summary).not.toContain("OSV dependency diff");
+  });
+
+  it("delegates scheduled OSV advisories to the specialist workflow", () => {
+    const input = passingInput({ eventName: "schedule" });
+    input.results.osvPullRequest = "skipped";
+    input.results.osvFull = "skipped";
+    const result = evaluateSecurityGate(input);
+
+    expect(result.ok).toBe(true);
+    expect(result.summary).toContain("| OSV full scan | Not applicable | skipped |");
+    expect(result.summary).toContain("Specialist scheduled OSV workflow owns the advisory scan");
   });
 
   it("fails closed when the policy classifier does not succeed", () => {

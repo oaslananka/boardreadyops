@@ -94,7 +94,12 @@
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": ["security", "dependencies"]
+    "labels": ["security", "dependencies", "manual-review"],
+    "minimumReleaseAge": null,
+    "schedule": [],
+    "prCreation": "immediate",
+    "automerge": false,
+    "vulnerabilityFixStrategy": "lowest"
   },
   "osvVulnerabilityAlerts": true
 }
