@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
-import { devNull } from "node:os";
 import { resolve, sep } from "node:path";
 import { promisify } from "node:util";
 
@@ -286,13 +285,18 @@ async function git(root, ...args) {
   return Buffer.from(stdout).toString("utf8");
 }
 
+export function gitConfigNullDevice(platform = process.platform) {
+  return platform === "win32" ? "NUL" : "/dev/null";
+}
+
 function isolatedGitEnvironment() {
   const environment = { ...process.env };
   for (const name of Object.keys(environment)) {
     if (name.startsWith("GIT_")) delete environment[name];
   }
-  environment.GIT_CONFIG_GLOBAL = devNull;
-  environment.GIT_CONFIG_SYSTEM = devNull;
+  const nullDevice = gitConfigNullDevice();
+  environment.GIT_CONFIG_GLOBAL = nullDevice;
+  environment.GIT_CONFIG_SYSTEM = nullDevice;
   environment.GIT_CONFIG_NOSYSTEM = "1";
   return environment;
 }

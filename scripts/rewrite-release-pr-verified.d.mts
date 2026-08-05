@@ -29,6 +29,8 @@ export interface VerifiedReleaseCommit {
   reason: string;
 }
 
+export function gitConfigNullDevice(platform?: NodeJS.Platform): string;
+
 export function collectDesiredTreeChanges(root?: string, baseRef?: string): Promise<DesiredTreeChanges>;
 
 export function rewriteReleaseBranchWithVerifiedCommit(
