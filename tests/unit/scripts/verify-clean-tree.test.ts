@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { isolatedGitEnvironment } from "../../helpers/git-environment.js";
+
 const scriptPath = path.join(process.cwd(), "scripts", "verify-clean-tree.mjs");
 const roots: string[] = [];
 
@@ -33,6 +35,23 @@ describe("verify-clean-tree", () => {
     expect(result.stderr).toContain("generated artifact is tracked: coverage");
   });
 
+  it("ignores hostile global Git configuration", async () => {
+    const environment = await createHostileGitEnvironment();
+    for (const scope of ["--global", "--system"]) {
+      const config = spawnSync("git", ["config", scope, "--list"], { encoding: "utf8", env: environment });
+      expect(config.status).toBe(0);
+      expect(config.stdout).toBe("");
+    }
+
+    const root = await createRepository(environment);
+    await writeTracked(root, "coverage/report.json", "{}\n", environment);
+
+    const result = runVerifier(root, environment);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("generated artifact is tracked: coverage");
+  });
+
   it("continues to reject banned language in project-authored files", async () => {
     const root = await createRepository();
     const phrase = [`${"sta"}${"te"}`, `${"o"}${"f"}`, `${"t"}${"he"}`, `${"a"}${"rt"}`].join("-");
@@ -56,16 +75,16 @@ describe("verify-clean-tree", () => {
   });
 });
 
-async function createRepository() {
+async function createRepository(environment = isolatedGitEnvironment()) {
   const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-clean-tree-"));
   roots.push(root);
-  runGit(root, ["init", "--quiet"]);
+  runGit(root, ["init", "--quiet"], environment);
   const hooksPath = path.join(root, ".git", "test-hooks");
   await mkdir(hooksPath, { recursive: true });
-  runGit(root, ["config", "core.hooksPath", hooksPath]);
-  runGit(root, ["config", "commit.gpgSign", "false"]);
-  runGit(root, ["config", "user.email", "tests@example.com"]);
-  runGit(root, ["config", "user.name", "BoardReadyOps Tests"]);
+  runGit(root, ["config", "core.hooksPath", hooksPath], environment);
+  runGit(root, ["config", "commit.gpgSign", "false"], environment);
+  runGit(root, ["config", "user.email", "tests@example.com"], environment);
+  runGit(root, ["config", "user.name", "BoardReadyOps Tests"], environment);
 
   await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
   await writeFile(
@@ -80,15 +99,20 @@ async function createRepository() {
     path.join(root, ".github", "workflows", "ci.yml"),
     "jobs:\n  test:\n    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'\n    runs-on: ubuntu-24.04\n",
   );
-  runGit(root, ["add", "."]);
-  runGit(root, ["commit", "--quiet", "-m", "test fixture"]);
+  runGit(root, ["add", "."], environment);
+  runGit(root, ["commit", "--quiet", "-m", "test fixture"], environment);
   return root;
 }
 
-async function writeTracked(root: string, relativePath: string, content: string) {
+async function writeTracked(
+  root: string,
+  relativePath: string,
+  content: string,
+  environment = isolatedGitEnvironment(),
+) {
   await writeFileRecursive(path.join(root, relativePath), content);
-  runGit(root, ["add", relativePath]);
-  runGit(root, ["commit", "--quiet", "-m", `update ${relativePath}`]);
+  runGit(root, ["add", relativePath], environment);
+  runGit(root, ["commit", "--quiet", "-m", `update ${relativePath}`], environment);
 }
 
 async function writeFileRecursive(file: string, content: string) {
@@ -96,25 +120,35 @@ async function writeFileRecursive(file: string, content: string) {
   await writeFile(file, content);
 }
 
-function runVerifier(root: string) {
+function runVerifier(root: string, environment = isolatedGitEnvironment()) {
   return spawnSync(process.execPath, [scriptPath], {
     cwd: root,
     encoding: "utf8",
-    env: isolatedGitEnvironment(),
+    env: environment,
   });
 }
 
-function runGit(root: string, args: string[]) {
-  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", env: isolatedGitEnvironment() });
+function runGit(root: string, args: string[], environment = isolatedGitEnvironment()) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", env: environment });
   if (result.status !== 0) {
     throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
   }
 }
 
-function isolatedGitEnvironment() {
-  const env = { ...process.env };
-  for (const name of Object.keys(env)) {
-    if (name.startsWith("GIT_")) delete env[name];
-  }
-  return env;
+async function createHostileGitEnvironment() {
+  const home = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-hostile-git-"));
+  roots.push(home);
+  const excludesFile = path.join(home, "global-ignore");
+  const hooksPath = path.join(home, "global-hooks");
+  await mkdir(hooksPath, { recursive: true });
+  await writeFile(excludesFile, "coverage/\n");
+  await writeFile(
+    path.join(home, ".gitconfig"),
+    `[core]\n  excludesFile = ${gitConfigPath(excludesFile)}\n  hooksPath = ${gitConfigPath(hooksPath)}\n[commit]\n  gpgSign = true\n[alias]\n  environment = config --list\n`,
+  );
+  return isolatedGitEnvironment({ HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: path.join(home, ".config") });
+}
+
+function gitConfigPath(value: string) {
+  return value.replaceAll("\\", "/");
 }
