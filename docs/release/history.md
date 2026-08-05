@@ -8,6 +8,14 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.30.1](https://github.com/oaslananka/boardreadyops/compare/v1.30.0...v1.30.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **core:** preserve directory symlinks in portable copies ([#328](https://github.com/oaslananka/boardreadyops/issues/328)) ([157b4a5](https://github.com/oaslananka/boardreadyops/commit/157b4a5015e9e5f89ec5863557f52f9532fb80c2))
+* **quality:** resolve SonarQube code smells and refactor cognitive complexity ([#320](https://github.com/oaslananka/boardreadyops/issues/320)) ([48eaf5c](https://github.com/oaslananka/boardreadyops/commit/48eaf5cb049fd18dffbdac3b5769173fa6e19458))
+
 ## [1.30.0](https://github.com/oaslananka/boardreadyops/compare/v1.29.0...v1.30.0) (2026-08-03)
 
 
