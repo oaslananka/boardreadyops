@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
-
 import {
   collectDesiredTreeChanges,
   rewriteReleaseBranchWithVerifiedCommit,
 } from "../../../scripts/rewrite-release-pr-verified.mjs";
+import { isolatedGitEnvironment } from "../../helpers/git-environment.js";
 
 const execFileAsync = promisify(execFile);
 const tempDirectories: string[] = [];
@@ -50,7 +50,18 @@ describe("rewrite-release-pr-verified", () => {
     await writeFile(join(root, "NOTICE"), "generated\n");
     await unlink(join(root, "obsolete.txt"));
 
-    const changes = await collectDesiredTreeChanges(root, baseOid);
+    const previousObjectDirectory = process.env.GIT_OBJECT_DIRECTORY;
+    process.env.GIT_OBJECT_DIRECTORY = join(root, "missing-object-directory");
+    let changes: Awaited<ReturnType<typeof collectDesiredTreeChanges>>;
+    try {
+      changes = await collectDesiredTreeChanges(root, baseOid);
+    } finally {
+      if (previousObjectDirectory === undefined) {
+        delete process.env.GIT_OBJECT_DIRECTORY;
+      } else {
+        process.env.GIT_OBJECT_DIRECTORY = previousObjectDirectory;
+      }
+    }
 
     expect(changes.baseOid).toBe(baseOid);
     expect(changes.branchHeadOid).toBe(branchHeadOid);
@@ -138,6 +149,55 @@ describe("rewrite-release-pr-verified", () => {
       url: "https://api.github.com/repos/oaslananka/boardreadyops/git/refs/heads/release-please-verified-123-1",
       init: { method: "DELETE" },
     });
+  });
+
+  it("waits for the rewritten branch head to become visible", async () => {
+    let branchReads = 0;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (method === "GET" && url.endsWith("/branches/release-please")) {
+        branchReads += 1;
+        return Response.json({
+          commit: { sha: branchReads < 4 ? "unsigned-release-head" : "verified-release-oid" },
+        });
+      }
+      if (method === "POST" && url.endsWith("/git/refs")) {
+        return Response.json({ ref: "refs/heads/release-please-verified-123-1" }, { status: 201 });
+      }
+      if (method === "POST" && url.endsWith("/graphql")) {
+        return Response.json({ data: { createCommitOnBranch: { commit: { oid: "verified-release-oid" } } } });
+      }
+      if (method === "GET" && url.endsWith("/commits/verified-release-oid")) {
+        return Response.json({ commit: { verification: { verified: true, reason: "valid" } } });
+      }
+      if (method === "PATCH" && url.endsWith("/git/refs/heads/release-please")) {
+        return Response.json({ object: { sha: "verified-release-oid" } });
+      }
+      if (method === "DELETE" && url.endsWith("/git/refs/heads/release-please-verified-123-1")) {
+        return new Response(null, { status: 204 });
+      }
+      throw new Error(`unexpected request: ${method} ${url}`);
+    };
+
+    const result = await rewriteReleaseBranchWithVerifiedCommit(
+      {
+        repository: "oaslananka/boardreadyops",
+        branch: "release-please",
+        temporaryBranch: "release-please-verified-123-1",
+        branchHeadOid: "unsigned-release-head",
+        baseOid: "main-oid",
+        headline: "release",
+        body: "",
+        additions: [{ path: "package.json", contents: "e30=" }],
+        deletions: [],
+        token: "test-token",
+      },
+      fetchImpl,
+    );
+
+    expect(result).toEqual({ oid: "verified-release-oid", verified: true, reason: "valid" });
+    expect(branchReads).toBe(4);
   });
 
   it("fails before mutation when the remote release branch changed after cloning", async () => {
@@ -265,6 +325,6 @@ describe("rewrite-release-pr-verified", () => {
 });
 
 async function git(root: string, ...args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync("git", args, { cwd: root });
+  const { stdout } = await execFileAsync("git", args, { cwd: root, env: isolatedGitEnvironment() });
   return stdout;
 }

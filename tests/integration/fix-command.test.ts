@@ -1,11 +1,15 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { formatFixPlan, isGitWorktreeDirty } from "../../src/cli/fixes.js";
 import { runCli } from "../../src/cli/index.js";
 import { runPipeline } from "../../src/core/pipeline.js";
-import { runProcess } from "../../src/util/process.js";
+import { isolatedGitEnvironment } from "../helpers/git-environment.js";
+
+const execFileAsync = promisify(execFile);
 
 describe("fix command", () => {
   it("prints a human-readable diff in dry-run mode without writing files", async () => {
@@ -550,9 +554,12 @@ async function runGit(cwd: string, args: string[]): Promise<void> {
 }
 
 async function runGitOutput(cwd: string, args: string[]) {
-  const result = await runProcess("git", args, { cwd, timeoutMs: 30_000 });
-  expect(result.code, result.stderr || result.error).toBe(0);
-  return result;
+  return execFileAsync("git", args, {
+    cwd,
+    encoding: "utf8",
+    env: isolatedGitEnvironment(),
+    timeout: 30_000,
+  });
 }
 
 async function writeProjectWithDnp(root: string, relativePath: string, name: string, dnp: boolean): Promise<void> {
