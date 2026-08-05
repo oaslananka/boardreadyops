@@ -57,7 +57,14 @@ export function evaluateSecurityGate(input) {
       "No dependency inventory changes",
     );
   } else {
-    addRow(rows, "OSV full scan", true, input.results.osvFull, "Full scans run on trusted non-PR events");
+    const aggregateFullScan = input.eventName === "push" || input.eventName === "workflow_dispatch";
+    addRow(
+      rows,
+      "OSV full scan",
+      aggregateFullScan,
+      input.results.osvFull,
+      "Specialist scheduled OSV workflow owns the advisory scan",
+    );
   }
 
   addRow(
