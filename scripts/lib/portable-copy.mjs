@@ -1,5 +1,5 @@
-import { chmod, copyFile, lstat, mkdir, readdir, readlink, realpath, symlink } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { chmod, copyFile, lstat, mkdir, readdir, readlink, realpath, stat, symlink } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 
 export async function copyDirectoryPortable(source, destination, options = {}) {
   await copyEntry(source, destination, {
@@ -16,8 +16,10 @@ async function copyEntry(source, destination, options) {
       return;
     }
 
+    const target = await readlink(source);
+    const targetMetadata = await stat(resolve(dirname(source), target));
     await mkdir(dirname(destination), { recursive: true });
-    await symlink(await readlink(source), destination);
+    await symlink(target, destination, targetMetadata.isDirectory() ? "dir" : "file");
     return;
   }
 

@@ -11,6 +11,31 @@ afterEach(async () => {
 });
 
 describe("portable directory copy", () => {
+  it("preserves directory symlink type for pnpm-style relative targets", async () => {
+    const source = await mkdtemp(path.join(process.cwd(), ".portable-copy-directory-source-"));
+    temporaryRoots.push(source);
+    const packageDirectory = "next@16.2.11_@babel+core@7._be10f97c94e825087e2e0e278d75b52b";
+    const target = path.join("..", "..", "..", "node_modules", ".pnpm", packageDirectory, "node_modules", "next");
+    const sourceLink = path.join(source, "apps", "web", "node_modules", "next");
+    await mkdir(path.dirname(sourceLink), { recursive: true });
+    await mkdir(path.resolve(path.dirname(sourceLink), target), { recursive: true });
+    await symlink(target, sourceLink, "dir");
+
+    const destinationParent = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-web-standalone-regression-"));
+    temporaryRoots.push(destinationParent);
+    const destinationRoot = path.join(destinationParent, "runtime");
+    const copiedLink = path.join(destinationRoot, "apps", "web", "node_modules", "next");
+
+    await copyDirectoryPortable(sourceLink, copiedLink);
+    const copiedTarget = path.resolve(path.dirname(copiedLink), target);
+    await mkdir(copiedTarget, { recursive: true });
+    await writeFile(path.join(copiedTarget, "package.json"), '{"name":"next"}\n');
+
+    await expect(readlink(copiedLink)).resolves.toBe(target);
+    expect((await lstat(copiedLink)).isSymbolicLink()).toBe(true);
+    expect((await stat(copiedLink)).isDirectory()).toBe(true);
+    await expect(readFile(path.join(copiedLink, "package.json"), "utf8")).resolves.toBe('{"name":"next"}\n');
+  });
   it.skipIf(process.platform === "win32")(
     "copies setgid source trees without applying special permission bits",
     async ({ skip }) => {
