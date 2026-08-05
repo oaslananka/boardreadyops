@@ -115,6 +115,15 @@ describe("dependency and security automation configuration", () => {
     };
     const renovate = JSON.parse(await repositoryFile("renovate.json")) as {
       packageRules?: Array<{ minimumReleaseAge?: string | false }>;
+      vulnerabilityAlerts?: {
+        enabled?: boolean;
+        labels?: string[];
+        minimumReleaseAge?: string | null;
+        schedule?: string[];
+        prCreation?: string;
+        automerge?: boolean;
+        vulnerabilityFixStrategy?: string;
+      };
     };
 
     expect(npmrc).toMatch(/^min-release-age=7$/mu);
@@ -125,24 +134,59 @@ describe("dependency and security automation configuration", () => {
       expect.arrayContaining([
         "next@16.2.11",
         "@next/env@16.2.11",
-        "fast-uri@3.1.4",
+        "@hono/node-server@2.0.12",
+        "fast-uri@3.1.5",
+        "hono@4.12.34",
+        "ip-address@10.3.1",
         "renovate@43.272.4",
         "@renovatebot/osv-offline-db@3.0.9",
         "@renovatebot/osv-offline@3.0.9",
-        "brace-expansion@5.0.8",
+        "brace-expansion@5.0.9",
         "js-yaml@5.2.2",
-        "postcss@8.5.18",
+        "postcss@8.5.23",
+        "undici@8.9.0",
         "valibot@1.4.2",
+      ]),
+    );
+    expect(workspace.minimumReleaseAgeExclude).not.toEqual(
+      expect.arrayContaining([
+        "@hono/node-server@2.0.10",
+        "brace-expansion@5.0.8",
+        "fast-uri@3.1.4",
+        "hono@4.12.27",
+        "ip-address@10.2.0",
+        "postcss@8.5.18",
+        "undici@8.5.0",
       ]),
     );
     expect(workspace.trustPolicyExclude).toEqual(["@yarnpkg/libzip@3.2.2", "semver@6.3.1"]);
     expect(workspace.overrides).toMatchObject({
       "archiver>readdir-glob": "3.0.0",
-      "brace-expansion@>=5 <5.0.8": "5.0.8",
-      postcss: "8.5.18",
+      "@hono/node-server@<2.0.12": "2.0.12",
+      "brace-expansion@>=5 <5.0.9": "5.0.9",
+      "fast-uri@>=3 <3.1.5": "3.1.5",
+      "hono@<4.12.34": "4.12.34",
+      "ip-address@<10.3.1": "10.3.1",
+      "postcss@<8.5.23": "8.5.23",
+      "undici@<8.9.0": "8.9.0",
       valibot: "1.4.2",
     });
+    expect(workspace.overrides).not.toHaveProperty("@hono/node-server");
+    expect(workspace.overrides).not.toHaveProperty("postcss");
+    expect(workspace.overrides).not.toHaveProperty("undici@<6.23.0");
+    expect(workspace.overrides).not.toHaveProperty("undici@<6.24.0");
     expect(workspace.overrides).not.toHaveProperty("brace-expansion@>=2 <2.1.2");
+    expect(renovate.vulnerabilityAlerts).toMatchObject({
+      enabled: true,
+      minimumReleaseAge: null,
+      schedule: [],
+      prCreation: "immediate",
+      automerge: false,
+      vulnerabilityFixStrategy: "lowest",
+    });
+    expect(renovate.vulnerabilityAlerts?.labels).toEqual(
+      expect.arrayContaining(["security", "dependencies", "manual-review"]),
+    );
     expect(renovate.packageRules).not.toHaveLength(0);
     for (const rule of renovate.packageRules ?? []) {
       expect(rule.minimumReleaseAge).toBe("7 days");
@@ -235,8 +279,8 @@ describe("dependency and security automation configuration", () => {
     expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.2");
     expect(workspace).not.toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
     expect(workspace).toContain("'archiver>readdir-glob': 3.0.0");
-    expect(workspace).toContain("brace-expansion@>=5 <5.0.8: 5.0.8");
-    expect(workspace).toContain("fast-uri@>=3 <3.1.4: 3.1.4");
+    expect(workspace).toContain("'brace-expansion@>=5 <5.0.9': 5.0.9");
+    expect(workspace).toContain("'fast-uri@>=3 <3.1.5': 3.1.5");
     expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.0");
     expect(workspace).toContain("linkify-it@>=5 <5.0.2: 5.0.2");
     expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.1");
@@ -248,14 +292,19 @@ describe("dependency and security automation configuration", () => {
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
 
     expect(securityWorkflow).not.toContain("security-events: write\n    env:");
-    expect(osvWorkflow).toContain("pull_request:");
-    expect(osvWorkflow).toContain("push:");
+    expect(securityWorkflow).toContain(
+      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
+    );
+    expect(securityWorkflow).toContain(
+      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
+    );
+    expect(securityWorkflow).toContain("github.event_name == 'push' || github.event_name == 'workflow_dispatch'");
+    expect(osvWorkflow).not.toContain("pull_request:");
+    expect(osvWorkflow).not.toContain("push:");
     expect(osvWorkflow).toContain("schedule:");
     expect(osvWorkflow).toContain("workflow_dispatch:");
     expect(osvWorkflow).toContain("security-events: write");
-    expect(osvWorkflow).toContain(
-      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
-    );
+    expect(osvWorkflow).not.toContain("osv-scanner-reusable-pr.yml");
     expect(osvWorkflow).toContain(
       "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
     );
@@ -264,6 +313,7 @@ describe("dependency and security automation configuration", () => {
 
     expect(securityDocs).toContain("OSV-Scanner v2.3.8");
     expect(securityDocs).toContain("No account, API token, or hosted scan quota is required");
+    expect(securityDocs).toContain("does not run on pull requests or pushes");
   });
 
   it("keeps SonarQube Cloud in Automatic Analysis mode without a competing CI scanner", async () => {
