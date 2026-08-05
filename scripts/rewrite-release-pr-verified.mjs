@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
+import { devNull } from "node:os";
 import { resolve, sep } from "node:path";
 import { promisify } from "node:util";
 
@@ -111,7 +112,7 @@ export async function rewriteReleaseBranchWithVerifiedCommit(options, fetchImpl 
       fetchImpl,
     );
 
-    const rewrittenHead = await getBranchHead(repository, branch, headers, fetchImpl);
+    const rewrittenHead = await waitForBranchHead(repository, branch, oid, headers, fetchImpl);
     if (rewrittenHead !== oid) {
       throw new Error(`release branch rewrite did not converge: expected ${oid}, found ${rewrittenHead}`);
     }
@@ -226,6 +227,21 @@ async function createVerifiedCommit(options, fetchImpl) {
   return oid;
 }
 
+async function waitForBranchHead(repository, branch, expectedOid, headers, fetchImpl) {
+  const attempts = 5;
+  let observedOid;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    observedOid = await getBranchHead(repository, branch, headers, fetchImpl);
+    if (observedOid === expectedOid) return observedOid;
+    if (attempt < attempts) await delay(200);
+  }
+  return observedOid;
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 async function getBranchHead(repository, branch, headers, fetchImpl) {
   const payload = await requestJson(
     repositoryUrl(repository, `branches/${encodeURIComponent(branch)}`),
@@ -264,9 +280,21 @@ async function git(root, ...args) {
   const { stdout } = await execFileAsync("git", args, {
     cwd: root,
     encoding: "buffer",
+    env: isolatedGitEnvironment(),
     maxBuffer: 32 * 1024 * 1024,
   });
   return Buffer.from(stdout).toString("utf8");
+}
+
+function isolatedGitEnvironment() {
+  const environment = { ...process.env };
+  for (const name of Object.keys(environment)) {
+    if (name.startsWith("GIT_")) delete environment[name];
+  }
+  environment.GIT_CONFIG_GLOBAL = devNull;
+  environment.GIT_CONFIG_SYSTEM = devNull;
+  environment.GIT_CONFIG_NOSYSTEM = "1";
+  return environment;
 }
 
 function splitNul(value) {
