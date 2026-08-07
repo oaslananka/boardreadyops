@@ -36,7 +36,7 @@ describe("Codecov integration", () => {
     const workflow = await text(".github/workflows/ci.yml");
     const coverageCi = packageJson.scripts?.["coverage:ci"] ?? "";
 
-    expect(coverageCi).toBe("pnpm run coverage:all");
+    expect(coverageCi).toBe("corepack pnpm run coverage:all");
     expect(workflow).toContain("run: pnpm run coverage:ci");
     expect(workflow.match(/codecov\/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f/gu)).toHaveLength(4);
     expect(workflow).toContain("report_type: test_results");
