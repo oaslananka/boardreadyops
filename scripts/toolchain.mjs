@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { access, chmod, lstat, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, lstat, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -29,6 +29,7 @@ export function resolveToolchainPaths(repositoryRoot, cacheRoot = defaultCacheRo
     venv,
     python: path.join(venv, windows ? "Scripts/python.exe" : "bin/python"),
     preCommit: path.join(venv, windows ? "Scripts/pre-commit.exe" : "bin/pre-commit"),
+    shellcheck: path.join(venv, windows ? "Scripts/shellcheck.exe" : "bin/shellcheck"),
     uv: path.join(venv, windows ? "Scripts/uv.exe" : "bin/uv"),
     browserPathFile: path.join(root, "browser-path"),
     hooksStamp: path.join(root, "hooks-ready.json"),
@@ -75,7 +76,12 @@ async function walkRepositoryDirectories(repositoryRoot, visitor) {
   await visit(repositoryRoot, true);
 }
 
-export function buildBootstrapPlan(config, paths) {
+export function buildBootstrapPlan(
+  config,
+  paths,
+  pythonLauncher = resolvePythonLauncher(),
+  venvCommand = [pythonLauncher, "-m", "venv", paths.venv],
+) {
   const preCommitHome = path.join(paths.cache, "pre-commit");
   const puppeteerCache = path.join(paths.cache, "puppeteer");
   return [
@@ -87,7 +93,7 @@ export function buildBootstrapPlan(config, paths) {
     {
       name: "Create Python virtual environment",
       cwd: paths.repositoryRoot,
-      command: [resolvePythonLauncher(), "-m", "venv", paths.venv],
+      command: venvCommand,
     },
     {
       name: "Install pinned Python tooling",
@@ -101,6 +107,7 @@ export function buildBootstrapPlan(config, paths) {
         "-r",
         path.join(paths.repositoryRoot, "docs", "requirements.txt"),
         `pre-commit==${config.validation.preCommit}`,
+        `shellcheck-py==${config.validation.shellcheck.packageVersion}`,
         `uv==${config.python.uv}`,
       ],
     },
@@ -181,6 +188,12 @@ export function evaluateToolchain(config, probe) {
       "Run the repository-local bootstrap to install pre-commit and validation hooks.",
     ),
     check(
+      "shellcheck",
+      probe.shellcheckVersion === config.validation.shellcheck.version,
+      versionMessage("ShellCheck", probe.shellcheckVersion, "ShellCheck not found"),
+      "Run the repository-local bootstrap to install the pinned ShellCheck release used by Actionlint.",
+    ),
+    check(
       "uv",
       probe.uvVersion === config.python.uv,
       versionMessage("uv", probe.uvVersion, "uv not found"),
@@ -253,6 +266,7 @@ export async function probeToolchain(config, paths) {
     ),
     mkdocsVersion: await pythonModuleVersion(paths.python, "mkdocs", env),
     preCommitVersion: normalizePrefixedVersion(await commandVersion(paths.preCommit, ["--version"], env), "pre-commit"),
+    shellcheckVersion: normalizePrefixedVersion(await commandVersion(paths.shellcheck, ["--version"], env)),
     uvVersion: normalizePrefixedVersion(await commandVersion(paths.uv, ["--version"], env), "uv"),
     hooksReady: await hooksStampMatches(config, paths.hooksStamp),
     browserPath,
@@ -271,13 +285,20 @@ async function bootstrap(config, paths) {
       "Canonical non-interactive bootstrap currently supports Linux x64 (Ubuntu 24.04). See docs/development/toolchain.md for other platforms.",
     );
   }
+  const pythonSelection = await selectPythonInterpreter(config, process.env, paths.repositoryRoot);
+  renderPythonSelection(pythonSelection.attempts);
+  const uvVersion = await commandVersion("uv", ["--version"], process.env);
+  const venvCommand = buildVirtualEnvironmentCommand(config, paths, pythonSelection.command, uvVersion);
+  process.stdout.write(
+    `==> Python environment: ${uvVersion === config.python.uv ? `uv ${uvVersion}` : "stdlib venv (pinned uv unavailable)"}\n`,
+  );
   const normalizedDirectories = await normalizeRepositoryModes(paths.repositoryRoot);
   if (normalizedDirectories > 0) {
     process.stdout.write(`==> Normalized ${normalizedDirectories} inherited directory mode(s)\n`);
   }
   await Promise.all([mkdir(paths.bin, { recursive: true }), mkdir(paths.cache, { recursive: true })]);
   await writePnpmWrapper(paths);
-  for (const step of buildBootstrapPlan(config, paths)) {
+  for (const step of buildBootstrapPlan(config, paths, pythonSelection.command, venvCommand)) {
     process.stdout.write(`==> ${step.name}\n`);
     await run(step.command[0], step.command.slice(1), {
       cwd: step.cwd,
@@ -518,8 +539,131 @@ function defaultCacheRoot() {
   return path.join(base, "boardreadyops");
 }
 
-function resolvePythonLauncher() {
-  return process.env.BOARDREADYOPS_PYTHON || (process.platform === "win32" ? "python" : "python3");
+export async function selectPythonInterpreter(config, env = process.env, cwd = defaultRepositoryRoot) {
+  const candidates = pythonCandidates(config, env);
+  const attempts = [];
+  for (const candidate of candidates) {
+    const result = await probePythonCandidate(config, candidate, env, cwd);
+    attempts.push(result);
+    if (result.status === "selected") {
+      return { command: candidate.command, version: result.version, source: candidate.source, attempts };
+    }
+  }
+
+  const remediation = pythonRemediation(config, process.platform);
+  throw new Error(
+    [
+      "No usable Python interpreter was found for the repository toolchain.",
+      ...attempts.map(formatPythonAttempt),
+      `Remediation: ${remediation}`,
+    ].join("\n"),
+  );
+}
+
+function pythonCandidates(config, env) {
+  const override = env.BOARDREADYOPS_PYTHON?.trim();
+  if (override) return [{ command: override, source: "BOARDREADYOPS_PYTHON" }];
+  const commands = [`python${config.python.preferred}`, "python3", "python"];
+  return [...new Set(commands)].map((command) => ({ command, source: "auto" }));
+}
+
+async function probePythonCandidate(config, candidate, env, cwd) {
+  let version;
+  try {
+    const result = await capture(candidate.command, ["--version"], { cwd, env });
+    version = normalizePrefixedVersion(`${result.stdout}\n${result.stderr}`.trim());
+  } catch (error) {
+    return rejectedPythonCandidate(candidate, undefined, `not available: ${diagnosticReason(error)}`);
+  }
+  if (!version || !supportsPython(config, version)) {
+    return rejectedPythonCandidate(
+      candidate,
+      version,
+      `unsupported version; expected ${config.python.minimum} through <${config.python.maximumExclusive}`,
+    );
+  }
+
+  try {
+    await capture(candidate.command, ["-c", "import subprocess; print('subprocess:ok')"], { cwd, env });
+  } catch (error) {
+    return rejectedPythonCandidate(candidate, version, `subprocess capability failed: ${diagnosticReason(error)}`);
+  }
+
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-python-probe-"));
+  const probeVenv = path.join(temporaryRoot, "venv");
+  try {
+    try {
+      await capture(candidate.command, ["-m", "venv", probeVenv], { cwd, env });
+    } catch (error) {
+      return rejectedPythonCandidate(
+        candidate,
+        version,
+        `virtual-environment creation failed: ${diagnosticReason(error)}`,
+      );
+    }
+    const probePython = path.join(probeVenv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+    try {
+      await capture(probePython, ["-m", "pip", "--version"], { cwd, env });
+    } catch (error) {
+      return rejectedPythonCandidate(
+        candidate,
+        version,
+        `package installer (pip) unavailable in created virtual environment: ${diagnosticReason(error)}`,
+      );
+    }
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+  return { ...candidate, version, status: "selected" };
+}
+
+function rejectedPythonCandidate(candidate, version, reason) {
+  return { ...candidate, version, status: "rejected", reason };
+}
+
+function renderPythonSelection(attempts) {
+  for (const attempt of attempts) {
+    process.stdout.write(`${formatPythonAttempt(attempt)}\n`);
+  }
+}
+
+function formatPythonAttempt(attempt) {
+  const source = attempt.source === "BOARDREADYOPS_PYTHON" ? " (BOARDREADYOPS_PYTHON)" : "";
+  if (attempt.status === "selected") {
+    return `Python candidate ${attempt.command}${source}: selected (Python ${attempt.version})`;
+  }
+  const version = attempt.version ? `Python ${attempt.version}; ` : "";
+  return `Python candidate ${attempt.command}${source}: rejected (${version}${attempt.reason})`;
+}
+
+function diagnosticReason(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replaceAll(/\s+/g, " ").trim();
+}
+
+function pythonRemediation(config, platform) {
+  const override = "set BOARDREADYOPS_PYTHON=/path/to/python to choose a known-good interpreter";
+  if (platform === "linux") {
+    return `install Python ${config.python.minimum} through <${config.python.maximumExclusive} with subprocess, venv, and pip support (Ubuntu/Debian: sudo apt-get install python3 python3-venv python3-pip), or ${override}.`;
+  }
+  if (platform === "darwin") {
+    return `install a supported Python with Homebrew (brew install python@${config.python.preferred}), or ${override}.`;
+  }
+  if (platform === "win32") {
+    return `install Python ${config.python.preferred} (winget install Python.Python.3.13), then ${override}.`;
+  }
+  return `install a complete supported Python runtime with subprocess, venv, and pip support, or ${override}.`;
+}
+
+export function buildVirtualEnvironmentCommand(config, paths, pythonLauncher, uvVersion) {
+  if (uvVersion === config.python.uv) {
+    return ["uv", "venv", "--python", pythonLauncher, "--seed", paths.venv];
+  }
+  return [pythonLauncher, "-m", "venv", paths.venv];
+}
+
+function resolvePythonLauncher(env = process.env) {
+  return env.BOARDREADYOPS_PYTHON || (process.platform === "win32" ? "python" : "python3");
 }
 
 function executableName(name) {

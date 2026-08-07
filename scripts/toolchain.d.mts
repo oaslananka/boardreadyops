@@ -17,6 +17,10 @@ export interface ToolchainManifest {
   };
   validation: {
     preCommit: string;
+    shellcheck: {
+      version: string;
+      packageVersion: string;
+    };
     actionlint: string;
     semgrep: string;
     gitleaks: string;
@@ -39,6 +43,7 @@ export interface ToolchainPaths {
   venv: string;
   python: string;
   preCommit: string;
+  shellcheck: string;
   uv: string;
   browserPathFile: string;
   hooksStamp: string;
@@ -66,6 +71,7 @@ export interface ToolchainProbe {
   pythonVersion: string | undefined;
   mkdocsVersion: string | undefined;
   preCommitVersion: string | undefined;
+  shellcheckVersion: string | undefined;
   uvVersion: string | undefined;
   hooksReady: boolean;
   browserPath: string | undefined;
@@ -87,13 +93,45 @@ export interface ToolchainResult {
   checks: ToolchainCheck[];
 }
 
+export interface PythonSelectionAttempt {
+  command: string;
+  source: "BOARDREADYOPS_PYTHON" | "auto";
+  version?: string;
+  status: "selected" | "rejected";
+  reason?: string;
+}
+
+export interface PythonSelection {
+  command: string;
+  version: string;
+  source: "BOARDREADYOPS_PYTHON" | "auto";
+  attempts: PythonSelectionAttempt[];
+}
+
 export function resolveToolchainPaths(repositoryRoot: string, cacheRoot?: string): ToolchainPaths;
 export function normalizeRepositoryModes(repositoryRoot: string): Promise<number>;
 export function buildToolchainEnvironment(
   paths: ToolchainPaths,
   baseEnvironment?: NodeJS.ProcessEnv,
 ): NodeJS.ProcessEnv;
-export function buildBootstrapPlan(config: ToolchainManifest, paths: ToolchainPaths): BootstrapStep[];
+export function buildBootstrapPlan(
+  config: ToolchainManifest,
+  paths: ToolchainPaths,
+  pythonLauncher?: string,
+  venvCommand?: string[],
+): BootstrapStep[];
 export function evaluateToolchain(config: ToolchainManifest, probe: ToolchainProbe): ToolchainResult;
 export function loadToolchainManifest(repositoryRoot?: string): Promise<ToolchainManifest>;
 export function probeToolchain(config: ToolchainManifest, paths: ToolchainPaths): Promise<ToolchainProbe>;
+
+export function selectPythonInterpreter(
+  config: ToolchainManifest,
+  env?: NodeJS.ProcessEnv,
+  cwd?: string,
+): Promise<PythonSelection>;
+export function buildVirtualEnvironmentCommand(
+  config: ToolchainManifest,
+  paths: ToolchainPaths,
+  pythonLauncher: string,
+  uvVersion: string | undefined,
+): string[];
