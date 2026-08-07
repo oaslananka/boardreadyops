@@ -12,7 +12,7 @@ body:
     attributes:
       label: BoardReadyOps version
       description: Output from `boardreadyops --version` or the npm/GitHub Action version.
-      placeholder: 1.7.2
+      placeholder: Paste the exact --version output
     validations:
       required: true
   - type: input

@@ -13,15 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@4efcd6d73e2e0de15a39c745b1a67e6c7a4f9ce0 # current action contract
+      - uses: oaslananka/boardreadyops@884f5fa31f8fd701693c533747c69eb7d13f5464 # v1.30.1
         with:
           config: boardreadyops.yml
 ```
 
-This example pins the current main Action commit because the input table below
-is generated from the repository's current `action.yml`. The public
-`v1.3.0` tag remains smoke-tested in the release channel matrix and includes
-all current inputs.
+This example pins the reviewed release commit shown above. The public
+`v1.30.1` tag is the current published release, and its `action.yml` input
+contract was verified against current main before this reference was updated.
+Use the immutable SHA when reproducibility matters; the floating `v1` alias
+moves with stable releases.
 
 ## Inputs
 

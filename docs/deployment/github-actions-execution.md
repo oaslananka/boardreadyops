@@ -123,7 +123,7 @@ The shipped workflow:
 5. checks out the exact commit with persisted credentials disabled;
 6. verifies the resulting Git SHA;
 7. installs and verifies KiCad 10.0.x;
-8. runs the exact BoardReadyOps v1.13.0 Action commit;
+8. runs the exact BoardReadyOps Action commit pinned in the reviewed workflow;
 9. uploads JSON, SARIF, and Markdown reports as GitHub Actions artifacts;
 10. maps the JSON report to the version-one cloud result contract; and
 11. obtains an OIDC token with audience `boardreadyops-cloud:<run-id>:<attempt-id>` and retries the callback up to three times.
@@ -133,6 +133,8 @@ Blocking findings complete the cloud run with decision `fail` and fail the GitHu
 ## Quota and ownership
 
 GitHub-hosted compute minutes and Actions artifact storage belong to the target repository owner. BoardReadyOps Cloud does not provide shared KiCad compute in this mode. Public and private repository billing behavior follows the owner's GitHub plan and organization policy.
+
+The workflow's BoardReadyOps SHA is an execution-contract pin, not the public documentation recommendation. It may intentionally lag the latest public release while cloud callback, setup-probe, and result-contract compatibility are validated. Update that operational pin only with the workflow-specific tests and commissioning evidence; user-facing examples elsewhere use the latest reviewed public release commit.
 
 Repository administrators must permit GitHub Actions and the pinned third-party actions used by the workflow. Organizations with an allow-list must allow:
 
