@@ -1,1 +1,5 @@
 blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/oaslananka/boardreadyops/security/advisories/new
+    about: Use GitHub private vulnerability reporting for vulnerabilities or sensitive security details.

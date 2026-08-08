@@ -9,6 +9,7 @@ release binaries, the GitHub Action, or container images.
 | --- | --- | --- |
 | Semantic versioning | Passed | release-please and version verification scripts. |
 | npm provenance | Passed | Publish workflow verifies package version and provenance configuration. |
+| npm publish authentication | Trusted Publishing | GitHub-hosted `publish-npm.yml` uses OIDC and fails closed if token/basic npm authentication is injected. |
 | GitHub release assets | Passed | Latest release includes platform assets, `SHA256SUMS`, and SBOM. |
 | Checksums | Passed | Install scripts download and verify `SHA256SUMS`. |
 | SBOM | Passed | `pnpm run sbom` and release SBOM artifact. |
@@ -34,9 +35,10 @@ for release-critical workflows.
 2. Run release verification commands from `docs/development/release-process.md`.
 3. Confirm generated bundles and package metadata match the release version.
 4. Confirm GitHub release assets, `SHA256SUMS`, and SBOM are present.
-5. Confirm npm package provenance and version metadata.
-6. Confirm release docs and README examples reference the current tag/commit.
-7. Record any channel drift in `docs/release/channel-verification.md`.
+5. Confirm npm package provenance and version metadata, including the GitHub repository, workflow, commit, and run associated with the Trusted Publishing attestation.
+6. Confirm the publish run did not use a long-lived npm token or write registry authentication to `.npmrc`.
+7. Confirm release docs and README examples reference the current tag/commit.
+8. Record any channel drift in `docs/release/channel-verification.md`.
 
 ## Not accepted
 

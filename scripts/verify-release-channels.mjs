@@ -164,6 +164,12 @@ export async function runReleaseChannelChecks({
   );
   check("npm publish workflow can mint OIDC tokens", /\bid-token:\s*write\b/.test(publishWorkflow));
   check(
+    "npm publish workflow refuses long-lived token authentication fallback",
+    /Refuse npm token-auth fallback/.test(publishWorkflow) &&
+      !/secrets\.NPM_TOKEN/.test(publishWorkflow) &&
+      !/_authToken=/.test(publishWorkflow),
+  );
+  check(
     "npm publish workflow disables package-manager cache for release builds",
     /package-manager-cache:\s*false/.test(publishWorkflow),
   );
