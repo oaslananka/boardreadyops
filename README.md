@@ -132,12 +132,16 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@005afb83bd04f50a8da33bbffc441818910951f6 # v1.7.2
+      - uses: oaslananka/boardreadyops@884f5fa31f8fd701693c533747c69eb7d13f5464 # v1.30.1
         with:
           config: boardreadyops.yml
           mode: enforce
           fail-on: high
 ```
+
+The examples pin the reviewed `v1.30.1` release commit for reproducibility.
+The floating `v1` alias is convenient for opt-in automatic minor/patch updates,
+but it moves as stable releases are published.
 
 SARIF upload requires `security-events: write`. Pull request comments require `pull-requests: write`.
 
@@ -145,7 +149,7 @@ Use the full container action when a workflow should carry KiCad CLI inside the
 BoardReadyOps runtime instead of installing KiCad separately:
 
 ```yaml
-      - uses: oaslananka/boardreadyops/apps/container@005afb83bd04f50a8da33bbffc441818910951f6 # v1.7.2
+      - uses: oaslananka/boardreadyops/apps/container@884f5fa31f8fd701693c533747c69eb7d13f5464 # v1.30.1
         with:
           config: boardreadyops.yml
           require-kicad: "true"

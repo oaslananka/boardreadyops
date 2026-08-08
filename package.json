@@ -35,7 +35,7 @@
     "prepare": "node scripts/prepare.mjs",
     "fmt": "biome format --write .",
     "format": "biome format --write .",
-    "lint": "biome check . && corepack pnpm run i18n:check",
+    "lint": "biome check . && corepack pnpm run i18n:check && corepack pnpm run verify:public-surface",
     "lint:fix": "biome check --write .",
     "hook:commitlint": "commitlint",
     "hook:lint-staged": "lint-staged",
@@ -111,7 +111,8 @@
     "test:int:monorepo": "node scripts/run-monorepo-integration.mjs",
     "verify:transition-writers": "node scripts/verify-control-plane-transition-writers.mjs",
     "cloud:load:verify": "node scripts/control-plane-load.mjs",
-    "cloud:isolation:verify": "vitest run --no-file-parallelism tests/integration/github-actions-result-isolation-postgres.test.ts && node scripts/target-repository-isolation.mjs"
+    "cloud:isolation:verify": "vitest run --no-file-parallelism tests/integration/github-actions-result-isolation-postgres.test.ts && node scripts/target-repository-isolation.mjs",
+    "verify:public-surface": "node scripts/sync-release-readme.mjs --check"
   },
   "lint-staged": {
     "{src,scripts,tests}/**/*.{ts,tsx,js,mjs,cjs}": [
