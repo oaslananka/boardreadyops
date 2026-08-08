@@ -109,6 +109,32 @@ describe("main branch governance ruleset", () => {
     },
   );
 
+  it("keeps the public contribution path GitHub-native and security reports private", async () => {
+    const contributing = await repositoryFile("CONTRIBUTING.md");
+    const detailedGovernance = await repositoryFile("docs/governance.md");
+    const maintainerGovernance = await repositoryFile("GOVERNANCE.md");
+    const pullRequestTemplate = await repositoryFile(".github/pull_request_template.md");
+    const issueTemplateConfig = await repositoryFile(".github/ISSUE_TEMPLATE/config.yml");
+    const security = await repositoryFile("SECURITY.md");
+
+    for (const document of [contributing, detailedGovernance]) {
+      const normalized = document.replace(/\s+/g, " ");
+      expect(normalized).toContain("GitHub Issues");
+      expect(normalized).toContain("GitHub Pull Requests");
+      expect(normalized).not.toMatch(/\bLinear\b/);
+      expect(normalized).not.toContain("codex/BOARD-");
+    }
+
+    expect(pullRequestTemplate).toContain("Related GitHub issue or rationale");
+    expect(pullRequestTemplate).not.toMatch(/\bLinear\b/);
+    expect(maintainerGovernance.replace(/\s+/g, " ")).toContain("optional maintainer metadata");
+    expect(maintainerGovernance).not.toContain("One Linear issue per pull request");
+
+    const advisoryUrl = "https://github.com/oaslananka/boardreadyops/security/advisories/new";
+    expect(issueTemplateConfig).toContain(advisoryUrl);
+    expect(security).toContain(advisoryUrl);
+  });
+
   it("documents the solo-maintainer review and PR-only emergency bypass policy", async () => {
     const governance = await repositoryFile("GOVERNANCE.md");
     const detailedGovernance = await repositoryFile("docs/governance.md");

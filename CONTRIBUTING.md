@@ -49,6 +49,14 @@ corepack pnpm run docs
 
 The canonical test taxonomy is in [docs/testing.md](docs/testing.md).
 
+## Public Contribution Workflow
+
+GitHub Issues and GitHub Pull Requests are the public source of truth for contribution intake, discussion, review, and CI evidence. Search existing GitHub Issues before starting substantial work. Open an issue when a bug, feature, RFC, or behavior change benefits from discussion; small, self-contained fixes may go directly to a pull request when the PR explains the rationale.
+
+Contributions from forks are welcome. A contributor only needs public GitHub access to open a compliant pull request. Private maintainer trackers, organization workspaces, and tracker-specific branch names are not contributor requirements.
+
+Do not use public issues for vulnerabilities or sensitive security details. Follow [SECURITY.md](SECURITY.md) and GitHub private vulnerability reporting instead.
+
 ## Required PR Validation
 
 Every code or documentation pull request must run this repository-level chain
@@ -181,24 +189,24 @@ Accepted scopes are enforced by `commitlint.config.cjs`. Common scopes include
 `docs`, `deps`, `release`, and `ci`; existing domain-specific scopes such as
 `bom`, `pinmap`, `mfg`, and `kicad` remain valid for focused changes.
 
-Agent branches use the Linear issue identifier:
+Use a short-lived, descriptive branch. Contributors working from forks may use any sensible branch name; common examples are:
 
 ```text
-codex/BOARD-<id>-<short-slug>
+fix/<short-slug>
+feat/<short-slug>
+docs/<short-slug>
 ```
 
-Keep each pull request scoped to one Linear issue. Link the issue in the PR body
-and record the commands that passed.
+Maintainer automation may use additional internal branch conventions, but external contributors do not need a private tracker identifier or organization-specific prefix. Keep each pull request focused on one coherent change. Link the related GitHub issue with `Closes #<number>` when one exists; when no issue is needed, explain the rationale directly in the pull request. Record the validation commands that passed.
 
 ## Pull Requests
 
 The pull request template lives at `.github/pull_request_template.md`. Fill in:
 
 - Scope and user-visible impact.
-- Related Linear issue.
+- Related GitHub issue, when one exists, or a short rationale for a direct pull request.
 - Validation commands and results.
-- Checklist items that apply to docs, generated artifacts, Action bundles,
-  schema changes, and branch protection documentation.
+- Checklist items that apply to docs, generated artifacts, Action bundles, schema changes, and branch protection documentation.
 
 The repository-level governance and review model is documented in
 [GOVERNANCE.md](GOVERNANCE.md) and [docs/governance.md](docs/governance.md).
