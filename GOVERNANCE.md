@@ -6,8 +6,7 @@ protections are expected before stable releases.
 
 ## Decision Making
 
-- Linear team `BOARD` is the planning source of truth for roadmap and task
-  priority.
+- GitHub Issues and GitHub Pull Requests are the public source of truth for contribution intake, review state, and user-visible work tracking.
 - GitHub is used for code, branches, pull requests, and CI results.
 - Architectural decisions are recorded as ADRs under `docs/architecture/adr/`.
 - Public contract changes must update the matching docs, schemas, examples, and
@@ -24,7 +23,7 @@ of relying only on a pull request comment.
 
 The maintainer is responsible for:
 
-- Keeping the Linear BOARD queue current.
+- Triaging the public GitHub issue and pull request queues and maintaining any optional internal tracking mappings.
 - Reviewing roadmap scope, breaking changes, and user-facing contracts.
 - Maintaining CODEOWNERS, CI requirements, branch protection, release
   configuration, and package ownership.
@@ -34,6 +33,12 @@ The maintainer is responsible for:
 
 Automation can run validation and merge eligible changes, but the maintainer owns
 policy decisions and external GitHub settings.
+
+## Maintainer Tracking Overlay
+
+Maintainers may associate a Linear `BOARD-*` identifier or another private tracker identifier with a GitHub issue or pull request as optional maintainer metadata. Internal automation may consume that mapping, but external contributors are never required to access a private tracker, know an internal identifier, or use tracker-specific branch names.
+
+Public contribution status, discussion, review, and CI evidence remain on GitHub. Do not copy private planning data or internal operational records into public issues or pull requests merely to preserve an internal mapping.
 
 ## Review Model
 
@@ -90,7 +95,7 @@ Required policy:
   the documented PR-only bypass.
 - Squash merge is the normal merge method.
 - Delete topic branches after merge.
-- One Linear issue per pull request.
+- Keep each pull request focused on one coherent change; reference a related GitHub issue when one exists, or provide a concise rationale when no issue is required.
 - Release, tag, and package-publish actions are maintainer-owned.
 
 ## Branch Protection
