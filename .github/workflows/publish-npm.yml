@@ -204,16 +204,27 @@ jobs:
         with:
           name: sbom
           path: sbom.cyclonedx.json
-      - name: Publish npm package
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Refuse npm token-auth fallback
         if: env.SHOULD_PUBLISH == 'true'
         run: |
           set -euo pipefail
 
-          # Authenticate with npm using the token secret, then let
-          # provenance use OIDC trusted publisher.
-          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "${HOME}/.npmrc"
+          if env | cut -d= -f1 | grep -Eq '^(NPM_TOKEN|NODE_AUTH_TOKEN|NPM_AUTH_TOKEN|NPM_CONFIG_.*(AUTH|TOKEN|PASSWORD|USERNAME))$'; then
+            echo "::error::Token-based npm authentication is not allowed in the publish job."
+            exit 1
+          fi
+
+          for npmrc in "${NPM_CONFIG_USERCONFIG:-${HOME}/.npmrc}" "${GITHUB_WORKSPACE}/.npmrc"; do
+            if [ -f "${npmrc}" ] && grep -Eq '(_authToken|_auth|_password|username)[[:space:]]*=' "${npmrc}"; then
+              echo "::error::Token/basic npm authentication configuration is not allowed in the publish job."
+              exit 1
+            fi
+          done
+
+      - name: Publish npm package
+        if: env.SHOULD_PUBLISH == 'true'
+        run: |
+          set -euo pipefail
 
           package_version="$(jq -er '.version' package.json)"
           published_version="$(npm view "boardreadyops@${package_version}" version --json 2>/dev/null | jq -r '. // empty' || true)"
