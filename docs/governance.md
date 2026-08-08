@@ -7,23 +7,26 @@ is the maintainer-facing policy file.
 
 ## Source Of Truth
 
-- Linear team `BOARD` owns roadmap priority and task state.
-- GitHub owns branches, pull requests, code review metadata, and CI evidence.
+- GitHub Issues and GitHub Pull Requests are the public source of truth for contribution intake, discussion, review state, and CI evidence.
+- The root `GOVERNANCE.md` owns maintainer policy and repository protection expectations.
 - ADRs under `docs/architecture/adr/` own architectural decisions.
-- Release-please owns release pull request generation; code agents must not merge
-  release-please pull requests unless the maintainer explicitly changes scope.
+- Release-please owns release pull request generation; code agents must not merge release-please pull requests unless the maintainer explicitly changes scope.
+
+Maintainers may associate optional private tracker metadata through internal automation. That metadata does not replace the public GitHub contribution record and is never required from an external contributor.
 
 ## Pull Request Requirements
 
 Every pull request must:
 
-- Address exactly one Linear issue.
-- Use a branch named `codex/BOARD-<id>-<short-slug>` for Codex agent work.
+- Keep one coherent change in scope.
+- Use a descriptive topic branch in the repository or contributor fork; no private tracker prefix is required.
 - Fill in `.github/pull_request_template.md`.
-- Link the Linear issue.
+- Link the related GitHub issue when one exists, or explain why a direct pull request is sufficient.
 - List validation commands and results.
 - Keep generated docs, bundles, notices, and schemas in sync with source changes.
 - Pass required CI before merge.
+
+Security vulnerabilities and sensitive security details are not part of public issue intake. Report them through the private process in `SECURITY.md`.
 
 ## Review And Ownership
 
