@@ -57,11 +57,13 @@ export function evaluatePublicReleaseSnapshot(snapshot) {
   });
 
   const assets = new Map((snapshot.release?.assets ?? []).map((asset) => [asset.name, asset]));
-  const assetNames = [...assets.keys()].sort();
+  const compareAssetNames = (left, right) => left.localeCompare(right, "en");
+  const assetNames = [...assets.keys()].sort(compareAssetNames);
+  const expectedAssetNames = [...EXPECTED_RELEASE_ASSETS].sort(compareAssetNames);
   fail(
     "GitHub release exposes the expected binary, checksum, and SBOM assets",
-    JSON.stringify(assetNames) === JSON.stringify([...EXPECTED_RELEASE_ASSETS].sort()),
-    { expected: [...EXPECTED_RELEASE_ASSETS].sort(), actual: assetNames },
+    JSON.stringify(assetNames) === JSON.stringify(expectedAssetNames),
+    { expected: expectedAssetNames, actual: assetNames },
   );
 
   const checksumMatches = EXPECTED_BINARY_ASSETS.every((name) => {
