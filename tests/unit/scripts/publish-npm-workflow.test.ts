@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const workflowPath = join(process.cwd(), ".github/workflows/publish-npm.yml");
 const packJsonExpression = ["$", "{pack_json}"].join("");
+const homeNpmrcRedirect = ['> "$', '{HOME}/.npmrc"'].join("");
 
 describe("publish-npm workflow contract", () => {
   it("uses one canonical workflow-dispatch publish trigger", async () => {
@@ -32,6 +33,20 @@ describe("publish-npm workflow contract", () => {
     expect(verificationBlock).toContain("metadata candidates");
     expect(verificationBlock).toContain("pack.unpackedSize");
     expect(verificationBlock).not.toContain("pnpm run check:size");
+  });
+
+  it("uses OIDC trusted publishing without a long-lived npm publish token fallback", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+    const publishBlock = workflow.slice(workflow.indexOf("- name: Publish npm package"));
+
+    expect(workflow).toContain("id-token: write");
+    expect(workflow).toContain("Refuse npm token-auth fallback");
+    expect(workflow).toContain("npm install -g npm@latest");
+    expect(workflow).not.toContain("secrets.NPM_TOKEN");
+    expect(publishBlock).not.toContain("_authToken=");
+    expect(publishBlock).not.toContain(homeNpmrcRedirect);
+    expect(publishBlock).toContain("npm publish --access public");
+    expect(publishBlock).toContain("npm publish --access public --tag next");
   });
 
   it("keeps publish idempotency and stable floating-tag gating", async () => {

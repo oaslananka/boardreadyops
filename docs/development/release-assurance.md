@@ -68,9 +68,11 @@ Before creating or publishing a release, the maintainer must verify:
 
 1. Check the `publish-npm` workflow run logs for the exact error.
 2. If the package was partially published (unlikely with npm's atomic publish), verify with `npm view boardreadyops@<version>` and check the `dist-tags`.
-3. If auth failed: rotate `NPM_TOKEN` in the repository secrets and re-run the workflow via `workflow_dispatch`.
-4. If provenance signing failed: confirm the workflow has `id-token: write` and that the npm package on npmjs.org allows trusted publishing from the repository.
-5. If the package version already exists: the workflow will skip publication without error (idempotent check is built in).
+3. If authentication failed, verify the npm trusted publisher is configured for repository `oaslananka/boardreadyops`, workflow file `publish-npm.yml`, and the `npm publish` action. Confirm the job still has `id-token: write` and uses a current npm CLI. Do not add a token fallback to the normal publish path.
+4. If provenance signing failed, verify the trusted publisher tuple and OIDC permission before retrying the same release tag.
+5. If the package version already exists, the workflow skips publication without error; verify the published version and provenance instead of attempting to overwrite it.
+
+During the Trusted Publishing migration only, the previous npm automation credential may remain in the approved secret-management system as a time-bounded rollback credential until one new version has been published successfully through OIDC and independently verified. It must not be injected into the normal publish job or written to `.npmrc`. After verified cutover, remove the GitHub Actions `NPM_TOKEN` secret, revoke the upstream npm token, and remove the obsolete source secret from Doppler. A rollback before revocation restores the previously reviewed workflow revision; it never exposes the credential in source, logs, issues, or pull requests.
 
 ### Release tag on wrong commit
 
