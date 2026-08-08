@@ -67,6 +67,27 @@ type WorkflowJob = {
 };
 
 describe("compatibility matrix", () => {
+  it("records the reviewed Node LTS patch baselines without changing the support floor", async () => {
+    const config = yaml.load(await readFile("docs/compatibility.yaml", "utf8")) as CompatibilityConfig & {
+      node: CompatibilityConfig["node"] & { minimumVersion: string };
+    };
+    const toolchain = JSON.parse(await readFile("toolchain.json", "utf8")) as {
+      node: { preferred: string; engines: string; supportedMajors: number[] };
+    };
+
+    expect(config.node.minimumVersion).toBe("22.14.0");
+    expect(config.node.supported).toEqual(["22", "24"]);
+    expect(config.node.current).toEqual(["26"]);
+    expect(config.node.tested).toEqual({
+      "22": "22.23.2",
+      "24": "24.19.0",
+    });
+    expect(toolchain.node.preferred).toBe("24.19.0");
+    expect(toolchain.node.engines).toBe("^22.14.0 || ^24.0.0");
+    expect(toolchain.node.supportedMajors).toEqual([22, 24]);
+    expect(config.node.tested?.["24"]).toBe(toolchain.node.preferred);
+  });
+
   it("renders docs/support-matrix.md from docs/compatibility.yaml", async () => {
     const config = yaml.load(await readFile("docs/compatibility.yaml", "utf8")) as CompatibilityConfig;
     const supportMatrix = await readFile("docs/support-matrix.md", "utf8");
@@ -417,7 +438,7 @@ describe("compatibility matrix", () => {
     expect(integrationRuns).toContain("pnpm run test:int");
     expect(config.kicad.tested).toEqual(["10.0"]);
     expect(config.kicad.eol).toEqual(["9.0"]);
-    expect(config.source_checked.date).toBe("2026-07-28");
+    expect(config.source_checked.date).toBe("2026-08-08");
     expect(config.source_checked.kicad.release).toBe("https://www.kicad.org/blog/2026/07/KiCad-10.0.5-Release/");
     expect(config.kicad.latestVerified).toBe("10.0.5");
     expect(config.node.supported).toEqual(["22", "24"]);

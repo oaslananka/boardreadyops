@@ -46,7 +46,7 @@ describe("container action release surfaces", () => {
     const dockerfile = await readFile("apps/container/Dockerfile", "utf8");
 
     expect(dockerfile).toContain("FROM ubuntu:26.04@sha256:");
-    expect(dockerfile).toContain("ARG NODE_VERSION=24.18.0");
+    expect(dockerfile).toContain("ARG NODE_VERSION=24.19.0");
     expect(dockerfile).not.toContain("ARG PNPM_VERSION");
     expect(dockerfile).toContain("ARG KICAD_PPA_SERIES=10.0");
     expect(dockerfile).toContain(`ppa:kicad/kicad-\${KICAD_PPA_SERIES}-releases`);
@@ -110,7 +110,7 @@ describe("container action release surfaces", () => {
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
-        "node-version": "24.18.0",
+        "node-version": "24.19.0",
       },
     ]);
   });
