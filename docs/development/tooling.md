@@ -4,7 +4,7 @@
 
 The toolchain includes:
 
-- Node 24.18.0 as the preferred runtime, with Node 22.14+ retained in compatibility testing;
+- Node 24.19.0 as the preferred runtime, with Node 22.14+ retained in compatibility testing;
 - pnpm 11.8.0 through Corepack and a repository-local nested-script wrapper;
 - TypeScript, Biome, Vitest, V8 coverage, esbuild, and Puppeteer from the lockfile;
 - uv 0.11.16 and uv 0.11.16 and MkDocs Material in a repository-local Python virtual environment;
