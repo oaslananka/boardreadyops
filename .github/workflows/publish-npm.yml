@@ -221,17 +221,141 @@ jobs:
             fi
           done
 
+      - name: Verify npm Trusted Publisher OIDC
+        if: env.SHOULD_PUBLISH == 'true'
+        env:
+          NPM_PACKAGE: boardreadyops
+          NPM_REGISTRY: https://registry.npmjs.org
+        run: |
+          set -euo pipefail
+
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::GitHub OIDC request environment is unavailable; check id-token: write."
+            exit 1
+          fi
+
+          oidc_response="$(mktemp)"
+          exchange_response="$(mktemp)"
+          trap 'rm -f "${oidc_response}" "${exchange_response}"' EXIT
+
+          request_url="${ACTIONS_ID_TOKEN_REQUEST_URL}"
+          separator="?"
+          case "${request_url}" in
+            *\?*) separator="&" ;;
+          esac
+          curl --fail --silent --show-error \
+            --header "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${request_url}${separator}audience=npm:registry.npmjs.org" \
+            --output "${oidc_response}"
+
+          id_token="$(OIDC_RESPONSE="${oidc_response}" node -e '
+            const { readFileSync } = require("node:fs");
+            const body = JSON.parse(readFileSync(process.env.OIDC_RESPONSE, "utf8"));
+            if (typeof body.value !== "string" || body.value.length === 0) process.exit(1);
+            process.stdout.write(body.value);
+          ')"
+
+          ID_TOKEN="${id_token}" node <<'NODE'
+          const token = process.env.ID_TOKEN ?? "";
+          const segments = token.split(".");
+          if (segments.length !== 3) throw new Error("GitHub OIDC ID token is not a JWT");
+          const payload = JSON.parse(Buffer.from(segments[1], "base64url").toString("utf8"));
+          const expected = {
+            iss: "https://token.actions.githubusercontent.com",
+            aud: "npm:registry.npmjs.org",
+            repository: "oaslananka/boardreadyops",
+          };
+          for (const [claim, value] of Object.entries(expected)) {
+            if (payload[claim] !== value) {
+              throw new Error(`Unexpected GitHub OIDC ${claim}: ${JSON.stringify(payload[claim] ?? null)}`);
+            }
+          }
+          const workflowRef = String(payload.workflow_ref ?? "");
+          if (!workflowRef.startsWith("oaslananka/boardreadyops/.github/workflows/publish-npm.yml@")) {
+            throw new Error(`Unexpected GitHub OIDC workflow_ref: ${JSON.stringify(workflowRef)}`);
+          }
+          const safeClaims = {
+            iss: payload.iss,
+            aud: payload.aud,
+            repository: payload.repository,
+            repository_owner: payload.repository_owner,
+            workflow: payload.workflow,
+            workflow_ref: payload.workflow_ref,
+            job_workflow_ref: payload.job_workflow_ref ?? null,
+            ref: payload.ref,
+            event_name: payload.event_name,
+            environment: payload.environment ?? null,
+          };
+          console.log(`GitHub OIDC safe claims: ${JSON.stringify(safeClaims)}`);
+          NODE
+
+          http_code="$(curl --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${id_token}" \
+            --output "${exchange_response}" \
+            --write-out '%{http_code}' \
+            "${NPM_REGISTRY}/-/npm/v1/oidc/token/exchange/package/${NPM_PACKAGE}")"
+
+          if [ "${http_code}" -lt 200 ] || [ "${http_code}" -ge 300 ]; then
+            message="$(EXCHANGE_RESPONSE="${exchange_response}" node -e '
+              const { readFileSync } = require("node:fs");
+              let message = "Unknown error";
+              try {
+                const body = JSON.parse(readFileSync(process.env.EXCHANGE_RESPONSE, "utf8"));
+                if (typeof body.message === "string" && body.message.length > 0) message = body.message;
+              } catch {}
+              process.stdout.write(message.replace(/[\r\n]+/g, " "));
+            ')"
+            echo "::error::npm Trusted Publisher OIDC exchange failed (HTTP ${http_code}): ${message}"
+            exit 1
+          fi
+
+          EXCHANGE_RESPONSE="${exchange_response}" node -e '
+            const { readFileSync } = require("node:fs");
+            const body = JSON.parse(readFileSync(process.env.EXCHANGE_RESPONSE, "utf8"));
+            if (typeof body.token !== "string" || body.token.length === 0) {
+              throw new Error("npm OIDC exchange response did not contain a token");
+            }
+          '
+          echo "npm Trusted Publisher OIDC exchange succeeded."
+
       - name: Publish npm package
         if: env.SHOULD_PUBLISH == 'true'
+        env:
+          NPM_PACKAGE: boardreadyops
+          NPM_REGISTRY: https://registry.npmjs.org
         run: |
           set -euo pipefail
 
           package_version="$(jq -er '.version' package.json)"
-          published_version="$(npm view "boardreadyops@${package_version}" version --json 2>/dev/null | jq -r '. // empty' || true)"
-          if [ "${published_version}" = "${package_version}" ]; then
-            echo "boardreadyops@${package_version} is already published; skipping npm publish."
-            exit 0
+          published_response="$(mktemp)"
+          trap 'rm -f "${published_response}"' EXIT
+          if ! published_http_code="$(curl --silent --show-error \
+            --output "${published_response}" \
+            --write-out '%{http_code}' \
+            "${NPM_REGISTRY}/${NPM_PACKAGE}/${package_version}")"; then
+            echo "::error::Could not check npm registry for ${NPM_PACKAGE}@${package_version}."
+            exit 1
           fi
+
+          case "${published_http_code}" in
+            200)
+              published_version="$(jq -er '.version' "${published_response}")"
+              if [ "${published_version}" != "${package_version}" ]; then
+                echo "::error::npm registry returned version ${published_version} for ${NPM_PACKAGE}@${package_version}."
+                exit 1
+              fi
+              echo "${NPM_PACKAGE}@${package_version} is already published; skipping npm publish."
+              exit 0
+              ;;
+            404)
+              ;;
+            *)
+              echo "::error::Could not check npm registry for ${NPM_PACKAGE}@${package_version} (HTTP ${published_http_code})."
+              exit 1
+              ;;
+          esac
+
           if [ "${RELEASE_IS_PRERELEASE}" = "true" ]; then
             npm publish --access public --tag next
           else
