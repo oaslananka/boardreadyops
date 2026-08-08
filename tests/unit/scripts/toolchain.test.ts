@@ -88,7 +88,7 @@ function healthyProbe(overrides: Partial<ToolchainProbe> = {}): ToolchainProbe {
   return {
     platform: "linux",
     architecture: "x64",
-    nodeVersion: "24.18.0",
+    nodeVersion: "24.19.0",
     corepackVersion: "0.34.6",
     pnpmVersion: "11.8.0",
     pythonVersion: "3.13.5",
