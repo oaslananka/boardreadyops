@@ -8,6 +8,15 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.30.2](https://github.com/oaslananka/boardreadyops/compare/v1.30.1...v1.30.2) (2026-08-08)
+
+
+### Bug Fixes
+
+* **ci:** harden toolchain bootstrap isolation ([#342](https://github.com/oaslananka/boardreadyops/issues/342)) ([204ebf5](https://github.com/oaslananka/boardreadyops/commit/204ebf5fde6325ef359eba51613e50f0ad5f5e34))
+* **ci:** restore dependency vulnerability gates ([#336](https://github.com/oaslananka/boardreadyops/issues/336)) ([257f16e](https://github.com/oaslananka/boardreadyops/commit/257f16e6df6487467ca33ad7660b61e7197d3455))
+* **ci:** use Git-compatible null config paths ([#340](https://github.com/oaslananka/boardreadyops/issues/340)) ([2944474](https://github.com/oaslananka/boardreadyops/commit/29444745dc300fec63a310497cc5398859484d45))
+
 ## [1.30.1](https://github.com/oaslananka/boardreadyops/compare/v1.30.0...v1.30.1) (2026-08-05)
 
 
