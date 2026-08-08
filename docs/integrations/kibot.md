@@ -28,7 +28,7 @@ jobs:
         run: kibot -c kibot.yaml -b hardware/main.kicad_pcb -d build/fab
 
       - name: Validate release readiness
-        uses: oaslananka/boardreadyops@288e2da378a3a80e7591dd410d0fcba6a2b46330 # v1.4.6
+        uses: oaslananka/boardreadyops@884f5fa31f8fd701693c533747c69eb7d13f5464 # v1.30.1
         with:
           config: boardreadyops.yml
           mode: enforce

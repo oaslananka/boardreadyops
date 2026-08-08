@@ -7,7 +7,7 @@ KiCad installation step. The container image includes KiCad CLI, Node.js, and
 the published BoardReadyOps package.
 
 The `ghcr.io/oaslananka/boardreadyops-full:v1` and `latest` images are
-anonymously readable as of the 2026-06-19 verification. Pin the Action reference
+anonymously readable as of the 2026-08-07 verification. Pin the Action reference
 to a release commit SHA for reproducibility.
 
 ```yaml
@@ -25,7 +25,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops/apps/container@288e2da378a3a80e7591dd410d0fcba6a2b46330 # v1.4.6
+      - uses: oaslananka/boardreadyops/apps/container@884f5fa31f8fd701693c533747c69eb7d13f5464 # v1.30.1
         with:
           config: boardreadyops.yml
           require-kicad: "true"
@@ -44,9 +44,9 @@ docker run --rm ghcr.io/oaslananka/boardreadyops-full:v1 --help
 ```
 
 The public `v1` and `latest` images were re-verified anonymously on
-2026-06-19 with OCI index digest
-`sha256:03eea649a1968e67fdb91f9c53e97e040bee3ca481f2b5ec79a8b8b3a11f299a`.
-The exact `v1.4.6`, `v1`, and `latest` tags all resolve to `sha256:03eea649a1968e67fdb91f9c53e97e040bee3ca481f2b5ec79a8b8b3a11f299a`.
+2026-08-07 with OCI index digest
+`sha256:4df163600bd03126f072a5870db33f72db9991bf932fe275b5858e54f73fc650`.
+The exact `v1.30.1`, `v1`, and `latest` tags all resolve to that same digest.
 
 The image includes the unprivileged `boardreadyops` account at UID `10001` for
 direct container runs that can provide writable mounts for that user. The

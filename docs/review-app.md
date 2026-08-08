@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@4efcd6d73e2e0de15a39c745b1a67e6c7a4f9ce0 # current action contract
+      - uses: oaslananka/boardreadyops@884f5fa31f8fd701693c533747c69eb7d13f5464 # v1.30.1
         with:
           comment-format: review
 ```
