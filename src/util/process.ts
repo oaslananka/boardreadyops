@@ -80,29 +80,21 @@ export function runProcess(command: string, args: string[], options: ProcessOpti
     child.stderr.on("data", (chunk: Buffer) => {
       stderr = appendBounded(stderr, chunk.toString("utf8"), maxStderr);
     });
-    child.on("error", (error) => {
-      if (settled) {
-        return;
-      }
+    const settle = (result: ProcessResult) => {
+      if (settled) return;
       settled = true;
       cleanup();
       if (aborted && options.signal) {
         rejectProcess(abortReason(options.signal));
         return;
       }
-      resolveProcess({ code: null, stdout, stderr, timedOut, error: error.message });
+      resolveProcess(result);
+    };
+    child.on("error", (error) => {
+      settle({ code: null, stdout, stderr, timedOut, error: error.message });
     });
     child.on("close", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      if (aborted && options.signal) {
-        rejectProcess(abortReason(options.signal));
-        return;
-      }
-      resolveProcess({ code, stdout, stderr, timedOut });
+      settle({ code, stdout, stderr, timedOut });
     });
   });
 }

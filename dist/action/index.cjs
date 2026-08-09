@@ -84891,29 +84891,21 @@ function runProcess(command, args, options = {}) {
     child.stderr.on("data", (chunk) => {
       stderr = appendBounded(stderr, chunk.toString("utf8"), maxStderr);
     });
-    child.on("error", (error52) => {
-      if (settled) {
-        return;
-      }
+    const settle = (result) => {
+      if (settled) return;
       settled = true;
       cleanup();
       if (aborted2 && options.signal) {
         rejectProcess(abortReason(options.signal));
         return;
       }
-      resolveProcess({ code: null, stdout, stderr, timedOut, error: error52.message });
+      resolveProcess(result);
+    };
+    child.on("error", (error52) => {
+      settle({ code: null, stdout, stderr, timedOut, error: error52.message });
     });
     child.on("close", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      if (aborted2 && options.signal) {
-        rejectProcess(abortReason(options.signal));
-        return;
-      }
-      resolveProcess({ code, stdout, stderr, timedOut });
+      settle({ code, stdout, stderr, timedOut });
     });
   });
 }

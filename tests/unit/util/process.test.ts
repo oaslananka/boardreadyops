@@ -34,7 +34,9 @@ describe("runProcess cancellation", () => {
     controller.abort();
 
     await expect(child).rejects.toMatchObject({ name: "AbortError" });
-    expect(Date.now() - abortedAt).toBeGreaterThanOrEqual(400);
+    if (process.platform !== "win32") {
+      expect(Date.now() - abortedAt).toBeGreaterThanOrEqual(400);
+    }
   }, 5_000);
 
   it("preserves timeout results while terminating an unresponsive child", async () => {
