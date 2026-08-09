@@ -52,7 +52,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Configure measured scale preset
         run: node scripts/control-plane-scale-envelope.mjs env "${{ matrix.preset }}" "$GITHUB_ENV"

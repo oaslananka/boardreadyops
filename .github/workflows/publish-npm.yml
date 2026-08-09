@@ -131,7 +131,7 @@ jobs:
       - if: env.SHOULD_PUBLISH == 'true'
         run: corepack enable
       - if: env.SHOULD_PUBLISH == 'true'
-        run: corepack install
+        run: node scripts/toolchain.mjs corepack-install
       - name: Setup uv
         if: env.SHOULD_PUBLISH == 'true'
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39

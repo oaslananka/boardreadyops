@@ -53,7 +53,7 @@ jobs:
           cd "$workdir"
           git fetch origin "${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           corepack enable
-          corepack install
+          node scripts/toolchain.mjs corepack-install
           pnpm install --frozen-lockfile
           # Keep generated release and compliance artifacts reviewable on the
           # release pull request instead of mutating them inside validation jobs.

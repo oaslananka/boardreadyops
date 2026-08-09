@@ -94,7 +94,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
       - run: pnpm run compatibility:check
@@ -127,7 +127,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
 
@@ -146,7 +146,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:unit
 
@@ -175,7 +175,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:unit
 
@@ -222,7 +222,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - name: Install KiCad ${{ matrix.kicad-version }}
         run: |
           set -euo pipefail
@@ -264,7 +264,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vitest run tests/integration/cross-platform-paths.test.ts
 
@@ -283,7 +283,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:action
 
@@ -302,7 +302,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - name: Setup uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
@@ -337,7 +337,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - name: Setup uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
         with:
@@ -369,7 +369,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Build cloud application
@@ -397,7 +397,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm --filter @boardreadyops/web build
@@ -420,7 +420,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run verify:dist
 
@@ -439,7 +439,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run coverage:ci
       - name: Upload bounded coverage evidence
@@ -515,7 +515,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run mutation
       - name: Check mutation thresholds
@@ -545,7 +545,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run security
       - name: Assert compliance checks did not mutate the checkout
@@ -566,7 +566,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run sbom
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

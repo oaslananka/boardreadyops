@@ -25,6 +25,6 @@ jobs:
           node-version-file: .nvmrc
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint

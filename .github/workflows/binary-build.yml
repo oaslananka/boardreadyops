@@ -56,7 +56,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
           no-cache: true
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build:binary -- --target ${{ matrix.target }}
       - run: pnpm run build:binary:verify -- --target ${{ matrix.target }}
@@ -90,7 +90,7 @@ jobs:
           path: dist/binary
           merge-multiple: true
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run sbom
       - name: Verify downloaded binary artifacts and generate checksums

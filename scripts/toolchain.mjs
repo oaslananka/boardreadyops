@@ -708,6 +708,28 @@ async function readOptional(file) {
   }
 }
 
+export async function installCorepackWithRetry({
+  cwd = defaultRepositoryRoot,
+  env = process.env,
+  attempts = 3,
+  retryDelayMs = Number(env.BOARDREADYOPS_COREPACK_RETRY_DELAY_MS ?? 1000),
+} = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await run("corepack", ["install"], { cwd, env });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+      const delayMs = Math.max(0, retryDelayMs) * attempt;
+      process.stderr.write(`Corepack install attempt ${attempt}/${attempts} failed; retrying in ${delayMs}ms.\n`);
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw new Error(`Corepack install failed after ${attempts} attempts: ${diagnosticReason(lastError)}`);
+}
+
 async function run(command, args, options) {
   const child = spawn(command, args, { ...options, stdio: "inherit" });
   const code = await new Promise((resolve, reject) => {
@@ -751,6 +773,10 @@ async function main() {
     renderDoctor(result);
     if (args.includes("--json")) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (args.includes("--strict") && !result.ok) process.exitCode = 1;
+    return;
+  }
+  if (command === "corepack-install") {
+    await installCorepackWithRetry({ cwd: repositoryRoot, env: process.env });
     return;
   }
   if (command === "run") {
