@@ -47,6 +47,17 @@ describe("runner CLI surface", () => {
     expect(streams.stderrText()).toContain("Runner interval must not exceed 300 seconds");
   });
 
+  it("documents and validates the explicit runner artifact mode", async () => {
+    const help = captureStreams();
+    expect(await runCli(["runner", "once", "--help"], help)).toBe(0);
+    expect(help.stdoutText()).toContain("--artifact-mode <mode>");
+    expect(help.stdoutText()).toContain("metadata-only");
+
+    const invalid = captureStreams();
+    expect(await runCli(["runner", "once", "--artifact-mode", "external-bucket"], invalid)).toBe(2);
+    expect(invalid.stderrText()).toContain("Runner artifact mode must be control-plane or metadata-only");
+  });
+
   it("does not rewrite runner as the default run command", async () => {
     const streams = captureStreams();
 

@@ -54581,13 +54581,16 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
+    const artifactMode = options.artifactMode ?? "control-plane";
+    const suppressArtifacts = job.safeMode.enabled || artifactMode === "metadata-only";
     let uploadedArtifacts = [];
-    if (job.safeMode.enabled) {
+    if (suppressArtifacts) {
       if (execution.artifacts.length > 0) {
         dependencies.log("runner.artifacts.suppressed", {
           run_id: job.runId,
           execution_attempt_id: job.executionAttemptId,
           artifacts: execution.artifacts.length,
+          artifact_mode: artifactMode,
           safe_mode_reasons: [...job.safeMode.reasons]
         });
       }
@@ -54599,7 +54602,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     }
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
-    const result = terminalResultFromExecution(job, execution, uploadedArtifacts);
+    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode);
     const request = {
       protocolVersion: 1,
       runId: job.runId,
@@ -54751,7 +54754,7 @@ async function publishArtifacts(client, job, artifacts) {
   }
   return published;
 }
-function terminalResultFromExecution(job, execution, artifacts) {
+function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
   const completed = execution.exitCode === 0 || execution.exitCode === 1;
   const decision = decisionFromExitCode(execution.exitCode);
   const findings = execution.report ? execution.report.findings.slice(0, 500).map((finding2) => ({
@@ -54782,9 +54785,10 @@ function terminalResultFromExecution(job, execution, artifacts) {
       findings_medium: summary?.medium ?? 0,
       findings_low: summary?.low ?? 0,
       findings_info: summary?.info ?? 0,
+      artifact_mode_metadata_only: artifactMode === "metadata-only" ? 1 : 0,
       artifacts_generated: execution.artifacts.length,
       artifacts_uploaded: artifacts.length,
-      artifacts_suppressed: job.safeMode.enabled ? execution.artifacts.length : 0,
+      artifacts_suppressed: Math.max(0, execution.artifacts.length - artifacts.length),
       ...execution.report?.readiness ? { readiness_score: execution.report.readiness.score } : {}
     },
     ...execution.report?.readiness ? { readiness: execution.report.readiness } : {},
@@ -55102,7 +55106,8 @@ function workerOptions(options) {
     ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },
     ...options.pollSeconds === void 0 ? {} : { pollSeconds: options.pollSeconds },
     requireKicad: options.requireKicad ?? true,
-    keepWorkspace: options.keepWorkspace ?? false
+    keepWorkspace: options.keepWorkspace ?? false,
+    artifactMode: options.artifactMode ?? "control-plane"
   };
 }
 function identityPath(options) {
@@ -56838,7 +56843,12 @@ function registerAllCommands(program2, streams) {
   runner.command("activate").description("activate a runner identity using a one-time enrollment token file").requiredOption("--url <url>", "BoardReadyOps control-plane origin").requiredOption("--enrollment-token-file <path>", "root-readable file containing the one-time token").option("--identity-dir <path>", "directory for the runner identity and Ed25519 keypair").option("--capability <value>", "runner capability selector", collectOption, []).option("--label <value>", "runner claim label", collectOption, []).option("--format <format>", "text or json", runnerOutputFormat, "text").action(async (options) => {
     process.exitCode = await runnerActivateCommand(options, streams);
   });
-  const addRunnerWorkOptions = (command) => command.option("--identity <path>", "runner identity JSON file").option("--workspace-root <path>", "private root for ephemeral source workspaces").option("--repository-mirror-root <path>", "customer-controlled bare repository mirror root").option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30).option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15).option("--no-require-kicad", "allow execution without kicad-cli").option("--keep-workspace", "retain the checked-out workspace after completion").option("--format <format>", "text or json", runnerOutputFormat, "text");
+  const addRunnerWorkOptions = (command) => command.option("--identity <path>", "runner identity JSON file").option("--workspace-root <path>", "private root for ephemeral source workspaces").option("--repository-mirror-root <path>", "customer-controlled bare repository mirror root").option("--heartbeat-seconds <seconds>", "lease heartbeat interval", runnerSeconds, 30).option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15).option("--no-require-kicad", "allow execution without kicad-cli").option("--keep-workspace", "retain the checked-out workspace after completion").option(
+    "--artifact-mode <mode>",
+    "artifact handling: control-plane or metadata-only",
+    runnerArtifactMode,
+    "control-plane"
+  ).option("--format <format>", "text or json", runnerOutputFormat, "text");
   addRunnerWorkOptions(runner.command("once").description("claim and process at most one runner job")).action(
     async (options) => {
       process.exitCode = await runnerOnceCommand(options, streams);
@@ -56896,6 +56906,12 @@ function runnerRevocationReason(value) {
   ];
   if (!values.includes(value)) {
     throw new InvalidArgumentError(`Runner revocation reason must be one of: ${values.join(", ")}.`);
+  }
+  return value;
+}
+function runnerArtifactMode(value) {
+  if (value !== "control-plane" && value !== "metadata-only") {
+    throw new InvalidArgumentError("Runner artifact mode must be control-plane or metadata-only.");
   }
   return value;
 }
