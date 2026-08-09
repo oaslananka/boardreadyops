@@ -3,6 +3,7 @@ import {
   formatArtifactBytes,
   formatRunDate,
   formatRunDuration,
+  githubActionsRunUrl,
   lookupRunDashboard,
   type RunDashboardQueryExecutor,
 } from "../../../apps/web/lib/run-dashboard.js";
@@ -73,6 +74,17 @@ async function stateFor(row: Record<string, unknown>): Promise<string | undefine
 }
 
 describe("run dashboard data", () => {
+  it("builds canonical GitHub Actions run links only for numeric workflow run IDs", () => {
+    expect(githubActionsRunUrl("octo-org/hardware-board", "456789")).toBe(
+      "https://github.com/octo-org/hardware-board/actions/runs/456789",
+    );
+    expect(githubActionsRunUrl("octo org/hardware board", "456789")).toBe(
+      "https://github.com/octo%20org/hardware%20board/actions/runs/456789",
+    );
+    expect(githubActionsRunUrl("octo-org/hardware-board", "dispatch-456")).toBeUndefined();
+    expect(githubActionsRunUrl("octo-org/hardware-board", "0")).toBeUndefined();
+  });
+
   it("returns not-found after the run lookup without querying child rows", async () => {
     const { executor, query } = executorWithResults([{ rows: [] }]);
     await expect(lookupRunDashboard("missing-run", executor)).resolves.toEqual({ state: "not-found" });
@@ -294,7 +306,7 @@ describe("run dashboard data", () => {
             heartbeat_at: completedAt,
             completed_at: completedAt,
             retry_after_at: null,
-            github_workflow_dispatch_id: "dispatch-456",
+            github_workflow_dispatch_id: "456789",
             failure_class: null,
             failure_message: null,
             result_digest: "b".repeat(64),
@@ -408,7 +420,14 @@ describe("run dashboard data", () => {
             downloadUrl: "https://boardreadyops.test/download/run-123/artifact-456",
           },
         ],
-        attempts: [{ id: "attempt-2", attemptNumber: 2, workflowDispatchId: "dispatch-456" }],
+        attempts: [
+          {
+            id: "attempt-2",
+            attemptNumber: 2,
+            workflowDispatchId: "456789",
+            workflowRunUrl: "https://github.com/octo-org/hardware-board/actions/runs/456789",
+          },
+        ],
         transitions: [{ entityType: "release_run", reasonCode: "runner_result_completed" }],
         reportLinks: [{ label: "HTML report", url: "https://reports.example.test/run-123" }],
       },

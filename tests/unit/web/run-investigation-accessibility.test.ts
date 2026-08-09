@@ -134,6 +134,40 @@ async function axeViolations(markup: string, path: string): Promise<string[]> {
 }
 
 describe("run investigation accessibility", () => {
+  it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {
+    const run = sampleRun();
+    run.attempts = [
+      {
+        id: "attempt-1",
+        attemptNumber: 1,
+        status: "completed",
+        createdAt: run.startedAt,
+        dispatchRequestedAt: run.startedAt,
+        dispatchedAt: run.startedAt,
+        startedAt: run.startedAt,
+        heartbeatAt: run.completedAt,
+        completedAt: run.completedAt,
+        retryAfterAt: undefined,
+        workflowDispatchId: "456789",
+        workflowRunUrl: "https://github.com/oaslananka/boardreadyops/actions/runs/456789",
+        failureClass: undefined,
+        failureMessage: undefined,
+        resultDigest: "b".repeat(64),
+      },
+    ];
+
+    const summary = renderToStaticMarkup(createElement(SummaryView, { run }));
+    const attempts = renderToStaticMarkup(createElement(AttemptsView, { run }));
+    const artifacts = renderToStaticMarkup(createElement(ArtifactsView, { run, searchParameters: {} }));
+
+    for (const markup of [summary, attempts, artifacts]) {
+      expect(markup).toContain("https://github.com/oaslananka/boardreadyops/actions/runs/456789");
+    }
+    expect(summary).toContain("Open GitHub Actions run");
+    expect(attempts).toContain("Open workflow logs and artifacts");
+    expect(artifacts).toContain("Open repository-owned GitHub Actions artifacts");
+  });
+
   it("renders stable investigation flow snapshots", () => {
     expect({
       summary: viewMarkup("summary"),
