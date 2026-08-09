@@ -47,10 +47,12 @@ export async function runPipeline(
   input: Partial<PipelineOptions> & { cwd?: string; path?: string } = {},
   logger?: Logger,
 ): Promise<RunResult> {
+  input.signal?.throwIfAborted();
   registerPipelineRules();
 
   // 1. Initialization Phase
   const ctx = await initializePipelineContext(input, logger);
+  ctx.options.signal?.throwIfAborted();
   const pipelineStart = performance.now();
   ctx.logger.debug("pipeline.start", {
     path: ctx.root,
@@ -59,12 +61,15 @@ export async function runPipeline(
 
   // 2. Discovery Phase
   const { pluginLoad, loadedWithPluginErrors, projects } = await discoverPhase(ctx);
+  ctx.options.signal?.throwIfAborted();
 
   // 3. Validation Phase
   const findings = await validatePhase(ctx, loadedWithPluginErrors, projects);
+  ctx.options.signal?.throwIfAborted();
 
   // 4. Post-processing Phase
   const postProcessed = await postProcessPhase(ctx, findings, projects);
+  ctx.options.signal?.throwIfAborted();
 
   // 5. Dispatch Phase
   const result = assembleRunResult({
@@ -79,6 +84,7 @@ export async function runPipeline(
     projects,
   });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
+  ctx.options.signal?.throwIfAborted();
 
   ctx.logger.debug("pipeline.finish", {
     latency_ms: Math.round(performance.now() - pipelineStart),
@@ -170,6 +176,7 @@ async function validatePhase(
   });
 
   const projectFindings = await mapLimit(projects, ctx.options.concurrency, async (project) => {
+    ctx.options.signal?.throwIfAborted();
     const projectConfig = configForProject(ctx.root, ctx.config, project);
     const override = projectConfig.projects?.[0];
     const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
@@ -188,6 +195,7 @@ async function validatePhase(
     };
     const output: Finding[] = [];
     for (const rule of activeRules) {
+      ctx.options.signal?.throwIfAborted();
       const startedAt = performance.now();
       ctx.logger.debug("pipeline.rule.start", {
         rule: rule.meta.id,
@@ -408,6 +416,7 @@ function normalizeOptions(
     quiet: input.quiet ?? false,
     verbose: input.verbose ?? false,
     color: input.color ?? "auto",
+    ...(input.signal ? { signal: input.signal } : {}),
     ...(input.notificationLinks ? { notificationLinks: input.notificationLinks } : {}),
   };
 }

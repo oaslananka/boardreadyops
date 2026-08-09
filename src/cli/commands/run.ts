@@ -100,9 +100,12 @@ export async function runCommand(
   options: CommonCliOptions,
   streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
   commandName = "run",
+  runtime: { signal?: AbortSignal } = {},
 ): Promise<number> {
+  runtime.signal?.throwIfAborted();
   const locale = resolveLocale();
   const root = await canonicalRoot(path.resolve(normalizePathInput(pathInput ?? ".")));
+  runtime.signal?.throwIfAborted();
   const logger = createCliLogger(root, options, streams.stderr);
   const startedAt = performance.now();
   let exitCode = 4;
@@ -127,7 +130,7 @@ export async function runCommand(
       return finish(2);
     }
     if (options.requireKicad) {
-      const kicad = await detectKicadCli(options.kicadCli);
+      const kicad = await detectKicadCli(options.kicadCli, runtime.signal);
       if (!kicad.found) {
         if (writesJsonToStdout(options)) {
           await writeDiagnosticReport(root, loaded, [kicadMissingFinding()], 3, streams, locale);
@@ -144,7 +147,13 @@ export async function runCommand(
         spinner.start();
       }
       try {
-        const result = await runPipeline(pipelineInputFromCli(root, options, options.annotations ?? true), logger);
+        const result = await runPipeline(
+          {
+            ...pipelineInputFromCli(root, options, options.annotations ?? true),
+            ...(runtime.signal ? { signal: runtime.signal } : {}),
+          },
+          logger,
+        );
         const resultExitCode = result.summary.failed ? 1 : 0;
         const cliResult = withCliStatus(result, resultExitCode);
 

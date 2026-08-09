@@ -14,16 +14,22 @@ export interface ProcessOptions {
   timeoutMs?: number;
   maxStdoutBytes?: number;
   maxStderrBytes?: number;
+  signal?: AbortSignal;
 }
 
 export function runProcess(command: string, args: string[], options: ProcessOptions = {}): Promise<ProcessResult> {
-  return new Promise((resolveProcess) => {
+  if (options.signal?.aborted) {
+    return Promise.reject(abortReason(options.signal));
+  }
+  return new Promise((resolveProcess, rejectProcess) => {
     const maxStdout = options.maxStdoutBytes ?? 1024 * 1024;
     const maxStderr = options.maxStderrBytes ?? 512 * 1024;
     let stdout = "";
     let stderr = "";
     let settled = false;
     let timedOut = false;
+    let aborted = false;
+    let forceKillTimer: NodeJS.Timeout | undefined;
     const useCmdShim = process.platform === "win32" && /\.(cmd|bat)$/i.test(command);
     const commandLine = useCmdShim
       ? {
@@ -38,16 +44,35 @@ export function runProcess(command: string, args: string[], options: ProcessOpti
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    const timer = setTimeout(() => {
-      timedOut = true;
+    const requestTermination = () => {
       child.kill("SIGTERM");
-      setTimeout(() => {
+      if (forceKillTimer) return;
+      forceKillTimer = setTimeout(() => {
         if (!settled) {
           child.kill("SIGKILL");
         }
-      }, 500).unref();
+      }, 500);
+      forceKillTimer.unref();
+    };
+    const onAbort = () => {
+      if (settled || aborted) return;
+      aborted = true;
+      requestTermination();
+    };
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+    if (options.signal?.aborted) onAbort();
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      requestTermination();
     }, options.timeoutMs ?? 30_000);
     timer.unref();
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      options.signal?.removeEventListener("abort", onAbort);
+    };
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdout = appendBounded(stdout, chunk.toString("utf8"), maxStdout);
@@ -55,23 +80,30 @@ export function runProcess(command: string, args: string[], options: ProcessOpti
     child.stderr.on("data", (chunk: Buffer) => {
       stderr = appendBounded(stderr, chunk.toString("utf8"), maxStderr);
     });
-    child.on("error", (error) => {
-      if (settled) {
+    const settle = (result: ProcessResult) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (aborted && options.signal) {
+        rejectProcess(abortReason(options.signal));
         return;
       }
-      settled = true;
-      clearTimeout(timer);
-      resolveProcess({ code: null, stdout, stderr, timedOut, error: error.message });
+      resolveProcess(result);
+    };
+    child.on("error", (error) => {
+      settle({ code: null, stdout, stderr, timedOut, error: error.message });
     });
     child.on("close", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      resolveProcess({ code, stdout, stderr, timedOut });
+      settle({ code, stdout, stderr, timedOut });
     });
   });
+}
+
+function abortReason(signal: AbortSignal): Error {
+  if (signal.reason instanceof Error) return signal.reason;
+  const error = new Error("The operation was aborted");
+  error.name = "AbortError";
+  return error;
 }
 
 function trustedCmdExe(): string {

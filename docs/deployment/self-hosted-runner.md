@@ -198,7 +198,7 @@ sudo -u boardreadyops-runner boardreadyops runner serve \
   --format json
 ```
 
-`serve` handles `SIGINT` and `SIGTERM`, stops polling, and relinquishes a claimed lease when shutdown interrupts execution. Transient claim errors are logged and retried after the configured poll interval. A valid signed claim poll refreshes the registration presence timestamp and, when supplied, the last reported strict agent version even when the queue is empty. A replayed request, a capability mismatch, an invalid signature, or a minimum-version rejection does not refresh presence.
+`serve` handles `SIGINT` and `SIGTERM`, stops polling, and propagates shutdown into an in-flight analysis before relinquishing the claimed lease. BoardReadyOps-owned KiCad child processes receive `SIGTERM`; if a child does not exit within 500 ms, the runner sends `SIGKILL` and waits for the child to close before cleaning the temporary workspace. Transient claim errors are logged and retried after the configured poll interval. A valid signed claim poll refreshes the registration presence timestamp and, when supplied, the last reported strict agent version even when the queue is empty. A replayed request, a capability mismatch, an invalid signature, or a minimum-version rejection does not refresh presence.
 
 ## Operator fleet visibility
 

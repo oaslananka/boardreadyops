@@ -83,7 +83,7 @@ export type RunnerWorkerDependencies = {
   executePipeline: (
     workspace: string,
     job: RunnerClaimedJob,
-    options: { requireKicad: boolean },
+    options: { requireKicad: boolean; signal?: AbortSignal },
   ) => Promise<RunnerExecutionOutput>;
   removeWorkspace: (workspace: string) => Promise<void>;
   sleep: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
@@ -175,6 +175,7 @@ export async function runRunnerWorkerOnce(
     heartbeat.start();
     const execution = await dependencies.executePipeline(workspace, job, {
       requireKicad: options.requireKicad ?? true,
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
@@ -223,11 +224,17 @@ export async function runRunnerWorkerOnce(
       decision: result.decision ?? "error",
     };
   } catch (error) {
+    const shutdown = error instanceof RunnerShutdownError || options.signal?.aborted === true;
+    const reportedError = shutdown && !(error instanceof RunnerShutdownError) ? new RunnerShutdownError() : error;
     if (!terminalPublished) {
-      const reason = error instanceof RunnerShutdownError ? "shutdown" : "job_error";
-      await bestEffortRelinquish(client, job, reason, sanitizedErrorMessage(error));
+      await bestEffortRelinquish(
+        client,
+        job,
+        shutdown ? "shutdown" : "job_error",
+        sanitizedErrorMessage(reportedError),
+      );
     }
-    throw error;
+    throw reportedError;
   } finally {
     await heartbeat.stop();
     if (workspace && (job.safeMode.enabled || options.keepWorkspace !== true)) {

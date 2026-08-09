@@ -16,7 +16,7 @@ export interface KicadReportRuleOptions {
 }
 
 export async function runKicadReportRule(context: RuleContext, options: KicadReportRuleOptions): Promise<Finding[]> {
-  const cli = await detectKicadCli(context.options.kicadCli);
+  const cli = await detectKicadCli(context.options.kicadCli, context.options.signal);
   if (!cli.found || !cli.path) {
     return [
       finding(context, {
@@ -49,6 +49,7 @@ async function processDesignFileReport(
   const result = await runKicadReport(cliPath, options.command, absoluteFile, {
     ...(context.options.variant ? { variant: context.options.variant } : {}),
     ...(cliVersion ? { version: cliVersion } : {}),
+    ...(context.options.signal ? { signal: context.options.signal } : {}),
   });
   for (const diagnostic of result.diagnostics) {
     const severity = options.severity(context, diagnostic.ruleId, kicadSeverityToFindingSeverity(diagnostic.severity));
