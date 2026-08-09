@@ -9534,7 +9534,7 @@ var require_omap = __commonJS({
     var _toString = Object.prototype.toString;
     function resolveYamlOmap(data) {
       if (data === null) return true;
-      const objectKeys = [];
+      const objectKeys = {};
       const object2 = data;
       for (let index = 0, length = object2.length; index < length; index += 1) {
         const pair = object2[index];
@@ -9548,8 +9548,8 @@ var require_omap = __commonJS({
           }
         }
         if (!pairHasKey) return false;
-        if (objectKeys.indexOf(pairKey) === -1) objectKeys.push(pairKey);
-        else return false;
+        if (_hasOwnProperty.call(objectKeys, pairKey)) return false;
+        Object.defineProperty(objectKeys, pairKey, { value: true });
       }
       return true;
     }
