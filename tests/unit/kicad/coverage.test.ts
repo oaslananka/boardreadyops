@@ -132,6 +132,18 @@ describe("KiCad CLI adapters", () => {
     ]);
   });
 
+  it("propagates an aborted execution signal into KiCad report processes", async () => {
+    const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)" });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      runKicadReport(process.execPath, "drc", path.join(root, "board.kicad_pcb"), { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
   it("returns sanitized textual errors when KiCad emits no JSON diagnostics", async () => {
     const root = await writeFixture({ "board.kicad_pcb": "(kicad_pcb)" });
     const cli = await writeExecutable(root, "bad-report-cli", [

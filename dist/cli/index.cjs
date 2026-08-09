@@ -27706,13 +27706,18 @@ var import_node_path15 = __toESM(require("node:path"), 1);
 var import_node_child_process2 = require("node:child_process");
 var import_node_path14 = require("node:path");
 function runProcess(command, args, options = {}) {
-  return new Promise((resolveProcess) => {
+  if (options.signal?.aborted) {
+    return Promise.reject(abortReason(options.signal));
+  }
+  return new Promise((resolveProcess, rejectProcess) => {
     const maxStdout = options.maxStdoutBytes ?? 1024 * 1024;
     const maxStderr = options.maxStderrBytes ?? 512 * 1024;
     let stdout = "";
     let stderr = "";
     let settled = false;
     let timedOut = false;
+    let aborted2 = false;
+    let forceKillTimer;
     const useCmdShim = process.platform === "win32" && /\.(cmd|bat)$/i.test(command);
     const commandLine = useCmdShim ? {
       command: trustedCmdExe(),
@@ -27724,39 +27729,62 @@ function runProcess(command, args, options = {}) {
       windowsVerbatimArguments: useCmdShim,
       stdio: ["ignore", "pipe", "pipe"]
     });
-    const timer = setTimeout(() => {
-      timedOut = true;
+    const requestTermination = () => {
       child.kill("SIGTERM");
-      setTimeout(() => {
+      if (forceKillTimer) return;
+      forceKillTimer = setTimeout(() => {
         if (!settled) {
           child.kill("SIGKILL");
         }
-      }, 500).unref();
+      }, 500);
+      forceKillTimer.unref();
+    };
+    const onAbort = () => {
+      if (settled || aborted2) return;
+      aborted2 = true;
+      requestTermination();
+    };
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+    if (options.signal?.aborted) onAbort();
+    const timer = setTimeout(() => {
+      timedOut = true;
+      requestTermination();
     }, options.timeoutMs ?? 3e4);
     timer.unref();
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
+      options.signal?.removeEventListener("abort", onAbort);
+    };
     child.stdout.on("data", (chunk) => {
       stdout = appendBounded(stdout, chunk.toString("utf8"), maxStdout);
     });
     child.stderr.on("data", (chunk) => {
       stderr = appendBounded(stderr, chunk.toString("utf8"), maxStderr);
     });
-    child.on("error", (error51) => {
-      if (settled) {
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (aborted2 && options.signal) {
+        rejectProcess(abortReason(options.signal));
         return;
       }
-      settled = true;
-      clearTimeout(timer);
-      resolveProcess({ code: null, stdout, stderr, timedOut, error: error51.message });
+      resolveProcess(result);
+    };
+    child.on("error", (error51) => {
+      settle({ code: null, stdout, stderr, timedOut, error: error51.message });
     });
     child.on("close", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      resolveProcess({ code, stdout, stderr, timedOut });
+      settle({ code, stdout, stderr, timedOut });
     });
   });
+}
+function abortReason(signal) {
+  if (signal.reason instanceof Error) return signal.reason;
+  const error51 = new Error("The operation was aborted");
+  error51.name = "AbortError";
+  return error51;
 }
 function trustedCmdExe() {
   const systemRoot = process.env.SystemRoot;
@@ -42408,13 +42436,17 @@ function parseKicadMajor(version2) {
 }
 
 // src/kicad/cli.ts
-async function detectKicadCli(explicit) {
+async function detectKicadCli(explicit, signal) {
   const candidates = explicit && explicit.trim() !== "" ? [explicit] : defaultKicadCliCandidates();
   for (const candidate of candidates) {
     if (candidate.includes(import_node_path15.default.sep) && !await pathExists(candidate)) {
       continue;
     }
-    const version2 = await runProcess(candidate, ["version"], { timeoutMs: 1e4, maxStderrBytes: 64 * 1024 });
+    const version2 = await runProcess(candidate, ["version"], {
+      timeoutMs: 1e4,
+      maxStderrBytes: 64 * 1024,
+      ...signal ? { signal } : {}
+    });
     if (version2.code === 0) {
       return {
         found: true,
@@ -42422,7 +42454,11 @@ async function detectKicadCli(explicit) {
         version: redactControlCharacters(version2.stdout || version2.stderr).trim()
       };
     }
-    const dashed = await runProcess(candidate, ["--version"], { timeoutMs: 1e4, maxStderrBytes: 64 * 1024 });
+    const dashed = await runProcess(candidate, ["--version"], {
+      timeoutMs: 1e4,
+      maxStderrBytes: 64 * 1024,
+      ...signal ? { signal } : {}
+    });
     if (dashed.code === 0) {
       return { found: true, path: candidate, version: redactControlCharacters(dashed.stdout || dashed.stderr).trim() };
     }
@@ -42436,7 +42472,8 @@ async function runKicadReport(cliPath, kind, inputFile, options = {}) {
   const result = await runProcess(cliPath, args, {
     timeoutMs: 12e4,
     maxStdoutBytes: 256 * 1024,
-    maxStderrBytes: 256 * 1024
+    maxStderrBytes: 256 * 1024,
+    ...options.signal ? { signal: options.signal } : {}
   });
   let reportText = "";
   try {
@@ -42521,7 +42558,7 @@ function kicadSeverityToFindingSeverity(value) {
 
 // src/rules/kicad-report.ts
 async function runKicadReportRule(context, options) {
-  const cli = await detectKicadCli(context.options.kicadCli);
+  const cli = await detectKicadCli(context.options.kicadCli, context.options.signal);
   if (!cli.found || !cli.path) {
     return [
       finding(context, {
@@ -42546,7 +42583,8 @@ async function processDesignFileReport(context, cliPath, cliVersion, options, ab
   const output = [];
   const result = await runKicadReport(cliPath, options.command, absoluteFile, {
     ...context.options.variant ? { variant: context.options.variant } : {},
-    ...cliVersion ? { version: cliVersion } : {}
+    ...cliVersion ? { version: cliVersion } : {},
+    ...context.options.signal ? { signal: context.options.signal } : {}
   });
   for (const diagnostic of result.diagnostics) {
     const severity = options.severity(context, diagnostic.ruleId, kicadSeverityToFindingSeverity(diagnostic.severity));
@@ -46563,16 +46601,21 @@ function waiverMatches(finding2, waiver) {
 
 // src/core/pipeline.ts
 async function runPipeline(input = {}, logger) {
+  input.signal?.throwIfAborted();
   registerPipelineRules();
   const ctx = await initializePipelineContext(input, logger);
+  ctx.options.signal?.throwIfAborted();
   const pipelineStart = performance.now();
   ctx.logger.debug("pipeline.start", {
     path: ctx.root,
     project_count: projectsLengthHint(input)
   });
   const { pluginLoad, loadedWithPluginErrors, projects } = await discoverPhase(ctx);
+  ctx.options.signal?.throwIfAborted();
   const findings = await validatePhase(ctx, loadedWithPluginErrors, projects);
+  ctx.options.signal?.throwIfAborted();
   const postProcessed = await postProcessPhase(ctx, findings, projects);
+  ctx.options.signal?.throwIfAborted();
   const result = assembleRunResult({
     ctx,
     effectiveFindings: postProcessed.effectiveFindings,
@@ -46585,6 +46628,7 @@ async function runPipeline(input = {}, logger) {
     projects
   });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
+  ctx.options.signal?.throwIfAborted();
   ctx.logger.debug("pipeline.finish", {
     latency_ms: Math.round(performance.now() - pipelineStart),
     findings: result.summary.total,
@@ -46651,6 +46695,7 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
     return true;
   });
   const projectFindings = await mapLimit(projects, ctx.options.concurrency, async (project) => {
+    ctx.options.signal?.throwIfAborted();
     const projectConfig = configForProject(ctx.root, ctx.config, project);
     const override = projectConfig.projects?.[0];
     const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
@@ -46669,6 +46714,7 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
     };
     const output = [];
     for (const rule2 of activeRules) {
+      ctx.options.signal?.throwIfAborted();
       const startedAt = performance.now();
       ctx.logger.debug("pipeline.rule.start", {
         rule: rule2.meta.id,
@@ -46839,6 +46885,7 @@ function normalizeOptions(cwd, root, config2, input, gate, forceFailOn) {
     quiet: input.quiet ?? false,
     verbose: input.verbose ?? false,
     color: input.color ?? "auto",
+    ...input.signal ? { signal: input.signal } : {},
     ...input.notificationLinks ? { notificationLinks: input.notificationLinks } : {}
   };
 }
@@ -49204,9 +49251,11 @@ function pipelineInputFromCli(root, options, annotations) {
     color: options.color ?? "auto"
   };
 }
-async function runCommand(pathInput, options, streams, commandName = "run") {
+async function runCommand(pathInput, options, streams, commandName = "run", runtime = {}) {
+  runtime.signal?.throwIfAborted();
   const locale = resolveLocale();
   const root = await canonicalRoot(import_node_path45.default.resolve(normalizePathInput(pathInput ?? ".")));
+  runtime.signal?.throwIfAborted();
   const logger = createCliLogger(root, options, streams.stderr);
   const startedAt = performance.now();
   let exitCode = 4;
@@ -49232,7 +49281,7 @@ async function runCommand(pathInput, options, streams, commandName = "run") {
       return finish(2);
     }
     if (options.requireKicad) {
-      const kicad = await detectKicadCli(options.kicadCli);
+      const kicad = await detectKicadCli(options.kicadCli, runtime.signal);
       if (!kicad.found) {
         if (writesJsonToStdout(options)) {
           await writeDiagnosticReport(root, loaded, [kicadMissingFinding()], 3, streams, locale);
@@ -49250,7 +49299,13 @@ async function runCommand(pathInput, options, streams, commandName = "run") {
         spinner.start();
       }
       try {
-        const result = await runPipeline(pipelineInputFromCli(root, options, options.annotations ?? true), logger);
+        const result = await runPipeline(
+          {
+            ...pipelineInputFromCli(root, options, options.annotations ?? true),
+            ...runtime.signal ? { signal: runtime.signal } : {}
+          },
+          logger
+        );
         const resultExitCode = result.summary.failed ? 1 : 0;
         const cliResult = withCliStatus(result, resultExitCode);
         if (spinner) {
@@ -54521,7 +54576,8 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     await heartbeat.pulse();
     heartbeat.start();
     const execution = await dependencies.executePipeline(workspace, job, {
-      requireKicad: options.requireKicad ?? true
+      requireKicad: options.requireKicad ?? true,
+      ...options.signal ? { signal: options.signal } : {}
     });
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
@@ -54568,11 +54624,17 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
       decision: result.decision ?? "error"
     };
   } catch (error51) {
+    const shutdown = error51 instanceof RunnerShutdownError || options.signal?.aborted === true;
+    const reportedError = shutdown && !(error51 instanceof RunnerShutdownError) ? new RunnerShutdownError() : error51;
     if (!terminalPublished) {
-      const reason = error51 instanceof RunnerShutdownError ? "shutdown" : "job_error";
-      await bestEffortRelinquish(client, job, reason, sanitizedErrorMessage(error51));
+      await bestEffortRelinquish(
+        client,
+        job,
+        shutdown ? "shutdown" : "job_error",
+        sanitizedErrorMessage(reportedError)
+      );
     }
-    throw error51;
+    throw reportedError;
   } finally {
     await heartbeat.stop();
     if (workspace && (job.safeMode.enabled || options.keepWorkspace !== true)) {
@@ -54789,6 +54851,7 @@ var import_promises27 = require("node:fs/promises");
 var import_node_path63 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
 async function executeRunnerPipeline(workspace, job, options) {
+  options.signal?.throwIfAborted();
   const relativeOutputDirectory = import_node_path63.default.join(".boardreadyops-runner", job.executionAttemptId);
   const outputDirectory2 = import_node_path63.default.join(workspace, relativeOutputDirectory);
   await (0, import_promises27.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
@@ -54829,8 +54892,10 @@ async function executeRunnerPipeline(workspace, job, options) {
       logLevel: "silent"
     },
     { stdout: output, stderr: output },
-    "runner"
+    "runner",
+    options.signal ? { signal: options.signal } : {}
   );
+  options.signal?.throwIfAborted();
   const report = await readRunReport(import_node_path63.default.join(workspace, targets[0].relative));
   const runnerReport = report ? {
     summary: {
