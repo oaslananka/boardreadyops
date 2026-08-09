@@ -73,14 +73,14 @@ tag must contain the binary build scripts.
 
 `publish-npm` has one canonical publish trigger: `workflow_dispatch`. Release automation dispatches it explicitly with the immutable release tag, and maintainers use the same entry point for controlled backfills or recovery. This avoids relying on follow-on `release` events caused by a workflow's repository `GITHUB_TOKEN`.
 
-The publish job runs on a GitHub-hosted runner with `id-token: write`, upgrades to a Trusted Publishing-capable npm CLI, and fails closed if npm token/basic-auth environment variables or `.npmrc` credentials are present. The npm package trusted publisher must be configured for repository `oaslananka/boardreadyops`, workflow filename `publish-npm.yml`, and allowed action `npm publish`. The workflow does not use `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or an `_authToken` entry for normal stable or prerelease publishing.
+The publish job runs on a GitHub-hosted runner with `id-token: write`, upgrades to a Trusted Publishing-capable npm CLI, and fails closed if npm token/basic-auth environment variables or `.npmrc` credentials are present. The workflow definition must be dispatched from `refs/heads/main`; release automation and manual recovery both pin `--ref main`, while the checked-out package remains the immutable release tag supplied through `tag`. The npm package trusted publisher must be configured for repository `oaslananka/boardreadyops`, workflow filename `publish-npm.yml`, and allowed action `npm publish`. The workflow does not use `NPM_TOKEN`, `NODE_AUTH_TOKEN`, or an `_authToken` entry for normal stable or prerelease publishing.
 
 If the automatic path did not run or a previous workflow fix needs to publish an
 already-created release tag, manually dispatch `publish-npm` from `main` with
 the `tag` input set to the published release tag:
 
 ```bash
-gh workflow run publish-npm.yml -f tag=v1.0.0 -f prerelease=false
+gh workflow run publish-npm.yml --ref main -f tag=v1.0.0 -f prerelease=false
 ```
 
 The workflow checks out the release tag with full history, verifies the tag version matches `package.json`, requires the tag commit to be an ancestor of current `origin/main`, and publishes the package with npm provenance. Release automation and maintainer recovery use the same dispatch contract, so already-created release tags can be backfilled after workflow-only fixes without weakening tag ancestry or version checks. Historical backfills validate the immutable package snapshot without rebuilding committed `dist/` bundles, because the selected release tag may predate the current reproducible-build workflow fixes.

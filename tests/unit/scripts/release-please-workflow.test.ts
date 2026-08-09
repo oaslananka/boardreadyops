@@ -23,6 +23,9 @@ describe("release-please workflow contract", () => {
     expect(workflow).toContain("pnpm run notice");
     expect(workflow).toContain(releaseBaseFetchExpression);
     expect(workflow).toContain("node scripts/rewrite-release-pr-verified.mjs");
+    expect(workflow).toContain(
+      ['gh workflow run publish-npm.yml --repo "', "$", '{{ github.repository }}" --ref main'].join(""),
+    );
     expect(workflow).not.toContain('git commit -am "chore: regenerate release and compliance artifacts"');
     expect(workflow).not.toContain(['git push origin "HEAD:', "$", '{PR_BRANCH}"'].join(""));
     expect(workflow).not.toContain('if [ -n "$(git status --porcelain)" ]');
