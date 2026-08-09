@@ -120,6 +120,10 @@ export function buildBootstrapPlan(
   pythonLauncher?: string,
   venvCommand?: string[],
 ): BootstrapStep[];
+export function buildCorepackInstallCommand(
+  platform?: NodeJS.Platform,
+  env?: NodeJS.ProcessEnv,
+): { command: string; args: string[] };
 export function evaluateToolchain(config: ToolchainManifest, probe: ToolchainProbe): ToolchainResult;
 export function loadToolchainManifest(repositoryRoot?: string): Promise<ToolchainManifest>;
 export function probeToolchain(config: ToolchainManifest, paths: ToolchainPaths): Promise<ToolchainProbe>;

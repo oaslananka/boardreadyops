@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildBootstrapPlan,
+  buildCorepackInstallCommand,
   buildToolchainEnvironment,
   buildVirtualEnvironmentCommand,
   evaluateToolchain,
@@ -217,6 +218,14 @@ describe("reproducible contributor toolchain", () => {
       expect(hook).not.toMatch(/(^|\n)pnpm\b/);
       expect(hook).not.toMatch(/(^|\n)pre-commit\b/);
     }
+  });
+
+  it("uses cmd.exe for Corepack shim execution on Windows", () => {
+    expect(buildCorepackInstallCommand("win32", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      args: ["/d", "/s", "/c", "corepack install"],
+    });
+    expect(buildCorepackInstallCommand("linux", {})).toEqual({ command: "corepack", args: ["install"] });
   });
 
   it.skipIf(process.platform === "win32")(

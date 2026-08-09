@@ -708,16 +708,28 @@ async function readOptional(file) {
   }
 }
 
+export function buildCorepackInstallCommand(platform = process.platform, env = process.env) {
+  if (platform === "win32") {
+    return {
+      command: env.ComSpec || env.COMSPEC || "cmd.exe",
+      args: ["/d", "/s", "/c", "corepack install"],
+    };
+  }
+  return { command: "corepack", args: ["install"] };
+}
+
 export async function installCorepackWithRetry({
   cwd = defaultRepositoryRoot,
   env = process.env,
+  platform = process.platform,
   attempts = 3,
   retryDelayMs = Number(env.BOARDREADYOPS_COREPACK_RETRY_DELAY_MS ?? 1000),
 } = {}) {
+  const corepackInstall = buildCorepackInstallCommand(platform, env);
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      await run("corepack", ["install"], { cwd, env });
+      await run(corepackInstall.command, corepackInstall.args, { cwd, env });
       return;
     } catch (error) {
       lastError = error;
