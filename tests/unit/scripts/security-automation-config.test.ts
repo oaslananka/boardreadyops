@@ -142,7 +142,7 @@ describe("dependency and security automation configuration", () => {
         "@renovatebot/osv-offline-db@3.0.9",
         "@renovatebot/osv-offline@3.0.9",
         "brace-expansion@5.0.9",
-        "js-yaml@5.2.2",
+        "js-yaml@5.2.2 || 4.3.1",
         "postcss@8.5.23",
         "undici@8.9.0",
         "valibot@1.4.2",
@@ -281,7 +281,7 @@ describe("dependency and security automation configuration", () => {
     expect(workspace).toContain("'archiver>readdir-glob': 3.0.0");
     expect(workspace).toContain("'brace-expansion@>=5 <5.0.9': 5.0.9");
     expect(workspace).toContain("'fast-uri@>=3 <3.1.5': 3.1.5");
-    expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.0");
+    expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.1");
     expect(workspace).toContain("linkify-it@>=5 <5.0.2: 5.0.2");
     expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.1");
 
