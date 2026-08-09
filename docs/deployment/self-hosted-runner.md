@@ -15,20 +15,15 @@ GitHub webhook
   -> BoardReadyOps control plane
   -> signed lease assignment containing owner/name/commit SHA
   -> customer runner checks out the exact SHA with customer credentials
-  -> customer runner uploads reports and a terminal result
+  -> customer runner publishes a terminal result and, when configured, generated reports
   -> control plane updates the GitHub Check Run
 ```
 
 The control plane does not send a GitHub App installation token, repository archive, source bundle, or file contents to a self-hosted runner. A self-hosted runner accepts only assignments whose `sourceMode` is `customer_checkout`; it rejects `broker` assignments before creating a workspace and relinquishes the lease. Source code remains on the customer runner and its configured Git remote or mirror.
 
-The runner sends only:
+The runner always sends signed claim, heartbeat, relinquish, and terminal-result requests plus bounded result data such as normalized findings and metrics. In the default `control-plane` artifact mode it may additionally request artifact capabilities and upload explicitly generated JSON, SARIF, and Markdown reports using server-issued, single-use upload capabilities. In `metadata-only` artifact mode it does not request artifact capabilities or send report artifact bytes.
 
-- signed claim, heartbeat, relinquish, artifact-capability, and terminal-result requests;
-- normalized findings and metrics;
-- explicitly generated JSON, SARIF, and Markdown reports;
-- artifact bytes covered by server-issued, single-use upload capabilities.
-
-It does not upload the checked-out workspace.
+Neither mode uploads the checked-out workspace. Findings and diagnostic messages may still contain repository-relative paths or engineering details, so `metadata-only` is an artifact-transfer policy rather than an anonymous-results mode.
 
 ## Prerequisites
 
@@ -180,10 +175,24 @@ The command exits `0` both when one job completes and when the queue is empty. A
 
 1. `preparing_source`;
 2. `running`;
-3. `uploading_artifacts`;
+3. `uploading_artifacts` when artifact mode is `control-plane` and the job is not in safe mode;
 4. `reporting`.
 
-The worker runs the existing BoardReadyOps pipeline in enforce mode, writes JSON, SARIF, and Markdown reports, requests upload capabilities bound to the active lease, uploads the exact declared byte counts, and publishes a terminal result. Safe-mode execution disables repository-provided plugins and notifier dispatch before analysis, so repository code cannot consume ambient notifier credentials or request plugin network/process permissions through the runner process. Temporary workspaces are removed by default. `--keep-workspace` is intended only for controlled debugging and increases source-retention risk. Safe-mode jobs always remove their workspace; `--keep-workspace` is ignored for those jobs and the worker emits `runner.workspace.retention_overridden` without source content or credential values.
+The worker runs the existing BoardReadyOps pipeline in enforce mode, writes JSON, SARIF, and Markdown reports inside the temporary workspace, and publishes a terminal result. The default `--artifact-mode control-plane` requests upload capabilities bound to the active lease and uploads the exact declared report byte counts before reporting. `--artifact-mode metadata-only` is an explicit local runner policy: it skips the `uploading_artifacts` lease stage, never requests artifact upload capabilities, sends an empty terminal artifact list, and still reports bounded findings, metrics, readiness, and waiver data. Terminal metrics include `artifact_mode_metadata_only=1`, so commissioning evidence can distinguish the selected local policy even when a run generates no artifacts. The control plane cannot opt a runner out of a locally selected `metadata-only` mode for an individual job.
+
+Safe-mode execution independently disables repository-provided plugins and notifier dispatch before analysis, so repository code cannot consume ambient notifier credentials or request plugin network/process permissions through the runner process. Safe mode also suppresses artifact uploads even when `control-plane` was selected. Temporary workspaces are removed by default. `--keep-workspace` is intended only for controlled debugging and increases source-retention risk. Safe-mode jobs always remove their workspace; `--keep-workspace` is ignored for those jobs and the worker emits `runner.workspace.retention_overridden` without source content or credential values.
+
+Use metadata-only result handling when generated report bytes must remain on customer-controlled infrastructure:
+
+```bash
+sudo -u boardreadyops-runner boardreadyops runner serve \
+  --identity /var/lib/boardreadyops-runner/identity/runner.json \
+  --workspace-root /var/lib/boardreadyops-runner/workspaces \
+  --artifact-mode metadata-only \
+  --format json
+```
+
+`metadata-only` does not add a persistence backend: generated report files are deleted with the temporary workspace under the default cleanup policy. A customer-managed retention or export mechanism, when required, is a separately governed customer-side responsibility; BoardReadyOps does not configure or receive credentials for it.
 
 `kicad-cli` is required by default. Use `--no-require-kicad` only for a deliberate reduced-capability test runner.
 
@@ -299,7 +308,7 @@ Use a single-replica `StatefulSet` or an equivalent controller that guarantees o
 - Store the identity in a dedicated Secret or CSI secret volume; enable encryption at rest and restrict RBAC to the runner service account.
 - Use an `emptyDir`, generic ephemeral volume, or customer-managed encrypted ephemeral volume for workspaces. Never place workspaces in a retained shared PVC.
 - Set `runAsNonRoot`, a fixed UID/GID, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, and drop all capabilities.
-- Apply an egress-only `NetworkPolicy` for the control plane, Git or mirror endpoint, artifact endpoint, DNS, and approved update infrastructure.
+- Apply an egress-only `NetworkPolicy` for the control plane, Git or mirror endpoint, the artifact endpoint when `control-plane` artifact mode is selected, DNS, and approved update infrastructure.
 - Set a termination grace period long enough for the worker to stop polling, relinquish an active lease, and remove its workspace. The control plane remains authoritative if the pod is killed before cleanup completes.
 - Use a `PodDisruptionBudget` only when it does not encourage two pods to mount the same identity simultaneously.
 
@@ -315,9 +324,9 @@ The runner opens outbound connections only; do not publish a Service, load balan
 
 | Purpose | Required destination | Notes |
 | --- | --- | --- |
-| Control-plane protocol | The configured BoardReadyOps HTTPS origin on TCP 443 | Required for activation, claim, heartbeat, lease, capability, and result requests. |
+| Control-plane protocol | The configured BoardReadyOps HTTPS origin on TCP 443 | Required for activation, claim, heartbeat, lease, and result requests; artifact-capability requests also use this origin in `control-plane` artifact mode. |
 | Source checkout | The customer Git host on TCP 443, or a customer-local mirror | Not required when every assignment is served from a local mirror. |
-| Managed artifact upload | The HTTPS host embedded in a server-issued upload capability | The capability is short-lived and attempt-bound; do not broad-allow arbitrary object-storage endpoints. |
+| Managed artifact upload | The HTTPS host embedded in a server-issued upload capability | Required only for `control-plane` artifact mode. The capability is short-lived and attempt-bound; do not broad-allow arbitrary object-storage endpoints. |
 | Updates | Customer-approved package, image, operating-system, and time-synchronization endpoints | Keep update traffic separate from the worker process where policy requires it. |
 
 The control plane uses Ed25519 signatures, a bounded timestamp window, and single-use nonces for runner mutations. Artifact uploads use short-lived, single-use HTTPS capabilities tied to the run, execution attempt, lease, artifact ID, declared byte count, and optional SHA-256 digest.
@@ -331,7 +340,7 @@ Commission a restricted-network installation by proving all of the following bef
 1. activation reaches the exact HTTPS origin and rejects a hostname or CA mismatch;
 2. `runner once` can claim an empty queue without any inbound listener;
 3. an exact-SHA checkout succeeds through the approved Git path;
-4. a capability-bound upload succeeds only to the expected artifact host;
+4. in `control-plane` artifact mode, a capability-bound upload succeeds only to the expected artifact host; in `metadata-only` mode, no artifact capability is requested and no artifact endpoint connection occurs;
 5. DNS, TLS, proxy, and firewall logs contain no enrollment token, signing key, Git credential, lease token, capability, source path, or finding payload; and
 6. removing any required egress rule fails closed and leaves the lease recoverable by expiry or relinquishment.
 
@@ -348,7 +357,7 @@ Recommended layout:
 
 Back up the identity directory as a secret. Do not copy it into images, source repositories, CI artifacts, or general-purpose backup sets without encryption and access controls. Workspaces should not be backed up and should be placed on encrypted storage where required by policy.
 
-Uploaded report artifacts are stored by the control plane's configured artifact driver. They contain BoardReadyOps reports, not an automatic source archive. Findings may include repository-relative paths and diagnostic messages; treat them according to the tenant's engineering-data classification.
+In `control-plane` artifact mode, uploaded report artifacts are stored by the control plane's configured artifact driver. They contain BoardReadyOps reports, not an automatic source archive. In `metadata-only` mode, generated report files remain only in the customer workspace and are deleted by the default workspace cleanup; any customer-managed retention mechanism is outside the BoardReadyOps control plane. BoardReadyOps receives no report artifact bytes or storage credentials. Findings may include repository-relative paths and diagnostic messages in either mode; treat terminal result data according to the tenant's engineering-data classification.
 
 ## Supported versions, update, and rollback
 
@@ -398,12 +407,12 @@ A production acceptance run should record all of the following:
 2. the release run is routed to `self_hosted` and the claimed job reports `sourceMode=customer_checkout`;
 3. the customer runner checks out the exact assigned SHA with customer credentials or a customer mirror;
 4. the control-plane host contains no checkout workspace for that repository and receives no repository token;
-5. signed heartbeat stages advance through source preparation, execution, artifact upload, and reporting;
-6. the GitHub Check Run reaches a terminal conclusion with findings and report links;
-7. the runner lease, registration, artifact capabilities, terminal result, and audit records share the same run and execution-attempt IDs;
+5. signed heartbeat stages advance through source preparation, execution, and reporting, with artifact upload present only when `control-plane` artifact mode is selected and safe mode is not active;
+6. the GitHub Check Run reaches a terminal conclusion with findings; `control-plane` mode also proves report links while `metadata-only` proves an empty artifact list and no artifact endpoint connection;
+7. the runner lease, registration, terminal result, and audit records share the same run and execution-attempt IDs, with artifact capabilities sharing those IDs only when artifact upload is enabled;
 8. the temporary customer workspace is removed after completion.
 
-Retain IDs, timestamps, Check Run URL, artifact digests, and audit-event references. Do not retain the enrollment token, lease token, upload capability, Git credential, source archive, or runner private key in the evidence bundle.
+Retain IDs, timestamps, Check Run URL, audit-event references, and artifact digests only when artifact upload is enabled. Do not retain the enrollment token, lease token, upload capability, Git credential, source archive, or runner private key in the evidence bundle.
 
 ## Failure behavior
 
@@ -414,7 +423,7 @@ The worker fails closed when:
 - a job requests managed/brokered source delivery;
 - checkout resolves to a SHA other than the assignment;
 - the lease becomes closed or stale;
-- artifact size or capability metadata does not match;
+- artifact size or capability metadata does not match when `control-plane` artifact mode is active;
 - a signed request is rejected or replayed;
 - the terminal result cannot be bound to the active execution attempt.
 

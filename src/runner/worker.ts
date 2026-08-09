@@ -14,6 +14,8 @@ import { loadRunnerPrivateKey, RunnerControlPlaneClient } from "./client.js";
 import { type LoadedRunnerIdentity, loadRunnerIdentity } from "./identity.js";
 import { checkoutRunnerSource } from "./source.js";
 
+export type RunnerArtifactMode = "control-plane" | "metadata-only";
+
 export type RunnerWorkerOptions = {
   identityFile: string;
   runnerVersion: string;
@@ -23,6 +25,7 @@ export type RunnerWorkerOptions = {
   pollSeconds?: number;
   requireKicad?: boolean;
   keepWorkspace?: boolean;
+  artifactMode?: RunnerArtifactMode;
   signal?: AbortSignal;
 };
 
@@ -180,13 +183,16 @@ export async function runRunnerWorkerOnce(
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
 
+    const artifactMode = options.artifactMode ?? "control-plane";
+    const suppressArtifacts = job.safeMode.enabled || artifactMode === "metadata-only";
     let uploadedArtifacts: ReleaseRunResult["artifacts"] = [];
-    if (job.safeMode.enabled) {
+    if (suppressArtifacts) {
       if (execution.artifacts.length > 0) {
         dependencies.log("runner.artifacts.suppressed", {
           run_id: job.runId,
           execution_attempt_id: job.executionAttemptId,
           artifacts: execution.artifacts.length,
+          artifact_mode: artifactMode,
           safe_mode_reasons: [...job.safeMode.reasons],
         });
       }
@@ -199,7 +205,7 @@ export async function runRunnerWorkerOnce(
 
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
-    const result = terminalResultFromExecution(job, execution, uploadedArtifacts);
+    const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode);
     const request: RunnerTerminalResultRequest = {
       protocolVersion: 1,
       runId: job.runId,
@@ -373,6 +379,7 @@ function terminalResultFromExecution(
   job: RunnerClaimedJob,
   execution: RunnerExecutionOutput,
   artifacts: ReleaseRunResult["artifacts"],
+  artifactMode: RunnerArtifactMode,
 ): ReleaseRunResult {
   const completed = execution.exitCode === 0 || execution.exitCode === 1;
   const decision = decisionFromExitCode(execution.exitCode);
@@ -406,9 +413,10 @@ function terminalResultFromExecution(
       findings_medium: summary?.medium ?? 0,
       findings_low: summary?.low ?? 0,
       findings_info: summary?.info ?? 0,
+      artifact_mode_metadata_only: artifactMode === "metadata-only" ? 1 : 0,
       artifacts_generated: execution.artifacts.length,
       artifacts_uploaded: artifacts.length,
-      artifacts_suppressed: job.safeMode.enabled ? execution.artifacts.length : 0,
+      artifacts_suppressed: Math.max(0, execution.artifacts.length - artifacts.length),
       ...(execution.report?.readiness ? { readiness_score: execution.report.readiness.score } : {}),
     },
     ...(execution.report?.readiness ? { readiness: execution.report.readiness } : {}),

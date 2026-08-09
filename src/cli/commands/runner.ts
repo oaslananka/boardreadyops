@@ -8,6 +8,7 @@ import { boardReadyVersion } from "../../generated/version.js";
 import { activateRunnerIdentity, defaultRunnerIdentityDirectory } from "../../runner/identity.js";
 import {
   defaultRunnerWorkspaceRoot,
+  type RunnerArtifactMode,
   type RunnerWorkerOptions,
   runRunnerWorkerOnce,
   serveRunnerWorker,
@@ -53,6 +54,7 @@ export type RunnerWorkCliOptions = {
   pollSeconds?: number;
   requireKicad?: boolean;
   keepWorkspace?: boolean;
+  artifactMode?: RunnerArtifactMode;
   format?: RunnerOutputFormat;
 };
 
@@ -212,6 +214,7 @@ function workerOptions(options: RunnerWorkCliOptions): RunnerWorkerOptions {
     ...(options.pollSeconds === undefined ? {} : { pollSeconds: options.pollSeconds }),
     requireKicad: options.requireKicad ?? true,
     keepWorkspace: options.keepWorkspace ?? false,
+    artifactMode: options.artifactMode ?? "control-plane",
   };
 }
 
