@@ -67,4 +67,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run publish-npm.yml --repo "${{ github.repository }}" -f tag="${RELEASE_TAG}" -f prerelease=false -f update_floating_tags=true
+        run: gh workflow run publish-npm.yml --repo "${{ github.repository }}" --ref main -f tag="${RELEASE_TAG}" -f prerelease=false -f update_floating_tags=true
