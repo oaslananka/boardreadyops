@@ -189,6 +189,7 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   const blockingFindings = run.findings.filter(
     (finding) => ["critical", "error", "high"].includes(finding.severity.toLowerCase()) && !finding.waivedAt,
   );
+  const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
     <>
       <Panel
@@ -286,6 +287,7 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
           <a href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}/checks`}>
             Open GitHub checks
           </a>
+          {latestWorkflowRunUrl ? <a href={latestWorkflowRunUrl}>Open GitHub Actions run</a> : null}
           {run.pullRequestNumber ? (
             <a href={`${githubRepositoryBaseUrl(run)}/pull/${run.pullRequestNumber}`}>
               Open pull request #{run.pullRequestNumber}
@@ -390,6 +392,12 @@ export function AttemptTimeline({ attempts }: Readonly<{ attempts: AttemptDetail
             {attempt.workflowDispatchId ? (
               <p>
                 Workflow run: <code>{attempt.workflowDispatchId}</code>
+                {attempt.workflowRunUrl ? (
+                  <>
+                    {" · "}
+                    <a href={attempt.workflowRunUrl}>Open workflow logs and artifacts</a>
+                  </>
+                ) : null}
               </p>
             ) : null}
             {attempt.failureClass || attempt.failureMessage ? (
@@ -709,11 +717,17 @@ export function ArtifactsView({
   const current = stringSearchParameters(searchParameters);
   const normalizedArtifactSort = filtersFromSearchParameters(searchParameters).artifactSort ?? "newest";
   const hasMetadataOnly = run.artifacts.some((artifact) => artifact.availability === "metadata-only");
+  const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
     <Panel
       title="Artifacts"
       description="Authoritative checksums, availability, retention responsibility, and bounded download access."
       id="artifacts"
+      actions={
+        latestWorkflowRunUrl ? (
+          <a href={latestWorkflowRunUrl}>Open repository-owned GitHub Actions artifacts</a>
+        ) : undefined
+      }
     >
       <form className="filter-bar artifact-filter-bar" method="get" action={`/runs/${run.id}/artifacts`}>
         <label>
