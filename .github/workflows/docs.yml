@@ -62,7 +62,7 @@ jobs:
         run: corepack enable
 
       - name: Install package manager
-        run: corepack install
+        run: node scripts/toolchain.mjs corepack-install
 
       - name: Setup uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39

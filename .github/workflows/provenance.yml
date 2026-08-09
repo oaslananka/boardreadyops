@@ -31,7 +31,7 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - name: Attest provenance

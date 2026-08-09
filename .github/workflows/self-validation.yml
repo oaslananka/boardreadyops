@@ -28,7 +28,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           package-manager-cache: false
       - run: corepack enable
-      - run: corepack install
+      - run: node scripts/toolchain.mjs corepack-install
       - name: Install KiCad 10
         run: |
           set -euo pipefail
