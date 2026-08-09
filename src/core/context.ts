@@ -38,6 +38,7 @@ export interface PipelineOptions {
   quiet: boolean;
   verbose: boolean;
   color: "auto" | "always" | "never";
+  signal?: AbortSignal;
   notificationLinks?: {
     reportUrl?: string | undefined;
     runUrl?: string | undefined;

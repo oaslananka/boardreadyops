@@ -10,8 +10,9 @@ import { runCommand } from "./commands/run.js";
 export async function executeRunnerPipeline(
   workspace: string,
   job: RunnerClaimedJob,
-  options: { requireKicad: boolean },
+  options: { requireKicad: boolean; signal?: AbortSignal },
 ): Promise<RunnerExecutionOutput> {
+  options.signal?.throwIfAborted();
   const relativeOutputDirectory = path.join(".boardreadyops-runner", job.executionAttemptId);
   const outputDirectory = path.join(workspace, relativeOutputDirectory);
   await mkdir(outputDirectory, { recursive: true, mode: 0o700 });
@@ -53,7 +54,9 @@ export async function executeRunnerPipeline(
     },
     { stdout: output, stderr: output },
     "runner",
+    options.signal ? { signal: options.signal } : {},
   );
+  options.signal?.throwIfAborted();
   const report = await readRunReport(path.join(workspace, targets[0].relative));
   const runnerReport = report
     ? {

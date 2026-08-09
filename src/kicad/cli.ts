@@ -19,6 +19,7 @@ export type KicadReportKind = "drc" | "erc";
 export interface KicadReportOptions {
   variant?: string;
   version?: string;
+  signal?: AbortSignal;
 }
 
 export interface KicadCliReportCapabilities {
@@ -30,13 +31,17 @@ export interface KicadCliReportCapabilities {
   exitCodeViolations: boolean;
 }
 
-export async function detectKicadCli(explicit?: string): Promise<KicadCli> {
+export async function detectKicadCli(explicit?: string, signal?: AbortSignal): Promise<KicadCli> {
   const candidates = explicit && explicit.trim() !== "" ? [explicit] : defaultKicadCliCandidates();
   for (const candidate of candidates) {
     if (candidate.includes(path.sep) && !(await pathExists(candidate))) {
       continue;
     }
-    const version = await runProcess(candidate, ["version"], { timeoutMs: 10_000, maxStderrBytes: 64 * 1024 });
+    const version = await runProcess(candidate, ["version"], {
+      timeoutMs: 10_000,
+      maxStderrBytes: 64 * 1024,
+      ...(signal ? { signal } : {}),
+    });
     if (version.code === 0) {
       return {
         found: true,
@@ -44,7 +49,11 @@ export async function detectKicadCli(explicit?: string): Promise<KicadCli> {
         version: redactControlCharacters(version.stdout || version.stderr).trim(),
       };
     }
-    const dashed = await runProcess(candidate, ["--version"], { timeoutMs: 10_000, maxStderrBytes: 64 * 1024 });
+    const dashed = await runProcess(candidate, ["--version"], {
+      timeoutMs: 10_000,
+      maxStderrBytes: 64 * 1024,
+      ...(signal ? { signal } : {}),
+    });
     if (dashed.code === 0) {
       return { found: true, path: candidate, version: redactControlCharacters(dashed.stdout || dashed.stderr).trim() };
     }
@@ -65,6 +74,7 @@ export async function runKicadReport(
     timeoutMs: 120_000,
     maxStdoutBytes: 256 * 1024,
     maxStderrBytes: 256 * 1024,
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   let reportText = "";
   try {

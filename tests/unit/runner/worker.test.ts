@@ -529,4 +529,59 @@ notifiers:
       safe_mode_reasons: ["private-repository"],
     });
   });
+
+  it("aborts in-flight execution, relinquishes the lease for shutdown, and cleans the workspace", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-abort-"));
+    roots.push(workspace);
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    const controller = new AbortController();
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(async (_workspace, _job, runOptions) => {
+        const signal = (runOptions as { requireKicad: boolean; signal?: AbortSignal }).signal;
+        if (!signal) throw new Error("runner execution signal missing");
+        expect(signal).toBe(controller.signal);
+        return await new Promise<RunnerExecutionOutput>((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(signal.reason instanceof Error ? signal.reason : new Error("runner execution aborted")),
+            { once: true },
+          );
+          queueMicrotask(() => controller.abort());
+        });
+      }),
+    });
+
+    await expect(
+      runRunnerWorkerOnce(
+        {
+          identityFile: "/identity/runner.json",
+          runnerVersion: "1.26.1",
+          signal: controller.signal,
+        },
+        overrides,
+      ),
+    ).rejects.toThrow(/runner shutdown requested/u);
+
+    expect(runnerClient.relinquish).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "shutdown", message: "runner shutdown requested" }),
+    );
+    expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
+    expect(runnerClient.publishTerminalResult).not.toHaveBeenCalled();
+  });
+
+  it("refuses to start the real runner pipeline when its execution signal is already aborted", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-pre-abort-"));
+    roots.push(workspace);
+    await cp(path.resolve("tests/fixtures/projects/safe-basic"), workspace, { recursive: true });
+    const controller = new AbortController();
+    controller.abort();
+    const options = {
+      requireKicad: false,
+      signal: controller.signal,
+    } as Parameters<typeof executeRunnerPipeline>[2] & { signal: AbortSignal };
+
+    await expect(executeRunnerPipeline(workspace, claimedJob(), options)).rejects.toMatchObject({ name: "AbortError" });
+  });
 });
