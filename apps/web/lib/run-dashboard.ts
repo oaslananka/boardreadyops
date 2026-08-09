@@ -68,6 +68,7 @@ type AttemptDetail = {
   completedAt: string | undefined;
   retryAfterAt: string | undefined;
   workflowDispatchId: string | undefined;
+  workflowRunUrl: string | undefined;
   failureClass: string | undefined;
   failureMessage: string | undefined;
   resultDigest: string | undefined;
@@ -425,6 +426,13 @@ export function formatRunDuration(durationMs: number | undefined): string {
   return `${(durationMs / 1000).toFixed(1)} s`;
 }
 
+export function githubActionsRunUrl(repository: string, workflowRunId: string | undefined): string | undefined {
+  if (!workflowRunId || !/^[1-9]\d{0,19}$/u.test(workflowRunId)) return undefined;
+  const [owner, name, ...rest] = repository.split("/");
+  if (!owner || !name || rest.length > 0) return undefined;
+  return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/actions/runs/${workflowRunId}`;
+}
+
 export function formatArtifactBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -613,8 +621,10 @@ export async function lookupRunDashboard(
     };
   });
 
-  const attempts = rows(attemptsResult).map(
-    (row): AttemptDetail => ({
+  const repositoryName = `${repository.owner}/${repository.name}`;
+  const attempts = rows(attemptsResult).map((row): AttemptDetail => {
+    const workflowDispatchId = stringValue(row, "github_workflow_dispatch_id");
+    return {
       id: requiredString(row, "id"),
       attemptNumber: numberValue(row, "attempt_number") ?? 0,
       status: requiredString(row, "status"),
@@ -625,12 +635,13 @@ export async function lookupRunDashboard(
       heartbeatAt: stringValue(row, "heartbeat_at"),
       completedAt: stringValue(row, "completed_at"),
       retryAfterAt: stringValue(row, "retry_after_at"),
-      workflowDispatchId: stringValue(row, "github_workflow_dispatch_id"),
+      workflowDispatchId,
+      workflowRunUrl: githubActionsRunUrl(repositoryName, workflowDispatchId),
       failureClass: stringValue(row, "failure_class"),
       failureMessage: stringValue(row, "failure_message"),
       resultDigest: stringValue(row, "result_digest"),
-    }),
-  );
+    };
+  });
 
   const transitions = rows(transitionsResult).map(
     (row): TransitionDetail => ({
@@ -685,7 +696,7 @@ export async function lookupRunDashboard(
       githubCheckPublishedAt: stringValue(runRow, "github_check_published_at"),
       githubCommentPublishedAt: stringValue(runRow, "github_comment_published_at"),
       lastPublicationError: stringValue(runRow, "last_publication_error"),
-      repository: `${repository.owner}/${repository.name}`,
+      repository: repositoryName,
       repositoryPrivate: repository.private,
       trustMode,
       safeModeReasons,
