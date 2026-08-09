@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { lstat, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -89,6 +89,7 @@ export type RunnerWorkerDependencies = {
     options: { requireKicad: boolean; signal?: AbortSignal },
   ) => Promise<RunnerExecutionOutput>;
   removeWorkspace: (workspace: string) => Promise<void>;
+  recoverCrashWorkspaces: (workspaceRoot: string, runnerId: string) => Promise<number>;
   sleep: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
   log: RunnerWorkerLog;
 };
@@ -108,6 +109,7 @@ const defaultDependencies: RunnerWorkerDependencies = {
     throw new Error("runner execution pipeline adapter is not configured");
   },
   removeWorkspace: async (workspace) => await rm(workspace, { recursive: true, force: true }),
+  recoverCrashWorkspaces: recoverRunnerCrashWorkspaces,
   sleep: abortableSleep,
   log: () => undefined,
 };
@@ -125,7 +127,10 @@ export async function runRunnerWorkerOnce(
   const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
-  const workspaceRoot = path.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  const workspaceRoot = runnerActiveWorkspaceRoot(
+    path.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    identity.runnerId,
+  );
   const claim = await client.claim({
     protocolVersion: 1,
     workerClass: "self_hosted",
@@ -262,7 +267,15 @@ export async function serveRunnerWorker(
 ): Promise<void> {
   const dependencies = { ...defaultDependencies, ...overrides };
   const pollSeconds = boundedSeconds(options.pollSeconds ?? 15, "pollSeconds", 1, 300);
-  await dependencies.loadIdentity(options.identityFile);
+  const identity = await dependencies.loadIdentity(options.identityFile);
+  if (options.signal?.aborted) return;
+  const recovered = await dependencies.recoverCrashWorkspaces(
+    path.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    identity.runnerId,
+  );
+  if (recovered > 0) {
+    dependencies.log("runner.workspace.crash_recovery_cleanup", { workspaces_removed: recovered });
+  }
   while (!options.signal?.aborted) {
     try {
       const result = await runRunnerWorkerOnce(options, dependencies);
@@ -442,6 +455,36 @@ async function bestEffortRelinquish(
       message: message.slice(0, 1000),
     })
     .catch(() => undefined);
+}
+
+function runnerActiveWorkspaceRoot(workspaceRoot: string, runnerId: string): string {
+  return path.join(path.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
+}
+
+async function recoverRunnerCrashWorkspaces(workspaceRoot: string, runnerId: string): Promise<number> {
+  const root = path.resolve(workspaceRoot);
+  const namespace = path.join(root, ".boardreadyops-active");
+  const namespaceInfo = await lstat(namespace).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!namespaceInfo) return 0;
+  if (namespaceInfo.isSymbolicLink() || !namespaceInfo.isDirectory()) {
+    throw new Error("runner active workspace namespace is not a regular directory");
+  }
+
+  const activeRoot = runnerActiveWorkspaceRoot(root, runnerId);
+  const activeInfo = await lstat(activeRoot).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!activeInfo) return 0;
+  if (activeInfo.isSymbolicLink() || !activeInfo.isDirectory()) {
+    throw new Error("runner identity workspace namespace is not a regular directory");
+  }
+  const entries = await readdir(activeRoot);
+  await rm(activeRoot, { recursive: true, force: true });
+  return entries.length;
 }
 
 function boundedSeconds(value: number, name: string, minimum: number, maximum: number): number {

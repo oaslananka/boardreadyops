@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,7 @@ import {
   type RunnerWorkerClient,
   type RunnerWorkerDependencies,
   runRunnerWorkerOnce,
+  serveRunnerWorker,
 } from "../../../src/runner/worker.js";
 
 const roots: string[] = [];
@@ -224,7 +225,7 @@ describe("runRunnerWorkerOnce", () => {
     expect(result).toEqual({ status: "completed", runId, executionAttemptId: attemptId, decision: "pass" });
     expect(checkoutSource).toHaveBeenCalledWith({
       job: claimedJob(),
-      workspaceRoot: path.resolve("/workspaces"),
+      workspaceRoot: path.join(path.resolve("/workspaces"), ".boardreadyops-active", runnerId),
     });
     expect(
       (runnerClient.heartbeat.mock.calls as unknown as Array<[RunnerLeaseHeartbeatRequest]>).map(
@@ -691,5 +692,66 @@ notifiers:
     } as Parameters<typeof executeRunnerPipeline>[2] & { signal: AbortSignal };
 
     await expect(executeRunnerPipeline(workspace, claimedJob(), options)).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
+
+describe("serveRunnerWorker", () => {
+  it("removes only this runner identity's managed crash leftovers before polling", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-recovery-"));
+    roots.push(root);
+    const orphan = path.join(root, ".boardreadyops-active", runnerId, "orphaned-workspace");
+    const otherRunnerId = "66666666-6666-4666-8666-666666666666";
+    const otherRunnerWorkspace = path.join(root, ".boardreadyops-active", otherRunnerId, "still-owned-elsewhere");
+    const customerFile = path.join(root, "customer-owned.txt");
+    await mkdir(orphan, { recursive: true });
+    await writeFile(path.join(orphan, "private-board.kicad_pcb"), "source", "utf8");
+    await mkdir(otherRunnerWorkspace, { recursive: true });
+    await writeFile(customerFile, "keep", "utf8");
+
+    const runnerClient = client(null);
+    const controller = new AbortController();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      sleep: vi.fn(async () => controller.abort()),
+    });
+
+    await serveRunnerWorker(
+      {
+        identityFile: "/identity/runner.json",
+        runnerVersion: "1.26.1",
+        workspaceRoot: root,
+        signal: controller.signal,
+      },
+      overrides,
+    );
+
+    await expect(access(path.join(root, ".boardreadyops-active", runnerId))).rejects.toThrow();
+    await expect(access(otherRunnerWorkspace)).resolves.toBeUndefined();
+    await expect(access(customerFile)).resolves.toBeUndefined();
+    expect(overrides.log).toHaveBeenCalledWith("runner.workspace.crash_recovery_cleanup", {
+      workspaces_removed: 1,
+    });
+    expect(runnerClient.claim).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed before polling when the managed workspace namespace is not a directory", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-recovery-invalid-"));
+    roots.push(root);
+    await writeFile(path.join(root, ".boardreadyops-active"), "unexpected", "utf8");
+    const runnerClient = client(null);
+    const overrides = dependencies(runnerClient.value);
+
+    await expect(
+      serveRunnerWorker(
+        {
+          identityFile: "/identity/runner.json",
+          runnerVersion: "1.26.1",
+          workspaceRoot: root,
+        },
+        overrides,
+      ),
+    ).rejects.toThrow(/active workspace namespace is not a regular directory/u);
+
+    expect(runnerClient.claim).not.toHaveBeenCalled();
   });
 });
