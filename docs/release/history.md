@@ -8,6 +8,18 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.30.3](https://github.com/oaslananka/boardreadyops/compare/v1.30.2...v1.30.3) (2026-08-09)
+
+
+### Bug Fixes
+
+* **cli:** add metadata-only runner artifact mode ([#352](https://github.com/oaslananka/boardreadyops/issues/352)) ([5a7fba3](https://github.com/oaslananka/boardreadyops/commit/5a7fba3eec2d5ef493db30d95a7808901ad832f3))
+* **cli:** cancel in-flight runner analysis on shutdown ([#351](https://github.com/oaslananka/boardreadyops/issues/351)) ([6fb5ee9](https://github.com/oaslananka/boardreadyops/commit/6fb5ee94fca88298521452737f371b67f6274584)), closes [#41](https://github.com/oaslananka/boardreadyops/issues/41)
+* **core:** clean crash-orphaned runner workspaces ([#353](https://github.com/oaslananka/boardreadyops/issues/353)) ([39af849](https://github.com/oaslananka/boardreadyops/commit/39af84911de1ecae24638021ecd6fc3c0d3bd9bd))
+* **deps:** pin patched nanoid transitive ([#350](https://github.com/oaslananka/boardreadyops/issues/350)) ([37cb00c](https://github.com/oaslananka/boardreadyops/commit/37cb00c56c7c0094aafef10be53b022992a4cb68))
+* **release:** harden npm trusted publishing ([#348](https://github.com/oaslananka/boardreadyops/issues/348)) ([fffa1cd](https://github.com/oaslananka/boardreadyops/commit/fffa1cdd938791d2888508f3ce88a433b13dd271)), closes [#334](https://github.com/oaslananka/boardreadyops/issues/334)
+* **release:** pin npm publish to main workflow identity ([#354](https://github.com/oaslananka/boardreadyops/issues/354)) ([78aeeb4](https://github.com/oaslananka/boardreadyops/commit/78aeeb4d9c21f8f202fff6ff3908fd36c1ad844e)), closes [#334](https://github.com/oaslananka/boardreadyops/issues/334)
+
 ## [1.30.2](https://github.com/oaslananka/boardreadyops/compare/v1.30.1...v1.30.2) (2026-08-08)
 
 
