@@ -48,7 +48,9 @@ describe("publish-npm workflow contract", () => {
     expect(workflow).toContain("npm Trusted Publisher OIDC exchange succeeded");
     expect(workflow).toContain("GitHub OIDC safe claims");
     expect(workflow).toContain('repository: "oaslananka/boardreadyops"');
-    expect(workflow).toContain('"oaslananka/boardreadyops/.github/workflows/publish-npm.yml@"');
+    expect(workflow).toContain("oaslananka/boardreadyops/.github/workflows/publish-npm.yml@refs/heads/main");
+    expect(workflow).toContain('ref: "refs/heads/main"');
+    expect(workflow).toContain("Publish workflow must run from refs/heads/main");
     expect(workflow).not.toContain("console.log(id_token)");
     expect(workflow).not.toContain("console.log(token)");
     expect(workflow).toContain("npm install -g npm@latest");

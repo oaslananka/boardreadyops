@@ -44,6 +44,15 @@ jobs:
       release_tag: ${{ steps.release.outputs.release_tag }}
       should_publish: ${{ steps.release.outputs.should_publish }}
     steps:
+      - name: Verify production workflow identity
+        env:
+          WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "${WORKFLOW_REF}" != "refs/heads/main" ]; then
+            echo "::error::Publish workflow must run from refs/heads/main."
+            exit 1
+          fi
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           fetch-depth: 0
@@ -264,6 +273,7 @@ jobs:
             iss: "https://token.actions.githubusercontent.com",
             aud: "npm:registry.npmjs.org",
             repository: "oaslananka/boardreadyops",
+            ref: "refs/heads/main",
           };
           for (const [claim, value] of Object.entries(expected)) {
             if (payload[claim] !== value) {
@@ -271,7 +281,7 @@ jobs:
             }
           }
           const workflowRef = String(payload.workflow_ref ?? "");
-          if (!workflowRef.startsWith("oaslananka/boardreadyops/.github/workflows/publish-npm.yml@")) {
+          if (workflowRef !== "oaslananka/boardreadyops/.github/workflows/publish-npm.yml@refs/heads/main") {
             throw new Error(`Unexpected GitHub OIDC workflow_ref: ${JSON.stringify(workflowRef)}`);
           }
           const safeClaims = {
