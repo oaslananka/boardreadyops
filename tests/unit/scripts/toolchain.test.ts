@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildBootstrapPlan,
+  buildCorepackInstallCommand,
   buildToolchainEnvironment,
   buildVirtualEnvironmentCommand,
   evaluateToolchain,
@@ -79,6 +80,28 @@ async function writeFailingCorepack(bin: string, marker: string): Promise<void> 
     `#!/usr/bin/env sh
 touch "${marker}"
 exit 93
+`,
+  );
+  await chmod(corepack, 0o755);
+}
+
+async function writeRetryingCorepack(bin: string, counterFile: string, failuresBeforeSuccess: number): Promise<void> {
+  const corepack = path.join(bin, "corepack");
+  await writeFile(
+    corepack,
+    `#!/usr/bin/env sh
+count=0
+if [ -f "${counterFile}" ]; then
+  count=$(cat "${counterFile}")
+fi
+count=$((count + 1))
+printf '%s\n' "$count" > "${counterFile}"
+if [ "$count" -le "${failuresBeforeSuccess}" ]; then
+  echo "simulated transient corepack failure $count" >&2
+  exit 93
+fi
+echo "simulated corepack success $count"
+exit 0
 `,
   );
   await chmod(corepack, 0o755);
@@ -195,6 +218,88 @@ describe("reproducible contributor toolchain", () => {
       expect(hook).not.toMatch(/(^|\n)pnpm\b/);
       expect(hook).not.toMatch(/(^|\n)pre-commit\b/);
     }
+  });
+
+  it("uses cmd.exe for Corepack shim execution on Windows", () => {
+    expect(buildCorepackInstallCommand("win32", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
+      command: "C:\\Windows\\System32\\cmd.exe",
+      args: ["/d", "/s", "/c", "corepack install"],
+    });
+    expect(buildCorepackInstallCommand("linux", {})).toEqual({ command: "corepack", args: ["install"] });
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "retries a transient Corepack install and succeeds on the third attempt",
+    async () => {
+      const temporaryRoot = await mkdtemp(path.join(root, ".toolchain-corepack-test-"));
+      const bin = path.join(temporaryRoot, "bin");
+      const counterFile = path.join(temporaryRoot, "attempts");
+      await mkdir(bin, { recursive: true });
+      await writeFile(path.join(temporaryRoot, "toolchain.json"), await repositoryFile("toolchain.json"));
+      await writeRetryingCorepack(bin, counterFile, 2);
+
+      try {
+        const result = spawnSync(process.execPath, [path.join(root, "scripts", "toolchain.mjs"), "corepack-install"], {
+          cwd: temporaryRoot,
+          env: {
+            ...process.env,
+            BOARDREADYOPS_COREPACK_RETRY_DELAY_MS: "0",
+            PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`,
+          },
+          encoding: "utf8",
+        });
+
+        expect(result.status).toBe(0);
+        expect(await readFile(counterFile, "utf8")).toBe("3\n");
+        expect(result.stderr).toContain("Corepack install attempt 1/3 failed");
+        expect(result.stderr).toContain("Corepack install attempt 2/3 failed");
+      } finally {
+        await rm(temporaryRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "fails closed after three unsuccessful Corepack install attempts",
+    async () => {
+      const temporaryRoot = await mkdtemp(path.join(root, ".toolchain-corepack-test-"));
+      const bin = path.join(temporaryRoot, "bin");
+      const counterFile = path.join(temporaryRoot, "attempts");
+      await mkdir(bin, { recursive: true });
+      await writeFile(path.join(temporaryRoot, "toolchain.json"), await repositoryFile("toolchain.json"));
+      await writeRetryingCorepack(bin, counterFile, 3);
+
+      try {
+        const result = spawnSync(process.execPath, [path.join(root, "scripts", "toolchain.mjs"), "corepack-install"], {
+          cwd: temporaryRoot,
+          env: {
+            ...process.env,
+            BOARDREADYOPS_COREPACK_RETRY_DELAY_MS: "0",
+            PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`,
+          },
+          encoding: "utf8",
+        });
+
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain("Corepack install failed after 3 attempts");
+        expect(await readFile(counterFile, "utf8")).toBe("3\n");
+      } finally {
+        await rm(temporaryRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("routes workflow Corepack installs through the tested toolchain boundary", async () => {
+    const workflowDirectory = path.join(root, ".github", "workflows");
+    const workflowFiles = (await readdir(workflowDirectory)).filter((file) => /\.ya?ml$/u.test(file)).sort();
+    const rawCorepackInstalls: string[] = [];
+
+    for (const file of workflowFiles) {
+      const content = await repositoryFile(path.join(".github", "workflows", file));
+      if (/\bcorepack install\b/u.test(content)) rawCorepackInstalls.push(file);
+    }
+
+    expect(rawCorepackInstalls).toEqual([]);
   });
 
   it("routes nested package scripts through the repository-pinned Corepack pnpm", async () => {
