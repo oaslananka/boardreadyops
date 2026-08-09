@@ -16514,13 +16514,13 @@ var require_async = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
     function read(path66, settings, callback) {
-      settings.fs.lstat(path66, (lstatError, lstat2) => {
+      settings.fs.lstat(path66, (lstatError, lstat3) => {
         if (lstatError !== null) {
           callFailureCallback(callback, lstatError);
           return;
         }
-        if (!lstat2.isSymbolicLink() || !settings.followSymbolicLink) {
-          callSuccessCallback(callback, lstat2);
+        if (!lstat3.isSymbolicLink() || !settings.followSymbolicLink) {
+          callSuccessCallback(callback, lstat3);
           return;
         }
         settings.fs.stat(path66, (statError, stat3) => {
@@ -16529,7 +16529,7 @@ var require_async = __commonJS({
               callFailureCallback(callback, statError);
               return;
             }
-            callSuccessCallback(callback, lstat2);
+            callSuccessCallback(callback, lstat3);
             return;
           }
           if (settings.markSymbolicLink) {
@@ -16556,9 +16556,9 @@ var require_sync = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
     function read(path66, settings) {
-      const lstat2 = settings.fs.lstatSync(path66);
-      if (!lstat2.isSymbolicLink() || !settings.followSymbolicLink) {
-        return lstat2;
+      const lstat3 = settings.fs.lstatSync(path66);
+      if (!lstat3.isSymbolicLink() || !settings.followSymbolicLink) {
+        return lstat3;
       }
       try {
         const stat3 = settings.fs.statSync(path66);
@@ -16568,7 +16568,7 @@ var require_sync = __commonJS({
         return stat3;
       } catch (error51) {
         if (!settings.throwErrorOnBrokenSymbolicLink) {
-          return lstat2;
+          return lstat3;
         }
         throw error51;
       }
@@ -16802,7 +16802,7 @@ var require_async2 = __commonJS({
         readdirWithFileTypes(directory, settings, callback);
         return;
       }
-      readdir(directory, settings, callback);
+      readdir2(directory, settings, callback);
     }
     exports2.read = read;
     function readdirWithFileTypes(directory, settings, callback) {
@@ -16851,7 +16851,7 @@ var require_async2 = __commonJS({
         });
       };
     }
-    function readdir(directory, settings, callback) {
+    function readdir2(directory, settings, callback) {
       settings.fs.readdir(directory, (readdirError, names) => {
         if (readdirError !== null) {
           callFailureCallback(callback, readdirError);
@@ -16886,7 +16886,7 @@ var require_async2 = __commonJS({
         });
       });
     }
-    exports2.readdir = readdir;
+    exports2.readdir = readdir2;
     function callFailureCallback(callback, error51) {
       callback(error51);
     }
@@ -16910,7 +16910,7 @@ var require_sync2 = __commonJS({
       if (!settings.stats && constants_1.IS_SUPPORT_READDIR_WITH_FILE_TYPES) {
         return readdirWithFileTypes(directory, settings);
       }
-      return readdir(directory, settings);
+      return readdir2(directory, settings);
     }
     exports2.read = read;
     function readdirWithFileTypes(directory, settings) {
@@ -16935,7 +16935,7 @@ var require_sync2 = __commonJS({
       });
     }
     exports2.readdirWithFileTypes = readdirWithFileTypes;
-    function readdir(directory, settings) {
+    function readdir2(directory, settings) {
       const names = settings.fs.readdirSync(directory);
       return names.map((name) => {
         const entryPath = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
@@ -16951,7 +16951,7 @@ var require_sync2 = __commonJS({
         return entry;
       });
     }
-    exports2.readdir = readdir;
+    exports2.readdir = readdir2;
   }
 });
 
@@ -54516,6 +54516,7 @@ var defaultDependencies2 = {
     throw new Error("runner execution pipeline adapter is not configured");
   },
   removeWorkspace: async (workspace) => await (0, import_promises26.rm)(workspace, { recursive: true, force: true }),
+  recoverCrashWorkspaces: recoverRunnerCrashWorkspaces,
   sleep: abortableSleep,
   log: () => void 0
 };
@@ -54528,7 +54529,10 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
   const privateKey = await dependencies.loadPrivateKey(identity.privateKeyPath);
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
-  const workspaceRoot = import_node_path62.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  const workspaceRoot = runnerActiveWorkspaceRoot(
+    import_node_path62.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    identity.runnerId
+  );
   const claim = await client.claim({
     protocolVersion: 1,
     workerClass: "self_hosted",
@@ -54655,7 +54659,15 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
 async function serveRunnerWorker(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
   const pollSeconds = boundedSeconds(options.pollSeconds ?? 15, "pollSeconds", 1, 300);
-  await dependencies.loadIdentity(options.identityFile);
+  const identity = await dependencies.loadIdentity(options.identityFile);
+  if (options.signal?.aborted) return;
+  const recovered = await dependencies.recoverCrashWorkspaces(
+    import_node_path62.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    identity.runnerId
+  );
+  if (recovered > 0) {
+    dependencies.log("runner.workspace.crash_recovery_cleanup", { workspaces_removed: recovered });
+  }
   while (!options.signal?.aborted) {
     try {
       const result = await runRunnerWorkerOnce(options, dependencies);
@@ -54806,6 +54818,33 @@ async function bestEffortRelinquish(client, job, reason, message) {
     reason,
     message: message.slice(0, 1e3)
   }).catch(() => void 0);
+}
+function runnerActiveWorkspaceRoot(workspaceRoot, runnerId) {
+  return import_node_path62.default.join(import_node_path62.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
+}
+async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
+  const root = import_node_path62.default.resolve(workspaceRoot);
+  const namespace = import_node_path62.default.join(root, ".boardreadyops-active");
+  const namespaceInfo = await (0, import_promises26.lstat)(namespace).catch((error51) => {
+    if (error51.code === "ENOENT") return void 0;
+    throw error51;
+  });
+  if (!namespaceInfo) return 0;
+  if (namespaceInfo.isSymbolicLink() || !namespaceInfo.isDirectory()) {
+    throw new Error("runner active workspace namespace is not a regular directory");
+  }
+  const activeRoot = runnerActiveWorkspaceRoot(root, runnerId);
+  const activeInfo = await (0, import_promises26.lstat)(activeRoot).catch((error51) => {
+    if (error51.code === "ENOENT") return void 0;
+    throw error51;
+  });
+  if (!activeInfo) return 0;
+  if (activeInfo.isSymbolicLink() || !activeInfo.isDirectory()) {
+    throw new Error("runner identity workspace namespace is not a regular directory");
+  }
+  const entries = await (0, import_promises26.readdir)(activeRoot);
+  await (0, import_promises26.rm)(activeRoot, { recursive: true, force: true });
+  return entries.length;
 }
 function boundedSeconds(value, name, minimum, maximum) {
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {

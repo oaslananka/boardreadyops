@@ -180,7 +180,7 @@ The command exits `0` both when one job completes and when the queue is empty. A
 
 The worker runs the existing BoardReadyOps pipeline in enforce mode, writes JSON, SARIF, and Markdown reports inside the temporary workspace, and publishes a terminal result. The default `--artifact-mode control-plane` requests upload capabilities bound to the active lease and uploads the exact declared report byte counts before reporting. `--artifact-mode metadata-only` is an explicit local runner policy: it skips the `uploading_artifacts` lease stage, never requests artifact upload capabilities, sends an empty terminal artifact list, and still reports bounded findings, metrics, readiness, and waiver data. Terminal metrics include `artifact_mode_metadata_only=1`, so commissioning evidence can distinguish the selected local policy even when a run generates no artifacts. The control plane cannot opt a runner out of a locally selected `metadata-only` mode for an individual job.
 
-Safe-mode execution independently disables repository-provided plugins and notifier dispatch before analysis, so repository code cannot consume ambient notifier credentials or request plugin network/process permissions through the runner process. Safe mode also suppresses artifact uploads even when `control-plane` was selected. Temporary workspaces are removed by default. `--keep-workspace` is intended only for controlled debugging and increases source-retention risk. Safe-mode jobs always remove their workspace; `--keep-workspace` is ignored for those jobs and the worker emits `runner.workspace.retention_overridden` without source content or credential values.
+Safe-mode execution independently disables repository-provided plugins and notifier dispatch before analysis, so repository code cannot consume ambient notifier credentials or request plugin network/process permissions through the runner process. Safe mode also suppresses artifact uploads even when `control-plane` was selected. New checkouts live under `<workspace-root>/.boardreadyops-active/<runner-id>/...`, where the runner ID comes from the validated local identity. Temporary workspaces are removed by default. `--keep-workspace` is intended only for controlled debugging and increases source-retention risk; it is process-lifetime debug retention, not restart-persistent storage. Safe-mode jobs always remove their workspace; `--keep-workspace` is ignored for those jobs and the worker emits `runner.workspace.retention_overridden` without source content or credential values.
 
 Use metadata-only result handling when generated report bytes must remain on customer-controlled infrastructure:
 
@@ -206,6 +206,8 @@ sudo -u boardreadyops-runner boardreadyops runner serve \
   --poll-seconds 15 \
   --format json
 ```
+
+At the start of `runner serve`, BoardReadyOps removes only the current runner identity's managed active-workspace namespace before polling for new work. This recovers source checkouts and generated report files left behind by an abrupt process or host crash. Cleanup does not inspect or remove sibling runner-identity namespaces or files stored directly under the configured workspace root. If `.boardreadyops-active` or the current identity namespace is a symlink or is not a regular directory, the service fails closed before claiming work rather than following the unexpected path. Run only one worker process per identity, as required by the deployment profiles below; a second concurrent process using the same identity would violate the cleanup ownership boundary.
 
 `serve` handles `SIGINT` and `SIGTERM`, stops polling, and propagates shutdown into an in-flight analysis before relinquishing the claimed lease. BoardReadyOps-owned KiCad child processes receive `SIGTERM`; if a child does not exit within 500 ms, the runner sends `SIGKILL` and waits for the child to close before cleaning the temporary workspace. Transient claim errors are logged and retried after the configured poll interval. A valid signed claim poll refreshes the registration presence timestamp and, when supplied, the last reported strict agent version even when the queue is empty. A replayed request, a capability mismatch, an invalid signature, or a minimum-version rejection does not refresh presence.
 
@@ -350,7 +352,7 @@ Recommended layout:
 
 ```text
 /var/lib/boardreadyops-runner/identity       # persistent, 0700
-/var/lib/boardreadyops-runner/workspaces     # ephemeral source checkout, 0700
+/var/lib/boardreadyops-runner/workspaces     # ephemeral root; active checkouts live under .boardreadyops-active/<runner-id>
 /var/lib/boardreadyops-runner/bootstrap      # one-time token staging, empty after activation
 /srv/git-mirrors                            # optional customer-managed bare mirrors
 ```
@@ -410,7 +412,7 @@ A production acceptance run should record all of the following:
 5. signed heartbeat stages advance through source preparation, execution, and reporting, with artifact upload present only when `control-plane` artifact mode is selected and safe mode is not active;
 6. the GitHub Check Run reaches a terminal conclusion with findings; `control-plane` mode also proves report links while `metadata-only` proves an empty artifact list and no artifact endpoint connection;
 7. the runner lease, registration, terminal result, and audit records share the same run and execution-attempt IDs, with artifact capabilities sharing those IDs only when artifact upload is enabled;
-8. the temporary customer workspace is removed after completion.
+8. the temporary customer workspace is removed after completion, and a forced process-crash drill proves that restarting `runner serve` removes the current identity's orphaned managed workspace before the next claim.
 
 Retain IDs, timestamps, Check Run URL, audit-event references, and artifact digests only when artifact upload is enabled. Do not retain the enrollment token, lease token, upload capability, Git credential, source archive, or runner private key in the evidence bundle.
 
@@ -425,6 +427,7 @@ The worker fails closed when:
 - the lease becomes closed or stale;
 - artifact size or capability metadata does not match when `control-plane` artifact mode is active;
 - a signed request is rejected or replayed;
-- the terminal result cannot be bound to the active execution attempt.
+- the terminal result cannot be bound to the active execution attempt;
+- the managed active-workspace namespace is a symlink or non-directory at service startup.
 
-Execution errors cause best-effort lease relinquishment and workspace cleanup. The control plane remains authoritative for stale leases, duplicate terminal results, and conflicting attempts.
+Execution errors cause best-effort lease relinquishment and workspace cleanup. Cooperative cancellation waits for BoardReadyOps-owned child processes to terminate before cleanup. A hard process or host crash cannot run `finally`; the next `runner serve` startup removes only that validated runner identity's managed active-workspace namespace before polling. The local event `runner.workspace.crash_recovery_cleanup` records only the number of removed workspace entries, never source paths or file contents. The control plane remains authoritative for stale leases, duplicate terminal results, and conflicting attempts.

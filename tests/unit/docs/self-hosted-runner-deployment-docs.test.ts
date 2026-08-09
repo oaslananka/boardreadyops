@@ -29,6 +29,16 @@ describe("self-hosted runner deployment documentation", () => {
     expect(runner).toContain("A fully disconnected runner cannot participate");
   });
 
+  it("defines the managed workspace crash-recovery boundary", async () => {
+    const runner = await readFile(runnerUrl, "utf8");
+
+    expect(runner).toContain(".boardreadyops-active/<runner-id>");
+    expect(runner).toContain("removes only the current runner identity's managed active-workspace namespace");
+    expect(runner).toContain("before polling for new work");
+    expect(runner).toContain("process-lifetime debug retention, not restart-persistent storage");
+    expect(runner).toContain("fails closed before claiming work");
+  });
+
   it("defines an exact-version upgrade, rollback, and re-enrollment contract", async () => {
     const runner = await readFile(runnerUrl, "utf8");
 
