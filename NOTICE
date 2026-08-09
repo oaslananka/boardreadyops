@@ -1338,7 +1338,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `js-tokens@4.0.0`, `js-tokens@10.0.0`
   - Description: Tiny JavaScript tokenizer.
   - Homepage: https://github.com/lydell/js-tokens#readme
-- `js-yaml@4.3.0`, `js-yaml@5.2.2`
+- `js-yaml@4.3.1`, `js-yaml@5.2.2`
   - Description: YAML 1.2 parser and serializer
   - Homepage: https://github.com/nodeca/js-yaml#readme
 - `jsesc@3.1.0`
