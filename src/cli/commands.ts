@@ -286,6 +286,12 @@ export function registerAllCommands(
       .option("--poll-seconds <seconds>", "empty-queue and failure retry interval", runnerSeconds, 15)
       .option("--no-require-kicad", "allow execution without kicad-cli")
       .option("--keep-workspace", "retain the checked-out workspace after completion")
+      .option(
+        "--artifact-mode <mode>",
+        "artifact handling: control-plane or metadata-only",
+        runnerArtifactMode,
+        "control-plane",
+      )
       .option("--format <format>", "text or json", runnerOutputFormat, "text");
   addRunnerWorkOptions(runner.command("once").description("claim and process at most one runner job")).action(
     async (options: RunnerWorkCliOptions) => {
@@ -349,6 +355,13 @@ function runnerRevocationReason(value: string): RunnerRevokeRegistrationCliOptio
     throw new InvalidArgumentError(`Runner revocation reason must be one of: ${values.join(", ")}.`);
   }
   return value as RunnerRevokeRegistrationCliOptions["reason"];
+}
+
+function runnerArtifactMode(value: string): RunnerWorkCliOptions["artifactMode"] {
+  if (value !== "control-plane" && value !== "metadata-only") {
+    throw new InvalidArgumentError("Runner artifact mode must be control-plane or metadata-only.");
+  }
+  return value;
 }
 
 function runnerOutputFormat(value: string): RunnerOutputFormat {

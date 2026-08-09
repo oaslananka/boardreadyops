@@ -273,6 +273,7 @@ describe("runRunnerWorkerOnce", () => {
         waivers: { active: [expect.objectContaining({ rule: "design.review", matched: 1 })], expired: [] },
         metrics: expect.objectContaining({
           readiness_score: 84,
+          artifact_mode_metadata_only: 0,
           artifacts_generated: 1,
           artifacts_uploaded: 1,
           artifacts_suppressed: 0,
@@ -281,6 +282,112 @@ describe("runRunnerWorkerOnce", () => {
     });
     expect(overrides.removeWorkspace).toHaveBeenCalledWith(workspace);
     expect(runnerClient.relinquish).not.toHaveBeenCalled();
+  });
+
+  it("suppresses artifact uploads in explicit metadata-only mode for a standard job", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-metadata-only-"));
+    roots.push(workspace);
+    const artifactFile = path.join(workspace, "result.json");
+    await writeFile(artifactFile, "hello", "utf8");
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    const execution: RunnerExecutionOutput = {
+      exitCode: 0,
+      report: {
+        findings: [],
+        summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      },
+      artifacts: [
+        {
+          kind: "report/json",
+          name: "boardreadyops-result.json",
+          role: "primary",
+          filePath: artifactFile,
+          bytes: 5,
+          sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+        },
+      ],
+    };
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(async () => execution),
+    });
+
+    const result = await runRunnerWorkerOnce(
+      {
+        identityFile: "/identity/runner.json",
+        runnerVersion: "1.26.1",
+        artifactMode: "metadata-only",
+      },
+      overrides,
+    );
+
+    expect(result).toMatchObject({ status: "completed", decision: "pass" });
+    expect(runnerClient.issueArtifactCapabilities).not.toHaveBeenCalled();
+    expect(runnerClient.uploadArtifact).not.toHaveBeenCalled();
+    expect(
+      (runnerClient.heartbeat.mock.calls as unknown as Array<[RunnerLeaseHeartbeatRequest]>).map(
+        ([request]) => request.stage,
+      ),
+    ).toEqual(["preparing_source", "running", "reporting"]);
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result.artifacts).toEqual([]);
+    expect(terminal?.result.metrics).toMatchObject({
+      artifact_mode_metadata_only: 1,
+      artifacts_generated: 1,
+      artifacts_uploaded: 0,
+      artifacts_suppressed: 1,
+    });
+    expect(overrides.log).toHaveBeenCalledWith(
+      "runner.artifacts.suppressed",
+      expect.objectContaining({
+        run_id: runId,
+        execution_attempt_id: attemptId,
+        artifacts: 1,
+        artifact_mode: "metadata-only",
+      }),
+    );
+  });
+
+  it("records explicit metadata-only mode even when no artifacts were generated", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-metadata-only-empty-"));
+    roots.push(workspace);
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(
+        async (): Promise<RunnerExecutionOutput> => ({
+          exitCode: 0,
+          report: {
+            findings: [],
+            summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+          },
+          artifacts: [],
+        }),
+      ),
+    });
+
+    await runRunnerWorkerOnce(
+      {
+        identityFile: "/identity/runner.json",
+        runnerVersion: "1.26.1",
+        artifactMode: "metadata-only",
+      },
+      overrides,
+    );
+
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result.metrics).toMatchObject({
+      artifact_mode_metadata_only: 1,
+      artifacts_generated: 0,
+      artifacts_uploaded: 0,
+      artifacts_suppressed: 0,
+    });
   });
 
   it("suppresses artifact capabilities and uploads for safe-mode runs", async () => {
@@ -338,6 +445,7 @@ describe("runRunnerWorkerOnce", () => {
       run_id: runId,
       execution_attempt_id: attemptId,
       artifacts: 1,
+      artifact_mode: "control-plane",
       safe_mode_reasons: ["private-repository"],
     });
   });

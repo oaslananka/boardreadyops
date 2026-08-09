@@ -71,10 +71,11 @@ boardreadyops runner serve \
   --workspace-root /var/lib/boardreadyops-runner/workspaces \
   --heartbeat-seconds 30 \
   --poll-seconds 15 \
+  --artifact-mode metadata-only \
   --format json
 ```
 
-The worker accepts only `customer_checkout` assignments, fetches the exact server-assigned SHA with customer-controlled Git credentials or a local mirror, uploads only generated reports, and removes the temporary workspace by default. See [Self-hosted runner mode](deployment/self-hosted-runner.md) for the trust boundary, permissions, network policy, service configuration, private-repository evidence, updates, and rollback.
+The worker accepts only `customer_checkout` assignments, fetches the exact server-assigned SHA with customer-controlled Git credentials or a local mirror, and removes the temporary workspace by default. Artifact mode defaults to `control-plane`, which uploads only generated reports through attempt-bound capabilities. `--artifact-mode metadata-only` sends the bounded terminal findings/metrics/readiness result without requesting artifact capabilities or transferring report artifact bytes. See [Self-hosted runner mode](deployment/self-hosted-runner.md) for the trust boundary, permissions, network policy, service configuration, private-repository evidence, updates, and rollback.
 
 ## Agent planning
 
