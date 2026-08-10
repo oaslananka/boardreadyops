@@ -1284,6 +1284,65 @@ async function runWorkerProcessInterruptionValidation(configuration, input) {
   return workerProcessRecovery;
 }
 
+async function startWorkerFleetRound(context) {
+  const { configuration, input, round, baseTime, store } = context;
+  const { repositoryRoot, children, expectedJobIds, workerFleetRecovery } = context;
+  for (let workerIndex = 0; workerIndex < configuration.workerFleetSize; workerIndex += 1) {
+    const repository =
+      input.repositories[(round * configuration.workerFleetSize + workerIndex) % input.repositories.length];
+    const deliveryId = `${input.prefix}-worker-fleet-${round}-${workerIndex}`;
+    const accepted = await store.acceptGitHubWebhook({
+      deliveryId,
+      eventType: "installation",
+      eventAction: "created",
+      installationExternalId: repository.githubInstallationId,
+      payloadSha256: createHash("sha256").update(deliveryId).digest("hex"),
+      actions: [
+        {
+          type: "installation.upsert",
+          installation: {
+            id: repository.githubInstallationId,
+            accountLogin: `${input.prefix}-worker-fleet-account`,
+            accountType: "Organization",
+          },
+        },
+      ],
+      receivedAt: baseTime,
+    });
+    if (accepted.outcome !== "accepted" || !accepted.jobId) {
+      throw new Error("worker fleet interruption fixture was not accepted");
+    }
+
+    const workerId = `${input.prefix}-fleet-abandoned-${round}-${workerIndex}`;
+    const child = spawnWorkerFixture(configuration, repositoryRoot, baseTime, workerId);
+    children.push(child);
+    workerFleetRecovery.childProcessesStarted += 1;
+    await waitForWorkerClaim(child, accepted.jobId);
+    expectedJobIds.push(accepted.jobId);
+  }
+}
+
+async function reclaimWorkerFleetRound(configuration, input, round, store, expectedJobIds, workerFleetRecovery) {
+  const reclaimedIds = new Set();
+  for (let workerIndex = 0; workerIndex < configuration.workerFleetSize; workerIndex += 1) {
+    const replacementWorker = `${input.prefix}-fleet-replacement-${round}-${workerIndex}`;
+    const reclaimed = (await store.claimJobs({ workerId: replacementWorker, limit: 1 }))[0];
+    if (!reclaimed || !expectedJobIds.includes(reclaimed.jobId) || reclaimed.attemptCount !== 2) {
+      throw new Error("terminated worker fleet lease was not reclaimed");
+    }
+    if (reclaimedIds.has(reclaimed.jobId)) throw new Error("terminated worker fleet job was reclaimed twice");
+    reclaimedIds.add(reclaimed.jobId);
+    workerFleetRecovery.abandonedLeasesReclaimed += 1;
+    if ((await store.completeJob({ jobId: reclaimed.jobId, workerId: replacementWorker })) !== "completed") {
+      throw new Error("replacement worker fleet did not complete a reclaimed job");
+    }
+    workerFleetRecovery.replacementCompletions += 1;
+  }
+  if (reclaimedIds.size !== expectedJobIds.length) {
+    throw new Error("replacement worker fleet did not reclaim every abandoned job");
+  }
+}
+
 async function runWorkerFleetInterruptionValidation(configuration, input) {
   const workerFleetRecovery = {
     ...createWorkerInterruptionRecovery(configuration.recoveryRounds),
@@ -1300,40 +1359,17 @@ async function runWorkerFleetInterruptionValidation(configuration, input) {
     const expectedJobIds = [];
 
     try {
-      for (let workerIndex = 0; workerIndex < configuration.workerFleetSize; workerIndex += 1) {
-        const repository =
-          input.repositories[(round * configuration.workerFleetSize + workerIndex) % input.repositories.length];
-        const deliveryId = `${input.prefix}-worker-fleet-${round}-${workerIndex}`;
-        const accepted = await store.acceptGitHubWebhook({
-          deliveryId,
-          eventType: "installation",
-          eventAction: "created",
-          installationExternalId: repository.githubInstallationId,
-          payloadSha256: createHash("sha256").update(deliveryId).digest("hex"),
-          actions: [
-            {
-              type: "installation.upsert",
-              installation: {
-                id: repository.githubInstallationId,
-                accountLogin: `${input.prefix}-worker-fleet-account`,
-                accountType: "Organization",
-              },
-            },
-          ],
-          receivedAt: baseTime,
-        });
-        if (accepted.outcome !== "accepted" || !accepted.jobId) {
-          throw new Error("worker fleet interruption fixture was not accepted");
-        }
-
-        const workerId = `${input.prefix}-fleet-abandoned-${round}-${workerIndex}`;
-        const child = spawnWorkerFixture(configuration, repositoryRoot, baseTime, workerId);
-        children.push(child);
-        workerFleetRecovery.childProcessesStarted += 1;
-        await waitForWorkerClaim(child, accepted.jobId);
-        expectedJobIds.push(accepted.jobId);
-      }
-
+      await startWorkerFleetRound({
+        configuration,
+        input,
+        round,
+        baseTime,
+        store,
+        repositoryRoot,
+        children,
+        expectedJobIds,
+        workerFleetRecovery,
+      });
       await Promise.all(
         children.map(async (child) => {
           await terminateWorkerProcess(child);
@@ -1345,25 +1381,7 @@ async function runWorkerFleetInterruptionValidation(configuration, input) {
     }
 
     now = offsetDate(baseTime, 2_000);
-    const reclaimedIds = new Set();
-    for (let workerIndex = 0; workerIndex < configuration.workerFleetSize; workerIndex += 1) {
-      const replacementWorker = `${input.prefix}-fleet-replacement-${round}-${workerIndex}`;
-      const reclaimed = (await store.claimJobs({ workerId: replacementWorker, limit: 1 }))[0];
-      if (!reclaimed || !expectedJobIds.includes(reclaimed.jobId) || reclaimed.attemptCount !== 2) {
-        throw new Error("terminated worker fleet lease was not reclaimed");
-      }
-      if (reclaimedIds.has(reclaimed.jobId)) throw new Error("terminated worker fleet job was reclaimed twice");
-      reclaimedIds.add(reclaimed.jobId);
-      workerFleetRecovery.abandonedLeasesReclaimed += 1;
-      if ((await store.completeJob({ jobId: reclaimed.jobId, workerId: replacementWorker })) !== "completed") {
-        throw new Error("replacement worker fleet did not complete a reclaimed job");
-      }
-      workerFleetRecovery.replacementCompletions += 1;
-    }
-    if (reclaimedIds.size !== expectedJobIds.length) {
-      throw new Error("replacement worker fleet did not reclaim every abandoned job");
-    }
-
+    await reclaimWorkerFleetRound(configuration, input, round, store, expectedJobIds, workerFleetRecovery);
     workerFleetRecovery.roundsCompleted += 1;
     workerFleetRecovery.maximumConvergenceMs = Math.max(
       workerFleetRecovery.maximumConvergenceMs,
