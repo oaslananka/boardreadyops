@@ -54568,19 +54568,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     private: job.repository.private,
     source_mode: job.sourceMode
   });
-  if (job.sourceMode !== "customer_checkout") {
-    await bestEffortRelinquish(
-      client,
-      job,
-      "job_error",
-      "Self-hosted runner refused a non-customer checkout assignment."
-    );
-    throw new Error("self-hosted runner received a source assignment that would cross the managed source boundary");
-  }
-  if (options.signal?.aborted) {
-    await bestEffortRelinquish(client, job, "shutdown", "Runner stopped before source checkout.");
-    throw new Error("runner shutdown requested before job execution");
-  }
+  await validateClaimedRunnerJob(client, job, options.signal);
   let workspace;
   let terminalPublished = false;
   const heartbeat = createHeartbeatController(client, job, heartbeatSeconds, dependencies.log);
@@ -54603,24 +54591,14 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
     if (options.signal?.aborted) throw new RunnerShutdownError();
     heartbeat.assertLeaseActive();
     const artifactMode = options.artifactMode ?? "control-plane";
-    const suppressArtifacts = job.safeMode.enabled || artifactMode === "metadata-only";
-    let uploadedArtifacts = [];
-    if (suppressArtifacts) {
-      if (execution.artifacts.length > 0) {
-        dependencies.log("runner.artifacts.suppressed", {
-          run_id: job.runId,
-          execution_attempt_id: job.executionAttemptId,
-          artifacts: execution.artifacts.length,
-          artifact_mode: artifactMode,
-          safe_mode_reasons: [...job.safeMode.reasons]
-        });
-      }
-    } else {
-      heartbeat.setStage("uploading_artifacts");
-      await heartbeat.pulse();
-      uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
-      heartbeat.assertLeaseActive();
-    }
+    const uploadedArtifacts = await resolveExecutionArtifacts(
+      dependencies,
+      client,
+      job,
+      execution,
+      artifactMode,
+      heartbeat
+    );
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
     const result = terminalResultFromExecution(job, execution, uploadedArtifacts, artifactMode);
@@ -54648,30 +54626,64 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
       decision: result.decision ?? "error"
     };
   } catch (error51) {
-    const shutdown = error51 instanceof RunnerShutdownError || options.signal?.aborted === true;
-    const reportedError = shutdown && !(error51 instanceof RunnerShutdownError) ? new RunnerShutdownError() : error51;
-    if (!terminalPublished) {
-      await bestEffortRelinquish(
-        client,
-        job,
-        shutdown ? "shutdown" : "job_error",
-        sanitizedErrorMessage(reportedError)
-      );
-    }
-    throw reportedError;
+    throw await handleRunnerExecutionFailure(client, job, error51, options.signal, terminalPublished);
   } finally {
     await heartbeat.stop();
-    if (workspace && (job.safeMode.enabled || options.keepWorkspace !== true)) {
-      if (job.safeMode.enabled && options.keepWorkspace === true) {
-        dependencies.log("runner.workspace.retention_overridden", {
-          run_id: job.runId,
-          execution_attempt_id: job.executionAttemptId,
-          safe_mode_reasons: [...job.safeMode.reasons]
-        });
-      }
-      await dependencies.removeWorkspace(workspace);
-    }
+    await cleanupRunnerWorkspace(dependencies, job, workspace, options.keepWorkspace);
   }
+}
+async function validateClaimedRunnerJob(client, job, signal) {
+  if (job.sourceMode !== "customer_checkout") {
+    await bestEffortRelinquish(
+      client,
+      job,
+      "job_error",
+      "Self-hosted runner refused a non-customer checkout assignment."
+    );
+    throw new Error("self-hosted runner received a source assignment that would cross the managed source boundary");
+  }
+  if (signal?.aborted) {
+    await bestEffortRelinquish(client, job, "shutdown", "Runner stopped before source checkout.");
+    throw new Error("runner shutdown requested before job execution");
+  }
+}
+async function resolveExecutionArtifacts(dependencies, client, job, execution, artifactMode, heartbeat) {
+  if (job.safeMode.enabled || artifactMode === "metadata-only") {
+    if (execution.artifacts.length > 0) {
+      dependencies.log("runner.artifacts.suppressed", {
+        run_id: job.runId,
+        execution_attempt_id: job.executionAttemptId,
+        artifacts: execution.artifacts.length,
+        artifact_mode: artifactMode,
+        safe_mode_reasons: [...job.safeMode.reasons]
+      });
+    }
+    return [];
+  }
+  heartbeat.setStage("uploading_artifacts");
+  await heartbeat.pulse();
+  const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
+  heartbeat.assertLeaseActive();
+  return uploadedArtifacts;
+}
+async function handleRunnerExecutionFailure(client, job, error51, signal, terminalPublished) {
+  const shutdown = error51 instanceof RunnerShutdownError || signal?.aborted === true;
+  const reportedError = shutdown && !(error51 instanceof RunnerShutdownError) ? new RunnerShutdownError() : error51;
+  if (!terminalPublished) {
+    await bestEffortRelinquish(client, job, shutdown ? "shutdown" : "job_error", sanitizedErrorMessage(reportedError));
+  }
+  return reportedError;
+}
+async function cleanupRunnerWorkspace(dependencies, job, workspace, keepWorkspace) {
+  if (!workspace || !job.safeMode.enabled && keepWorkspace === true) return;
+  if (job.safeMode.enabled && keepWorkspace === true) {
+    dependencies.log("runner.workspace.retention_overridden", {
+      run_id: job.runId,
+      execution_attempt_id: job.executionAttemptId,
+      safe_mode_reasons: [...job.safeMode.reasons]
+    });
+  }
+  await dependencies.removeWorkspace(workspace);
 }
 async function serveRunnerWorker(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
