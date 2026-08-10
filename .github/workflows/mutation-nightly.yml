@@ -39,7 +39,7 @@ jobs:
             mutation-${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml', 'stryker.config.mjs') }}-
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm run deps:install-ci
       - run: pnpm exec stryker run --incremental --incrementalFile reports/stryker-incremental.json
       - name: Save mutation incremental state
         if: always() && steps.mutation-cache.outputs.cache-hit != 'true' && hashFiles('reports/stryker-incremental.json') != ''

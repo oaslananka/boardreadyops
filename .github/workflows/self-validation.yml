@@ -41,7 +41,7 @@ jobs:
             echo "::error::Expected KiCad 10.0.*, got ${version}"
             exit 1
           fi
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm run deps:install-ci
       - run: pnpm run build
       - name: Run BoardReadyOps against this repository
         run: |

@@ -245,6 +245,17 @@ describe("binary build scripts", () => {
     expect(formula.match(/sha256 "[0-9a-f]{64}"/g)).toHaveLength(4);
   });
 
+  it("keeps Unix installer downloads HTTPS-only without duplicating curl policy literals", () => {
+    const installer = readProjectFile("install.sh");
+
+    expect(installer).toContain("https_only='=https'");
+    expect(installer).toContain("curl_https()");
+    expect(installer).toContain(
+      ['curl --proto "$', '{https_only}" --proto-redir "$', '{https_only}" -fsSL "$@"'].join(""),
+    );
+    expect(installer.match(/curl_https /g)).toHaveLength(2);
+  });
+
   it("keeps the PowerShell installer compatible with existing and current sessions", () => {
     const installer = readProjectFile("install.ps1");
 

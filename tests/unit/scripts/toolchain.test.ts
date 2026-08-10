@@ -302,6 +302,35 @@ describe("reproducible contributor toolchain", () => {
     expect(rawCorepackInstalls).toEqual([]);
   });
 
+  it("routes automation installs through audited lifecycle-script allowlists", async () => {
+    const packageJson = JSON.parse(await repositoryFile("package.json")) as { scripts: Record<string, string> };
+    const ciInstall = packageJson.scripts["deps:install-ci"];
+    const webInstall = packageJson.scripts["deps:install-web"];
+    const trustedRebuild = "corepack pnpm rebuild @prisma/engines esbuild prisma sharp";
+
+    expect(ciInstall).toBe(`corepack pnpm install --frozen-lockfile --ignore-scripts && ${trustedRebuild}`);
+    expect(webInstall).toBe(
+      `corepack pnpm install --frozen-lockfile --ignore-scripts --filter @boardreadyops/web... --filter boardreadyops && ${trustedRebuild}`,
+    );
+
+    const workflowDirectory = path.join(root, ".github", "workflows");
+    const workflowFiles = (await readdir(workflowDirectory)).filter((file) => /\.ya?ml$/u.test(file));
+    for (const file of workflowFiles) {
+      const content = await repositoryFile(path.join(".github", "workflows", file));
+      const rawInstalls = content.split(/\r?\n/u).filter((line) => /\bpnpm install\b/u.test(line));
+      expect(
+        rawInstalls.every((line) => line.includes("--ignore-scripts")),
+        file,
+      ).toBe(true);
+    }
+    expect(await repositoryFile("apps/web/Dockerfile")).not.toMatch(/\bpnpm install\b/u);
+    expect(await repositoryFile("apps/container/Dockerfile")).toContain(
+      ['npm install --global --ignore-scripts --no-audit --no-fund "boardreadyops@$', '{BOARDREADYOPS_VERSION}"'].join(
+        "",
+      ),
+    );
+  });
+
   it("routes nested package scripts through the repository-pinned Corepack pnpm", async () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as { scripts: Record<string, string> };
     const barePnpmScripts = Object.entries(packageJson.scripts)

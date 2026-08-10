@@ -79,7 +79,7 @@ jobs:
           echo "${docs_venv}/bin" >> "${GITHUB_PATH}"
 
       - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
+        run: corepack pnpm run deps:install-ci
 
       - name: Generate docs
         run: pnpm run docs
