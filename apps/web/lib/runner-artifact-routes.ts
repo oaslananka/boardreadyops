@@ -239,6 +239,73 @@ async function writeRequestBody(input: {
   return { ok: true, bytes, sha256: hash.digest("hex") };
 }
 
+type AuthenticatedRunnerRequest = NonNullable<Awaited<ReturnType<typeof authenticateRunnerRequest>>>;
+type ArtifactCapabilityRequest = ReturnType<typeof runnerArtifactCapabilityRequestSchema.parse>;
+
+function capabilityRequestRejectionResponse(status: "replayed" | "stale"): Response {
+  return status === "replayed"
+    ? jsonResponse({ ok: false, error: "artifact capability request was replayed" }, 409)
+    : jsonResponse({ ok: false, error: "runner lease is stale" }, 409);
+}
+
+function artifactCapabilityAcceptedResponse(
+  environment: Readonly<Record<string, string | undefined>>,
+  uploads: Awaited<ReturnType<RunnerArtifactStore["issueCapabilities"]>> & { status: "accepted" },
+): Response {
+  const responseUploads = uploads.uploads.map((upload) => {
+    const uploadUrl = publicUploadUrl(environment, upload.artifactId, upload.uploadToken);
+    if (!uploadUrl) throw new Error("HTTPS public URL is not configured");
+    return {
+      artifactId: upload.artifactId,
+      storagePath: upload.storagePath,
+      uploadUrl,
+      expiresAt: upload.expiresAt,
+      maximumBytes: upload.maximumBytes,
+    };
+  });
+  return jsonResponse(
+    runnerArtifactCapabilityResponseSchema.parse({
+      protocolVersion: 1,
+      uploads: responseUploads,
+    }),
+  );
+}
+
+async function issueArtifactCapabilities(input: {
+  dependencies: RunnerArtifactRouteDependencies;
+  executor: SqlQueryExecutor;
+  authenticated: AuthenticatedRunnerRequest;
+  request: ArtifactCapabilityRequest;
+}): Promise<Response> {
+  try {
+    const capabilityConfiguration = resolveArtifactCapabilityConfiguration(input.dependencies.environment);
+    const result = await input.dependencies
+      .createArtifactStore(input.executor, {
+        capabilityTtlSeconds: capabilityConfiguration.uploadCapabilityTtlSeconds,
+      })
+      .issueCapabilities({
+        ...input.authenticated.identity,
+        requestTimestamp: input.authenticated.envelope.timestamp,
+        requestNonce: input.authenticated.envelope.nonce,
+        runId: input.request.runId,
+        executionAttemptId: input.request.executionAttemptId,
+        leaseId: input.request.leaseId,
+        leaseToken: input.request.leaseToken,
+        artifacts: input.request.artifacts.map((artifact) => ({
+          kind: artifact.kind,
+          name: artifact.name,
+          role: artifact.role,
+          bytes: artifact.bytes,
+          ...(artifact.sha256 === undefined ? {} : { sha256: artifact.sha256 }),
+        })),
+      });
+    if (result.status !== "accepted") return capabilityRequestRejectionResponse(result.status);
+    return artifactCapabilityAcceptedResponse(input.dependencies.environment, result);
+  } catch {
+    return jsonResponse({ ok: false, error: "artifact capability service is unavailable" }, 503);
+  }
+}
+
 export async function handleRunnerArtifactCapabilityRequest(
   request: Request,
   dependencies: RunnerArtifactRouteDependencies = defaultDependencies(),
@@ -272,54 +339,12 @@ export async function handleRunnerArtifactCapabilityRequest(
     return jsonResponse({ ok: false, error: "HTTPS public URL is not configured" }, 503);
   }
 
-  try {
-    const capabilityConfiguration = resolveArtifactCapabilityConfiguration(dependencies.environment);
-    const result = await dependencies
-      .createArtifactStore(executor, {
-        capabilityTtlSeconds: capabilityConfiguration.uploadCapabilityTtlSeconds,
-      })
-      .issueCapabilities({
-        ...authenticated.identity,
-        requestTimestamp: authenticated.envelope.timestamp,
-        requestNonce: authenticated.envelope.nonce,
-        runId: parsed.data.runId,
-        executionAttemptId: parsed.data.executionAttemptId,
-        leaseId: parsed.data.leaseId,
-        leaseToken: parsed.data.leaseToken,
-        artifacts: parsed.data.artifacts.map((artifact) => ({
-          kind: artifact.kind,
-          name: artifact.name,
-          role: artifact.role,
-          bytes: artifact.bytes,
-          ...(artifact.sha256 === undefined ? {} : { sha256: artifact.sha256 }),
-        })),
-      });
-    if (result.status !== "accepted") {
-      return result.status === "replayed"
-        ? jsonResponse({ ok: false, error: "artifact capability request was replayed" }, 409)
-        : jsonResponse({ ok: false, error: "runner lease is stale" }, 409);
-    }
-
-    const uploads = result.uploads.map((upload) => {
-      const uploadUrl = publicUploadUrl(dependencies.environment, upload.artifactId, upload.uploadToken);
-      if (!uploadUrl) throw new Error("HTTPS public URL is not configured");
-      return {
-        artifactId: upload.artifactId,
-        storagePath: upload.storagePath,
-        uploadUrl,
-        expiresAt: upload.expiresAt,
-        maximumBytes: upload.maximumBytes,
-      };
-    });
-    return jsonResponse(
-      runnerArtifactCapabilityResponseSchema.parse({
-        protocolVersion: 1,
-        uploads,
-      }),
-    );
-  } catch {
-    return jsonResponse({ ok: false, error: "artifact capability service is unavailable" }, 503);
-  }
+  return issueArtifactCapabilities({
+    dependencies,
+    executor,
+    authenticated,
+    request: parsed.data,
+  });
 }
 
 export async function handleRunnerArtifactUploadRequest(
