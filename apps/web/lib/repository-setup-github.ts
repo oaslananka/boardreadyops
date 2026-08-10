@@ -73,6 +73,28 @@ function dummyResultUrl(environment: Readonly<Record<string, string | undefined>
   return `${baseUrl.replace(/\/$/u, "")}/api/v1/runs/github-actions-result?run_id=${probeId}&attempt_id=${probeId}`;
 }
 
+function repositorySetupReadinessFromWorkflow(workflow: Record<string, unknown>): RepositorySetupGitHubReadiness {
+  const workflowId = typeof workflow.id === "number" && Number.isSafeInteger(workflow.id) ? workflow.id : undefined;
+  const workflowName = typeof workflow.name === "string" ? workflow.name : undefined;
+  const workflowPath = typeof workflow.path === "string" ? workflow.path : undefined;
+  const metadata = {
+    ...(workflowId === undefined ? {} : { workflowId }),
+    ...(workflowName ? { workflowName } : {}),
+    ...(workflowPath ? { workflowPath } : {}),
+  };
+
+  if (workflow.state !== "active") {
+    return { actionsEnabled: true, workflowStatus: "disabled", ...metadata };
+  }
+  if (
+    workflowName !== repositorySetupWorkflowName ||
+    workflowPath !== `.github/workflows/${repositorySetupWorkflowPath}`
+  ) {
+    return { actionsEnabled: true, workflowStatus: "incompatible", ...metadata };
+  }
+  return { actionsEnabled: true, workflowStatus: "probe_required", ...metadata };
+}
+
 export function createRepositorySetupGitHubClient(
   options: {
     environment?: Readonly<Record<string, string | undefined>>;
@@ -115,38 +137,7 @@ export function createRepositorySetupGitHubClient(
       if (workflowResponse.status === 403) return { actionsEnabled: false, workflowStatus: "actions_disabled" };
       if (workflowResponse.status === 404) return { actionsEnabled: true, workflowStatus: "missing" };
       const workflow = await responseJson(workflowResponse, "GitHub Actions workflow lookup");
-      const workflowId = typeof workflow.id === "number" && Number.isSafeInteger(workflow.id) ? workflow.id : undefined;
-      const workflowName = typeof workflow.name === "string" ? workflow.name : undefined;
-      const workflowPath = typeof workflow.path === "string" ? workflow.path : undefined;
-      const state = typeof workflow.state === "string" ? workflow.state : "unknown";
-      if (state !== "active") {
-        return {
-          actionsEnabled: true,
-          workflowStatus: "disabled",
-          ...(workflowId === undefined ? {} : { workflowId }),
-          ...(workflowName ? { workflowName } : {}),
-          ...(workflowPath ? { workflowPath } : {}),
-        };
-      }
-      if (
-        workflowName !== repositorySetupWorkflowName ||
-        workflowPath !== `.github/workflows/${repositorySetupWorkflowPath}`
-      ) {
-        return {
-          actionsEnabled: true,
-          workflowStatus: "incompatible",
-          ...(workflowId === undefined ? {} : { workflowId }),
-          ...(workflowName ? { workflowName } : {}),
-          ...(workflowPath ? { workflowPath } : {}),
-        };
-      }
-      return {
-        actionsEnabled: true,
-        workflowStatus: "probe_required",
-        ...(workflowId === undefined ? {} : { workflowId }),
-        workflowName,
-        workflowPath,
-      };
+      return repositorySetupReadinessFromWorkflow(workflow);
     },
 
     async dispatchProbe(input) {
