@@ -39,31 +39,52 @@ export function parseProjectMetadata(projectFileContent: string): KicadProjectMe
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function pushArrayChildren(stack: unknown[], entries: unknown[]): void {
+  for (const entry of entries) {
+    if (typeof entry !== "string") stack.push(entry);
+  }
+}
+
+function collectConfiguredValue(found: Set<string>, value: unknown): void {
+  if (typeof value === "string") {
+    found.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === "string") found.add(entry);
+    }
+  }
+}
+
+function inspectObject(
+  item: Record<string, unknown>,
+  configuredKeys: Set<string>,
+  found: Set<string>,
+  stack: unknown[],
+): void {
+  for (const [key, value] of Object.entries(item)) {
+    if (configuredKeys.has(key)) collectConfiguredValue(found, value);
+    stack.push(value);
+  }
+}
+
 function collectStrings(input: unknown, keys: string[]): string[] {
-  const found: string[] = [];
+  const found = new Set<string>();
+  const configuredKeys = new Set(keys);
   const stack = [input];
   while (stack.length > 0) {
     const item = stack.pop();
     if (Array.isArray(item)) {
-      for (const entry of item) {
-        if (typeof entry !== "string") {
-          stack.push(entry);
-        }
-      }
+      pushArrayChildren(stack, item);
       continue;
     }
-    if (item && typeof item === "object") {
-      for (const [key, value] of Object.entries(item)) {
-        if (keys.includes(key)) {
-          if (typeof value === "string") {
-            found.push(value);
-          } else if (Array.isArray(value)) {
-            found.push(...value.filter((entry): entry is string => typeof entry === "string"));
-          }
-        }
-        stack.push(value);
-      }
-    }
+    if (!isRecord(item)) continue;
+    inspectObject(item, configuredKeys, found, stack);
   }
-  return [...new Set(found)];
+  return [...found];
 }
