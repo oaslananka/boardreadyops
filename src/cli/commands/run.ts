@@ -95,6 +95,45 @@ export function pipelineInputFromCli(
   };
 }
 
+type RunPreparation = {
+  loaded: LoadedConfig;
+  exitCode?: number;
+};
+
+async function prepareRun(
+  root: string,
+  options: CommonCliOptions,
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
+  locale: ReturnType<typeof resolveLocale>,
+  signal?: AbortSignal,
+): Promise<RunPreparation> {
+  const loaded = await loadConfig(root, options.config);
+  if (loaded.errors.length > 0) {
+    if (writesJsonToStdout(options)) {
+      await writeDiagnosticReport(root, loaded, configErrorFindings(root, loaded), 2, streams, locale);
+    } else {
+      for (const error of loaded.errors) {
+        streams.stderr.write(`${t("cli.error.configuration", { error }, locale)}\n`);
+      }
+    }
+    return { loaded, exitCode: 2 };
+  }
+
+  if (!options.requireKicad) {
+    return { loaded };
+  }
+  const kicad = await detectKicadCli(options.kicadCli, signal);
+  if (kicad.found) {
+    return { loaded };
+  }
+  if (writesJsonToStdout(options)) {
+    await writeDiagnosticReport(root, loaded, [kicadMissingFinding()], 3, streams, locale);
+  } else {
+    streams.stderr.write(`${t("cli.error.environment.kicadMissing", {}, locale)}\n`);
+  }
+  return { loaded, exitCode: 3 };
+}
+
 export async function runCommand(
   pathInput: string | undefined,
   options: CommonCliOptions,
@@ -118,27 +157,10 @@ export async function runCommand(
     path: root,
   });
   try {
-    const loaded = await loadConfig(root, options.config);
-    if (loaded.errors.length > 0) {
-      if (writesJsonToStdout(options)) {
-        await writeDiagnosticReport(root, loaded, configErrorFindings(root, loaded), 2, streams, locale);
-      } else {
-        for (const error of loaded.errors) {
-          streams.stderr.write(`${t("cli.error.configuration", { error }, locale)}\n`);
-        }
-      }
-      return finish(2);
-    }
-    if (options.requireKicad) {
-      const kicad = await detectKicadCli(options.kicadCli, runtime.signal);
-      if (!kicad.found) {
-        if (writesJsonToStdout(options)) {
-          await writeDiagnosticReport(root, loaded, [kicadMissingFinding()], 3, streams, locale);
-        } else {
-          streams.stderr.write(`${t("cli.error.environment.kicadMissing", {}, locale)}\n`);
-        }
-        return finish(3);
-      }
+    const preparation = await prepareRun(root, options, streams, locale, runtime.signal);
+    const { loaded } = preparation;
+    if (preparation.exitCode !== undefined) {
+      return finish(preparation.exitCode);
     }
     const runOnce = async () => {
       let spinner: Spinner | undefined;
