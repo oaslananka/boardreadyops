@@ -1284,17 +1284,9 @@ async function runWorkerProcessInterruptionValidation(configuration, input) {
   return workerProcessRecovery;
 }
 
-async function startWorkerFleetRound({
-  configuration,
-  input,
-  round,
-  baseTime,
-  store,
-  repositoryRoot,
-  children,
-  expectedJobIds,
-  workerFleetRecovery,
-}) {
+async function startWorkerFleetRound(context) {
+  const { configuration, input, round, baseTime, store } = context;
+  const { repositoryRoot, children, expectedJobIds, workerFleetRecovery } = context;
   for (let workerIndex = 0; workerIndex < configuration.workerFleetSize; workerIndex += 1) {
     const repository =
       input.repositories[(round * configuration.workerFleetSize + workerIndex) % input.repositories.length];
