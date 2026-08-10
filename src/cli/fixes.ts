@@ -621,27 +621,37 @@ async function planDnpConsistency(
     if (!isRuleEnabledForProject(config, target.project, dnpConsistencyRule)) {
       continue;
     }
-    const projectContexts = contextsForBomTarget(root, target, config, projects);
-    const footprints = await collectProjectFootprintDnp(root, projectContexts);
-    const bomPath = target.path;
-    const text = await readTextFile(bomPath);
-    const document = parseDelimitedDocument(text, bomPath);
-    if (document.header.length === 0) {
-      continue;
-    }
-    for (const [index, row] of document.rows.entries()) {
-      const references = splitRefs(fieldByAliases(document.header, row, ["reference", "refs", "ref", "designator"]));
-      const bomDnp = isDnpValue(fieldByAliases(document.header, row, ["dnp", "do not populate", "populate"]));
-      for (const reference of references) {
-        if (!footprints.has(reference) || footprints.get(reference) === bomDnp) {
-          continue;
-        }
-        plan.skipped.push({
-          ruleId: dnpConsistencyRule,
-          path: `${normalizeRelative(root, bomPath)}:${index + 2}`,
-          message: `${reference} has inconsistent DNP state and is not automatically applied.`,
-        });
+    await planDnpConsistencyTarget(root, config, target, projects, plan);
+  }
+}
+
+async function planDnpConsistencyTarget(
+  root: string,
+  config: BoardReadyOpsConfig,
+  target: BomTarget,
+  projects: ProjectContext[],
+  plan: MutablePlan,
+): Promise<void> {
+  const projectContexts = contextsForBomTarget(root, target, config, projects);
+  const footprints = await collectProjectFootprintDnp(root, projectContexts);
+  const bomPath = target.path;
+  const text = await readTextFile(bomPath);
+  const document = parseDelimitedDocument(text, bomPath);
+  if (document.header.length === 0) {
+    return;
+  }
+  for (const [index, row] of document.rows.entries()) {
+    const references = splitRefs(fieldByAliases(document.header, row, ["reference", "refs", "ref", "designator"]));
+    const bomDnp = isDnpValue(fieldByAliases(document.header, row, ["dnp", "do not populate", "populate"]));
+    for (const reference of references) {
+      if (!footprints.has(reference) || footprints.get(reference) === bomDnp) {
+        continue;
       }
+      plan.skipped.push({
+        ruleId: dnpConsistencyRule,
+        path: `${normalizeRelative(root, bomPath)}:${index + 2}`,
+        message: `${reference} has inconsistent DNP state and is not automatically applied.`,
+      });
     }
   }
 }
