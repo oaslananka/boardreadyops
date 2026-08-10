@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { build } from "esbuild";
 
@@ -24,7 +25,7 @@ await buildBundle("src/cli/index.ts", "dist/cli/index.cjs", 0o755);
 await buildBundle("src/action/index.ts", "dist/action/index.cjs", 0o644);
 
 async function buildBundle(entryPoint, outfile, mode) {
-  const tempOutfile = `${outfile}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  const tempOutfile = `${outfile}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
   await removeWithRetry(tempOutfile);
   try {
     await build({

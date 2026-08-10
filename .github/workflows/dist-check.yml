@@ -27,6 +27,6 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm run deps:install-ci
       - run: pnpm run verify:dist
       - run: node scripts/check-npm-pack.mjs

@@ -28,8 +28,8 @@ RUN set -eux; \
       *) echo "Unsupported Node architecture." >&2; exit 1 ;; \
     esac; \
     archive="node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
-    curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/${archive}"; \
-    curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
+    curl --proto '=https' --proto-redir '=https' -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/${archive}"; \
+    curl --proto '=https' --proto-redir '=https' -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
     grep " ${archive}\$" SHASUMS256.txt | sha256sum -c -; \
     tar -xJf "${archive}" --directory /usr/local --strip-components 1; \
     rm "${archive}" SHASUMS256.txt; \
@@ -37,7 +37,7 @@ RUN set -eux; \
     npm --version
 
 RUN set -eux; \
-    NPM_CONFIG_UPDATE_NOTIFIER=false npm install --global --no-audit --no-fund "boardreadyops@${BOARDREADYOPS_VERSION}"; \
+    NPM_CONFIG_UPDATE_NOTIFIER=false npm install --global --ignore-scripts --no-audit --no-fund "boardreadyops@${BOARDREADYOPS_VERSION}"; \
     rm -rf /root/.npm /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx; \
     boardreadyops --version; \
     kicad-cli version; \

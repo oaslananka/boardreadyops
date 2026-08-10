@@ -235,8 +235,8 @@ jobs:
           cd "${workdir}"
           archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           checksum_file="gitleaks_${GITLEAKS_VERSION}_checksums.txt"
-          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
-          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${checksum_file}"
+          curl --proto '=https' --proto-redir '=https' -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          curl --proto '=https' --proto-redir '=https' -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${checksum_file}"
           grep " ${archive}$" "${checksum_file}" | sha256sum -c -
           tar -xzf "${archive}" gitleaks
           sudo install -m 0755 gitleaks /usr/local/bin/gitleaks

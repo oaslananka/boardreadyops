@@ -54,7 +54,7 @@ jobs:
           git fetch origin "${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
           corepack enable
           node scripts/toolchain.mjs corepack-install
-          pnpm install --frozen-lockfile
+          corepack pnpm run deps:install-ci
           # Keep generated release and compliance artifacts reviewable on the
           # release pull request instead of mutating them inside validation jobs.
           pnpm run notice

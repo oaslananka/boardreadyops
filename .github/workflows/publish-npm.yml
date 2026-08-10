@@ -126,7 +126,7 @@ jobs:
           set -euo pipefail
           node --version
           npm --version
-          npm install -g npm@latest
+          npm install -g npm@11.18.0
           npm --version
       - if: env.SHOULD_PUBLISH == 'true'
         run: corepack enable
@@ -146,7 +146,7 @@ jobs:
           uv pip install --python "${docs_venv}/bin/python" -r docs/requirements.txt
           echo "${docs_venv}/bin" >> "${GITHUB_PATH}"
       - if: env.SHOULD_PUBLISH == 'true'
-        run: pnpm install --frozen-lockfile
+        run: corepack pnpm run deps:install-ci
       - name: Verify release package
         if: env.SHOULD_PUBLISH == 'true'
         env:

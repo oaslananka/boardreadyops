@@ -231,7 +231,7 @@ async function waitForBranchHead(repository, branch, expectedOid, headers, fetch
   let observedOid;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     observedOid = await getBranchHead(repository, branch, headers, fetchImpl);
-    if (observedOid === expectedOid) return observedOid;
+    if (observedOid === expectedOid) break;
     if (attempt < attempts) await delay(200);
   }
   return observedOid;

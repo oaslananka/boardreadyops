@@ -13,7 +13,7 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/cloud-core/package.json packages/cloud-core/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/db/package.json packages/db/package.json
-RUN pnpm install --frozen-lockfile --filter @boardreadyops/web... --filter boardreadyops
+RUN corepack pnpm run deps:install-web
 
 FROM deps AS build
 COPY . .
