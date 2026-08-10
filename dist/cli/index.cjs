@@ -46421,63 +46421,68 @@ function isBlocking(finding2, failOn) {
 function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
-function computeReadiness(input) {
-  const isProduction = input.releaseMode === "production";
+function normalizedOutputs(input) {
   const required2 = [...new Set(input.requiredOutputs)].sort((a, b) => a.localeCompare(b));
   const recommended = [...new Set(input.recommendedOutputs)].filter((output) => !required2.includes(output)).sort((a, b) => a.localeCompare(b));
-  const missingRequired = required2.filter((output) => !input.presentOutputs.has(output));
-  const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
-  const expiredWaivers = input.expiredWaivers ?? 0;
+  return { required: required2, recommended };
+}
+function countFindings(findings, failOn) {
   let blocking = 0;
   let nonBlocking = 0;
-  for (const finding2 of input.findings) {
-    if (!finding2.suppressed && finding2.severity !== "info") {
-      if (isBlocking(finding2, input.failOn)) {
-        blocking += 1;
-      } else {
-        nonBlocking += 1;
-      }
-    }
+  for (const finding2 of findings) {
+    if (finding2.suppressed || finding2.severity === "info") continue;
+    if (isBlocking(finding2, failOn)) blocking += 1;
+    else nonBlocking += 1;
   }
-  const warnings = [];
-  for (const output of missingRequired) {
-    warnings.push(`Required output ${output} is missing.`);
-  }
-  for (const output of missingRecommended) {
-    warnings.push(
-      isProduction ? `Recommended output ${output} is required in production mode.` : `Recommended output ${output} is missing.`
-    );
-  }
-  if (blocking > 0) {
-    warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
-  }
+  return { blocking, nonBlocking };
+}
+function readinessWarnings(missingRequired, missingRecommended, blocking, isProduction, expiredWaivers) {
+  const warnings = missingRequired.map((output) => `Required output ${output} is missing.`);
+  warnings.push(
+    ...missingRecommended.map(
+      (output) => isProduction ? `Recommended output ${output} is required in production mode.` : `Recommended output ${output} is missing.`
+    )
+  );
+  if (blocking > 0) warnings.push(`${blocking} blocking finding(s) must be resolved before release.`);
   if (isProduction && expiredWaivers > 0) {
     warnings.push(`${expiredWaivers} expired waiver(s) must be renewed or removed before production release.`);
   }
+  return warnings;
+}
+function readinessStatus(missingRequired, missingRecommended, blocking, nonBlocking, productionBlockers) {
+  if (missingRequired.length > 0 || blocking > 0 || productionBlockers > 0) return "blocked";
+  if (missingRecommended.length > 0 || nonBlocking > 0) return "at-risk";
+  return "ready";
+}
+function readinessEvidence(required2, recommended, presentOutputs) {
+  return [
+    ...required2.map((output) => ({ output, importance: "required", present: presentOutputs.has(output) })),
+    ...recommended.map((output) => ({
+      output,
+      importance: "recommended",
+      present: presentOutputs.has(output)
+    }))
+  ].sort((left, right) => left.output.localeCompare(right.output));
+}
+function computeReadiness(input) {
+  const isProduction = input.releaseMode === "production";
+  const { required: required2, recommended } = normalizedOutputs(input);
+  const missingRequired = required2.filter((output) => !input.presentOutputs.has(output));
+  const missingRecommended = recommended.filter((output) => !input.presentOutputs.has(output));
+  const expiredWaivers = input.expiredWaivers ?? 0;
+  const { blocking, nonBlocking } = countFindings(input.findings, input.failOn);
+  const warnings = readinessWarnings(missingRequired, missingRecommended, blocking, isProduction, expiredWaivers);
   const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
   const score = clampScore(
     100 - missingRequired.length * REQUIRED_PENALTY - missingRecommended.length * RECOMMENDED_PENALTY - blocking * BLOCKING_PENALTY - nonBlocking * NON_BLOCKING_PENALTY - productionBlockers * REQUIRED_PENALTY
   );
-  const status = missingRequired.length > 0 || blocking > 0 || productionBlockers > 0 ? "blocked" : missingRecommended.length > 0 || nonBlocking > 0 ? "at-risk" : "ready";
-  const evidence = [
-    ...required2.map((output) => ({
-      output,
-      importance: "required",
-      present: input.presentOutputs.has(output)
-    })),
-    ...recommended.map((output) => ({
-      output,
-      importance: "recommended",
-      present: input.presentOutputs.has(output)
-    }))
-  ].sort((left, right) => left.output.localeCompare(right.output));
   return {
     profile: input.profile,
     score,
-    status,
+    status: readinessStatus(missingRequired, missingRecommended, blocking, nonBlocking, productionBlockers),
     blocking,
     nonBlocking,
-    evidence,
+    evidence: readinessEvidence(required2, recommended, input.presentOutputs),
     missingRequired,
     missingRecommended,
     warnings
