@@ -182,61 +182,89 @@ async function removeFile(filePath: string | undefined): Promise<void> {
   await unlink(filePath).catch(() => undefined);
 }
 
+type ArtifactBodyWriteFailure = { ok: false; reason: string; status: number };
+type ArtifactBodyWriteResult = { ok: true; bytes: number; sha256: string } | ArtifactBodyWriteFailure;
+
+function declaredArtifactLengthFailure(request: Request, maximumBytes: number): ArtifactBodyWriteFailure | undefined {
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength === null) return undefined;
+  if (!/^\d+$/u.test(declaredLength) || String(Number(declaredLength)) !== declaredLength) {
+    return { ok: false, reason: "artifact content length is invalid", status: 400 };
+  }
+  const parsedLength = Number(declaredLength);
+  if (!Number.isSafeInteger(parsedLength) || parsedLength > maximumBytes) {
+    return { ok: false, reason: "artifact payload exceeds its declared size", status: 413 };
+  }
+  if (parsedLength !== maximumBytes) {
+    return { ok: false, reason: "artifact payload size does not match its declaration", status: 409 };
+  }
+  return undefined;
+}
+
+async function writeArtifactBufferFully(file: Awaited<ReturnType<typeof open>>, value: Uint8Array): Promise<void> {
+  let offset = 0;
+  while (offset < value.byteLength) {
+    const write = await file.write(value, offset, value.byteLength - offset);
+    if (write.bytesWritten <= 0) throw new Error("artifact write made no progress");
+    offset += write.bytesWritten;
+  }
+}
+
+async function streamArtifactRequestBody(input: {
+  request: Request;
+  file: Awaited<ReturnType<typeof open>>;
+  hash: ReturnType<typeof createHash>;
+  maximumBytes: number;
+}): Promise<{ ok: true; bytes: number } | ArtifactBodyWriteFailure> {
+  const reader = input.request.body?.getReader();
+  if (!reader) return { ok: true, bytes: 0 };
+
+  let bytes = 0;
+  while (true) {
+    const item = await reader.read();
+    if (item.done) return { ok: true, bytes };
+    bytes += item.value.byteLength;
+    if (bytes > input.maximumBytes) {
+      await reader.cancel("artifact payload exceeds its declared size").catch(() => undefined);
+      return { ok: false, reason: "artifact payload exceeds its declared size", status: 413 };
+    }
+    input.hash.update(item.value);
+    await writeArtifactBufferFully(input.file, item.value);
+  }
+}
+
 async function writeRequestBody(input: {
   request: Request;
   temporaryPath: string;
   maximumBytes: number;
-}): Promise<{ ok: true; bytes: number; sha256: string } | { ok: false; reason: string; status: number }> {
-  const declaredLength = input.request.headers.get("content-length");
-  if (declaredLength !== null) {
-    if (!/^\d+$/u.test(declaredLength) || String(Number(declaredLength)) !== declaredLength) {
-      return { ok: false, reason: "artifact content length is invalid", status: 400 };
-    }
-    const parsedLength = Number(declaredLength);
-    if (!Number.isSafeInteger(parsedLength) || parsedLength > input.maximumBytes) {
-      return { ok: false, reason: "artifact payload exceeds its declared size", status: 413 };
-    }
-    if (parsedLength !== input.maximumBytes) {
-      return { ok: false, reason: "artifact payload size does not match its declaration", status: 409 };
-    }
-  }
+}): Promise<ArtifactBodyWriteResult> {
+  const declaredLengthFailure = declaredArtifactLengthFailure(input.request, input.maximumBytes);
+  if (declaredLengthFailure) return declaredLengthFailure;
 
   const file = await open(input.temporaryPath, "wx", 0o600).catch(() => undefined);
   if (!file) return { ok: false, reason: "artifact storage is unavailable", status: 503 };
 
   const hash = createHash("sha256");
-  let bytes = 0;
+  let streamed: { ok: true; bytes: number } | ArtifactBodyWriteFailure;
   try {
-    const reader = input.request.body?.getReader();
-    if (reader) {
-      while (true) {
-        const item = await reader.read();
-        if (item.done) break;
-        bytes += item.value.byteLength;
-        if (bytes > input.maximumBytes) {
-          await reader.cancel("artifact payload exceeds its declared size").catch(() => undefined);
-          return { ok: false, reason: "artifact payload exceeds its declared size", status: 413 };
-        }
-        hash.update(item.value);
-        let offset = 0;
-        while (offset < item.value.byteLength) {
-          const write = await file.write(item.value, offset, item.value.byteLength - offset);
-          if (write.bytesWritten <= 0) throw new Error("artifact write made no progress");
-          offset += write.bytesWritten;
-        }
-      }
-    }
-    await file.sync();
+    streamed = await streamArtifactRequestBody({
+      request: input.request,
+      file,
+      hash,
+      maximumBytes: input.maximumBytes,
+    });
+    if (streamed.ok) await file.sync();
   } catch {
     return { ok: false, reason: "artifact upload stream failed", status: 400 };
   } finally {
     await file.close().catch(() => undefined);
   }
 
-  if (bytes !== input.maximumBytes) {
+  if (!streamed.ok) return streamed;
+  if (streamed.bytes !== input.maximumBytes) {
     return { ok: false, reason: "artifact payload size does not match its declaration", status: 409 };
   }
-  return { ok: true, bytes, sha256: hash.digest("hex") };
+  return { ok: true, bytes: streamed.bytes, sha256: hash.digest("hex") };
 }
 
 type AuthenticatedRunnerRequest = NonNullable<Awaited<ReturnType<typeof authenticateRunnerRequest>>>;
