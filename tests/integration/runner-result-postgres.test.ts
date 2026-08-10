@@ -1,7 +1,10 @@
+import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { handleResultRequest, type ResultRouteDependencies } from "../../apps/web/app/api/v1/runs/result/route.js";
 import { createSqlAuditLogStore } from "../../packages/db/src/audit-log-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
+import { createSqlRunnerArtifactStore } from "../../packages/db/src/runner-artifact-store.js";
+import { createSqlRunnerLeaseStore } from "../../packages/db/src/runner-lease-store.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
 
 const connectionString = getPostgresTestConnectionString();
@@ -168,7 +171,283 @@ afterAll(async () => {
   await executor.query("delete from installations where id = $1", [installationId]);
 });
 
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function opaqueToken(value: string): string {
+  return createHash("sha256").update(value).digest("base64url");
+}
+
+function secondsAfter(base: Date, seconds: number): Date {
+  return new Date(base.valueOf() + seconds * 1000);
+}
+
+type LeaseBoundArtifactFixture = {
+  base: Date;
+  installationId: string;
+  managedIdentityId: string;
+  runId: string;
+  attemptId: string;
+  leaseId: string;
+  artifactId: string;
+  artifact: {
+    kind: string;
+    name: string;
+    storagePath: string;
+    sha256: string;
+    bytes: number;
+    role: string;
+  };
+};
+
+async function setupLeaseBoundArtifact(label: string): Promise<LeaseBoundArtifactFixture> {
+  if (!executor) throw new Error("DATABASE_URL is required");
+  const base = new Date(Date.now() + 60_000);
+  const installationId = randomUUID();
+  const repositoryId = randomUUID();
+  const runId = randomUUID();
+  const attemptId = randomUUID();
+  const leaseId = randomUUID();
+  const artifactId = randomUUID();
+  const managedIdentityId = randomUUID();
+  const leaseToken = opaqueToken(`lease:${label}`);
+  const uploadToken = opaqueToken(`upload:${label}`);
+  const artifactSha256 = sha256(`artifact:${label}`);
+  const githubSeed = Number.parseInt(sha256(label).slice(0, 12), 16);
+  const owner = `artifact-${label}`.slice(0, 39);
+  const name = `board-${label}`.slice(0, 100);
+
+  await executor.query(
+    `insert into installations (id, github_installation_id, account_login, account_type)
+     values ($1, $2, $3, 'Organization')`,
+    [installationId, githubSeed, owner],
+  );
+  await executor.query(
+    `insert into repositories (id, installation_id, github_repo_id, owner, name, private, default_branch)
+     values ($1, $2, $3, $4, $5, true, 'main')`,
+    [repositoryId, installationId, githubSeed + 1, owner, name],
+  );
+  await executor.query(
+    `insert into release_runs (
+       id, repository_id, commit_sha, ref, pull_request_number, trigger_kind, status, started_at
+     ) values ($1, $2, $3, 'refs/pull/26/head', 26, 'pr', 'queued', $4::timestamptz)`,
+    [runId, repositoryId, sha256(runId).slice(0, 40), base.toISOString()],
+  );
+  await executor.query(
+    `insert into managed_runner_identities (
+       id, name, public_key, public_key_fingerprint, capabilities, status,
+       created_at, activated_at, last_heartbeat_at
+     ) values (
+       $1, $2, $3, $4, $5::jsonb, 'active',
+       $6::timestamptz, $6::timestamptz, $6::timestamptz
+     )`,
+    [
+      managedIdentityId,
+      `managed-${label}-${managedIdentityId}`,
+      "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA3333333333333333333333333333333333333333333=\n-----END PUBLIC KEY-----",
+      sha256(managedIdentityId),
+      JSON.stringify(["kicad:10"]),
+      base.toISOString(),
+    ],
+  );
+
+  const generatedIds = [attemptId, leaseId];
+  const claimed = await createSqlRunnerLeaseStore(executor, {
+    now: () => base,
+    id: () => generatedIds.shift() ?? randomUUID(),
+    leaseToken: () => leaseToken,
+    leaseDurationSeconds: 120,
+    maximumLeaseDurationSeconds: 600,
+  }).claimJob({
+    workerClass: "managed",
+    managedRunnerIdentityId: managedIdentityId,
+    requestTimestamp: Math.floor(base.valueOf() / 1000),
+    requestNonce: opaqueToken(`claim:${label}`),
+    capabilities: ["kicad:10"],
+  });
+  if (claimed.status !== "claimed" || claimed.runId !== runId) {
+    throw new Error(`expected lease-bound artifact fixture claim, received ${claimed.status}`);
+  }
+
+  const artifactStore = createSqlRunnerArtifactStore(executor, {
+    now: () => secondsAfter(base, 10),
+    id: () => artifactId,
+    uploadToken: () => uploadToken,
+  });
+  const issued = await artifactStore.issueCapabilities({
+    workerClass: "managed",
+    managedRunnerIdentityId: managedIdentityId,
+    requestTimestamp: Math.floor(secondsAfter(base, 10).valueOf() / 1000),
+    requestNonce: opaqueToken(`artifact:${label}`),
+    runId,
+    executionAttemptId: attemptId,
+    leaseId,
+    leaseToken,
+    artifacts: [
+      {
+        kind: "report/json",
+        name: "boardreadyops-result.json",
+        role: "primary",
+        bytes: 2048,
+        sha256: artifactSha256,
+      },
+    ],
+  });
+  if (issued.status !== "accepted" || issued.uploads.length !== 1) {
+    throw new Error(`expected artifact capability, received ${issued.status}`);
+  }
+  const upload = issued.uploads[0];
+  if (!upload) throw new Error("artifact upload capability is missing");
+  const begun = await artifactStore.beginUpload({ artifactId, uploadToken: upload.uploadToken });
+  if (begun.status !== "accepted") throw new Error(`expected artifact upload begin, received ${begun.status}`);
+  const completed = await artifactStore.completeUpload({
+    artifactId,
+    uploadToken: upload.uploadToken,
+    sha256: artifactSha256,
+    bytes: 2048,
+  });
+  if (completed.status !== "accepted") {
+    throw new Error(`expected artifact upload completion, received ${completed.status}`);
+  }
+
+  return {
+    base,
+    installationId,
+    managedIdentityId,
+    runId,
+    attemptId,
+    leaseId,
+    artifactId,
+    artifact: {
+      kind: "report/json",
+      name: "boardreadyops-result.json",
+      storagePath: upload.storagePath,
+      sha256: artifactSha256,
+      bytes: 2048,
+      role: "primary",
+    },
+  };
+}
+
+async function cleanupLeaseBoundArtifact(fixture: LeaseBoundArtifactFixture): Promise<void> {
+  if (!executor) return;
+  await executor.query("delete from installations where id = $1", [fixture.installationId]);
+  await executor.query("delete from managed_runner_identities where id = $1", [fixture.managedIdentityId]);
+}
+
+function leaseBoundResultRequest(
+  fixture: LeaseBoundArtifactFixture,
+  artifact: LeaseBoundArtifactFixture["artifact"],
+): Request {
+  const url = new URL("https://boardreadyops.internal/api/v1/runs/result");
+  url.searchParams.set("run_id", fixture.runId);
+  url.searchParams.set("attempt_id", fixture.attemptId);
+  return new Request(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      version: 1,
+      executionAttemptId: fixture.attemptId,
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      artifacts: [artifact],
+      metrics: {},
+      reportLinks: [],
+    }),
+  });
+}
+
 describeDatabase("runner result PostgreSQL integration", () => {
+  it("rejects lease-bound terminal artifact metadata that diverges from the verified upload", async () => {
+    if (!executor) throw new Error("DATABASE_URL is required");
+    const fixture = await setupLeaseBoundArtifact("result-integrity-mismatch");
+
+    try {
+      const response = await handleResultRequest(
+        leaseBoundResultRequest(fixture, { ...fixture.artifact, sha256: "b".repeat(64) }),
+        {
+          ...dependencies,
+          authenticationVerified: true,
+          verifiedLeaseId: fixture.leaseId,
+          now: () => secondsAfter(fixture.base, 20),
+        },
+      );
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({
+        ok: false,
+        error: "runner artifact metadata does not match verified uploads",
+        runId: fixture.runId,
+        executionAttemptId: fixture.attemptId,
+      });
+
+      const state = rows(
+        await executor.query(
+          `select release_runs.status,
+                  (select count(*)::int from release_run_results where run_id = $1) as result_count,
+                  artifacts.id as artifact_id,
+                  artifacts.sha256,
+                  artifacts.bytes
+             from release_runs
+             join artifacts on artifacts.run_id = release_runs.id
+            where release_runs.id = $1`,
+          [fixture.runId],
+        ),
+      );
+      expect(state).toEqual([
+        {
+          status: "running",
+          result_count: 0,
+          artifact_id: fixture.artifactId,
+          sha256: fixture.artifact.sha256,
+          bytes: fixture.artifact.bytes,
+        },
+      ]);
+    } finally {
+      await cleanupLeaseBoundArtifact(fixture);
+    }
+  });
+
+  it("retains the authoritative upload record for an exact lease-bound terminal artifact", async () => {
+    if (!executor) throw new Error("DATABASE_URL is required");
+    const fixture = await setupLeaseBoundArtifact("result-integrity-match");
+
+    try {
+      const response = await handleResultRequest(leaseBoundResultRequest(fixture, fixture.artifact), {
+        ...dependencies,
+        authenticationVerified: true,
+        verifiedLeaseId: fixture.leaseId,
+        now: () => secondsAfter(fixture.base, 20),
+      });
+
+      expect(response.status).toBe(202);
+      await expect(response.json()).resolves.toMatchObject({ ok: true, status: "accepted", runId: fixture.runId });
+      const artifactRows = rows(
+        await executor.query(
+          `select id, kind, name, storage_path, sha256, bytes, role
+             from artifacts
+            where run_id = $1`,
+          [fixture.runId],
+        ),
+      );
+      expect(artifactRows).toEqual([
+        {
+          id: fixture.artifactId,
+          kind: fixture.artifact.kind,
+          name: fixture.artifact.name,
+          storage_path: fixture.artifact.storagePath,
+          sha256: fixture.artifact.sha256,
+          bytes: fixture.artifact.bytes,
+          role: fixture.artifact.role,
+        },
+      ]);
+    } finally {
+      await cleanupLeaseBoundArtifact(fixture);
+    }
+  });
+
   it("persists the versioned result atomically and accepts exact replay", async () => {
     if (!executor) throw new Error("DATABASE_URL is required");
     const accepted = await handleResultRequest(callbackRequest(), dependencies);
