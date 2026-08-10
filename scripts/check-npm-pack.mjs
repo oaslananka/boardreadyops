@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 
 export const requiredFiles = [
   "package.json",
@@ -12,8 +13,9 @@ export const requiredFiles = [
 ];
 
 export function checkPack(root = process.cwd()) {
-  const result = spawnSync("npm", ["pack", "--dry-run", "--json"], {
-    // NOSONAR -- npm is a fixed package-manager executable; CI/developer PATH is a trusted execution boundary.
+  const npmExecutable = path.join(path.dirname(process.execPath), process.platform === "win32" ? "npm.cmd" : "npm");
+  const result = spawnSync(npmExecutable, ["pack", "--dry-run", "--json"], {
+    shell: process.platform === "win32",
     cwd: root,
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
