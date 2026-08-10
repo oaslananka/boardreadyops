@@ -293,10 +293,7 @@ function latestVerifiedKicadPatchDrift(config, latestBySeries) {
   ];
 }
 
-function findNodeDrift(config, releases) {
-  const minimum = Number(config.node.minimum);
-  const supported = new Set(config.node.supported);
-  const documentedCurrent = new Set(config.node.current);
+function latestNodeReleasesByMajor(releases, minimum) {
   const latestByMajor = new Map();
   for (const release of releases) {
     const version = stableReleaseName(releaseName(release));
@@ -309,6 +306,14 @@ function findNodeDrift(config, releases) {
       latestByMajor.set(major, { version, lts: release.lts });
     }
   }
+  return latestByMajor;
+}
+
+function findNodeDrift(config, releases) {
+  const minimum = Number(config.node.minimum);
+  const supported = new Set(config.node.supported);
+  const documentedCurrent = new Set(config.node.current);
+  const latestByMajor = latestNodeReleasesByMajor(releases, minimum);
 
   const drift = [];
   for (const [major, entry] of [...latestByMajor.entries()].sort(([left], [right]) => Number(left) - Number(right))) {
