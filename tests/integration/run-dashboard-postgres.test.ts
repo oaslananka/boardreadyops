@@ -70,6 +70,23 @@ beforeAll(async () => {
        ($1, 'archive', 'board.zip', 'runs/board.zip', $4, 2048, 'primary', now())`,
     [runId, "a".repeat(64), "b".repeat(64), "c".repeat(64)],
   );
+  await database().query(
+    `insert into artifact_deletion_jobs (
+       artifact_id, installation_id, repository_id, release_run_id, storage_driver, storage_path,
+       deletion_reason, artifact_kind, artifact_role, artifact_sha256, artifact_bytes, status,
+       available_at, created_at, completed_at, deletion_outcome, last_error_class, last_error_message
+     ) values
+       ('7a000000-0000-4000-8000-000000000101', $1, $2, $3, 'local', 'deleted/report.bin',
+        'result_replaced', 'report', 'evidence', $4, 512, 'completed', now(), now(), now(), 'deleted', null, null),
+       ('7a000000-0000-4000-8000-000000000102', $1, $2, $3, 'local', 'missing/report.bin',
+        'result_replaced', 'report', 'evidence', $5, 256, 'completed', now(), now(), now(), 'missing', null, null),
+       ('7a000000-0000-4000-8000-000000000103', $1, $2, $3, 'local', 'pending/report.bin',
+        'result_replaced', 'report', 'evidence', $6, 128, 'available', now(), now(), null, null, null, null),
+       ('7a000000-0000-4000-8000-000000000104', $1, $2, $3, 'local', 'failed/report.bin',
+        'result_replaced', 'report', 'evidence', $7, 64, 'dead_letter', now(), now(), now(), null,
+        'unsafe_path', 'Artifact object deletion did not reach a terminal state.')`,
+    [installationId, repositoryId, runId, "1".repeat(64), "2".repeat(64), "3".repeat(64), "4".repeat(64)],
+  );
 });
 
 afterAll(async () => {
@@ -123,6 +140,14 @@ describeDatabase("run dashboard PostgreSQL integration", () => {
     expect(result.run.artifactsPage).toEqual({ page: 1, pageSize: 10, total: 2, totalPages: 1 });
     expect(result.run.artifacts.map((artifact) => artifact.name)).toEqual(["large.html", "small.html"]);
     expect(result.run.artifacts.every((artifact) => artifact.availability === "metadata-only")).toBe(true);
+    expect(result.run.artifactLifecycle).toEqual({
+      deleted: 1,
+      missing: 1,
+      pendingDeletion: 1,
+      failedDeletion: 1,
+    });
     expect(JSON.stringify(result)).not.toContain("runs/large.html");
+    expect(JSON.stringify(result)).not.toContain("deleted/report.bin");
+    expect(JSON.stringify(result)).not.toContain("unsafe_path");
   });
 });

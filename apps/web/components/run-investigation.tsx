@@ -717,6 +717,17 @@ export function ArtifactsView({
   const current = stringSearchParameters(searchParameters);
   const normalizedArtifactSort = filtersFromSearchParameters(searchParameters).artifactSort ?? "newest";
   const hasMetadataOnly = run.artifacts.some((artifact) => artifact.availability === "metadata-only");
+  const artifactLifecycleTotal =
+    run.artifactLifecycle.deleted +
+    run.artifactLifecycle.missing +
+    run.artifactLifecycle.pendingDeletion +
+    run.artifactLifecycle.failedDeletion;
+  const artifactLifecycleTone =
+    run.artifactLifecycle.failedDeletion > 0
+      ? ("danger" as const)
+      : run.artifactLifecycle.pendingDeletion > 0
+        ? ("warning" as const)
+        : ("info" as const);
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
     <Panel
@@ -780,6 +791,20 @@ export function ArtifactsView({
       {hasMetadataOnly ? (
         <Alert title="Some artifact data is partial" tone="warning">
           <p>Checksums and metadata are available, but this deployment has not configured a signed download source.</p>
+        </Alert>
+      ) : null}
+      {artifactLifecycleTotal > 0 ? (
+        <Alert title="Artifact lifecycle history" tone={artifactLifecycleTone}>
+          <p>
+            Run-wide counts come from durable artifact deletion jobs. Replaced artifact metadata is removed before
+            physical deletion; these counts do not imply an automatic age-based expiry policy.
+          </p>
+          <DefinitionGrid>
+            <Definition label="Deleted objects">{run.artifactLifecycle.deleted}</Definition>
+            <Definition label="Already missing">{run.artifactLifecycle.missing}</Definition>
+            <Definition label="Deletion pending">{run.artifactLifecycle.pendingDeletion}</Definition>
+            <Definition label="Deletion failed">{run.artifactLifecycle.failedDeletion}</Definition>
+          </DefinitionGrid>
         </Alert>
       ) : null}
       <p className="result-count" aria-live="polite">

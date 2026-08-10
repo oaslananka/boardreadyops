@@ -97,6 +97,7 @@ function sampleRun(): RunDetail {
       },
     ],
     artifactsPage: { page: 1, pageSize: 25, total: 1, totalPages: 1 },
+    artifactLifecycle: { deleted: 1, missing: 1, pendingDeletion: 1, failedDeletion: 0 },
     attempts: [],
     transitions: [],
   };
