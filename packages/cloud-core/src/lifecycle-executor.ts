@@ -179,6 +179,40 @@ async function completeSkippedCheckRun(
   });
 }
 
+type PreparedCheckRun = {
+  checkRunId: number | string;
+  checkRunCreated: boolean;
+};
+
+async function prepareReleaseCheckRun(
+  action: EnqueueReleaseRunInput,
+  releaseRun: EnqueuedReleaseRun & { runId: string },
+  store: GitHubAppLifecycleStore,
+  result: GitHubAppLifecycleExecutionResult,
+  checkRunClient?: GitHubAppCheckRunClient,
+): Promise<PreparedCheckRun | undefined> {
+  const existingCheckRunId = releaseRun.githubCheckRunId;
+  if (existingCheckRunId !== undefined && existingCheckRunId !== null) {
+    result.checkRunsSkipped += 1;
+    return { checkRunId: existingCheckRunId, checkRunCreated: false };
+  }
+  if (!checkRunClient) {
+    return undefined;
+  }
+
+  const checkRun = await checkRunClient.createPullRequestCheckRun({
+    action,
+    runId: releaseRun.runId,
+    idempotencyKey: releaseRun.idempotencyKey,
+  });
+  await store.attachGitHubCheckRun({
+    idempotencyKey: releaseRun.idempotencyKey,
+    githubCheckRunId: checkRun.id,
+  });
+  result.checkRunsCreated += 1;
+  return { checkRunId: checkRun.id, checkRunCreated: true };
+}
+
 async function executeReleaseRun(
   action: EnqueueReleaseRunInput,
   releaseRun: EnqueuedReleaseRun & { runId: string },
@@ -187,30 +221,12 @@ async function executeReleaseRun(
   checkRunClient?: GitHubAppCheckRunClient,
   workflowDispatchClient?: GitHubAppWorkflowDispatchClient,
 ): Promise<void> {
-  let checkRunId = releaseRun.githubCheckRunId ?? undefined;
-  let checkRunCreated = false;
-
-  if (checkRunId === undefined || checkRunId === null) {
-    if (!checkRunClient) {
-      result.workflowDispatchesSkipped += 1;
-      return;
-    }
-
-    const checkRun = await checkRunClient.createPullRequestCheckRun({
-      action,
-      runId: releaseRun.runId,
-      idempotencyKey: releaseRun.idempotencyKey,
-    });
-    await store.attachGitHubCheckRun({
-      idempotencyKey: releaseRun.idempotencyKey,
-      githubCheckRunId: checkRun.id,
-    });
-    checkRunId = checkRun.id;
-    checkRunCreated = true;
-    result.checkRunsCreated += 1;
-  } else {
-    result.checkRunsSkipped += 1;
+  const preparedCheckRun = await prepareReleaseCheckRun(action, releaseRun, store, result, checkRunClient);
+  if (!preparedCheckRun) {
+    result.workflowDispatchesSkipped += 1;
+    return;
   }
+  const { checkRunId, checkRunCreated } = preparedCheckRun;
 
   const skipReason = dispatchSkipReason(action);
   if (skipReason) {
