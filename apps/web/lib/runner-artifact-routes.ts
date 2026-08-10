@@ -65,6 +65,47 @@ function defaultDependencies(): RunnerArtifactRouteDependencies {
   };
 }
 
+type ArtifactUploadService =
+  | { ok: true; storageRoot: string; store: RunnerArtifactStore }
+  | { ok: false; response: Response };
+
+function artifactUploadService(dependencies: RunnerArtifactRouteDependencies): ArtifactUploadService {
+  if ((dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local") !== "local") {
+    return { ok: false, response: jsonResponse({ ok: false, error: "artifact storage driver is not supported" }, 501) };
+  }
+  const storageRoot = dependencies.environment.ARTIFACT_STORAGE_ROOT;
+  if (!storageRoot) {
+    return { ok: false, response: jsonResponse({ ok: false, error: "artifact storage root is not configured" }, 503) };
+  }
+  const executor = dependencies.queryExecutor();
+  if (!executor) {
+    return { ok: false, response: jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503) };
+  }
+  return { ok: true, storageRoot, store: dependencies.createArtifactStore(executor) };
+}
+
+function begunUploadRejectionResponse(status: "expired" | "replayed" | "stale"): Response {
+  switch (status) {
+    case "expired":
+      return jsonResponse({ ok: false, error: "artifact upload capability expired" }, 410);
+    case "replayed":
+      return jsonResponse({ ok: false, error: "artifact upload capability was already used" }, 409);
+    case "stale":
+      return jsonResponse({ ok: false, error: "artifact upload capability is invalid" }, 403);
+  }
+}
+
+function completedUploadRejectionResponse(status: "expired" | "rejected" | "stale"): Response {
+  switch (status) {
+    case "expired":
+      return jsonResponse({ ok: false, error: "artifact upload was expired" }, 410);
+    case "rejected":
+      return jsonResponse({ ok: false, error: "artifact upload was rejected" }, 409);
+    case "stale":
+      return jsonResponse({ ok: false, error: "artifact upload was stale" }, 403);
+  }
+}
+
 async function parseJsonBody(request: Request): Promise<ParsedBody> {
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null && /^\d+$/u.test(contentLength) && Number(contentLength) > maximumCapabilityRequestBytes) {
@@ -290,33 +331,17 @@ export async function handleRunnerArtifactUploadRequest(
   if (!artifactIdPattern.test(artifactId) || !uploadTokenPattern.test(uploadToken)) {
     return jsonResponse({ ok: false, error: "valid artifact upload capability is required" }, 401);
   }
-  if ((dependencies.environment.ARTIFACT_STORAGE_DRIVER ?? "local") !== "local") {
-    return jsonResponse({ ok: false, error: "artifact storage driver is not supported" }, 501);
-  }
-  const storageRoot = dependencies.environment.ARTIFACT_STORAGE_ROOT;
-  if (!storageRoot) {
-    return jsonResponse({ ok: false, error: "artifact storage root is not configured" }, 503);
-  }
+  const service = artifactUploadService(dependencies);
+  if (!service.ok) return service.response;
 
-  const executor = dependencies.queryExecutor();
-  if (!executor) return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
-  const store = dependencies.createArtifactStore(executor);
-
-  const begun = await store.beginUpload({ artifactId, uploadToken }).catch(() => undefined);
+  const begun = await service.store.beginUpload({ artifactId, uploadToken }).catch(() => undefined);
   if (!begun) return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
-  if (begun.status !== "accepted") {
-    if (begun.status === "expired") {
-      return jsonResponse({ ok: false, error: "artifact upload capability expired" }, 410);
-    }
-    return begun.status === "replayed"
-      ? jsonResponse({ ok: false, error: "artifact upload capability was already used" }, 409)
-      : jsonResponse({ ok: false, error: "artifact upload capability is invalid" }, 403);
-  }
+  if (begun.status !== "accepted") return begunUploadRejectionResponse(begun.status);
 
-  const target = await localArtifactTarget(storageRoot, begun.storagePath);
+  const target = await localArtifactTarget(service.storageRoot, begun.storagePath);
   if (!target) {
     await Promise.resolve(
-      store.failUpload({ artifactId, uploadToken, reason: "Artifact storage path is unavailable." }),
+      service.store.failUpload({ artifactId, uploadToken, reason: "Artifact storage path is unavailable." }),
     ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact storage path is unavailable" }, 503);
   }
@@ -328,14 +353,20 @@ export async function handleRunnerArtifactUploadRequest(
   });
   if (!written.ok) {
     await removeFile(target.temporaryPath);
-    await Promise.resolve(store.failUpload({ artifactId, uploadToken, reason: written.reason })).catch(() => undefined);
+    await Promise.resolve(service.store.failUpload({ artifactId, uploadToken, reason: written.reason })).catch(
+      () => undefined,
+    );
     return jsonResponse({ ok: false, error: written.reason }, written.status);
   }
 
   if (begun.expectedSha256 !== undefined && begun.expectedSha256 !== written.sha256) {
     await removeFile(target.temporaryPath);
     await Promise.resolve(
-      store.failUpload({ artifactId, uploadToken, reason: "Artifact SHA-256 does not match its declaration." }),
+      service.store.failUpload({
+        artifactId,
+        uploadToken,
+        reason: "Artifact SHA-256 does not match its declaration.",
+      }),
     ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact SHA-256 does not match its declaration" }, 409);
   }
@@ -346,25 +377,28 @@ export async function handleRunnerArtifactUploadRequest(
   } catch {
     await removeFile(target.temporaryPath);
     await Promise.resolve(
-      store.failUpload({ artifactId, uploadToken, reason: "Artifact destination already exists or is unavailable." }),
+      service.store.failUpload({
+        artifactId,
+        uploadToken,
+        reason: "Artifact destination already exists or is unavailable.",
+      }),
     ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact destination is unavailable" }, 409);
   }
 
-  const completed = await store
+  const completed = await service.store
     .completeUpload({ artifactId, uploadToken, sha256: written.sha256, bytes: written.bytes })
     .catch(() => undefined);
   if (!completed) {
     await removeFile(target.finalPath);
     await Promise.resolve(
-      store.failUpload({ artifactId, uploadToken, reason: "Artifact metadata persistence failed." }),
+      service.store.failUpload({ artifactId, uploadToken, reason: "Artifact metadata persistence failed." }),
     ).catch(() => undefined);
     return jsonResponse({ ok: false, error: "artifact upload service is unavailable" }, 503);
   }
   if (completed.status !== "accepted" && completed.status !== "replayed") {
     await removeFile(target.finalPath);
-    const status = completed.status === "expired" ? 410 : completed.status === "rejected" ? 409 : 403;
-    return jsonResponse({ ok: false, error: `artifact upload was ${completed.status}` }, status);
+    return completedUploadRejectionResponse(completed.status);
   }
 
   return jsonResponse(
