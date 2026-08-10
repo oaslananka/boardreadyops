@@ -336,6 +336,16 @@ describe("reproducible contributor toolchain", () => {
     expect(containerDockerfile).toContain(['"boardreadyops@$', '{BOARDREADYOPS_VERSION}"'].join(""));
   });
 
+  it("resolves npm pack from the running Node installation instead of PATH", async () => {
+    const checkNpmPack = await repositoryFile("scripts/check-npm-pack.mjs");
+
+    expect(checkNpmPack).toContain(
+      'const npmExecutable = path.join(path.dirname(process.execPath), process.platform === "win32" ? "npm.cmd" : "npm");',
+    );
+    expect(checkNpmPack).toContain('spawnSync(npmExecutable, ["pack", "--dry-run", "--json"]');
+    expect(checkNpmPack).not.toContain('spawnSync("npm",');
+  });
+
   it("routes nested package scripts through the repository-pinned Corepack pnpm", async () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as { scripts: Record<string, string> };
     const barePnpmScripts = Object.entries(packageJson.scripts)
