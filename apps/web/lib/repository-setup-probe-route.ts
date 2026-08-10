@@ -81,6 +81,26 @@ async function requestBody(request: Request): Promise<unknown | undefined> {
   }
 }
 
+type ProbeCompletion = Awaited<ReturnType<RepositorySetupStore["completeProbe"]>>;
+
+function probeCompletionResponse(completed: ProbeCompletion): Response {
+  if (completed.outcome === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
+  if (completed.outcome === "stale") return controlPlaneJsonError("repository setup probe is stale", 409);
+  if (completed.outcome === "not_found") return controlPlaneJsonError("repository setup probe is unavailable", 404);
+  if (completed.outcome !== "completed" && completed.outcome !== "replayed") {
+    return controlPlaneJsonError("repository setup probe conflicted", 409);
+  }
+  return controlPlaneJsonResponse(
+    {
+      ok: true,
+      outcome: completed.outcome,
+      ...(completed.revisionId ? { revisionId: completed.revisionId } : {}),
+      ...(completed.revision === undefined ? {} : { revision: completed.revision }),
+    },
+    200,
+  );
+}
+
 export async function handleRepositorySetupProbeResult(
   request: Request,
   dependencies: RepositorySetupProbeRouteDependencies = createRepositorySetupProbeRouteDependencies(),
@@ -134,19 +154,5 @@ export async function handleRepositorySetupProbeResult(
   } catch {
     return controlPlaneJsonError("repository setup probe could not be persisted", 503);
   }
-  if (completed.outcome === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
-  if (completed.outcome === "stale") return controlPlaneJsonError("repository setup probe is stale", 409);
-  if (completed.outcome === "not_found") return controlPlaneJsonError("repository setup probe is unavailable", 404);
-  if (completed.outcome !== "completed" && completed.outcome !== "replayed") {
-    return controlPlaneJsonError("repository setup probe conflicted", 409);
-  }
-  return controlPlaneJsonResponse(
-    {
-      ok: true,
-      outcome: completed.outcome,
-      ...(completed.revisionId ? { revisionId: completed.revisionId } : {}),
-      ...(completed.revision === undefined ? {} : { revision: completed.revision }),
-    },
-    200,
-  );
+  return probeCompletionResponse(completed);
 }
