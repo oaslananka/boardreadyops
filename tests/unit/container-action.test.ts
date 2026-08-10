@@ -47,12 +47,15 @@ describe("container action release surfaces", () => {
 
     expect(dockerfile).toContain("FROM ubuntu:26.04@sha256:");
     expect(dockerfile).toContain("ARG NODE_VERSION=24.19.0");
+    expect(dockerfile).toContain("ARG BOARDREADYOPS_VERSION");
+    expect(dockerfile).not.toContain("ARG BOARDREADYOPS_VERSION=latest");
+    expect(dockerfile).toContain("BOARDREADYOPS_VERSION must be an exact semantic version");
     expect(dockerfile).not.toContain("ARG PNPM_VERSION");
     expect(dockerfile).toContain("ARG KICAD_PPA_SERIES=10.0");
     expect(dockerfile).toContain(`ppa:kicad/kicad-\${KICAD_PPA_SERIES}-releases`);
-    expect(dockerfile).toContain(
-      `NPM_CONFIG_UPDATE_NOTIFIER=false npm install --global --ignore-scripts --no-audit --no-fund "boardreadyops@\${BOARDREADYOPS_VERSION}"`,
-    );
+    expect(dockerfile).toContain("NPM_CONFIG_UPDATE_NOTIFIER=false npm install");
+    expect(dockerfile).toContain("--global --ignore-scripts --no-audit --no-fund");
+    expect(dockerfile).toContain(`"boardreadyops@\${BOARDREADYOPS_VERSION}"`);
     expect(dockerfile).not.toContain("corepack ");
     expect(dockerfile).not.toContain("pnpm add --global");
     expect(dockerfile).toContain("/root/.npm");

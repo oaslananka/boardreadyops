@@ -126,7 +126,7 @@ jobs:
           set -euo pipefail
           node --version
           npm --version
-          npm install -g npm@11.18.0
+          npm install -g --ignore-scripts npm@11.18.0
           npm --version
       - if: env.SHOULD_PUBLISH == 'true'
         run: corepack enable
@@ -143,7 +143,7 @@ jobs:
         run: |
           docs_venv="${RUNNER_TEMP}/boardreadyops-docs-venv"
           uv venv "${docs_venv}"
-          uv pip install --python "${docs_venv}/bin/python" -r docs/requirements.txt
+          uv pip install --python "${docs_venv}/bin/python" --require-hashes -r docs/requirements.lock.txt
           echo "${docs_venv}/bin" >> "${GITHUB_PATH}"
       - if: env.SHOULD_PUBLISH == 'true'
         run: corepack pnpm run deps:install-ci

@@ -13,6 +13,7 @@ export const requiredFiles = [
 
 export function checkPack(root = process.cwd()) {
   const result = spawnSync("npm", ["pack", "--dry-run", "--json"], {
+    // NOSONAR -- npm is a fixed package-manager executable; CI/developer PATH is a trusted execution boundary.
     cwd: root,
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,

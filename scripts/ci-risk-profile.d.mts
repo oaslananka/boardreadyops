@@ -37,4 +37,4 @@ export interface CiRiskProfile {
 }
 
 export function classifyChangedFiles(files: readonly string[], options?: CiRiskProfileOptions): CiRiskProfile;
-export function readFilesFromArg(path?: string): string[];
+export function readFilesFromArg(inputPath?: string, repositoryRoot?: string): string[];

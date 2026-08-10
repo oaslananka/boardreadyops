@@ -3,7 +3,7 @@
 # that label. Repository rulesets remain the authoritative merge gate.
 merge_queue:
   mode: parallel
-  max_parallel_checks: 5
+  max_parallel_checks: 1
   status_comments: outcomes
   reset_on_external_merge: always
   skip_intermediate_results: true
@@ -46,9 +46,14 @@ queue_rules:
       - check-success = ci / risk-profile
       - check-success = ci / lint
       - check-success = ci / typecheck
+      - check-success = ci / test-unit
+      - check-success = ci / build
+      - check-success = ci / verify-dist
+      - check-success = security / gate
 
     merge_conditions:
       - label = queue-me
+      - -draft
       - check-success = ci / risk-profile
       - check-success = ci / lint
       - check-success = ci / typecheck
