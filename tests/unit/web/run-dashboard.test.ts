@@ -292,7 +292,17 @@ describe("run dashboard data", () => {
         ],
       },
       { rows: [{ total: 27 }] },
-      { rows: [{ total: 1 }] },
+      {
+        rows: [
+          {
+            total: 1,
+            deleted_artifact_count: 2,
+            missing_artifact_count: 1,
+            pending_artifact_deletion_count: 3,
+            failed_artifact_deletion_count: 1,
+          },
+        ],
+      },
       {
         rows: [
           {
@@ -403,6 +413,12 @@ describe("run dashboard data", () => {
         deadLetterCount: 0,
         findingsPage: { page: 2, pageSize: 10, total: 27, totalPages: 3 },
         artifactsPage: { page: 1, pageSize: 10, total: 1, totalPages: 1 },
+        artifactLifecycle: {
+          deleted: 2,
+          missing: 1,
+          pendingDeletion: 3,
+          failedDeletion: 1,
+        },
         findings: [
           {
             id: "finding-error",
@@ -448,6 +464,11 @@ describe("run dashboard data", () => {
     expect(findingSql).toContain("offset $5");
     expect(query.mock.calls[5]?.[1]).toEqual(["run-123", "%board\\_100\\%%", "error", 10, 10]);
     expect(artifactCountSql).toContain("lower(artifacts.kind)");
+    expect(artifactCountSql).toContain("artifact_deletion_jobs.release_run_id = $1");
+    expect(artifactCountSql).toContain("deletion_outcome = 'deleted'");
+    expect(artifactCountSql).toContain("deletion_outcome = 'missing'");
+    expect(artifactCountSql).toContain("status in ('available', 'leased')");
+    expect(artifactCountSql).toContain("status = 'dead_letter'");
     expect(query.mock.calls[2]?.[1]).toEqual(["run-123", "%release%", "primary", "release-archive"]);
     expect(artifactSql).toContain("artifacts.bytes desc");
     expect(artifactSql).toContain("limit $5");

@@ -55,6 +55,11 @@ describe("run investigation routes", () => {
     expect(component).toContain("artifactsPage");
     expect(component).toContain("Copy SHA-256");
     expect(component).toContain("no automatic age-based expiry");
+    expect(component).toContain("Artifact lifecycle history");
+    expect(component).toContain("Deleted objects");
+    expect(component).toContain("Already missing");
+    expect(component).toContain("Deletion pending");
+    expect(component).toContain("Deletion failed");
     expect(component).toContain("Open GitHub checks");
     expect(component).toContain("Operator authentication required");
     expect(styles).toContain(":focus-visible");

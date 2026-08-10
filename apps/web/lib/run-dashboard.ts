@@ -43,6 +43,13 @@ type FindingDetail = {
 
 type ArtifactAvailability = "available" | "metadata-only";
 
+type ArtifactLifecycleSummary = {
+  deleted: number;
+  missing: number;
+  pendingDeletion: number;
+  failedDeletion: number;
+};
+
 type ArtifactDetail = {
   id: string;
   kind: string;
@@ -126,6 +133,7 @@ export type RunDetail = {
   findingsPage: PageInfo;
   artifacts: ArtifactDetail[];
   artifactsPage: PageInfo;
+  artifactLifecycle: ArtifactLifecycleSummary;
   attempts: AttemptDetail[];
   transitions: TransitionDetail[];
 };
@@ -539,7 +547,38 @@ export async function lookupRunDashboard(
 
   const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult] = await Promise.all([
     executor.query(`select count(*)::int as total from findings where ${findingScope.sql}`, findingScope.parameters),
-    executor.query(`select count(*)::int as total from artifacts where ${artifactScope.sql}`, artifactScope.parameters),
+    executor.query(
+      `select count(*)::int as total,
+              coalesce((
+                select count(*)::int
+                from artifact_deletion_jobs
+                where artifact_deletion_jobs.release_run_id = $1
+                  and artifact_deletion_jobs.status = 'completed'
+                  and artifact_deletion_jobs.deletion_outcome = 'deleted'
+              ), 0)::int as deleted_artifact_count,
+              coalesce((
+                select count(*)::int
+                from artifact_deletion_jobs
+                where artifact_deletion_jobs.release_run_id = $1
+                  and artifact_deletion_jobs.status = 'completed'
+                  and artifact_deletion_jobs.deletion_outcome = 'missing'
+              ), 0)::int as missing_artifact_count,
+              coalesce((
+                select count(*)::int
+                from artifact_deletion_jobs
+                where artifact_deletion_jobs.release_run_id = $1
+                  and artifact_deletion_jobs.status in ('available', 'leased')
+              ), 0)::int as pending_artifact_deletion_count,
+              coalesce((
+                select count(*)::int
+                from artifact_deletion_jobs
+                where artifact_deletion_jobs.release_run_id = $1
+                  and artifact_deletion_jobs.status = 'dead_letter'
+              ), 0)::int as failed_artifact_deletion_count
+       from artifacts
+       where ${artifactScope.sql}`,
+      artifactScope.parameters,
+    ),
     executor.query(
       `select id, attempt_number, status, created_at, dispatch_requested_at, dispatched_at,
               started_at, heartbeat_at, completed_at, retry_after_at,
@@ -563,7 +602,14 @@ export async function lookupRunDashboard(
   ]);
 
   const findingTotal = numberValue(rows(findingCountResult)[0] ?? {}, "total") ?? 0;
-  const artifactTotal = numberValue(rows(artifactCountResult)[0] ?? {}, "total") ?? 0;
+  const artifactCountRow = rows(artifactCountResult)[0] ?? {};
+  const artifactTotal = numberValue(artifactCountRow, "total") ?? 0;
+  const artifactLifecycle: ArtifactLifecycleSummary = {
+    deleted: numberValue(artifactCountRow, "deleted_artifact_count") ?? 0,
+    missing: numberValue(artifactCountRow, "missing_artifact_count") ?? 0,
+    pendingDeletion: numberValue(artifactCountRow, "pending_artifact_deletion_count") ?? 0,
+    failedDeletion: numberValue(artifactCountRow, "failed_artifact_deletion_count") ?? 0,
+  };
   const findingsPage = pageInfo(filters.findingsPage, filters.pageSize, findingTotal);
   const artifactsPage = pageInfo(filters.artifactsPage, filters.pageSize, artifactTotal);
   const findingOffset = (findingsPage.page - 1) * filters.pageSize;
@@ -721,6 +767,7 @@ export async function lookupRunDashboard(
       findingsPage,
       artifacts,
       artifactsPage,
+      artifactLifecycle,
       attempts,
       transitions,
     },
