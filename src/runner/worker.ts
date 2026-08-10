@@ -151,19 +151,7 @@ export async function runRunnerWorkerOnce(
     source_mode: job.sourceMode,
   });
 
-  if (job.sourceMode !== "customer_checkout") {
-    await bestEffortRelinquish(
-      client,
-      job,
-      "job_error",
-      "Self-hosted runner refused a non-customer checkout assignment.",
-    );
-    throw new Error("self-hosted runner received a source assignment that would cross the managed source boundary");
-  }
-  if (options.signal?.aborted) {
-    await bestEffortRelinquish(client, job, "shutdown", "Runner stopped before source checkout.");
-    throw new Error("runner shutdown requested before job execution");
-  }
+  await validateClaimedRunnerJob(client, job, options.signal);
 
   let workspace: string | undefined;
   let terminalPublished = false;
@@ -189,24 +177,14 @@ export async function runRunnerWorkerOnce(
     heartbeat.assertLeaseActive();
 
     const artifactMode = options.artifactMode ?? "control-plane";
-    const suppressArtifacts = job.safeMode.enabled || artifactMode === "metadata-only";
-    let uploadedArtifacts: ReleaseRunResult["artifacts"] = [];
-    if (suppressArtifacts) {
-      if (execution.artifacts.length > 0) {
-        dependencies.log("runner.artifacts.suppressed", {
-          run_id: job.runId,
-          execution_attempt_id: job.executionAttemptId,
-          artifacts: execution.artifacts.length,
-          artifact_mode: artifactMode,
-          safe_mode_reasons: [...job.safeMode.reasons],
-        });
-      }
-    } else {
-      heartbeat.setStage("uploading_artifacts");
-      await heartbeat.pulse();
-      uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
-      heartbeat.assertLeaseActive();
-    }
+    const uploadedArtifacts = await resolveExecutionArtifacts(
+      dependencies,
+      client,
+      job,
+      execution,
+      artifactMode,
+      heartbeat,
+    );
 
     heartbeat.setStage("reporting");
     await heartbeat.pulse();
@@ -235,30 +213,91 @@ export async function runRunnerWorkerOnce(
       decision: result.decision ?? "error",
     };
   } catch (error) {
-    const shutdown = error instanceof RunnerShutdownError || options.signal?.aborted === true;
-    const reportedError = shutdown && !(error instanceof RunnerShutdownError) ? new RunnerShutdownError() : error;
-    if (!terminalPublished) {
-      await bestEffortRelinquish(
-        client,
-        job,
-        shutdown ? "shutdown" : "job_error",
-        sanitizedErrorMessage(reportedError),
-      );
-    }
-    throw reportedError;
+    throw await handleRunnerExecutionFailure(client, job, error, options.signal, terminalPublished);
   } finally {
     await heartbeat.stop();
-    if (workspace && (job.safeMode.enabled || options.keepWorkspace !== true)) {
-      if (job.safeMode.enabled && options.keepWorkspace === true) {
-        dependencies.log("runner.workspace.retention_overridden", {
-          run_id: job.runId,
-          execution_attempt_id: job.executionAttemptId,
-          safe_mode_reasons: [...job.safeMode.reasons],
-        });
-      }
-      await dependencies.removeWorkspace(workspace);
-    }
+    await cleanupRunnerWorkspace(dependencies, job, workspace, options.keepWorkspace);
   }
+}
+
+async function validateClaimedRunnerJob(
+  client: RunnerWorkerClient,
+  job: RunnerClaimedJob,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (job.sourceMode !== "customer_checkout") {
+    await bestEffortRelinquish(
+      client,
+      job,
+      "job_error",
+      "Self-hosted runner refused a non-customer checkout assignment.",
+    );
+    throw new Error("self-hosted runner received a source assignment that would cross the managed source boundary");
+  }
+  if (signal?.aborted) {
+    await bestEffortRelinquish(client, job, "shutdown", "Runner stopped before source checkout.");
+    throw new Error("runner shutdown requested before job execution");
+  }
+}
+
+async function resolveExecutionArtifacts(
+  dependencies: RunnerWorkerDependencies,
+  client: RunnerWorkerClient,
+  job: RunnerClaimedJob,
+  execution: RunnerExecutionOutput,
+  artifactMode: RunnerArtifactMode,
+  heartbeat: ReturnType<typeof createHeartbeatController>,
+): Promise<ReleaseRunResult["artifacts"]> {
+  if (job.safeMode.enabled || artifactMode === "metadata-only") {
+    if (execution.artifacts.length > 0) {
+      dependencies.log("runner.artifacts.suppressed", {
+        run_id: job.runId,
+        execution_attempt_id: job.executionAttemptId,
+        artifacts: execution.artifacts.length,
+        artifact_mode: artifactMode,
+        safe_mode_reasons: [...job.safeMode.reasons],
+      });
+    }
+    return [];
+  }
+
+  heartbeat.setStage("uploading_artifacts");
+  await heartbeat.pulse();
+  const uploadedArtifacts = await publishArtifacts(client, job, execution.artifacts);
+  heartbeat.assertLeaseActive();
+  return uploadedArtifacts;
+}
+
+async function handleRunnerExecutionFailure(
+  client: RunnerWorkerClient,
+  job: RunnerClaimedJob,
+  error: unknown,
+  signal: AbortSignal | undefined,
+  terminalPublished: boolean,
+): Promise<unknown> {
+  const shutdown = error instanceof RunnerShutdownError || signal?.aborted === true;
+  const reportedError = shutdown && !(error instanceof RunnerShutdownError) ? new RunnerShutdownError() : error;
+  if (!terminalPublished) {
+    await bestEffortRelinquish(client, job, shutdown ? "shutdown" : "job_error", sanitizedErrorMessage(reportedError));
+  }
+  return reportedError;
+}
+
+async function cleanupRunnerWorkspace(
+  dependencies: RunnerWorkerDependencies,
+  job: RunnerClaimedJob,
+  workspace: string | undefined,
+  keepWorkspace: boolean | undefined,
+): Promise<void> {
+  if (!workspace || (!job.safeMode.enabled && keepWorkspace === true)) return;
+  if (job.safeMode.enabled && keepWorkspace === true) {
+    dependencies.log("runner.workspace.retention_overridden", {
+      run_id: job.runId,
+      execution_attempt_id: job.executionAttemptId,
+      safe_mode_reasons: [...job.safeMode.reasons],
+    });
+  }
+  await dependencies.removeWorkspace(workspace);
 }
 
 export async function serveRunnerWorker(
