@@ -119,6 +119,76 @@ async function retryFailure(
   return { reconciliationId: item.reconciliationId, status, outcomeCode };
 }
 
+async function retryOrFinalizeFailure(
+  item: ClaimedControlPlaneReconciliationItem,
+  dependencies: ControlPlaneCheckRunReconciliationDependencies,
+  deadline: Date,
+  input: { observedStatus: string; observedConclusion?: string; outcomeCode: string; errorMessage: string },
+): Promise<ProcessControlPlaneCheckRunReconciliationResult> {
+  const failedAt = dependencies.now?.() ?? new Date();
+  if (failedAt >= deadline) {
+    return finalizeFailure(item, dependencies, {
+      observedStatus: input.observedStatus,
+      ...(input.observedConclusion ? { observedConclusion: input.observedConclusion } : {}),
+      publicFailureReason: input.outcomeCode,
+    });
+  }
+  return retryFailure(item, dependencies, input.outcomeCode, input.errorMessage);
+}
+
+async function handleMissingCheckRun(
+  item: ClaimedControlPlaneReconciliationItem,
+  dependencies: ControlPlaneCheckRunReconciliationDependencies,
+  deadline: Date,
+  nextCheckSeconds: number,
+): Promise<ProcessControlPlaneCheckRunReconciliationResult> {
+  const observedAt = dependencies.now?.() ?? new Date();
+  if (observedAt >= deadline) {
+    return finalizeFailure(item, dependencies, {
+      observedStatus: "not_found",
+      publicFailureReason: "github_check_run_not_found",
+    });
+  }
+  const status = await dependencies.operations.rescheduleReconciliationItem({
+    reconciliationId: item.reconciliationId,
+    workerId: dependencies.workerId,
+    nextCheckAt: new Date(observedAt.valueOf() + nextCheckSeconds * 1000),
+    outcomeCode: "github_check_run_not_found",
+  });
+  return {
+    reconciliationId: item.reconciliationId,
+    status,
+    outcomeCode: "github_check_run_not_found",
+  };
+}
+
+async function repairCheckRun(
+  item: ClaimedControlPlaneReconciliationItem,
+  dependencies: ControlPlaneCheckRunReconciliationDependencies,
+  context: ControlPlaneCheckRunReconciliationContext,
+  observation: Extract<GitHubCheckRunObservation, { kind: "present" }>,
+  deadline: Date,
+): Promise<ProcessControlPlaneCheckRunReconciliationResult | undefined> {
+  try {
+    const presentation = recoveryPresentation(context.expectedConclusion);
+    await dependencies.github.completeCheckRun({
+      ...checkRunScope(context),
+      runId: context.releaseRunId,
+      conclusion: context.expectedConclusion,
+      completedAt: context.completedAt,
+      ...presentation,
+    });
+    return undefined;
+  } catch {
+    return retryOrFinalizeFailure(item, dependencies, deadline, {
+      observedStatus: observation.status,
+      ...(observation.conclusion ? { observedConclusion: observation.conclusion } : {}),
+      outcomeCode: "github_check_run_update_failed",
+      errorMessage: "GitHub Check Run reconciliation update failed.",
+    });
+  }
+}
+
 export async function processControlPlaneCheckRunReconciliation(
   item: ClaimedControlPlaneReconciliationItem,
   dependencies: ControlPlaneCheckRunReconciliationDependencies,
@@ -147,40 +217,15 @@ export async function processControlPlaneCheckRunReconciliation(
   try {
     observation = await dependencies.github.readCheckRun(checkRunScope(context));
   } catch {
-    const failedAt = dependencies.now?.() ?? new Date();
-    if (failedAt >= deadline) {
-      return finalizeFailure(item, dependencies, {
-        observedStatus: "lookup_failed",
-        publicFailureReason: "github_check_run_lookup_failed",
-      });
-    }
-    return retryFailure(
-      item,
-      dependencies,
-      "github_check_run_lookup_failed",
-      "GitHub Check Run reconciliation lookup failed.",
-    );
+    return retryOrFinalizeFailure(item, dependencies, deadline, {
+      observedStatus: "lookup_failed",
+      outcomeCode: "github_check_run_lookup_failed",
+      errorMessage: "GitHub Check Run reconciliation lookup failed.",
+    });
   }
 
-  const observedAt = dependencies.now?.() ?? new Date();
   if (observation.kind === "not_found") {
-    if (observedAt < deadline) {
-      const status = await dependencies.operations.rescheduleReconciliationItem({
-        reconciliationId: item.reconciliationId,
-        workerId: dependencies.workerId,
-        nextCheckAt: new Date(observedAt.valueOf() + nextCheckSeconds * 1000),
-        outcomeCode: "github_check_run_not_found",
-      });
-      return {
-        reconciliationId: item.reconciliationId,
-        status,
-        outcomeCode: "github_check_run_not_found",
-      };
-    }
-    return finalizeFailure(item, dependencies, {
-      observedStatus: "not_found",
-      publicFailureReason: "github_check_run_not_found",
-    });
+    return handleMissingCheckRun(item, dependencies, deadline, nextCheckSeconds);
   }
 
   if (!isBoundToContext(observation, context)) {
@@ -193,31 +238,8 @@ export async function processControlPlaneCheckRunReconciliation(
 
   const action = isCurrent(observation, context.expectedConclusion) ? "observed_current" : "updated";
   if (action === "updated") {
-    try {
-      const presentation = recoveryPresentation(context.expectedConclusion);
-      await dependencies.github.completeCheckRun({
-        ...checkRunScope(context),
-        runId: context.releaseRunId,
-        conclusion: context.expectedConclusion,
-        completedAt: context.completedAt,
-        ...presentation,
-      });
-    } catch {
-      const failedAt = dependencies.now?.() ?? new Date();
-      if (failedAt >= deadline) {
-        return finalizeFailure(item, dependencies, {
-          observedStatus: observation.status,
-          ...(observation.conclusion ? { observedConclusion: observation.conclusion } : {}),
-          publicFailureReason: "github_check_run_update_failed",
-        });
-      }
-      return retryFailure(
-        item,
-        dependencies,
-        "github_check_run_update_failed",
-        "GitHub Check Run reconciliation update failed.",
-      );
-    }
+    const failure = await repairCheckRun(item, dependencies, context, observation, deadline);
+    if (failure) return failure;
   }
 
   const status = await dependencies.operations.applyCheckRunReconciliation({
