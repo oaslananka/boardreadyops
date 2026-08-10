@@ -13,6 +13,7 @@ import { configuredSecretValue } from "../../../../../lib/secret-value.js";
 export const runtime = "nodejs";
 
 type QueryRow = Record<string, unknown>;
+type NumberLikeCell = number | string | undefined;
 type CheckConclusion = "failure" | "neutral" | "success" | "timed_out";
 type ResultQueryExecutor = SqlQueryExecutor;
 type GitHubAppCheckRunClient = NonNullable<ReturnType<typeof createGitHubAppCheckRunClient>>;
@@ -90,7 +91,7 @@ function publicationTrustSnapshot(row: QueryRow): PublicationTrustSnapshot | und
   return { trustMode: rawMode, safeModeReasons };
 }
 
-function numberLikeCell(row: QueryRow, key: string): number | string | undefined {
+function numberLikeCell(row: QueryRow, key: string): NumberLikeCell {
   const value = row[key];
   return typeof value === "number" || typeof value === "string" ? value : undefined;
 }
