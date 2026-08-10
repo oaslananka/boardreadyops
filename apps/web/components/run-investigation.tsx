@@ -185,6 +185,21 @@ function githubRepositoryBaseUrl(run: RunDetail): string {
   return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`;
 }
 
+function SummaryDecisionAction({ runId, blockingCount }: Readonly<{ runId: string; blockingCount: number }>) {
+  if (blockingCount > 0) {
+    return (
+      <Link className="button button-primary" href={`/runs/${runId}/findings?findingState=active&findingSort=severity`}>
+        Review {blockingCount} blocking finding{blockingCount === 1 ? "" : "s"}
+      </Link>
+    );
+  }
+  return (
+    <Link className="button button-primary" href={`/runs/${runId}/artifacts`}>
+      Verify release evidence
+    </Link>
+  );
+}
+
 export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   const blockingFindings = run.findings.filter(
     (finding) => ["critical", "error", "high"].includes(finding.severity.toLowerCase()) && !finding.waivedAt,
@@ -203,18 +218,7 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
             <p className="decision-copy">{decisionCopy(run, blockingFindings.length)}</p>
           </div>
           <div className="decision-actions">
-            {blockingFindings.length > 0 ? (
-              <Link
-                className="button button-primary"
-                href={`/runs/${run.id}/findings?findingState=active&findingSort=severity`}
-              >
-                Review {blockingFindings.length} blocking finding{blockingFindings.length === 1 ? "" : "s"}
-              </Link>
-            ) : (
-              <Link className="button button-primary" href={`/runs/${run.id}/artifacts`}>
-                Verify release evidence
-              </Link>
-            )}
+            <SummaryDecisionAction runId={run.id} blockingCount={blockingFindings.length} />
             <Link className="button button-secondary" href={`/runs/${run.id}/attempts`}>
               Inspect execution
             </Link>
