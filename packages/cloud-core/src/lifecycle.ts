@@ -278,6 +278,60 @@ function result(
   return lifecycleResult;
 }
 
+function normalizeInstallationEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  if (action === "suspend" || action === "unsuspend") {
+    return result(options, action, [
+      {
+        type: action === "suspend" ? "installation.suspended" : "installation.unsuspended",
+        installation,
+      },
+    ]);
+  }
+
+  const repositories = arrayValue(payload, "repositories").flatMap((repository) => {
+    const parsed = repositoryFromPayload(repository);
+    return parsed ? [parsed] : [];
+  });
+  const installationAction: GitHubAppLifecycleAction =
+    action === "deleted"
+      ? { type: "installation.deleted", installation }
+      : { type: "installation.upsert", installation };
+
+  return result(options, action, [
+    installationAction,
+    ...repositories.map(
+      (repository): GitHubAppLifecycleAction => ({
+        type: action === "deleted" ? "repository.removed" : "repository.upsert",
+        installation,
+        repository,
+      }),
+    ),
+  ]);
+}
+
+function normalizeInstallationRepositoriesEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  return result(options, action, [
+    ...arrayValue(payload, "repositories_added").flatMap((repository) => {
+      const parsed = repositoryFromPayload(repository);
+      return parsed ? [{ type: "repository.upsert" as const, installation, repository: parsed }] : [];
+    }),
+    ...arrayValue(payload, "repositories_removed").flatMap((repository) => {
+      const parsed = repositoryFromPayload(repository);
+      return parsed ? [{ type: "repository.removed" as const, installation, repository: parsed }] : [];
+    }),
+  ]);
+}
+
 export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOptions): GitHubAppLifecycleResult {
   if (!isRecord(options.payload)) {
     return unsupported(options, "payload must be a JSON object");
@@ -296,48 +350,11 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
   }
 
   if (options.event === "installation") {
-    if (action === "suspend" || action === "unsuspend") {
-      return result(options, action, [
-        {
-          type: action === "suspend" ? "installation.suspended" : "installation.unsuspended",
-          installation,
-        },
-      ]);
-    }
-
-    const repositories = arrayValue(options.payload, "repositories").flatMap((repository) => {
-      const parsed = repositoryFromPayload(repository);
-      return parsed ? [parsed] : [];
-    });
-
-    const installationAction: GitHubAppLifecycleAction =
-      action === "deleted"
-        ? { type: "installation.deleted", installation }
-        : { type: "installation.upsert", installation };
-
-    return result(options, action, [
-      installationAction,
-      ...repositories.map(
-        (repository): GitHubAppLifecycleAction => ({
-          type: action === "deleted" ? "repository.removed" : "repository.upsert",
-          installation,
-          repository,
-        }),
-      ),
-    ]);
+    return normalizeInstallationEvent(options, options.payload, action, installation);
   }
 
   if (options.event === "installation_repositories") {
-    return result(options, action, [
-      ...arrayValue(options.payload, "repositories_added").flatMap((repository) => {
-        const parsed = repositoryFromPayload(repository);
-        return parsed ? [{ type: "repository.upsert" as const, installation, repository: parsed }] : [];
-      }),
-      ...arrayValue(options.payload, "repositories_removed").flatMap((repository) => {
-        const parsed = repositoryFromPayload(repository);
-        return parsed ? [{ type: "repository.removed" as const, installation, repository: parsed }] : [];
-      }),
-    ]);
+    return normalizeInstallationRepositoriesEvent(options, options.payload, action, installation);
   }
 
   if (options.event === "pull_request") {
