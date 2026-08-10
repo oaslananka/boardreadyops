@@ -6,7 +6,11 @@ import {
 } from "@boardreadyops/cloud-core/repository-setup";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { createSqlRepositorySetupStore, type RepositorySetupStore } from "@boardreadyops/db/repository-setup-store";
+import {
+  createSqlRepositorySetupStore,
+  type RepositorySetupContext,
+  type RepositorySetupStore,
+} from "@boardreadyops/db/repository-setup-store";
 import { readBoundedRequestBody } from "./bounded-request-body.js";
 import { authenticateControlPlaneOperator } from "./control-plane-operator-auth.js";
 import { controlPlaneJsonError, controlPlaneJsonResponse } from "./control-plane-operator-response.js";
@@ -202,6 +206,118 @@ async function selectPreset(
   return controlPlaneJsonResponse({ ok: true, ...applied }, applied.outcome === "applied" ? 201 : 200);
 }
 
+type SelectedSetupRevision = NonNullable<RepositorySetupContext["current"]>;
+type ProbeReadinessStatus = Exclude<
+  Awaited<ReturnType<RepositorySetupGitHubClient["inspect"]>>["workflowStatus"],
+  "probe_required"
+>;
+type ProbeDispatch = Awaited<ReturnType<RepositorySetupGitHubClient["dispatchProbe"]>>;
+
+async function rejectUnavailableProbeReadiness(
+  store: RepositorySetupStore,
+  context: RepositorySetupContext,
+  current: SelectedSetupRevision,
+  actorId: string,
+  requestId: string,
+  workflowStatus: ProbeReadinessStatus,
+): Promise<Response> {
+  await store.applyRevision({
+    installationId: context.installationId,
+    repositoryId: context.repositoryId,
+    preset: current.preset,
+    presetVersion: current.presetVersion,
+    source: "operator",
+    actorId,
+    requestId: readinessRequestId(requestId),
+    workflowStatus,
+    configStatus: "unknown",
+    diagnostics: [`GitHub readiness: ${workflowStatus}`],
+  });
+  return controlPlaneJsonError(
+    `repository workflow readiness is ${workflowStatus}; ${workflowRemediation(workflowStatus)}`,
+    409,
+  );
+}
+
+async function replayedProbeResponse(store: RepositorySetupStore, probeId: string): Promise<Response> {
+  const replayed = await store.getProbe(probeId);
+  if (!replayed) return controlPlaneJsonError("repository setup probe is unavailable", 404);
+  if (replayed.status === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
+  if (replayed.status === "failed") {
+    return controlPlaneJsonError("repository setup probe previously failed; use a new requestId", 409);
+  }
+  return controlPlaneJsonResponse({ ok: true, outcome: "replayed", probeId, status: replayed.status }, 200);
+}
+
+async function staleProbeDispatchResponse(
+  store: RepositorySetupStore,
+  probeId: string,
+  dispatched: ProbeDispatch,
+): Promise<Response> {
+  const terminal = await store.getProbe(probeId);
+  if (terminal?.status === "completed") {
+    return controlPlaneJsonResponse(
+      {
+        ok: true,
+        outcome: "completed",
+        probeId,
+        workflowRunId: dispatched.workflowRunId,
+        ...(dispatched.workflowRunUrl ? { workflowRunUrl: dispatched.workflowRunUrl } : {}),
+      },
+      200,
+    );
+  }
+  if (terminal?.status === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
+  if (terminal?.status === "failed") return controlPlaneJsonError("repository setup probe failed", 409);
+  return controlPlaneJsonError("repository setup probe state changed before dispatch completed", 409);
+}
+
+async function persistedProbeDispatchResponse(
+  store: RepositorySetupStore,
+  probeId: string,
+  dispatched: ProbeDispatch,
+  marked: string,
+): Promise<Response> {
+  if (marked === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
+  if (marked === "not_found") return controlPlaneJsonError("repository setup probe is unavailable", 404);
+  if (marked === "stale") return staleProbeDispatchResponse(store, probeId, dispatched);
+  if (marked !== "applied" && marked !== "replayed") {
+    return controlPlaneJsonError("repository setup probe state could not be persisted", 503);
+  }
+  return controlPlaneJsonResponse(
+    {
+      ok: true,
+      outcome: "dispatched",
+      probeId,
+      workflowRunId: dispatched.workflowRunId,
+      ...(dispatched.workflowRunUrl ? { workflowRunUrl: dispatched.workflowRunUrl } : {}),
+    },
+    202,
+  );
+}
+
+async function dispatchSetupProbe(
+  store: RepositorySetupStore,
+  githubClient: RepositorySetupGitHubClient,
+  context: RepositorySetupContext,
+  probeId: string,
+): Promise<Response> {
+  try {
+    const dispatched = await githubClient.dispatchProbe({
+      githubInstallationId: context.githubInstallationId,
+      owner: context.owner,
+      name: context.name,
+      defaultBranch: context.defaultBranch,
+      probeId,
+    });
+    const marked = await store.markProbeDispatched({ probeId, workflowRunId: dispatched.workflowRunId });
+    return persistedProbeDispatchResponse(store, probeId, dispatched, marked);
+  } catch {
+    await store.failProbe({ probeId, failureCode: "dispatch_failed" });
+    return controlPlaneJsonError("repository setup probe dispatch failed", 502);
+  }
+}
+
 async function createProbe(
   body: Record<string, unknown>,
   actorId: string,
@@ -216,8 +332,8 @@ async function createProbe(
   }
   const context = await store.getContext({ installationId, repositoryId });
   if (!context) return controlPlaneJsonError("repository is unavailable", 404);
-  if (!context.current)
-    return controlPlaneJsonError("select a policy preset before validating repository readiness", 409);
+  const current = context.current;
+  if (!current) return controlPlaneJsonError("select a policy preset before validating repository readiness", 409);
 
   const githubClient = dependencies.githubClient();
   let readiness: Awaited<ReturnType<typeof githubClient.inspect>>;
@@ -231,23 +347,7 @@ async function createProbe(
     return controlPlaneJsonError("GitHub repository readiness is temporarily unavailable", 503);
   }
   if (readiness.workflowStatus !== "probe_required") {
-    const workflowStatus = readiness.workflowStatus;
-    await store.applyRevision({
-      installationId,
-      repositoryId,
-      preset: context.current.preset,
-      presetVersion: context.current.presetVersion,
-      source: "operator",
-      actorId,
-      requestId: readinessRequestId(requestId),
-      workflowStatus,
-      configStatus: "unknown",
-      diagnostics: [`GitHub readiness: ${readiness.workflowStatus}`],
-    });
-    return controlPlaneJsonError(
-      `repository workflow readiness is ${readiness.workflowStatus}; ${workflowRemediation(readiness.workflowStatus)}`,
-      409,
-    );
+    return rejectUnavailableProbeReadiness(store, context, current, actorId, requestId, readiness.workflowStatus);
   }
 
   const created = await store.createProbe({
@@ -260,71 +360,12 @@ async function createProbe(
   if (created.outcome === "not_configured") {
     return controlPlaneJsonError("select a policy preset before validating repository readiness", 409);
   }
-  if (created.outcome === "conflict")
+  if (created.outcome === "conflict") {
     return controlPlaneJsonError("requestId conflicts with an existing setup probe", 409);
+  }
   if (!created.probeId) return controlPlaneJsonError("repository setup probe could not be created", 503);
-  if (created.outcome === "replayed") {
-    const replayed = await store.getProbe(created.probeId);
-    if (!replayed) return controlPlaneJsonError("repository setup probe is unavailable", 404);
-    if (replayed.status === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
-    if (replayed.status === "failed") {
-      return controlPlaneJsonError("repository setup probe previously failed; use a new requestId", 409);
-    }
-    return controlPlaneJsonResponse(
-      { ok: true, outcome: "replayed", probeId: created.probeId, status: replayed.status },
-      200,
-    );
-  }
-
-  try {
-    const dispatched = await githubClient.dispatchProbe({
-      githubInstallationId: context.githubInstallationId,
-      owner: context.owner,
-      name: context.name,
-      defaultBranch: context.defaultBranch,
-      probeId: created.probeId,
-    });
-    const marked = await store.markProbeDispatched({
-      probeId: created.probeId,
-      workflowRunId: dispatched.workflowRunId,
-    });
-    if (marked === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
-    if (marked === "not_found") return controlPlaneJsonError("repository setup probe is unavailable", 404);
-    if (marked === "stale") {
-      const terminal = await store.getProbe(created.probeId);
-      if (terminal?.status === "completed") {
-        return controlPlaneJsonResponse(
-          {
-            ok: true,
-            outcome: "completed",
-            probeId: created.probeId,
-            workflowRunId: dispatched.workflowRunId,
-            ...(dispatched.workflowRunUrl ? { workflowRunUrl: dispatched.workflowRunUrl } : {}),
-          },
-          200,
-        );
-      }
-      if (terminal?.status === "expired") return controlPlaneJsonError("repository setup probe expired", 410);
-      if (terminal?.status === "failed") return controlPlaneJsonError("repository setup probe failed", 409);
-      return controlPlaneJsonError("repository setup probe state changed before dispatch completed", 409);
-    }
-    if (marked !== "applied" && marked !== "replayed") {
-      return controlPlaneJsonError("repository setup probe state could not be persisted", 503);
-    }
-    return controlPlaneJsonResponse(
-      {
-        ok: true,
-        outcome: "dispatched",
-        probeId: created.probeId,
-        workflowRunId: dispatched.workflowRunId,
-        ...(dispatched.workflowRunUrl ? { workflowRunUrl: dispatched.workflowRunUrl } : {}),
-      },
-      202,
-    );
-  } catch {
-    await store.failProbe({ probeId: created.probeId, failureCode: "dispatch_failed" });
-    return controlPlaneJsonError("repository setup probe dispatch failed", 502);
-  }
+  if (created.outcome === "replayed") return replayedProbeResponse(store, created.probeId);
+  return dispatchSetupProbe(store, githubClient, context, created.probeId);
 }
 
 export async function handleRepositorySetupPost(
