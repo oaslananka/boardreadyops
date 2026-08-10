@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 
-const child = spawn("node", ["scripts/build.mjs", "--watch"], {
+const child = spawn(process.execPath, ["scripts/build.mjs", "--watch"], {
   stdio: "inherit",
-  shell: process.platform === "win32",
+  shell: false,
   windowsHide: true,
 });
 

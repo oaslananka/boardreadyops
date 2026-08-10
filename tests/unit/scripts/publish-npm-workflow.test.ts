@@ -53,7 +53,7 @@ describe("publish-npm workflow contract", () => {
     expect(workflow).toContain("Publish workflow must run from refs/heads/main");
     expect(workflow).not.toContain("console.log(id_token)");
     expect(workflow).not.toContain("console.log(token)");
-    expect(workflow).toContain("npm install -g npm@11.18.0");
+    expect(workflow).toContain("npm install -g --ignore-scripts npm@11.18.0");
     expect(workflow).not.toContain("secrets.NPM_TOKEN");
     expect(publishBlock).not.toContain("_authToken=");
     expect(publishBlock).not.toContain(homeNpmrcRedirect);

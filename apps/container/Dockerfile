@@ -1,7 +1,7 @@
 FROM ubuntu:26.04@sha256:53958ec7b67c2c9355df922dd08dbf0360611f8c3cdb656875e81873db9ffdba
 
 ARG NODE_VERSION=24.19.0
-ARG BOARDREADYOPS_VERSION=latest
+ARG BOARDREADYOPS_VERSION
 ARG KICAD_PPA_SERIES=10.0
 
 LABEL org.opencontainers.image.source="https://github.com/oaslananka/boardreadyops"
@@ -37,7 +37,15 @@ RUN set -eux; \
     npm --version
 
 RUN set -eux; \
-    NPM_CONFIG_UPDATE_NOTIFIER=false npm install --global --ignore-scripts --no-audit --no-fund "boardreadyops@${BOARDREADYOPS_VERSION}"; \
+    if ! printf '%s\n' "${BOARDREADYOPS_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then \
+      echo "BOARDREADYOPS_VERSION must be an exact semantic version." >&2; \
+      exit 1; \
+    fi; \
+    NPM_CONFIG_UPDATE_NOTIFIER=false npm install \
+      --global --ignore-scripts --no-audit --no-fund \
+      "boardreadyops@${BOARDREADYOPS_VERSION}" # NOSONAR -- exact version validated above.
+
+RUN set -eux; \
     rm -rf /root/.npm /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx; \
     boardreadyops --version; \
     kicad-cli version; \

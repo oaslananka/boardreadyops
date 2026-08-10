@@ -75,7 +75,7 @@ jobs:
         run: |
           docs_venv="${RUNNER_TEMP}/boardreadyops-docs-venv"
           uv venv "${docs_venv}"
-          uv pip install --python "${docs_venv}/bin/python" -r docs/requirements.txt
+          uv pip install --python "${docs_venv}/bin/python" --require-hashes -r docs/requirements.lock.txt
           echo "${docs_venv}/bin" >> "${GITHUB_PATH}"
 
       - name: Install Node dependencies

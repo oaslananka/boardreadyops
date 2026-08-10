@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
 
 const DOCS_PATTERNS = [
@@ -18,7 +19,7 @@ const DOCS_PATTERNS = [
 const DOCS_GENERATION_PATTERNS = [
   /^scripts\/(docs-build|generate-api-docs|generate-release-history|generate-rule-docs|update-action-inputs-docs)\.mjs$/,
   /^scripts\/check-docs-a11y\.mjs$/,
-  /^docs\/requirements\.txt$/,
+  /^docs\/requirements(?:\.lock)?\.txt$/,
   /^packages\/plugin-sdk\//,
 ];
 
@@ -182,11 +183,18 @@ function serializeGithubOutput(profile) {
     .join("\n");
 }
 
-export function readFilesFromArg(path) {
-  if (!path || path === "-") {
+export function readFilesFromArg(inputPath, repositoryRoot = process.cwd()) {
+  if (!inputPath || inputPath === "-") {
     return fs.readFileSync(0, "utf8").split(/\r?\n/u);
   }
-  return fs.readFileSync(path, "utf8").split(/\r?\n/u);
+
+  const root = fs.realpathSync(repositoryRoot);
+  const requested = fs.realpathSync(path.resolve(root, inputPath));
+  const relative = path.relative(root, requested);
+  if (relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new TypeError(`Changed-file list is outside the repository root: ${inputPath}`);
+  }
+  return fs.readFileSync(requested, "utf8").split(/\r?\n/u);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -138,6 +138,7 @@ describe("reproducible contributor toolchain", () => {
       devDependencies: Record<string, string>;
     };
     const requirements = await repositoryFile("docs/requirements.txt");
+    const requirementsLock = await repositoryFile("docs/requirements.lock.txt");
     const preCommit = await repositoryFile(".pre-commit-config.yaml");
     const workflowFiles = [
       "binary-build.yml",
@@ -179,6 +180,12 @@ describe("reproducible contributor toolchain", () => {
     expect(requirements).toContain(`mkdocs==${config.python.mkdocs}`);
     expect(requirements).toContain(`mkdocs-material==${config.python.mkdocsMaterial}`);
     expect(requirements).toContain(`mike==${config.python.mike}`);
+    expect(requirementsLock).toContain("--generate-hashes");
+    for (const workflow of workflows) {
+      expect(workflow).not.toContain(
+        ['uv pip install --python "$', '{docs_venv}/bin/python" -r docs/requirements.txt'].join(""),
+      );
+    }
     expect(preCommit).toContain(`minimum_pre_commit_version: "${config.validation.preCommit}"`);
     expect(preCommit).toContain(`rev: v${config.validation.actionlint}`);
     expect(preCommit).toContain(`rev: v${config.validation.semgrep}`);
@@ -324,11 +331,9 @@ describe("reproducible contributor toolchain", () => {
       ).toBe(true);
     }
     expect(await repositoryFile("apps/web/Dockerfile")).not.toMatch(/\bpnpm install\b/u);
-    expect(await repositoryFile("apps/container/Dockerfile")).toContain(
-      ['npm install --global --ignore-scripts --no-audit --no-fund "boardreadyops@$', '{BOARDREADYOPS_VERSION}"'].join(
-        "",
-      ),
-    );
+    const containerDockerfile = await repositoryFile("apps/container/Dockerfile");
+    expect(containerDockerfile).toContain("--global --ignore-scripts --no-audit --no-fund");
+    expect(containerDockerfile).toContain(['"boardreadyops@$', '{BOARDREADYOPS_VERSION}"'].join(""));
   });
 
   it("routes nested package scripts through the repository-pinned Corepack pnpm", async () => {
