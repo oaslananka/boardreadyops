@@ -1482,7 +1482,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `pkg-types@2.3.1`
   - Description: Node.js utilities and TypeScript definitions for `package.json` and `tsconfig.json`
   - Homepage: https://github.com/unjs/pkg-types#readme
-- `postcss@8.5.23`
+- `postcss@8.5.26`
   - Description: Tool for transforming styles with JS plugins
   - Homepage: https://postcss.org/
 - `postgres-array@2.0.0`
