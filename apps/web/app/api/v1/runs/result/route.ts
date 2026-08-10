@@ -377,79 +377,90 @@ export const defaultResultRouteDependencies: ResultRouteDependencies = {
     verifyGitHubActionsOidcToken(token, executionAttemptId === undefined ? { runId } : { runId, executionAttemptId }),
 };
 
-export async function handleResultRequest(
-  request: Request,
-  dependencies: ResultRouteDependencies = defaultResultRouteDependencies,
-): Promise<Response> {
+type ParsedResultRequest = {
+  runId: string;
+  executionAttemptId: string | undefined;
+  result: ReleaseRunResult;
+};
+
+type ResultRequestRead = { value: ParsedResultRequest } | { response: Response };
+
+type PersistedRunnerResult = {
+  row: QueryRow | undefined;
+  completedAt: string;
+};
+
+type ResultPublicationState = {
+  checkRunUpdated: boolean;
+  pullRequestCommentCreated: boolean;
+  publicationWarnings: string[];
+  response?: Response;
+};
+
+async function readResultRequest(request: Request, dependencies: ResultRouteDependencies): Promise<ResultRequestRead> {
   const searchParams = new URL(request.url).searchParams;
   const runId = searchParams.get("run_id");
-  const attemptIdParameter = searchParams.get("attempt_id");
-  const executionAttemptId = attemptIdParameter ?? undefined;
-
+  const executionAttemptId = searchParams.get("attempt_id") ?? undefined;
   if (!runId) {
-    return Response.json({ ok: false, error: "run_id query parameter is required" }, { status: 400 });
+    return { response: Response.json({ ok: false, error: "run_id query parameter is required" }, { status: 400 }) };
   }
-
   if (executionAttemptId !== undefined && !lowercaseUuidPattern.test(executionAttemptId)) {
-    return Response.json({ ok: false, error: "attempt_id query parameter must be a valid UUID" }, { status: 400 });
+    return {
+      response: Response.json({ ok: false, error: "attempt_id query parameter must be a valid UUID" }, { status: 400 }),
+    };
   }
 
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null) {
     const declaredBytes = Number(contentLength);
     if (Number.isFinite(declaredBytes) && declaredBytes > maximumResultBodyBytes) {
-      return Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 });
+      return { response: Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 }) };
     }
   }
 
   const bodyText = await request.text();
   if (Buffer.byteLength(bodyText, "utf8") > maximumResultBodyBytes) {
-    return Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 });
+    return { response: Response.json({ ok: false, error: "runner result payload is too large" }, { status: 413 }) };
   }
-
-  const configuredKey = configuredSecretValue({
-    valueName: resultKeyEnvName,
-    fileName: resultKeyFileEnvName,
-  });
-
-  if (
-    !dependencies.authenticationVerified &&
-    !(await verifyRunnerAuthentication(
+  const configuredKey = configuredSecretValue({ valueName: resultKeyEnvName, fileName: resultKeyFileEnvName });
+  const authenticated =
+    dependencies.authenticationVerified ||
+    (await verifyRunnerAuthentication(
       request,
       { key: configuredKey, runId, executionAttemptId, body: bodyText },
       dependencies.verifyOidcToken,
-    ))
-  ) {
-    return Response.json({ ok: false, error: "invalid runner result authentication" }, { status: 401 });
+    ));
+  if (!authenticated) {
+    return { response: Response.json({ ok: false, error: "invalid runner result authentication" }, { status: 401 }) };
   }
 
   const body = parseJson(bodyText);
-
   if (body === undefined) {
-    return Response.json({ ok: false, error: "invalid runner result JSON" }, { status: 400 });
+    return { response: Response.json({ ok: false, error: "invalid runner result JSON" }, { status: 400 }) };
   }
-
   const parsed = releaseRunResultSchema.safeParse(body);
-
   if (!parsed.success) {
-    return Response.json({ ok: false, error: "invalid runner result" }, { status: 400 });
+    return { response: Response.json({ ok: false, error: "invalid runner result" }, { status: 400 }) };
   }
-
   if (parsed.data.executionAttemptId !== executionAttemptId) {
-    return Response.json({ ok: false, error: "execution attempt does not match callback URL" }, { status: 400 });
+    return {
+      response: Response.json({ ok: false, error: "execution attempt does not match callback URL" }, { status: 400 }),
+    };
   }
+  return { value: { runId, executionAttemptId, result: parsed.data } };
+}
 
-  const executor = dependencies.queryExecutor();
-
-  if (!executor) {
-    return Response.json({ ok: false, error: "database is not configured" }, { status: 503 });
-  }
-
+async function persistRunnerResult(
+  executor: ResultQueryExecutor,
+  dependencies: ResultRouteDependencies,
+  input: ParsedResultRequest,
+): Promise<PersistedRunnerResult> {
+  const { runId, executionAttemptId, result } = input;
   const completedAt = dependencies.now().toISOString();
-  const digest = resultDigest(parsed.data);
-  const terminalDigest = terminalStatus(parsed.data.status) ? digest : null;
+  const digest = resultDigest(result);
+  const terminalDigest = terminalStatus(result.status) ? digest : null;
   const findingsJson = JSON.stringify(
-    parsed.data.findings.map((finding) => ({
+    result.findings.map((finding) => ({
       rule_id: finding.ruleId,
       severity: finding.severity,
       message: finding.message,
@@ -457,7 +468,7 @@ export async function handleResultRequest(
     })),
   );
   const artifactsJson = JSON.stringify(
-    parsed.data.artifacts.map((artifact) => ({
+    result.artifacts.map((artifact) => ({
       kind: artifact.kind,
       name: artifact.name,
       storage_path: artifact.storagePath,
@@ -466,11 +477,11 @@ export async function handleResultRequest(
       role: artifact.role,
     })),
   );
-  const metricsJson = JSON.stringify(parsed.data.metrics);
-  const reportLinksJson = JSON.stringify(parsed.data.reportLinks);
-  const payloadJson = JSON.stringify(parsed.data);
-  const githubCheckConclusion = checkConclusion(parsed.data);
-  const decisionAuditMetadataJson = JSON.stringify(releaseDecisionAuditMetadata(parsed.data, githubCheckConclusion));
+  const metricsJson = JSON.stringify(result.metrics);
+  const reportLinksJson = JSON.stringify(result.reportLinks);
+  const payloadJson = JSON.stringify(result);
+  const githubCheckConclusion = checkConclusion(result);
+  const decisionAuditMetadataJson = JSON.stringify(releaseDecisionAuditMetadata(result, githubCheckConclusion));
   const updateResult = await executor.query(
     `with existing as materialized (
        select id,
@@ -924,13 +935,13 @@ export async function handleResultRequest(
     [
       runId,
       executionAttemptId ?? null,
-      parsed.data.status,
-      parsed.data.decision,
+      result.status,
+      result.decision,
       completedAt,
       findingsJson,
       terminalDigest,
-      parsed.data.version,
-      parsed.data.conclusion,
+      result.version,
+      result.conclusion,
       metricsJson,
       reportLinksJson,
       payloadJson,
@@ -943,158 +954,260 @@ export async function handleResultRequest(
     ],
   );
   const row = rows(updateResult)[0];
+  return { row, completedAt };
+}
 
-  if (!row) {
-    return Response.json({ ok: false, error: "release run not found" }, { status: 404 });
+function persistenceOutcomeResponse(
+  persistenceOutcome: string,
+  runId: string,
+  executionAttemptId: string | undefined,
+): Response | undefined {
+  switch (persistenceOutcome) {
+    case "superseded":
+      return Response.json(
+        { ok: false, error: "release run was superseded by a newer commit", runId },
+        { status: 409 },
+      );
+    case "stale_attempt":
+      return Response.json(
+        { ok: false, error: "execution attempt is no longer current", runId, executionAttemptId },
+        { status: 409 },
+      );
+    case "artifact_integrity_mismatch":
+      return Response.json(
+        {
+          ok: false,
+          error: "runner artifact metadata does not match verified uploads",
+          runId,
+          executionAttemptId,
+        },
+        { status: 409 },
+      );
+    case "conflicting_terminal_result":
+      return Response.json(
+        { ok: false, error: "terminal result conflicts with the persisted result", runId, executionAttemptId },
+        { status: 409 },
+      );
+    case "invalid_transition":
+      return Response.json(
+        { ok: false, error: "runner result is not valid for the current lifecycle state", runId, executionAttemptId },
+        { status: 409 },
+      );
+    default:
+      return undefined;
   }
+}
 
-  const persistenceOutcome = stringCell(row, "persistence_outcome") ?? "accepted";
+type CheckRunPublicationResult = {
+  updated: boolean;
+  error?: string;
+  configurationError: boolean;
+};
 
-  if (persistenceOutcome === "superseded") {
-    return Response.json({ ok: false, error: "release run was superseded by a newer commit", runId }, { status: 409 });
+async function completeResultCheckRun(input: {
+  client: GitHubAppCheckRunClient | undefined;
+  installationId: number | string | undefined;
+  repositoryOwner: string | undefined;
+  repositoryName: string | undefined;
+  githubCheckRunId: number | string | undefined;
+  trustSnapshot: PublicationTrustSnapshot | undefined;
+  checkOutput: ReturnType<typeof buildReadinessCheckOutput> | undefined;
+  result: ReleaseRunResult;
+  runId: string;
+  completedAt: string;
+}): Promise<CheckRunPublicationResult> {
+  if (!input.githubCheckRunId || !input.trustSnapshot || !input.checkOutput) {
+    return { updated: false, configurationError: false };
   }
-
-  if (persistenceOutcome === "stale_attempt") {
-    return Response.json(
-      { ok: false, error: "execution attempt is no longer current", runId, executionAttemptId },
-      { status: 409 },
-    );
+  if (!input.client?.completeCheckRun || !input.installationId || !input.repositoryOwner || !input.repositoryName) {
+    return { updated: false, error: "GitHub check-run completion is not configured", configurationError: true };
   }
-
-  if (persistenceOutcome === "artifact_integrity_mismatch") {
-    return Response.json(
-      {
-        ok: false,
-        error: "runner artifact metadata does not match verified uploads",
-        runId,
-        executionAttemptId,
-      },
-      { status: 409 },
-    );
+  try {
+    await input.client.completeCheckRun({
+      installationId: input.installationId,
+      repositoryOwner: input.repositoryOwner,
+      repositoryName: input.repositoryName,
+      checkRunId: input.githubCheckRunId,
+      runId: input.runId,
+      conclusion: checkConclusion(input.result),
+      title: input.checkOutput.title,
+      summary: input.checkOutput.summary,
+      completedAt: input.completedAt,
+    });
+    return { updated: true, configurationError: false };
+  } catch (error) {
+    return {
+      updated: false,
+      error: `GitHub check run: ${publicationErrorMessage(error)}`,
+      configurationError: false,
+    };
   }
+}
 
-  if (persistenceOutcome === "conflicting_terminal_result") {
-    return Response.json(
-      { ok: false, error: "terminal result conflicts with the persisted result", runId, executionAttemptId },
-      { status: 409 },
-    );
+async function createResultPullRequestComment(input: {
+  client: GitHubAppCheckRunClient | undefined;
+  installationId: number | string | undefined;
+  repositoryOwner: string | undefined;
+  repositoryName: string | undefined;
+  pullRequestNumber: number | undefined;
+  trustSnapshot: PublicationTrustSnapshot | undefined;
+  publicationInput: (ReleaseRunResult & PublicationTrustSnapshot & { detailsUrl: string | undefined }) | undefined;
+}): Promise<{ created: boolean; warning?: string }> {
+  if (!input.pullRequestNumber || !input.trustSnapshot || !input.publicationInput) return { created: false };
+  if (
+    !input.client?.createPullRequestComment ||
+    !input.installationId ||
+    !input.repositoryOwner ||
+    !input.repositoryName
+  ) {
+    return { created: false, warning: "GitHub pull-request comment publication is not configured" };
   }
+  try {
+    await input.client.createPullRequestComment({
+      installationId: input.installationId,
+      repositoryOwner: input.repositoryOwner,
+      repositoryName: input.repositoryName,
+      pullRequestNumber: input.pullRequestNumber,
+      body: buildReadinessPrComment(input.publicationInput),
+    });
+    return { created: true };
+  } catch (error) {
+    return { created: false, warning: `GitHub pull request comment: ${publicationErrorMessage(error)}` };
+  }
+}
 
-  if (persistenceOutcome === "invalid_transition") {
-    return Response.json(
-      { ok: false, error: "runner result is not valid for the current lifecycle state", runId, executionAttemptId },
-      { status: 409 },
-    );
+async function publishTerminalResult(
+  executor: ResultQueryExecutor,
+  dependencies: ResultRouteDependencies,
+  input: ParsedResultRequest,
+  row: QueryRow,
+  completedAt: string,
+): Promise<ResultPublicationState> {
+  if (!terminalStatus(input.result.status)) {
+    return { checkRunUpdated: false, pullRequestCommentCreated: false, publicationWarnings: [] };
   }
 
   const publicationCompletedAt = stringCell(row, "completed_at") ?? completedAt;
   const githubCheckRunId = numberLikeCell(row, "github_check_run_id");
-  let checkRunUpdated = false;
-  let pullRequestCommentCreated = false;
+  const checkRunClient = dependencies.checkRunClient();
+  const installationId = numberLikeCell(row, "github_installation_id");
+  const repositoryOwner = stringCell(row, "owner");
+  const repositoryName = stringCell(row, "name");
+  const trustSnapshot = publicationTrustSnapshot(row);
+  const publicationInput = trustSnapshot
+    ? { ...input.result, ...trustSnapshot, detailsUrl: dependencies.detailsUrl(input.runId) }
+    : undefined;
+  const checkOutput = publicationInput ? buildReadinessCheckOutput(publicationInput) : undefined;
+  const blockingPublicationErrors: string[] = [];
   const publicationWarnings: string[] = [];
+  let publicationConfigurationError = false;
+  if (!trustSnapshot) {
+    blockingPublicationErrors.push("Release-run trust snapshot is invalid");
+    publicationConfigurationError = true;
+  }
 
-  if (terminalStatus(parsed.data.status)) {
-    const checkRunClient = dependencies.checkRunClient();
-    const installationId = numberLikeCell(row, "github_installation_id");
-    const repositoryOwner = stringCell(row, "owner");
-    const repositoryName = stringCell(row, "name");
-    const runDetailsUrl = dependencies.detailsUrl(runId);
-    const trustSnapshot = publicationTrustSnapshot(row);
-    const publicationInput = trustSnapshot
-      ? { ...parsed.data, ...trustSnapshot, detailsUrl: runDetailsUrl }
-      : undefined;
-    const checkOutput = publicationInput ? buildReadinessCheckOutput(publicationInput) : undefined;
-    const blockingPublicationErrors: string[] = [];
-    let publicationConfigurationError = false;
+  const checkRun = await completeResultCheckRun({
+    client: checkRunClient,
+    installationId,
+    repositoryOwner,
+    repositoryName,
+    githubCheckRunId,
+    trustSnapshot,
+    checkOutput,
+    result: input.result,
+    runId: input.runId,
+    completedAt: publicationCompletedAt,
+  });
+  if (checkRun.error) blockingPublicationErrors.push(checkRun.error);
+  publicationConfigurationError ||= checkRun.configurationError;
 
-    if (!trustSnapshot) {
-      blockingPublicationErrors.push("Release-run trust snapshot is invalid");
-      publicationConfigurationError = true;
-    }
+  const comment = await createResultPullRequestComment({
+    client: checkRunClient,
+    installationId,
+    repositoryOwner,
+    repositoryName,
+    pullRequestNumber: numberCell(row, "pull_request_number"),
+    trustSnapshot,
+    publicationInput,
+  });
+  if (comment.warning) publicationWarnings.push(comment.warning);
 
-    if (githubCheckRunId && trustSnapshot && checkOutput) {
-      if (!checkRunClient?.completeCheckRun || !installationId || !repositoryOwner || !repositoryName) {
-        blockingPublicationErrors.push("GitHub check-run completion is not configured");
-        publicationConfigurationError = true;
-      } else {
-        try {
-          await checkRunClient.completeCheckRun({
-            installationId,
-            repositoryOwner,
-            repositoryName,
-            checkRunId: githubCheckRunId,
-            runId,
-            conclusion: checkConclusion(parsed.data),
-            title: checkOutput.title,
-            summary: checkOutput.summary,
-            completedAt: publicationCompletedAt,
-          });
-          checkRunUpdated = true;
-        } catch (error) {
-          blockingPublicationErrors.push(`GitHub check run: ${publicationErrorMessage(error)}`);
-        }
-      }
-    }
-
-    const pullRequestNumber = numberCell(row, "pull_request_number");
-    if (pullRequestNumber && trustSnapshot && publicationInput) {
-      if (!checkRunClient?.createPullRequestComment || !installationId || !repositoryOwner || !repositoryName) {
-        publicationWarnings.push("GitHub pull-request comment publication is not configured");
-      } else {
-        try {
-          await checkRunClient.createPullRequestComment({
-            installationId,
-            repositoryOwner,
-            repositoryName,
-            pullRequestNumber,
-            body: buildReadinessPrComment(publicationInput),
-          });
-          pullRequestCommentCreated = true;
-        } catch (error) {
-          publicationWarnings.push(`GitHub pull request comment: ${publicationErrorMessage(error)}`);
-        }
-      }
-    }
-
-    const publicationErrors = [...blockingPublicationErrors, ...publicationWarnings];
-    await recordPublicationState(executor, {
-      runId,
-      completedAt: publicationCompletedAt,
-      checkRunUpdated,
-      pullRequestCommentCreated,
-      errors: publicationErrors,
-    });
-
-    if (blockingPublicationErrors.length > 0) {
-      return Response.json(
+  await recordPublicationState(executor, {
+    runId: input.runId,
+    completedAt: publicationCompletedAt,
+    checkRunUpdated: checkRun.updated,
+    pullRequestCommentCreated: comment.created,
+    errors: [...blockingPublicationErrors, ...publicationWarnings],
+  });
+  if (blockingPublicationErrors.length > 0) {
+    return {
+      checkRunUpdated: checkRun.updated,
+      pullRequestCommentCreated: comment.created,
+      publicationWarnings,
+      response: Response.json(
         {
           ok: false,
           persisted: true,
           error: "runner result was persisted but GitHub publication is incomplete",
           publicationErrors: blockingPublicationErrors,
           publicationWarnings,
-          runId,
-          executionAttemptId,
-          checkRunUpdated,
-          pullRequestCommentCreated,
+          runId: input.runId,
+          executionAttemptId: input.executionAttemptId,
+          checkRunUpdated: checkRun.updated,
+          pullRequestCommentCreated: comment.created,
         },
         { status: publicationConfigurationError ? 503 : 502 },
-      );
-    }
+      ),
+    };
   }
+  return {
+    checkRunUpdated: checkRun.updated,
+    pullRequestCommentCreated: comment.created,
+    publicationWarnings,
+  };
+}
+
+export async function handleResultRequest(
+  request: Request,
+  dependencies: ResultRouteDependencies = defaultResultRouteDependencies,
+): Promise<Response> {
+  const requestRead = await readResultRequest(request, dependencies);
+  if ("response" in requestRead) return requestRead.response;
+
+  const executor = dependencies.queryExecutor();
+  if (!executor) return Response.json({ ok: false, error: "database is not configured" }, { status: 503 });
+
+  const persisted = await persistRunnerResult(executor, dependencies, requestRead.value);
+  if (!persisted.row) return Response.json({ ok: false, error: "release run not found" }, { status: 404 });
+
+  const persistenceOutcome = stringCell(persisted.row, "persistence_outcome") ?? "accepted";
+  const rejection = persistenceOutcomeResponse(
+    persistenceOutcome,
+    requestRead.value.runId,
+    requestRead.value.executionAttemptId,
+  );
+  if (rejection) return rejection;
+
+  const publication = await publishTerminalResult(
+    executor,
+    dependencies,
+    requestRead.value,
+    persisted.row,
+    persisted.completedAt,
+  );
+  if (publication.response) return publication.response;
 
   const responseStatus = persistenceOutcome === "replayed" ? "replayed" : "accepted";
-
   return Response.json(
     {
       ok: true,
       status: responseStatus,
-      runId,
-      executionAttemptId,
-      checkRunUpdated,
-      pullRequestCommentCreated,
-      ...(publicationWarnings.length === 0 ? {} : { publicationWarnings }),
-      result: parsed.data,
+      runId: requestRead.value.runId,
+      executionAttemptId: requestRead.value.executionAttemptId,
+      checkRunUpdated: publication.checkRunUpdated,
+      pullRequestCommentCreated: publication.pullRequestCommentCreated,
+      ...(publication.publicationWarnings.length === 0 ? {} : { publicationWarnings: publication.publicationWarnings }),
+      result: requestRead.value.result,
     },
     { status: responseStatus === "replayed" ? 200 : 202 },
   );
