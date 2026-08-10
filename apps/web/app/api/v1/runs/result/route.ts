@@ -1007,10 +1007,10 @@ type CheckRunPublicationResult = {
 
 async function completeResultCheckRun(input: {
   client: GitHubAppCheckRunClient | undefined;
-  installationId: number | string | undefined;
+  installationId: NumberLikeCell;
   repositoryOwner: string | undefined;
   repositoryName: string | undefined;
-  githubCheckRunId: number | string | undefined;
+  githubCheckRunId: NumberLikeCell;
   trustSnapshot: PublicationTrustSnapshot | undefined;
   checkOutput: ReturnType<typeof buildReadinessCheckOutput> | undefined;
   result: ReleaseRunResult;
