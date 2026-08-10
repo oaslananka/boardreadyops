@@ -38,6 +38,7 @@ scopes:
 queue_rules:
   - name: default
     batch_size: 1
+    checks_timeout: 0
     batch_max_wait_time: 5 min
     merge_method: squash
     queue_conditions:

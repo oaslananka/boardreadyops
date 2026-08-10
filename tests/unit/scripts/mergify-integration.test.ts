@@ -31,6 +31,7 @@ describe("Mergify integration contract", () => {
 
   it("uses in-place queue checks compatible with the strict required-check ruleset", () => {
     expect(mergify).toContain("max_parallel_checks: 1");
+    expect(mergify).toContain("checks_timeout: 0");
     const queueConditions = mergify.slice(
       mergify.indexOf("    queue_conditions:"),
       mergify.indexOf("    merge_conditions:"),
