@@ -314,67 +314,72 @@ async function planBomMissingMpn(
     return;
   }
   const bomTargets = await resolveBomTargets(root, config, { includeVariants: true });
-  if (bomTargets.length === 0) {
+  for (const target of bomTargets) {
+    await planBomMissingMpnTarget(root, config, target, ruleId, plan, virtualTexts);
+  }
+}
+
+async function planBomMissingMpnTarget(
+  root: string,
+  config: BoardReadyOpsConfig,
+  target: BomTarget,
+  ruleId: string,
+  plan: MutablePlan,
+  virtualTexts: Map<string, string>,
+): Promise<void> {
+  if (!isRuleEnabledForProject(config, target.project, ruleId)) {
     return;
   }
-  for (const target of bomTargets) {
-    if (!isRuleEnabledForProject(config, target.project, ruleId)) {
-      continue;
-    }
-    const bomPath = target.path;
-    const before = await readVirtualText(bomPath, virtualTexts);
-    const document = parseDelimitedDocument(before, bomPath);
-    if (document.header.length === 0) {
-      continue;
-    }
-    const mpnIndex = ensureColumn(document.header, ["mpn", "manufacturer part number"]);
-    for (const row of document.rows) {
-      while (row.length <= mpnIndex) {
-        row.push("");
-      }
-    }
-    const sourceAliases = [
-      "ki_part",
-      "kipart",
-      "ki part",
-      "manufacturer_part_number",
-      "mfr part number",
-      "part number",
-    ];
-    let fixed = 0;
-    for (const row of document.rows) {
-      const references = splitRefs(fieldByAliases(document.header, row, ["reference", "refs", "ref", "designator"]));
-      if (
-        references.length === 0 ||
-        isDnpValue(fieldByAliases(document.header, row, ["dnp", "do not populate", "populate"]))
-      ) {
-        continue;
-      }
-      if (cellAt(row, mpnIndex)) {
-        continue;
-      }
-      const inferred = fieldByAliases(document.header, row, sourceAliases);
-      if (!inferred) {
-        continue;
-      }
-      row[mpnIndex] = inferred;
-      fixed += 1;
-    }
-    if (fixed === 0) {
-      continue;
-    }
-    const after = writeDelimitedDocument(document);
-    addTextChange({
-      plan,
-      virtualTexts,
-      root,
-      file: bomPath,
-      before,
-      after,
-      ruleIds: [ruleId],
-      summary: `Fill ${fixed} missing BOM MPN value(s).`,
-    });
+  const bomPath = target.path;
+  const before = await readVirtualText(bomPath, virtualTexts);
+  const document = parseDelimitedDocument(before, bomPath);
+  if (document.header.length === 0) {
+    return;
   }
+  const mpnIndex = ensureColumn(document.header, ["mpn", "manufacturer part number"]);
+  ensureRowsHaveColumn(document.rows, mpnIndex);
+  const fixed = fillMissingMpnValues(document, mpnIndex);
+  if (fixed === 0) {
+    return;
+  }
+  const after = writeDelimitedDocument(document);
+  addTextChange({
+    plan,
+    virtualTexts,
+    root,
+    file: bomPath,
+    before,
+    after,
+    ruleIds: [ruleId],
+    summary: `Fill ${fixed} missing BOM MPN value(s).`,
+  });
+}
+
+function ensureRowsHaveColumn(rows: string[][], columnIndex: number): void {
+  for (const row of rows) {
+    while (row.length <= columnIndex) {
+      row.push("");
+    }
+  }
+}
+
+function fillMissingMpnValues(document: ReturnType<typeof parseDelimitedDocument>, mpnIndex: number): number {
+  const sourceAliases = ["ki_part", "kipart", "ki part", "manufacturer_part_number", "mfr part number", "part number"];
+  let fixed = 0;
+  for (const row of document.rows) {
+    const references = splitRefs(fieldByAliases(document.header, row, ["reference", "refs", "ref", "designator"]));
+    const dnp = isDnpValue(fieldByAliases(document.header, row, ["dnp", "do not populate", "populate"]));
+    if (references.length === 0 || dnp || cellAt(row, mpnIndex)) {
+      continue;
+    }
+    const inferred = fieldByAliases(document.header, row, sourceAliases);
+    if (!inferred) {
+      continue;
+    }
+    row[mpnIndex] = inferred;
+    fixed += 1;
+  }
+  return fixed;
 }
 
 async function planReleaseRevisions(
