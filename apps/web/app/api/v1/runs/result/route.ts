@@ -497,12 +497,62 @@ export async function handleResultRequest(
        where id = $1
        for update
      ),
+     runner_artifact_integrity as materialized (
+       select existing.id,
+              case
+                when $15::text is null then true
+                else
+                  (select count(*)
+                     from runner_artifact_upload_capabilities as capability
+                    where capability.run_id = existing.id
+                      and capability.execution_attempt_id = $2
+                      and capability.lease_id = $15) = jsonb_array_length($14::jsonb)
+                  and not exists (
+                    select 1
+                    from runner_artifact_upload_capabilities as capability
+                    left join artifacts as uploaded_artifact
+                      on uploaded_artifact.id = capability.artifact_id
+                     and uploaded_artifact.run_id = capability.run_id
+                    where capability.run_id = existing.id
+                      and capability.execution_attempt_id = $2
+                      and capability.lease_id = $15
+                      and (
+                        capability.status <> 'uploaded'
+                        or uploaded_artifact.id is null
+                        or uploaded_artifact.kind <> capability.kind
+                        or uploaded_artifact.name <> capability.name
+                        or uploaded_artifact.storage_path <> capability.storage_path
+                        or uploaded_artifact.bytes <> capability.declared_bytes
+                        or uploaded_artifact.role <> capability.role
+                        or not exists (
+                          select 1
+                          from jsonb_to_recordset($14::jsonb) as reported_artifact(
+                            kind text,
+                            name text,
+                            storage_path text,
+                            sha256 text,
+                            bytes integer,
+                            role text
+                          )
+                          where reported_artifact.kind = capability.kind
+                            and reported_artifact.name = capability.name
+                            and reported_artifact.storage_path = capability.storage_path
+                            and reported_artifact.sha256 = uploaded_artifact.sha256
+                            and reported_artifact.bytes = uploaded_artifact.bytes
+                            and reported_artifact.role = capability.role
+                        )
+                      )
+                  )
+              end as matches_verified_uploads
+       from existing
+     ),
      classified as (
        select existing.*,
               case
                 when existing.status = 'superseded' then 'superseded'
                 when existing.execution_attempt_id is distinct from $2 then 'stale_attempt'
                 when existing.attempt_status in ('cancelled', 'timed_out', 'stale', 'superseded') then 'stale_attempt'
+                when not runner_artifact_integrity.matches_verified_uploads then 'artifact_integrity_mismatch'
                 when existing.status in ('completed', 'failed', 'timed_out') then
                   case
                     when $3 in ('completed', 'failed', 'timed_out')
@@ -514,6 +564,7 @@ export async function handleResultRequest(
                 else 'accepted'
               end as persistence_outcome
        from existing
+       join runner_artifact_integrity on runner_artifact_integrity.id = existing.id
      ),
      transitioned as materialized (
        select classified.*,
@@ -601,6 +652,16 @@ export async function handleResultRequest(
        from artifacts as artifact
        join updated on updated.id = artifact.run_id
        join repositories as repository on repository.id = updated.repository_id
+       where $15::text is null
+          or not exists (
+            select 1
+            from runner_artifact_upload_capabilities as verified_capability
+            where verified_capability.artifact_id = artifact.id
+              and verified_capability.run_id = artifact.run_id
+              and verified_capability.execution_attempt_id = $2
+              and verified_capability.lease_id = $15
+              and verified_capability.status = 'uploaded'
+          )
      ),
      queued_artifact_deletions as (
        insert into artifact_deletion_jobs (
@@ -752,6 +813,7 @@ export async function handleResultRequest(
          bytes integer,
          role text
        )
+       where $15::text is null
        returning id
      ),
      upserted_result as (
@@ -830,7 +892,7 @@ export async function handleResultRequest(
                 'attemptUpdated', exists(select 1 from updated_attempt),
                 'leaseCompleted', exists(select 1 from completed_lease),
                  'findingCount', (select count(*) from inserted_findings),
-                'artifactCount', (select count(*) from inserted_artifacts),
+                'artifactCount', jsonb_array_length($14::jsonb),
                 'artifactDeletionJobCount', (select count(*) from queued_artifact_deletions),
                 'artifactDeletionSkippedCount', (select count(*) from skipped_artifact_deletion_audit),
                 'metricCount', (select count(*) from jsonb_object_keys($10::jsonb)),
@@ -895,6 +957,18 @@ export async function handleResultRequest(
   if (persistenceOutcome === "stale_attempt") {
     return Response.json(
       { ok: false, error: "execution attempt is no longer current", runId, executionAttemptId },
+      { status: 409 },
+    );
+  }
+
+  if (persistenceOutcome === "artifact_integrity_mismatch") {
+    return Response.json(
+      {
+        ok: false,
+        error: "runner artifact metadata does not match verified uploads",
+        runId,
+        executionAttemptId,
+      },
       { status: 409 },
     );
   }
