@@ -1,5 +1,8 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { classifyChangedFiles } from "../../../scripts/ci-risk-profile.mjs";
+import { classifyChangedFiles, readFilesFromArg } from "../../../scripts/ci-risk-profile.mjs";
 
 describe("ci-risk-profile", () => {
   it("keeps docs-only pull requests on the docs path without heavy runtime gates", () => {
@@ -90,6 +93,16 @@ describe("ci-risk-profile", () => {
     expect(profile.needs_unit).toBe(true);
     expect(profile.needs_coverage).toBe(false);
     expect(profile.needs_mutation).toBe(false);
+  });
+
+  it("rejects changed-file list paths that escape the repository root", async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-ci-risk-"));
+    const repositoryRoot = path.join(parent, "repo");
+    const outside = path.join(parent, "outside.txt");
+    await import("node:fs/promises").then(({ mkdir }) => mkdir(repositoryRoot));
+    await writeFile(outside, "src/core/index.ts\n", "utf8");
+
+    expect(() => readFilesFromArg(outside, repositoryRoot)).toThrow(/outside the repository root/u);
   });
 
   it("treats main pushes as full runs regardless of path", () => {

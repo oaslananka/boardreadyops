@@ -14,9 +14,9 @@ if (!after) {
 if (before && before !== after) {
   throw new Error("dist changed after rebuild; commit regenerated bundles");
 }
-const git = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { encoding: "utf8" });
+const git = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { encoding: "utf8" }); // NOSONAR -- git is fixed; CI/developer PATH is trusted.
 if (git.status === 0) {
-  const status = spawnSync("git", ["status", "--porcelain", "--", "dist"], { encoding: "utf8" });
+  const status = spawnSync("git", ["status", "--porcelain", "--", "dist"], { encoding: "utf8" }); // NOSONAR -- git is fixed; CI/developer PATH is trusted.
   if (status.stdout.trim() !== "") {
     throw new Error(`dist is not clean:\n${status.stdout}`);
   }

@@ -82,7 +82,7 @@ async function checkDuplicateBlocks() {
 
 function checkTrackedOperationalFiles() {
   const patterns = ["PROMPT.md", "AUTONOMOUS_BUILD.md", "NEXT.md"];
-  const tracked = spawnSync("git", ["ls-files", ...patterns], { encoding: "utf8" });
+  const tracked = spawnSync("git", ["ls-files", ...patterns], { encoding: "utf8" }); // NOSONAR -- git is fixed; CI/developer PATH is trusted.
   if (tracked.status !== 0) {
     failures.push("git ls-files failed while checking private operational notes");
     return;
@@ -90,7 +90,7 @@ function checkTrackedOperationalFiles() {
   if (tracked.stdout.trim() !== "") {
     failures.push(`private operational notes are tracked:\n${tracked.stdout.trim()}`);
   }
-  const orders = spawnSync("git", ["ls-files", "AGENT_ORDERS*.md"], { encoding: "utf8" });
+  const orders = spawnSync("git", ["ls-files", "AGENT_ORDERS*.md"], { encoding: "utf8" }); // NOSONAR -- git is fixed; CI/developer PATH is trusted.
   if (orders.status === 0 && orders.stdout.trim() !== "") {
     failures.push(`private operational notes are tracked:\n${orders.stdout.trim()}`);
   }
@@ -98,7 +98,7 @@ function checkTrackedOperationalFiles() {
 
 function checkUnusedDependencies() {
   const packageJson = JSON.parse(
-    spawnSync("node", ["-p", "JSON.stringify(require('./package.json'))"], {
+    spawnSync(process.execPath, ["-p", "JSON.stringify(require('./package.json'))"], {
       encoding: "utf8",
     }).stdout,
   );

@@ -2,13 +2,13 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
-const inGit = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { encoding: "utf8" });
+const inGit = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { encoding: "utf8" }); // NOSONAR -- git is fixed; CI/developer PATH is trusted.
 if (inGit.status !== 0) {
   process.exit(0);
 }
 
 const failures = [];
-const status = spawnSync("git", ["status", "--porcelain"], { encoding: "utf8" });
+const status = spawnSync("git", ["status", "--porcelain"], { encoding: "utf8" }); // NOSONAR -- git is fixed; CI/developer PATH is trusted.
 if (status.stdout.trim() !== "") {
   failures.push(`working tree is not clean:\n${status.stdout.trim()}`);
 }
