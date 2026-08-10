@@ -40,8 +40,13 @@ fi
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT INT TERM
 
-curl -fsSL "${download_root}/${asset}" -o "${tmpdir}/${asset}"
-curl -fsSL "${download_root}/SHA256SUMS" -o "${tmpdir}/SHA256SUMS"
+https_only='=https'
+curl_https() {
+  curl --proto "${https_only}" --proto-redir "${https_only}" -fsSL "$@"
+}
+
+curl_https "${download_root}/${asset}" -o "${tmpdir}/${asset}"
+curl_https "${download_root}/SHA256SUMS" -o "${tmpdir}/SHA256SUMS"
 
 checksum_line="$(grep " ${asset}\$" "${tmpdir}/SHA256SUMS" || true)"
 if [ -z "${checksum_line}" ]; then

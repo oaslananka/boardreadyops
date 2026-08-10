@@ -32,7 +32,7 @@ jobs:
           package-manager-cache: false
       - run: corepack enable
       - run: node scripts/toolchain.mjs corepack-install
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm run deps:install-ci
       - run: pnpm run build
       - name: Attest provenance
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32

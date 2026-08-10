@@ -45646,8 +45646,8 @@ async function projectContext(root, projectFile) {
   const entries = await safeReadDir(projectRoot);
   const schematicFiles = entries.filter(
     (file2) => file2.endsWith(".kicad_sch") && (import_node_path39.default.basename(file2, ".kicad_sch") === base || entries.length === 1)
-  ).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort();
-  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path39.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path39.default.join(projectRoot, file2)).sort();
+  ).map((file2) => import_node_path39.default.join(projectRoot, file2));
+  const boardFiles = entries.filter((file2) => file2.endsWith(".kicad_pcb") && import_node_path39.default.basename(file2, ".kicad_pcb") === base).map((file2) => import_node_path39.default.join(projectRoot, file2));
   const jobsetFiles = await discoverJobsets(projectRoot);
   return {
     projectFile: normalizeRelative(root, projectFile),

@@ -1,59 +1,81 @@
+# Merge Queue remains maintainer-controlled. A PR enters the queue only after a
+# maintainer explicitly applies the `queue-me` label; automation must never add
+# that label. Repository rulesets remain the authoritative merge gate.
+merge_queue:
+  mode: parallel
+  max_parallel_checks: 5
+  status_comments: outcomes
+  reset_on_external_merge: always
+  skip_intermediate_results: true
+
+# File-pattern scopes are used only by Mergify to avoid running conflicting
+# queued changes in parallel. BoardReadyOps CI continues to use its own
+# risk-profile job for validation routing.
+scopes:
+  source:
+    files:
+      cli:
+        include:
+          - "src/cli/**/*"
+      core:
+        include:
+          - "src/**/*"
+          - "packages/cloud-core/**/*"
+          - "packages/db/**/*"
+      web:
+        include:
+          - "apps/web/**/*"
+          - "packages/db/**/*"
+      repository:
+        include:
+          - ".github/**/*"
+          - "scripts/**/*"
+          - "package.json"
+          - "pnpm-lock.yaml"
+          - "renovate.json"
+  merge_queue_scope: merge-queue
+
+queue_rules:
+  - name: default
+    batch_size: 1
+    batch_max_wait_time: 5 min
+    merge_method: squash
+    queue_conditions:
+      - label = queue-me
+      - -draft
+      - check-success = ci / risk-profile
+      - check-success = ci / lint
+      - check-success = ci / typecheck
+
+    merge_conditions:
+      - label = queue-me
+      - check-success = ci / risk-profile
+      - check-success = ci / lint
+      - check-success = ci / typecheck
+      - check-success = ci / test-unit
+      - check-success = ci / build
+      - check-success = ci / verify-dist
+      - check-success = security / gate
+
 pull_request_rules:
-  - name: auto-merge safe Renovate updates
+  - name: queue explicitly approved pull requests
     conditions:
-      - author = renovate[bot]
-      - label = dependencies
-      - label = automerge
-      - -label = manual-review
-      - -label = breaking-change
-      - -label = do-not-merge
-      - check-success = ci / risk-profile
-      - check-success = ci / lint
-      - check-success = ci / typecheck
-      - check-success = ci / test-unit
-      - check-success = ci / build
-      - check-success = ci / verify-dist
-      - check-success = ci / security
-      - check-success = CodeQL
+      - label = queue-me
       - -draft
     actions:
-      merge:
-        method: squash
+      queue:
+        name: default
 
-  - name: auto-merge release-please PRs
+  - name: label security workflow changes
     conditions:
-      - author = release-please[bot]
-      - -label = do-not-merge
-      - check-success = ci / risk-profile
-      - check-success = ci / lint
-      - check-success = ci / typecheck
-      - check-success = ci / test-unit
-      - check-success = ci / build
-      - check-success = ci / verify-dist
-      - check-success = ci / security
-      - check-success = CodeQL
-      - -draft
+      - files ~= "^\\.github/workflows/security"
     actions:
-      merge:
-        method: squash
+      label:
+        add: ["security", "manual-review"]
 
-  - name: auto-merge feature PRs after checks and review
+  - name: label documentation changes
     conditions:
-      - -author = renovate[bot]
-      - -author = release-please[bot]
-      - -author = dependabot[bot]
-      - -label = do-not-merge
-      - check-success = ci / risk-profile
-      - check-success = ci / lint
-      - check-success = ci / typecheck
-      - check-success = ci / test-unit
-      - check-success = ci / build
-      - check-success = ci / verify-dist
-      - check-success = ci / security
-      - check-success = CodeQL
-      - "#approved-reviews-by >= 1"
-      - "#changes-requested-reviews-by = 0"
-      - -draft
+      - files ~= "^docs/"
     actions:
-      merge:
-        method: squash
+      label:
+        add: ["documentation"]

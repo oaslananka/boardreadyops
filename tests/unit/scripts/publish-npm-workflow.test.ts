@@ -53,7 +53,7 @@ describe("publish-npm workflow contract", () => {
     expect(workflow).toContain("Publish workflow must run from refs/heads/main");
     expect(workflow).not.toContain("console.log(id_token)");
     expect(workflow).not.toContain("console.log(token)");
-    expect(workflow).toContain("npm install -g npm@latest");
+    expect(workflow).toContain("npm install -g npm@11.18.0");
     expect(workflow).not.toContain("secrets.NPM_TOKEN");
     expect(publishBlock).not.toContain("_authToken=");
     expect(publishBlock).not.toContain(homeNpmrcRedirect);
@@ -70,10 +70,10 @@ describe("publish-npm workflow contract", () => {
 
     expect(publishBlock).toContain("is already published; skipping npm publish");
     expect(publishBlock).toContain('published_http_code="$(curl --silent --show-error');
-    expect(publishBlock).toContain('"${NPM_REGISTRY}/${NPM_PACKAGE}/${package_version}"');
-    expect(publishBlock).toContain('case "${published_http_code}" in');
+    expect(publishBlock).toContain(['"$', "{NPM_REGISTRY}/$", "{NPM_PACKAGE}/$", '{package_version}"'].join(""));
+    expect(publishBlock).toContain(['case "$', '{published_http_code}" in'].join(""));
     expect(publishBlock).toContain("Could not check npm registry");
-    expect(publishBlock).not.toContain('npm view "boardreadyops@${package_version}" version');
+    expect(publishBlock).not.toContain(['npm view "boardreadyops@$', '{package_version}" version'].join(""));
     expect(publishBlock).not.toContain("|| true");
     expect(workflow).toContain("release_allows_floating_tags == 'true'");
     expect(workflow).toContain("release_is_prerelease == 'false'");

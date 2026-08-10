@@ -38,12 +38,10 @@ async function projectContext(root: string, projectFile: string): Promise<Projec
     .filter(
       (file) => file.endsWith(".kicad_sch") && (path.basename(file, ".kicad_sch") === base || entries.length === 1),
     )
-    .map((file) => path.join(projectRoot, file))
-    .sort();
+    .map((file) => path.join(projectRoot, file));
   const boardFiles = entries
     .filter((file) => file.endsWith(".kicad_pcb") && path.basename(file, ".kicad_pcb") === base)
-    .map((file) => path.join(projectRoot, file))
-    .sort();
+    .map((file) => path.join(projectRoot, file));
   const jobsetFiles = await discoverJobsets(projectRoot);
   return {
     projectFile: normalizeRelative(root, projectFile),

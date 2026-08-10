@@ -51,7 +51,7 @@ describe("container action release surfaces", () => {
     expect(dockerfile).toContain("ARG KICAD_PPA_SERIES=10.0");
     expect(dockerfile).toContain(`ppa:kicad/kicad-\${KICAD_PPA_SERIES}-releases`);
     expect(dockerfile).toContain(
-      `NPM_CONFIG_UPDATE_NOTIFIER=false npm install --global --no-audit --no-fund "boardreadyops@\${BOARDREADYOPS_VERSION}"`,
+      `NPM_CONFIG_UPDATE_NOTIFIER=false npm install --global --ignore-scripts --no-audit --no-fund "boardreadyops@\${BOARDREADYOPS_VERSION}"`,
     );
     expect(dockerfile).not.toContain("corepack ");
     expect(dockerfile).not.toContain("pnpm add --global");
