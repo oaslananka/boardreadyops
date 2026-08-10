@@ -21,6 +21,12 @@ export async function findI18nProblems(root = process.cwd(), options = {}) {
   if (!sourceCatalog) {
     return ["src/i18n/en.ts: source catalog not found"];
   }
+  compareCatalogKeys(sourceCatalog, catalogs, problems);
+  await scanSourceKeys(root, sourceGlobs, sourceCatalog.keys, problems);
+  return problems;
+}
+
+function compareCatalogKeys(sourceCatalog, catalogs, problems) {
   for (const catalog of catalogs.filter((entry) => !entry.source)) {
     for (const key of [...sourceCatalog.keys].sort((a, b) => a.localeCompare(b))) {
       if (!catalog.keys.has(key)) {
@@ -33,7 +39,9 @@ export async function findI18nProblems(root = process.cwd(), options = {}) {
       }
     }
   }
+}
 
+async function scanSourceKeys(root, sourceGlobs, sourceKeys, problems) {
   const files = await glob(sourceGlobs, {
     cwd: root,
     ignore: ["dist/**", "coverage/**", "node_modules/**", ".stryker-tmp/**"],
@@ -42,12 +50,11 @@ export async function findI18nProblems(root = process.cwd(), options = {}) {
   for (const file of files.sort((a, b) => a.localeCompare(b))) {
     const source = await readFile(path.join(root, file), "utf8");
     for (const call of extractLiteralTCalls(file, source)) {
-      if (!sourceCatalog.keys.has(call.key)) {
+      if (!sourceKeys.has(call.key)) {
         problems.push(`${file}:${call.line}: unknown i18n key "${call.key}"`);
       }
     }
   }
-  return problems;
 }
 
 export async function main(root = process.cwd()) {
