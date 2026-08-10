@@ -395,6 +395,157 @@ function timeoutFailure(seenCheckRun, seenWorkflowRun) {
   return "canary_check_run_missing";
 }
 
+async function lookupCanaryCheckRun(options, expectedSha, runtime) {
+  const checkQuery = new URLSearchParams({ check_name: options.checkRunName, filter: "all", per_page: "100" });
+  const checkRuns = await githubJson(
+    runtime,
+    options,
+    "Check Run lookup",
+    "GET",
+    `/repos/${options.repository}/commits/${expectedSha}/check-runs?${checkQuery}`,
+  );
+  const rows = Array.isArray(objectValue(checkRuns.value).check_runs) ? objectValue(checkRuns.value).check_runs : [];
+  return rows.find((row) => {
+    const checkRun = objectValue(row);
+    return checkRun.name === options.checkRunName && checkRun.head_sha === expectedSha;
+  });
+}
+
+function checkRunReleaseBinding(options, expectedSha, checkRunId, detail) {
+  const releaseRunId = stringValue(detail.external_id);
+  const detailsUrl = stringValue(detail.details_url);
+  if (
+    !releaseRunId ||
+    !uuidPattern.test(releaseRunId) ||
+    !detailsUrl ||
+    !sameOrigin(detailsUrl, options.publicOrigin)
+  ) {
+    throw new SyntheticCanaryError("canary_check_run_binding_invalid", "Check Run release binding was invalid", {
+      expectedSha,
+      checkRunId,
+      checkRunUrl: stringValue(detail.html_url),
+    });
+  }
+  const workflowRunId = workflowRunIdFromSummary(objectValue(detail.output).summary, options.repository);
+  if (!workflowRunId) {
+    throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow link was not published", {
+      expectedSha,
+      checkRunId,
+      checkRunUrl: stringValue(detail.html_url),
+    });
+  }
+  return { releaseRunId, workflowRunId };
+}
+
+async function readCanaryCheckRun(options, expectedSha, runtime, match) {
+  const checkRunId = numberValue(objectValue(match).id);
+  if (!checkRunId) {
+    throw new SyntheticCanaryError("canary_check_run_binding_invalid", "Check Run identifier was invalid", {
+      expectedSha,
+    });
+  }
+  const detailResponse = await githubJson(
+    runtime,
+    options,
+    "Check Run detail lookup",
+    "GET",
+    `/repos/${options.repository}/check-runs/${checkRunId}`,
+  );
+  const detail = objectValue(detailResponse.value);
+  if (detail.name !== options.checkRunName || detail.head_sha !== expectedSha) {
+    throw new SyntheticCanaryError("canary_check_run_binding_invalid", "Check Run binding did not match", {
+      expectedSha,
+      checkRunId,
+    });
+  }
+  if (detail.status !== "completed") return { status: "pending" };
+  if (detail.conclusion !== "success") {
+    throw new SyntheticCanaryError("canary_check_run_failed", "Check Run completed unsuccessfully", {
+      expectedSha,
+      checkRunId,
+      checkRunUrl: stringValue(detail.html_url),
+    });
+  }
+  const binding = checkRunReleaseBinding(options, expectedSha, checkRunId, detail);
+  return { status: "completed", checkRunId, detail, ...binding };
+}
+
+function workflowRunMatches(options, workflowId, run) {
+  return (
+    objectValue(run.repository).full_name === options.repository &&
+    run.event === "workflow_dispatch" &&
+    run.workflow_id === workflowId
+  );
+}
+
+async function readCanaryWorkflowRun(options, expectedSha, runtime, checkRun) {
+  const workflow = await githubJson(
+    runtime,
+    options,
+    "readiness workflow lookup",
+    "GET",
+    `/repos/${options.repository}/actions/workflows/${encodeURIComponent(options.readinessWorkflow)}`,
+    undefined,
+    [200, 404],
+  );
+  if (workflow.status === 404) {
+    throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow was not found", {
+      expectedSha,
+      workflowRunId: checkRun.workflowRunId,
+    });
+  }
+  const workflowId = numberValue(objectValue(workflow.value).id);
+  if (!workflowId) {
+    throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow identifier was invalid", {
+      expectedSha,
+      workflowRunId: checkRun.workflowRunId,
+    });
+  }
+  const workflowRun = await githubJson(
+    runtime,
+    options,
+    "readiness workflow run lookup",
+    "GET",
+    `/repos/${options.repository}/actions/runs/${checkRun.workflowRunId}`,
+    undefined,
+    [200, 404],
+  );
+  if (workflowRun.status === 404) {
+    throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow run was not found", {
+      expectedSha,
+      workflowRunId: checkRun.workflowRunId,
+    });
+  }
+  const run = objectValue(workflowRun.value);
+  if (!workflowRunMatches(options, workflowId, run)) {
+    throw new SyntheticCanaryError("canary_check_run_binding_invalid", "readiness workflow binding was invalid", {
+      expectedSha,
+      workflowRunId: checkRun.workflowRunId,
+    });
+  }
+  if (run.status !== "completed") return { status: "pending" };
+  const workflowUrl = stringValue(run.html_url);
+  if (run.conclusion !== "success") {
+    throw new SyntheticCanaryError("canary_workflow_failed", "readiness workflow completed unsuccessfully", {
+      expectedSha,
+      workflowRunId: checkRun.workflowRunId,
+      workflowUrl,
+    });
+  }
+  return { status: "completed", workflowUrl };
+}
+
+function verifiedCanaryResult(expectedSha, checkRun, workflowRun) {
+  return {
+    expectedSha,
+    checkRunId: checkRun.checkRunId,
+    ...(stringValue(checkRun.detail.html_url) ? { checkRunUrl: stringValue(checkRun.detail.html_url) } : {}),
+    releaseRunId: checkRun.releaseRunId,
+    workflowRunId: checkRun.workflowRunId,
+    ...(workflowRun.workflowUrl ? { workflowUrl: workflowRun.workflowUrl } : {}),
+  };
+}
+
 async function verifyWithRuntime(options, expectedSha, runtime) {
   const startedAt = nowValue(runtime.now);
   let seenCheckRun = false;
@@ -407,19 +558,7 @@ async function verifyWithRuntime(options, expectedSha, runtime) {
         elapsedMs,
       });
     }
-    const checkQuery = new URLSearchParams({ check_name: options.checkRunName, filter: "all", per_page: "100" });
-    const checkRuns = await githubJson(
-      runtime,
-      options,
-      "Check Run lookup",
-      "GET",
-      `/repos/${options.repository}/commits/${expectedSha}/check-runs?${checkQuery}`,
-    );
-    const rows = Array.isArray(objectValue(checkRuns.value).check_runs) ? objectValue(checkRuns.value).check_runs : [];
-    const match = rows.find((row) => {
-      const checkRun = objectValue(row);
-      return checkRun.name === options.checkRunName && checkRun.head_sha === expectedSha;
-    });
+    const match = await lookupCanaryCheckRun(options, expectedSha, runtime);
     if (!match) {
       const nextElapsed = nowValue(runtime.now) - startedAt;
       if (nextElapsed >= options.timeoutMs) {
@@ -432,129 +571,18 @@ async function verifyWithRuntime(options, expectedSha, runtime) {
       continue;
     }
     seenCheckRun = true;
-    const checkRunId = numberValue(objectValue(match).id);
-    if (!checkRunId) {
-      throw new SyntheticCanaryError("canary_check_run_binding_invalid", "Check Run identifier was invalid", {
-        expectedSha,
-      });
-    }
-    const detailResponse = await githubJson(
-      runtime,
-      options,
-      "Check Run detail lookup",
-      "GET",
-      `/repos/${options.repository}/check-runs/${checkRunId}`,
-    );
-    const detail = objectValue(detailResponse.value);
-    if (detail.name !== options.checkRunName || detail.head_sha !== expectedSha) {
-      throw new SyntheticCanaryError("canary_check_run_binding_invalid", "Check Run binding did not match", {
-        expectedSha,
-        checkRunId,
-      });
-    }
-    if (detail.status !== "completed") {
+    const checkRun = await readCanaryCheckRun(options, expectedSha, runtime, match);
+    if (checkRun.status === "pending") {
       await runtime.sleep(options.pollIntervalMs);
       continue;
     }
-    if (detail.conclusion !== "success") {
-      throw new SyntheticCanaryError("canary_check_run_failed", "Check Run completed unsuccessfully", {
-        expectedSha,
-        checkRunId,
-        checkRunUrl: stringValue(detail.html_url),
-      });
-    }
-    const releaseRunId = stringValue(detail.external_id);
-    const detailsUrl = stringValue(detail.details_url);
-    if (
-      !releaseRunId ||
-      !uuidPattern.test(releaseRunId) ||
-      !detailsUrl ||
-      !sameOrigin(detailsUrl, options.publicOrigin)
-    ) {
-      throw new SyntheticCanaryError("canary_check_run_binding_invalid", "Check Run release binding was invalid", {
-        expectedSha,
-        checkRunId,
-        checkRunUrl: stringValue(detail.html_url),
-      });
-    }
-    const summary = objectValue(detail.output).summary;
-    const workflowRunId = workflowRunIdFromSummary(summary, options.repository);
-    if (!workflowRunId) {
-      throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow link was not published", {
-        expectedSha,
-        checkRunId,
-        checkRunUrl: stringValue(detail.html_url),
-      });
-    }
-    const workflow = await githubJson(
-      runtime,
-      options,
-      "readiness workflow lookup",
-      "GET",
-      `/repos/${options.repository}/actions/workflows/${encodeURIComponent(options.readinessWorkflow)}`,
-      undefined,
-      [200, 404],
-    );
-    if (workflow.status === 404) {
-      throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow was not found", {
-        expectedSha,
-        workflowRunId,
-      });
-    }
-    const workflowId = numberValue(objectValue(workflow.value).id);
-    if (!workflowId) {
-      throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow identifier was invalid", {
-        expectedSha,
-        workflowRunId,
-      });
-    }
-    const workflowRun = await githubJson(
-      runtime,
-      options,
-      "readiness workflow run lookup",
-      "GET",
-      `/repos/${options.repository}/actions/runs/${workflowRunId}`,
-      undefined,
-      [200, 404],
-    );
-    if (workflowRun.status === 404) {
-      throw new SyntheticCanaryError("canary_workflow_missing", "readiness workflow run was not found", {
-        expectedSha,
-        workflowRunId,
-      });
-    }
+    const workflowRun = await readCanaryWorkflowRun(options, expectedSha, runtime, checkRun);
     seenWorkflowRun = true;
-    const run = objectValue(workflowRun.value);
-    if (
-      objectValue(run.repository).full_name !== options.repository ||
-      run.event !== "workflow_dispatch" ||
-      run.workflow_id !== workflowId
-    ) {
-      throw new SyntheticCanaryError("canary_check_run_binding_invalid", "readiness workflow binding was invalid", {
-        expectedSha,
-        workflowRunId,
-      });
-    }
-    if (run.status !== "completed") {
+    if (workflowRun.status === "pending") {
       await runtime.sleep(options.pollIntervalMs);
       continue;
     }
-    const workflowUrl = stringValue(run.html_url);
-    if (run.conclusion !== "success") {
-      throw new SyntheticCanaryError("canary_workflow_failed", "readiness workflow completed unsuccessfully", {
-        expectedSha,
-        workflowRunId,
-        workflowUrl,
-      });
-    }
-    return {
-      expectedSha,
-      checkRunId,
-      ...(stringValue(detail.html_url) ? { checkRunUrl: stringValue(detail.html_url) } : {}),
-      releaseRunId,
-      workflowRunId,
-      ...(workflowUrl ? { workflowUrl } : {}),
-    };
+    return verifiedCanaryResult(expectedSha, checkRun, workflowRun);
   }
 }
 
