@@ -6,6 +6,7 @@ const capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
 const githubOwnerPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 const githubRepositoryPattern = /^[A-Za-z0-9_.-]{1,100}$/u;
 const strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+const artifactContentTypePattern = /^[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*\/[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*$/u;
 
 export const runnerProtocolVersionSchema = z.literal(1);
 export const runnerWorkerClassSchema = z.enum(["managed", "self_hosted"]);
@@ -25,6 +26,13 @@ export const runnerVersionSchema = z
 export const runnerLeaseSecretSchema = z.string().min(43).max(256).regex(base64UrlPattern);
 export const runnerEnrollmentTokenSchema = z.string().min(43).max(256).regex(base64UrlPattern);
 export const runnerCapabilitySchema = z.string().trim().min(1).max(128).regex(capabilityPattern);
+export const artifactContentTypeSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(255)
+  .regex(artifactContentTypePattern, "artifact content type must be a media type without parameters")
+  .transform((value) => value.toLowerCase());
 export const runnerSafeModeReasonSchema = z.enum(["draft-pull-request", "fork-pull-request", "private-repository"]);
 
 export const runnerSignedRequestEnvelopeSchema = z
@@ -198,6 +206,7 @@ export const runnerArtifactDeclarationSchema = z
       .string()
       .regex(/^[0-9a-f]{64}$/u)
       .optional(),
+    contentType: artifactContentTypeSchema.optional(),
   })
   .strict();
 

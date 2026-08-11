@@ -8,6 +8,7 @@ export type RunnerArtifactDeclaration = {
   role: string;
   bytes: number;
   sha256?: string;
+  contentType?: string;
 };
 
 export type IssueRunnerArtifactCapabilitiesInput = RunnerLeaseMutationContext & {
@@ -79,6 +80,8 @@ export type RunnerArtifactStoreOptions = {
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
 const sha256Pattern = /^[0-9a-f]{64}$/u;
+const artifactContentTypePattern = /^[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*\/[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*$/u;
+const defaultArtifactContentType = "application/octet-stream";
 
 function rows(result: unknown): readonly Record<string, unknown>[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
@@ -164,11 +167,14 @@ function normalizeDeclaration(input: RunnerArtifactDeclaration): RunnerArtifactD
   if (role.length < 1 || role.length > 128) return undefined;
   if (!Number.isSafeInteger(input.bytes) || input.bytes < 0 || input.bytes > 2_147_483_647) return undefined;
   if (input.sha256 !== undefined && !sha256Pattern.test(input.sha256)) return undefined;
+  const contentType = input.contentType?.trim().toLowerCase() ?? defaultArtifactContentType;
+  if (contentType.length > 255 || !artifactContentTypePattern.test(contentType)) return undefined;
   return {
     kind,
     name,
     role,
     bytes: input.bytes,
+    contentType,
     ...(input.sha256 === undefined ? {} : { sha256: input.sha256 }),
   };
 }
@@ -253,6 +259,7 @@ export function createSqlRunnerArtifactStore(
               kind: entry.declaration.kind,
               name: entry.declaration.name,
               role: entry.declaration.role,
+              content_type: entry.declaration.contentType ?? defaultArtifactContentType,
               declared_bytes: entry.declaration.bytes,
               expected_sha256: entry.declaration.sha256 ?? null,
               storage_path: entry.storagePath,

@@ -53572,6 +53572,7 @@ var capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
 var githubOwnerPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 var githubRepositoryPattern = /^[A-Za-z0-9_.-]{1,100}$/u;
 var strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+var artifactContentTypePattern = /^[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*\/[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*$/u;
 var runnerProtocolVersionSchema = external_exports.literal(1);
 var runnerWorkerClassSchema = external_exports.enum(["managed", "self_hosted"]);
 var runnerSigningAlgorithmSchema = external_exports.literal("ed25519");
@@ -53586,6 +53587,7 @@ var runnerVersionSchema = external_exports.string().max(64).regex(strictVersionP
 var runnerLeaseSecretSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
 var runnerEnrollmentTokenSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
 var runnerCapabilitySchema = external_exports.string().trim().min(1).max(128).regex(capabilityPattern);
+var artifactContentTypeSchema = external_exports.string().trim().min(3).max(255).regex(artifactContentTypePattern, "artifact content type must be a media type without parameters").transform((value) => value.toLowerCase());
 var runnerSafeModeReasonSchema = external_exports.enum(["draft-pull-request", "fork-pull-request", "private-repository"]);
 var runnerSignedRequestEnvelopeSchema = external_exports.object({
   protocolVersion: runnerProtocolVersionSchema,
@@ -53715,7 +53717,8 @@ var runnerArtifactDeclarationSchema = external_exports.object({
   name: external_exports.string().trim().min(1).max(256),
   role: external_exports.string().trim().min(1).max(128),
   bytes: external_exports.number().int().nonnegative().max(2147483647),
-  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional()
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional(),
+  contentType: artifactContentTypeSchema.optional()
 }).strict();
 var runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema.extend({
   artifacts: external_exports.array(runnerArtifactDeclarationSchema).min(1).max(100)
@@ -53784,7 +53787,8 @@ var releaseRunArtifactSchema = external_exports.object({
   storagePath: artifactStoragePathSchema,
   sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u),
   bytes: external_exports.number().int().nonnegative().max(2147483647),
-  role: external_exports.string().trim().min(1).max(128)
+  role: external_exports.string().trim().min(1).max(128),
+  contentType: artifactContentTypeSchema.optional()
 });
 var releaseRunReportLinkSchema = external_exports.object({
   label: external_exports.string().trim().min(1).max(160),
@@ -54768,7 +54772,8 @@ async function publishArtifacts(client, job, artifacts) {
       name: artifact.name,
       role: artifact.role,
       bytes: artifact.bytes,
-      sha256: artifact.sha256
+      sha256: artifact.sha256,
+      contentType: artifact.contentType ?? "application/octet-stream"
     }))
   };
   const capabilities = await client.issueArtifactCapabilities(request);
@@ -54788,6 +54793,7 @@ async function publishArtifacts(client, job, artifacts) {
       role: artifact.role,
       bytes: artifact.bytes,
       sha256: artifact.sha256,
+      contentType: artifact.contentType ?? "application/octet-stream",
       storagePath: capability.storagePath
     });
   }

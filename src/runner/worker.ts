@@ -42,6 +42,7 @@ export type RunnerExecutionArtifact = {
   filePath: string;
   bytes: number;
   sha256: string;
+  contentType?: string;
 };
 
 type RunnerExecutionReport = {
@@ -402,6 +403,7 @@ async function publishArtifacts(
       role: artifact.role,
       bytes: artifact.bytes,
       sha256: artifact.sha256,
+      contentType: artifact.contentType ?? "application/octet-stream",
     })),
   };
   const capabilities = await client.issueArtifactCapabilities(request);
@@ -421,6 +423,7 @@ async function publishArtifacts(
       role: artifact.role,
       bytes: artifact.bytes,
       sha256: artifact.sha256,
+      contentType: artifact.contentType ?? "application/octet-stream",
       storagePath: capability.storagePath,
     });
   }
