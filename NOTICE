@@ -277,7 +277,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `istanbul-reports@3.2.0`
   - Description: istanbul reports
   - Homepage: https://istanbul.js.org/
-- `qs@6.15.2`
+- `qs@6.15.3`
   - Description: A querystring parser that supports nesting and arrays, with a depth limit
   - Homepage: https://github.com/ljharb/qs
 - `smol-toml@1.7.0`
@@ -1661,7 +1661,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `shebang-regex@3.0.0`
   - Description: Regular expression for matching a shebang line
   - Homepage: https://github.com/sindresorhus/shebang-regex#readme
-- `side-channel@1.1.0`
+- `side-channel@1.1.1`
   - Description: Store information about any JS value in a side channel. Uses WeakMap if available.
   - Homepage: https://github.com/ljharb/side-channel#readme
 - `side-channel-list@1.0.1`
