@@ -215,6 +215,7 @@ describe("reproducible contributor toolchain", () => {
     expect(preCommit).toContain("corepack pnpm run hook:lint-staged");
     expect(preCommit).toContain("node scripts/toolchain.mjs run pre-commit run --hook-stage pre-commit");
     expect(preCommit).toContain("corepack pnpm run toolchain:bootstrap");
+    expect(prePush).toMatch(/^set -e\n/u);
     expect(prePush).toContain("corepack pnpm run typecheck");
     expect(prePush).toContain("corepack pnpm run test:unit");
     expect(prePush).toContain("corepack pnpm run verify:dist");
@@ -224,6 +225,48 @@ describe("reproducible contributor toolchain", () => {
     for (const hook of [commitMsg, preCommit, prePush]) {
       expect(hook).not.toMatch(/(^|\n)pnpm\b/);
       expect(hook).not.toMatch(/(^|\n)pre-commit\b/);
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("fails pre-push immediately when unit tests fail", async () => {
+    const temporaryRoot = await mkdtemp(path.join(root, ".toolchain-pre-push-test-"));
+    const bin = path.join(temporaryRoot, "bin");
+    const trace = path.join(temporaryRoot, "trace.log");
+    await mkdir(bin, { recursive: true });
+    await writeFile(
+      path.join(bin, "corepack"),
+      `#!/usr/bin/env sh
+echo "corepack $*" >> "${trace}"
+case "$*" in
+  "pnpm run typecheck") exit 0 ;;
+  "pnpm run test:unit") exit 42 ;;
+  "pnpm run verify:dist") exit 0 ;;
+  *) exit 97 ;;
+esac
+`,
+    );
+    await writeFile(
+      path.join(bin, "node"),
+      `#!/usr/bin/env sh
+echo "node $*" >> "${trace}"
+exit 0
+`,
+    );
+    await chmod(path.join(bin, "corepack"), 0o755);
+    await chmod(path.join(bin, "node"), 0o755);
+
+    try {
+      const result = spawnSync("sh", [path.join(root, ".husky", "pre-push")], {
+        cwd: root,
+        env: { ...process.env, PATH: `${bin}${path.delimiter}/usr/bin${path.delimiter}/bin` },
+        encoding: "utf8",
+      });
+      const calls = (await readFile(trace, "utf8")).trim().split("\n");
+
+      expect(result.status).toBe(42);
+      expect(calls).toEqual(["corepack pnpm run typecheck", "corepack pnpm run test:unit"]);
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
     }
   });
 
