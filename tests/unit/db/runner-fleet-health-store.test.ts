@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
 import { createSqlRunnerFleetHealthStore } from "../../../packages/db/src/runner-fleet-health-store.js";
@@ -95,6 +96,12 @@ describe("runner fleet health store", () => {
     await expect(
       missing.readFleetHealth({ installationId, observedAt, observationWindowSeconds: 300 }),
     ).resolves.toBeUndefined();
+  });
+
+  it("keeps version ordering non-mutating", () => {
+    const source = readFileSync("packages/db/src/runner-fleet-health-store.ts", "utf8");
+    expect(source).toContain("versions.toSorted(compareVersionsDescending)");
+    expect(source).not.toContain("versions.sort(compareVersionsDescending)");
   });
 
   it("rejects invalid input and malformed aggregate rows before exposing a snapshot", async () => {

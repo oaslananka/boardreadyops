@@ -281,7 +281,7 @@ export function createSqlRunnerFleetHealthStore(executor: SqlQueryExecutor): Run
             ? { earliestExpirySeconds: ageSeconds(earliestLeaseExpiryAt, input.observedAt) }
             : {}),
         },
-        versions: versions.sort(compareVersionsDescending),
+        versions: versions.toSorted(compareVersionsDescending),
       };
     },
   };
