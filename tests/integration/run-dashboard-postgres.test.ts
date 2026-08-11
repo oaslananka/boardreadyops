@@ -139,7 +139,7 @@ describeDatabase("run dashboard PostgreSQL integration", () => {
     expect(result.run.findings[0]?.ruleId).toBe("rule.11");
     expect(result.run.artifactsPage).toEqual({ page: 1, pageSize: 10, total: 2, totalPages: 1 });
     expect(result.run.artifacts.map((artifact) => artifact.name)).toEqual(["large.html", "small.html"]);
-    expect(result.run.artifacts.every((artifact) => artifact.availability === "metadata-only")).toBe(true);
+    expect(result.run.artifacts.every((artifact) => artifact.availability === "available")).toBe(true);
     expect(result.run.artifactLifecycle).toEqual({
       deleted: 1,
       missing: 1,

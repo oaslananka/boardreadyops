@@ -188,7 +188,9 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
         executionAttemptId: fixture.attemptId,
         leaseId: fixture.leaseId,
         leaseToken: fixture.leaseToken,
-        artifacts: [{ kind: "report", name: "report.json", role: "machine", bytes: 42, sha256 }],
+        artifacts: [
+          { kind: "report", name: "report.json", role: "machine", bytes: 42, sha256, contentType: "application/json" },
+        ],
       };
       const issued = await issueStore.issueCapabilities(input);
       expect(issued).toEqual({
@@ -207,7 +209,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
 
       const pending = rows(
         await requireExecutor().query(
-          `select status, upload_token_digest, storage_path
+          `select status, upload_token_digest, storage_path, content_type
            from runner_artifact_upload_capabilities
            where artifact_id = $1`,
           [artifactId],
@@ -216,6 +218,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
       expect(pending).toMatchObject({
         status: "pending",
         storage_path: `${fixture.runId}/${fixture.attemptId}/${artifactId}.bin`,
+        content_type: "application/json",
       });
       expect(pending?.upload_token_digest).toBe(fingerprint(uploadToken));
       expect(pending?.upload_token_digest).not.toBe(uploadToken);
@@ -244,7 +247,7 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
 
       const artifactRows = rows(
         await requireExecutor().query(
-          `select id, run_id, kind, name, role, bytes, sha256, storage_path
+          `select id, run_id, execution_attempt_id, kind, name, role, bytes, sha256, storage_path, content_type, retention_until
            from artifacts where id = $1`,
           [artifactId],
         ),
@@ -253,12 +256,15 @@ describeDatabase("runner artifact capability PostgreSQL store", () => {
         {
           id: artifactId,
           run_id: fixture.runId,
+          execution_attempt_id: fixture.attemptId,
           kind: "report",
           name: "report.json",
           role: "machine",
           bytes: 42,
           sha256,
           storage_path: `${fixture.runId}/${fixture.attemptId}/${artifactId}.bin`,
+          content_type: "application/json",
+          retention_until: null,
         },
       ]);
     } finally {

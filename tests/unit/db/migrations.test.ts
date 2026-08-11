@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(38);
+    expect(cloudDatabaseSchemaVersion).toBe(39);
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -69,7 +69,23 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0036_control_plane_history_retention_indexes.sql",
       "0037_runner_fleet_health.sql",
       "0038_runner_registration_revocation.sql",
+      "0039_artifact_metadata_contract.sql",
     ]);
+  });
+
+  it("persists provider-neutral artifact metadata in schema v39", async () => {
+    const sql = await readFile(join(migrationsDir, "0039_artifact_metadata_contract.sql"), "utf8");
+
+    expect(sql).toContain("add column if not exists execution_attempt_id text");
+    expect(sql).toContain("add column if not exists content_type text");
+    expect(sql).toContain("add column if not exists retention_until timestamptz");
+    expect(sql).toContain("artifacts_execution_attempt_fk");
+    expect(sql).toContain("runner_artifact_upload_capabilities_content_type_valid");
+    expect(sql).toContain("boardreadyops_issue_artifact_upload_capabilities");
+    expect(sql).toContain("boardreadyops_complete_artifact_upload");
+    expect(sql).not.toContain("s3");
+    expect(sql).not.toContain("r2");
+    expect(sql).not.toContain("vercel");
   });
 
   it("indexes terminal one-time records for bounded retention cleanup", async () => {

@@ -231,10 +231,26 @@ describe("runner protocol contracts", () => {
             role: "primary",
             bytes: 4096,
             sha256: "b".repeat(64),
+            contentType: "text/html",
           },
         ],
       }).success,
     ).toBe(true);
+
+    expect(
+      runnerArtifactCapabilityRequestSchema.safeParse({
+        ...leaseContext(),
+        artifacts: [
+          {
+            kind: "html-report",
+            name: "report.html",
+            role: "primary",
+            bytes: 4096,
+            contentType: "text html",
+          },
+        ],
+      }).success,
+    ).toBe(false);
 
     expect(
       runnerTerminalResultRequestSchema.safeParse({

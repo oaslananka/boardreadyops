@@ -325,6 +325,7 @@ async function issueArtifactCapabilities(input: {
           role: artifact.role,
           bytes: artifact.bytes,
           ...(artifact.sha256 === undefined ? {} : { sha256: artifact.sha256 }),
+          ...(artifact.contentType === undefined ? {} : { contentType: artifact.contentType }),
         })),
       });
     if (result.status !== "accepted") return capabilityRequestRejectionResponse(result.status);

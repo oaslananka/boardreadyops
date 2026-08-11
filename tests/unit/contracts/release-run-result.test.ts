@@ -37,6 +37,7 @@ describe("release run result contract", () => {
           sha256: "a".repeat(64),
           bytes: 4096,
           role: "primary",
+          contentType: "text/html",
         },
       ],
       metrics: { durationMs: 1234, readinessScore: 72 },
@@ -45,6 +46,7 @@ describe("release run result contract", () => {
 
     expect(result.version).toBe(1);
     expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0]?.contentType).toBe("text/html");
     expect(result.metrics.readinessScore).toBe(72);
     expect(result.reportLinks[0]?.url).toMatch(/^https:/u);
   });
@@ -124,6 +126,7 @@ describe("release run result contract", () => {
             sha256: "b".repeat(64),
             bytes: 10,
             role: "primary",
+            contentType: "text html",
           },
         ],
         reportLinks: [{ label: "Report", url: "http://reports.example.test/report.html" }],
