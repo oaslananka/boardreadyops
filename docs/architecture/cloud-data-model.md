@@ -105,15 +105,23 @@ A file included in the release evidence bundle.
 interface Artifact {
   id: string;
   runId: string;                    // → ReleaseRun.id
+  executionAttemptId?: string;      // → ReleaseRunAttempt.id when known
   kind: "gerber" | "drill" | "bom" | "position" | "pdf" | "step" | "report" | "manifest" | "other";
   name: string;                     // display name
-  storagePath: string;              // internal path in artifact store (not public)
+  storagePath: string;              // provider-neutral internal locator (not public)
   sha256: string;
   bytes: number;
   role: "fabrication" | "assembly" | "documentation" | "report" | "evidence";
+  contentType: string;              // normalized media type, for example application/json
+  retentionUntil?: Date;            // optional persisted policy deadline; not an automatic global expiry
   uploadedAt: Date;
 }
 ```
+
+Artifact ownership is not duplicated into the row. Tenant ownership is derived from the authoritative
+run → repository → installation relationship. A live artifact row is the durable availability source of
+truth; signed-download capability is a separate access concern. Deletion jobs retain bounded operational
+outcomes after replaced artifact metadata is removed.
 
 ### Waiver
 
@@ -199,8 +207,8 @@ No artifact binary content passes through the API server on download.
 
 The data model is designed to be database-agnostic (no PostgreSQL-specific types in the schema above). Migration considerations:
 
-- **Schema versioning**: additive SQL migrations are recorded in `cloud_schema_migrations`; schema version 37 includes aggregate runner-fleet visibility and last-reported agent versions; earlier migrations remain additive and ordered.
+- **Schema versioning**: additive SQL migrations are recorded in `cloud_schema_migrations`; schema version 39 includes provider-neutral artifact execution-attempt, media-type, and optional retention-deadline metadata; earlier migrations remain additive and ordered.
 - **Multi-region**: findings and artifacts are append-only; replication to read replicas is straightforward.
 - **Tenant isolation**: all queries filter by `installationId`; adding row-level security (RLS) in PostgreSQL does not require schema changes.
-- **Artifact store swap**: `storagePath` is internal. Switching from Vercel Blob to R2 or S3 requires a data migration script but no schema change.
+- **Artifact store swap**: `storagePath` is a provider-neutral internal locator. Selecting or migrating an object-storage provider is a separate deployment concern and does not change the artifact metadata contract.
 - **Self-hosted**: the data model supports a self-hosted deployment by replacing the GitHub App credentials and storage backend without structural changes.

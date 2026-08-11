@@ -5,6 +5,7 @@ const lifecycleUrl = new URL("../../../docs/security/data-lifecycle.md", import.
 const auditUrl = new URL("../../../docs/security/audit-logs.md", import.meta.url);
 const navigationUrl = new URL("../../../mkdocs.yml", import.meta.url);
 const selfHostedRunnerUrl = new URL("../../../docs/deployment/self-hosted-runner.md", import.meta.url);
+const cloudDataModelUrl = new URL("../../../docs/architecture/cloud-data-model.md", import.meta.url);
 
 describe("data lifecycle documentation", () => {
   it("documents the implemented storage boundaries and lifecycle matrix without overclaiming erasure", async () => {
@@ -41,6 +42,21 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("organization, repository, or user erasure workflow is not implemented");
     expect(lifecycle).toContain("legal-hold workflow is not implemented");
     expect(lifecycle).toContain("backup and platform-log expiry remain operator responsibilities");
+  });
+
+  it("documents provider-neutral artifact evidence metadata and availability semantics", async () => {
+    const lifecycle = await readFile(lifecycleUrl, "utf8");
+    const dataModel = await readFile(cloudDataModelUrl, "utf8");
+
+    expect(dataModel).toContain("contentType: string");
+    expect(dataModel).toContain("executionAttemptId?: string");
+    expect(dataModel).toContain("retentionUntil?: Date");
+    expect(dataModel).toContain("run → repository → installation");
+    expect(dataModel).toContain("schema version 39");
+    expect(lifecycle).toContain("A durable artifact row is the availability source of truth");
+    expect(lifecycle).toContain("does not make that artifact `metadata-only`");
+    expect(lifecycle).toContain("`metadata-only` runner mode emits no managed artifact row");
+    expect(lifecycle).toContain("optional persisted retention deadline");
   });
 
   it("documents fail-closed safe-mode workspace cleanup", async () => {

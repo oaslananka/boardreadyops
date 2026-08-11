@@ -90,6 +90,7 @@ function sampleRun(): RunDetail {
         sha256: "a".repeat(64),
         bytes: 2048,
         role: "primary",
+        contentType: "text/html",
         uploadedAt: "2026-07-30T00:02:00.000Z",
         downloadUrl: "https://boardreadyops.example/runs/run-accessible/artifacts/artifact-1",
         availability: "available",

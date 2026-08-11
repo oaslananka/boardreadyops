@@ -41,7 +41,7 @@ type FindingDetail = {
   waivedAt: string | undefined;
 };
 
-type ArtifactAvailability = "available" | "metadata-only";
+type ArtifactAvailability = "available";
 
 type ArtifactLifecycleSummary = {
   deleted: number;
@@ -57,10 +57,13 @@ type ArtifactDetail = {
   sha256: string;
   bytes: number;
   role: string;
+  contentType: string;
+  executionAttemptId: string | undefined;
   uploadedAt: string;
   downloadUrl: string | undefined;
   availability: ArtifactAvailability;
-  retention: "no-automatic-expiry";
+  retention: "no-automatic-expiry" | "retained-until";
+  retentionUntil: string | undefined;
 };
 
 type AttemptDetail = {
@@ -628,7 +631,8 @@ export async function lookupRunDashboard(
     ),
     executor.query(
       `select artifacts.id, artifacts.kind, artifacts.name, artifacts.sha256,
-              artifacts.bytes, artifacts.role, artifacts.uploaded_at
+              artifacts.bytes, artifacts.role, artifacts.content_type,
+              artifacts.execution_attempt_id, artifacts.retention_until, artifacts.uploaded_at
        from artifacts
        where ${artifactScope.sql}
        order by ${artifactOrder(filters.artifactSort)}
@@ -653,6 +657,7 @@ export async function lookupRunDashboard(
   const artifacts = rows(artifactsResult).map((row): ArtifactDetail => {
     const artifactId = requiredString(row, "id");
     const downloadUrl = options.artifactDownloadUrl?.({ runId, artifactId });
+    const retentionUntil = stringValue(row, "retention_until");
     return {
       id: artifactId,
       kind: requiredString(row, "kind"),
@@ -660,10 +665,13 @@ export async function lookupRunDashboard(
       sha256: requiredString(row, "sha256"),
       bytes: numberValue(row, "bytes") ?? 0,
       role: requiredString(row, "role"),
+      contentType: stringValue(row, "content_type") ?? "application/octet-stream",
+      executionAttemptId: stringValue(row, "execution_attempt_id"),
       uploadedAt: requiredString(row, "uploaded_at"),
       downloadUrl,
-      availability: downloadUrl ? "available" : "metadata-only",
-      retention: "no-automatic-expiry",
+      availability: "available",
+      retention: retentionUntil ? "retained-until" : "no-automatic-expiry",
+      retentionUntil,
     };
   });
 

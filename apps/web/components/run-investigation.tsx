@@ -720,7 +720,7 @@ export function ArtifactsView({
 }: Readonly<{ run: RunDetail; searchParameters: SearchParameterMap }>) {
   const current = stringSearchParameters(searchParameters);
   const normalizedArtifactSort = filtersFromSearchParameters(searchParameters).artifactSort ?? "newest";
-  const hasMetadataOnly = run.artifacts.some((artifact) => artifact.availability === "metadata-only");
+  const hasUnavailableSignedDownload = run.artifacts.some((artifact) => !artifact.downloadUrl);
   const artifactLifecycleTotal =
     run.artifactLifecycle.deleted +
     run.artifactLifecycle.missing +
@@ -792,9 +792,9 @@ export function ArtifactsView({
           </Link>
         </div>
       </form>
-      {hasMetadataOnly ? (
-        <Alert title="Some artifact data is partial" tone="warning">
-          <p>Checksums and metadata are available, but this deployment has not configured a signed download source.</p>
+      {hasUnavailableSignedDownload ? (
+        <Alert title="Signed artifact download is unavailable" tone="warning">
+          <p>The artifact is recorded as available, but this deployment cannot issue a signed download URL.</p>
         </Alert>
       ) : null}
       {artifactLifecycleTotal > 0 ? (
@@ -832,13 +832,18 @@ function ArtifactRow({ artifact }: Readonly<{ artifact: ArtifactDetail }>) {
       <th scope="row">
         <strong>{artifact.name}</strong>
         <span>
-          {humanize(artifact.kind)} · {humanize(artifact.role)}
+          {humanize(artifact.kind)} · {humanize(artifact.role)} · {artifact.contentType}
         </span>
         <time dateTime={artifact.uploadedAt}>{formatRunDate(artifact.uploadedAt)}</time>
       </th>
       <td>
         <StatusBadge value={artifact.availability} />
-        <span className="cell-note">Retention: no automatic age-based expiry</span>
+        <span className="cell-note">
+          {artifact.retentionUntil
+            ? `Retention recorded until ${formatRunDate(artifact.retentionUntil)}`
+            : "Retention: no automatic age-based expiry"}
+        </span>
+        {artifact.executionAttemptId ? <span className="cell-note">Attempt: {artifact.executionAttemptId}</span> : null}
       </td>
       <td>
         <code className="checksum">{artifact.sha256}</code>
@@ -851,7 +856,7 @@ function ArtifactRow({ artifact }: Readonly<{ artifact: ArtifactDetail }>) {
             Download signed copy
           </a>
         ) : (
-          <span>Metadata only</span>
+          <span>Signed download unavailable</span>
         )}
       </td>
     </tr>

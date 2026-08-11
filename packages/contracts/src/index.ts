@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { runnerLeaseContextSchema } from "./runner-protocol.js";
+import { artifactContentTypeSchema, runnerLeaseContextSchema } from "./runner-protocol.js";
 
 export * from "./runner-protocol.js";
 
@@ -45,6 +45,7 @@ export const releaseRunArtifactSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/u),
   bytes: z.number().int().nonnegative().max(2_147_483_647),
   role: z.string().trim().min(1).max(128),
+  contentType: artifactContentTypeSchema.optional(),
 });
 
 export const releaseRunReportLinkSchema = z.object({

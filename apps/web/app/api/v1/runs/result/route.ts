@@ -476,6 +476,7 @@ async function persistRunnerResult(
       sha256: artifact.sha256,
       bytes: artifact.bytes,
       role: artifact.role,
+      content_type: artifact.contentType ?? "application/octet-stream",
     })),
   );
   const metricsJson = JSON.stringify(result.metrics);
@@ -536,6 +537,7 @@ async function persistRunnerResult(
                         or uploaded_artifact.storage_path <> capability.storage_path
                         or uploaded_artifact.bytes <> capability.declared_bytes
                         or uploaded_artifact.role <> capability.role
+                        or uploaded_artifact.content_type <> capability.content_type
                         or not exists (
                           select 1
                           from jsonb_to_recordset($14::jsonb) as reported_artifact(
@@ -544,7 +546,8 @@ async function persistRunnerResult(
                             storage_path text,
                             sha256 text,
                             bytes integer,
-                            role text
+                            role text,
+                            content_type text
                           )
                           where reported_artifact.kind = capability.kind
                             and reported_artifact.name = capability.name
@@ -552,6 +555,7 @@ async function persistRunnerResult(
                             and reported_artifact.sha256 = uploaded_artifact.sha256
                             and reported_artifact.bytes = uploaded_artifact.bytes
                             and reported_artifact.role = capability.role
+                            and reported_artifact.content_type = capability.content_type
                         )
                       )
                   )
@@ -807,8 +811,10 @@ async function persistRunnerResult(
        returning id
      ),
      inserted_artifacts as (
-       insert into artifacts (run_id, kind, name, storage_path, sha256, bytes, role)
+       insert into artifacts (run_id, execution_attempt_id, content_type, kind, name, storage_path, sha256, bytes, role)
        select updated.id,
+              $2,
+              artifact.content_type,
               artifact.kind,
               artifact.name,
               artifact.storage_path,
@@ -823,7 +829,8 @@ async function persistRunnerResult(
          storage_path text,
          sha256 text,
          bytes integer,
-         role text
+         role text,
+         content_type text
        )
        where $15::text is null
        returning id

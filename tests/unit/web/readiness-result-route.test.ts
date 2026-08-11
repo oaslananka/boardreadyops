@@ -316,6 +316,7 @@ describe("readiness result route authentication and publication", () => {
         sha256: "a".repeat(64),
         bytes: 4096,
         role: "primary",
+        contentType: "text/html",
       },
     ];
     const body = JSON.stringify({
@@ -406,6 +407,7 @@ describe("readiness result route authentication and publication", () => {
     expect(sql).toContain("'result_replaced'");
     expect(sql).toContain("join deleted_artifacts on deleted_artifacts.id = captured_artifacts.id");
     expect(sql).toContain("inserted_artifacts as");
+    expect(sql).toContain("execution_attempt_id, content_type");
     expect(sql).toContain("updated_attempt as");
     expect(sql).toContain("boardreadyops_apply_runner_result_state");
     expect(sql).toContain("classified.version");
@@ -459,6 +461,7 @@ describe("readiness result route authentication and publication", () => {
           sha256: "a".repeat(64),
           bytes: 4096,
           role: "primary",
+          content_type: "text/html",
         },
       ]),
     );
