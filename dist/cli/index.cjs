@@ -50517,11 +50517,11 @@ function emptyPlan() {
 }
 function sortPlan(plan) {
   return {
-    changes: plan.changes.sort((left, right) => left.path.localeCompare(right.path)),
-    skipped: plan.skipped.sort(
+    changes: plan.changes.toSorted((left, right) => left.path.localeCompare(right.path)),
+    skipped: plan.skipped.toSorted(
       (left, right) => `${left.ruleId}:${left.path}`.localeCompare(`${right.ruleId}:${right.path}`)
     ),
-    drcSuggestions: plan.drcSuggestions.sort(
+    drcSuggestions: plan.drcSuggestions.toSorted(
       (left, right) => `${left.ruleId}:${left.path}:${left.line ?? 0}`.localeCompare(`${right.ruleId}:${right.path}:${right.line ?? 0}`)
     )
   };

@@ -251,11 +251,11 @@ function emptyPlan(): MutablePlan {
 
 function sortPlan(plan: MutablePlan): FixPlan {
   return {
-    changes: plan.changes.sort((left, right) => left.path.localeCompare(right.path)),
-    skipped: plan.skipped.sort((left, right) =>
+    changes: plan.changes.toSorted((left, right) => left.path.localeCompare(right.path)),
+    skipped: plan.skipped.toSorted((left, right) =>
       `${left.ruleId}:${left.path}`.localeCompare(`${right.ruleId}:${right.path}`),
     ),
-    drcSuggestions: plan.drcSuggestions.sort((left, right) =>
+    drcSuggestions: plan.drcSuggestions.toSorted((left, right) =>
       `${left.ruleId}:${left.path}:${left.line ?? 0}`.localeCompare(`${right.ruleId}:${right.path}:${right.line ?? 0}`),
     ),
   };
