@@ -26109,7 +26109,7 @@ function parseSexprDocument(text) {
     processSexprToken(text, char, position, nodes, stack, errors);
   }
   const end = mark(position);
-  for (const list of stack.reverse()) {
+  for (const list of stack.toReversed()) {
     list.span.end = end;
     errors.push({ message: "Unclosed list", span: { start: list.span.start, end } });
   }
