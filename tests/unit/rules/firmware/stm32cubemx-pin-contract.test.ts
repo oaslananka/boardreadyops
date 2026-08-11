@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { validateConfig } from "../../../../src/core/config.js";
@@ -15,6 +16,12 @@ describe("firmware.stm32cubemx-pin-contract", () => {
         projects: [{ path: ".", firmware: { stm32cubemx: { project: "board.ioc" } } }],
       }),
     ).toEqual([]);
+  });
+
+  it("keeps MCU designator fallback branching explicit", async () => {
+    const source = await fs.readFile("src/rules/firmware/stm32cubemx-pin-contract.ts", "utf8");
+    expect(source).toContain("const configuredMcuDesignator = context.config.firmware?.stm32cubemx?.mcuDesignator;");
+    expect(source).not.toContain(': typeof context.config.firmware?.stm32cubemx?.mcuDesignator === "string"');
   });
 
   it("parses a STM32CubeMX .ioc file into a normalized contract", async () => {

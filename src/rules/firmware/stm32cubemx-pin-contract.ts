@@ -33,12 +33,12 @@ export const stm32CubeMxPinContractRule = rule(
       return [];
     }
     const ruleConfig = configFor(context, ruleId);
+    const configuredMcuDesignator = context.config.firmware?.stm32cubemx?.mcuDesignator;
+    const fallbackMcuDesignator = typeof configuredMcuDesignator === "string" ? configuredMcuDesignator : "U1";
     const mcuDesignator =
       typeof ruleConfig["mcu-designator"] === "string" && ruleConfig["mcu-designator"].trim() !== ""
         ? ruleConfig["mcu-designator"].trim()
-        : typeof context.config.firmware?.stm32cubemx?.mcuDesignator === "string"
-          ? context.config.firmware.stm32cubemx.mcuDesignator
-          : "U1";
+        : fallbackMcuDesignator;
 
     // Use a custom loader that passes mcu-designator, then delegate to shared logic.
     const customAdapter = {
