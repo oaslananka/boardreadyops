@@ -62,11 +62,11 @@ export function RunLiveRefresh({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (!enabled) return null;
   return (
-    <p className="live-refresh-status" role="status">
+    <output className="live-refresh-status">
       <span className="live-refresh-indicator" aria-hidden="true" />
       <span>
         <strong>Live status updates</strong> refresh every five seconds and resume automatically after reconnect.
       </span>
-    </p>
+    </output>
   );
 }
