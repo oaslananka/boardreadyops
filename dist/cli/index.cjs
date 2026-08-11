@@ -26649,7 +26649,7 @@ function orderedLoopArea(segments) {
     }
     areas.push(polygonArea(points.slice(0, -1)));
   }
-  const [outer, ...holes] = areas.sort((left, right) => right - left);
+  const [outer, ...holes] = areas.toSorted((left, right) => right - left);
   if (!outer) {
     return void 0;
   }

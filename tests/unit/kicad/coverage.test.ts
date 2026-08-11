@@ -465,6 +465,12 @@ describe("KiCad parsers", () => {
     expect(extractBlocks('(symbol (property "Value" "escaped \\" quote"))', "symbol")).toHaveLength(1);
   });
 
+  it("keeps outline area ordering non-mutating", async () => {
+    const source = await fs.readFile("src/kicad/pcb.ts", "utf8");
+    expect(source).toContain("areas.toSorted((left, right) => right - left)");
+    expect(source).not.toContain("areas.sort((left, right) => right - left)");
+  });
+
   it("parses variants and jobsets from fallback formats", async () => {
     expect(parseVariants("not json")).toEqual([]);
     expect(activeVariantDnpRefs({ name: "none", dnpOverrides: [] }, ["R1"])).toEqual([]);
