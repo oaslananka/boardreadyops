@@ -26,6 +26,8 @@ describe("run investigation routes", () => {
     expect(liveRefreshComponent).toContain('"use client"');
     expect(liveRefreshComponent).toContain("router.refresh()");
     expect(liveRefreshComponent).toContain("Live status updates");
+    expect(liveRefreshComponent).toContain('<output className="live-refresh-status">');
+    expect(liveRefreshComponent).not.toContain('role="status"');
     expect(component).toContain("RunLiveRefresh");
     expect(component).toContain("liveRefresh");
     expect(lifecycleDocumentation).toContain("five-second server refresh");
