@@ -43315,7 +43315,9 @@ var stm32CubeMxPinContractRule = rule(
       return [];
     }
     const ruleConfig2 = configFor(context, ruleId4);
-    const mcuDesignator = typeof ruleConfig2["mcu-designator"] === "string" && ruleConfig2["mcu-designator"].trim() !== "" ? ruleConfig2["mcu-designator"].trim() : typeof context.config.firmware?.stm32cubemx?.mcuDesignator === "string" ? context.config.firmware.stm32cubemx.mcuDesignator : "U1";
+    const configuredMcuDesignator = context.config.firmware?.stm32cubemx?.mcuDesignator;
+    const fallbackMcuDesignator = typeof configuredMcuDesignator === "string" ? configuredMcuDesignator : "U1";
+    const mcuDesignator = typeof ruleConfig2["mcu-designator"] === "string" && ruleConfig2["mcu-designator"].trim() !== "" ? ruleConfig2["mcu-designator"].trim() : fallbackMcuDesignator;
     const customAdapter = {
       ...stm32CubeMxAdapter,
       load: (file2) => loadStm32CubeMxContract(file2, mcuDesignator)
