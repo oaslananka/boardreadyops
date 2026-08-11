@@ -125,7 +125,7 @@ jobs:
           fi
 
       - name: Check out exact target commit
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ inputs.head_sha }}
           persist-credentials: false
@@ -315,12 +315,12 @@ jobs:
           fi
 
       - name: Check out default branch
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
       - name: Check out verified BoardReadyOps release
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: oaslananka/boardreadyops
           ref: ce925376bd71daf7e07f31fb1bb19a8bde30b172 # v1.24.1
