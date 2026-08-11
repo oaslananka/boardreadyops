@@ -34,6 +34,14 @@ describe("fix command", () => {
     await expect(fs.stat(path.join(root, "CHANGELOG.md"))).rejects.toThrow();
   });
 
+  it("keeps fix-plan ordering non-mutating", async () => {
+    const source = await fs.readFile("src/cli/fixes.ts", "utf8");
+    expect(source.match(/\.toSorted\(/g)).toHaveLength(3);
+    expect(source).not.toContain("plan.changes.sort(");
+    expect(source).not.toContain("plan.skipped.sort(");
+    expect(source).not.toContain("plan.drcSuggestions.sort(");
+  });
+
   it("keeps unchanged diff lines aligned around insertions", () => {
     const output = formatFixPlan({
       changes: [
