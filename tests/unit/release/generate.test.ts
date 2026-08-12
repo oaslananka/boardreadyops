@@ -116,6 +116,15 @@ describe("validateGenerateRecipe", () => {
   });
 });
 
+describe("generate source invariants", () => {
+  it("keeps directory entry sorting immutable", async () => {
+    const source = await fs.readFile(path.join(process.cwd(), "src/release/generate.ts"), "utf8");
+
+    expect(source).toContain("entries.toSorted((left, right) => left.name.localeCompare(right.name))");
+    expect(source).not.toContain("entries.sort((left, right) => left.name.localeCompare(right.name))");
+  });
+});
+
 describe("runGenerate", () => {
   it("produces artifacts and a checksum manifest for the default recipe", async () => {
     const outputDir = await makeTempDir();
