@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   canonicalRunnerRequest,
@@ -20,6 +21,12 @@ function vectorRequest() {
 }
 
 describe("runner request signature protocol v1", () => {
+  it("keeps text comparison branching explicit", async () => {
+    const source = await fs.readFile("packages/cloud-core/src/runner-request-signature.ts", "utf8");
+    expect(source).toContain("if (left < right) {");
+    expect(source).not.toContain("return left < right ? -1 : left > right ? 1 : 0;");
+  });
+
   it("matches the committed Ed25519 canonical request test vector", () => {
     const request = vectorRequest();
 
