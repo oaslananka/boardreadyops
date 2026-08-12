@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -39,6 +40,12 @@ describe("check-bundle-sizes", () => {
       size: 1234,
       unpackedSize: 5678,
     });
+  });
+
+  it("keeps npm pack candidate branching explicit", async () => {
+    const source = await fs.readFile("scripts/check-bundle-sizes.mjs", "utf8");
+    expect(source).toContain("const directMetadata = Array.isArray(parsed?.files) ? [parsed] : undefined;");
+    expect(source).not.toContain(": Array.isArray(parsed?.files)\n      ? [parsed]");
   });
 
   it("rejects npm pack output without numeric size metadata", () => {
