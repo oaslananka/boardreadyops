@@ -345,7 +345,7 @@ async function walkFiles(directory: string): Promise<string[]> {
   } catch {
     return output;
   }
-  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+  for (const entry of entries.toSorted((left, right) => left.name.localeCompare(right.name))) {
     const target = path.join(directory, entry.name);
     if (entry.isDirectory()) {
       output.push(...(await walkFiles(target)));
