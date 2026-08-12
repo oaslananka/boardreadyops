@@ -53883,7 +53883,13 @@ var lowercaseUuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-
 var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
 var strictVersionPattern2 = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 function compareText(left, right) {
-  return left < right ? -1 : left > right ? 1 : 0;
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
 }
 function encodeQueryComponent(value) {
   return encodeURIComponent(value).replace(
