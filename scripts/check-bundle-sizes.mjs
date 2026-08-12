@@ -28,11 +28,10 @@ export function normalizeSizePolicy(policy, label = "size budget") {
 export function parseNpmPackOutput(raw) {
   const jsonStart = raw.search(/[[{]/u);
   const parsed = JSON.parse(jsonStart >= 0 ? raw.slice(jsonStart) : raw);
+  const directMetadata = Array.isArray(parsed?.files) ? [parsed] : undefined;
   const candidates = Array.isArray(parsed)
     ? parsed
-    : Array.isArray(parsed?.files)
-      ? [parsed]
-      : Object.values(parsed ?? {}).filter((value) => Array.isArray(value?.files));
+    : (directMetadata ?? Object.values(parsed ?? {}).filter((value) => Array.isArray(value?.files)));
   if (candidates.length !== 1) {
     throw new Error(`npm pack output included ${candidates.length} metadata candidates`);
   }
