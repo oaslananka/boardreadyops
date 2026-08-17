@@ -294,7 +294,7 @@ describe("dependency and security automation configuration", () => {
     expect(workspace).toContain("'fast-uri@>=3 <3.1.5': 3.1.5");
     expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.1");
     expect(workspace).toContain("linkify-it@>=5 <5.0.2: 5.0.2");
-    expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.1");
+    expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.3");
 
     expect(preCommit).toContain("repo: https://github.com/google/osv-scanner");
     expect(preCommit).toContain("rev: v2.3.8");
