@@ -1,6 +1,6 @@
 {
   "name": "boardreadyops",
-  "version": "1.30.3",
+  "version": "1.31.0",
   "description": "BoardReadyOps checks KiCad hardware repositories for production readiness before fabrication.",
   "type": "module",
   "license": "MIT",
