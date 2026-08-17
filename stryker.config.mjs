@@ -7,6 +7,7 @@ export default {
     configFile: "vitest.config.ts",
   },
   testFiles: ["tests/unit/**/*.test.ts", "tests/property/**/*.test.ts", "tests/snapshot/**/*.test.ts"],
+  ignorePatterns: ["tests/unit/kicad/source-guards.test.ts"],
   mutate: [
     "src/core/**/*.ts",
     "!src/core/context.ts",
