@@ -120,17 +120,14 @@ describe("control-plane webhook retention configuration", () => {
     ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 3650, controlPlaneHistoryDays: 90 });
   });
 
-  it.each([
-    "0",
-    "3651",
-    "1.5",
-    "thirty",
-    "",
-  ])("rejects invalid terminal ephemeral record retention value %s", (value) => {
-    expect(() =>
-      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: value }),
-    ).toThrowError(expect.objectContaining({ code: "invalid-ephemeral-record-retention-days" }));
-  });
+  it.each(["0", "3651", "1.5", "thirty", ""])(
+    "rejects invalid terminal ephemeral record retention value %s",
+    (value) => {
+      expect(() =>
+        resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS: value }),
+      ).toThrowError(expect.objectContaining({ code: "invalid-ephemeral-record-retention-days" }));
+    },
+  );
 
   it("accepts an explicit bounded completed control-plane history retention period", () => {
     expect(
@@ -144,17 +141,14 @@ describe("control-plane webhook retention configuration", () => {
     ).toEqual({ webhookInboxDays: 30, ephemeralRecordsDays: 30, controlPlaneHistoryDays: 3650 });
   });
 
-  it.each([
-    "0",
-    "3651",
-    "1.5",
-    "ninety",
-    "",
-  ])("rejects invalid completed control-plane history retention value %s", (value) => {
-    expect(() =>
-      resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS: value }),
-    ).toThrowError(expect.objectContaining({ code: "invalid-control-plane-history-retention-days" }));
-  });
+  it.each(["0", "3651", "1.5", "ninety", ""])(
+    "rejects invalid completed control-plane history retention value %s",
+    (value) => {
+      expect(() =>
+        resolveControlPlaneRetentionConfiguration({ BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS: value }),
+      ).toThrowError(expect.objectContaining({ code: "invalid-control-plane-history-retention-days" }));
+    },
+  );
 });
 
 describe("artifact upload capability configuration", () => {
@@ -195,16 +189,12 @@ describe("self-hosted runner minimum-version configuration", () => {
     expect(compareStrictVersions("2.0.0", "10.0.0")).toBeLessThan(0);
   });
 
-  it.each([
-    "",
-    "1.26",
-    "v1.26.1",
-    "01.26.1",
-    "1.26.1-beta.1",
-    "1.26.1+build",
-  ])("rejects invalid minimum runner version %s", (value) => {
-    expect(() =>
-      resolveSelfHostedRunnerVersionConfiguration({ BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: value }),
-    ).toThrowError(expect.objectContaining({ code: "invalid-self-hosted-runner-minimum-version" }));
-  });
+  it.each(["", "1.26", "v1.26.1", "01.26.1", "1.26.1-beta.1", "1.26.1+build"])(
+    "rejects invalid minimum runner version %s",
+    (value) => {
+      expect(() =>
+        resolveSelfHostedRunnerVersionConfiguration({ BOARDREADYOPS_SELF_HOSTED_RUNNER_MIN_VERSION: value }),
+      ).toThrowError(expect.objectContaining({ code: "invalid-self-hosted-runner-minimum-version" }));
+    },
+  );
 });

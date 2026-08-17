@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "next": "16.2.12",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "@boardreadyops/cloud-core": "workspace:*",
     "@boardreadyops/contracts": "workspace:*",
     "@boardreadyops/db": "workspace:*",

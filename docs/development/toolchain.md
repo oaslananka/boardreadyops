@@ -54,7 +54,7 @@ source "$(corepack pnpm -s toolchain:env)"
 
 ## Browser discovery
 
-The bootstrap asks Puppeteer 25.2.0 to install its compatible Chrome revision and records the executable in `.boardreadyops/toolchain/browser-path`. Documentation accessibility checks prefer `PA11Y_CHROME_PATH`, then this recorded path, and finally standard system Chrome or Edge locations. Doctor executes the recorded browser with `--version`, so a present but unloadable binary fails before the 194-page accessibility scan begins.
+The bootstrap asks Puppeteer 25.2.1 to install its compatible Chrome revision and records the executable in `.boardreadyops/toolchain/browser-path`. Documentation accessibility checks prefer `PA11Y_CHROME_PATH`, then this recorded path, and finally standard system Chrome or Edge locations. Doctor executes the recorded browser with `--version`, so a present but unloadable binary fails before the 194-page accessibility scan begins.
 
 ## Optional prerequisites
 

@@ -17,17 +17,15 @@ describe("manufacturing.outputs-present", () => {
     expect(findings.map((finding) => finding.details?.required)).toContain("gerber");
   });
 
-  it.each([
-    "jlcpcb-layout",
-    "pcbway-layout",
-    "aisler-layout",
-    "oshpark-layout",
-    "custom-layout",
-  ])("detects vendor and custom output layouts in %s", async (fixture) => {
-    const result = await runFreshVendorFixture(fixture);
+  it.each(["jlcpcb-layout", "pcbway-layout", "aisler-layout", "oshpark-layout", "custom-layout"])(
+    "detects vendor and custom output layouts in %s",
+    async (fixture) => {
+      const result = await runFreshVendorFixture(fixture);
 
-    expectRule(result, "manufacturing.outputs-present", 0);
-  }, 15_000);
+      expectRule(result, "manufacturing.outputs-present", 0);
+    },
+    15_000,
+  );
 
   it("uses selected vendor profile evidence requirements", async () => {
     const root = await writeFixture({

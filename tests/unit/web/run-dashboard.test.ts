@@ -126,17 +126,15 @@ describe("run dashboard data", () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it.each([
-    true,
-    null,
-    undefined,
-    "not-a-boolean",
-  ])("fails repository dashboards closed for private or malformed visibility %j", async (privateValue) => {
-    const { executor, query } = executorWithResults([{ rows: [baseRunRow({ private: privateValue })] }]);
+  it.each([true, null, undefined, "not-a-boolean"])(
+    "fails repository dashboards closed for private or malformed visibility %j",
+    async (privateValue) => {
+      const { executor, query } = executorWithResults([{ rows: [baseRunRow({ private: privateValue })] }]);
 
-    await expect(lookupRunDashboard("private-run", executor)).resolves.toEqual({ state: "not-found" });
-    expect(query).toHaveBeenCalledTimes(1);
-  });
+      await expect(lookupRunDashboard("private-run", executor)).resolves.toEqual({ state: "not-found" });
+      expect(query).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it.each([false, "false", "f", 0, "0"])("treats explicit public visibility %j as public", async (privateValue) => {
     const { executor, query } = executorWithResults([
