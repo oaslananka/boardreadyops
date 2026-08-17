@@ -13,6 +13,8 @@ minimumReleaseAgeExclude:
   - '@next/swc-win32-x64-msvc@16.2.11'
   - '@hono/node-server@2.0.12'
   - 'brace-expansion@5.0.9'
+  # GitHub advisory GHSA-ggr8-5vv4-36mx: first patched deepmerge-ts release
+  - 'deepmerge-ts@8.0.0'
   # Renovate security update: js-yaml@4.3.1
   - 'js-yaml@5.2.2 || 4.3.1'
   # OSV security update: nanoid@3.3.17 || 3.3.18
@@ -47,6 +49,7 @@ allowBuilds:
 
 overrides:
   'archiver>readdir-glob': 3.0.0
+  '@prisma/config>deepmerge-ts': 8.0.0
   'pa11y>puppeteer': 25.2.0
   '@hono/node-server@<2.0.12': 2.0.12
   'postcss@<8.5.23': 8.5.23
