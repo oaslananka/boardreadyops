@@ -241,7 +241,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@pa11y/html_codesniffer@2.6.0`
   - Description: HTML_CodeSniffer is a client-side JavaScript that checks a HTML document or source code, and detects violations of a defined coding standard.
   - Homepage: http://squizlabs.github.io/HTML_CodeSniffer/
-- `deepmerge-ts@7.1.5`
+- `deepmerge-ts@8.0.0`
   - Description: Deeply merge 2 or more objects respecting type information.
   - Homepage: https://github.com/RebeccaStevens/deepmerge-ts#readme
 - `devtools-protocol@0.0.1638949`
