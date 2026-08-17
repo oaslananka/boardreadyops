@@ -4,6 +4,60 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.31.0](https://github.com/oaslananka/boardreadyops/compare/v1.30.3...v1.31.0) (2026-08-17)
+
+
+### Features
+
+* **core:** persist artifact evidence metadata ([#391](https://github.com/oaslananka/boardreadyops/issues/391)) ([e1acd38](https://github.com/oaslananka/boardreadyops/commit/e1acd3836fbfa829d6b9e926896b5a177a54bade))
+* **core:** surface artifact deletion lifecycle ([#360](https://github.com/oaslananka/boardreadyops/issues/360)) ([1f080b8](https://github.com/oaslananka/boardreadyops/commit/1f080b86d3b66cd8c519577563a71b7ba30adc88)), closes [#26](https://github.com/oaslananka/boardreadyops/issues/26)
+* **report:** link dashboard to GitHub Actions runs ([#358](https://github.com/oaslananka/boardreadyops/issues/358)) ([e58fcdb](https://github.com/oaslananka/boardreadyops/commit/e58fcdbfe43208a6614882100a0f17ee064b2f8a))
+
+
+### Bug Fixes
+
+* **ci:** fail pre-push checks closed ([#397](https://github.com/oaslananka/boardreadyops/issues/397)) ([df7723c](https://github.com/oaslananka/boardreadyops/commit/df7723c632b6d522a1811eff0981ffa995272f05))
+* **ci:** force Mergify in-place queue checks ([#366](https://github.com/oaslananka/boardreadyops/issues/366)) ([e2a346c](https://github.com/oaslananka/boardreadyops/commit/e2a346cf5fa7e1770714406b26eca0e5cec3f734))
+* **ci:** isolate source guards from mutation runs ([#407](https://github.com/oaslananka/boardreadyops/issues/407)) ([aadfa8a](https://github.com/oaslananka/boardreadyops/commit/aadfa8a3401a6a0061ebb0f60cb0d43529f28313))
+* **ci:** reduce compatibility drift complexity ([#372](https://github.com/oaslananka/boardreadyops/issues/372)) ([d25671b](https://github.com/oaslananka/boardreadyops/commit/d25671b6e2b55d2674954a9d6128b859475086e5))
+* **ci:** reduce i18n check complexity ([#373](https://github.com/oaslananka/boardreadyops/issues/373)) ([ff9d203](https://github.com/oaslananka/boardreadyops/commit/ff9d203a485cb746797d49f1c103374363c46bac))
+* **ci:** reduce synthetic canary complexity ([#386](https://github.com/oaslananka/boardreadyops/issues/386)) ([2c47cc6](https://github.com/oaslananka/boardreadyops/commit/2c47cc6917dd0e490be03a3851327467988a34cf))
+* **ci:** reduce worker fleet load complexity ([#374](https://github.com/oaslananka/boardreadyops/issues/374)) ([505a686](https://github.com/oaslananka/boardreadyops/commit/505a6869811d23ec85de8e4fe03d53e3bb29a789))
+* **ci:** regenerate dependency artifacts in Renovate ([#406](https://github.com/oaslananka/boardreadyops/issues/406)) ([341098e](https://github.com/oaslananka/boardreadyops/commit/341098e324612c6282ff84b7e6ab5b7e0c996a12))
+* **ci:** remediate Sonar and Mergify findings ([#364](https://github.com/oaslananka/boardreadyops/issues/364)) ([3ee4b08](https://github.com/oaslananka/boardreadyops/commit/3ee4b08e46e61105125315a6bff662f24a301f51))
+* **ci:** resolve npm pack via Node installation ([#367](https://github.com/oaslananka/boardreadyops/issues/367)) ([48f9a9d](https://github.com/oaslananka/boardreadyops/commit/48f9a9dd74b34284bce534df318b89e779f81b8f))
+* **ci:** retry transient Corepack bootstrap ([#356](https://github.com/oaslananka/boardreadyops/issues/356)) ([2d6a8ca](https://github.com/oaslananka/boardreadyops/commit/2d6a8ca0668c1a939fb8a4ecca29b4835340628b))
+* **ci:** simplify npm pack metadata branching ([#399](https://github.com/oaslananka/boardreadyops/issues/399)) ([9e6a3e7](https://github.com/oaslananka/boardreadyops/commit/9e6a3e70d293e6fe4944a63968e790cafb4ac0e2))
+* **cli:** keep fix plan sorting immutable ([#394](https://github.com/oaslananka/boardreadyops/issues/394)) ([a506d10](https://github.com/oaslananka/boardreadyops/commit/a506d10262cece22ee8fd38106bceba191c104fa))
+* **cli:** reduce DNP fix planning complexity ([#369](https://github.com/oaslananka/boardreadyops/issues/369)) ([4024ac6](https://github.com/oaslananka/boardreadyops/commit/4024ac69562069837da0049cd4b315b835fad144))
+* **cli:** reduce run command complexity ([#375](https://github.com/oaslananka/boardreadyops/issues/375)) ([46d13ff](https://github.com/oaslananka/boardreadyops/commit/46d13ff7df0f307e83f1b6c6a0cf6654615c48f1))
+* **core:** keep pcb area sorting immutable ([#396](https://github.com/oaslananka/boardreadyops/issues/396)) ([711a152](https://github.com/oaslananka/boardreadyops/commit/711a152e5f93d320a04fb489b69528683cc87e4b))
+* **core:** keep release file sorting immutable ([#401](https://github.com/oaslananka/boardreadyops/issues/401)) ([c922131](https://github.com/oaslananka/boardreadyops/commit/c92213115d73c8d8e8286f6cbf10a278b7c3f122))
+* **core:** keep runner fleet sorting immutable ([#393](https://github.com/oaslananka/boardreadyops/issues/393)) ([4065c7f](https://github.com/oaslananka/boardreadyops/commit/4065c7fe680580fdcd09f9c16f34a4bcae26dbde))
+* **core:** keep sexpr stack traversal immutable ([#395](https://github.com/oaslananka/boardreadyops/issues/395)) ([918fcb8](https://github.com/oaslananka/boardreadyops/commit/918fcb86ef30849bdcf55ead4acb24c88e0af330))
+* **core:** preserve verified runner artifacts ([#359](https://github.com/oaslananka/boardreadyops/issues/359)) ([4757691](https://github.com/oaslananka/boardreadyops/commit/47576913888889ab2e6d46bdcf0cd278ad4910d8)), closes [#26](https://github.com/oaslananka/boardreadyops/issues/26)
+* **core:** reduce artifact capability complexity ([#380](https://github.com/oaslananka/boardreadyops/issues/380)) ([b781ca5](https://github.com/oaslananka/boardreadyops/commit/b781ca51486349a47900426d04da2ec9b622757f))
+* **core:** reduce artifact stream complexity ([#381](https://github.com/oaslananka/boardreadyops/issues/381)) ([593e778](https://github.com/oaslananka/boardreadyops/commit/593e778eea072850cf998a674f67c085f11a3824))
+* **core:** reduce artifact upload complexity ([#379](https://github.com/oaslananka/boardreadyops/issues/379)) ([fe04596](https://github.com/oaslananka/boardreadyops/commit/fe0459623278d98d5747317ec1f7cdca4c299dd9))
+* **core:** reduce BOM MPN fix complexity ([#384](https://github.com/oaslananka/boardreadyops/issues/384)) ([d4b99e1](https://github.com/oaslananka/boardreadyops/commit/d4b99e12c84ee13f9f8a9d860ce3af88c64940d6))
+* **core:** reduce check-run reconciliation complexity ([#382](https://github.com/oaslananka/boardreadyops/issues/382)) ([075b330](https://github.com/oaslananka/boardreadyops/commit/075b33039c480f5a984536125a0b5e2ac6136670))
+* **core:** reduce lifecycle executor complexity ([#371](https://github.com/oaslananka/boardreadyops/issues/371)) ([2df087b](https://github.com/oaslananka/boardreadyops/commit/2df087bed5699f375f1b4a8eea52f39f7c51bfa0))
+* **core:** reduce repository setup complexity ([#378](https://github.com/oaslananka/boardreadyops/issues/378)) ([e0d47b5](https://github.com/oaslananka/boardreadyops/commit/e0d47b53d6fbb622aa4d6b06e8bf60b5ecfb80ae))
+* **core:** reduce repository setup probe complexity ([#385](https://github.com/oaslananka/boardreadyops/issues/385)) ([0eaa50c](https://github.com/oaslananka/boardreadyops/commit/0eaa50c0913a918f4e6b72a31596560c5c8459bf))
+* **core:** reduce result route complexity ([#387](https://github.com/oaslananka/boardreadyops/issues/387)) ([ad9f6af](https://github.com/oaslananka/boardreadyops/commit/ad9f6af93a13f95810131a59b7b443da7b92e14f))
+* **core:** reduce run summary complexity ([#370](https://github.com/oaslananka/boardreadyops/issues/370)) ([27dbc18](https://github.com/oaslananka/boardreadyops/commit/27dbc18056ca1d6f32fcc1efb5e8cc9c16c0b0bc))
+* **core:** reduce runner claim complexity ([#376](https://github.com/oaslananka/boardreadyops/issues/376)) ([94a2a61](https://github.com/oaslananka/boardreadyops/commit/94a2a61c51bd31fee805848ca1563e371556d4d7))
+* **core:** reduce runner worker complexity ([#383](https://github.com/oaslananka/boardreadyops/issues/383)) ([9aa6860](https://github.com/oaslananka/boardreadyops/commit/9aa68605b524406d6485134189a6da6c5acd7eb4))
+* **core:** reduce setup probe callback complexity ([#368](https://github.com/oaslananka/boardreadyops/issues/368)) ([ae00c9d](https://github.com/oaslananka/boardreadyops/commit/ae00c9d6d542bcb6d7a8996b4175b04d3ba74941))
+* **core:** reduce Sonar complexity in core parsers ([#365](https://github.com/oaslananka/boardreadyops/issues/365)) ([49b1e83](https://github.com/oaslananka/boardreadyops/commit/49b1e83cfd16b2a20d9d8c6dc85178b3dac4b06d))
+* **core:** reduce webhook lifecycle complexity ([#377](https://github.com/oaslananka/boardreadyops/issues/377)) ([734a8e9](https://github.com/oaslananka/boardreadyops/commit/734a8e90b1e69d192baf9e3e1f22e644b6e5d17f))
+* **core:** simplify runner request text comparison ([#400](https://github.com/oaslananka/boardreadyops/issues/400)) ([0a4dea9](https://github.com/oaslananka/boardreadyops/commit/0a4dea91380760d8a69885c8ffdb262cd0f450fc))
+* **core:** simplify STM32 designator fallback ([#398](https://github.com/oaslananka/boardreadyops/issues/398)) ([d661c44](https://github.com/oaslananka/boardreadyops/commit/d661c44d6c1eda7a3274114a082c1f9023f8f4b7))
+* **core:** use semantic live status output ([#392](https://github.com/oaslananka/boardreadyops/issues/392)) ([10d5248](https://github.com/oaslananka/boardreadyops/commit/10d524874cc635d3d32cd288ac31778944bf7b14))
+* **deps:** patch deepmerge-ts in Prisma config ([#409](https://github.com/oaslananka/boardreadyops/issues/409)) ([7d3e2d5](https://github.com/oaslananka/boardreadyops/commit/7d3e2d5104e64c9f078318efbbd257f48fb85d11))
+* **deps:** remove vulnerable extract-zip path ([#408](https://github.com/oaslananka/boardreadyops/issues/408)) ([800ebcd](https://github.com/oaslananka/boardreadyops/commit/800ebcd46826961018ea038809bca86f14f6704c))
+* **deps:** update vulnerable nanoid to 3.3.18 ([#402](https://github.com/oaslananka/boardreadyops/issues/402)) ([48be1f9](https://github.com/oaslananka/boardreadyops/commit/48be1f91346c622f7fcac32e16c7ea27f6d4fdfe))
+
 ## [1.30.3](https://github.com/oaslananka/boardreadyops/compare/v1.30.2...v1.30.3) (2026-08-09)
 
 
