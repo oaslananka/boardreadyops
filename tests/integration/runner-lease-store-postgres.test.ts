@@ -307,46 +307,46 @@ describeDatabase("runner lease PostgreSQL store", () => {
     }
   });
 
-  it.each([
-    "draft-pull-request",
-    "fork-pull-request",
-  ] as const)("does not create a runner lease for a %s trust snapshot", async (reason) => {
-    const now = testTime(-150);
-    const tenant = await createTenant(`lease-test-${reason}`, false);
-    const runId = await createQueuedRun(tenant, now);
-    const managedIdentityId = await createManagedIdentity(`lease-test-${reason}`, now);
+  it.each(["draft-pull-request", "fork-pull-request"] as const)(
+    "does not create a runner lease for a %s trust snapshot",
+    async (reason) => {
+      const now = testTime(-150);
+      const tenant = await createTenant(`lease-test-${reason}`, false);
+      const runId = await createQueuedRun(tenant, now);
+      const managedIdentityId = await createManagedIdentity(`lease-test-${reason}`, now);
 
-    try {
-      await databaseExecutor().query(
-        "update release_runs set trust_mode = 'safe', safe_mode_reasons = $2::text[] where id = $1",
-        [runId, [reason]],
-      );
-      const result = await fixedStore({
-        now,
-        ids: [randomUUID(), randomUUID()],
-        tokens: [token(reason)],
-      }).claimJob({
-        workerClass: "managed",
-        managedRunnerIdentityId: managedIdentityId,
-        requestTimestamp: requestTimestamp(now),
-        requestNonce: nonce(reason),
-        capabilities: ["kicad:10"],
-      });
-
-      expect(result).toEqual({ status: "empty", retryAfterSeconds: 15 });
-      const counts = rows(
+      try {
         await databaseExecutor().query(
-          `select
+          "update release_runs set trust_mode = 'safe', safe_mode_reasons = $2::text[] where id = $1",
+          [runId, [reason]],
+        );
+        const result = await fixedStore({
+          now,
+          ids: [randomUUID(), randomUUID()],
+          tokens: [token(reason)],
+        }).claimJob({
+          workerClass: "managed",
+          managedRunnerIdentityId: managedIdentityId,
+          requestTimestamp: requestTimestamp(now),
+          requestNonce: nonce(reason),
+          capabilities: ["kicad:10"],
+        });
+
+        expect(result).toEqual({ status: "empty", retryAfterSeconds: 15 });
+        const counts = rows(
+          await databaseExecutor().query(
+            `select
                (select count(*)::int from release_run_attempts where run_id = $1) as attempts,
                (select count(*)::int from runner_job_leases where run_id = $1) as leases`,
-          [runId],
-        ),
-      )[0];
-      expect(counts).toEqual({ attempts: 0, leases: 0 });
-    } finally {
-      await cleanupTenant(tenant, managedIdentityId);
-    }
-  });
+            [runId],
+          ),
+        )[0];
+        expect(counts).toEqual({ attempts: 0, leases: 0 });
+      } finally {
+        await cleanupTenant(tenant, managedIdentityId);
+      }
+    },
+  );
 
   it("allows only one concurrent claim for one queued logical run", async () => {
     const now = testTime(0);
@@ -660,9 +660,10 @@ describeDatabase("runner lease PostgreSQL store", () => {
           [runnerId],
         ),
       )[0];
-      expect((afterPoll?.last_heartbeat_at as Date).toISOString()).toBe(pollAt);
-      expect(afterPoll?.last_runner_version).toBe("1.27.1");
-      expect(afterPoll?.nonces).toBe(1);
+      if (!afterPoll) throw new Error("expected runner presence row after valid poll");
+      expect((afterPoll.last_heartbeat_at as Date).toISOString()).toBe(pollAt);
+      expect(afterPoll.last_runner_version).toBe("1.27.1");
+      expect(afterPoll.nonces).toBe(1);
 
       await expect(
         fixedStore({ now: replayAt, ids: [randomUUID(), randomUUID()], tokens: [token("presence-legacy")] }).claimJob({
@@ -683,9 +684,10 @@ describeDatabase("runner lease PostgreSQL store", () => {
           [runnerId],
         ),
       )[0];
-      expect((afterLegacyPoll?.last_heartbeat_at as Date).toISOString()).toBe(replayAt);
-      expect(afterLegacyPoll?.last_runner_version).toBe("1.27.1");
-      expect(afterLegacyPoll?.nonces).toBe(2);
+      if (!afterLegacyPoll) throw new Error("expected runner presence row after legacy poll");
+      expect((afterLegacyPoll.last_heartbeat_at as Date).toISOString()).toBe(replayAt);
+      expect(afterLegacyPoll.last_runner_version).toBe("1.27.1");
+      expect(afterLegacyPoll.nonces).toBe(2);
 
       await expect(
         fixedStore({ now: replayAt, ids: [randomUUID(), randomUUID()], tokens: [token("presence-replay")] }).claimJob({
@@ -717,9 +719,10 @@ describeDatabase("runner lease PostgreSQL store", () => {
           [runnerId],
         ),
       )[0];
-      expect((afterRejectedMutations?.last_heartbeat_at as Date).toISOString()).toBe(replayAt);
-      expect(afterRejectedMutations?.last_runner_version).toBe("1.27.1");
-      expect(afterRejectedMutations?.nonces).toBe(2);
+      if (!afterRejectedMutations) throw new Error("expected runner presence row after rejected mutations");
+      expect((afterRejectedMutations.last_heartbeat_at as Date).toISOString()).toBe(replayAt);
+      expect(afterRejectedMutations.last_runner_version).toBe("1.27.1");
+      expect(afterRejectedMutations.nonces).toBe(2);
     } finally {
       await cleanupTenant(tenant);
     }

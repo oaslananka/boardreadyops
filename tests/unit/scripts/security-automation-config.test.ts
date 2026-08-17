@@ -284,7 +284,7 @@ describe("dependency and security automation configuration", () => {
     const securityDocs = await repositoryFile("docs/security-automation.md");
     const workspace = await repositoryFile("pnpm-workspace.yaml");
 
-    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.2");
+    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.3");
     expect(workspace).not.toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
     expect(workspace).toContain("'archiver>readdir-glob': 3.0.0");
     expect(workspace).toContain("'brace-expansion@>=5 <5.0.9': 5.0.9");

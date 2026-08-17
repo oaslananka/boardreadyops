@@ -254,18 +254,17 @@ describe("readiness result formatting", () => {
     },
   ] as const;
 
-  it.each(templateCases)("renders the $name terminal template from its reviewed fixture", async ({
-    name,
-    expectedTitle,
-    input,
-  }) => {
-    const output = buildReadinessCheckOutput(input);
-    const comment = buildReadinessPrComment(input);
-    const fixture = await readFile(path.resolve(`tests/fixtures/web/readiness-comments/${name}.md`), "utf8");
+  it.each(templateCases)(
+    "renders the $name terminal template from its reviewed fixture",
+    async ({ name, expectedTitle, input }) => {
+      const output = buildReadinessCheckOutput(input);
+      const comment = buildReadinessPrComment(input);
+      const fixture = await readFile(path.resolve(`tests/fixtures/web/readiness-comments/${name}.md`), "utf8");
 
-    expect(output.title).toBe(expectedTitle);
-    expect(output.summary).toContain("Next steps");
-    expect(comment).toBe(fixture);
-    expect(comment).toContain("<!-- boardreadyops:release-readiness -->");
-  });
+      expect(output.title).toBe(expectedTitle);
+      expect(output.summary).toContain("Next steps");
+      expect(comment).toBe(fixture);
+      expect(comment).toContain("<!-- boardreadyops:release-readiness -->");
+    },
+  );
 });

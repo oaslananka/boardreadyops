@@ -173,10 +173,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `prisma@7.8.0`
   - Description: Prisma is an open-source database toolkit. It includes a JavaScript/TypeScript ORM for Node.js, migrations and a modern GUI to view and edit the data in your database. You can use Prisma in new projects or add it to an existing one.
   - Homepage: https://www.prisma.io
-- `puppeteer@25.2.0`
+- `puppeteer@25.2.0`, `puppeteer@25.2.1`
   - Description: A high-level API to control headless Chrome over the DevTools Protocol
   - Homepage: https://github.com/puppeteer/puppeteer/tree/main#readme
-- `puppeteer-core@25.2.0`
+- `puppeteer-core@25.2.0`, `puppeteer-core@25.2.1`
   - Description: A high-level API to control headless Chrome over the DevTools Protocol
   - Homepage: https://github.com/puppeteer/puppeteer/tree/main#readme
 - `readdir-glob@3.0.0`
@@ -194,7 +194,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `typed-inject@5.0.0`
   - Description: Type safe dependency injection framework for TypeScript
   - Homepage: https://github.com/nicojs/typed-inject/#readme
-- `typedoc@0.28.19`
+- `typedoc@0.28.20`
   - Description: Create api documentation for TypeScript projects.
   - Homepage: https://typedoc.org
 - `typescript@3.9.10`, `typescript@5.4.5`, `typescript@6.0.3`
@@ -842,25 +842,25 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@typespec/ts-http-runtime@0.3.5`
   - Description: Isomorphic client library for making HTTP requests in node.js and browser.
   - Homepage: https://github.com/Azure/azure-sdk-for-js/blob/main/sdk/core/ts-http-runtime/
-- `@vitest/coverage-v8@4.1.9`
+- `@vitest/coverage-v8@4.1.10`
   - Description: V8 coverage provider for Vitest
   - Homepage: https://vitest.dev/guide/coverage
-- `@vitest/expect@4.1.9`
+- `@vitest/expect@4.1.10`
   - Description: Jest's expect matchers as a Chai plugin
   - Homepage: https://vitest.dev/api/expect
-- `@vitest/mocker@4.1.9`
+- `@vitest/mocker@4.1.10`
   - Description: Vitest module mocker implementation
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/mocker
-- `@vitest/pretty-format@4.1.9`
+- `@vitest/pretty-format@4.1.10`
   - Description: Fork of pretty-format with support for ESM
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/pretty-format
-- `@vitest/runner@4.1.9`
+- `@vitest/runner@4.1.10`
   - Description: Vitest test runner
   - Homepage: https://vitest.dev/api/advanced/runner
-- `@vitest/snapshot@4.1.9`
+- `@vitest/snapshot@4.1.10`
   - Description: Vitest snapshot manager
   - Homepage: https://vitest.dev/guide/snapshot
-- `@vitest/spy@4.1.9`
+- `@vitest/spy@4.1.10`
   - Description: Lightweight Jest compatible spy implementation
   - Homepage: https://vitest.dev/api/mock
 - `abort-controller@3.0.0`
@@ -1087,7 +1087,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `es-toolkit@1.48.1`
   - Description: A state-of-the-art, high-performance JavaScript utility library with a small bundle size and strong type annotations.
   - Homepage: https://es-toolkit.dev
-- `esbuild@0.28.1`
+- `esbuild@0.28.2`
   - Description: An extremely fast JavaScript and CSS bundler and minifier.
   - Homepage: https://github.com/evanw/esbuild#readme
 - `escalade@3.2.0`
@@ -1222,7 +1222,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `html-escaper@2.0.2`
   - Description: fast and safe way to escape and unescape &<>'" chars
   - Homepage: https://github.com/WebReflection/html-escaper
-- `html-validate@11.5.3`
+- `html-validate@11.5.7`
   - Description: Offline HTML5 validator and linter
   - Homepage: https://html-validate.org
 - `http-proxy-agent@7.0.2`
@@ -1288,7 +1288,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `js-tokens@4.0.0`, `js-tokens@10.0.0`
   - Description: Tiny JavaScript tokenizer.
   - Homepage: https://github.com/lydell/js-tokens#readme
-- `js-yaml@4.3.1`, `js-yaml@5.2.2`
+- `js-yaml@4.3.1`, `js-yaml@5.2.3`
   - Description: YAML 1.2 parser and serializer
   - Homepage: https://github.com/nodeca/js-yaml#readme
 - `jsesc@3.1.0`
@@ -1357,7 +1357,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `make-dir@4.0.0`
   - Description: Make a directory and its parents if needed - Think `mkdir -p`
   - Homepage: https://github.com/sindresorhus/make-dir#readme
-- `markdown-it@14.2.0`
+- `markdown-it@14.3.0`
   - Description: Markdown-it - modern pluggable markdown parser.
   - Homepage: https://github.com/markdown-it/markdown-it#readme
 - `math-intrinsics@1.1.0`
@@ -1527,10 +1527,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `rc9@3.0.1`
   - Description: Read/Write config couldn't be easier!
   - Homepage: https://github.com/unjs/rc9#readme
-- `react@19.2.7`
+- `react@19.2.8`
   - Description: React is a JavaScript library for building user interfaces.
   - Homepage: https://react.dev/
-- `react-dom@19.2.7`
+- `react-dom@19.2.8`
   - Description: React package for working with the DOM.
   - Homepage: https://react.dev/
 - `readable-stream@2.3.8`, `readable-stream@4.7.0`
@@ -1727,7 +1727,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `vite@8.0.16`
   - Description: Native-ESM powered web dev build tool
   - Homepage: https://vite.dev
-- `vitest@4.1.9`
+- `vitest@4.1.10`
   - Description: Next generation testing framework powered by Vite
   - Homepage: https://vitest.dev
 - `webpack-virtual-modules@0.6.2`
@@ -1766,7 +1766,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## MIT OR Apache-2.0
 
-- `@biomejs/biome@2.5.1`
+- `@biomejs/biome@2.5.7`
   - Description: Biome is a toolchain for the web: formatter, linter and more
   - Homepage: https://biomejs.dev
 

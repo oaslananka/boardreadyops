@@ -38,19 +38,18 @@ describe("security aggregate gate", () => {
     expect(result.summary).toContain("| OSV dependency diff | Required | success |");
   });
 
-  it.each([
-    "failure",
-    "cancelled",
-    "skipped",
-  ] as const)("fails when an applicable scanner result is %s", (scannerResult) => {
-    const input = passingInput();
-    input.results.semgrep = scannerResult;
-    const result = evaluateSecurityGate(input);
+  it.each(["failure", "cancelled", "skipped"] as const)(
+    "fails when an applicable scanner result is %s",
+    (scannerResult) => {
+      const input = passingInput();
+      input.results.semgrep = scannerResult;
+      const result = evaluateSecurityGate(input);
 
-    expect(result.ok).toBe(false);
-    expect(result.failures).toContain(`Semgrep: ${scannerResult}`);
-    expect(result.summary).toContain(`| Semgrep | Required | ${scannerResult} |`);
-  });
+      expect(result.ok).toBe(false);
+      expect(result.failures).toContain(`Semgrep: ${scannerResult}`);
+      expect(result.summary).toContain(`| Semgrep | Required | ${scannerResult} |`);
+    },
+  );
 
   it("reports policy-approved non-applicable checks instead of silently omitting them", () => {
     const result = evaluateSecurityGate(
