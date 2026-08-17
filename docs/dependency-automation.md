@@ -8,14 +8,14 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 - The pinned Renovate runner executes at 06:17 Europe/Istanbul on weekdays and can also be started manually.
 - The runner is explicitly scoped to `oaslananka/boardreadyops`; repository autodiscovery and onboarding are disabled.
 - The workflow uses the `GH_AUTH_TOKEN` repository secret. That credential must belong to a dedicated automation identity with the minimum repository permissions required to create branches, pull requests, labels, and issues.
-- Post-upgrade command execution is restricted to the exact `corepack pnpm run notice` command through `RENOVATE_ALLOWED_COMMANDS`; shell execution is not enabled.
+- Post-upgrade command execution is restricted through `RENOVATE_ALLOWED_COMMANDS` to the exact `corepack pnpm run renovate:post-upgrade` entry point. That repository-controlled script runs the hardened CI dependency install, refreshes `NOTICE`, and rebuilds the committed `dist/` bundles; Renovate cannot execute arbitrary post-upgrade commands.
 - Renovate itself never runs on a pull-request event, so untrusted pull-request code cannot obtain the automation token.
 
 ## Policy
 
 - Renovate owns npm workspace updates, GitHub Actions updates, Dockerfile updates, and Docker Compose updates.
 - Generated output, dependency trees, and test fixtures are ignored.
-- Dependency branches regenerate `NOTICE` through an allowlisted post-upgrade task, so third-party license inventory changes remain visible and reviewable in the pull request.
+- Dependency branches regenerate `NOTICE` and the committed `dist/` bundles through the allowlisted post-upgrade task, so license inventory and shipped CLI/Action bundle changes remain visible and reviewable in the pull request.
 - GitHub repository security alerts and security update PRs remain enabled in repository security settings.
 - Major upgrades require Dependency Dashboard approval and manual review.
 - Core runtime, GitHub integration, GitHub Actions, Dockerfile, and Docker Compose updates require manual review.

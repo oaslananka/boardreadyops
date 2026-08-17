@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - renovate.json
+      - package.json
       - .github/workflows/renovate.yml
       - docs/dependency-automation.md
       - tests/unit/scripts/security-automation-config.test.ts
@@ -11,6 +12,7 @@ on:
     branches: [main]
     paths:
       - renovate.json
+      - package.json
       - .github/workflows/renovate.yml
       - docs/dependency-automation.md
       - tests/unit/scripts/security-automation-config.test.ts
@@ -59,7 +61,7 @@ jobs:
       RENOVATE_ONBOARDING: "false"
       RENOVATE_PLATFORM: github
       RENOVATE_REPOSITORIES: '["oaslananka/boardreadyops"]'
-      RENOVATE_ALLOWED_COMMANDS: '["^corepack pnpm run notice$"]'
+      RENOVATE_ALLOWED_COMMANDS: '["^corepack pnpm run renovate:post-upgrade$"]'
       RENOVATE_REQUIRE_CONFIG: required
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
