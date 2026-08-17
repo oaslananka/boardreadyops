@@ -1742,7 +1742,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `wrap-ansi@7.0.0`, `wrap-ansi@9.0.2`, `wrap-ansi@10.0.0`
   - Description: Wordwrap a string with ANSI escape codes
   - Homepage: https://github.com/chalk/wrap-ansi#readme
-- `ws@8.21.1`
+- `ws@8.21.3`
   - Description: Simple to use, blazing fast and thoroughly tested websocket client and server for Node.js
   - Homepage: https://github.com/websockets/ws
 - `xtend@4.0.2`
