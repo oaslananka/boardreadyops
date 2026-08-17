@@ -2,15 +2,6 @@ minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - '@renovatebot/osv-offline-db@3.0.9'
   - '@renovatebot/osv-offline@3.0.9'
-  - '@next/env@16.2.11'
-  - '@next/swc-darwin-arm64@16.2.11'
-  - '@next/swc-darwin-x64@16.2.11'
-  - '@next/swc-linux-arm64-gnu@16.2.11'
-  - '@next/swc-linux-arm64-musl@16.2.11'
-  - '@next/swc-linux-x64-gnu@16.2.11'
-  - '@next/swc-linux-x64-musl@16.2.11'
-  - '@next/swc-win32-arm64-msvc@16.2.11'
-  - '@next/swc-win32-x64-msvc@16.2.11'
   - '@hono/node-server@2.0.12'
   - 'brace-expansion@5.0.9'
   # GitHub advisory GHSA-ggr8-5vv4-36mx: first patched deepmerge-ts release
@@ -24,7 +15,6 @@ minimumReleaseAgeExclude:
   - 'undici@8.9.0'
   - 'valibot@1.4.2'
   - 'fast-uri@3.1.5'
-  - 'next@16.2.11'
   - 'renovate@43.272.4'
 trustPolicy: no-downgrade
 trustPolicyExclude:
