@@ -80286,6 +80286,11 @@ var binaryTag = defineScalarTag("tag:yaml.org,2002:binary", {
 });
 var YAML_DATE_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$");
 var YAML_TIMESTAMP_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:[Tt]|[ \\t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \\t]*(Z|([-+])([0-9][0-9]?)(?::([0-9][0-9]))?))?$");
+function makeUtcDate(year, month, day, hour = 0, minute = 0, second = 0, fraction = 0) {
+  const date5 = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
+  date5.setUTCFullYear(year, month, day);
+  return date5;
+}
 function resolveYamlTimestamp(source) {
   let match = YAML_DATE_REGEXP.exec(source);
   if (match === null) match = YAML_TIMESTAMP_REGEXP.exec(source);
@@ -80294,7 +80299,7 @@ function resolveYamlTimestamp(source) {
   const month = +match[2] - 1;
   const day = +match[3];
   if (!match[4]) {
-    const date6 = new Date(Date.UTC(year, month, day));
+    const date6 = makeUtcDate(year, month, day);
     if (date6.getUTCFullYear() !== year || date6.getUTCMonth() !== month || date6.getUTCDate() !== day) return NOT_RESOLVED;
     return date6;
   }
@@ -80308,7 +80313,7 @@ function resolveYamlTimestamp(source) {
     while (value.length < 3) value += "0";
     fraction = +value;
   }
-  const date5 = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
+  const date5 = makeUtcDate(year, month, day, hour, minute, second, fraction);
   if (date5.getUTCFullYear() !== year || date5.getUTCMonth() !== month || date5.getUTCDate() !== day) return NOT_RESOLVED;
   if (match[9]) {
     const offsetHour = +match[10];
@@ -80406,7 +80411,11 @@ var mapTag = defineMappingTag("tag:yaml.org,2002:map", {
     return Object.prototype.hasOwnProperty.call(container, String(key));
   },
   keys: (container) => Object.keys(container),
-  get: (container, key) => container[String(key)]
+  get: (container, key) => {
+    const normalizedKey = String(key);
+    if (!Object.prototype.hasOwnProperty.call(container, normalizedKey)) return null;
+    return container[normalizedKey];
+  }
 });
 var setTag = defineMappingTag("tag:yaml.org,2002:set", {
   create: () => /* @__PURE__ */ new Set(),
@@ -80427,9 +80436,9 @@ var setTag = defineMappingTag("tag:yaml.org,2002:set", {
 });
 function createTagDefinitionMap() {
   return {
-    scalar: {},
-    sequence: {},
-    mapping: {}
+    scalar: /* @__PURE__ */ Object.create(null),
+    sequence: /* @__PURE__ */ Object.create(null),
+    mapping: /* @__PURE__ */ Object.create(null)
   };
 }
 function createTagDefinitionListMap() {
@@ -80599,7 +80608,11 @@ var legacyMapTag = defineMappingTag("tag:yaml.org,2002:map", {
     return normalizedKey !== null && Object.prototype.hasOwnProperty.call(container, normalizedKey);
   },
   keys: (container) => Object.keys(container),
-  get: (container, key) => container[String(key)]
+  get: (container, key) => {
+    const normalizedKey = String(key);
+    if (!Object.prototype.hasOwnProperty.call(container, normalizedKey)) return null;
+    return container[normalizedKey];
+  }
 });
 var DEFAULT_SNIPPET_OPTIONS = {
   maxLength: 79,
@@ -80935,10 +80948,10 @@ function getScalarValue(input, scalar) {
       return getPlainValue(input, valueStart, valueEnd);
   }
 }
-var DEFAULT_TAG_HANDLERS = {
+var DEFAULT_TAG_HANDLERS = Object.assign(/* @__PURE__ */ Object.create(null), {
   "!": "!",
   "!!": "tag:yaml.org,2002:"
-};
+});
 function tagNameFull(rawTag, tagHandlers) {
   if (rawTag.startsWith("!<") && rawTag.endsWith(">")) return decodeURIComponent(rawTag.slice(2, -1));
   const handleEnd = rawTag.indexOf("!", 1);
@@ -81179,6 +81192,10 @@ function constructFromEvents(events, options) {
       }
       case 6: {
         const frame = state3.frames.pop();
+        if (frame.kind === "mapping" && frame.hasKey) {
+          state3.position = frame.keyPosition;
+          throwError$1(state3, "incomplete mapping pair in event stream");
+        }
         if (frame.kind === "document") state3.documents.push(frame.value);
         else {
           const value = frame.tag.carrierIsResult ? frame.value : finalizeCollection(state3, frame.position, frame.tag, frame.value);
@@ -81848,10 +81865,6 @@ function parseNode(state3, parentIndent, nodeContext, allowToSeek, allowCompact,
     if (state3.lineIndent > parentIndent) indentStatus = 1;
     else if (state3.lineIndent === parentIndent) indentStatus = 0;
     else indentStatus = -1;
-  }
-  if (state3.position === state3.lineStart && testDocumentSeparator(state3)) {
-    state3.depth--;
-    return false;
   }
   if (indentStatus === 1) while (true) {
     const ch = state3.input.charCodeAt(state3.position);

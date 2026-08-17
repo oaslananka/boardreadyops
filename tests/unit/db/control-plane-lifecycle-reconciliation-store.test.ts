@@ -61,25 +61,24 @@ describe("control-plane lifecycle reconciliation store", () => {
     expect(calls[1]?.params).toEqual(["worker-1", "2026-07-24T01:30:00.000Z", "2026-07-24T01:32:00.000Z", 3]);
   });
 
-  it.each([
-    "applied",
-    "already_repaired",
-    "already_terminal",
-  ] as const)("maps the %s lifecycle apply outcome", async (outcome) => {
-    const executor: SqlQueryExecutor = {
-      async query(sql, params) {
-        expect(sql).toContain("boardreadyops_apply_control_plane_lifecycle_reconciliation");
-        expect(params).toEqual(["reconciliation-1", "worker-1", "2026-07-24T01:30:00.000Z"]);
-        return { rows: [{ outcome }] };
-      },
-    };
-    const store = createSqlControlPlaneOperationsStore(executor, { now: () => now });
+  it.each(["applied", "already_repaired", "already_terminal"] as const)(
+    "maps the %s lifecycle apply outcome",
+    async (outcome) => {
+      const executor: SqlQueryExecutor = {
+        async query(sql, params) {
+          expect(sql).toContain("boardreadyops_apply_control_plane_lifecycle_reconciliation");
+          expect(params).toEqual(["reconciliation-1", "worker-1", "2026-07-24T01:30:00.000Z"]);
+          return { rows: [{ outcome }] };
+        },
+      };
+      const store = createSqlControlPlaneOperationsStore(executor, { now: () => now });
 
-    expect(typeof store.applyLifecycleReconciliation).toBe("function");
-    await expect(
-      store.applyLifecycleReconciliation({ reconciliationId: "reconciliation-1", workerId: "worker-1" }),
-    ).resolves.toBe(outcome);
-  });
+      expect(typeof store.applyLifecycleReconciliation).toBe("function");
+      await expect(
+        store.applyLifecycleReconciliation({ reconciliationId: "reconciliation-1", workerId: "worker-1" }),
+      ).resolves.toBe(outcome);
+    },
+  );
 
   it("maps unknown lifecycle apply outcomes to stale and validates deadlines", async () => {
     const executor: SqlQueryExecutor = {
