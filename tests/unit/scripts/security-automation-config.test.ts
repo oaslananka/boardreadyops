@@ -148,6 +148,7 @@ describe("dependency and security automation configuration", () => {
         "@renovatebot/osv-offline-db@3.0.9",
         "@renovatebot/osv-offline@3.0.9",
         "brace-expansion@5.0.9",
+        "deepmerge-ts@8.0.0",
         "js-yaml@5.2.2 || 4.3.1",
         "nanoid@3.3.17 || 3.3.18",
         "postcss@8.5.23",
@@ -169,6 +170,7 @@ describe("dependency and security automation configuration", () => {
     expect(workspace.trustPolicyExclude).toEqual(["@yarnpkg/libzip@3.2.2", "semver@6.3.1"]);
     expect(workspace.overrides).toMatchObject({
       "archiver>readdir-glob": "3.0.0",
+      "@prisma/config>deepmerge-ts": "8.0.0",
       "@hono/node-server@<2.0.12": "2.0.12",
       "brace-expansion@>=5 <5.0.9": "5.0.9",
       "fast-uri@>=3 <3.1.5": "3.1.5",
