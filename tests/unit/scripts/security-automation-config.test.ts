@@ -80,6 +80,9 @@ describe("dependency and security automation configuration", () => {
 
   it("keeps Renovate project-scoped, scheduled, and supply-chain hardened", async () => {
     const renovate = JSON.parse(await repositoryFile("renovate.json")) as Record<string, unknown>;
+    const packageJson = JSON.parse(await repositoryFile("package.json")) as {
+      scripts?: Record<string, string>;
+    };
 
     expect(renovate.extends).toEqual(
       expect.arrayContaining(["config:best-practices", ":dependencyDashboard", ":semanticCommits"]),
@@ -93,9 +96,12 @@ describe("dependency and security automation configuration", () => {
     expect(await repositoryFile("renovate.json")).not.toContain("3 days");
     expect(renovate.pinDigests).toBe(true);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
+    expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe(
+      "corepack pnpm run deps:install-ci && corepack pnpm run notice && corepack pnpm run build",
+    );
     expect(renovate.postUpgradeTasks).toEqual({
-      commands: ["corepack pnpm run notice"],
-      fileFilters: ["NOTICE"],
+      commands: ["corepack pnpm run renovate:post-upgrade"],
+      fileFilters: ["NOTICE", "dist/**"],
       executionMode: "branch",
     });
     expect(renovate.ignorePaths).toEqual(
@@ -222,7 +228,8 @@ describe("dependency and security automation configuration", () => {
     expect(workflow).toContain("pnpm run renovate:validate");
     expect(workflow).not.toContain("npx ");
     expect(workflow).toContain("RENOVATE_REPOSITORIES: '[\"oaslananka/boardreadyops\"]'");
-    expect(workflow).toContain("RENOVATE_ALLOWED_COMMANDS: '[\"^corepack pnpm run notice$\"]'");
+    expect(workflow).toContain("RENOVATE_ALLOWED_COMMANDS: '[\"^corepack pnpm run renovate:post-upgrade$\"]'");
+    expect(workflow).toMatch(/pull_request:[\s\S]*- package\.json/u);
     expect(workflow).toContain("token: $" + "{{ secrets.GH_AUTH_TOKEN }}");
     expect(workflow).not.toContain("pull_request_target");
   });

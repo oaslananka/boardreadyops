@@ -24,8 +24,8 @@
   "branchConcurrentLimit": 10,
   "postUpdateOptions": ["pnpmDedupe"],
   "postUpgradeTasks": {
-    "commands": ["corepack pnpm run notice"],
-    "fileFilters": ["NOTICE"],
+    "commands": ["corepack pnpm run renovate:post-upgrade"],
+    "fileFilters": ["NOTICE", "dist/**"],
     "executionMode": "branch"
   },
   "lockFileMaintenance": {
