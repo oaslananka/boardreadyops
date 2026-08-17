@@ -151,7 +151,6 @@ describe("dependency and security automation configuration", () => {
         "deepmerge-ts@8.0.0",
         "js-yaml@5.2.2 || 4.3.1",
         "nanoid@3.3.17 || 3.3.18",
-        "postcss@8.5.23",
         "undici@8.9.0",
         "valibot@1.4.2",
       ]),
@@ -177,7 +176,7 @@ describe("dependency and security automation configuration", () => {
       "hono@<4.12.34": "4.12.34",
       "ip-address@<10.3.1": "10.3.1",
       "nanoid@<3.3.17": "3.3.18",
-      "postcss@<8.5.23": "8.5.23",
+      "postcss@<8.5.23": "8.5.26",
       "undici@<8.9.0": "8.9.0",
       valibot: "1.4.2",
     });
