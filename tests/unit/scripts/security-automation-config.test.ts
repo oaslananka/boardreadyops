@@ -138,8 +138,6 @@ describe("dependency and security automation configuration", () => {
     expect(workspace.blockExoticSubdeps).toBe(true);
     expect(workspace.minimumReleaseAgeExclude).toEqual(
       expect.arrayContaining([
-        "next@16.2.11",
-        "@next/env@16.2.11",
         "@hono/node-server@2.0.12",
         "fast-uri@3.1.5",
         "hono@4.12.34",
