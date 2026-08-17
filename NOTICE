@@ -1402,7 +1402,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `named-placeholders@1.1.6`
   - Description: sql named placeholders to unnamed compiler
   - Homepage: https://github.com/mysqljs/named-placeholders#readme
-- `nanoid@3.3.17`
+- `nanoid@3.3.18`
   - Description: A tiny (116 bytes), secure URL-friendly unique string ID generator
   - Homepage: https://github.com/ai/nanoid#readme
 - `next@16.2.11`
