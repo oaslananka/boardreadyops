@@ -816,16 +816,16 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@types/mustache@4.2.6`
   - Description: TypeScript definitions for mustache
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/mustache
-- `@types/node@24.13.2`
+- `@types/node@24.13.3`
   - Description: TypeScript definitions for node
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node
 - `@types/pg@8.16.0`
   - Description: TypeScript definitions for pg
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/pg
-- `@types/react@19.2.17`
+- `@types/react@19.2.18`
   - Description: TypeScript definitions for react
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react
-- `@types/react-dom@19.2.3`
+- `@types/react-dom@19.2.4`
   - Description: TypeScript definitions for react-dom
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react-dom
 - `@types/unist@3.0.3`
