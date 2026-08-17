@@ -28,7 +28,7 @@ ALLOW_MAJOR_RELEASE=true task verify
 task test:int
 pre-commit run --all-files
 actionlint .github/workflows/*.yml
-yamllint .github/workflows/ .github/actions/ action.yml action.yaml
+yamllint .github/workflows/ action.yml
 gitleaks detect --source . --redact --verbose
 ```
 
