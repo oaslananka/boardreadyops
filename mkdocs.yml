@@ -118,6 +118,7 @@ nav:
           - Customer Self-hosted Runner: deployment/self-hosted-runner.md
       - Control-plane Reconciliation: operations/control-plane-reconciliation.md
       - Control-plane Load Validation: operations/control-plane-load-validation.md
+      - Control-plane Restore Drill: operations/control-plane-restore-drill.md
       - Synthetic Target Canaries: operations/synthetic-target-repository-canaries.md
       - Testing: testing.md
       - Accessibility: accessibility.md
