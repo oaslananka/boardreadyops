@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.31.2](https://github.com/oaslananka/boardreadyops/compare/v1.31.1...v1.31.2) (2026-08-18)
+
+
+### Bug Fixes
+
+* **ci:** speed up clean-tree content scans ([#413](https://github.com/oaslananka/boardreadyops/issues/413)) ([1a6631b](https://github.com/oaslananka/boardreadyops/commit/1a6631b125afc00ab518e7f98358c11d4bb6e2d9))
+
 ## [1.31.1](https://github.com/oaslananka/boardreadyops/compare/v1.31.0...v1.31.1) (2026-08-17)
 
 
