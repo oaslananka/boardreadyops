@@ -28,6 +28,6 @@ The command refuses a non-absolute backup path, identical source/restore databas
 
 ## Boundaries and remaining GA evidence
 
-This drill closes the repeatable isolated backup/restore plus real web/worker readiness gap. It **does not prove** provider backup scheduling meets the 15-minute RPO, that a regional database or availability-zone outage meets the 60-minute RTO, that local or object-store managed artifact bytes are recoverable, or that an hours-long production-shape soak and real GitHub shared-rate-limit behavior are healthy. Those remain separate GA evidence items in issue #222.
+This drill closes the repeatable isolated backup/restore plus real web/worker readiness gap. It **does not prove** provider backup scheduling meets the 15-minute RPO, that a regional database or availability-zone outage meets the 60-minute RTO, or that the separately defined local managed-artifact byte recovery objective is met; that still requires an encrypted artifact-volume backup/restore drill. Non-local object-storage drivers have no GA recovery claim in the current deployment profile. An hours-long production-shape soak and real GitHub shared-rate-limit behavior also remain separate GA evidence items in issue #222.
 
 The workflow uses no repository secrets and never contacts GitHub as a product integration. Its `BOARDREADYOPS_RUNNER_MODE=disabled` setting is deliberate: restore readiness verifies the persisted control-plane state and production runtime image without granting a disposable drill authority to dispatch customer workflows or publish Check Runs.
