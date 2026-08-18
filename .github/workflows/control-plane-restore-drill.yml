@@ -1,0 +1,167 @@
+name: control-plane-restore-drill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-restore-drill-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_restore_source
+      BOARDREADYOPS_RESTORE_DRILL_SOURCE_DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_restore_source
+      BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_restore_target
+      BOARDREADYOPS_RESTORE_DRILL_BACKUP_PATH: /tmp/boardreadyops-restore-drill.dump
+      BOARDREADYOPS_RESTORE_DRILL_CONFIRMATION: isolated-disposable-database
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: boardreadyops
+          POSTGRES_DB: boardreadyops_restore_source
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boardreadyops -d boardreadyops_restore_source"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare PostgreSQL 17 client wrappers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/pg17-bin"
+          cat > "${RUNNER_TEMP}/pg17-bin/psql" <<'SH'
+          #!/bin/sh
+          exec docker run --rm --network host postgres:17-alpine psql "$@"
+          SH
+          cat > "${RUNNER_TEMP}/pg17-bin/pg_dump" <<'SH'
+          #!/bin/sh
+          exec docker run --rm --network host \
+            -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGSSLMODE \
+            postgres:17-alpine pg_dump "$@"
+          SH
+          cat > "${RUNNER_TEMP}/pg17-bin/pg_restore" <<'SH'
+          #!/bin/sh
+          exec docker run --rm --network host \
+            -v /tmp:/tmp:ro \
+            -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGSSLMODE \
+            postgres:17-alpine pg_restore "$@"
+          SH
+          chmod 0700 "${RUNNER_TEMP}/pg17-bin/psql" "${RUNNER_TEMP}/pg17-bin/pg_dump" "${RUNNER_TEMP}/pg17-bin/pg_restore"
+      - name: Create isolated empty restore database
+        run: |
+          export PATH="${RUNNER_TEMP}/pg17-bin:${PATH}"
+          psql postgresql://boardreadyops@127.0.0.1:5432/postgres \
+            --set=ON_ERROR_STOP=1 \
+            --command='create database boardreadyops_restore_target template template0'
+      - name: Apply current migrations to disposable source
+        run: pnpm --filter @boardreadyops/db db:migrate
+      - name: Verify backup, restore, and representative run state
+        run: |
+          export PATH="${RUNNER_TEMP}/pg17-bin:${PATH}"
+          umask 077
+          pnpm run cloud:restore:verify > restore-database-report.json
+      - name: Build production runtime image
+        run: >-
+          docker build
+          --file apps/web/Dockerfile
+          --tag boardreadyops-restore-drill:${GITHUB_SHA}
+          --build-arg VCS_REF=${GITHUB_SHA}
+          --build-arg VERSION=restore-drill
+          .
+      - name: Start restored web and worker runtime
+        run: |
+          docker run --detach --network host --name boardreadyops-restore-web \
+            --env DATABASE_URL="$BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL" \
+            --env GITHUB_WEBHOOK_SECRET=restore-drill-placeholder \
+            --env BOARDREADYOPS_RUNNER_MODE=disabled \
+            --env ARTIFACT_STORAGE_DRIVER=local \
+            --env ARTIFACT_STORAGE_ROOT=/tmp/boardreadyops-artifacts \
+            boardreadyops-restore-drill:${GITHUB_SHA}
+          docker run --detach --network host --name boardreadyops-restore-worker \
+            --env DATABASE_URL="$BOARDREADYOPS_RESTORE_DRILL_TARGET_DATABASE_URL" \
+            --env GITHUB_WEBHOOK_SECRET=restore-drill-placeholder \
+            --env BOARDREADYOPS_RUNNER_MODE=disabled \
+            --env BOARDREADYOPS_WORKER_HEALTH_PORT=3001 \
+            --env ARTIFACT_STORAGE_DRIVER=local \
+            --env ARTIFACT_STORAGE_ROOT=/tmp/boardreadyops-artifacts \
+            boardreadyops-restore-drill:${GITHUB_SHA} node worker.mjs
+      - name: Verify restored service readiness
+        run: |
+          node --input-type=module - <<'NODE'
+          const endpoints = [
+            "http://127.0.0.1:3000/api/health/ready",
+            "http://127.0.0.1:3001/health/ready",
+          ];
+          for (const endpoint of endpoints) {
+            let ready = false;
+            for (let attempt = 0; attempt < 60; attempt += 1) {
+              try {
+                const response = await fetch(endpoint, { cache: "no-store" });
+                const body = await response.json();
+                if (response.ok && body?.ok === true) {
+                  ready = true;
+                  break;
+                }
+              } catch {}
+              await new Promise((resolve) => setTimeout(resolve, 1_000));
+            }
+            if (!ready) throw new Error(`restore readiness endpoint did not become ready: ${endpoint}`);
+          }
+          NODE
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const database = JSON.parse(fs.readFileSync("restore-database-report.json", "utf8"));
+          const report = {
+            event: "control_plane_restore_drill_verified",
+            sourceSha: process.env.GITHUB_SHA,
+            database: {
+              backupBytes: database.backupBytes,
+              migrationCount: database.migrationCount,
+              publicTableCount: database.publicTableCount,
+              representativeRows: database.representativeRows,
+              restoredRunStateVerified: database.restoredRunStateVerified,
+            },
+            runtime: {
+              image: "apps/web/Dockerfile",
+              webReady: true,
+              workerReady: true,
+              runnerMode: "disabled",
+            },
+          };
+          fs.writeFileSync("control-plane-restore-drill.json", `${JSON.stringify(report)}\n`, { mode: 0o600 });
+          NODE
+      - name: Stop isolated restored runtime
+        if: always()
+        run: docker rm --force boardreadyops-restore-web boardreadyops-restore-worker 2>/dev/null || true
+      - name: Upload aggregate-only restore evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: control-plane-restore-drill
+          path: |
+            restore-database-report.json
+            control-plane-restore-drill.json
+          if-no-files-found: warn
+          retention-days: 30
