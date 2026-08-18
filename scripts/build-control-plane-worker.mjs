@@ -16,6 +16,7 @@ const nodeBundleOptions = {
   sourcemap: false,
   legalComments: "none",
   logLevel: "info",
+  external: ["pg"],
 };
 
 const workerBuild = await build({
