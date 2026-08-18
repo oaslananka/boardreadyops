@@ -112,6 +112,7 @@
     "test:int:monorepo": "node scripts/run-monorepo-integration.mjs",
     "verify:transition-writers": "node scripts/verify-control-plane-transition-writers.mjs",
     "cloud:load:verify": "node scripts/control-plane-load.mjs",
+    "cloud:restore:verify": "node scripts/control-plane-restore-drill.mjs",
     "cloud:isolation:verify": "vitest run --no-file-parallelism tests/integration/github-actions-result-isolation-postgres.test.ts && node scripts/target-repository-isolation.mjs",
     "verify:public-surface": "node scripts/sync-release-readme.mjs --check",
     "deps:install-ci": "corepack pnpm install --frozen-lockfile --ignore-scripts && corepack pnpm rebuild @prisma/engines esbuild prisma sharp",

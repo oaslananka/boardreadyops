@@ -189,6 +189,11 @@ ${operations}`;
     expect(deployment).toContain("representative row counts");
     expect(deployment).toContain("/api/health/ready");
     expect(deployment).toContain("does not verify optional managed artifact bytes");
+    expect(deployment).toContain("Artifact metadata follows the PostgreSQL recovery objective");
+    expect(deployment).toContain("no BoardReadyOps-managed artifact-byte RPO or RTO applies");
+    expect(deployment).toContain("same 15-minute artifact-byte RPO");
+    expect(deployment).toContain("inside the same 60-minute service RTO");
+    expect(deployment).toContain("Non-local artifact storage drivers are not currently supported");
   });
 
   it("documents guarded runner lease lifecycle transitions", () => {
