@@ -1,32 +1,32 @@
 class Boardreadyops < Formula
   desc "CI preflight for production-ready PCBs"
   homepage "https://github.com/oaslananka/boardreadyops"
-  version "1.31.1"
+  version "1.31.2"
   license "MIT"
 
-  # Release v1.31.1 checksums from SHA256SUMS.
+  # Release v1.31.2 checksums from SHA256SUMS.
   # Regenerate with: gh release download v#{version} && sha256sum boardreadyops-* > SHA256SUMS
   on_macos do
     on_arm do
       url "https://github.com/oaslananka/boardreadyops/releases/download/v#{version}/boardreadyops-macos-arm64"
-      sha256 "662b7d995e627f58f4769725e672a247a398bd964e019fa1ccf45ce018b93508"
+      sha256 "8da3869b938f3f58bf06cf6f1c8806cd39a227e4189e37748ba3e8a3174be15b"
     end
 
     on_intel do
       url "https://github.com/oaslananka/boardreadyops/releases/download/v#{version}/boardreadyops-macos-x64"
-      sha256 "b8967a5b967bf2466a183ec759c5a435a094a1778e1abe80c8dce12f40d69088"
+      sha256 "534a45db6aad60c4a76a4798f5c7beb59f2dc526996ee54366cb9f0defbc5abd"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/oaslananka/boardreadyops/releases/download/v#{version}/boardreadyops-linux-arm64"
-      sha256 "cc1184b64a48ecdeaaa67139396b62026b99f0e54453a8511435ed9ef0b66afd"
+      sha256 "883ea3c4d27ec40c59eba2e2ffb9fd5dd271abc0c22b79cc089271dfd838e642"
     end
 
     on_intel do
       url "https://github.com/oaslananka/boardreadyops/releases/download/v#{version}/boardreadyops-linux-x64"
-      sha256 "14624bd6a6d658d59cee81fe5402329860a334c563df6fed3f21c5cf656c1e41"
+      sha256 "5d843b1729e40c63170d50d154f481173d3edcd72e5cf0d32609733ad4ce10fb"
     end
   end
 

@@ -132,7 +132,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: oaslananka/boardreadyops@9ff52b175961d1c144a8fd99ba1a8d4528fb01c8 # v1.31.1
+      - uses: oaslananka/boardreadyops@9bc8a075d885ad1182e2ad4fcd4c9160f8160c94 # v1.31.2
         with:
           config: boardreadyops.yml
           mode: enforce
@@ -149,7 +149,7 @@ Use the full container action when a workflow should carry KiCad CLI inside the
 BoardReadyOps runtime instead of installing KiCad separately:
 
 ```yaml
-      - uses: oaslananka/boardreadyops/apps/container@9ff52b175961d1c144a8fd99ba1a8d4528fb01c8 # v1.31.1
+      - uses: oaslananka/boardreadyops/apps/container@9bc8a075d885ad1182e2ad4fcd4c9160f8160c94 # v1.31.2
         with:
           config: boardreadyops.yml
           require-kicad: "true"
