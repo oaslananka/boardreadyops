@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.31.1](https://github.com/oaslananka/boardreadyops/compare/v1.31.0...v1.31.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **deps:** update dependency next to v16.2.12 ([#405](https://github.com/oaslananka/boardreadyops/issues/405)) ([7e08e2f](https://github.com/oaslananka/boardreadyops/commit/7e08e2fd9bead284ef5c8b9ab9549bd4d281cd78))
+
 ## [1.31.0](https://github.com/oaslananka/boardreadyops/compare/v1.30.3...v1.31.0) (2026-08-17)
 
 
