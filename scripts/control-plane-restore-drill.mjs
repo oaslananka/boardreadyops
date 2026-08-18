@@ -16,12 +16,8 @@ export const RESTORE_DRILL_CONFIRMATION = "isolated-disposable-database";
 function createExecutor(connectionString) {
   const pool = new Pool({ connectionString, max: 2 });
   return {
-    async query(sql, params = []) {
-      return await pool.query(sql, [...params]);
-    },
-    async close() {
-      await pool.end();
-    },
+    query: (sql, params = []) => pool.query(sql, [...params]),
+    close: () => pool.end(),
   };
 }
 
