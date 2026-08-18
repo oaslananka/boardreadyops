@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -28,6 +28,27 @@ describe("verify-clean-tree", () => {
 
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
+  });
+
+  it("does not traverse ignored repository-local toolchain directories", async () => {
+    const root = await createRepository();
+    const inaccessible = path.join(root, ".boardreadyops", "toolchain", "venv", "inaccessible");
+    await mkdir(inaccessible, { recursive: true });
+    await writeFile(path.join(inaccessible, "ignored.txt"), "ignored local toolchain content\n");
+
+    if (process.platform !== "win32") {
+      await chmod(inaccessible, 0o000);
+    }
+
+    try {
+      const result = runVerifier(root);
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe("");
+    } finally {
+      if (process.platform !== "win32") {
+        await chmod(inaccessible, 0o700);
+      }
+    }
   });
 
   it("rejects tracked generated artifact directories", async () => {
@@ -91,7 +112,7 @@ async function createRepository(environment = isolatedGitEnvironment()) {
   runGit(root, ["config", "user.email", "tests@example.com"], environment);
   runGit(root, ["config", "user.name", "BoardReadyOps Tests"], environment);
 
-  await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
+  await writeFile(path.join(root, ".gitignore"), "node_modules/\n/.boardreadyops/toolchain/\n");
   await writeFile(
     path.join(root, "NOTICE"),
     `Third-party description: ${[`${"sta"}${"te"}`, `${"o"}${"f"}`, `${"t"}${"he"}`, `${"a"}${"rt"}`].join("-")} utilities for writing ${"produc"}${"tion"}-grade software.\n`,

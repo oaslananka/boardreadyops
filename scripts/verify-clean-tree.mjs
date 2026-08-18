@@ -8,6 +8,7 @@ if (inGit.status !== 0) {
 }
 
 const failures = [];
+let trackedContentCache;
 const status = spawnSync("git", ["status", "--porcelain"], { encoding: "utf8" }); // NOSONAR -- git is fixed; CI/developer PATH is trusted.
 if (status.stdout.trim() !== "") {
   failures.push(`working tree is not clean:\n${status.stdout.trim()}`);
@@ -37,9 +38,7 @@ if (failures.length > 0) {
 
 function scanForbiddenContent() {
   const terms = [new RegExp(`board[-_]?${"gu"}${"ard"}`, "i"), new RegExp(`oaslananka-${"la"}${"b"}`)];
-  const files = listFiles(".").filter((file) => !ignored(file));
-  for (const file of files) {
-    const text = readText(file);
+  for (const { file, text } of trackedContent()) {
     for (const term of terms) {
       if (term.test(text)) {
         failures.push(`forbidden content in ${file}`);
@@ -100,8 +99,10 @@ function scanBannedLanguage() {
     [word("co-auth", "ored-by:"), word("co", "dex")],
   ];
   const patterns = phraseParts.map((parts) => new RegExp(parts.join("[^a-zA-Z0-9]+"), "i"));
-  for (const file of listFiles(".").filter((entry) => !ignored(entry) && normalize(entry) !== "NOTICE")) {
-    const text = readText(file);
+  for (const { file, text } of trackedContent()) {
+    if (normalize(file) === "NOTICE") {
+      continue;
+    }
     for (const pattern of patterns) {
       if (pattern.test(text)) {
         failures.push(`banned language in ${file}`);
@@ -109,6 +110,84 @@ function scanBannedLanguage() {
       }
     }
   }
+}
+
+function trackedContent() {
+  if (trackedContentCache) {
+    return trackedContentCache;
+  }
+
+  const entries = listTrackedIndexEntries().filter(({ file }) => !ignored(file));
+  const objectIds = [...new Set(entries.filter(({ mode }) => mode !== "160000").map(({ objectId }) => objectId))];
+  const objects = readGitObjects(objectIds);
+  trackedContentCache = entries.map(({ file, mode, objectId }) => ({
+    file,
+    text: mode === "160000" ? "" : (objects.get(objectId) ?? ""),
+  }));
+  return trackedContentCache;
+}
+
+function listTrackedIndexEntries() {
+  const options = { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 };
+  const result = spawnSync("git", ["ls-files", "--cached", "--stage", "-z"], options); // NOSONAR -- git and its arguments are fixed; trusted developer/CI PATH resolution is intentional.
+  if (result.status !== 0) {
+    throw new Error(`git ls-files failed: ${result.stderr.trim()}`);
+  }
+
+  return result.stdout
+    .split("\0")
+    .filter(Boolean)
+    .map((record) => {
+      const separator = record.indexOf("\t");
+      if (separator < 0) {
+        throw new Error(`unexpected git ls-files record: ${record}`);
+      }
+      const [mode, objectId, stage] = record.slice(0, separator).split(" ");
+      if (!mode || !objectId || stage !== "0") {
+        throw new Error(`unexpected tracked index entry: ${record}`);
+      }
+      return { mode, objectId, file: record.slice(separator + 1) };
+    });
+}
+
+function readGitObjects(objectIds) {
+  if (objectIds.length === 0) {
+    return new Map();
+  }
+
+  const options = { input: `${objectIds.join("\n")}\n`, maxBuffer: 256 * 1024 * 1024 };
+  const result = spawnSync("git", ["cat-file", "--batch"], options); // NOSONAR -- git and its arguments are fixed; object IDs come from the trusted repository index and developer/CI PATH resolution is intentional.
+  if (result.status !== 0) {
+    throw new Error(`git cat-file failed: ${result.stderr.toString("utf8").trim()}`);
+  }
+
+  const objects = new Map();
+  let offset = 0;
+  for (const requestedObjectId of objectIds) {
+    const headerEnd = result.stdout.indexOf(0x0a, offset);
+    if (headerEnd < 0) {
+      throw new Error(`missing git cat-file header for ${requestedObjectId}`);
+    }
+    const header = result.stdout.subarray(offset, headerEnd).toString("utf8");
+    const match = /^([0-9a-f]+) ([a-z]+) (\d+)$/.exec(header);
+    if (!match) {
+      throw new Error(`unexpected git cat-file header: ${header}`);
+    }
+    const [, objectId, objectType, sizeText] = match;
+    if (objectId !== requestedObjectId || objectType !== "blob") {
+      throw new Error(`unexpected git object for ${requestedObjectId}: ${header}`);
+    }
+
+    const size = Number.parseInt(sizeText, 10);
+    const contentStart = headerEnd + 1;
+    const contentEnd = contentStart + size;
+    if (contentEnd >= result.stdout.length || result.stdout[contentEnd] !== 0x0a) {
+      throw new Error(`truncated git cat-file payload for ${requestedObjectId}`);
+    }
+    objects.set(objectId, result.stdout.subarray(contentStart, contentEnd).toString("utf8"));
+    offset = contentEnd + 1;
+  }
+  return objects;
 }
 
 function hasTrackedPath(entry) {
