@@ -139,7 +139,7 @@ jobs:
           fail-on: high
 ```
 
-The examples pin the reviewed `v1.30.1` release commit for reproducibility.
+The examples pin the reviewed `v1.31.2` release commit for reproducibility.
 The floating `v1` alias is convenient for opt-in automatic minor/patch updates,
 but it moves as stable releases are published.
 
