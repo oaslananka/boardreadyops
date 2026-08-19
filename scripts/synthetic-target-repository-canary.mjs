@@ -10,7 +10,6 @@ const defaultValues = {
   noncePath: "canary/nonce.txt",
   checkRunName: "BoardReadyOps / release readiness",
   readinessWorkflow: "readiness-runner.yml",
-  publicOrigin: "https://boardreadyops.oaslananka.dev",
   timeoutSeconds: 1200,
   pollIntervalSeconds: 15,
   maxRequests: 256,
@@ -90,7 +89,7 @@ export function readSyntheticCanaryOptions(environment = process.env) {
   if (!workflowPattern.test(readinessWorkflow)) {
     throw new Error("BOARDREADYOPS_CANARY_READINESS_WORKFLOW is invalid");
   }
-  const publicOrigin = environment.BOARDREADYOPS_CANARY_PUBLIC_ORIGIN ?? defaultValues.publicOrigin;
+  const publicOrigin = required(environment, "BOARDREADYOPS_CANARY_PUBLIC_ORIGIN");
   if (!validOrigin(publicOrigin)) {
     throw new Error("BOARDREADYOPS_CANARY_PUBLIC_ORIGIN must be an HTTPS origin");
   }

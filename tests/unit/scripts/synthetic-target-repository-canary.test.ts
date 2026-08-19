@@ -42,6 +42,7 @@ function options(overrides: Record<string, string> = {}) {
     GITHUB_RUN_ID: "123456",
     GITHUB_RUN_ATTEMPT: "2",
     BOARDREADYOPS_CANARY_VISIBILITY: "public",
+    BOARDREADYOPS_CANARY_PUBLIC_ORIGIN: "https://boardreadyops.example.com",
     ...overrides,
   });
 }
@@ -54,8 +55,17 @@ describe("synthetic target-repository canary options", () => {
     );
   });
 
-  it("uses bounded production defaults", () => {
-    expect(options()).toMatchObject({
+  it("requires an explicit production origin", () => {
+    expect(() =>
+      readSyntheticCanaryOptions({
+        GITHUB_REPOSITORY: "oaslananka/boardreadyops-canary-public",
+        GITHUB_TOKEN: "github-token",
+        GITHUB_RUN_ID: "123456",
+        GITHUB_RUN_ATTEMPT: "2",
+        BOARDREADYOPS_CANARY_VISIBILITY: "public",
+      }),
+    ).toThrow("BOARDREADYOPS_CANARY_PUBLIC_ORIGIN is required");
+    expect(options({ BOARDREADYOPS_CANARY_PUBLIC_ORIGIN: "https://boardreadyops.example.com" })).toMatchObject({
       repository: "oaslananka/boardreadyops-canary-public",
       visibility: "public",
       branch: "boardreadyops-canary",
@@ -63,7 +73,7 @@ describe("synthetic target-repository canary options", () => {
       noncePath: "canary/nonce.txt",
       checkRunName: "BoardReadyOps / release readiness",
       readinessWorkflow: "readiness-runner.yml",
-      publicOrigin: "https://boardreadyops.oaslananka.dev",
+      publicOrigin: "https://boardreadyops.example.com",
       timeoutMs: 1_200_000,
       pollIntervalMs: 15_000,
       maxRequests: 256,
@@ -180,7 +190,7 @@ describe("synthetic canary convergence", () => {
           status: "completed",
           conclusion: "success",
           external_id: runUuid,
-          details_url: `https://boardreadyops.oaslananka.dev/runs/${runUuid}`,
+          details_url: `https://boardreadyops.example.com/runs/${runUuid}`,
           html_url: "https://github.com/oaslananka/boardreadyops-canary-public/runs/55",
           output: { summary: `**Reports:** 1\n\n- [GitHub Actions run](${workflowUrl})` },
         },
@@ -238,7 +248,7 @@ describe("synthetic canary convergence", () => {
           status: "completed",
           conclusion: "success",
           external_id: "private-payload-token=do-not-leak",
-          details_url: "https://boardreadyops.oaslananka.dev/runs/invalid",
+          details_url: "https://boardreadyops.example.com/runs/invalid",
           output: { summary: "private finding" },
         },
       },

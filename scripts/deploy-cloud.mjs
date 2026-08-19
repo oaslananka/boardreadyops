@@ -18,7 +18,7 @@ export const defaultDeployOptions = {
   appName: "boardreadyops-cloud",
   container: "bro-web",
   workerContainer: "bro-worker",
-  healthUrl: "https://boardreadyops.oaslananka.dev/api/health",
+  healthUrl: "",
   canaryHealthUrl: "http://127.0.0.1:3004/api/health",
   imageRepository: "boardreadyops-web-runtime",
   runtimeEnvFile: "/opt/boardreadyops-cloud/runtime-env",
@@ -45,6 +45,14 @@ function envValue(env, name, fallback) {
   return env[name] ?? fallback;
 }
 
+function requiredEnv(env, name) {
+  const value = env[name];
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${name} is required`);
+  }
+  return value.trim();
+}
+
 function envInteger(env, name, fallback) {
   const value = Number.parseInt(String(env[name] ?? ""), 10);
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -55,7 +63,7 @@ export function readDeployOptions(env = process.env) {
     appName: envValue(env, "BOARDREADYOPS_CLOUD_APP_NAME", defaultDeployOptions.appName),
     container: envValue(env, "BOARDREADYOPS_CLOUD_CONTAINER", defaultDeployOptions.container),
     workerContainer: envValue(env, "BOARDREADYOPS_CLOUD_WORKER_CONTAINER", defaultDeployOptions.workerContainer),
-    healthUrl: envValue(env, "BOARDREADYOPS_CLOUD_HEALTH_URL", defaultDeployOptions.healthUrl),
+    healthUrl: requiredEnv(env, "BOARDREADYOPS_CLOUD_HEALTH_URL"),
     canaryHealthUrl: envValue(env, "BOARDREADYOPS_CLOUD_CANARY_HEALTH_URL", defaultDeployOptions.canaryHealthUrl),
     imageRepository: envValue(env, "BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY", defaultDeployOptions.imageRepository),
     runtimeEnvFile: envValue(env, "BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE", defaultDeployOptions.runtimeEnvFile),
