@@ -819,7 +819,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@types/node@24.13.3`
   - Description: TypeScript definitions for node
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node
-- `@types/pg@8.16.0`
+- `@types/pg@8.21.0`
   - Description: TypeScript definitions for pg
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/pg
 - `@types/react@19.2.18`
@@ -1766,7 +1766,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## MIT OR Apache-2.0
 
-- `@biomejs/biome@2.5.7`
+- `@biomejs/biome@2.5.8`
   - Description: Biome is a toolchain for the web: formatter, linter and more
   - Homepage: https://biomejs.dev
 
