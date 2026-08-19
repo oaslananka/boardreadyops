@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 export function createRenovateEnvironment(storeDir, baseEnv = process.env) {
   return {
     ...baseEnv,
-    npm_config_store_dir: storeDir,
+    pnpm_config_store_dir: storeDir,
   };
 }
 
@@ -44,6 +44,7 @@ export async function main(root = process.cwd(), options = {}) {
   const makeTemp = options.makeTemp ?? ((prefix) => mkdtemp(path.join(tmpdir(), prefix)));
   const remove = options.remove ?? ((target, removeOptions) => rm(target, removeOptions));
   const run = options.run ?? runCommand;
+  await remove(path.join(root, "node_modules"), { recursive: true, force: true });
   const storeDir = await makeTemp("boardreadyops-renovate-pnpm-");
   const env = createRenovateEnvironment(storeDir, options.baseEnv ?? process.env);
 
