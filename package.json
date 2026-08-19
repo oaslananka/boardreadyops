@@ -86,7 +86,7 @@
     "verify": "corepack pnpm run lint && corepack pnpm run typecheck && corepack pnpm run knip && corepack pnpm run compatibility:check && corepack pnpm run build && corepack pnpm run verify:dist && corepack pnpm run verify:version && corepack pnpm run verify:marketplace && corepack pnpm run test:unit && corepack pnpm run test:property && corepack pnpm run test:snapshot && corepack pnpm run test:action && corepack pnpm run test:a11y && corepack pnpm run coverage && corepack pnpm run verify:structure && corepack pnpm run gc && corepack pnpm run docs && corepack pnpm run security",
     "security": "corepack pnpm run licenses:check && corepack pnpm run notice:check && corepack pnpm run check:reuse",
     "renovate:validate": "corepack pnpm --config.ignore-scripts=true --package=renovate@43.272.4 dlx renovate-config-validator renovate.json",
-    "renovate:post-upgrade": "corepack pnpm run deps:install-ci && corepack pnpm run notice && corepack pnpm run build",
+    "renovate:post-upgrade": "corepack pnpm run deps:install-renovate && corepack pnpm run notice && corepack pnpm run build",
     "generated:check": "corepack pnpm run notice:check && corepack pnpm run compatibility:check",
     "verify:release-channels": "node scripts/verify-release-channels.mjs",
     "verify:release": "corepack pnpm run verify && corepack pnpm run verify:release-channels && corepack pnpm run verify:clean-tree",
@@ -116,6 +116,7 @@
     "cloud:isolation:verify": "vitest run --no-file-parallelism tests/integration/github-actions-result-isolation-postgres.test.ts && node scripts/target-repository-isolation.mjs",
     "verify:public-surface": "node scripts/sync-release-readme.mjs --check",
     "deps:install-ci": "corepack pnpm install --frozen-lockfile --ignore-scripts && corepack pnpm rebuild @prisma/engines esbuild prisma sharp",
+    "deps:install-renovate": "corepack pnpm install --frozen-lockfile --ignore-scripts --force && corepack pnpm rebuild @prisma/engines esbuild prisma sharp",
     "deps:install-web": "corepack pnpm install --frozen-lockfile --ignore-scripts --filter @boardreadyops/web... --filter boardreadyops && corepack pnpm rebuild @prisma/engines esbuild prisma sharp"
   },
   "lint-staged": {

@@ -8,7 +8,7 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 - The pinned Renovate runner executes at 06:17 Europe/Istanbul on weekdays and can also be started manually.
 - The runner is explicitly scoped to `oaslananka/boardreadyops`; repository autodiscovery and onboarding are disabled.
 - The workflow uses the `GH_AUTH_TOKEN` repository secret. That credential must belong to a dedicated automation identity with the minimum repository permissions required to create branches, pull requests, labels, and issues.
-- Post-upgrade command execution is restricted through `RENOVATE_ALLOWED_COMMANDS` to the exact `corepack pnpm run renovate:post-upgrade` entry point. That repository-controlled script runs the hardened CI dependency install, refreshes `NOTICE`, and rebuilds the committed `dist/` bundles; Renovate cannot execute arbitrary post-upgrade commands.
+- Post-upgrade command execution is restricted through `RENOVATE_ALLOWED_COMMANDS` to the exact `corepack pnpm run renovate:post-upgrade` entry point. That repository-controlled script force-refreshes pnpm package-index metadata before rebuilding native tooling, then refreshes `NOTICE` and the committed `dist/` bundles. This avoids stale-store `pnpm licenses list` failures while keeping Renovate unable to execute arbitrary post-upgrade commands.
 - Renovate itself never runs on a pull-request event, so untrusted pull-request code cannot obtain the automation token.
 
 ## Policy
@@ -18,7 +18,7 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 - Dependency branches regenerate `NOTICE` and the committed `dist/` bundles through the allowlisted post-upgrade task, so license inventory and shipped CLI/Action bundle changes remain visible and reviewable in the pull request.
 - GitHub repository security alerts and security update PRs remain enabled in repository security settings.
 - Major upgrades require Dependency Dashboard approval and manual review.
-- Core runtime, GitHub integration, GitHub Actions, Dockerfile, and Docker Compose updates require manual review.
+- Core runtime and GitHub integration dependencies use exact manifest versions so unrelated lockfile refreshes cannot advance them implicitly; their updates, plus GitHub Actions, Dockerfile, and Docker Compose updates, require manual review.
 - Low-risk development dependency and `@types/*` minor/patch updates wait at least seven days, receive the `automerge` label, and may be squash-merged by Mergify after all required checks pass.
 - TypeScript compiler updates wait at least seven days and always require manual review.
 - GitHub Actions and container references remain digest-pinned.

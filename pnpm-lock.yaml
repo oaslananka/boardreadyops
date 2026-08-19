@@ -172,7 +172,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/db
       '@octokit/auth-app':
-        specifier: latest
+        specifier: 8.2.0
         version: 8.2.0
       next:
         specifier: 16.2.12
