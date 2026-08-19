@@ -59,7 +59,7 @@ jobs:
           TARGET: ${{ inputs.target }}
           HEAD_SHA: ${{ inputs.head_sha }}
           RESULT_URL: ${{ inputs.result_url }}
-          CLOUD_ORIGIN: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN || 'https://boardreadyops.oaslananka.dev' }}
+          CLOUD_ORIGIN: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
           SAFE_MODE: ${{ inputs.safe_mode }}
           SAFE_MODE_REASONS: ${{ inputs.safe_mode_reasons }}
         run: |
@@ -294,7 +294,7 @@ jobs:
           SETUP_PROBE_ID: ${{ inputs.setup_probe_id }}
           SETUP_RESULT_URL: ${{ inputs.setup_result_url }}
           TARGET: ${{ inputs.target }}
-          CLOUD_ORIGIN: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN || 'https://boardreadyops.oaslananka.dev' }}
+          CLOUD_ORIGIN: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
         run: |
           if ! [[ "$SETUP_PROBE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
             echo "setup_probe_id must be a lowercase UUID" >&2

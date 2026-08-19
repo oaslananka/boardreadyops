@@ -92,6 +92,7 @@ jobs:
     uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87 # BoardReadyOps canary workflow
     with:
       visibility: public
+      public-origin: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
 ```
 
 ## Private repository wrapper
@@ -121,6 +122,7 @@ jobs:
     uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87 # BoardReadyOps canary workflow
     with:
       visibility: private
+      public-origin: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
 ```
 
 Do not change the pin to a branch or tag. Upgrade it only after reviewing a newer BoardReadyOps commit and manually commissioning both repositories.
@@ -136,10 +138,11 @@ For each repository:
 5. Add the reviewed `readiness-runner.yml` to the default branch at `.github/workflows/readiness-runner.yml`.
 6. Add a minimal passing KiCad project and `boardreadyops.yml` to the default branch.
 7. Add `canary/nonce.txt` with an initial informational value.
-8. Enable GitHub Actions for the repository and allow the pinned actions used by both workflows.
-9. Enable the repository setting that allows GitHub Actions to create and approve pull requests. If an organization policy blocks this repository setting, change the organization policy only after checking the effective setting on every other organization repository.
-10. Add the appropriate wrapper shown above.
-11. Confirm the default branch is `main` and no existing branch or pull request uses the fixed `boardreadyops-canary` identity for another purpose.
+8. Set the non-secret repository variable `BOARDREADYOPS_CLOUD_ORIGIN` to the reviewed deployed BoardReadyOps HTTPS origin. Do not commission a canary until that origin is selected and reachable.
+9. Enable GitHub Actions for the repository and allow the pinned actions used by both workflows.
+10. Enable the repository setting that allows GitHub Actions to create and approve pull requests. If an organization policy blocks this repository setting, change the organization policy only after checking the effective setting on every other organization repository.
+11. Add the appropriate wrapper shown above.
+12. Confirm the default branch is `main` and no existing branch or pull request uses the fixed `boardreadyops-canary` identity for another purpose.
 
 The canary workflow creates or reuses the `boardreadyops-canary` branch and a persistent pull request titled `chore: BoardReadyOps synthetic canary`. Every run creates one commit whose parent is the current `main` commit and changes only `canary/nonce.txt`.
 

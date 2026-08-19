@@ -19,9 +19,8 @@ on:
         default: 15
       public-origin:
         description: Expected BoardReadyOps public HTTPS origin
-        required: false
+        required: true
         type: string
-        default: https://boardreadyops.oaslananka.dev
       readiness-workflow:
         description: Target repository readiness workflow filename
         required: false

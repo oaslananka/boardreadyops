@@ -14,9 +14,19 @@ describe("deploy-cloud", () => {
     expect(dockerTagFromRevision("---")).toBe("unknown");
   });
 
+  it("requires an explicit public health URL instead of a retired deployment default", () => {
+    expect(() => readDeployOptions({})).toThrow("BOARDREADYOPS_CLOUD_HEALTH_URL is required");
+    expect(
+      readDeployOptions({
+        BOARDREADYOPS_CLOUD_HEALTH_URL: "https://boardreadyops.example.com/api/health",
+      }).healthUrl,
+    ).toBe("https://boardreadyops.example.com/api/health");
+  });
+
   it("reads immutable deployment overrides", () => {
     expect(
       readDeployOptions({
+        BOARDREADYOPS_CLOUD_HEALTH_URL: "https://boardreadyops.example.com/api/health",
         BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY: "example/cloud",
         BOARDREADYOPS_CLOUD_WORKER_CONTAINER: "example-worker",
         BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE: "/run/secrets/cloud.env",

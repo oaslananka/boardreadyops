@@ -2,14 +2,14 @@
 
 Customer-operated execution workers are deployed separately from the control plane. See [Self-hosted runner mode](self-hosted-runner.md) for enrollment, source-boundary, service, network, and rollback procedures.
 
-This guide describes the self-hosted deployment target for `boardreadyops.oaslananka.dev` on `ops-vps-02`.
+This guide describes a generic self-hosted BoardReadyOps Cloud control-plane deployment. It intentionally does not name a current production machine or IP address. Select the deployment host and the **operator-selected HTTPS origin** before commissioning, and keep those environment-specific values in the operations system rather than in the public repository.
 
 ## Target topology
 
 ```text
-Cloudflare DNS
-  -> boardreadyops.oaslananka.dev
-  -> ops-vps-02 / 46.101.195.208
+operator-selected HTTPS origin
+  -> operator-managed DNS / ingress
+  -> operator-selected deployment host
   -> Caddy on the boardreadyops-cloud Docker network
   -> immutable BoardReadyOps web image on web:3000
   -> durable PostgreSQL webhook inbox and control-plane jobs
@@ -18,17 +18,9 @@ Cloudflare DNS
   -> PostgreSQL, Redis, and a persistent artifact volume
 ```
 
-## DNS
+## DNS and public origin
 
-Cloudflare DNS contains this record:
-
-```text
-Type: A
-Name: boardreadyops
-Content: 46.101.195.208
-Proxy: DNS only
-TTL: 60
-```
+Choose the public HTTPS origin as part of deployment commissioning. The repository does not define a production hostname, provider, IP address, or DNS record. `deploy/env.example` uses the reserved `boardreadyops.example.com` documentation domain only as a placeholder. Replace it with the real origin before deployment and configure `BOARDREADYOPS_CADDY_HOST`, `APP_URL`, `NEXT_PUBLIC_APP_URL`, `BOARDREADYOPS_PUBLIC_URL`, and `BOARDREADYOPS_CLOUD_HEALTH_URL` consistently.
 
 ## Runtime layout
 
@@ -44,7 +36,7 @@ Keep the live Caddy bind mount under `/opt/boardreadyops-cloud`; do not bind it 
 
 ## Host requirements
 
-Install Docker Engine and the Docker Compose v2 plugin on the VPS. The web and control-plane worker processes have independent healthchecks. PostgreSQL and Redis healthchecks are also defined in `deploy/docker-compose.yml`.
+Install Docker Engine and the Docker Compose v2 plugin on the selected deployment host. The web and control-plane worker processes have independent healthchecks. PostgreSQL and Redis healthchecks are also defined in `deploy/docker-compose.yml`.
 
 The webhook endpoint never performs GitHub Check Run creation or workflow dispatch inline. It verifies and normalizes the request, atomically stores one `webhook_inbox` row and one `control_plane_jobs` row, and returns HTTP 202. The lifecycle worker claims jobs with PostgreSQL leases and writes release-run state plus required `control_plane_outbox` records transactionally. An independent outbox loop delivers Check Run and workflow effects, so GitHub API latency does not block unrelated webhook planning. Check Run creation is replay-safe through `external_id = runId`; an uncertain workflow dispatch becomes `reconciliation_required` and is not automatically replayed. See [Transactional outbox](../architecture/transactional-outbox.md) for the state model, reconciliation procedure, metrics, and external-broker triggers.
 
@@ -106,7 +98,8 @@ The cloud build emits `apps/web/.next/worker-meta.json` from esbuild and runs `p
 
 ```bash
 cp deploy/env.example deploy/.env
-# Edit deploy/.env before public deployment.
+# Replace the example hostname and edit deploy/.env before public deployment.
+export BOARDREADYOPS_CLOUD_HEALTH_URL="https://boardreadyops.example.com/api/health"
 export BOARDREADYOPS_GIT_SHA="$(git rev-parse HEAD)"
 export BOARDREADYOPS_BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export BOARDREADYOPS_VERSION="$(node -p "require('./package.json').version")"
@@ -119,7 +112,7 @@ The build writes the commit SHA, package version, and build timestamp into stand
 ## Health check
 
 ```bash
-curl -fsS https://boardreadyops.oaslananka.dev/api/health
+curl -fsS "${BOARDREADYOPS_PUBLIC_URL}/api/health"
 
 docker compose --env-file deploy/.env -f deploy/docker-compose.yml exec worker \
   node -e "fetch('http://127.0.0.1:3001/health/ready').then(async r=>{console.log(await r.text());process.exit(r.ok?0:1)})"
@@ -142,7 +135,7 @@ Inspect the native Docker health state with:
 docker inspect --format '{{json .State.Health}}' bro-web
 ```
 
-## Repeatable VPS deploy from main
+## Repeatable self-hosted deploy from main
 
 After a change is merged to `main`, update the clean production worktree without rewriting local history:
 
@@ -200,7 +193,7 @@ Supported environment overrides:
 ```text
 BOARDREADYOPS_CLOUD_CONTAINER=bro-web
 BOARDREADYOPS_CLOUD_WORKER_CONTAINER=bro-worker
-BOARDREADYOPS_CLOUD_HEALTH_URL=https://boardreadyops.oaslananka.dev/api/health
+BOARDREADYOPS_CLOUD_HEALTH_URL=https://boardreadyops.example.com/api/health
 BOARDREADYOPS_CLOUD_CANARY_HEALTH_URL=http://127.0.0.1:3004/api/health
 BOARDREADYOPS_CLOUD_IMAGE_REPOSITORY=boardreadyops-web-runtime
 BOARDREADYOPS_CLOUD_RUNTIME_ENV_FILE=/opt/boardreadyops-cloud/runtime-env
@@ -235,10 +228,11 @@ BOARDREADYOPS_RECONCILIATION_NEXT_CHECK_SECONDS=60
 
 The same reconciliation cadence covers internal webhook inbox/job drift, missed GitHub Actions callbacks, and terminal Check Run publication drift. Internal lifecycle repair uses `lifecycle_job_missing` and `lifecycle_inbox_state_drift`, treats `control_plane_jobs.status` as authoritative, and does not require GitHub credentials. Its logs never include normalized actions. The worker readiness payload reports `lastLifecycleReconciliationPollAt`, `lastSuccessfulLifecycleReconciliationAt`, `lastCheckRunReconciliationPollAt`, and `lastSuccessfulCheckRunReconciliationAt` separately so operators can distinguish database repair, publication repair, and workflow-state convergence.
 
-For a dry run:
+For a dry run, provide the intended public health URL explicitly so the preview cannot inherit a retired deployment target:
 
 ```bash
-BOARDREADYOPS_CLOUD_DRY_RUN=1 pnpm run cloud:deploy:self-hosted
+BOARDREADYOPS_CLOUD_HEALTH_URL=https://boardreadyops.example.com/api/health \
+  BOARDREADYOPS_CLOUD_DRY_RUN=1 pnpm run cloud:deploy:self-hosted
 ```
 
 ## Signed artifact downloads
