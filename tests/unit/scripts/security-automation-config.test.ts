@@ -86,6 +86,9 @@ describe("dependency and security automation configuration", () => {
     const webPackageJson = JSON.parse(await repositoryFile("apps/web/package.json")) as {
       dependencies?: Record<string, string>;
     };
+    const renovateWorkflow = yaml.load(await repositoryFile(".github/workflows/renovate.yml")) as {
+      jobs?: { renovate?: { env?: Record<string, string> } };
+    };
 
     expect(webPackageJson.dependencies?.["@octokit/auth-app"]).toBe("8.2.0");
     expect(webPackageJson.dependencies?.["@octokit/auth-app"]).not.toBe("latest");
@@ -103,6 +106,7 @@ describe("dependency and security automation configuration", () => {
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
     expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
+    expect(renovateWorkflow.jobs?.renovate?.env?.CI).toBe("true");
     expect(renovate.postUpgradeTasks).toEqual({
       commands: ["corepack pnpm run renovate:post-upgrade"],
       fileFilters: ["NOTICE", "dist/**"],
