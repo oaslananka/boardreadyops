@@ -89,7 +89,7 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87 # BoardReadyOps canary workflow
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@d93cff3819ffcbbff97ac9600f71a27844c4d005 # BoardReadyOps canary workflow
     with:
       visibility: public
       public-origin: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
@@ -119,7 +119,7 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87 # BoardReadyOps canary workflow
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@d93cff3819ffcbbff97ac9600f71a27844c4d005 # BoardReadyOps canary workflow
     with:
       visibility: private
       public-origin: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}

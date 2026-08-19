@@ -248,7 +248,7 @@ ${operations}`;
     expect(canaries).toContain("47 */6 * * *");
     expect(canaries).toContain("workflow_dispatch:");
     expect(canaries).toContain(
-      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@40788612c2a84d185f7d3f087c0d2a525295ad87",
+      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@d93cff3819ffcbbff97ac9600f71a27844c4d005",
     );
     expect(canaries).toContain("actions: read");
     expect(canaries).toContain("checks: read");
