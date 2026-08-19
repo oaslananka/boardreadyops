@@ -7,8 +7,8 @@ explicitly blocked by a tracked follow-up issue.
 ## Current Supersession (2026-06-19)
 
 This page records the original BOARD audit target below. The current public
-channel state is superseded by `boardreadyops@1.31.3` and GitHub Release
-`v1.31.3`: npm clean-consumer install, Linux x64 release binary
+channel state is superseded by `boardreadyops@1.31.4` and GitHub Release
+`v1.31.4`: npm clean-consumer install, Linux x64 release binary
 checksum/runtime smoke, release asset publication, Homebrew formula checksum
 data, and anonymous GHCR `v1`/`latest` manifest access are verified in
 [Release Channel Verification](channel-verification.md). Keep the historical
