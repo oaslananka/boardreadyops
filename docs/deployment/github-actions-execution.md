@@ -28,7 +28,7 @@ Copy the reviewed workflow from:
 .github/workflows/readiness-runner.yml
 ```
 
-into the same path on the target repository's default branch. The target repository also needs a reviewed `boardreadyops.yml` because the pinned compatibility Action treats that path as an explicit configuration file. The workflow defaults to `https://boardreadyops.oaslananka.dev`; a staging repository may set the repository variable `BOARDREADYOPS_CLOUD_ORIGIN` to another HTTPS origin.
+into the same path on the target repository's default branch. The target repository also needs a reviewed `boardreadyops.yml` because the pinned compatibility Action treats that path as an explicit configuration file. Set the non-secret repository variable `BOARDREADYOPS_CLOUD_ORIGIN` to the deployed BoardReadyOps control-plane HTTPS origin before dispatch. There is no baked-in production origin; a missing or non-HTTPS value fails closed before an OIDC callback is attempted.
 
 Do not place the workflow only on a pull request branch. GitHub's workflow-dispatch endpoint resolves workflow files from the repository default branch.
 
@@ -86,7 +86,7 @@ Changing requested App permissions requires existing installations to be re-auth
 ```env
 BOARDREADYOPS_RUNNER_MODE=github-actions
 BOARDREADYOPS_DISPATCH_WORKFLOW=readiness-runner.yml
-BOARDREADYOPS_PUBLIC_URL=https://boardreadyops.oaslananka.dev
+BOARDREADYOPS_PUBLIC_URL=https://boardreadyops.example.com
 BOARDREADYOPS_RELEASE_REPOSITORIES=owner/repository
 ```
 
@@ -119,7 +119,7 @@ The shipped workflow:
 1. requires lowercase UUID run and execution-attempt IDs;
 2. requires `target` to equal `github.repository`;
 3. accepts only a full lowercase 40-character commit SHA;
-4. pins the callback to the repository-controlled `BOARDREADYOPS_CLOUD_ORIGIN` HTTPS origin (production by default) and the exact run/attempt URL;
+4. pins the callback to the explicitly configured repository-controlled `BOARDREADYOPS_CLOUD_ORIGIN` HTTPS origin and the exact run/attempt URL;
 5. checks out the exact commit with persisted credentials disabled;
 6. verifies the resulting Git SHA;
 7. installs and verifies KiCad 10.0.x;
@@ -147,13 +147,14 @@ Repository administrators must permit GitHub Actions and the pinned third-party 
 1. Add the GitHub App installation to the target repository.
 2. Confirm the installation has Actions read/write and Checks read/write.
 3. Add `boardreadyops.yml` and `.github/workflows/readiness-runner.yml` to the default branch.
-4. Confirm Actions are enabled and the organization policy permits the pinned actions.
-5. Open or synchronize a non-draft, same-repository pull request.
-6. Verify the BoardReadyOps Check Run becomes queued and then in progress.
-7. Verify the target repository receives a `BoardReadyOps Readiness Runner` workflow run.
-8. Verify checkout resolved to the assigned SHA and KiCad 10.0.x ran.
-9. Verify the OIDC callback completes the Check Run and the dashboard shows findings and the Actions run link.
-10. Verify no target checkout exists on the control-plane host or `ops-vps-03`.
+4. Set `BOARDREADYOPS_CLOUD_ORIGIN` to the reviewed deployed control-plane HTTPS origin.
+5. Confirm Actions are enabled and the organization policy permits the pinned actions.
+6. Open or synchronize a non-draft, same-repository pull request.
+7. Verify the BoardReadyOps Check Run becomes queued and then in progress.
+8. Verify the target repository receives a `BoardReadyOps Readiness Runner` workflow run.
+9. Verify checkout resolved to the assigned SHA and KiCad 10.0.x ran.
+10. Verify the OIDC callback completes the Check Run and the dashboard shows findings and the Actions run link.
+11. Verify no target checkout exists on the control-plane host or `ops-vps-03`.
 
 For continuous production-path validation across both repository visibility classes, provision and commission the [synthetic target-repository canaries](../operations/synthetic-target-repository-canaries.md).
 

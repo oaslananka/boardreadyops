@@ -11,6 +11,14 @@ type Workflow = {
 };
 
 describe("synthetic target-repository canary workflow", () => {
+  it("requires callers to provide the deployed public origin", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain("public-origin:");
+    expect(workflow).toContain("description: Expected BoardReadyOps public HTTPS origin");
+    expect(workflow).not.toContain("default: https://boardreadyops.oaslananka.dev");
+  });
+
   it("uses a workflow-call-only, repository-local permission boundary", async () => {
     const workflow = await readFile(workflowPath, "utf8");
 

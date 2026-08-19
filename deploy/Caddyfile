@@ -1,4 +1,4 @@
-boardreadyops.oaslananka.dev {
+{$BOARDREADYOPS_CADDY_HOST} {
   encode zstd gzip
   reverse_proxy web:3000
 }

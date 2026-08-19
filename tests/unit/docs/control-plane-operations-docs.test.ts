@@ -214,6 +214,26 @@ ${operations}`;
     expect(lifecycle).not.toContain("Issue #23 remains open");
   });
 
+  it("does not encode a retired production host or IP in deployment contracts", () => {
+    const files = [
+      "docs/deployment/self-hosted.md",
+      "docs/deployment/github-actions-execution.md",
+      "deploy/env.example",
+      "deploy/Caddyfile",
+      "deploy/docker-compose.yml",
+      "scripts/deploy-cloud.mjs",
+      ".github/workflows/readiness-runner.yml",
+      ".github/workflows/synthetic-target-repository-canary.yml",
+      "scripts/synthetic-target-repository-canary.mjs",
+    ];
+    const combined = files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+
+    expect(combined).not.toContain("ops-vps-02");
+    expect(combined).not.toContain("46.101.195.208");
+    expect(combined).not.toContain("boardreadyops.oaslananka.dev");
+    expect(fs.readFileSync("docs/deployment/self-hosted.md", "utf8")).toContain("operator-selected HTTPS origin");
+  });
+
   it("documents public and private synthetic target-repository canaries", () => {
     const canaryPath = "docs/operations/synthetic-target-repository-canaries.md";
     expect(fs.existsSync(canaryPath)).toBe(true);

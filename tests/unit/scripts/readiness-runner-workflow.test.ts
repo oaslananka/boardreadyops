@@ -63,6 +63,13 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("core.setFailed(policyFailed");
   });
 
+  it("requires the target repository to configure the control-plane origin explicitly", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain("CLOUD_ORIGIN: $" + "{{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}");
+    expect(workflow).not.toContain("boardreadyops.oaslananka.dev");
+  });
+
   it("binds dispatch to this repository, the exact SHA, and the production callback", async () => {
     const workflow = await readFile(workflowPath, "utf8");
 
