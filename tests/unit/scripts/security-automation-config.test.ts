@@ -83,7 +83,12 @@ describe("dependency and security automation configuration", () => {
     const packageJson = JSON.parse(await repositoryFile("package.json")) as {
       scripts?: Record<string, string>;
     };
+    const webPackageJson = JSON.parse(await repositoryFile("apps/web/package.json")) as {
+      dependencies?: Record<string, string>;
+    };
 
+    expect(webPackageJson.dependencies?.["@octokit/auth-app"]).toBe("8.2.0");
+    expect(webPackageJson.dependencies?.["@octokit/auth-app"]).not.toBe("latest");
     expect(renovate.extends).toEqual(
       expect.arrayContaining(["config:best-practices", ":dependencyDashboard", ":semanticCommits"]),
     );
@@ -96,8 +101,11 @@ describe("dependency and security automation configuration", () => {
     expect(await repositoryFile("renovate.json")).not.toContain("3 days");
     expect(renovate.pinDigests).toBe(true);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
+    expect(packageJson.scripts?.["deps:install-renovate"]).toBe(
+      "corepack pnpm install --frozen-lockfile --ignore-scripts --force && corepack pnpm rebuild @prisma/engines esbuild prisma sharp",
+    );
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe(
-      "corepack pnpm run deps:install-ci && corepack pnpm run notice && corepack pnpm run build",
+      "corepack pnpm run deps:install-renovate && corepack pnpm run notice && corepack pnpm run build",
     );
     expect(renovate.postUpgradeTasks).toEqual({
       commands: ["corepack pnpm run renovate:post-upgrade"],
