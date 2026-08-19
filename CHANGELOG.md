@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.31.3](https://github.com/oaslananka/boardreadyops/compare/v1.31.2...v1.31.3) (2026-08-18)
+
+
+### Bug Fixes
+
+* **cloud:** keep pg external in runtime bundles ([#423](https://github.com/oaslananka/boardreadyops/issues/423)) ([9c7c1b4](https://github.com/oaslananka/boardreadyops/commit/9c7c1b4a17d824bf6280b15ca4655b75fd1ef829))
+
 ## [1.31.2](https://github.com/oaslananka/boardreadyops/compare/v1.31.1...v1.31.2) (2026-08-18)
 
 
