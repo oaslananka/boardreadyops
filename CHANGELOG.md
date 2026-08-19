@@ -4,6 +4,14 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.31.6](https://github.com/oaslananka/boardreadyops/compare/v1.31.5...v1.31.6) (2026-08-19)
+
+
+### Bug Fixes
+
+* **deps:** make Renovate store isolation hermetic ([#436](https://github.com/oaslananka/boardreadyops/issues/436)) ([f41d620](https://github.com/oaslananka/boardreadyops/commit/f41d620fe9f69ef27ae148d4d99576cf5b975e63))
+* **deps:** stabilize Renovate CI runtime ([#438](https://github.com/oaslananka/boardreadyops/issues/438)) ([3e790e0](https://github.com/oaslananka/boardreadyops/commit/3e790e09e6d3c2e5b219029c627a00481b0bb939))
+
 ## [1.31.5](https://github.com/oaslananka/boardreadyops/compare/v1.31.4...v1.31.5) (2026-08-19)
 
 
