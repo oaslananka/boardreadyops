@@ -13,7 +13,7 @@ describe("Renovate post-upgrade isolation", () => {
     });
 
     expect(env.PATH).toBe("/usr/bin");
-    expect(env.npm_config_store_dir).toBe("/tmp/boardreadyops-renovate-store");
+    expect(env.pnpm_config_store_dir).toBe("/tmp/boardreadyops-renovate-store");
   });
 
   it("keeps frozen install, native rebuild, NOTICE, and dist generation in order", () => {
@@ -42,9 +42,12 @@ describe("Renovate post-upgrade isolation", () => {
 
     expect(calls).toHaveLength(4);
     for (const call of calls) {
-      expect(call.options.env.npm_config_store_dir).toBe("/tmp/isolated-store");
+      expect(call.options.env.pnpm_config_store_dir).toBe("/tmp/isolated-store");
     }
-    expect(removals).toEqual([{ target: "/tmp/isolated-store", options: { recursive: true, force: true } }]);
+    expect(removals).toEqual([
+      { target: "/repo/node_modules", options: { recursive: true, force: true } },
+      { target: "/tmp/isolated-store", options: { recursive: true, force: true } },
+    ]);
   });
 
   it("cleans the temporary store when a child command fails", async () => {
@@ -63,6 +66,9 @@ describe("Renovate post-upgrade isolation", () => {
       }),
     ).rejects.toBe(failure);
 
-    expect(removals).toEqual([{ target: "/tmp/isolated-store", options: { recursive: true, force: true } }]);
+    expect(removals).toEqual([
+      { target: "/repo/node_modules", options: { recursive: true, force: true } },
+      { target: "/tmp/isolated-store", options: { recursive: true, force: true } },
+    ]);
   });
 });
