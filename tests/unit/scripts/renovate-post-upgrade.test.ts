@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 // @ts-expect-error Native ESM operations script intentionally has no declaration file.
 import { createRenovateEnvironment, main, renovateCommandPlan } from "../../../scripts/renovate-post-upgrade.mjs";
@@ -45,7 +46,7 @@ describe("Renovate post-upgrade isolation", () => {
       expect(call.options.env.pnpm_config_store_dir).toBe("/tmp/isolated-store");
     }
     expect(removals).toEqual([
-      { target: "/repo/node_modules", options: { recursive: true, force: true } },
+      { target: join("/repo", "node_modules"), options: { recursive: true, force: true } },
       { target: "/tmp/isolated-store", options: { recursive: true, force: true } },
     ]);
   });
@@ -67,7 +68,7 @@ describe("Renovate post-upgrade isolation", () => {
     ).rejects.toBe(failure);
 
     expect(removals).toEqual([
-      { target: "/repo/node_modules", options: { recursive: true, force: true } },
+      { target: join("/repo", "node_modules"), options: { recursive: true, force: true } },
       { target: "/tmp/isolated-store", options: { recursive: true, force: true } },
     ]);
   });
