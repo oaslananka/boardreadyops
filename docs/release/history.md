@@ -8,6 +8,14 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.31.5](https://github.com/oaslananka/boardreadyops/compare/v1.31.4...v1.31.5) (2026-08-19)
+
+
+### Bug Fixes
+
+* **deps:** isolate Renovate pnpm store ([#435](https://github.com/oaslananka/boardreadyops/issues/435)) ([6b10f95](https://github.com/oaslananka/boardreadyops/commit/6b10f953c6f0a1167b445b1219c862f9c363aacd))
+* **deps:** keep Renovate updates deterministic ([#433](https://github.com/oaslananka/boardreadyops/issues/433)) ([536ef54](https://github.com/oaslananka/boardreadyops/commit/536ef5475fc47963bd82aacce6396a95e00c660c))
+
 ## [1.31.4](https://github.com/oaslananka/boardreadyops/compare/v1.31.3...v1.31.4) (2026-08-19)
 
 
