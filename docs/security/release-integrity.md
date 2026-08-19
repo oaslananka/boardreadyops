@@ -22,7 +22,7 @@ release binaries, the GitHub Action, or container images.
 Users should prefer pinned versions and verify binary assets through checksums.
 
 ```bash
-curl -fsSLO https://github.com/oaslananka/boardreadyops/releases/download/v1.31.2/SHA256SUMS
+curl -fsSLO https://github.com/oaslananka/boardreadyops/releases/download/v1.31.3/SHA256SUMS
 sha256sum -c SHA256SUMS
 ```
 
