@@ -17,7 +17,7 @@
     "@boardreadyops/cloud-core": "workspace:*",
     "@boardreadyops/contracts": "workspace:*",
     "@boardreadyops/db": "workspace:*",
-    "@octokit/auth-app": "latest"
+    "@octokit/auth-app": "8.2.0"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
