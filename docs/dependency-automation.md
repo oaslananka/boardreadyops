@@ -8,7 +8,7 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 - The pinned Renovate runner executes at 06:17 Europe/Istanbul on weekdays and can also be started manually.
 - The runner is explicitly scoped to `oaslananka/boardreadyops`; repository autodiscovery and onboarding are disabled.
 - The workflow uses the `GH_AUTH_TOKEN` repository secret. That credential must belong to a dedicated automation identity with the minimum repository permissions required to create branches, pull requests, labels, and issues.
-- Post-upgrade command execution is restricted through `RENOVATE_ALLOWED_COMMANDS` to the exact `corepack pnpm run renovate:post-upgrade` entry point. That repository-controlled script force-refreshes pnpm package-index metadata before rebuilding native tooling, then refreshes `NOTICE` and the committed `dist/` bundles. This avoids stale-store `pnpm licenses list` failures while keeping Renovate unable to execute arbitrary post-upgrade commands.
+- Post-upgrade command execution is restricted through `RENOVATE_ALLOWED_COMMANDS` to the exact `corepack pnpm run renovate:post-upgrade` entry point. That repository-controlled script creates an isolated temporary pnpm store for the dependency install, native rebuild, `NOTICE` refresh, and committed `dist/` rebuild, then removes the store. This prevents shared-runner pnpm store metadata from breaking `pnpm licenses list` while keeping Renovate unable to execute arbitrary post-upgrade commands.
 - Renovate itself never runs on a pull-request event, so untrusted pull-request code cannot obtain the automation token.
 
 ## Policy

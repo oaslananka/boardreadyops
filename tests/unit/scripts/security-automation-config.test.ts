@@ -101,12 +101,8 @@ describe("dependency and security automation configuration", () => {
     expect(await repositoryFile("renovate.json")).not.toContain("3 days");
     expect(renovate.pinDigests).toBe(true);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
-    expect(packageJson.scripts?.["deps:install-renovate"]).toBe(
-      "corepack pnpm install --frozen-lockfile --ignore-scripts --force && corepack pnpm rebuild @prisma/engines esbuild prisma sharp",
-    );
-    expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe(
-      "corepack pnpm run deps:install-renovate && corepack pnpm run notice && corepack pnpm run build",
-    );
+    expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
+    expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
     expect(renovate.postUpgradeTasks).toEqual({
       commands: ["corepack pnpm run renovate:post-upgrade"],
       fileFilters: ["NOTICE", "dist/**"],
