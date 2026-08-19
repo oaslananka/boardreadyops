@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.31.4](https://github.com/oaslananka/boardreadyops/compare/v1.31.3...v1.31.4) (2026-08-19)
+
+
+### Bug Fixes
+
+* **cloud:** retire stale production origin defaults ([#427](https://github.com/oaslananka/boardreadyops/issues/427)) ([6bd0c5b](https://github.com/oaslananka/boardreadyops/commit/6bd0c5b968236636a21d1f1a6f6212a7da1c9844))
+
 ## [1.31.3](https://github.com/oaslananka/boardreadyops/compare/v1.31.2...v1.31.3) (2026-08-18)
 
 
