@@ -22,5 +22,10 @@ describe("self-hosted control-plane portability documentation", () => {
     expect(deployment).toContain("Host Node.js is not required for the Compose build path");
     expect(deployment).toContain("cloud:backup:verify");
     expect(deployment).toContain("control-plane restore drill");
+    expect(deployment).toContain("Production maintenance service");
+    expect(deployment).toContain("sudo bash deploy/maintenance/install.sh --deployment-dir /absolute/path");
+    expect(deployment).toContain("boardreadyops-maintenance runtime-status");
+    expect(deployment).toContain("boardreadyops-maintenance backup-restore-verify");
+    expect(deployment).toContain("does not add `exec-agent` to the Docker group");
   });
 });
