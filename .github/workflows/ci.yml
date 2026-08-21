@@ -162,7 +162,7 @@ jobs:
           fi
       - name: Run unit tests with JUnit report
         id: tests
-        run: pnpm run test:unit --reporter=junit --outputFile=junit.xml
+        run: pnpm run test:unit --reporter=default --reporter=junit --outputFile.junit=junit.xml
         continue-on-error: true
       - name: Upload test results to Mergify CI Insights
         if: ${{ always() && steps.mergify-token.outputs.enabled == 'true' }}
@@ -219,7 +219,7 @@ jobs:
           fi
       - name: Run unit tests with JUnit report
         id: tests
-        run: pnpm run test:unit --reporter=junit --outputFile=junit.xml
+        run: pnpm run test:unit --reporter=default --reporter=junit --outputFile.junit=junit.xml
         continue-on-error: true
       - name: Upload test results to Mergify CI Insights
         if: ${{ always() && steps.mergify-token.outputs.enabled == 'true' }}
