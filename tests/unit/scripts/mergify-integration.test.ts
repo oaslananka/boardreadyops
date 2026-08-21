@@ -65,6 +65,13 @@ describe("Mergify integration contract", () => {
     expect(new Set(actionUses)).toEqual(new Set(["Mergifyio/gha-mergify-ci@f16859b8b4496abe98768bed352d5d9c969a2793"]));
   });
 
+  it("keeps unit-test failures visible in logs while preserving JUnit reports", () => {
+    const observableUnitCommand =
+      "pnpm run test:unit --reporter=default --reporter=junit --outputFile.junit=junit.xml";
+    expect(ci.match(new RegExp(observableUnitCommand.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "gu")) ?? []).toHaveLength(2);
+    expect(ci).not.toContain("pnpm run test:unit --reporter=junit --outputFile=junit.xml");
+  });
+
   it("keeps test failures authoritative when CI Insights upload is enabled", () => {
     expect(ci).toContain(["test_step_outcome: $", "{{ steps.tests.outcome }}"].join(""));
     expect(ci).toContain("steps.tests.outcome != 'success'");
