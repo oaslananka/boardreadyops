@@ -134,6 +134,7 @@ describe("dependency and security automation configuration", () => {
     expect(validator).toContain("readonly");
     expect(validator).toContain('"--entrypoint"');
     expect(validator).toContain('"renovate-config-validator"');
+    expect(validator).toContain('spawn("/usr/bin/docker"');
   });
 
   it("enforces package-manager release quarantine and dependency trust policies", async () => {

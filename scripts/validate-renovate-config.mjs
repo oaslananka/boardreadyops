@@ -17,7 +17,7 @@ const args = [
   "renovate.json",
 ];
 
-const child = spawn("docker", args, {
+const child = spawn("/usr/bin/docker", args, {
   stdio: "inherit",
   windowsHide: true,
 });
