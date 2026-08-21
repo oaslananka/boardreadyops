@@ -13,7 +13,7 @@ export type ResultOidcExpectations = {
   executionAttemptId?: string;
   repository: string;
   repositoryId: string;
-  sha: string;
+  targetSha: string;
   workflowRef: string;
   ref: string;
   audience: string;
@@ -102,7 +102,7 @@ export async function resultOidcExpectations(
   const workflowRef = githubActionsWorkflowRef(repository, defaultBranch, workflow);
   const ref = githubActionsWorkflowGitRef(defaultBranch);
   if (!workflowRef || !ref) return undefined;
-  const audience = `boardreadyops-cloud:${runId}:${executionAttemptId ?? "none"}:${trust.trustMode}:${
+  const audience = `boardreadyops-cloud:${runId}:${executionAttemptId ?? "none"}:${sha}:${trust.trustMode}:${
     trust.safeModeReasons.length > 0 ? trust.safeModeReasons.join(",") : "none"
   }`;
 
@@ -111,7 +111,7 @@ export async function resultOidcExpectations(
     ...(executionAttemptId === undefined ? {} : { executionAttemptId }),
     repository,
     repositoryId,
-    sha,
+    targetSha: sha,
     workflowRef,
     ref,
     audience,
