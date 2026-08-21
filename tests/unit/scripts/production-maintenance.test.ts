@@ -102,7 +102,7 @@ for payload in [
       expect(script).toContain(service);
     }
     expect(script).toContain("org.opencontainers.image.revision");
-    expect(script).toContain("git -C");
+    expect(script).toContain('git -c safe.directory="$repo_dir" -C');
     expect(script).toContain("restart_count");
     expect(script).not.toMatch(/Env|runtime\.env|POSTGRES_PASSWORD|DATABASE_URL|GITHUB_APP|PRIVATE_KEY/u);
   });
@@ -110,6 +110,7 @@ for payload in [
   it("restores production PostgreSQL only into disposable internal resources and verifies cleanup before success", () => {
     const script = read(backupVerifyPath);
 
+    expect(script).toContain('git -c safe.directory="$repo_dir" -C');
     expect(script).toContain("pg_dump");
     expect(script).toContain("--format=custom");
     expect(script).toContain("--no-owner");

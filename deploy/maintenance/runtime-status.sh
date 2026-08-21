@@ -24,7 +24,7 @@ PY
 repo_dir="${deployment_dir}/repo"
 [[ -d "$repo_dir" && ! -L "$repo_dir" ]] || fail "BoardReadyOps deployment is unavailable"
 
-release_sha="$(/usr/bin/git -C "$repo_dir" rev-parse --verify HEAD 2>/dev/null || true)"
+release_sha="$(/usr/bin/git -c safe.directory="$repo_dir" -C "$repo_dir" rev-parse --verify HEAD 2>/dev/null || true)"
 [[ "$release_sha" =~ ^[0-9a-f]{40}$ ]] || fail "BoardReadyOps release identity is unavailable"
 
 container_for_service() {
