@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import grp
 import json
 import os
-import pwd
 import socket
 import stat
 import struct
@@ -12,6 +10,7 @@ from pathlib import PurePosixPath
 ALLOWED_USER = "exec-agent"
 SOCKET_GROUP = "exec-agent"
 SOCKET_PATH = "/run/boardreadyops-maintenance/control.sock"
+SOCKET_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP
 INSTALL_ROOT = "/opt/boardreadyops-maintenance"
 REQUEST_LIMIT = 1024
 RESPONSE_LIMIT = 64 * 1024
@@ -140,6 +139,9 @@ def remove_stale_socket(path: str) -> None:
 
 
 def main() -> int:
+    import grp
+    import pwd
+
     if os.geteuid() != 0:
         raise SystemExit("maintenance server must run as root")
     deployment_dir = validate_deployment_dir(os.environ.get("BOARDREADYOPS_DEPLOYMENT_DIR", ""))
@@ -154,7 +156,8 @@ def main() -> int:
     try:
         listener.bind(SOCKET_PATH)
         os.chown(SOCKET_PATH, 0, socket_gid)
-        os.chmod(SOCKET_PATH, 0o660)
+        # Intentionally root:exec-agent rw only; SOCKET_MODE contains no world permission bits.
+        os.chmod(SOCKET_PATH, SOCKET_MODE)
         listener.listen(8)
         while True:
             connection, _ = listener.accept()
