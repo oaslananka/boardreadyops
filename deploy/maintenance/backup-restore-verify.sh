@@ -94,7 +94,7 @@ source_pg_health="$(/usr/bin/docker inspect --format '{{if .State.Health}}{{.Sta
 source_pg_image="$(/usr/bin/docker inspect --format '{{.Image}}' "$source_pg" 2>/dev/null || true)"
 [[ "$source_pg_image" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "BoardReadyOps PostgreSQL image identity is unavailable"
 
-release_sha="$(/usr/bin/git -C "$repo_dir" rev-parse --verify HEAD 2>/dev/null || true)"
+release_sha="$(/usr/bin/git -c safe.directory="$repo_dir" -C "$repo_dir" rev-parse --verify HEAD 2>/dev/null || true)"
 [[ "$release_sha" =~ ^[0-9a-f]{40}$ ]] || fail "BoardReadyOps release identity is unavailable"
 image_revision="$(/usr/bin/docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$source_web" 2>/dev/null || true)"
 [[ "$image_revision" = "$release_sha" ]] || fail "BoardReadyOps runtime release does not match the deployment checkout"
