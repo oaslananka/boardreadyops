@@ -155,7 +155,8 @@ def main() -> int:
     try:
         listener.bind(SOCKET_PATH)
         os.chown(SOCKET_PATH, 0, socket_gid)
-        os.chmod(SOCKET_PATH, 0o660)
+        # Intentionally root:exec-agent rw only; group access is required for the sole authorized peer and world access is zero.
+        os.chmod(SOCKET_PATH, 0o660)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
         listener.listen(8)
         while True:
             connection, _ = listener.accept()

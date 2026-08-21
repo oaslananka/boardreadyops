@@ -71,6 +71,10 @@ for payload in [
     expect(server).toContain("SO_PEERCRED");
     expect(server).toContain('ALLOWED_USER = "exec-agent"');
     expect(server).toContain("REQUEST_LIMIT = 1024");
+    expect(server).toContain("os.chown(SOCKET_PATH, 0, socket_gid)");
+    expect(server).toContain(
+      "os.chmod(SOCKET_PATH, 0o660)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions",
+    );
     expect(server).toContain("subprocess.run(");
     expect(server).toContain("shell=False");
     expect(server).not.toMatch(/sudoers|NOPASSWD|docker group|\/bin\/sh -c|shell=True/u);
