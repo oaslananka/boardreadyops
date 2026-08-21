@@ -1,0 +1,32 @@
+[Unit]
+Description=BoardReadyOps production maintenance service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=exec-agent
+ExecStart=/usr/bin/python3 /opt/boardreadyops-maintenance/server.py
+EnvironmentFile=/etc/boardreadyops-maintenance/maintenance.env
+RuntimeDirectory=boardreadyops-maintenance
+RuntimeDirectoryMode=0750
+UMask=0007
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
+ReadWritePaths=/run/boardreadyops-maintenance
+
+[Install]
+WantedBy=multi-user.target
