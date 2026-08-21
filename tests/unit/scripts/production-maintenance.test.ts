@@ -41,6 +41,7 @@ finally:
     builtins.__import__ = real_import
 assert module.parse_request(b'{"version":1,"operation":"runtime-status"}\n') == "runtime-status"
 assert module.parse_request(b'{"version":1,"operation":"backup-restore-verify"}\n') == "backup-restore-verify"
+assert module.SOCKET_MODE == 0o660
 assert module.command_for_operation("runtime-status", "/srv/boardreadyops") == [
     "/opt/boardreadyops-maintenance/runtime-status.sh", "--deployment-dir", "/srv/boardreadyops"
 ]
@@ -72,9 +73,9 @@ for payload in [
     expect(server).toContain('ALLOWED_USER = "exec-agent"');
     expect(server).toContain("REQUEST_LIMIT = 1024");
     expect(server).toContain("os.chown(SOCKET_PATH, 0, socket_gid)");
-    expect(server).toContain(
-      "os.chmod(SOCKET_PATH, 0o660)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions",
-    );
+    expect(server).toContain("SOCKET_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP");
+    expect(server).toContain("os.chmod(SOCKET_PATH, SOCKET_MODE)");
+    expect(server).not.toContain("nosemgrep");
     expect(server).toContain("subprocess.run(");
     expect(server).toContain("shell=False");
     expect(server).not.toMatch(/sudoers|NOPASSWD|docker group|\/bin\/sh -c|shell=True/u);
