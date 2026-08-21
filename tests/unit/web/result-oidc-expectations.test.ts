@@ -31,11 +31,11 @@ describe("result OIDC repository binding", () => {
       executionAttemptId,
       repository: "octo-org/hardware-board",
       repositoryId: "98765",
-      sha: "a".repeat(40),
+      targetSha: "a".repeat(40),
       workflowRef: "octo-org/hardware-board/.github/workflows/readiness-runner.yml@refs/heads/trunk",
       ref: "refs/heads/trunk",
       audience:
-        "boardreadyops-cloud:5dc4193b-5c7e-4df8-b86f-e4d3266fc22d:7559e99b-4998-4e02-a94a-7a7a4686ae11:safe:private-repository",
+        "boardreadyops-cloud:5dc4193b-5c7e-4df8-b86f-e4d3266fc22d:7559e99b-4998-4e02-a94a-7a7a4686ae11:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:safe:private-repository",
       trustMode: "safe",
       safeModeReasons: ["private-repository"],
     });
@@ -61,7 +61,7 @@ describe("result OIDC repository binding", () => {
     query.mockResolvedValueOnce({ rows: [{ ...baseRow, trust_mode: "standard", safe_mode_reasons: [] }] });
     await expect(resultOidcExpectations({ query }, runId, executionAttemptId)).resolves.toMatchObject({
       audience:
-        "boardreadyops-cloud:5dc4193b-5c7e-4df8-b86f-e4d3266fc22d:7559e99b-4998-4e02-a94a-7a7a4686ae11:standard:none",
+        "boardreadyops-cloud:5dc4193b-5c7e-4df8-b86f-e4d3266fc22d:7559e99b-4998-4e02-a94a-7a7a4686ae11:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:standard:none",
       trustMode: "standard",
       safeModeReasons: [],
     });
