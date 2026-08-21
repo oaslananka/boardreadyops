@@ -4,6 +4,21 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.32.0](https://github.com/oaslananka/boardreadyops/compare/v1.31.6...v1.32.0) (2026-08-21)
+
+
+### Features
+
+* **cloud:** add production maintenance service ([#457](https://github.com/oaslananka/boardreadyops/issues/457)) ([202f4b3](https://github.com/oaslananka/boardreadyops/commit/202f4b30a3358351f8d95824594c5dd111e934c9))
+
+
+### Bug Fixes
+
+* **ci:** bind target SHA in Actions OIDC audience ([#454](https://github.com/oaslananka/boardreadyops/issues/454)) ([a3fd3bf](https://github.com/oaslananka/boardreadyops/commit/a3fd3bf471e54ba3bc65338d8a9f41bbfceccc7d))
+* **ci:** keep maintenance contract portable ([#460](https://github.com/oaslananka/boardreadyops/issues/460)) ([03cae04](https://github.com/oaslananka/boardreadyops/commit/03cae04cb420067240008218f63e0364eb185181))
+* **ci:** make Renovate validation hermetic ([#459](https://github.com/oaslananka/boardreadyops/issues/459)) ([35419cc](https://github.com/oaslananka/boardreadyops/commit/35419cc87adbb00909d6f8ce2bd7f85671eb8d71))
+* **core:** trust scoped production checkout ([#458](https://github.com/oaslananka/boardreadyops/issues/458)) ([eadca80](https://github.com/oaslananka/boardreadyops/commit/eadca803c023e9caeb972bd90fdc2e4bd6b9133e))
+
 ## [1.31.6](https://github.com/oaslananka/boardreadyops/compare/v1.31.5...v1.31.6) (2026-08-19)
 
 
