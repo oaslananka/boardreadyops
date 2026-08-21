@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import grp
 import json
 import os
-import pwd
 import socket
 import stat
 import struct
@@ -140,6 +138,9 @@ def remove_stale_socket(path: str) -> None:
 
 
 def main() -> int:
+    import grp
+    import pwd
+
     if os.geteuid() != 0:
         raise SystemExit("maintenance server must run as root")
     deployment_dir = validate_deployment_dir(os.environ.get("BOARDREADYOPS_DEPLOYMENT_DIR", ""))

@@ -25,11 +25,20 @@ function runPython(program: string) {
 describe("BoardReadyOps production maintenance boundary", () => {
   it("accepts only the two versioned maintenance operations and maps them to fixed helper argv", () => {
     const result = runPython(String.raw`
-import importlib.util, json, sys
+import builtins, importlib.util, json, sys
 path = sys.argv[1]
+real_import = builtins.__import__
+def import_without_posix_accounts(name, *args, **kwargs):
+    if name in {"grp", "pwd"}:
+        raise ModuleNotFoundError(name)
+    return real_import(name, *args, **kwargs)
 spec = importlib.util.spec_from_file_location("boardreadyops_maintenance", path)
 module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+builtins.__import__ = import_without_posix_accounts
+try:
+    spec.loader.exec_module(module)
+finally:
+    builtins.__import__ = real_import
 assert module.parse_request(b'{"version":1,"operation":"runtime-status"}\n') == "runtime-status"
 assert module.parse_request(b'{"version":1,"operation":"backup-restore-verify"}\n') == "backup-restore-verify"
 assert module.command_for_operation("runtime-status", "/srv/boardreadyops") == [
