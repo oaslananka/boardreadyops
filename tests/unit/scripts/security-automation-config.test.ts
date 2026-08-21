@@ -117,6 +117,26 @@ describe("dependency and security automation configuration", () => {
     );
   });
 
+  it("validates Renovate with an immutable network-isolated container", async () => {
+    const packageJson = JSON.parse(await repositoryFile("package.json")) as {
+      scripts?: Record<string, string>;
+    };
+    const validator = await repositoryFile("scripts/validate-renovate-config.mjs").catch(() => "");
+    const workflow = await repositoryFile(".github/workflows/renovate.yml");
+
+    expect(workflow.match(/- scripts\/validate-renovate-config\.mjs/gu) ?? []).toHaveLength(2);
+    expect(packageJson.scripts?.["renovate:validate"]).toBe("node scripts/validate-renovate-config.mjs");
+    expect(packageJson.scripts?.["renovate:validate"]).not.toContain("dlx");
+    expect(validator).toContain(
+      "renovate/renovate@sha256:62a5af4b26c18336b0ff5bc69f2e956337b6696e493b0de57a0d71c9d637da20",
+    );
+    expect(validator).toContain('"--network=none"');
+    expect(validator).toContain("readonly");
+    expect(validator).toContain('"--entrypoint"');
+    expect(validator).toContain('"renovate-config-validator"');
+    expect(validator).toContain('spawn("/usr/bin/docker"');
+  });
+
   it("enforces package-manager release quarantine and dependency trust policies", async () => {
     const npmrc = await repositoryFile(".npmrc");
     const workspace = yaml.load(await repositoryFile("pnpm-workspace.yaml")) as {
