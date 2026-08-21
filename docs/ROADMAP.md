@@ -1,6 +1,6 @@
 # BoardReadyOps v2 Roadmap
 
-> Tracking issue: [#260 — BoardReadyOps v2 — From KiCad project to verified manufacturing release](https://github.com/oaslananka/boardreadyops/issues/260)
+> Current execution: [BoardReadyOps — Public Roadmap](https://github.com/users/oaslananka/projects/21) · Sequencing: [#191](https://github.com/oaslananka/boardreadyops/issues/191)
 
 ## Vision
 
@@ -184,4 +184,4 @@ And receive:
 - Reference the target milestone when opening issues or PRs
 - Check the [Contributing guide](https://github.com/oaslananka/boardreadyops/blob/main/CONTRIBUTING.md) for development workflow
 
-See the full roadmap tracking issue: [#260](https://github.com/oaslananka/boardreadyops/issues/260)
+See the [BoardReadyOps — Public Roadmap](https://github.com/users/oaslananka/projects/21) for current execution and [#191](https://github.com/oaslananka/boardreadyops/issues/191) for roadmap sequencing.

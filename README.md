@@ -250,13 +250,14 @@ The repository intentionally versions `dist/action/index.cjs` and `dist/cli/inde
 
 ## Roadmap
 
-BoardReadyOps is evolving from a validation gate into a full hardware release OS. See [docs/ROADMAP.md](docs/ROADMAP.md) for the milestone plan and [issue #260](https://github.com/oaslananka/boardreadyops/issues/260) for the tracking issue.
+BoardReadyOps is evolving from a validation gate into a full hardware release OS. See [docs/ROADMAP.md](docs/ROADMAP.md) for the milestone plan, the [Public Roadmap Project](https://github.com/users/oaslananka/projects/21) for current execution, and [issue #191](https://github.com/oaslananka/boardreadyops/issues/191) for roadmap sequencing.
 
 ## Links
 
 - Repository: <https://github.com/oaslananka/boardreadyops>
 - Issues: <https://github.com/oaslananka/boardreadyops/issues>
-- Roadmap: <https://github.com/oaslananka/boardreadyops/issues/260>
+- Public Roadmap: <https://github.com/users/oaslananka/projects/21>
+- Roadmap sequencing: <https://github.com/oaslananka/boardreadyops/issues/191>
 - Security advisories: <https://github.com/oaslananka/boardreadyops/security/advisories/new>
 
 ## License
