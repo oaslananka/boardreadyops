@@ -4,7 +4,7 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 
 ## Execution
 
-- `.github/workflows/renovate.yml` validates `renovate.json` on pull requests and changes to `main`.
+- `.github/workflows/renovate.yml` validates `renovate.json` on pull requests and changes to `main`. Validation runs the official Renovate image by immutable digest, with the repository mounted read-only and container networking disabled, so validation cannot drift through dynamically resolved `pnpm dlx` transitives.
 - The pinned Renovate runner executes at 06:17 Europe/Istanbul on weekdays and can also be started manually.
 - The runner is explicitly scoped to `oaslananka/boardreadyops`; repository autodiscovery and onboarding are disabled.
 - The workflow uses the `GH_AUTH_TOKEN` repository secret. That credential must belong to a dedicated automation identity with the minimum repository permissions required to create branches, pull requests, labels, and issues.
