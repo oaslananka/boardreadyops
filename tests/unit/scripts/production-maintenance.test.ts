@@ -10,21 +10,34 @@ const servicePath = `${root}/boardreadyops-maintenance.service`;
 const runtimeStatusPath = `${root}/runtime-status.sh`;
 const backupVerifyPath = `${root}/backup-restore-verify.sh`;
 const pythonLauncher = process.env.BOARDREADYOPS_PYTHON ?? (process.platform === "win32" ? "python" : "python3");
+const pythonSubprocessTimeoutMs = 20_000;
+const pythonContractTestTimeoutMs = 30_000;
 
 function read(path: string): string {
   return fs.readFileSync(path, "utf8");
 }
 
-function runPython(program: string) {
+function runPython(program: string, timeoutMs = pythonSubprocessTimeoutMs) {
   return spawnSync(pythonLauncher, ["-c", program, serverPath], {
     cwd: process.cwd(),
     encoding: "utf8",
+    timeout: timeoutMs,
   });
 }
 
+describe("production maintenance Python test harness", () => {
+  it("bounds Python subprocesses independently of the Vitest timeout", () => {
+    const result = runPython("import time; time.sleep(1)", 250);
+
+    expect(result.error).toMatchObject({ code: "ETIMEDOUT" });
+  });
+});
+
 describe("BoardReadyOps production maintenance boundary", () => {
-  it("accepts only the two versioned maintenance operations and maps them to fixed helper argv", () => {
-    const result = runPython(String.raw`
+  it(
+    "accepts only the two versioned maintenance operations and maps them to fixed helper argv",
+    () => {
+      const result = runPython(String.raw`
 import builtins, importlib.util, json, sys
 path = sys.argv[1]
 real_import = builtins.__import__
@@ -62,8 +75,10 @@ for payload in [
         raise AssertionError(payload)
 `);
 
-    expect(result.status, result.stderr).toBe(0);
-  });
+      expect(result.status, result.stderr).toBe(0);
+    },
+    pythonContractTestTimeoutMs,
+  );
 
   it("binds the control socket to the dedicated exec-agent peer and never exposes generic root execution", () => {
     const server = read(serverPath);
