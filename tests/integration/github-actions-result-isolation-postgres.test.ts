@@ -39,6 +39,7 @@ const fixtures = {
     runId: "10000000-0000-4000-8000-000000000003",
     attemptId: "10000000-0000-4000-8000-000000000004",
     commitSha: "a".repeat(40),
+    workflowSha: "d".repeat(40),
     checkRunId: 9_100_003,
     pullRequestNumber: 17,
     trustMode: "safe" as const,
@@ -55,6 +56,7 @@ const fixtures = {
     runId: "20000000-0000-4000-8000-000000000003",
     attemptId: "20000000-0000-4000-8000-000000000004",
     commitSha: "b".repeat(40),
+    workflowSha: "e".repeat(40),
     checkRunId: 9_200_003,
     pullRequestNumber: null,
     trustMode: "standard" as const,
@@ -71,9 +73,9 @@ function rows(result: unknown): QueryRow[] {
   return Array.isArray(value) ? (value as QueryRow[]) : [];
 }
 
-function audience(fixture: Fixture): string {
+function audience(fixture: Fixture, targetSha = fixture.commitSha): string {
   const reasons = fixture.safeModeReasons.length > 0 ? fixture.safeModeReasons.join(",") : "none";
-  return `boardreadyops-cloud:${fixture.runId}:${fixture.attemptId}:${fixture.trustMode}:${reasons}`;
+  return `boardreadyops-cloud:${fixture.runId}:${fixture.attemptId}:${targetSha}:${fixture.trustMode}:${reasons}`;
 }
 
 function workflowRef(fixture: Fixture): string {
@@ -92,7 +94,7 @@ function token(fixture: Fixture, overrides: Readonly<Record<string, unknown>> = 
       repository_id: fixture.githubRepositoryId,
       workflow_ref: workflowRef(fixture),
       ref: "refs/heads/main",
-      sha: fixture.commitSha,
+      sha: fixture.workflowSha,
       event_name: "workflow_dispatch",
       runner_environment: "github-hosted",
       run_id: String(fixture.checkRunId),
@@ -356,7 +358,7 @@ describeDatabase("target-repository GitHub Actions two-installation isolation", 
       { repository_id: fixtures.b.githubRepositoryId },
       { workflow_ref: workflowRef(fixtures.b) },
       { ref: "refs/heads/feature" },
-      { sha: "c".repeat(40) },
+      { aud: audience(fixtures.a, "c".repeat(40)) },
       { event_name: "pull_request" },
       { runner_environment: "self-hosted" },
     ];

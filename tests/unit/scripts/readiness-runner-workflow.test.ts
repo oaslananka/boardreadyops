@@ -34,12 +34,14 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("id: validate");
     expect(workflow).toContain("if: always() && steps.validate.outcome == 'success'");
     expect(workflow).toContain("id-token: write");
+    expect(workflow).toContain("HEAD_SHA: $" + "{{ inputs.head_sha }}");
     expect(workflow).toContain("const oidcToken = await core.getIDToken(audience)");
     expect(workflow).toContain("authorization: `Bearer $" + "{oidcToken}`");
     expect(workflow).toContain(
       "boardreadyops-cloud:$" +
         "{runId}:$" +
         "{executionAttemptId}:$" +
+        "{targetSha}:$" +
         "{trustMode}:$" +
         '{safeModeReasons || "none"}',
     );
