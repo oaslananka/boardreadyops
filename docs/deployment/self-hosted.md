@@ -38,6 +38,27 @@ Keep the live Caddy bind mount under `/opt/boardreadyops-cloud`; do not bind it 
 
 Docker Engine and Docker Compose are the host runtime requirements. Host Node.js is not required for the Compose build path: the production web image performs its Node.js build inside Docker. The web and control-plane worker processes have independent healthchecks, and PostgreSQL and Redis healthchecks are defined in `deploy/docker-compose.yml`.
 
+## Production maintenance service
+
+A BoardReadyOps-operated host may install the repository-owned maintenance service when an unprivileged `exec-agent` needs two production-safe maintenance operations without receiving root shell or Docker access. The service runs as root, listens only on `/run/boardreadyops-maintenance/control.sock`, verifies the exact `exec-agent` peer UID, and accepts only the versioned `runtime-status` and `backup-restore-verify` requests. The installer does not add `exec-agent` to the Docker group, does not create a privileged shell path, and stores only the operator-selected deployment directory in its root-only configuration.
+
+Install it once from the exact reviewed BoardReadyOps release on the deployment host:
+
+```bash
+sudo bash deploy/maintenance/install.sh --deployment-dir /absolute/path
+```
+
+For a normal layout, replace `/absolute/path` with the directory that contains the production `repo/` checkout and deployment state. The installer validates that the path is absolute, normalized, real, and contains `repo/deploy/docker-compose.yml`; it then binds only that deployment tree read-only into the hardened service namespace. Runtime secrets remain outside the maintenance protocol.
+
+After installation the unprivileged maintenance client has only these two commands:
+
+```bash
+boardreadyops-maintenance runtime-status
+boardreadyops-maintenance backup-restore-verify
+```
+
+`runtime-status` returns aggregate service state, restart counts, and the checkout/image revision binding for the fixed `boardreadyops-cloud` Compose project. `backup-restore-verify` reads production PostgreSQL with native `pg_dump`, restores into disposable containers on an internal Docker network, compares migrations/tables/representative aggregate row counts, starts isolated web and worker containers with runner execution disabled, requires both readiness endpoints, verifies cleanup, and only then emits aggregate evidence. The maintenance response never includes database URLs, passwords, GitHub credentials, tenant identifiers, findings, webhook payloads, artifact paths, or OIDC claims.
+
 ## VPS migration and portable cutover
 
 Treat a control-plane move as a state transfer and ingress cutover, not as a new logical BoardReadyOps installation. The portable state boundary has four parts: **PostgreSQL state**, any **local artifact volume** used by `ARTIFACT_STORAGE_DRIVER=local`, the **root-only runtime environment**, and the operator-managed **ingress or tunnel credential**. Keep those materials outside the Git checkout and transfer them only through an encrypted, access-controlled operator path. Do not copy shell history, temporary OIDC tokens, GitHub installation tokens, webhook payloads, or application logs as migration inputs.
