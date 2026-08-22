@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./styles.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://boardreadyops.com"),
   title: { default: "BoardReadyOps Cloud", template: "%s · BoardReadyOps" },
   description: "Accessible release investigation for KiCad hardware projects.",
   openGraph: {

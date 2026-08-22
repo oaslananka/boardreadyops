@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { metadata } from "../../../apps/web/app/layout.js";
 
 describe("root layout metadata", () => {
+  it("sets metadataBase for absolute asset URLs", () => {
+    expect(metadata.metadataBase?.href).toBe("https://boardreadyops.com/");
+  });
+
   it("keeps the existing page title template", () => {
     expect(metadata.title).toEqual({ default: "BoardReadyOps Cloud", template: "%s · BoardReadyOps" });
   });
