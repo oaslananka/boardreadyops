@@ -1,0 +1,73 @@
+name: control-plane-production-soak
+
+on:
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Commissioned BoardReadyOps HTTPS origin to sample (no trailing path)
+        required: true
+        type: string
+      duration_minutes:
+        description: Sustained soak duration in minutes
+        required: true
+        default: "240"
+        type: string
+      interval_seconds:
+        description: Delay between readiness samples
+        required: true
+        default: "60"
+        type: string
+      max_consecutive_failures:
+        description: Consecutive failed samples before aborting early
+        required: true
+        default: "3"
+        type: string
+      latency_p95_ms:
+        description: Maximum acceptable p95 readiness latency
+        required: true
+        default: "2000"
+        type: string
+      minimum_availability_percent:
+        description: Minimum acceptable sample success rate
+        required: true
+        default: "99"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-production-soak
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    if: github.repository_owner == 'oaslananka'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 780
+    env:
+      BOARDREADYOPS_SOAK_ORIGIN: ${{ inputs.origin }}
+      BOARDREADYOPS_SOAK_DURATION_MINUTES: ${{ inputs.duration_minutes }}
+      BOARDREADYOPS_SOAK_INTERVAL_SECONDS: ${{ inputs.interval_seconds }}
+      BOARDREADYOPS_SOAK_MAX_CONSECUTIVE_FAILURES: ${{ inputs.max_consecutive_failures }}
+      BOARDREADYOPS_SOAK_LATENCY_P95_MS: ${{ inputs.latency_p95_ms }}
+      BOARDREADYOPS_SOAK_MINIMUM_AVAILABILITY_PERCENT: ${{ inputs.minimum_availability_percent }}
+      BOARDREADYOPS_SOAK_REPORT_PATH: control-plane-production-soak-report.json
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Run production readiness soak monitor
+        run: node scripts/control-plane-production-soak.mjs
+      - name: Upload privacy-safe soak report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: control-plane-production-soak-report
+          path: control-plane-production-soak-report.json
+          if-no-files-found: warn
+          retention-days: 30
