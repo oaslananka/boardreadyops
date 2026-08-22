@@ -114,6 +114,7 @@
     "cloud:load:verify": "node scripts/control-plane-load.mjs",
     "cloud:restore:verify": "node scripts/control-plane-restore-drill.mjs",
     "cloud:isolation:verify": "vitest run --no-file-parallelism tests/integration/github-actions-result-isolation-postgres.test.ts && node scripts/target-repository-isolation.mjs",
+    "cloud:soak:verify": "node scripts/control-plane-production-soak.mjs",
     "verify:public-surface": "node scripts/sync-release-readme.mjs --check",
     "deps:install-ci": "corepack pnpm install --frozen-lockfile --ignore-scripts && corepack pnpm rebuild @prisma/engines esbuild prisma sharp",
     "deps:install-web": "corepack pnpm install --frozen-lockfile --ignore-scripts --filter @boardreadyops/web... --filter boardreadyops && corepack pnpm rebuild @prisma/engines esbuild prisma sharp"
