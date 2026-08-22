@@ -56,6 +56,7 @@ export type GitHubAppLifecycleAction =
       pullRequestNumber: number;
       ref: string;
       commitSha: string;
+      baseCommitSha?: string;
       triggerKind: "pr";
       pullRequestDraft?: boolean;
       pullRequestFromFork?: boolean;
@@ -175,6 +176,15 @@ function repositoryFromPayload(value: unknown): GitHubRepositoryRef | null {
   return repository;
 }
 
+const fullLowercaseCommitSha = /^[0-9a-f]{40}$/u;
+
+function pullRequestBaseCommitSha(pullRequest: Record<string, unknown>): string | null {
+  const base = pullRequest.base;
+  if (!isRecord(base)) return null;
+  const sha = stringValue(base, "sha");
+  return sha && fullLowercaseCommitSha.test(sha) ? sha : null;
+}
+
 function pullRequestCommitSha(pullRequest: Record<string, unknown>): string | null {
   const head = pullRequest.head;
 
@@ -182,7 +192,8 @@ function pullRequestCommitSha(pullRequest: Record<string, unknown>): string | nu
     return null;
   }
 
-  return stringValue(head, "sha") ?? null;
+  const sha = stringValue(head, "sha");
+  return sha && fullLowercaseCommitSha.test(sha) ? sha : null;
 }
 
 function pullRequestRef(pullRequest: Record<string, unknown>): string | null {
@@ -370,11 +381,12 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
     }
 
     const pullRequestNumber = numberValue(pullRequest, "number");
+    const baseCommitSha = pullRequestBaseCommitSha(pullRequest);
     const commitSha = pullRequestCommitSha(pullRequest);
     const ref = pullRequestRef(pullRequest);
 
-    if (pullRequestNumber === undefined || !commitSha || !ref) {
-      return unsupported(options, "pull request payload does not include number, head sha, and head ref");
+    if (pullRequestNumber === undefined || !baseCommitSha || !commitSha || !ref) {
+      return unsupported(options, "pull request payload does not include number, base sha, head sha, and head ref");
     }
 
     const pullRequestFromFork = pullRequestIsFromFork(repository, pullRequest);
@@ -386,6 +398,7 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       pullRequestNumber,
       ref,
       commitSha,
+      baseCommitSha,
       triggerKind: "pr",
       pullRequestDraft,
       pullRequestFromFork,

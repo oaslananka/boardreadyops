@@ -134,6 +134,82 @@ describe("buildActionHardwareImpact", () => {
     expect(impact?.baseline).toEqual({ status: "available", sha: baseSha });
   });
 
+  it.each([
+    [
+      "a missing marker",
+      [
+        {
+          name: "BoardReadyOps / release readiness",
+          external_id: cloudRunId,
+          head_sha: headSha,
+          output: { summary: "Trust mode: Standard" },
+        },
+      ],
+    ],
+    [
+      "the wrong external id",
+      [
+        {
+          name: "BoardReadyOps / release readiness",
+          external_id: "other-run",
+          head_sha: headSha,
+          output: { summary: `Impact base SHA: ${baseSha}` },
+        },
+      ],
+    ],
+    [
+      "the wrong head sha",
+      [
+        {
+          name: "BoardReadyOps / release readiness",
+          external_id: cloudRunId,
+          head_sha: "c".repeat(40),
+          output: { summary: `Impact base SHA: ${baseSha}` },
+        },
+      ],
+    ],
+    [
+      "duplicate matching Check Runs",
+      [
+        {
+          name: "BoardReadyOps / release readiness",
+          external_id: cloudRunId,
+          head_sha: headSha,
+          output: { summary: `Impact base SHA: ${baseSha}` },
+        },
+        {
+          name: "BoardReadyOps / release readiness",
+          external_id: cloudRunId,
+          head_sha: headSha,
+          output: { summary: `Impact base SHA: ${baseSha}` },
+        },
+      ],
+    ],
+    [
+      "a malformed marker",
+      [
+        {
+          name: "BoardReadyOps / release readiness",
+          external_id: cloudRunId,
+          head_sha: headSha,
+          output: { summary: "Impact base SHA: not-a-sha" },
+        },
+      ],
+    ],
+  ])("rejects hosted binding with %s", async (_label, checks) => {
+    process.env.BOARDREADYOPS_PR_HEAD_SHA = headSha;
+    process.env.BOARDREADYOPS_CLOUD_RUN_ID = cloudRunId;
+    const listForRef = vi.fn();
+    const paginate = vi.fn(async () => checks);
+    mocks.getOctokit.mockReturnValue({ rest: { checks: { listForRef } }, paginate });
+
+    await expect(
+      buildActionHardwareImpact(run(), { workspace: "/workspace", artifactName: "boardreadyops" }),
+    ).resolves.toBeUndefined();
+    expect(mocks.loadExactBaseRunResult).not.toHaveBeenCalled();
+    expect(mocks.execFile).not.toHaveBeenCalled();
+  });
+
   it("returns undefined when there is no PR comparison context", async () => {
     await expect(
       buildActionHardwareImpact(run(), { workspace: "/workspace", artifactName: "boardreadyops" }),

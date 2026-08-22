@@ -92,6 +92,30 @@ describe("GitHub App Check Run ensure", () => {
       title: "BoardReadyOps release readiness queued",
       summary: expect.stringContaining("Trust mode: Standard"),
     });
+    expect(creationBody.output?.summary).not.toContain("Impact base SHA:");
+  });
+
+  it("binds a valid exact base SHA into the queued summary without extra repository metadata", async () => {
+    request
+      .mockResolvedValueOnce(jsonResponse({ check_runs: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 90 }, 201));
+
+    await ensurePullRequestCheckRun({
+      apiBaseUrl: "https://github.test/api/v3",
+      token: "installation-token",
+      input: {
+        ...input,
+        action: { ...input.action, baseCommitSha: "a".repeat(40) },
+      },
+      request,
+    });
+
+    const creationBody = JSON.parse(String(request.mock.calls[1]?.[1]?.body)) as {
+      output?: { summary?: string };
+    };
+    expect(creationBody.output?.summary).toContain(`Impact base SHA: ${"a".repeat(40)}`);
+    expect(creationBody.output?.summary).not.toContain("98765");
+    expect(creationBody.output?.summary).not.toContain("installation-token");
   });
 
   it("surfaces safe-mode reasons and enforced restrictions while the Check Run is queued", async () => {

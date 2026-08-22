@@ -16,6 +16,7 @@ const action = {
   pullRequestNumber: 42,
   ref: "feature/ready",
   commitSha: "0123456789abcdef",
+  baseCommitSha: "a".repeat(40),
   triggerKind: "pr" as const,
 };
 
@@ -54,7 +55,14 @@ describe("transactional release-run outbox store", () => {
     expect(calls[0]?.sql).toContain("boardreadyops_enqueue_release_run_with_outbox");
     expect(calls[0]?.params).toHaveLength(11);
     expect(calls[0]?.params[9]).toBe("outbox-row-id");
-    expect(String(calls[0]?.params[10])).toContain('"type":"github.check_run.create"');
+    const payload = JSON.parse(String(calls[0]?.params[10]));
+    expect(payload).toMatchObject({
+      type: "github.check_run.create",
+      action: {
+        baseCommitSha: "a".repeat(40),
+        commitSha: "0123456789abcdef",
+      },
+    });
   });
 
   it("does not create a run or outbox record outside the rollout policy", async () => {
