@@ -1,3 +1,4 @@
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RunResult } from "../../../src/core/result.js";
 
@@ -31,6 +32,8 @@ import { buildActionHardwareImpact } from "../../../src/action/hardware-impact.j
 const baseSha = "a".repeat(40);
 const headSha = "b".repeat(40);
 const cloudRunId = "5dc4193b-5c7e-4df8-b86f-e4d3266fc22d";
+const workspace = "/workspace";
+const dotGit = path.join(workspace, ".git");
 
 function run(score = 80): RunResult {
   return {
@@ -108,8 +111,8 @@ describe("buildActionHardwareImpact", () => {
       analyzedSha: headSha,
       currentRunId: 900,
     });
-    expect(mocks.stat).toHaveBeenCalledWith("/workspace/.git");
-    expect(mocks.readFile).toHaveBeenCalledWith("/workspace/.git/HEAD", "utf8");
+    expect(mocks.stat).toHaveBeenCalledWith(dotGit);
+    expect(mocks.readFile).toHaveBeenCalledWith(path.join(dotGit, "HEAD"), "utf8");
     expect(mocks.execFile).not.toHaveBeenCalled();
     expect(impact).toMatchObject({
       baseline: { status: "available", sha: baseSha },
@@ -126,9 +129,10 @@ describe("buildActionHardwareImpact", () => {
       },
     };
     mocks.stat.mockResolvedValue({ isDirectory: () => false, isFile: () => true });
+    const worktreeGitDirectory = path.resolve(path.dirname(dotGit), "repo/.git/worktrees/board");
     mocks.readFile.mockImplementation(async (file) => {
-      if (file === "/workspace/.git") return "gitdir: /repo/.git/worktrees/board\n";
-      if (file === "/repo/.git/worktrees/board/HEAD") return `${headSha}\n`;
+      if (file === dotGit) return `gitdir: ${worktreeGitDirectory}\n`;
+      if (file === path.join(worktreeGitDirectory, "HEAD")) return `${headSha}\n`;
       throw new Error(`unexpected read: ${String(file)}`);
     });
 
@@ -147,9 +151,9 @@ describe("buildActionHardwareImpact", () => {
     };
     const missing = Object.assign(new Error("missing"), { code: "ENOENT" });
     mocks.readFile.mockImplementation(async (file) => {
-      if (file === "/workspace/.git/HEAD") return "ref: refs/heads/feature/hardware-impact\n";
-      if (file === "/workspace/.git/commondir") throw missing;
-      if (file === "/workspace/.git/refs/heads/feature/hardware-impact") return `${headSha}\n`;
+      if (file === path.join(dotGit, "HEAD")) return "ref: refs/heads/feature/hardware-impact\n";
+      if (file === path.join(dotGit, "commondir")) throw missing;
+      if (file === path.join(dotGit, "refs", "heads", "feature", "hardware-impact")) return `${headSha}\n`;
       throw new Error(`unexpected read: ${String(file)}`);
     });
 
