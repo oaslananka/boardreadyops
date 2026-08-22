@@ -25,3 +25,5 @@ apps/web/.next/
 # Repository-local reproducible validation toolchain
 /.boardreadyops/toolchain/
 /.boardreadyops/verification/
+
+.superpowers/
