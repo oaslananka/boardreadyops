@@ -51328,7 +51328,14 @@ function validateGenerateRecipe(value) {
   return { errors: errors.length > 0 ? errors : ["recipe is invalid"] };
 }
 async function collectStepArtifacts(outputDir, absoluteOutput, step) {
-  const files = step.isDirectory ? await walkFiles(absoluteOutput) : await fileExists2(absoluteOutput) ? [absoluteOutput] : [];
+  let files;
+  if (step.isDirectory) {
+    files = await walkFiles(absoluteOutput);
+  } else if (await fileExists2(absoluteOutput)) {
+    files = [absoluteOutput];
+  } else {
+    files = [];
+  }
   const artifacts = [];
   for (const file2 of files) {
     const relativePath = toPosix(import_node_path51.default.relative(outputDir, file2));
