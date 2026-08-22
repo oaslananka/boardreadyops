@@ -5,14 +5,7 @@ export type BrandMarkProps = {
 
 export function BrandMarkIcon({ size = 32, className }: BrandMarkProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 104 104"
-      role="img"
-      aria-label="BoardReadyOps"
-      className={className}
-    >
+    <svg width={size} height={size} viewBox="0 0 104 104" role="img" aria-label="BoardReadyOps" className={className}>
       <rect x="4" y="4" width="96" height="96" rx="20" fill="#0f1713" stroke="#1e2e26" />
       <g stroke="#3fe08a" strokeWidth="3" strokeLinecap="round">
         <line x1="36" y1="22" x2="36" y2="30" />

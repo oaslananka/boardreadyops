@@ -15,7 +15,8 @@
       "!site",
       "!sbom.cyclonedx.json",
       "!**/node_modules",
-      "!apps/web/.next"
+      "!apps/web/.next",
+      "!.superpowers"
     ]
   },
   "formatter": {
