@@ -1,69 +1,14 @@
 import type { RunResult } from "../result.js";
+import type { HardwareImpactBaselineReason, HardwareImpactV1 } from "./hardware-impact.types.js";
 import { diffRuns, type RunDiff } from "./run.js";
 
-type HardwareImpactDomain = "readiness" | "findings" | "bom" | "manufacturing";
-type HardwareImpactRiskDirection = "increased" | "decreased" | "unchanged" | "unknown";
-export type HardwareImpactBaselineReason =
-  | "not-found"
-  | "invalid-artifact"
-  | "unsupported-result"
-  | "candidate-mismatch";
+export type { HardwareImpactBaselineReason, HardwareImpactV1 } from "./hardware-impact.types.js";
 
-type HardwareImpactBaseline =
-  | { status: "available"; sha: string }
-  | { status: "unavailable"; sha: string; reason: HardwareImpactBaselineReason };
-
-interface HardwareImpactEvidenceRef {
-  domain: HardwareImpactDomain;
-  kind: "finding" | "bom-row" | "output" | "readiness";
-  label: string;
-  path?: string | undefined;
-  ruleId?: string | undefined;
-  severity?: string | undefined;
-}
-
-interface HardwareImpactFacts {
-  readiness: {
-    previousScore: number | null;
-    currentScore: number | null;
-    scoreDelta: number | null;
-    previousStatus: "ready" | "at-risk" | "blocked" | null;
-    currentStatus: "ready" | "at-risk" | "blocked" | null;
-    statusChanged: boolean;
-  };
-  findings: {
-    added: number;
-    resolved: number;
-    addedBlocking: number;
-    resolvedBlocking: number;
-  };
-  bom: {
-    added: number;
-    removed: number;
-    changed: number;
-    truncated: boolean;
-  };
-  manufacturing: {
-    outputsAdded: number;
-    outputsRemoved: number;
-    outputsChanged: number;
-  };
-}
-
-interface HardwareImpactAssessment {
-  materialChange: boolean;
-  riskDirection: HardwareImpactRiskDirection;
-  affectedDomains: HardwareImpactDomain[];
-}
-
-export interface HardwareImpactV1 {
-  version: 1;
-  baseline: HardwareImpactBaseline;
-  candidate: { sha: string };
-  facts: HardwareImpactFacts;
-  assessment: HardwareImpactAssessment;
-  evidence: HardwareImpactEvidenceRef[];
-}
+type HardwareImpactDomain = HardwareImpactV1["assessment"]["affectedDomains"][number];
+type HardwareImpactRiskDirection = HardwareImpactV1["assessment"]["riskDirection"];
+type HardwareImpactEvidenceRef = HardwareImpactV1["evidence"][number];
+type HardwareImpactFacts = HardwareImpactV1["facts"];
+type HardwareImpactAssessment = HardwareImpactV1["assessment"];
 
 type BuildHardwareImpactInput =
   | {
