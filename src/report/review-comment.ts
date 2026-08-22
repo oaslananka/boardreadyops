@@ -34,6 +34,9 @@ export function formatReviewComment(
     "",
     ...topFindings(result, locale),
   ];
+  if (result.hardwareImpact) {
+    lines.push("", ...hardwareImpactSection(result.hardwareImpact));
+  }
   if (result.bomRisk && result.bomRisk.overallRiskScore > 0) {
     lines.push("", ...bomRiskSection(result.bomRisk));
   }
@@ -119,6 +122,77 @@ function location(finding: Finding): string {
 
 function severityLabel(severity: Severity, locale: Locale): string {
   return t(`severity.${severity}`, {}, locale);
+}
+
+function hardwareImpactSection(impact: NonNullable<RunResult["hardwareImpact"]>): string[] {
+  const lines = ["### Hardware impact"];
+  if (impact.baseline.status === "unavailable") {
+    lines.push(
+      "",
+      "Exact base SHA evidence unavailable; the current run result is still valid, but no authoritative PR change comparison was produced.",
+    );
+    return lines;
+  }
+
+  const domains = impact.assessment.affectedDomains.length;
+  lines.push(
+    "",
+    `${impact.assessment.materialChange ? "Material change" : "No material change"} · risk ${impact.assessment.riskDirection} · ${domains} affected ${domains === 1 ? "domain" : "domains"}`,
+    "",
+    "#### Changed facts",
+    "",
+    ...hardwareImpactFactLines(impact),
+    "",
+    "#### Impact assessment",
+    "",
+    `- Risk direction: ${impact.assessment.riskDirection}`,
+    `- Material change: ${impact.assessment.materialChange ? "yes" : "no"}`,
+    `- Affected domains: ${impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.join(", ") : "none"}`,
+  );
+  return lines;
+}
+
+function hardwareImpactFactLines(impact: NonNullable<RunResult["hardwareImpact"]>): string[] {
+  const lines: string[] = [];
+  const readiness = impact.facts.readiness;
+  if (readiness.scoreDelta !== 0 || readiness.statusChanged) {
+    lines.push(
+      `- Readiness: ${score(readiness.previousScore)} → ${score(readiness.currentScore)} (${delta(readiness.scoreDelta)})`,
+    );
+  }
+  const findings = impact.facts.findings;
+  if (findings.added > 0 || findings.resolved > 0) {
+    const blocker =
+      findings.addedBlocking > 0
+        ? `; ${findings.addedBlocking} new ${findings.addedBlocking === 1 ? "blocker" : "blockers"}`
+        : "";
+    const resolved =
+      findings.resolvedBlocking > 0
+        ? `; ${findings.resolvedBlocking} resolved ${findings.resolvedBlocking === 1 ? "blocker" : "blockers"}`
+        : "";
+    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}`);
+  }
+  const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
+  if (bomChanged > 0) {
+    lines.push(`- BOM: ${bomChanged} changed ${bomChanged === 1 ? "row" : "rows"}`);
+  }
+  const outputChanged =
+    impact.facts.manufacturing.outputsAdded +
+    impact.facts.manufacturing.outputsRemoved +
+    impact.facts.manufacturing.outputsChanged;
+  if (outputChanged > 0) {
+    lines.push(`- Manufacturing: ${outputChanged} changed ${outputChanged === 1 ? "output" : "outputs"}`);
+  }
+  return lines.length > 0 ? lines : ["- No supported v1 facts changed."];
+}
+
+function score(value: number | null): string {
+  return value === null ? "n/a" : String(value);
+}
+
+function delta(value: number | null): string {
+  if (value === null) return "n/a";
+  return value > 0 ? `+${value}` : String(value);
 }
 
 function bomRiskSection(risk: BomRiskSummary): string[] {

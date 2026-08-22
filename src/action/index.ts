@@ -10,6 +10,7 @@ import { formatMarkdown } from "../report/markdown.js";
 import { formatSarif } from "../report/sarif.js";
 import { writeTextFile } from "../util/fs.js";
 import { upsertPullRequestComment } from "./comment.js";
+import { buildActionHardwareImpact } from "./hardware-impact.js";
 import { readActionInputs } from "./inputs.js";
 import { setActionOutputs } from "./outputs.js";
 import { uploadArtifacts, uploadSarif } from "./upload.js";
@@ -33,7 +34,7 @@ export async function runAction(): Promise<void> {
     path: inputs.path,
     gate: inputs.gate,
   });
-  const result = await runPipeline(
+  const pipelineResult = await runPipeline(
     {
       ...inputs,
       notificationLinks: {
@@ -42,6 +43,20 @@ export async function runAction(): Promise<void> {
     },
     logger,
   );
+  let result = pipelineResult;
+  try {
+    const hardwareImpact = await buildActionHardwareImpact(pipelineResult, {
+      workspace,
+      artifactName: inputs.artifactName,
+    });
+    if (hardwareImpact) {
+      result = { ...pipelineResult, hardwareImpact };
+    }
+  } catch (error) {
+    logger.warn("action.hardware_impact.unavailable", {
+      errorClass: error instanceof Error ? error.name || "Error" : "UnknownError",
+    });
+  }
   const written: { sarif?: string; json?: string; markdown?: string; hbom?: string } = {};
   if (inputs.outputs.json) {
     written.json = inputs.outputs.json;

@@ -36243,7 +36243,7 @@ var require_timestamp = __commonJS({
     }
     function constructYamlTimestamp(data) {
       let fraction = 0;
-      let delta = null;
+      let delta2 = null;
       let match = YAML_DATE_REGEXP2.exec(data);
       if (match === null) match = YAML_TIMESTAMP_REGEXP2.exec(data);
       if (match === null) throw new Error("Date resolve error");
@@ -36266,11 +36266,11 @@ var require_timestamp = __commonJS({
       if (match[9]) {
         const tzHour = +match[10];
         const tzMinute = +(match[11] || 0);
-        delta = (tzHour * 60 + tzMinute) * 6e4;
-        if (match[9] === "-") delta = -delta;
+        delta2 = (tzHour * 60 + tzMinute) * 6e4;
+        if (match[9] === "-") delta2 = -delta2;
       }
       const date5 = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
-      if (delta) date5.setTime(date5.getTime() - delta);
+      if (delta2) date5.setTime(date5.getTime() - delta2);
       return date5;
     }
     function representYamlTimestamp(object2) {
@@ -84348,11 +84348,11 @@ function hasApprovedAlternates(mpn, map2) {
 }
 
 // src/util/risk-level.ts
-function riskLevelFromScore(score) {
-  if (score === 0) return "none";
-  if (score >= 60) return "critical";
-  if (score >= 40) return "high";
-  if (score >= 20) return "medium";
+function riskLevelFromScore(score2) {
+  if (score2 === 0) return "none";
+  if (score2 >= 60) return "critical";
+  if (score2 >= 40) return "high";
+  if (score2 >= 20) return "medium";
   return "low";
 }
 
@@ -103319,11 +103319,11 @@ function checkMaxFindings(max, summary2) {
     message: summary2.total <= max ? `${summary2.total} finding(s) within the limit of ${max}.` : `${summary2.total} finding(s) exceed the limit of ${max}.`
   };
 }
-function checkMinReadinessScore(score, readiness) {
+function checkMinReadinessScore(score2, readiness) {
   const actual = readiness?.score ?? 0;
   return {
-    ok: actual >= score,
-    message: actual >= score ? `Readiness score ${actual} meets the minimum of ${score}.` : `Readiness score ${actual} is below the minimum of ${score}.`
+    ok: actual >= score2,
+    message: actual >= score2 ? `Readiness score ${actual} meets the minimum of ${score2}.` : `Readiness score ${actual} is below the minimum of ${score2}.`
   };
 }
 function checkReadinessStatus(allowed, readiness) {
@@ -103417,12 +103417,12 @@ function computeReadiness(input) {
   const { blocking, nonBlocking } = countFindings(input.findings, input.failOn);
   const warnings = readinessWarnings(missingRequired, missingRecommended, blocking, isProduction, expiredWaivers);
   const productionBlockers = isProduction ? missingRecommended.length + expiredWaivers : 0;
-  const score = clampScore(
+  const score2 = clampScore(
     100 - missingRequired.length * REQUIRED_PENALTY - missingRecommended.length * RECOMMENDED_PENALTY - blocking * BLOCKING_PENALTY - nonBlocking * NON_BLOCKING_PENALTY - productionBlockers * REQUIRED_PENALTY
   );
   return {
     profile: input.profile,
-    score,
+    score: score2,
     status: readinessStatus(missingRequired, missingRecommended, blocking, nonBlocking, productionBlockers),
     blocking,
     nonBlocking,
@@ -109059,6 +109059,9 @@ function formatReviewComment(result, reports = [], locale = "en") {
     "",
     ...topFindings2(result, locale)
   ];
+  if (result.hardwareImpact) {
+    lines.push("", ...hardwareImpactSection(result.hardwareImpact));
+  }
   if (result.bomRisk && result.bomRisk.overallRiskScore > 0) {
     lines.push("", ...bomRiskSection(result.bomRisk));
   }
@@ -109135,6 +109138,63 @@ function location(finding2) {
 }
 function severityLabel(severity, locale) {
   return t(`severity.${severity}`, {}, locale);
+}
+function hardwareImpactSection(impact) {
+  const lines = ["### Hardware impact"];
+  if (impact.baseline.status === "unavailable") {
+    lines.push(
+      "",
+      "Exact base SHA evidence unavailable; the current run result is still valid, but no authoritative PR change comparison was produced."
+    );
+    return lines;
+  }
+  const domains = impact.assessment.affectedDomains.length;
+  lines.push(
+    "",
+    `${impact.assessment.materialChange ? "Material change" : "No material change"} \xB7 risk ${impact.assessment.riskDirection} \xB7 ${domains} affected ${domains === 1 ? "domain" : "domains"}`,
+    "",
+    "#### Changed facts",
+    "",
+    ...hardwareImpactFactLines(impact),
+    "",
+    "#### Impact assessment",
+    "",
+    `- Risk direction: ${impact.assessment.riskDirection}`,
+    `- Material change: ${impact.assessment.materialChange ? "yes" : "no"}`,
+    `- Affected domains: ${impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.join(", ") : "none"}`
+  );
+  return lines;
+}
+function hardwareImpactFactLines(impact) {
+  const lines = [];
+  const readiness = impact.facts.readiness;
+  if (readiness.scoreDelta !== 0 || readiness.statusChanged) {
+    lines.push(
+      `- Readiness: ${score(readiness.previousScore)} \u2192 ${score(readiness.currentScore)} (${delta(readiness.scoreDelta)})`
+    );
+  }
+  const findings = impact.facts.findings;
+  if (findings.added > 0 || findings.resolved > 0) {
+    const blocker = findings.addedBlocking > 0 ? `; ${findings.addedBlocking} new ${findings.addedBlocking === 1 ? "blocker" : "blockers"}` : "";
+    const resolved = findings.resolvedBlocking > 0 ? `; ${findings.resolvedBlocking} resolved ${findings.resolvedBlocking === 1 ? "blocker" : "blockers"}` : "";
+    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}`);
+  }
+  const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
+  if (bomChanged > 0) {
+    lines.push(`- BOM: ${bomChanged} changed ${bomChanged === 1 ? "row" : "rows"}`);
+  }
+  const outputChanged = impact.facts.manufacturing.outputsAdded + impact.facts.manufacturing.outputsRemoved + impact.facts.manufacturing.outputsChanged;
+  if (outputChanged > 0) {
+    lines.push(`- Manufacturing: ${outputChanged} changed ${outputChanged === 1 ? "output" : "outputs"}`);
+  }
+  return lines.length > 0 ? lines : ["- No supported v1 facts changed."];
+}
+function score(value) {
+  return value === null ? "n/a" : String(value);
+}
+function delta(value) {
+  if (value === null) return "n/a";
+  return value > 0 ? `+${value}` : String(value);
 }
 function bomRiskSection(risk) {
   const atRisk = risk.components.filter((c) => c.riskLevel !== "none");
@@ -117812,9 +117872,9 @@ var EntityDecoder = class {
           }
         }
         if (limitLength) {
-          const delta = replacement.length - (token.length + 2);
-          if (delta > 0) {
-            this._expandedLength += delta;
+          const delta2 = replacement.length - (token.length + 2);
+          if (delta2 > 0) {
+            this._expandedLength += delta2;
             if (this._expandedLength > this._maxExpandedLength) {
               throw new Error(
                 `[EntityReplacer] Expanded content length limit exceeded: ${this._expandedLength} > ${this._maxExpandedLength}`
@@ -144306,6 +144366,72 @@ If the error persists, please check whether Actions and API requests are operati
 var client = new DefaultArtifactClient();
 
 // src/action/previous-result.ts
+var fullLowercaseSha = /^[0-9a-f]{40}$/u;
+async function loadExactBaseRunResult(input) {
+  if (!fullLowercaseSha.test(input.candidateSha) || !fullLowercaseSha.test(input.analyzedSha) || input.candidateSha !== input.analyzedSha) {
+    return { status: "unavailable", baseSha: input.baseSha, reason: "candidate-mismatch" };
+  }
+  if (!fullLowercaseSha.test(input.baseSha)) {
+    throw new Error("exact-base lookup requires a full lowercase base commit SHA");
+  }
+  if (!Number.isSafeInteger(input.currentRunId) || input.currentRunId <= 0) {
+    throw new Error("exact-base lookup requires a valid current workflow run id");
+  }
+  const octokit = getOctokit(input.token);
+  const current = await octokit.rest.actions.getWorkflowRun({
+    owner: input.owner,
+    repo: input.repo,
+    run_id: input.currentRunId
+  });
+  const workflowId = current.data.workflow_id;
+  if (!Number.isSafeInteger(workflowId) || workflowId <= 0) {
+    throw new Error("current workflow run did not expose a valid workflow id");
+  }
+  const listedRuns = await octokit.paginate(octokit.rest.actions.listWorkflowRuns, {
+    owner: input.owner,
+    repo: input.repo,
+    workflow_id: workflowId,
+    status: "completed",
+    head_sha: input.baseSha,
+    per_page: 100
+  });
+  const eligibleRunIds = listedRuns.filter(
+    (run) => run.id !== input.currentRunId && run.head_sha === input.baseSha && run.workflow_id === workflowId && Number.isSafeInteger(run.id)
+  ).map((run) => run.id).sort((left, right) => right - left);
+  const client2 = new DefaultArtifactClient();
+  let sawNamedArtifact = false;
+  let sawUnsupportedResult = false;
+  for (const workflowRunId of eligibleRunIds) {
+    const findBy = {
+      token: input.token,
+      workflowRunId,
+      repositoryOwner: input.owner,
+      repositoryName: input.repo
+    };
+    const artifact = (await client2.listArtifacts({ latest: true, findBy })).artifacts.find(
+      (entry) => entry.name === input.artifactName
+    );
+    if (!artifact) continue;
+    sawNamedArtifact = true;
+    const directory = await import_promises18.default.mkdtemp(import_node_path42.default.join(import_node_os5.default.tmpdir(), "boardreadyops-exact-base-"));
+    try {
+      const downloaded = await client2.downloadArtifact(artifact.id, { path: directory, findBy });
+      const parsed = await findComparisonRunResultArtifact(downloaded.downloadPath ?? directory);
+      if (parsed.status === "supported") {
+        return { status: "available", baseSha: input.baseSha, runId: workflowRunId, result: parsed.result };
+      }
+      if (parsed.status === "unsupported") sawUnsupportedResult = true;
+    } finally {
+      await import_promises18.default.rm(directory, { recursive: true, force: true }).catch(() => void 0);
+    }
+  }
+  if (!sawNamedArtifact) return { status: "unavailable", baseSha: input.baseSha, reason: "not-found" };
+  return {
+    status: "unavailable",
+    baseSha: input.baseSha,
+    reason: sawUnsupportedResult ? "unsupported-result" : "invalid-artifact"
+  };
+}
 async function loadPreviousRunResult(token, owner, repo, artifactName2, pull) {
   const octokit = getOctokit(token);
   const currentSha = process.env.GITHUB_SHA;
@@ -144348,6 +144474,76 @@ async function findRunResultArtifact(root) {
 async function previousRunIds(octokit, owner, repo, branch, currentSha, currentRunId) {
   const response = await octokit.rest.actions.listWorkflowRunsForRepo({ owner, repo, branch, status: "completed", per_page: 100 }).catch(() => void 0);
   return response?.data.workflow_runs.filter((run) => run.id !== currentRunId && run.head_sha !== currentSha).map((run) => run.id) ?? [];
+}
+async function findComparisonRunResultArtifact(root) {
+  let sawUnsupported = false;
+  for (const file2 of await artifactFiles(root)) {
+    let payload;
+    try {
+      payload = JSON.parse(await import_promises18.default.readFile(file2, "utf8"));
+    } catch {
+      continue;
+    }
+    const classification = classifyComparisonPayload(payload);
+    if (classification.status === "supported") return classification;
+    if (classification.status === "unsupported") sawUnsupported = true;
+  }
+  return sawUnsupported ? { status: "unsupported" } : { status: "invalid" };
+}
+function classifyComparisonPayload(payload) {
+  if (!isRecord(payload)) return { status: "invalid" };
+  const tool = payload.tool;
+  if (!isRecord(tool) || tool.name !== "boardreadyops") return { status: "invalid" };
+  return isComparisonRunResult(payload) ? { status: "supported", result: payload } : { status: "unsupported" };
+}
+function isComparisonRunResult(payload) {
+  return payload.schemaVersion === 1 && isTool(payload.tool) && typeof payload.generatedAt === "string" && payload.generatedAt.length > 0 && isRecord(payload.summary) && Array.isArray(payload.projects) && Array.isArray(payload.findings) && payload.findings.every(isComparisonFinding) && isFabricationSnapshot(payload.fabrication) && optionalStatus(payload.status) && optionalReleaseMode(payload.releaseMode) && optionalReadiness(payload.readiness);
+}
+function isTool(value) {
+  return isRecord(value) && value.name === "boardreadyops" && typeof value.version === "string" && value.version.length > 0;
+}
+function isComparisonFinding(value) {
+  if (!isRecord(value) || !isRecord(value.resource)) return false;
+  return typeof value.fingerprint === "string" && value.fingerprint.length > 0 && typeof value.ruleId === "string" && value.ruleId.length > 0 && isFindingSeverity(value.severity) && typeof value.message === "string" && typeof value.resource.path === "string" && value.resource.path.length > 0 && isResourceKind(value.resource.kind);
+}
+function isFabricationSnapshot(value) {
+  if (!isRecord(value) || !Array.isArray(value.bom) || !Array.isArray(value.outputs)) return false;
+  return value.bom.every(isBomEntry) && value.outputs.every(isFabricationOutput);
+}
+function isBomEntry(value) {
+  if (!isRecord(value) || typeof value.reference !== "string" || value.reference.length === 0) return false;
+  const optionalStrings = ["sourcePath", "value", "footprint", "manufacturer", "mpn", "lifecycle", "compliance"];
+  if (optionalStrings.some((key) => value[key] !== void 0 && typeof value[key] !== "string")) return false;
+  if (value.suppliers !== void 0 && (!Array.isArray(value.suppliers) || !value.suppliers.every((item) => typeof item === "string"))) {
+    return false;
+  }
+  if (value.dnp !== void 0 && typeof value.dnp !== "boolean") return false;
+  return value.quantity === void 0 || typeof value.quantity === "number" && Number.isFinite(value.quantity);
+}
+function isFabricationOutput(value) {
+  return isRecord(value) && typeof value.kind === "string" && value.kind.length > 0 && Array.isArray(value.files) && value.files.every(
+    (file2) => isRecord(file2) && typeof file2.path === "string" && file2.path.length > 0 && typeof file2.digest === "string"
+  );
+}
+function optionalReadiness(value) {
+  if (value === void 0) return true;
+  if (!isRecord(value)) return false;
+  return typeof value.score === "number" && Number.isFinite(value.score) && value.score >= 0 && value.score <= 100 && (value.status === "ready" || value.status === "at-risk" || value.status === "blocked");
+}
+function optionalStatus(value) {
+  return value === void 0 || value === "passed" || value === "failed";
+}
+function optionalReleaseMode(value) {
+  return value === void 0 || value === "prototype" || value === "pilot" || value === "production";
+}
+function isFindingSeverity(value) {
+  return value === "critical" || value === "high" || value === "medium" || value === "low" || value === "info";
+}
+function isResourceKind(value) {
+  return value === "project" || value === "schematic" || value === "pcb" || value === "bom" || value === "pinmap" || value === "firmware" || value === "manifest";
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 async function artifactFiles(root) {
   const entries = await import_promises18.default.readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
@@ -144412,6 +144608,344 @@ function reviewReports(artifactName2) {
     return [{ label: `Reports (artifact: ${artifactName2})`, url: `${server}/${repository}/actions/runs/${runId2}` }];
   }
   return [];
+}
+
+// src/action/hardware-impact.ts
+var import_node_child_process2 = require("node:child_process");
+
+// src/core/diff/run.ts
+function diffRuns(previous, current, options = {}) {
+  return {
+    previousGeneratedAt: previous.generatedAt,
+    currentGeneratedAt: current.generatedAt,
+    previousReleaseMode: previous.releaseMode ?? null,
+    currentReleaseMode: current.releaseMode ?? null,
+    readiness: buildReadinessDelta(previous, current),
+    findings: buildFindingsDelta(previous.findings, current.findings),
+    fabrication: diffFabrication(
+      previous.fabrication,
+      current.fabrication,
+      previous.findings,
+      current.findings,
+      options
+    )
+  };
+}
+function buildReadinessDelta(previous, current) {
+  const previousScore = previous.readiness?.score ?? null;
+  const currentScore = current.readiness?.score ?? null;
+  const scoreDelta = previousScore !== null && currentScore !== null ? currentScore - previousScore : null;
+  const previousStatus = previous.readiness?.status ?? null;
+  const currentStatus = current.readiness?.status ?? null;
+  const statusRank = {
+    ready: 0,
+    "at-risk": 1,
+    blocked: 2
+  };
+  const previousStatusRank = previousStatus !== null ? statusRank[previousStatus] : null;
+  const currentStatusRank = currentStatus !== null ? statusRank[currentStatus] : null;
+  const conclusionChanged = previous.status !== current.status;
+  const riskIncreased = scoreDelta !== null && scoreDelta < 0 || previousStatusRank !== null && currentStatusRank !== null && currentStatusRank > previousStatusRank;
+  return {
+    previousScore,
+    currentScore,
+    scoreDelta,
+    previousStatus,
+    currentStatus,
+    conclusionChanged,
+    riskIncreased
+  };
+}
+function toFindingRef(finding2) {
+  return {
+    fingerprint: finding2.fingerprint,
+    ruleId: finding2.ruleId,
+    severity: finding2.severity,
+    message: finding2.message,
+    resourcePath: finding2.resource.path
+  };
+}
+function buildFindingsDelta(previous, current) {
+  const previousByFingerprint = new Map(previous.map((finding2) => [finding2.fingerprint, finding2]));
+  const currentByFingerprint = new Map(current.map((finding2) => [finding2.fingerprint, finding2]));
+  return {
+    added: current.filter((finding2) => !previousByFingerprint.has(finding2.fingerprint)).map(toFindingRef),
+    resolved: previous.filter((finding2) => !currentByFingerprint.has(finding2.fingerprint)).map(toFindingRef),
+    unchanged: current.filter((finding2) => previousByFingerprint.has(finding2.fingerprint)).map(toFindingRef)
+  };
+}
+
+// src/core/diff/hardware-impact.ts
+var DOMAIN_ORDER = ["readiness", "findings", "bom", "manufacturing"];
+var DOMAIN_RANK = new Map(DOMAIN_ORDER.map((domain2, index) => [domain2, index]));
+var KIND_RANK = /* @__PURE__ */ new Map([
+  ["readiness", 0],
+  ["finding", 1],
+  ["bom-row", 2],
+  ["output", 3]
+]);
+var MAX_EVIDENCE = 12;
+var MAX_EVIDENCE_TEXT = 256;
+var STATUS_RANK = { ready: 0, "at-risk": 1, blocked: 2 };
+function buildHardwareImpact(input) {
+  if (input.baseline.status === "unavailable") {
+    return unavailableImpact(input.baseline, input.candidate);
+  }
+  const diff = diffRuns(input.baseline.result, input.candidate.result);
+  const facts = factsFromDiff(diff);
+  return {
+    version: 1,
+    baseline: { status: "available", sha: input.baseline.sha },
+    candidate: { sha: input.candidate.sha },
+    facts,
+    assessment: assessmentFromFacts(facts, input.baseline.result, input.candidate.result),
+    evidence: evidenceFromDiff(diff)
+  };
+}
+function unavailableImpact(baseline, candidate) {
+  const currentReadiness = candidate.result.readiness;
+  return {
+    version: 1,
+    baseline: { status: "unavailable", sha: baseline.sha, reason: baseline.reason },
+    candidate: { sha: candidate.sha },
+    facts: {
+      readiness: {
+        previousScore: null,
+        currentScore: currentReadiness?.score ?? null,
+        scoreDelta: null,
+        previousStatus: null,
+        currentStatus: currentReadiness?.status ?? null,
+        statusChanged: false
+      },
+      findings: { added: 0, resolved: 0, addedBlocking: 0, resolvedBlocking: 0 },
+      bom: { added: 0, removed: 0, changed: 0, truncated: false },
+      manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 }
+    },
+    assessment: { materialChange: false, riskDirection: "unknown", affectedDomains: [] },
+    evidence: []
+  };
+}
+function factsFromDiff(diff) {
+  return {
+    readiness: {
+      previousScore: diff.readiness.previousScore,
+      currentScore: diff.readiness.currentScore,
+      scoreDelta: diff.readiness.scoreDelta,
+      previousStatus: diff.readiness.previousStatus,
+      currentStatus: diff.readiness.currentStatus,
+      statusChanged: diff.readiness.previousStatus !== diff.readiness.currentStatus
+    },
+    findings: {
+      added: diff.findings.added.length,
+      resolved: diff.findings.resolved.length,
+      addedBlocking: diff.findings.added.filter((finding2) => blockingSeverity(finding2.severity)).length,
+      resolvedBlocking: diff.findings.resolved.filter((finding2) => blockingSeverity(finding2.severity)).length
+    },
+    bom: {
+      added: countByStatus(diff.fabrication.bom.rows, "added"),
+      removed: countByStatus(diff.fabrication.bom.rows, "removed"),
+      changed: countByStatus(diff.fabrication.bom.rows, "changed"),
+      truncated: diff.fabrication.bom.truncated
+    },
+    manufacturing: {
+      outputsAdded: countByStatus(diff.fabrication.outputs, "added"),
+      outputsRemoved: countByStatus(diff.fabrication.outputs, "removed"),
+      outputsChanged: countByStatus(diff.fabrication.outputs, "changed")
+    }
+  };
+}
+function assessmentFromFacts(facts, previous, current) {
+  const affectedDomains = DOMAIN_ORDER.filter((domain2) => domainChanged(domain2, facts));
+  const materialChange = affectedDomains.length > 0;
+  const readinessWorsened = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "worse");
+  const readinessImproved = statusMoved(facts.readiness.previousStatus, facts.readiness.currentStatus, "better");
+  const conclusionWorsened = previous.status === "passed" && current.status === "failed";
+  const conclusionImproved = previous.status === "failed" && current.status === "passed";
+  const increased = readinessWorsened || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta < 0 || facts.findings.addedBlocking > 0 || conclusionWorsened;
+  const decreased = readinessImproved || facts.readiness.scoreDelta !== null && facts.readiness.scoreDelta > 0 || facts.findings.resolvedBlocking > 0 || conclusionImproved;
+  let riskDirection;
+  if (increased) {
+    riskDirection = "increased";
+  } else if (decreased) {
+    riskDirection = "decreased";
+  } else if (materialChange) {
+    riskDirection = "unknown";
+  } else {
+    riskDirection = "unchanged";
+  }
+  return { materialChange, riskDirection, affectedDomains };
+}
+function domainChanged(domain2, facts) {
+  switch (domain2) {
+    case "readiness":
+      return facts.readiness.scoreDelta !== null ? facts.readiness.scoreDelta !== 0 || facts.readiness.statusChanged : facts.readiness.statusChanged;
+    case "findings":
+      return facts.findings.added > 0 || facts.findings.resolved > 0;
+    case "bom":
+      return facts.bom.added > 0 || facts.bom.removed > 0 || facts.bom.changed > 0;
+    case "manufacturing":
+      return facts.manufacturing.outputsAdded > 0 || facts.manufacturing.outputsRemoved > 0 || facts.manufacturing.outputsChanged > 0;
+  }
+}
+function statusMoved(previous, current, direction) {
+  if (previous === null || current === null) return false;
+  const delta2 = STATUS_RANK[current] - STATUS_RANK[previous];
+  return direction === "worse" ? delta2 > 0 : delta2 < 0;
+}
+function blockingSeverity(severity) {
+  return severity === "critical" || severity === "high";
+}
+function countByStatus(entries, status) {
+  return entries.filter((entry) => entry.status === status).length;
+}
+function evidenceFromDiff(diff) {
+  const evidence = [];
+  if (diff.readiness.scoreDelta !== 0 || diff.readiness.previousStatus !== diff.readiness.currentStatus) {
+    evidence.push({
+      domain: "readiness",
+      kind: "readiness",
+      label: bounded(
+        `Readiness ${formatScore(diff.readiness.previousScore)} \u2192 ${formatScore(diff.readiness.currentScore)}; ${formatStatus(diff.readiness.previousStatus)} \u2192 ${formatStatus(diff.readiness.currentStatus)}`
+      )
+    });
+  }
+  for (const finding2 of diff.findings.added) {
+    evidence.push(findingEvidence("Added finding", finding2));
+  }
+  for (const finding2 of diff.findings.resolved) {
+    evidence.push(findingEvidence("Resolved finding", finding2));
+  }
+  for (const row of diff.fabrication.bom.rows.filter((entry) => entry.status !== "unchanged")) {
+    evidence.push({
+      domain: "bom",
+      kind: "bom-row",
+      label: bounded(`${capitalize(row.status)} BOM row ${row.reference}`)
+    });
+  }
+  for (const output of diff.fabrication.outputs.filter((entry) => entry.status !== "unchanged")) {
+    evidence.push({
+      domain: "manufacturing",
+      kind: "output",
+      label: bounded(
+        `${capitalize(output.status)} output ${output.kind} (changed ${output.changed}, added ${output.added}, removed ${output.removed})`
+      )
+    });
+  }
+  return evidence.sort(compareEvidence).slice(0, MAX_EVIDENCE);
+}
+function findingEvidence(prefix2, finding2) {
+  return {
+    domain: "findings",
+    kind: "finding",
+    label: bounded(`${prefix2}: ${finding2.ruleId} \u2014 ${finding2.message}`),
+    path: bounded(finding2.resourcePath),
+    ruleId: bounded(finding2.ruleId),
+    severity: finding2.severity
+  };
+}
+function compareEvidence(left, right) {
+  return (DOMAIN_RANK.get(left.domain) ?? 99) - (DOMAIN_RANK.get(right.domain) ?? 99) || (KIND_RANK.get(left.kind) ?? 99) - (KIND_RANK.get(right.kind) ?? 99) || left.label.localeCompare(right.label) || (left.path ?? "").localeCompare(right.path ?? "") || (left.ruleId ?? "").localeCompare(right.ruleId ?? "");
+}
+function bounded(value) {
+  return value.slice(0, MAX_EVIDENCE_TEXT);
+}
+function formatScore(value) {
+  return value === null ? "n/a" : String(value);
+}
+function formatStatus(value) {
+  return value ?? "n/a";
+}
+function capitalize(value) {
+  return value.length === 0 ? value : `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
+}
+
+// src/action/hardware-impact.ts
+var readinessCheckName = "BoardReadyOps / release readiness";
+var fullLowercaseSha2 = /^[0-9a-f]{40}$/u;
+var baseMarker = /^Impact base SHA: ([0-9a-f]{40})$/gmu;
+async function buildActionHardwareImpact(result, context5) {
+  const token = process.env.GITHUB_TOKEN;
+  const repository = process.env.GITHUB_REPOSITORY;
+  const currentRunId = numericRunId(process.env.GITHUB_RUN_ID);
+  if (!token || !repository || currentRunId === void 0) return void 0;
+  const [owner, repo] = repository.split("/");
+  if (!owner || !repo) return void 0;
+  const binding = directPullRequestBinding(repository) ?? await hostedPullRequestBinding(token, owner, repo);
+  if (!binding) return void 0;
+  const analyzedSha = await checkoutSha(context5.workspace);
+  const lookup2 = await loadExactBaseRunResult({
+    token,
+    owner,
+    repo,
+    artifactName: context5.artifactName ?? "boardreadyops",
+    baseSha: binding.baseSha,
+    candidateSha: binding.headSha,
+    analyzedSha,
+    currentRunId
+  });
+  return lookup2.status === "available" ? buildHardwareImpact({
+    baseline: { status: "available", sha: lookup2.baseSha, result: lookup2.result },
+    candidate: { sha: binding.headSha, result }
+  }) : buildHardwareImpact({
+    baseline: { status: "unavailable", sha: lookup2.baseSha, reason: lookup2.reason },
+    candidate: { sha: binding.headSha, result }
+  });
+}
+function directPullRequestBinding(repository) {
+  const pull = context2.payload.pull_request;
+  const baseSha = pull?.base?.sha;
+  const headSha = pull?.head?.sha;
+  const baseRepository = pull?.base?.repo?.full_name;
+  const headRepository = pull?.head?.repo?.full_name;
+  if (typeof baseSha !== "string" || typeof headSha !== "string" || !fullLowercaseSha2.test(baseSha) || !fullLowercaseSha2.test(headSha) || baseRepository !== repository || headRepository !== repository) {
+    return void 0;
+  }
+  return { baseSha, headSha };
+}
+async function hostedPullRequestBinding(token, owner, repo) {
+  const headSha = process.env.BOARDREADYOPS_PR_HEAD_SHA;
+  const cloudRunId = process.env.BOARDREADYOPS_CLOUD_RUN_ID;
+  if (!headSha || !fullLowercaseSha2.test(headSha) || !cloudRunId) return void 0;
+  const octokit = getOctokit(token);
+  const checks = await octokit.paginate(octokit.rest.checks.listForRef, {
+    owner,
+    repo,
+    ref: headSha,
+    check_name: readinessCheckName,
+    filter: "all",
+    per_page: 100
+  });
+  const matchingChecks = checks.filter(
+    (check2) => check2.name === readinessCheckName && check2.external_id === cloudRunId && check2.head_sha === headSha
+  );
+  if (matchingChecks.length !== 1) return void 0;
+  const summary2 = matchingChecks[0]?.output?.summary;
+  if (typeof summary2 !== "string") return void 0;
+  const matches = [...summary2.matchAll(baseMarker)];
+  if (matches.length !== 1) return void 0;
+  const baseSha = matches[0]?.[1];
+  return baseSha && fullLowercaseSha2.test(baseSha) ? { baseSha, headSha } : void 0;
+}
+function checkoutSha(workspace) {
+  return new Promise((resolve2, reject) => {
+    (0, import_node_child_process2.execFile)("git", ["rev-parse", "HEAD"], { cwd: workspace, encoding: "utf8" }, (error52, stdout) => {
+      if (error52) {
+        reject(error52);
+        return;
+      }
+      const sha = String(stdout).trim();
+      if (!fullLowercaseSha2.test(sha)) {
+        reject(new Error("analyzed checkout did not resolve to a full lowercase commit SHA"));
+        return;
+      }
+      resolve2(sha);
+    });
+  });
+}
+function numericRunId(value) {
+  if (!value) return void 0;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : void 0;
 }
 
 // src/action/inputs.ts
@@ -144640,7 +145174,7 @@ async function runAction() {
     path: inputs.path,
     gate: inputs.gate
   });
-  const result = await runPipeline(
+  const pipelineResult = await runPipeline(
     {
       ...inputs,
       notificationLinks: {
@@ -144649,6 +145183,20 @@ async function runAction() {
     },
     logger7
   );
+  let result = pipelineResult;
+  try {
+    const hardwareImpact = await buildActionHardwareImpact(pipelineResult, {
+      workspace,
+      artifactName: inputs.artifactName
+    });
+    if (hardwareImpact) {
+      result = { ...pipelineResult, hardwareImpact };
+    }
+  } catch (error52) {
+    logger7.warn("action.hardware_impact.unavailable", {
+      errorClass: error52 instanceof Error ? error52.name || "Error" : "UnknownError"
+    });
+  }
   const written = {};
   if (inputs.outputs.json) {
     written.json = inputs.outputs.json;

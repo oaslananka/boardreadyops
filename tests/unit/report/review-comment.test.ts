@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { HardwareImpactV1 } from "../../../src/core/diff/hardware-impact.js";
 import { createFinding, type Finding, type FindingSummary } from "../../../src/core/findings.js";
 import type { RunResult } from "../../../src/core/result.js";
 import { formatReviewComment } from "../../../src/report/review-comment.js";
@@ -36,6 +37,34 @@ function result(findings: Finding[]): RunResult {
     findings,
     fabrication: { bom: [], outputs: [] },
     generatedAt: "2026-06-22T00:00:00.000Z",
+  };
+}
+
+function impact(overrides: Partial<HardwareImpactV1> = {}): HardwareImpactV1 {
+  return {
+    version: 1,
+    baseline: { status: "available", sha: "a".repeat(40) },
+    candidate: { sha: "b".repeat(40) },
+    facts: {
+      readiness: {
+        previousScore: 82,
+        currentScore: 71,
+        scoreDelta: -11,
+        previousStatus: "ready",
+        currentStatus: "at-risk",
+        statusChanged: true,
+      },
+      findings: { added: 2, resolved: 1, addedBlocking: 1, resolvedBlocking: 0 },
+      bom: { added: 1, removed: 0, changed: 2, truncated: false },
+      manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 },
+    },
+    assessment: {
+      materialChange: true,
+      riskDirection: "increased",
+      affectedDomains: ["readiness", "findings", "bom"],
+    },
+    evidence: [],
+    ...overrides,
   };
 }
 
@@ -132,5 +161,33 @@ describe("formatReviewComment", () => {
     const prototypeResult: RunResult = { ...result([]), releaseMode: "prototype" };
     const protoBody = formatReviewComment(prototypeResult);
     expect(protoBody).toContain("🔬 prototype |");
+  });
+
+  it("renders changed facts separately from deterministic impact assessment", () => {
+    const body = formatReviewComment({ ...result([]), hardwareImpact: impact() });
+
+    expect(body).toContain("### Hardware impact");
+    expect(body).toContain("Material change · risk increased · 3 affected domains");
+    expect(body).toContain("#### Changed facts");
+    expect(body).toContain("Readiness: 82 → 71 (-11)");
+    expect(body).toContain("Findings: +2 / -1; 1 new blocker");
+    expect(body).toContain("BOM: 3 changed rows");
+    expect(body).toContain("#### Impact assessment");
+    expect(body).toContain("Risk direction: increased");
+    expect(body).toContain("Affected domains: readiness, findings, bom");
+  });
+
+  it("renders an explicit authoritative-comparison warning when the exact base is unavailable", () => {
+    const unavailable: HardwareImpactV1 = impact({
+      baseline: { status: "unavailable", sha: "a".repeat(40), reason: "invalid-artifact" },
+      assessment: { materialChange: false, riskDirection: "unknown", affectedDomains: [] },
+      evidence: [],
+    });
+    const body = formatReviewComment({ ...result([]), hardwareImpact: unavailable });
+
+    expect(body).toContain(
+      "Exact base SHA evidence unavailable; the current run result is still valid, but no authoritative PR change comparison was produced.",
+    );
+    expect(body).not.toContain("invalid-artifact");
   });
 });
