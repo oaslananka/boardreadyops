@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.32.1](https://github.com/oaslananka/boardreadyops/compare/v1.32.0...v1.32.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **core:** simplify release artifact collection ([#462](https://github.com/oaslananka/boardreadyops/issues/462)) ([9fbf080](https://github.com/oaslananka/boardreadyops/commit/9fbf080919ec4b095e085545ac87f80c3e12b9d9))
+
 ## [1.32.0](https://github.com/oaslananka/boardreadyops/compare/v1.31.6...v1.32.0) (2026-08-21)
 
 
