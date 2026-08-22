@@ -120,17 +120,21 @@ async function checkoutSha(workspace: string): Promise<string> {
   if (looseSha && fullLowercaseSha.test(looseSha.trim())) return looseSha.trim();
 
   const packedRefs = await readOptionalText(path.join(commonDirectory, "packed-refs"));
-  if (packedRefs) {
-    for (const line of packedRefs.split(/\r?\n/u)) {
-      if (line.startsWith("#") || line.startsWith("^") || line.length === 0) continue;
-      const separator = line.indexOf(" ");
-      if (separator < 0 || line.slice(separator + 1) !== ref) continue;
-      const sha = line.slice(0, separator);
-      if (fullLowercaseSha.test(sha)) return sha;
-    }
-  }
+  const packedSha = packedRefs ? packedRefSha(packedRefs, ref) : undefined;
+  if (packedSha) return packedSha;
 
   throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
+}
+
+function packedRefSha(packedRefs: string, ref: string): string | undefined {
+  for (const line of packedRefs.split(/\r?\n/u)) {
+    if (line.startsWith("#") || line.startsWith("^") || line.length === 0) continue;
+    const separator = line.indexOf(" ");
+    if (separator < 0 || line.slice(separator + 1) !== ref) continue;
+    const sha = line.slice(0, separator);
+    if (fullLowercaseSha.test(sha)) return sha;
+  }
+  return undefined;
 }
 
 async function resolveGitDirectory(workspace: string): Promise<string> {

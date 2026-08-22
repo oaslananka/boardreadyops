@@ -144956,16 +144956,19 @@ async function checkoutSha(workspace) {
   const looseSha = await readOptionalText(import_node_path43.default.join(commonDirectory, ...ref.split("/")));
   if (looseSha && fullLowercaseSha2.test(looseSha.trim())) return looseSha.trim();
   const packedRefs = await readOptionalText(import_node_path43.default.join(commonDirectory, "packed-refs"));
-  if (packedRefs) {
-    for (const line of packedRefs.split(/\r?\n/u)) {
-      if (line.startsWith("#") || line.startsWith("^") || line.length === 0) continue;
-      const separator = line.indexOf(" ");
-      if (separator < 0 || line.slice(separator + 1) !== ref) continue;
-      const sha = line.slice(0, separator);
-      if (fullLowercaseSha2.test(sha)) return sha;
-    }
-  }
+  const packedSha = packedRefs ? packedRefSha(packedRefs, ref) : void 0;
+  if (packedSha) return packedSha;
   throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
+}
+function packedRefSha(packedRefs, ref) {
+  for (const line of packedRefs.split(/\r?\n/u)) {
+    if (line.startsWith("#") || line.startsWith("^") || line.length === 0) continue;
+    const separator = line.indexOf(" ");
+    if (separator < 0 || line.slice(separator + 1) !== ref) continue;
+    const sha = line.slice(0, separator);
+    if (fullLowercaseSha2.test(sha)) return sha;
+  }
+  return void 0;
 }
 async function resolveGitDirectory(workspace) {
   const dotGit = import_node_path43.default.join(workspace, ".git");
