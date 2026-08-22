@@ -73,7 +73,9 @@ moves with stable releases.
 
 ## Pull request comments
 
-When `comment-pr` is enabled, the sticky pull request comment summarizes the current findings. If the Action can read a previous BoardReadyOps JSON artifact from the pull request head branch or base branch, the comment also includes a fabrication diff for BOM rows, manufacturing outputs, and newly added findings.
+When `comment-pr` is enabled, the sticky pull request comment summarizes the current findings. With `comment-format: review`, BoardReadyOps also attempts an exact-base hardware-impact comparison: the exact pull request base SHA is compared with the exact analyzed head SHA using a BoardReadyOps JSON artifact from the same workflow identity. There is no latest-run or same-branch fallback. If exact-base evidence is unavailable, the comment says so and the current-run decision remains valid. The default `report` format keeps its existing fabrication-diff behavior when a prior report artifact can be discovered.
+
+Exact-base artifact discovery uses the job-scoped repository `GITHUB_TOKEN` and needs `actions: read`. The historical/current detailed report artifacts remain in the target repository; only the bounded structured impact summary is eligible for hosted result publication.
 
 ## Notifiers
 

@@ -53841,6 +53841,73 @@ var releaseRunWaiversSchema = external_exports.object({
   active: external_exports.array(releaseRunWaiverSchema).max(100).default([]),
   expired: external_exports.array(releaseRunWaiverSchema).max(100).default([])
 }).strict();
+var hardwareImpactDomainSchema = external_exports.enum(["readiness", "findings", "bom", "manufacturing"]);
+var hardwareImpactRiskDirectionSchema = external_exports.enum(["increased", "decreased", "unchanged", "unknown"]);
+var hardwareImpactBaselineReasonSchema = external_exports.enum([
+  "not-found",
+  "invalid-artifact",
+  "unsupported-result",
+  "candidate-mismatch"
+]);
+var hardwareImpactShaSchema = external_exports.string().regex(/^[0-9a-f]{40}$/u);
+var hardwareImpactCountSchema = external_exports.number().int().nonnegative().max(1e4);
+var hardwareImpactReadinessStatusSchema = external_exports.enum(["ready", "at-risk", "blocked"]);
+var hardwareImpactEvidenceSeveritySchema = external_exports.enum(["critical", "error", "high", "medium", "low", "info"]);
+var hardwareImpactAvailableBaselineSchema = external_exports.object({ status: external_exports.literal("available"), sha: hardwareImpactShaSchema }).strict();
+var hardwareImpactUnavailableBaselineSchema = external_exports.object({
+  status: external_exports.literal("unavailable"),
+  sha: hardwareImpactShaSchema,
+  reason: hardwareImpactBaselineReasonSchema
+}).strict();
+var hardwareImpactEvidenceRefSchema = external_exports.object({
+  domain: hardwareImpactDomainSchema,
+  kind: external_exports.enum(["finding", "bom-row", "output", "readiness"]),
+  label: external_exports.string().trim().min(1).max(256),
+  path: external_exports.string().trim().min(1).max(256).optional(),
+  ruleId: external_exports.string().trim().min(1).max(256).optional(),
+  severity: hardwareImpactEvidenceSeveritySchema.optional()
+}).strict();
+var hardwareImpactV1Schema = external_exports.object({
+  version: external_exports.literal(1),
+  baseline: external_exports.discriminatedUnion("status", [
+    hardwareImpactAvailableBaselineSchema,
+    hardwareImpactUnavailableBaselineSchema
+  ]),
+  candidate: external_exports.object({ sha: hardwareImpactShaSchema }).strict(),
+  facts: external_exports.object({
+    readiness: external_exports.object({
+      previousScore: external_exports.number().int().min(0).max(100).nullable(),
+      currentScore: external_exports.number().int().min(0).max(100).nullable(),
+      scoreDelta: external_exports.number().int().min(-100).max(100).nullable(),
+      previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
+      currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
+      statusChanged: external_exports.boolean()
+    }).strict(),
+    findings: external_exports.object({
+      added: hardwareImpactCountSchema,
+      resolved: hardwareImpactCountSchema,
+      addedBlocking: hardwareImpactCountSchema,
+      resolvedBlocking: hardwareImpactCountSchema
+    }).strict(),
+    bom: external_exports.object({
+      added: hardwareImpactCountSchema,
+      removed: hardwareImpactCountSchema,
+      changed: hardwareImpactCountSchema,
+      truncated: external_exports.boolean()
+    }).strict(),
+    manufacturing: external_exports.object({
+      outputsAdded: hardwareImpactCountSchema,
+      outputsRemoved: hardwareImpactCountSchema,
+      outputsChanged: hardwareImpactCountSchema
+    }).strict()
+  }).strict(),
+  assessment: external_exports.object({
+    materialChange: external_exports.boolean(),
+    riskDirection: hardwareImpactRiskDirectionSchema,
+    affectedDomains: external_exports.array(hardwareImpactDomainSchema).max(4).refine((domains) => new Set(domains).size === domains.length, "affected domains must be unique")
+  }).strict(),
+  evidence: external_exports.array(hardwareImpactEvidenceRefSchema).max(12)
+}).strict();
 function inferredConclusion(input) {
   if (input.status === "timed_out") {
     return "timed_out";
@@ -53864,7 +53931,8 @@ var releaseRunResultBaseSchema = external_exports.object({
   metrics: releaseRunMetricsSchema.default({}),
   reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([]),
   readiness: releaseRunReadinessSchema.optional(),
-  waivers: releaseRunWaiversSchema.optional()
+  waivers: releaseRunWaiversSchema.optional(),
+  hardwareImpact: hardwareImpactV1Schema.optional()
 }).strict();
 var releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context) => {
   const expected = inferredConclusion(value);
@@ -54866,6 +54934,7 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
     },
     ...execution.report?.readiness ? { readiness: execution.report.readiness } : {},
     ...execution.report?.waivers ? { waivers: execution.report.waivers } : {},
+    ...execution.report?.hardwareImpact ? { hardwareImpact: execution.report.hardwareImpact } : {},
     reportLinks: []
   });
 }

@@ -60,11 +60,27 @@ The job declares only:
 
 ```yaml
 permissions:
+  actions: read
+  checks: read
   contents: read
   id-token: write
 ```
 
-`contents: read` belongs to the workflow's short-lived `GITHUB_TOKEN`, not the GitHub App installation token. `id-token: write` permits the workflow to request a short-lived OIDC token for the result callback. No `BOARDREADYOPS_API_KEY`, runner callback secret, GitHub personal access token, or App private key is stored in the repository.
+These are job-scoped permissions for the workflow's short-lived repository `GITHUB_TOKEN`:
+
+- `actions: read` — read historical BoardReadyOps workflow artifacts in this repository only;
+- `checks: read` — read the App-created Check Run that binds this release run to its exact PR base SHA;
+- `contents: read` — checkout the exact assigned commit; and
+- `id-token: write` — obtain the short-lived OIDC token for the result callback.
+
+This job permission change does **not** alter the production GitHub App permission profile below. No `BOARDREADYOPS_API_KEY`, runner callback secret, GitHub personal access token, or App private key is stored in the repository.
+
+
+### Exact-base hardware-impact boundary
+
+For PR-native hardware impact, the control plane records the webhook's exact PR base SHA in the queued BoardReadyOps Check Run. The target workflow reads that Check Run using its job-scoped `checks: read` permission and binds it to the exact release `run_id` and head SHA before comparison. No new `workflow_dispatch` input is required, so existing target workflows do not receive an unexpected input during rolling upgrades.
+
+The Action then resolves the historical BoardReadyOps artifact only inside the same target repository and same workflow identity. If the exact base artifact is absent or invalid, it does not fall back to another run. Raw historical/current reports, source files, and workflow artifacts stay in the target repository. The OIDC callback may carry only the validated bounded `hardwareImpact` object; the control plane stores it inside the existing tenant-scoped terminal-result payload and uses it for Check Run/optional PR-comment rendering.
 
 ## GitHub App permissions
 

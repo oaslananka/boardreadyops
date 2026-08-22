@@ -20,6 +20,7 @@ jobs:
   boardreadyops:
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       pull-requests: write
       security-events: write
@@ -36,6 +37,13 @@ jobs:
 container action overrides the image CLI entrypoint so GitHub Actions receives
 the same report files, outputs, SARIF upload behavior, and pull request comment
 behavior as the root action.
+
+
+## Pull request hardware impact
+
+The Node and container actions share the same exact-base hardware-impact behavior. On a pull request, `comment-format: review` compares the exact PR base SHA with the exact analyzed head SHA when the same workflow has a valid BoardReadyOps JSON artifact for that base commit. `actions: read` lets the short-lived repository `GITHUB_TOKEN` discover that historical workflow artifact. Missing exact-base evidence is reported explicitly; BoardReadyOps never silently substitutes another run and does not change the current-run decision because the comparison is unavailable.
+
+The source checkout and full previous/current report artifacts stay in the target repository. Hosted execution may publish only the bounded structured hardware-impact summary and evidence references described in the JSON report contract.
 
 The default image entrypoint remains the CLI for direct use:
 
