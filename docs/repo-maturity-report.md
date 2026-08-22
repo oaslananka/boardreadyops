@@ -109,7 +109,7 @@ conditions become true:
 | --- | --- | --- |
 | Semantic Versioning | Passed | Release-please and version verification are configured. |
 | CHANGELOG | Passed | `CHANGELOG.md` exists and release history is generated. |
-| GitHub Releases | Passed | Latest release `v1.32.1` has binary assets, `SHA256SUMS`, and SBOM. |
+| GitHub Releases | Passed | Latest release `v1.33.0` has binary assets, `SHA256SUMS`, and SBOM. |
 | Checksums | Passed | Release assets include `SHA256SUMS`; installers verify checksums. |
 | Provenance / attestation | Passed | Workflows and docs cover provenance and artifact attestation. |
 | Reproducibility | Partial | Dist and binary verification exist; independent reproducible-build attestation remains a future hardening item. |

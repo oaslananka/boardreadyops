@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.33.0](https://github.com/oaslananka/boardreadyops/compare/v1.32.1...v1.33.0) (2026-08-22)
+
+
+### Features
+
+* add PR-native hardware change impact v1 ([#464](https://github.com/oaslananka/boardreadyops/issues/464)) ([6674db5](https://github.com/oaslananka/boardreadyops/commit/6674db5911ed317026713ee61455b524fb25be14))
+
 ## [1.32.1](https://github.com/oaslananka/boardreadyops/compare/v1.32.0...v1.32.1) (2026-08-22)
 
 
