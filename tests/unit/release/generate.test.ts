@@ -123,6 +123,14 @@ describe("generate source invariants", () => {
     expect(source).toContain("entries.toSorted((left, right) => left.name.localeCompare(right.name))");
     expect(source).not.toContain("entries.sort((left, right) => left.name.localeCompare(right.name))");
   });
+
+  it("keeps artifact collection branching explicit", async () => {
+    const source = await fs.readFile(path.join(process.cwd(), "src/release/generate.ts"), "utf8");
+
+    expect(source).toContain("if (step.isDirectory)");
+    expect(source).toContain("else if (await fileExists(absoluteOutput))");
+    expect(source).not.toContain(": (await fileExists(absoluteOutput))\n      ? [absoluteOutput]\n      : []");
+  });
 });
 
 describe("runGenerate", () => {
