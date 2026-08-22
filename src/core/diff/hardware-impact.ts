@@ -1,19 +1,19 @@
 import type { RunResult } from "../result.js";
 import { diffRuns, type RunDiff } from "./run.js";
 
-export type HardwareImpactDomain = "readiness" | "findings" | "bom" | "manufacturing";
-export type HardwareImpactRiskDirection = "increased" | "decreased" | "unchanged" | "unknown";
+type HardwareImpactDomain = "readiness" | "findings" | "bom" | "manufacturing";
+type HardwareImpactRiskDirection = "increased" | "decreased" | "unchanged" | "unknown";
 export type HardwareImpactBaselineReason =
   | "not-found"
   | "invalid-artifact"
   | "unsupported-result"
   | "candidate-mismatch";
 
-export type HardwareImpactBaseline =
+type HardwareImpactBaseline =
   | { status: "available"; sha: string }
   | { status: "unavailable"; sha: string; reason: HardwareImpactBaselineReason };
 
-export interface HardwareImpactEvidenceRef {
+interface HardwareImpactEvidenceRef {
   domain: HardwareImpactDomain;
   kind: "finding" | "bom-row" | "output" | "readiness";
   label: string;
@@ -22,7 +22,7 @@ export interface HardwareImpactEvidenceRef {
   severity?: string | undefined;
 }
 
-export interface HardwareImpactFacts {
+interface HardwareImpactFacts {
   readiness: {
     previousScore: number | null;
     currentScore: number | null;
@@ -50,7 +50,7 @@ export interface HardwareImpactFacts {
   };
 }
 
-export interface HardwareImpactAssessment {
+interface HardwareImpactAssessment {
   materialChange: boolean;
   riskDirection: HardwareImpactRiskDirection;
   affectedDomains: HardwareImpactDomain[];
