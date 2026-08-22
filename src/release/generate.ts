@@ -323,11 +323,14 @@ async function collectStepArtifacts(
   absoluteOutput: string,
   step: GeneratePlanStep,
 ): Promise<GeneratedArtifact[]> {
-  const files = step.isDirectory
-    ? await walkFiles(absoluteOutput)
-    : (await fileExists(absoluteOutput))
-      ? [absoluteOutput]
-      : [];
+  let files: string[];
+  if (step.isDirectory) {
+    files = await walkFiles(absoluteOutput);
+  } else if (await fileExists(absoluteOutput)) {
+    files = [absoluteOutput];
+  } else {
+    files = [];
+  }
   const artifacts: GeneratedArtifact[] = [];
   for (const file of files) {
     const relativePath = toPosix(path.relative(outputDir, file));
