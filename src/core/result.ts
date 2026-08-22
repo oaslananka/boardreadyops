@@ -2,6 +2,7 @@ import type { BomRiskSummary } from "./bom-risk.js";
 import type { ReleaseMode } from "./config.types.js";
 import type { ProjectContext } from "./context.js";
 import type { FabricationSnapshot } from "./diff/fabrication.js";
+import type { HardwareImpactV1 } from "./diff/hardware-impact.types.js";
 import type { Finding, FindingSummary } from "./findings.js";
 import type { LoadedPlugin } from "./plugin-loader.js";
 import type { PolicyEvaluation } from "./policy.js";
@@ -25,6 +26,7 @@ export interface RunResult {
   projects: ProjectContext[];
   findings: Finding[];
   fabrication: FabricationSnapshot;
+  hardwareImpact?: HardwareImpactV1 | undefined;
   plugins?: LoadedPlugin[] | undefined;
   generatedAt: string;
 }

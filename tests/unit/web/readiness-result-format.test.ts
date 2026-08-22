@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildReadinessCheckOutput, buildReadinessPrComment } from "../../../apps/web/lib/readiness-result-format.js";
+import type { ReleaseRunResult } from "../../../packages/contracts/src/index.js";
 
 describe("readiness result formatting", () => {
   const findings = [
@@ -23,6 +24,96 @@ describe("readiness result formatting", () => {
       message: "High priority",
     },
   ] as const;
+
+  const hardwareImpact: NonNullable<ReleaseRunResult["hardwareImpact"]> = {
+    version: 1,
+    baseline: { status: "available" as const, sha: "a".repeat(40) },
+    candidate: { sha: "b".repeat(40) },
+    facts: {
+      readiness: {
+        previousScore: 82,
+        currentScore: 71,
+        scoreDelta: -11,
+        previousStatus: "ready" as const,
+        currentStatus: "at-risk" as const,
+        statusChanged: true,
+      },
+      findings: { added: 2, resolved: 1, addedBlocking: 1, resolvedBlocking: 0 },
+      bom: { added: 1, removed: 0, changed: 2, truncated: false },
+      manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 },
+    },
+    assessment: {
+      materialChange: true,
+      riskDirection: "increased" as const,
+      affectedDomains: ["readiness", "findings", "bom"],
+    },
+    evidence: [
+      {
+        domain: "findings" as const,
+        kind: "finding" as const,
+        label: "Added finding | unsafe\n### injected heading",
+        path: "board`path\nnext.kicad_pcb",
+        ruleId: "design`rule\nnext",
+        severity: "high" as const,
+      },
+    ],
+  };
+
+  it("renders the same structured hardware impact semantics in Check Run and PR output", () => {
+    const input = {
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      artifacts: [],
+      metrics: {},
+      reportLinks: [],
+      hardwareImpact,
+    };
+    const check = buildReadinessCheckOutput(input);
+    const comment = buildReadinessPrComment(input);
+
+    for (const output of [check.summary, comment]) {
+      expect(output).toContain("### Hardware impact");
+      expect(output).toContain("Material change · risk increased · 3 affected domains");
+      expect(output).toContain("#### Changed facts");
+      expect(output).toContain("Readiness: 82 → 71 (-11)");
+      expect(output).toContain("Findings: +2 / -1; 1 new blocker");
+      expect(output).toContain("BOM: 3 changed rows");
+      expect(output).toContain("#### Impact assessment");
+      expect(output).toContain("Risk direction: increased");
+      expect(output).toContain("Affected domains: readiness, findings, bom");
+      expect(output).toContain("Added finding   unsafe ### injected heading");
+      expect(output).not.toContain("\n### injected heading");
+    }
+  });
+
+  it("renders baseline-unavailable impact without exposing the internal reason or changing the terminal title", () => {
+    const unavailable: NonNullable<ReleaseRunResult["hardwareImpact"]> = {
+      ...hardwareImpact,
+      baseline: { status: "unavailable", sha: "a".repeat(40), reason: "invalid-artifact" },
+      assessment: { materialChange: false, riskDirection: "unknown", affectedDomains: [] },
+      evidence: [],
+    };
+    const input = {
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      artifacts: [],
+      metrics: {},
+      reportLinks: [],
+      hardwareImpact: unavailable,
+    };
+    const check = buildReadinessCheckOutput(input);
+    const comment = buildReadinessPrComment(input);
+
+    expect(check.title).toBe("✅ BoardReadyOps: Ready to release");
+    for (const output of [check.summary, comment]) {
+      expect(output).toContain(
+        "Exact base SHA evidence unavailable; the current run result is still valid, but no authoritative PR change comparison was produced.",
+      );
+      expect(output).not.toContain("invalid-artifact");
+    }
+  });
 
   it("orders findings by severity and sanitizes inline Markdown content", () => {
     const output = buildReadinessCheckOutput({

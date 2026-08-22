@@ -138,6 +138,9 @@ function queuedTrustSummary(action) {
     })
     .join(" · ");
   const lines = [`Trust mode: ${safeMode ? "Safe (restricted)" : "Standard"}`, `Trust reasons: ${reasons || "None"}`];
+  if (typeof action.baseCommitSha === "string" && /^[0-9a-f]{40}$/u.test(action.baseCommitSha)) {
+    lines.push(`Impact base SHA: ${action.baseCommitSha}`);
+  }
   if (safeMode && (action.pullRequestDraft === true || action.pullRequestFromFork === true)) {
     lines.push("Runner dispatch will be skipped; managed artifacts and result callback authority will not be granted.");
   } else if (safeMode) {

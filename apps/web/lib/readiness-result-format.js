@@ -346,6 +346,86 @@ function appendReports(lines, reports, limit = 10) {
   if (reports.length > limit) lines.push(`- …and ${reports.length - limit} more reports.`);
 }
 
+function appendHardwareImpact(lines, impact) {
+  if (!impact) return;
+  lines.push("", "### Hardware impact", "");
+  if (impact.baseline.status === "unavailable") {
+    lines.push(
+      "Exact base SHA evidence unavailable; the current run result is still valid, but no authoritative PR change comparison was produced.",
+    );
+    return;
+  }
+
+  const domains = impact.assessment.affectedDomains.length;
+  lines.push(
+    `${impact.assessment.materialChange ? "Material change" : "No material change"} · risk ${sanitizeInline(impact.assessment.riskDirection)} · ${domains} affected ${domains === 1 ? "domain" : "domains"}`,
+    "",
+    "#### Changed facts",
+    "",
+    ...hardwareImpactFactLines(impact),
+    "",
+    "#### Impact assessment",
+    "",
+    `- Risk direction: ${sanitizeInline(impact.assessment.riskDirection)}`,
+    `- Material change: ${impact.assessment.materialChange ? "yes" : "no"}`,
+    `- Affected domains: ${impact.assessment.affectedDomains.length > 0 ? impact.assessment.affectedDomains.map(sanitizeInline).join(", ") : "none"}`,
+  );
+  appendHardwareImpactEvidence(lines, impact.evidence ?? []);
+}
+
+function hardwareImpactFactLines(impact) {
+  const lines = [];
+  const readiness = impact.facts.readiness;
+  if (readiness.scoreDelta !== 0 || readiness.statusChanged) {
+    lines.push(
+      `- Readiness: ${hardwareImpactScore(readiness.previousScore)} → ${hardwareImpactScore(readiness.currentScore)} (${hardwareImpactDelta(readiness.scoreDelta)})`,
+    );
+  }
+  const findings = impact.facts.findings;
+  if (findings.added > 0 || findings.resolved > 0) {
+    const addedBlockers = hardwareImpactBlockerSuffix(findings.addedBlocking, "new");
+    const resolvedBlockers = hardwareImpactBlockerSuffix(findings.resolvedBlocking, "resolved");
+    lines.push(`- Findings: +${findings.added} / -${findings.resolved}${addedBlockers}${resolvedBlockers}`);
+  }
+  const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
+  if (bomChanged > 0) lines.push(`- BOM: ${bomChanged} changed ${bomChanged === 1 ? "row" : "rows"}`);
+  const outputsChanged =
+    impact.facts.manufacturing.outputsAdded +
+    impact.facts.manufacturing.outputsRemoved +
+    impact.facts.manufacturing.outputsChanged;
+  if (outputsChanged > 0) {
+    lines.push(`- Manufacturing: ${outputsChanged} changed ${outputsChanged === 1 ? "output" : "outputs"}`);
+  }
+  return lines.length > 0 ? lines : ["- No supported v1 facts changed."];
+}
+
+function hardwareImpactBlockerSuffix(count, state) {
+  if (count <= 0) return "";
+  const noun = count === 1 ? "blocker" : "blockers";
+  return `; ${count} ${state} ${noun}`;
+}
+
+function appendHardwareImpactEvidence(lines, evidence) {
+  if (evidence.length === 0) return;
+  lines.push("", "#### Supporting evidence", "");
+  for (const item of evidence) {
+    const metadata = [item.ruleId ? code(item.ruleId) : undefined, item.path ? code(item.path) : undefined]
+      .filter(Boolean)
+      .join(" · ");
+    const metadataSuffix = metadata ? ` · ${metadata}` : "";
+    lines.push(`- ${sanitizeInline(item.label)}${metadataSuffix}`);
+  }
+}
+
+function hardwareImpactScore(value) {
+  return value == null ? "n/a" : String(value);
+}
+
+function hardwareImpactDelta(value) {
+  if (value == null) return "n/a";
+  return value > 0 ? `+${value}` : String(value);
+}
+
 function nextSteps(input) {
   const outcome = terminalOutcome(input);
   switch (outcome) {
@@ -399,6 +479,7 @@ function checkSummary(input) {
   appendArtifacts(lines, input.artifacts ?? [], 5);
   appendMetrics(lines, input.metrics, 5);
   appendReports(lines, input.reportLinks ?? [], 5);
+  appendHardwareImpact(lines, input.hardwareImpact);
   appendNextSteps(lines, input);
   if (input.detailsUrl) lines.push("", `Open the hosted run dashboard: ${input.detailsUrl}`);
   return lines.join("\n");
@@ -421,6 +502,7 @@ export function buildReadinessPrComment(input) {
   appendArtifacts(lines, input.artifacts ?? []);
   appendMetrics(lines, input.metrics, 8);
   appendReports(lines, input.reportLinks ?? []);
+  appendHardwareImpact(lines, input.hardwareImpact);
   appendNextSteps(lines, input);
   appendDashboard(lines, input.detailsUrl);
   lines.push("", "<!-- boardreadyops:release-readiness -->");

@@ -61,6 +61,8 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain('Buffer.byteLength(JSON.stringify(payload), "utf8") > 900 * 1024');
     expect(workflow).toContain("findings_total:");
     expect(workflow).toContain('label: "GitHub Actions run"');
+    expect(workflow).toContain('report.hardwareImpact && typeof report.hardwareImpact === "object"');
+    expect(workflow).toContain("...(hardwareImpact ? { hardwareImpact } : {})");
     expect(workflow).toContain("for (let attempt = 1; attempt <= 3; attempt += 1)");
     expect(workflow).toContain("core.setFailed(policyFailed");
   });
@@ -107,5 +109,32 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain("SAFE_MODE_REASONS: $" + "{{ inputs.safe_mode_reasons }}");
     expect(workflow).toContain('"x-boardreadyops-trust-mode": trustMode');
     expect(workflow).toContain('"x-boardreadyops-safe-mode-reasons": safeModeReasons');
+  });
+
+  it("adds only repository-scoped read permissions for exact-base impact and keeps dispatch inputs stable", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+    const readinessJob = workflow.slice(workflow.indexOf("  readiness:"), workflow.indexOf("  setup-probe:"));
+    const actionStep = readinessJob.slice(
+      readinessJob.indexOf("- name: Run BoardReadyOps"),
+      readinessJob.indexOf("- name: Publish OIDC-authenticated cloud result"),
+    );
+
+    expect(workflow).not.toContain("base_sha:");
+    expect(readinessJob).toContain(
+      [
+        "permissions:",
+        "      actions: read",
+        "      checks: read",
+        "      contents: read",
+        "      id-token: write",
+      ].join("\n"),
+    );
+    expect(actionStep).toContain("GITHUB_TOKEN: $" + "{{ github.token }}");
+    expect(actionStep).toContain("BOARDREADYOPS_PR_HEAD_SHA: $" + "{{ inputs.head_sha }}");
+    expect(actionStep).toContain("BOARDREADYOPS_CLOUD_RUN_ID: $" + "{{ inputs.run_id }}");
+    expect(workflow).not.toContain("pull-requests: write");
+    expect(workflow).not.toContain("contents: write");
+    expect(workflow).not.toContain("GITHUB_APP_PRIVATE_KEY");
+    expect(workflow).not.toContain("BOARDREADYOPS_RUNNER_RESULT_KEY");
   });
 });
