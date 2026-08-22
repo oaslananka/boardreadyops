@@ -1,6 +1,11 @@
 import { appendFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { percentile } from "./control-plane-load.mjs";
+import { summarizeDurations } from "./control-plane-load.mjs";
+import {
+  boundedEnvironmentInteger as boundedInteger,
+  requiredEnvironmentValue as required,
+  isBareHttpsOrigin as validBareHttpsOrigin,
+} from "./lib/environment.mjs";
 
 const readyPath = "/api/health/ready";
 
@@ -19,44 +24,6 @@ export class ProductionSoakError extends Error {
     this.name = "ProductionSoakError";
     this.reason = reason;
     this.details = details;
-  }
-}
-
-function required(environment, name) {
-  const value = environment[name];
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${name} is required`);
-  }
-  return value.trim();
-}
-
-function boundedInteger(environment, name, fallback, minimum, maximum) {
-  const raw = environment[name];
-  if (raw === undefined) return fallback;
-  const normalized = raw.trim();
-  if (!/^\d+$/u.test(normalized)) {
-    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
-  }
-  const value = Number(normalized);
-  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
-    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
-  }
-  return value;
-}
-
-function validBareHttpsOrigin(value) {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.username === "" &&
-      url.password === "" &&
-      url.pathname === "/" &&
-      url.search === "" &&
-      url.hash === ""
-    );
-  } catch {
-    return false;
   }
 }
 
@@ -133,16 +100,7 @@ function summarizeLatencies(durations, elapsedMs) {
       maximumMs: 0,
     };
   }
-  const boundedElapsedMs = Math.max(elapsedMs, 1);
-  return {
-    count: durations.length,
-    elapsedMs: rounded(boundedElapsedMs),
-    throughputPerSecond: rounded((durations.length * 1_000) / boundedElapsedMs, 2),
-    p50Ms: rounded(percentile(durations, 0.5)),
-    p95Ms: rounded(percentile(durations, 0.95)),
-    p99Ms: rounded(percentile(durations, 0.99)),
-    maximumMs: rounded(Math.max(...durations)),
-  };
+  return summarizeDurations(durations, elapsedMs);
 }
 
 async function sampleReadyEndpoint(runtime, options) {

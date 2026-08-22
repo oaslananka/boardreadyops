@@ -1,3 +1,5 @@
+import { requiredEnvironmentValue as required, isBareHttpsOrigin as validOrigin } from "./lib/environment.mjs";
+
 const repositoryPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/u;
 const branchPattern = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/u;
 const pathPattern = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$/u;
@@ -24,14 +26,6 @@ export class SyntheticCanaryError extends Error {
   }
 }
 
-function required(environment, name) {
-  const value = environment[name];
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${name} is required`);
-  }
-  return value.trim();
-}
-
 function positiveInteger(environment, name, fallback) {
   const raw = environment[name];
   if (raw === undefined || raw === "") return fallback;
@@ -40,22 +34,6 @@ function positiveInteger(environment, name, fallback) {
     throw new Error(`${name} must be a positive integer`);
   }
   return value;
-}
-
-function validOrigin(value) {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.username === "" &&
-      url.password === "" &&
-      url.pathname === "/" &&
-      url.search === "" &&
-      url.hash === ""
-    );
-  } catch {
-    return false;
-  }
 }
 
 function safePath(value, name, pattern) {
