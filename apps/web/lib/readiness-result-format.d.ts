@@ -1,3 +1,5 @@
+import type { ReleaseRunResult } from "@boardreadyops/contracts";
+
 export type FindingTemplateInput = {
   ruleId: string;
   severity: string;
@@ -59,6 +61,7 @@ export type ReadinessResultTemplateInput = {
   detailsUrl?: string | undefined;
   trustMode?: RunTrustModeTemplateInput | undefined;
   safeModeReasons?: readonly SafeModeReasonTemplateInput[] | undefined;
+  hardwareImpact?: ReleaseRunResult["hardwareImpact"] | undefined;
 };
 
 export declare function buildReadinessCheckOutput(input: ReadinessResultTemplateInput): {

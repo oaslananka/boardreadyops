@@ -216,6 +216,55 @@ describe("readiness result route authentication and publication", () => {
     expect(persistenceSql).toContain("effective.safe_mode_reasons");
   });
 
+  it("publishes validated hardware impact through both GitHub output surfaces", async () => {
+    const body = JSON.stringify({
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      hardwareImpact: validHardwareImpact(),
+    });
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            github_installation_id: 12345,
+            trust_mode: "standard",
+            safe_mode_reasons: [],
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+
+    const response = await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(response.status).toBe(202);
+    expect(completeCheckRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: expect.stringContaining("### Hardware impact"),
+      }),
+    );
+    expect(completeCheckRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: expect.stringContaining("Material change · risk increased · 4 affected domains"),
+      }),
+    );
+    expect(createPullRequestComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("### Hardware impact"),
+      }),
+    );
+    expect(createPullRequestComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("#### Impact assessment"),
+      }),
+    );
+  });
+
   it("fails closed instead of publishing a misleading terminal trust snapshot", async () => {
     const body = JSON.stringify({ status: "completed", decision: "pass", findings: [] });
     query
