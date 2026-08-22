@@ -173,6 +173,90 @@ describe("buildHardwareImpact", () => {
     expect(unclassifiedChange.assessment.affectedDomains).toEqual(["bom"]);
   });
 
+  it("treats critical findings as blockers and recognizes resolved blocker risk reduction", () => {
+    const critical = finding("design.short", "critical", "Critical short detected", "board.kicad_pcb");
+    const previous = run({ status: "failed", findings: [critical] });
+    const current = run({ status: "passed", findings: [] });
+
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: previous },
+      candidate: { sha: headSha, result: current },
+    });
+
+    expect(impact.facts.findings).toMatchObject({ resolved: 1, resolvedBlocking: 1 });
+    expect(impact.assessment.riskDirection).toBe("decreased");
+  });
+
+  it("tracks removed BOM rows plus added and removed manufacturing outputs", () => {
+    const previous = run({
+      fabrication: {
+        bom: [
+          { reference: "R1", value: "10k" },
+          { reference: "C1", value: "100nF" },
+        ],
+        outputs: [
+          { kind: "gerber", files: [{ path: "fab/top.gbr", digest: "aaa" }] },
+          { kind: "drill", files: [{ path: "fab/board.drl", digest: "bbb" }] },
+        ],
+      },
+    });
+    const current = run({
+      fabrication: {
+        bom: [{ reference: "R1", value: "10k" }],
+        outputs: [
+          { kind: "gerber", files: [{ path: "fab/top.gbr", digest: "aaa" }] },
+          { kind: "pick-place", files: [{ path: "fab/positions.csv", digest: "ccc" }] },
+        ],
+      },
+    });
+
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: previous },
+      candidate: { sha: headSha, result: current },
+    });
+
+    expect(impact.facts.bom).toMatchObject({ removed: 1 });
+    expect(impact.facts.manufacturing).toEqual({ outputsAdded: 1, outputsRemoved: 1, outputsChanged: 0 });
+    expect(impact.assessment.affectedDomains).toEqual(["bom", "manufacturing"]);
+  });
+
+  it("handles readiness appearing for the first time without inventing a score direction", () => {
+    const previous = run();
+    const current = run({ readiness: readiness(73, "at-risk") });
+
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: previous },
+      candidate: { sha: headSha, result: current },
+    });
+
+    expect(impact.facts.readiness).toEqual({
+      previousScore: null,
+      currentScore: 73,
+      scoreDelta: null,
+      previousStatus: null,
+      currentStatus: "at-risk",
+      statusChanged: true,
+    });
+    expect(impact.assessment).toEqual({
+      materialChange: true,
+      riskDirection: "unknown",
+      affectedDomains: ["readiness"],
+    });
+    expect(impact.evidence[0]?.label).toContain("Readiness n/a → 73; n/a → at-risk");
+  });
+
+  it("uses evidence path ordering when otherwise identical finding labels are added", () => {
+    const first = finding("design.same-rule", "medium", "Same message", "a-board.kicad_pcb");
+    const second = finding("design.same-rule", "medium", "Same message", "b-board.kicad_pcb");
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run() },
+      candidate: { sha: headSha, result: run({ findings: [second, first] }) },
+    });
+
+    const findingEvidence = impact.evidence.filter((entry) => entry.kind === "finding");
+    expect(findingEvidence.map((entry) => entry.path)).toEqual(["a-board.kicad_pcb", "b-board.kicad_pcb"]);
+  });
+
   it("keeps the current run valid while marking missing exact-base evidence unavailable", () => {
     const unavailable = buildHardwareImpact({
       baseline: { status: "unavailable", sha: baseSha, reason: "not-found" },
@@ -195,5 +279,15 @@ describe("buildHardwareImpact", () => {
       assessment: { materialChange: false, riskDirection: "unknown", affectedDomains: [] },
       evidence: [],
     });
+  });
+
+  it("uses null current readiness when exact-base evidence is unavailable and the candidate has no readiness", () => {
+    const impact = buildHardwareImpact({
+      baseline: { status: "unavailable", sha: baseSha, reason: "unsupported-result" },
+      candidate: { sha: headSha, result: run() },
+    });
+
+    expect(impact.facts.readiness.currentScore).toBeNull();
+    expect(impact.facts.readiness.currentStatus).toBeNull();
   });
 });
