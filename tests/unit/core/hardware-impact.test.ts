@@ -257,6 +257,18 @@ describe("buildHardwareImpact", () => {
     expect(labels).toEqual(["Added finding: design.same-rule — zeta", "Added finding: design.same-rule — älpha"]);
   });
 
+  it("uses severity as the final deterministic evidence tie-breaker", () => {
+    const medium = finding("design.same-rule", "medium", "Same message", "board.kicad_pcb");
+    const high = finding("design.same-rule", "high", "Same message", "board.kicad_pcb");
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run() },
+      candidate: { sha: headSha, result: run({ findings: [medium, high] }) },
+    });
+
+    const severities = impact.evidence.filter((entry) => entry.kind === "finding").map((entry) => entry.severity);
+    expect(severities).toEqual(["high", "medium"]);
+  });
+
   it("uses evidence path ordering when otherwise identical finding labels are added", () => {
     const first = finding("design.same-rule", "medium", "Same message", "a-board.kicad_pcb");
     const second = finding("design.same-rule", "medium", "Same message", "b-board.kicad_pcb");
