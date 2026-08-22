@@ -20,6 +20,9 @@ const repository = {
   },
 };
 
+const baseSha = "a".repeat(40);
+const headSha = "b".repeat(40);
+
 const publicRepository = {
   ...repository,
   private: false,
@@ -131,9 +134,10 @@ describe("GitHub App lifecycle normalization", () => {
         repository,
         pull_request: {
           number: 42,
+          base: { sha: baseSha },
           head: {
             ref: "feature/pcb-release",
-            sha: "0123456789abcdef",
+            sha: headSha,
             repo: {
               full_name: "octo-org/hardware-board",
               fork: false,
@@ -186,7 +190,8 @@ describe("GitHub App lifecycle normalization", () => {
         },
         pullRequestNumber: 42,
         ref: "feature/pcb-release",
-        commitSha: "0123456789abcdef",
+        commitSha: headSha,
+        baseCommitSha: baseSha,
         triggerKind: "pr",
         pullRequestDraft: false,
         pullRequestFromFork: false,
@@ -208,9 +213,10 @@ describe("GitHub App lifecycle normalization", () => {
         repository: publicRepository,
         pull_request: {
           number: 42,
+          base: { sha: baseSha },
           head: {
             ref: "feature/pcb-release",
-            sha: "0123456789abcdef",
+            sha: headSha,
             repo: {
               full_name: "contributor/hardware-board",
               fork: true,
@@ -243,9 +249,10 @@ describe("GitHub App lifecycle normalization", () => {
         pull_request: {
           number: 42,
           draft: true,
+          base: { sha: baseSha },
           head: {
             ref: "feature/pcb-release",
-            sha: "0123456789abcdef",
+            sha: headSha,
             repo: {
               full_name: "contributor/hardware-board",
               fork: true,
@@ -266,6 +273,30 @@ describe("GitHub App lifecycle normalization", () => {
     });
   });
 
+  it("rejects queued pull requests without an exact base SHA", () => {
+    const normalized = normalizeGitHubAppWebhook({
+      event: "pull_request",
+      delivery: "delivery-missing-base",
+      payload: {
+        action: "opened",
+        installation,
+        repository: publicRepository,
+        pull_request: {
+          number: 42,
+          head: {
+            ref: "feature/pcb-release",
+            sha: headSha,
+            repo: { full_name: "octo-org/hardware-board", fork: false },
+          },
+        },
+      },
+    });
+
+    expect(normalized.accepted).toBe(false);
+    expect(normalized.reason).toMatch(/base sha/iu);
+    expect(normalized.actions).toEqual([]);
+  });
+
   it("accepts ignored pull request actions without enqueueing work", () => {
     const normalized = normalizeGitHubAppWebhook({
       event: "pull_request",
@@ -276,9 +307,10 @@ describe("GitHub App lifecycle normalization", () => {
         repository,
         pull_request: {
           number: 42,
+          base: { sha: baseSha },
           head: {
             ref: "feature/pcb-release",
-            sha: "0123456789abcdef",
+            sha: headSha,
           },
         },
       },

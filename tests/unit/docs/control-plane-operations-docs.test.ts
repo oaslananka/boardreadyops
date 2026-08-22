@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const documentationPath = "docs/operations/control-plane-reconciliation.md";
@@ -284,5 +286,19 @@ ${operations}`;
     expect(navigation).toContain("Synthetic Target Canaries: operations/synthetic-target-repository-canaries.md");
     expect(execution).toContain("synthetic-target-repository-canaries.md");
     expect(reconciliation).toContain("synthetic-target-repository-canaries.md");
+  });
+
+  it("documents exact-base impact without broadening the GitHub App permission boundary", async () => {
+    const deployment = await readFile(join(process.cwd(), "docs/deployment/github-actions-execution.md"), "utf8");
+    const review = await readFile(join(process.cwd(), "docs/review-app.md"), "utf8");
+
+    for (const permission of ["actions: read", "checks: read", "contents: read", "id-token: write"]) {
+      expect(deployment).toContain(permission);
+    }
+    expect(deployment).toContain("does **not** alter the production GitHub App permission profile");
+    expect(deployment).toContain("does not fall back to another run");
+    expect(review).toContain("exact base SHA");
+    expect(review).toContain("does not substitute a newer, older, or merely same-branch run");
+    expect(review).toContain("current-run decision remains valid");
   });
 });

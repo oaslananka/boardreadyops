@@ -152,6 +152,47 @@ describe("action bundle", () => {
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
     expect(`${result.stdout}\n${result.stderr}`).toContain("BoardReadyOps found");
   });
+
+  it("writes candidate-mismatch hardware impact without changing the current run conclusion", async () => {
+    const workspace = await workspaceFromFixture("safe-basic");
+    initializeGitWorkspace(workspace);
+    const eventPath = path.join(workspace, "event.json");
+    await fs.writeFile(
+      eventPath,
+      JSON.stringify({
+        pull_request: {
+          number: 9,
+          base: { sha: "a".repeat(40), repo: { full_name: "oaslananka/boardreadyops" } },
+          head: { sha: "b".repeat(40), repo: { full_name: "oaslananka/boardreadyops" } },
+        },
+      }),
+      "utf8",
+    );
+
+    const execution = runActionBundle(workspace, {
+      GITHUB_ACTIONS: "true",
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_REPOSITORY: "oaslananka/boardreadyops",
+      GITHUB_RUN_ID: "900",
+      GITHUB_TOKEN: "dummy-token",
+      INPUT_PATH: ".",
+      INPUT_CONFIG: "boardreadyops.yml",
+      "INPUT_UPLOAD-SARIF": "false",
+      "INPUT_UPLOAD-ARTIFACTS": "false",
+      "INPUT_COMMENT-PR": "false",
+      INPUT_ANNOTATIONS: "false",
+      "INPUT_FAIL-ON": "never",
+    });
+
+    expect(execution.status, `${execution.stdout}\n${execution.stderr}`).toBe(0);
+    const json = JSON.parse(await fs.readFile(path.join(workspace, "boardreadyops.findings.json"), "utf8"));
+    expect(json.hardwareImpact).toMatchObject({
+      baseline: { status: "unavailable", sha: "a".repeat(40), reason: "candidate-mismatch" },
+      candidate: { sha: "b".repeat(40) },
+      assessment: { materialChange: false, riskDirection: "unknown", affectedDomains: [] },
+    });
+    expect(json.summary.failed).toBe(false);
+  });
 });
 
 async function workspaceFromFixture(fixture: string): Promise<string> {
@@ -179,6 +220,21 @@ function runActionBundle(workspace: string, env: Record<string, string>) {
       ...env,
     },
   });
+}
+
+function initializeGitWorkspace(workspace: string): void {
+  for (const args of [
+    ["init", "--quiet"],
+    ["config", "user.email", "tests@boardreadyops.dev"],
+    ["config", "user.name", "BoardReadyOps Tests"],
+    ["add", "."],
+    ["commit", "--quiet", "-m", "fixture"],
+  ]) {
+    const result = spawnSync("git", args, { cwd: workspace, encoding: "utf8" });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+    }
+  }
 }
 
 async function outputValue(file: string, name: string): Promise<string | undefined> {
