@@ -162,14 +162,8 @@ function hardwareImpactFactLines(impact: NonNullable<RunResult["hardwareImpact"]
   }
   const findings = impact.facts.findings;
   if (findings.added > 0 || findings.resolved > 0) {
-    const blocker =
-      findings.addedBlocking > 0
-        ? `; ${findings.addedBlocking} new ${findings.addedBlocking === 1 ? "blocker" : "blockers"}`
-        : "";
-    const resolved =
-      findings.resolvedBlocking > 0
-        ? `; ${findings.resolvedBlocking} resolved ${findings.resolvedBlocking === 1 ? "blocker" : "blockers"}`
-        : "";
+    const blocker = blockerSuffix(findings.addedBlocking, "new");
+    const resolved = blockerSuffix(findings.resolvedBlocking, "resolved");
     lines.push(`- Findings: +${findings.added} / -${findings.resolved}${blocker}${resolved}`);
   }
   const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
@@ -184,6 +178,12 @@ function hardwareImpactFactLines(impact: NonNullable<RunResult["hardwareImpact"]
     lines.push(`- Manufacturing: ${outputChanged} changed ${outputChanged === 1 ? "output" : "outputs"}`);
   }
   return lines.length > 0 ? lines : ["- No supported v1 facts changed."];
+}
+
+function blockerSuffix(count: number, state: "new" | "resolved"): string {
+  if (count <= 0) return "";
+  const noun = count === 1 ? "blocker" : "blockers";
+  return `; ${count} ${state} ${noun}`;
 }
 
 function score(value: number | null): string {

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   context: { payload: {} as Record<string, unknown> },
   getOctokit: vi.fn(),
   execFile: vi.fn(),
+  stat: vi.fn(),
+  readFile: vi.fn(),
   loadExactBaseRunResult: vi.fn(),
 }));
 
@@ -14,6 +16,11 @@ vi.mock("@actions/github", () => ({
 }));
 
 vi.mock("node:child_process", () => ({ execFile: mocks.execFile }));
+
+vi.mock("node:fs/promises", () => ({
+  stat: mocks.stat,
+  readFile: mocks.readFile,
+}));
 
 vi.mock("../../../src/action/previous-result.js", () => ({
   loadExactBaseRunResult: mocks.loadExactBaseRunResult,
@@ -58,8 +65,12 @@ beforeEach(() => {
   mocks.context.payload = {};
   mocks.getOctokit.mockReset();
   mocks.execFile.mockReset();
+  mocks.stat.mockReset();
+  mocks.readFile.mockReset();
   mocks.loadExactBaseRunResult.mockReset();
   mocks.execFile.mockImplementation((_command, _args, _options, callback) => callback(null, `${headSha}\n`, ""));
+  mocks.stat.mockResolvedValue({ isDirectory: () => true, isFile: () => false });
+  mocks.readFile.mockResolvedValue(`${headSha}\n`);
   mocks.loadExactBaseRunResult.mockResolvedValue({ status: "available", baseSha, runId: 700, result: run(82) });
   setCommonEnv();
 });
@@ -97,11 +108,55 @@ describe("buildActionHardwareImpact", () => {
       analyzedSha: headSha,
       currentRunId: 900,
     });
+    expect(mocks.stat).toHaveBeenCalledWith("/workspace/.git");
+    expect(mocks.readFile).toHaveBeenCalledWith("/workspace/.git/HEAD", "utf8");
+    expect(mocks.execFile).not.toHaveBeenCalled();
     expect(impact).toMatchObject({
       baseline: { status: "available", sha: baseSha },
       candidate: { sha: headSha },
       facts: { readiness: { previousScore: 82, currentScore: 71, scoreDelta: -11 } },
     });
+  });
+
+  it("resolves the analyzed SHA from worktree git metadata without invoking git", async () => {
+    mocks.context.payload = {
+      pull_request: {
+        base: { sha: baseSha, repo: { full_name: "octo/board" } },
+        head: { sha: headSha, repo: { full_name: "octo/board" } },
+      },
+    };
+    mocks.stat.mockResolvedValue({ isDirectory: () => false, isFile: () => true });
+    mocks.readFile.mockImplementation(async (file) => {
+      if (file === "/workspace/.git") return "gitdir: /repo/.git/worktrees/board\n";
+      if (file === "/repo/.git/worktrees/board/HEAD") return `${headSha}\n`;
+      throw new Error(`unexpected read: ${String(file)}`);
+    });
+
+    await buildActionHardwareImpact(run(), { workspace: "/workspace", artifactName: "boardreadyops" });
+
+    expect(mocks.loadExactBaseRunResult).toHaveBeenCalledWith(expect.objectContaining({ analyzedSha: headSha }));
+    expect(mocks.execFile).not.toHaveBeenCalled();
+  });
+
+  it("resolves a symbolic HEAD from a loose ref without invoking git", async () => {
+    mocks.context.payload = {
+      pull_request: {
+        base: { sha: baseSha, repo: { full_name: "octo/board" } },
+        head: { sha: headSha, repo: { full_name: "octo/board" } },
+      },
+    };
+    const missing = Object.assign(new Error("missing"), { code: "ENOENT" });
+    mocks.readFile.mockImplementation(async (file) => {
+      if (file === "/workspace/.git/HEAD") return "ref: refs/heads/feature/hardware-impact\n";
+      if (file === "/workspace/.git/commondir") throw missing;
+      if (file === "/workspace/.git/refs/heads/feature/hardware-impact") return `${headSha}\n`;
+      throw new Error(`unexpected read: ${String(file)}`);
+    });
+
+    await buildActionHardwareImpact(run(), { workspace: "/workspace", artifactName: "boardreadyops" });
+
+    expect(mocks.loadExactBaseRunResult).toHaveBeenCalledWith(expect.objectContaining({ analyzedSha: headSha }));
+    expect(mocks.execFile).not.toHaveBeenCalled();
   });
 
   it("uses the hosted BoardReadyOps Check Run as the trusted base binding", async () => {

@@ -1,4 +1,5 @@
-import { execFile } from "node:child_process";
+import { readFile, stat } from "node:fs/promises";
+import path from "node:path";
 import * as github from "@actions/github";
 import { buildHardwareImpact, type HardwareImpactV1 } from "../core/diff/hardware-impact.js";
 import type { RunResult } from "../core/result.js";
@@ -103,21 +104,64 @@ async function hostedPullRequestBinding(
   return baseSha && fullLowercaseSha.test(baseSha) ? { baseSha, headSha } : undefined;
 }
 
-function checkoutSha(workspace: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile("git", ["rev-parse", "HEAD"], { cwd: workspace, encoding: "utf8" }, (error, stdout) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      const sha = String(stdout).trim();
-      if (!fullLowercaseSha.test(sha)) {
-        reject(new Error("analyzed checkout did not resolve to a full lowercase commit SHA"));
-        return;
-      }
-      resolve(sha);
-    });
-  });
+async function checkoutSha(workspace: string): Promise<string> {
+  const gitDirectory = await resolveGitDirectory(workspace);
+  const head = (await readFile(path.join(gitDirectory, "HEAD"), "utf8")).trim();
+  if (fullLowercaseSha.test(head)) return head;
+
+  const match = /^ref: (refs\/[^\r\n]+)$/u.exec(head);
+  const ref = match?.[1];
+  if (!ref || !safeGitRef(ref)) {
+    throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
+  }
+
+  const commonDirectory = await resolveCommonGitDirectory(gitDirectory);
+  const looseSha = await readOptionalText(path.join(commonDirectory, ...ref.split("/")));
+  if (looseSha && fullLowercaseSha.test(looseSha.trim())) return looseSha.trim();
+
+  const packedRefs = await readOptionalText(path.join(commonDirectory, "packed-refs"));
+  if (packedRefs) {
+    for (const line of packedRefs.split(/\r?\n/u)) {
+      if (line.startsWith("#") || line.startsWith("^") || line.length === 0) continue;
+      const separator = line.indexOf(" ");
+      if (separator < 0 || line.slice(separator + 1) !== ref) continue;
+      const sha = line.slice(0, separator);
+      if (fullLowercaseSha.test(sha)) return sha;
+    }
+  }
+
+  throw new Error("analyzed checkout did not resolve to a full lowercase commit SHA");
+}
+
+async function resolveGitDirectory(workspace: string): Promise<string> {
+  const dotGit = path.join(workspace, ".git");
+  const metadata = await stat(dotGit);
+  if (metadata.isDirectory()) return dotGit;
+  if (!metadata.isFile()) throw new Error("workspace .git metadata is unavailable");
+
+  const marker = (await readFile(dotGit, "utf8")).trim();
+  const match = /^gitdir: (.+)$/u.exec(marker);
+  if (!match?.[1]) throw new Error("workspace .git metadata is invalid");
+  return path.resolve(path.dirname(dotGit), match[1]);
+}
+
+async function resolveCommonGitDirectory(gitDirectory: string): Promise<string> {
+  const commonMarker = await readOptionalText(path.join(gitDirectory, "commondir"));
+  return commonMarker ? path.resolve(gitDirectory, commonMarker.trim()) : gitDirectory;
+}
+
+async function readOptionalText(file: string): Promise<string | undefined> {
+  try {
+    return await readFile(file, "utf8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+function safeGitRef(ref: string): boolean {
+  if (!ref.startsWith("refs/") || ref.includes("\\")) return false;
+  return ref.split("/").every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
 }
 
 function numericRunId(value: string | undefined): number | undefined {

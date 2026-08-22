@@ -383,14 +383,8 @@ function hardwareImpactFactLines(impact) {
   }
   const findings = impact.facts.findings;
   if (findings.added > 0 || findings.resolved > 0) {
-    const addedBlockers =
-      findings.addedBlocking > 0
-        ? `; ${findings.addedBlocking} new ${findings.addedBlocking === 1 ? "blocker" : "blockers"}`
-        : "";
-    const resolvedBlockers =
-      findings.resolvedBlocking > 0
-        ? `; ${findings.resolvedBlocking} resolved ${findings.resolvedBlocking === 1 ? "blocker" : "blockers"}`
-        : "";
+    const addedBlockers = hardwareImpactBlockerSuffix(findings.addedBlocking, "new");
+    const resolvedBlockers = hardwareImpactBlockerSuffix(findings.resolvedBlocking, "resolved");
     lines.push(`- Findings: +${findings.added} / -${findings.resolved}${addedBlockers}${resolvedBlockers}`);
   }
   const bomChanged = impact.facts.bom.added + impact.facts.bom.removed + impact.facts.bom.changed;
@@ -405,6 +399,12 @@ function hardwareImpactFactLines(impact) {
   return lines.length > 0 ? lines : ["- No supported v1 facts changed."];
 }
 
+function hardwareImpactBlockerSuffix(count, state) {
+  if (count <= 0) return "";
+  const noun = count === 1 ? "blocker" : "blockers";
+  return `; ${count} ${state} ${noun}`;
+}
+
 function appendHardwareImpactEvidence(lines, evidence) {
   if (evidence.length === 0) return;
   lines.push("", "#### Supporting evidence", "");
@@ -412,7 +412,8 @@ function appendHardwareImpactEvidence(lines, evidence) {
     const metadata = [item.ruleId ? code(item.ruleId) : undefined, item.path ? code(item.path) : undefined]
       .filter(Boolean)
       .join(" · ");
-    lines.push(`- ${sanitizeInline(item.label)}${metadata ? ` · ${metadata}` : ""}`);
+    const metadataSuffix = metadata ? ` · ${metadata}` : "";
+    lines.push(`- ${sanitizeInline(item.label)}${metadataSuffix}`);
   }
 }
 

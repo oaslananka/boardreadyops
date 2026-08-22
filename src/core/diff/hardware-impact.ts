@@ -212,7 +212,8 @@ function evidenceFromDiff(diff: RunDiff): HardwareImpactEvidenceRef[] {
       ),
     });
   }
-  return evidence.sort(compareEvidence).slice(0, MAX_EVIDENCE);
+  evidence.sort(compareEvidence);
+  return evidence.slice(0, MAX_EVIDENCE);
 }
 
 function findingEvidence(prefix: string, finding: RunDiff["findings"]["added"][number]): HardwareImpactEvidenceRef {

@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import * as core from "@actions/core";
-import { createLogger } from "../core/logger.js";
+import { createLogger, type Logger } from "../core/logger.js";
 import { runPipeline } from "../core/pipeline.js";
+import type { RunResult } from "../core/result.js";
 import { emitAnnotations } from "../report/annotations.js";
 import { formatHbom } from "../report/hbom.js";
 import { formatJson } from "../report/json.js";
@@ -43,20 +44,7 @@ export async function runAction(): Promise<void> {
     },
     logger,
   );
-  let result = pipelineResult;
-  try {
-    const hardwareImpact = await buildActionHardwareImpact(pipelineResult, {
-      workspace,
-      artifactName: inputs.artifactName,
-    });
-    if (hardwareImpact) {
-      result = { ...pipelineResult, hardwareImpact };
-    }
-  } catch (error) {
-    logger.warn("action.hardware_impact.unavailable", {
-      errorClass: error instanceof Error ? error.name || "Error" : "UnknownError",
-    });
-  }
+  const result = await attachHardwareImpact(pipelineResult, workspace, inputs.artifactName, logger);
   const written: { sarif?: string; json?: string; markdown?: string; hbom?: string } = {};
   if (inputs.outputs.json) {
     written.json = inputs.outputs.json;
@@ -108,6 +96,23 @@ export async function runAction(): Promise<void> {
 runAction().catch((error) => {
   core.setFailed(error instanceof Error ? error.message : "BoardReadyOps failed.");
 });
+
+async function attachHardwareImpact(
+  pipelineResult: RunResult,
+  workspace: string,
+  artifactName: string,
+  logger: Logger,
+): Promise<RunResult> {
+  try {
+    const hardwareImpact = await buildActionHardwareImpact(pipelineResult, { workspace, artifactName });
+    return hardwareImpact ? { ...pipelineResult, hardwareImpact } : pipelineResult;
+  } catch (error) {
+    logger.warn("action.hardware_impact.unavailable", {
+      errorClass: error instanceof Error ? error.name || "Error" : "UnknownError",
+    });
+    return pipelineResult;
+  }
+}
 
 async function ensureRunnerFile(file: string | undefined): Promise<void> {
   if (!file) {
