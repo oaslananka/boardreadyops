@@ -173,6 +173,26 @@ describe("runRunnerWorkerOnce", () => {
           missingRecommended: ["assembly-drawing"],
           warnings: ["Recommended output assembly-drawing is missing."],
         },
+        hardwareImpact: {
+          version: 1,
+          baseline: { status: "available", sha: "a".repeat(40) },
+          candidate: { sha: "b".repeat(40) },
+          facts: {
+            readiness: {
+              previousScore: 82,
+              currentScore: 84,
+              scoreDelta: 2,
+              previousStatus: "at-risk",
+              currentStatus: "at-risk",
+              statusChanged: false,
+            },
+            findings: { added: 0, resolved: 1, addedBlocking: 0, resolvedBlocking: 0 },
+            bom: { added: 0, removed: 0, changed: 0, truncated: false },
+            manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 0 },
+          },
+          assessment: { materialChange: true, riskDirection: "decreased", affectedDomains: ["readiness", "findings"] },
+          evidence: [],
+        },
         waivers: {
           active: [
             {
@@ -272,6 +292,10 @@ describe("runRunnerWorkerOnce", () => {
         findings: [{ ruleId: "design.review", severity: "medium", path: "board.kicad_pcb" }],
         readiness: { score: 84, status: "at-risk", blocking: 0, nonBlocking: 1 },
         waivers: { active: [expect.objectContaining({ rule: "design.review", matched: 1 })], expired: [] },
+        hardwareImpact: expect.objectContaining({
+          version: 1,
+          assessment: { materialChange: true, riskDirection: "decreased", affectedDomains: ["readiness", "findings"] },
+        }),
         metrics: expect.objectContaining({
           readiness_score: 84,
           artifact_mode_metadata_only: 0,

@@ -61,6 +61,8 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).toContain('Buffer.byteLength(JSON.stringify(payload), "utf8") > 900 * 1024');
     expect(workflow).toContain("findings_total:");
     expect(workflow).toContain('label: "GitHub Actions run"');
+    expect(workflow).toContain('report.hardwareImpact && typeof report.hardwareImpact === "object"');
+    expect(workflow).toContain("...(hardwareImpact ? { hardwareImpact } : {})");
     expect(workflow).toContain("for (let attempt = 1; attempt <= 3; attempt += 1)");
     expect(workflow).toContain("core.setFailed(policyFailed");
   });

@@ -215,6 +215,10 @@ jobs:
               Array.isArray(report.findings);
             const policyFailed = reportAvailable && report.summary.failed === true;
             const operationalFailure = !reportAvailable || (readinessOutcome !== "success" && !policyFailed);
+            const hardwareImpact =
+              reportAvailable && report.hardwareImpact && typeof report.hardwareImpact === "object"
+                ? report.hardwareImpact
+                : undefined;
             const rawFindings = reportAvailable ? report.findings : [];
             const severity = (value) => value === "critical" ? "error" :
               ["error", "high", "medium", "low", "info"].includes(value) ? value : "error";
@@ -257,6 +261,7 @@ jobs:
                 findings_info: finiteMetric(summary.info),
               },
               reportLinks,
+              ...(hardwareImpact ? { hardwareImpact } : {}),
             };
             while (Buffer.byteLength(JSON.stringify(payload), "utf8") > 900 * 1024 && findings.length > 0) {
               findings.pop();

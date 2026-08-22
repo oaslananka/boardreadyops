@@ -94,6 +94,100 @@ export const releaseRunWaiversSchema = z
   })
   .strict();
 
+export const hardwareImpactDomainSchema = z.enum(["readiness", "findings", "bom", "manufacturing"]);
+export const hardwareImpactRiskDirectionSchema = z.enum(["increased", "decreased", "unchanged", "unknown"]);
+export const hardwareImpactBaselineReasonSchema = z.enum([
+  "not-found",
+  "invalid-artifact",
+  "unsupported-result",
+  "candidate-mismatch",
+]);
+const hardwareImpactShaSchema = z.string().regex(/^[0-9a-f]{40}$/u);
+const hardwareImpactCountSchema = z.number().int().nonnegative().max(10_000);
+const hardwareImpactReadinessStatusSchema = z.enum(["ready", "at-risk", "blocked"]);
+const hardwareImpactEvidenceSeveritySchema = z.enum(["critical", "error", "high", "medium", "low", "info"]);
+
+const hardwareImpactAvailableBaselineSchema = z
+  .object({ status: z.literal("available"), sha: hardwareImpactShaSchema })
+  .strict();
+const hardwareImpactUnavailableBaselineSchema = z
+  .object({
+    status: z.literal("unavailable"),
+    sha: hardwareImpactShaSchema,
+    reason: hardwareImpactBaselineReasonSchema,
+  })
+  .strict();
+
+export const hardwareImpactEvidenceRefSchema = z
+  .object({
+    domain: hardwareImpactDomainSchema,
+    kind: z.enum(["finding", "bom-row", "output", "readiness"]),
+    label: z.string().trim().min(1).max(256),
+    path: z.string().trim().min(1).max(256).optional(),
+    ruleId: z.string().trim().min(1).max(256).optional(),
+    severity: hardwareImpactEvidenceSeveritySchema.optional(),
+  })
+  .strict();
+
+export const hardwareImpactV1Schema = z
+  .object({
+    version: z.literal(1),
+    baseline: z.discriminatedUnion("status", [
+      hardwareImpactAvailableBaselineSchema,
+      hardwareImpactUnavailableBaselineSchema,
+    ]),
+    candidate: z.object({ sha: hardwareImpactShaSchema }).strict(),
+    facts: z
+      .object({
+        readiness: z
+          .object({
+            previousScore: z.number().int().min(0).max(100).nullable(),
+            currentScore: z.number().int().min(0).max(100).nullable(),
+            scoreDelta: z.number().int().min(-100).max(100).nullable(),
+            previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
+            currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
+            statusChanged: z.boolean(),
+          })
+          .strict(),
+        findings: z
+          .object({
+            added: hardwareImpactCountSchema,
+            resolved: hardwareImpactCountSchema,
+            addedBlocking: hardwareImpactCountSchema,
+            resolvedBlocking: hardwareImpactCountSchema,
+          })
+          .strict(),
+        bom: z
+          .object({
+            added: hardwareImpactCountSchema,
+            removed: hardwareImpactCountSchema,
+            changed: hardwareImpactCountSchema,
+            truncated: z.boolean(),
+          })
+          .strict(),
+        manufacturing: z
+          .object({
+            outputsAdded: hardwareImpactCountSchema,
+            outputsRemoved: hardwareImpactCountSchema,
+            outputsChanged: hardwareImpactCountSchema,
+          })
+          .strict(),
+      })
+      .strict(),
+    assessment: z
+      .object({
+        materialChange: z.boolean(),
+        riskDirection: hardwareImpactRiskDirectionSchema,
+        affectedDomains: z
+          .array(hardwareImpactDomainSchema)
+          .max(4)
+          .refine((domains) => new Set(domains).size === domains.length, "affected domains must be unique"),
+      })
+      .strict(),
+    evidence: z.array(hardwareImpactEvidenceRefSchema).max(12),
+  })
+  .strict();
+
 function inferredConclusion(input: {
   status: z.infer<typeof releaseRunStatusSchema>;
   decision: z.infer<typeof releaseDecisionSchema> | null;
@@ -123,6 +217,7 @@ const releaseRunResultBaseSchema = z
     reportLinks: z.array(releaseRunReportLinkSchema).max(20).default([]),
     readiness: releaseRunReadinessSchema.optional(),
     waivers: releaseRunWaiversSchema.optional(),
+    hardwareImpact: hardwareImpactV1Schema.optional(),
   })
   .strict();
 

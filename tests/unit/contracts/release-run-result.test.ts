@@ -1,6 +1,42 @@
 import { describe, expect, it } from "vitest";
 import { releaseRunResultSchema } from "../../../packages/contracts/src/index.js";
 
+function validHardwareImpact() {
+  return {
+    version: 1,
+    baseline: { status: "available" as const, sha: "a".repeat(40) },
+    candidate: { sha: "b".repeat(40) },
+    facts: {
+      readiness: {
+        previousScore: 82,
+        currentScore: 71,
+        scoreDelta: -11,
+        previousStatus: "ready" as const,
+        currentStatus: "at-risk" as const,
+        statusChanged: true,
+      },
+      findings: { added: 2, resolved: 1, addedBlocking: 1, resolvedBlocking: 0 },
+      bom: { added: 1, removed: 0, changed: 2, truncated: false },
+      manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 1 },
+    },
+    assessment: {
+      materialChange: true,
+      riskDirection: "increased" as const,
+      affectedDomains: ["readiness", "findings", "bom", "manufacturing"] as const,
+    },
+    evidence: [
+      {
+        domain: "findings" as const,
+        kind: "finding" as const,
+        label: "Added finding: design.board-outline",
+        path: "board.kicad_pcb",
+        ruleId: "design.board-outline",
+        severity: "high",
+      },
+    ],
+  };
+}
+
 describe("release run result contract", () => {
   it("normalizes the rolling-upgrade payload into contract v1", () => {
     expect(
@@ -132,5 +168,87 @@ describe("release run result contract", () => {
         reportLinks: [{ label: "Report", url: "http://reports.example.test/report.html" }],
       }).success,
     ).toBe(false);
+  });
+
+  it("accepts bounded hardware impact while keeping old payloads valid", () => {
+    expect(
+      releaseRunResultSchema.parse({ status: "completed", decision: "pass", findings: [] }).hardwareImpact,
+    ).toBeUndefined();
+
+    const parsed = releaseRunResultSchema.parse({
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      hardwareImpact: validHardwareImpact(),
+    });
+    expect(parsed.hardwareImpact?.version).toBe(1);
+  });
+
+  it.each([
+    ["uppercase base SHA", { baseline: { status: "available", sha: "A".repeat(40) } }],
+    ["short candidate SHA", { candidate: { sha: "b".repeat(39) } }],
+    ["unknown risk direction", { assessment: { riskDirection: "safer" } }],
+    ["unknown domain", { assessment: { affectedDomains: ["firmware"] } }],
+    ["unknown evidence kind", { evidence: [{ domain: "findings", kind: "raw", label: "x" }] }],
+    ["unexpected nested key", { candidate: { sha: "b".repeat(40), extra: true } }],
+  ])("rejects malformed hardware impact: %s", (_label, patch) => {
+    const impact = validHardwareImpact() as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
+      impact[key] =
+        typeof value === "object" && value !== null && !Array.isArray(value)
+          ? { ...(impact[key] ?? {}), ...(value as Record<string, unknown>) }
+          : value;
+    }
+    expect(
+      releaseRunResultSchema.safeParse({ status: "completed", decision: "pass", findings: [], hardwareImpact: impact })
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects evidence and numeric values beyond the bounded hardware impact contract", () => {
+    const tooMuchEvidence = validHardwareImpact();
+    tooMuchEvidence.evidence = Array.from({ length: 13 }, (_, index) => ({
+      domain: "findings" as const,
+      kind: "finding" as const,
+      label: `finding-${index}`,
+      path: `board-${index}.kicad_pcb`,
+      ruleId: `rule.${index}`,
+      severity: "high",
+    }));
+    expect(
+      releaseRunResultSchema.safeParse({
+        status: "completed",
+        decision: "pass",
+        findings: [],
+        hardwareImpact: tooMuchEvidence,
+      }).success,
+    ).toBe(false);
+
+    for (const impact of [
+      { ...validHardwareImpact(), evidence: [{ domain: "findings", kind: "finding", label: "x".repeat(257) }] },
+      {
+        ...validHardwareImpact(),
+        facts: {
+          ...validHardwareImpact().facts,
+          readiness: { ...validHardwareImpact().facts.readiness, currentScore: 101 },
+        },
+      },
+      {
+        ...validHardwareImpact(),
+        facts: {
+          ...validHardwareImpact().facts,
+          findings: { ...validHardwareImpact().facts.findings, added: Number.POSITIVE_INFINITY },
+        },
+      },
+    ]) {
+      expect(
+        releaseRunResultSchema.safeParse({
+          status: "completed",
+          decision: "pass",
+          findings: [],
+          hardwareImpact: impact,
+        }).success,
+      ).toBe(false);
+    }
   });
 });

@@ -18,6 +18,42 @@ const dependencies: ResultRouteDependencies = {
 
 const executionAttemptId = "7559e99b-4998-4e02-a94a-7a7a4686ae11";
 
+function validHardwareImpact(riskDirection: "increased" | "decreased" | "unchanged" | "unknown" = "increased") {
+  return {
+    version: 1,
+    baseline: { status: "available" as const, sha: "a".repeat(40) },
+    candidate: { sha: "b".repeat(40) },
+    facts: {
+      readiness: {
+        previousScore: 82,
+        currentScore: 71,
+        scoreDelta: -11,
+        previousStatus: "ready" as const,
+        currentStatus: "at-risk" as const,
+        statusChanged: true,
+      },
+      findings: { added: 2, resolved: 1, addedBlocking: 1, resolvedBlocking: 0 },
+      bom: { added: 1, removed: 0, changed: 2, truncated: false },
+      manufacturing: { outputsAdded: 0, outputsRemoved: 0, outputsChanged: 1 },
+    },
+    assessment: {
+      materialChange: true,
+      riskDirection,
+      affectedDomains: ["readiness", "findings", "bom", "manufacturing"] as const,
+    },
+    evidence: [
+      {
+        domain: "findings" as const,
+        kind: "finding" as const,
+        label: "private explanatory label must not enter audit metadata",
+        path: "private/board.kicad_pcb",
+        ruleId: "design.board-outline",
+        severity: "high" as const,
+      },
+    ],
+  };
+}
+
 const originalEnvironment = {
   resultKey: process.env.BOARDREADYOPS_RUNNER_RESULT_KEY,
   requireSignature: process.env.BOARDREADYOPS_REQUIRE_RUNNER_SIGNATURE,
@@ -305,6 +341,31 @@ describe("readiness result route authentication and publication", () => {
     expect(secondParams[6]).toBe(firstParams[6]);
   });
 
+  it("changes terminal result identity when structured hardware impact changes", async () => {
+    const firstBody = JSON.stringify({
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      hardwareImpact: validHardwareImpact("increased"),
+    });
+    const secondBody = JSON.stringify({
+      status: "completed",
+      decision: "pass",
+      findings: [],
+      hardwareImpact: validHardwareImpact("unknown"),
+    });
+    query.mockResolvedValue({ rows: [] });
+
+    await handleResultRequest(resultRequest({ body: firstBody }), dependencies);
+    await handleResultRequest(resultRequest({ body: secondBody }), dependencies);
+
+    const firstParams = query.mock.calls[0]?.[1] as unknown[];
+    const secondParams = query.mock.calls[1]?.[1] as unknown[];
+    expect(firstParams[6]).toMatch(/^[0-9a-f]{64}$/u);
+    expect(secondParams[6]).toMatch(/^[0-9a-f]{64}$/u);
+    expect(secondParams[6]).not.toBe(firstParams[6]);
+  });
+
   it("persists the versioned result, findings, artifacts, and audit event in one atomic statement", async () => {
     const metrics = { durationMs: 1234, readinessScore: 72 };
     const reportLinks = [{ label: "HTML report", url: "https://reports.example.test/run-123/index.html" }];
@@ -319,6 +380,7 @@ describe("readiness result route authentication and publication", () => {
         contentType: "text/html",
       },
     ];
+    const hardwareImpact = validHardwareImpact();
     const body = JSON.stringify({
       version: 1,
       status: "completed",
@@ -340,6 +402,7 @@ describe("readiness result route authentication and publication", () => {
       artifacts,
       metrics,
       reportLinks,
+      hardwareImpact,
       readiness: {
         score: 72,
         status: "blocked",
@@ -451,6 +514,7 @@ describe("readiness result route authentication and publication", () => {
     expect(params[9]).toBe(JSON.stringify(metrics));
     expect(params[10]).toBe(JSON.stringify(reportLinks));
     expect(params[11]).toContain('"version":1');
+    expect(JSON.parse(String(params[11])).hardwareImpact).toEqual(hardwareImpact);
     expect(params[12]).toBe(params[6]);
     expect(params[13]).toBe(
       JSON.stringify([
@@ -472,6 +536,9 @@ describe("readiness result route authentication and publication", () => {
         githubCheckConclusion: "failure",
         readinessReported: true,
         waiversReported: true,
+        hardwareImpactReported: true,
+        hardwareImpactBaselineStatus: "available",
+        hardwareImpactRiskDirection: "increased",
         activeWaiverCount: 1,
         expiredWaiverCount: 1,
         staleWaiverCount: 1,
@@ -486,6 +553,9 @@ describe("readiness result route authentication and publication", () => {
     );
     expect(params[16]).not.toContain("hardware-team");
     expect(params[16]).not.toContain("prototype lot");
+    expect(params[16]).not.toContain("private explanatory label");
+    expect(params[16]).not.toContain("private/board.kicad_pcb");
+    expect(params[16]).not.toContain("design.board-outline");
     expect(params[17]).toBe("local");
     expect(sql).toContain(") || $17::jsonb");
 

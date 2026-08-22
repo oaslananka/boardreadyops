@@ -256,6 +256,7 @@ function normalizedResultForDigest(result: ReleaseRunResult): Record<string, unk
     normalized.metrics = Object.fromEntries(Object.entries(result.metrics).sort(([a], [b]) => a.localeCompare(b)));
   }
   if (result.reportLinks.length > 0) normalized.reportLinks = [...result.reportLinks].sort(byCanonicalJson);
+  if (result.hardwareImpact) normalized.hardwareImpact = result.hardwareImpact;
 
   return normalized;
 }
@@ -277,6 +278,13 @@ function releaseDecisionAuditMetadata(result: ReleaseRunResult, githubCheckConcl
     githubCheckConclusion,
     readinessReported: readiness !== undefined,
     waiversReported: result.waivers !== undefined,
+    hardwareImpactReported: result.hardwareImpact !== undefined,
+    ...(result.hardwareImpact
+      ? {
+          hardwareImpactBaselineStatus: result.hardwareImpact.baseline.status,
+          hardwareImpactRiskDirection: result.hardwareImpact.assessment.riskDirection,
+        }
+      : {}),
     activeWaiverCount: activeWaivers.length,
     expiredWaiverCount: expiredWaivers.length,
     staleWaiverCount: [...activeWaivers, ...expiredWaivers].filter((waiver) => waiver.stale).length,

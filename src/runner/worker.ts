@@ -56,6 +56,7 @@ type RunnerExecutionReport = {
   };
   readiness?: NonNullable<ReleaseRunResult["readiness"]>;
   waivers?: NonNullable<ReleaseRunResult["waivers"]>;
+  hardwareImpact?: NonNullable<ReleaseRunResult["hardwareImpact"]>;
   findings: Array<{
     ruleId: string;
     severity: "critical" | "high" | "medium" | "low" | "info";
@@ -476,6 +477,7 @@ function terminalResultFromExecution(
     },
     ...(execution.report?.readiness ? { readiness: execution.report.readiness } : {}),
     ...(execution.report?.waivers ? { waivers: execution.report.waivers } : {}),
+    ...(execution.report?.hardwareImpact ? { hardwareImpact: execution.report.hardwareImpact } : {}),
     reportLinks: [],
   });
 }
