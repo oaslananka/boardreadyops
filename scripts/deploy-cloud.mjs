@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { requiredEnvironmentValue as requiredEnv } from "./lib/environment.mjs";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageVersion = JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")).version;
@@ -43,14 +44,6 @@ function envFlag(env, name) {
 
 function envValue(env, name, fallback) {
   return env[name] ?? fallback;
-}
-
-function requiredEnv(env, name) {
-  const value = env[name];
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${name} is required`);
-  }
-  return value.trim();
 }
 
 function envInteger(env, name, fallback) {

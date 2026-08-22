@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
+import { boundedEnvironmentInteger as boundedInteger } from "./lib/environment.mjs";
 
 export const CONTROL_PLANE_LOAD_CONFIRMATION = "isolated-disposable-database";
 
@@ -22,20 +23,6 @@ const isolatedTables = Object.freeze([
   "control_plane_jobs",
   "control_plane_outbox",
 ]);
-
-function boundedInteger(environment, name, fallback, minimum, maximum) {
-  const raw = environment[name];
-  if (raw === undefined) return fallback;
-  const normalized = raw.trim();
-  if (!/^\d+$/u.test(normalized)) {
-    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
-  }
-  const value = Number(normalized);
-  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
-    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
-  }
-  return value;
-}
 
 export function parseControlPlaneLoadConfiguration(environment = process.env) {
   if (environment.BOARDREADYOPS_LOAD_CONFIRMATION !== CONTROL_PLANE_LOAD_CONFIRMATION) {
