@@ -3,7 +3,7 @@ import { metadata } from "../../../apps/web/app/layout.js";
 
 describe("root layout metadata", () => {
   it("sets metadataBase for absolute asset URLs", () => {
-    expect(metadata.metadataBase?.href).toBe("https://boardreadyops.com/");
+    expect(metadata.metadataBase?.toString()).toBe("https://boardreadyops.com/");
   });
 
   it("keeps the existing page title template", () => {
@@ -13,10 +13,10 @@ describe("root layout metadata", () => {
   it("sets Open Graph fields for social sharing", () => {
     expect(metadata.openGraph?.title).toBe("BoardReadyOps — Release evidence that leads to a decision.");
     expect(metadata.openGraph?.url).toBe("https://boardreadyops.com");
-    expect(metadata.openGraph?.type).toBe("website");
+    expect((metadata.openGraph as { type?: string })?.type).toBe("website");
   });
 
   it("sets a large-image Twitter card", () => {
-    expect(metadata.twitter?.card).toBe("summary_large_image");
+    expect((metadata.twitter as { card?: string })?.card).toBe("summary_large_image");
   });
 });
