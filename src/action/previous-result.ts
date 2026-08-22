@@ -329,7 +329,13 @@ async function artifactFiles(root: string): Promise<string[]> {
   return entries
     .filter((entry) => entry.isFile())
     .map((entry) => path.join(entry.parentPath, entry.name))
-    .sort((a, b) => a.localeCompare(b));
+    .sort(compareText);
+}
+
+function compareText(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function runId(value: string | undefined): number | undefined {

@@ -245,6 +245,18 @@ describe("buildHardwareImpact", () => {
     expect(impact.evidence[0]?.label).toContain("Readiness n/a → 73; n/a → at-risk");
   });
 
+  it("orders evidence with locale-independent code-unit semantics", () => {
+    const zFinding = finding("design.same-rule", "medium", "zeta", "z-board.kicad_pcb");
+    const umlautFinding = finding("design.same-rule", "medium", "älpha", "umlaut-board.kicad_pcb");
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run() },
+      candidate: { sha: headSha, result: run({ findings: [umlautFinding, zFinding] }) },
+    });
+
+    const labels = impact.evidence.filter((entry) => entry.kind === "finding").map((entry) => entry.label);
+    expect(labels).toEqual(["Added finding: design.same-rule — zeta", "Added finding: design.same-rule — älpha"]);
+  });
+
   it("uses evidence path ordering when otherwise identical finding labels are added", () => {
     const first = finding("design.same-rule", "medium", "Same message", "a-board.kicad_pcb");
     const second = finding("design.same-rule", "medium", "Same message", "b-board.kicad_pcb");

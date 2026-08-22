@@ -230,10 +230,17 @@ function compareEvidence(left: HardwareImpactEvidenceRef, right: HardwareImpactE
   return (
     (DOMAIN_RANK.get(left.domain) ?? 99) - (DOMAIN_RANK.get(right.domain) ?? 99) ||
     (KIND_RANK.get(left.kind) ?? 99) - (KIND_RANK.get(right.kind) ?? 99) ||
-    left.label.localeCompare(right.label) ||
-    (left.path ?? "").localeCompare(right.path ?? "") ||
-    (left.ruleId ?? "").localeCompare(right.ruleId ?? "")
+    compareText(left.label, right.label) ||
+    compareText(left.path ?? "", right.path ?? "") ||
+    compareText(left.ruleId ?? "", right.ruleId ?? "") ||
+    compareText(left.severity ?? "", right.severity ?? "")
   );
+}
+
+function compareText(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function bounded(value: string): string {

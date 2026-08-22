@@ -33,7 +33,7 @@ type MockRun = { id: number; head_sha: string; workflow_id: number; conclusion?:
 
 type ArtifactFixture =
   | { kind: "missing" }
-  | { kind: "named"; payload: unknown | string }
+  | { kind: "named"; payload: unknown | string; files?: Record<string, unknown | string> }
   | { kind: "wrong-name"; payload: unknown | string };
 
 function validComparisonReport() {
@@ -90,8 +90,12 @@ function configureExactLookup(runs: MockRun[], artifacts: Map<number, ArtifactFi
     if (!fixture || fixture.kind === "missing") throw new Error("missing artifact fixture");
     downloadPaths.push(options.path);
     await fs.mkdir(options.path, { recursive: true });
-    const content = typeof fixture.payload === "string" ? fixture.payload : JSON.stringify(fixture.payload);
-    await fs.writeFile(path.join(options.path, "boardreadyops.findings.json"), content, "utf8");
+    const files =
+      fixture.kind === "named" && fixture.files ? fixture.files : { "boardreadyops.findings.json": fixture.payload };
+    for (const [name, payload] of Object.entries(files)) {
+      const content = typeof payload === "string" ? payload : JSON.stringify(payload);
+      await fs.writeFile(path.join(options.path, name), content, "utf8");
+    }
     return { downloadPath: options.path };
   });
 
@@ -232,6 +236,30 @@ describe("exact-base action result", () => {
 
     await expect(loadExactBaseRunResult(lookupInput())).resolves.toMatchObject({ status: "available", runId: 305 });
     expect(exactLookupMocks.listArtifacts.mock.calls[0]?.[0]).toMatchObject({ findBy: { workflowRunId: 305 } });
+  });
+
+  it("selects a valid artifact file with locale-independent code-unit ordering", async () => {
+    const zReport = { ...validComparisonReport(), generatedAt: "2026-08-21T00:00:00.000Z" };
+    const umlautReport = { ...validComparisonReport(), generatedAt: "2026-08-22T00:00:00.000Z" };
+    configureExactLookup(
+      [{ id: 500, head_sha: baseSha, workflow_id: workflowId }],
+      new Map([
+        [
+          500,
+          {
+            kind: "named",
+            payload: zReport,
+            files: { "z-result.json": zReport, "ä-result.json": umlautReport },
+          },
+        ],
+      ]),
+    );
+
+    await expect(loadExactBaseRunResult(lookupInput())).resolves.toMatchObject({
+      status: "available",
+      runId: 500,
+      result: { generatedAt: "2026-08-21T00:00:00.000Z" },
+    });
   });
 
   it("returns candidate-mismatch before GitHub or artifact discovery", async () => {
