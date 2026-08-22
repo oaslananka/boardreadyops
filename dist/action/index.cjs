@@ -144547,7 +144547,12 @@ function isRecord(value) {
 }
 async function artifactFiles(root) {
   const entries = await import_promises18.default.readdir(root, { recursive: true, withFileTypes: true }).catch(() => []);
-  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path42.default.join(entry.parentPath, entry.name)).sort((a, b) => a.localeCompare(b));
+  return entries.filter((entry) => entry.isFile()).map((entry) => import_node_path42.default.join(entry.parentPath, entry.name)).sort(compareText);
+}
+function compareText(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 function runId(value) {
   if (!value) {
@@ -144844,7 +144849,12 @@ function findingEvidence(prefix2, finding2) {
   };
 }
 function compareEvidence(left, right) {
-  return (DOMAIN_RANK.get(left.domain) ?? 99) - (DOMAIN_RANK.get(right.domain) ?? 99) || (KIND_RANK.get(left.kind) ?? 99) - (KIND_RANK.get(right.kind) ?? 99) || left.label.localeCompare(right.label) || (left.path ?? "").localeCompare(right.path ?? "") || (left.ruleId ?? "").localeCompare(right.ruleId ?? "");
+  return (DOMAIN_RANK.get(left.domain) ?? 99) - (DOMAIN_RANK.get(right.domain) ?? 99) || (KIND_RANK.get(left.kind) ?? 99) - (KIND_RANK.get(right.kind) ?? 99) || compareText2(left.label, right.label) || compareText2(left.path ?? "", right.path ?? "") || compareText2(left.ruleId ?? "", right.ruleId ?? "") || compareText2(left.severity ?? "", right.severity ?? "");
+}
+function compareText2(left, right) {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 function bounded(value) {
   return value.slice(0, MAX_EVIDENCE_TEXT);
