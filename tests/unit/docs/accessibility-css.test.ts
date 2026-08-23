@@ -17,6 +17,18 @@ describe("documentation accessibility CSS", () => {
     expect(css).toContain("color: #f9fafb;");
   });
 
+  it("uses BoardReadyOps documentation brand variables without weakening scheme-scoped nav contrast", async () => {
+    const css = await readFile("docs/stylesheets/accessibility.css", "utf8");
+
+    expect(css).toContain("--bro-docs-bg:");
+    expect(css).toContain("--bro-docs-surface:");
+    expect(css).toContain("--bro-docs-accent:");
+    expect(css).toContain(".md-header");
+    expect(css).toContain(".md-tabs");
+    expect(css).toContain(".md-typeset code");
+    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
+  });
+
   it("keeps nested navigation labels from inheriting low-opacity theme colors", async () => {
     const css = await readFile("docs/stylesheets/accessibility.css", "utf8");
 
