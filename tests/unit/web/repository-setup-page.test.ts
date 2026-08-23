@@ -77,6 +77,13 @@ describe("repository setup preview page", () => {
     expect(markup).toContain('href="#readiness"');
   });
 
+  it("keeps the scrollable configuration preview natively keyboard focusable", async () => {
+    const markup = await render({ preset: "production" });
+    expect(markup).toContain('class="setup-code-preview"');
+    expect(markup).toContain('aria-labelledby="setup-config-preview-caption"');
+    expect(markup).toContain('readOnly=""');
+  });
+
   it("falls back safely and has no WCAG A/AA violations", async () => {
     const markup = await render({ preset: "not-a-preset" });
     expect(markup).toContain("Prototype fabrication");

@@ -142,10 +142,15 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                 <Definition label="Ignores">Rules explicitly set to false in the preview</Definition>
               </DefinitionGrid>
               <figure className="setup-code-figure">
-                <figcaption>{selected.name} boardreadyops.yml preview</figcaption>
-                <pre>
-                  <code>{selected.config}</code>
-                </pre>
+                <figcaption id="setup-config-preview-caption">{selected.name} boardreadyops.yml preview</figcaption>
+                <textarea
+                  className="setup-code-preview"
+                  aria-labelledby="setup-config-preview-caption"
+                  readOnly
+                  rows={Math.min(selected.config.split("\n").length, 28)}
+                  spellCheck={false}
+                  value={selected.config}
+                />
               </figure>
             </article>
             <article className="setup-file-preview">
