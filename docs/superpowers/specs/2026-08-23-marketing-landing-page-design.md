@@ -117,4 +117,3 @@ This is a static content route with no new business logic, so the existing unit/
 
 - Exact final copy for the "See an example PR" secondary CTA target (a real example PR/repo does not exist yet publicly) — needs a real link or should point to the docs walkthrough instead. Flag during implementation rather than block the design on it.
 - Whether the mark also replaces the current "BR" text mark in `AppShell` immediately, or only ships on the landing route for now and migrates to `AppShell` when `/setup`/`/runs` get their own design pass. Recommendation: ship it in `AppShell` too, since it's a strict improvement over "BR" and carries no visual-direction risk for those routes — but this is a small enough call that it can be made during implementation rather than requiring another approval round.
-
