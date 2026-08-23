@@ -33,6 +33,14 @@ async function snapshotFixture(name: string): Promise<Record<string, string>> {
 }
 
 describe("rule fixture isolation", () => {
+  it("honors a fixture's declared runRules when no explicit rule selection is provided", async () => {
+    const result = await runFixture("package-completeness-missing", { kicadCli: "nonexistent-cli" });
+
+    expect(result.findings.some((finding) => finding.ruleId === "manufacturing.package-completeness")).toBe(true);
+    expect(result.findings.some((finding) => finding.ruleId === "drc.kicad-cli-unavailable")).toBe(false);
+    expect(result.findings.some((finding) => finding.ruleId === "erc.kicad-cli-unavailable")).toBe(false);
+  });
+
   it("does not create or modify files in tracked package-completeness fixtures", async () => {
     const before = Object.fromEntries(
       await Promise.all(fixtureNames.map(async (name) => [name, await snapshotFixture(name)] as const)),
