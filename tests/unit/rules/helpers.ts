@@ -11,7 +11,10 @@ type RunPipelineInput = NonNullable<Parameters<typeof runPipeline>[0]>;
 
 export async function runFixture(fixture: string, options: Omit<RunPipelineInput, "path"> = {}): Promise<RunResult> {
   const temp = await copyFixture(fixture);
-  const outcome = await runPipeline({ ...options, path: temp, failOn: options.failOn ?? "never" }).then(
+  const fixtureRules = options.rules === undefined ? await readFixtureRunRules(fixture) : [];
+  const effectiveOptions =
+    options.rules === undefined && fixtureRules.length > 0 ? { ...options, rules: fixtureRules } : options;
+  const outcome = await runPipeline({ ...effectiveOptions, path: temp, failOn: options.failOn ?? "never" }).then(
     (value) => ({ ok: true as const, value }),
     (error: unknown) => ({ ok: false as const, error }),
   );
@@ -22,6 +25,14 @@ export async function runFixture(fixture: string, options: Omit<RunPipelineInput
   }
   if (!outcome.ok) throw outcome.error;
   return outcome.value;
+}
+
+async function readFixtureRunRules(fixture: string): Promise<string[]> {
+  const raw = await fs.readFile(path.join(fixtureRoot, fixture, "expected-findings.json"), "utf8");
+  const expected = JSON.parse(raw) as { runRules?: unknown };
+  return Array.isArray(expected.runRules)
+    ? expected.runRules.filter((ruleId): ruleId is string => typeof ruleId === "string")
+    : [];
 }
 
 export function expectRule(result: RunResult, ruleId: string, count?: number): Finding[] {
