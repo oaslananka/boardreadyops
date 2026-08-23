@@ -96,7 +96,7 @@ export default function HomePage() {
               </p>
               <div className="landing-cta-row">
                 <a className="landing-button-primary" href={installUrl}>
-                  Install on GitHub
+                  <span>Install on GitHub</span>
                   <span aria-hidden="true">↗</span>
                 </a>
                 <Link className="landing-button-secondary" href="/setup">
@@ -300,7 +300,7 @@ export default function HomePage() {
             </div>
             <div className="landing-cta-row">
               <a className="landing-button-primary" href={installUrl}>
-                Install on GitHub
+                <span>Install on GitHub</span>
                 <span aria-hidden="true">↗</span>
               </a>
               <Link className="landing-button-secondary" href="/setup">

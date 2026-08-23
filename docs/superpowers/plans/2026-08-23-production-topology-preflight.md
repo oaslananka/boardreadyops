@@ -158,7 +158,7 @@ records=()
 ready=true
 for service in "${services[@]}"; do
   expected_name="${project}-${service}-1"
-  id="$(/usr/bin/docker ps -a --filter "name=^/${expected_name}$" --format '{{.ID}}' | head -n 1)"
+  id="$(/usr/bin/docker ps -a --filter "name=^/${expected_name}$" --format '{{ .ID }}' | head -n 1)"
   if [[ -z "$id" ]]; then
     records+=("${service}|${expected_name}|missing|missing|false")
     ready=false
@@ -166,8 +166,8 @@ for service in "${services[@]}"; do
   fi
   compose_project="$(/usr/bin/docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$id" 2>/dev/null || true)"
   compose_service="$(/usr/bin/docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$id" 2>/dev/null || true)"
-  state="$(/usr/bin/docker inspect --format '{{.State.Status}}' "$id" 2>/dev/null || true)"
-  health="$(/usr/bin/docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id" 2>/dev/null || true)"
+  state="$(/usr/bin/docker inspect --format '{{ .State.Status }}' "$id" 2>/dev/null || true)"
+  health="$(/usr/bin/docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}none{{ end }}' "$id" 2>/dev/null || true)"
   owned=false
   [[ "$compose_project" = "$project" && "$compose_service" = "$service" ]] && owned=true
   [[ "$owned" = true ]] || ready=false
