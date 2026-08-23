@@ -223,6 +223,69 @@ describe("run dashboard environment loader", () => {
       expect(mocks.createQueryExecutor).not.toHaveBeenCalled();
     });
 
+    it("covers failure demo state without weakening the production guard", async () => {
+      const result = await loadRunDashboard("demo-fail", { NODE_ENV: "development" }, {}, dependencies);
+
+      expect(result).toMatchObject({
+        state: "found",
+        run: {
+          status: "failed",
+          decision: "fail",
+          readinessScore: 42,
+          conclusion: "failure",
+          investigationState: "failed",
+          metrics: expect.objectContaining({ criticalFindings: 1 }),
+          findings: expect.arrayContaining([
+            expect.objectContaining({ ruleId: "bom.missing-mpn", severity: "critical" }),
+          ]),
+          attempts: [
+            expect.objectContaining({
+              status: "failed",
+              failureClass: "HardVerificationFailure",
+              failureMessage: expect.stringContaining("missing manufacturer part number"),
+            }),
+          ],
+          transitions: expect.arrayContaining([
+            expect.objectContaining({ entityType: "release_run", toStatus: "failed", reasonCode: "terminal_failure" }),
+            expect.objectContaining({ entityType: "execution_attempt", toStatus: "failed" }),
+          ]),
+        },
+      });
+      expect(mocks.createQueryExecutor).not.toHaveBeenCalled();
+    });
+
+    it("applies demo finding severity and search filters", async () => {
+      const byRule = await loadRunDashboard(
+        "demo-pass",
+        { NODE_ENV: "development" },
+        { findingSearch: "bom.missing", findingSeverity: "HIGH" },
+        dependencies,
+      );
+      expect(byRule).toMatchObject({
+        state: "found",
+        run: { findings: [expect.objectContaining({ ruleId: "bom.missing-mpn", severity: "high" })] },
+      });
+
+      const byMessage = await loadRunDashboard(
+        "demo-pass",
+        { NODE_ENV: "development" },
+        { findingSearch: "capacitor", findingSeverity: "high" },
+        dependencies,
+      );
+      expect(byMessage).toMatchObject({
+        state: "found",
+        run: { findings: [expect.objectContaining({ ruleId: "bom.missing-mpn" })] },
+      });
+
+      const noMatch = await loadRunDashboard(
+        "demo-pass",
+        { NODE_ENV: "development" },
+        { findingSearch: "does-not-exist", findingSeverity: "medium" },
+        dependencies,
+      );
+      expect(noMatch).toMatchObject({ state: "found", run: { findings: [], findingsPage: { total: 0 } } });
+    });
+
     it("uses database executor when DATABASE_URL is configured, even for demo runId", async () => {
       mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);
       mocks.query.mockResolvedValueOnce({ rows: [] });

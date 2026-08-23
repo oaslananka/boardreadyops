@@ -50,10 +50,14 @@ export function CopyButton({ label, value }: CopyButtonProps) {
     }
   }
 
+  let buttonLabel = label;
+  if (status === "copied") buttonLabel = "Copied ✓";
+  else if (status === "failed") buttonLabel = "Copy failed";
+
   return (
     <span className="copy-control">
       <button className="button button-secondary button-compact" type="button" onClick={copy}>
-        {status === "copied" ? "Copied ✓" : status === "failed" ? "Copy failed" : label}
+        {buttonLabel}
       </button>
       <span className="sr-only" aria-live="polite">
         {copyStatusMessage(status)}
