@@ -17,8 +17,8 @@ export default function HomePage() {
           BoardReadyOps
         </Link>
         <nav aria-label="Global navigation" className="landing-nav-links">
-          <span>Product</span>
-          <span>How it works</span>
+          <a href="#product">Product</a>
+          <a href="#how-it-works">How it works</a>
           <a href="https://docs.boardreadyops.com">Docs</a>
           <a className="landing-nav-cta" href={installUrl}>
             Install on GitHub
@@ -65,7 +65,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="landing-how" aria-label="How it works">
+        <section className="landing-how" id="how-it-works" aria-label="How it works">
           <p className="landing-how-label">How it works</p>
           <div className="landing-how-grid">
             <div>
@@ -86,7 +86,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="landing-features" aria-label="Investigation capabilities">
+        <section className="landing-features" id="product" aria-label="Investigation capabilities">
           <article className="landing-feature-card">
             <h3>Decision first</h3>
             <p>See the stable readiness result and the shortest next action before opening low-level evidence.</p>
