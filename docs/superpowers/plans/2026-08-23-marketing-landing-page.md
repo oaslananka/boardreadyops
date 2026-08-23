@@ -16,7 +16,7 @@
 - New styles live in a stylesheet scoped to the landing route, not appended to `apps/web/app/styles.css` (spec §6.2).
 - No new web font — system font stack only (spec §4.4).
 - Primary CTA target: `https://github.com/apps/boardreadyops/installations/new` (GitHub App install URL) everywhere "Install on GitHub" appears.
-- Palette tokens are exact, copied from spec §4.2: background `#0a0f0d`, surface `#0f1713`, border `#1e2e26`, accent `#3fe08a`, accent-soft `#9fc9ae`, fg `#f4fff8`, muted `#5a7a68`.
+- Palette tokens are exact, copied from spec §4.2: background `#0a0f0d`, surface `#0f1713`, border `#1e2e26`, accent `#3fe08a`, accent-soft `#9fc9ae`, fg `#f4fff8`, muted `#6e8a78`.
 - Copy ships in English (spec §5).
 
 ---
@@ -350,7 +350,7 @@ Create `apps/web/app/landing.css`:
 
 .landing-trust-line {
   font-size: 12px;
-  color: #5a7a68;
+  color: #6e8a78;
   margin-top: 16px;
 }
 
@@ -406,7 +406,7 @@ Create `apps/web/app/landing.css`:
 }
 
 .landing-pr-preview-link {
-  color: #5a7a68;
+  color: #6e8a78;
   padding-left: 18px;
 }
 
@@ -420,7 +420,7 @@ Create `apps/web/app/landing.css`:
   text-align: center;
   font-size: 12px;
   letter-spacing: 0.1em;
-  color: #5a7a68;
+  color: #6e8a78;
   text-transform: uppercase;
   margin-bottom: 36px;
 }
@@ -495,7 +495,7 @@ Create `apps/web/app/landing.css`:
   padding: 32px 40px;
   text-align: center;
   font-size: 12px;
-  color: #5a7a68;
+  color: #6e8a78;
   border-top: 1px solid #1a2620;
 }
 
@@ -544,8 +544,8 @@ export default function HomePage() {
           BoardReadyOps
         </Link>
         <nav aria-label="Global navigation" className="landing-nav-links">
-          <span>Product</span>
-          <span>How it works</span>
+          <a href="#product">Product</a>
+          <a href="#how-it-works">How it works</a>
           <a href="https://docs.boardreadyops.com">Docs</a>
           <a className="landing-nav-cta" href={installUrl}>
             Install on GitHub
@@ -592,7 +592,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="landing-how" aria-label="How it works">
+        <section className="landing-how" id="how-it-works" aria-label="How it works">
           <p className="landing-how-label">How it works</p>
           <div className="landing-how-grid">
             <div>
@@ -613,7 +613,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="landing-features" aria-label="Investigation capabilities">
+        <section className="landing-features" id="product" aria-label="Investigation capabilities">
           <article className="landing-feature-card">
             <h3>Decision first</h3>
             <p>See the stable readiness result and the shortest next action before opening low-level evidence.</p>
