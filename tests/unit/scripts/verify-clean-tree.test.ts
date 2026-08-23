@@ -61,7 +61,7 @@ describe("verify-clean-tree", () => {
     expect(result.stderr).toContain("generated artifact is tracked: coverage");
   });
 
-  it("ignores hostile global Git configuration", async () => {
+  it("ignores hostile global and XDG Git configuration", async () => {
     const environment = await createHostileGitEnvironment();
     for (const scope of ["--global", "--system"]) {
       const config = spawnSync("git", ["config", scope, "--list"], { encoding: "utf8", env: environment });
@@ -167,7 +167,9 @@ async function createHostileGitEnvironment() {
   const excludesFile = path.join(home, "global-ignore");
   const hooksPath = path.join(home, "global-hooks");
   await mkdir(hooksPath, { recursive: true });
+  await mkdir(path.join(home, ".config", "git"), { recursive: true });
   await writeFile(excludesFile, "coverage/\n");
+  await writeFile(path.join(home, ".config", "git", "ignore"), "coverage/\n");
   await writeFile(
     path.join(home, ".gitconfig"),
     `[core]\n  excludesFile = ${gitConfigPath(excludesFile)}\n  hooksPath = ${gitConfigPath(hooksPath)}\n[commit]\n  gpgSign = true\n[alias]\n  environment = config --list\n`,

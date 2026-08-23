@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BrandMarkLockup } from "./brand-mark.js";
 
 export type StatusTone = "danger" | "info" | "neutral" | "success" | "warning";
 
@@ -98,16 +99,11 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
       </a>
       <header className="site-header">
         <div className="site-header-inner">
-          <Link className="brand" href="/">
-            <span className="brand-mark" aria-hidden="true">
-              BR
-            </span>
-            <span>
-              <strong>BoardReadyOps</strong>
-              <small>Release investigation</small>
-            </span>
+          <Link className="brand" href="/" aria-label="BoardReadyOps home">
+            <BrandMarkLockup size={24} className="brand-lockup" />
           </Link>
-          <nav aria-label="Global navigation">
+          <nav className="site-navigation" aria-label="Global navigation">
+            <Link href="/setup">Repository setup</Link>
             <a href="https://docs.boardreadyops.com">Documentation</a>
           </nav>
         </div>

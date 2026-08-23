@@ -41,9 +41,9 @@ export function BrandMarkIcon({ size = 32, className }: BrandMarkProps) {
 
 export function BrandMarkLockup({ size = 24, className }: BrandMarkProps) {
   return (
-    <span className={className} style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+    <span className={className ?? "brand-lockup"}>
       <BrandMarkIcon size={size} />
-      <span style={{ fontWeight: 700, fontSize: Math.round(size * 0.62), color: "#f4fff8" }}>BoardReadyOps</span>
+      <span className="brand-mark-wordmark">BoardReadyOps</span>
     </span>
   );
 }

@@ -172,6 +172,24 @@ describe("run investigation accessibility", () => {
     expect(artifacts).toContain("Open repository-owned GitHub Actions artifacts");
   });
 
+  it("puts decision and evidence identity ahead of secondary metadata", () => {
+    const markup = viewMarkup("summary");
+    expect(markup).toContain("Evidence control room");
+    expect(markup).toContain("Release decision");
+    expect(markup).toContain("Readiness score");
+    expect(markup).toContain("Authoritative GitHub sources");
+  });
+
+  it("preserves bounded evidence controls while changing presentation", () => {
+    const findings = viewMarkup("findings");
+    const artifacts = viewMarkup("artifacts");
+    expect(findings).toContain('name="findingSearch"');
+    expect(findings).toContain('name="findingSeverity"');
+    expect(findings).toContain('name="findingGroup"');
+    expect(artifacts).toContain('name="artifactSearch"');
+    expect(artifacts).toContain("Download signed copy");
+  });
+
   it("renders stable investigation flow snapshots", () => {
     expect({
       summary: viewMarkup("summary"),

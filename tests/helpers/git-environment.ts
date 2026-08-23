@@ -8,6 +8,7 @@ export function isolatedGitEnvironment(overrides: NodeJS.ProcessEnv = {}): NodeJ
     if (name.startsWith("GIT_")) delete environment[name];
   }
   const nullDevice = gitConfigNullDevice();
+  environment.XDG_CONFIG_HOME = nullDevice;
   environment.GIT_CONFIG_GLOBAL = nullDevice;
   environment.GIT_CONFIG_SYSTEM = nullDevice;
   environment.GIT_CONFIG_NOSYSTEM = "1";
