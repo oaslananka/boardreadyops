@@ -180,6 +180,16 @@ describe("run investigation accessibility", () => {
     expect(markup).toContain("Authoritative GitHub sources");
   });
 
+  it("preserves bounded evidence controls while changing presentation", () => {
+    const findings = viewMarkup("findings");
+    const artifacts = viewMarkup("artifacts");
+    expect(findings).toContain('name="findingSearch"');
+    expect(findings).toContain('name="findingSeverity"');
+    expect(findings).toContain('name="findingGroup"');
+    expect(artifacts).toContain('name="artifactSearch"');
+    expect(artifacts).toContain("Download signed copy");
+  });
+
   it("renders stable investigation flow snapshots", () => {
     expect({
       summary: viewMarkup("summary"),

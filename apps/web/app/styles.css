@@ -737,7 +737,7 @@ code {
   display: grid;
   padding: 0 0 0 1.15rem;
   margin: 0;
-  gap: var(--space-5);
+  gap: var(--space-4);
   list-style: none;
 }
 
@@ -747,7 +747,7 @@ code {
   bottom: 0.7rem;
   left: 0.35rem;
   width: 1px;
-  background: var(--border-strong);
+  background: linear-gradient(var(--bro-border-strong), color-mix(in srgb, var(--bro-border) 45%, transparent));
   content: "";
 }
 
@@ -761,16 +761,20 @@ code {
   left: -1.15rem;
   width: 0.7rem;
   height: 0.7rem;
-  border: 2px solid var(--accent);
+  border: 2px solid var(--bro-accent);
   border-radius: 50%;
-  background: var(--background-elevated);
+  background: var(--bro-bg-elevated);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--bro-accent) 7%, transparent);
 }
 
 .timeline article {
   padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-lg);
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--bro-accent) 3%, transparent), transparent 52%),
+    var(--bro-bg-elevated);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bro-text) 3%, transparent);
 }
 
 .timeline article > header {
@@ -796,9 +800,10 @@ code {
 
 .transition-list li {
   padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-md);
+  background: var(--bro-bg-elevated);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--bro-accent) 55%, transparent);
 }
 
 .transition-list p {
@@ -815,9 +820,12 @@ code {
   display: grid;
   align-items: end;
   padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-lg);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--bro-accent) 4%, transparent), transparent 52%),
+    var(--bro-bg-elevated);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bro-text) 3%, transparent);
   gap: var(--space-3);
   grid-template-columns: minmax(14rem, 2fr) repeat(3, minmax(10rem, 1fr));
 }
@@ -839,9 +847,19 @@ code {
   width: 100%;
   min-height: 2.65rem;
   padding: 0.55rem 0.7rem;
-  border: 1px solid var(--border-strong);
-  background: var(--background);
-  color: var(--text);
+  border: 1px solid var(--bro-border-strong);
+  border-radius: var(--bro-radius-sm);
+  background: var(--bro-surface-sunken);
+  color: var(--bro-text);
+  transition:
+    border-color var(--bro-motion-fast) var(--bro-ease),
+    box-shadow var(--bro-motion-fast) var(--bro-ease);
+}
+
+.filter-bar input:focus,
+.filter-bar select:focus {
+  border-color: var(--bro-border-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--bro-accent) 9%, transparent);
 }
 
 .filter-bar input::placeholder {
@@ -857,9 +875,15 @@ code {
 }
 
 .result-count {
+  width: fit-content;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--bro-border);
+  border-radius: 999px;
   margin: var(--space-4) 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  background: var(--bro-bg-elevated);
+  color: var(--bro-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
 }
 
 .finding-list {
@@ -869,9 +893,12 @@ code {
 
 .finding-list > li {
   padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-lg);
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--bro-accent) 3%, transparent), transparent 45%),
+    var(--bro-bg-elevated);
+  box-shadow: inset 3px 0 0 var(--bro-border-strong);
 }
 
 .finding-list header > div {
@@ -918,15 +945,17 @@ code {
 .table-scroll {
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-lg);
+  background: var(--bro-bg-elevated);
+  box-shadow: var(--bro-shadow-soft);
 }
 
 .artifact-table {
   width: 100%;
   min-width: 62rem;
   border-collapse: collapse;
-  background: var(--surface-muted);
+  background: var(--bro-bg-elevated);
 }
 
 .artifact-table th,
@@ -938,8 +967,8 @@ code {
 }
 
 .artifact-table thead th {
-  background: var(--surface-strong);
-  color: var(--text-subtle);
+  background: var(--bro-surface-strong);
+  color: var(--bro-text-subtle);
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -986,9 +1015,9 @@ code {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-md);
+  background: var(--bro-bg-elevated);
   gap: var(--space-4);
 }
 
@@ -1823,4 +1852,22 @@ code {
     display: grid;
     grid-template-columns: 1fr;
   }
+}
+
+/* Dense evidence sub-surfaces */
+#publication,
+#metrics,
+#reports,
+#audit,
+#audit-boundary {
+  border-color: var(--bro-border);
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--bro-accent) 3%, transparent), transparent 42%),
+    var(--bro-bg-elevated);
+}
+
+#publication .definition-grid > div,
+#metrics .definition-grid > div,
+#audit .definition-grid > div {
+  background: var(--bro-surface-sunken);
 }
