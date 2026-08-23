@@ -53797,7 +53797,8 @@ var findingSchema = external_exports.object({
   ruleId: external_exports.string().min(1).max(256),
   severity: findingSeveritySchema,
   message: external_exports.string().min(1).max(4e3),
-  path: external_exports.string().min(1).max(1024).optional()
+  path: external_exports.string().min(1).max(1024).optional(),
+  project: external_exports.string().trim().min(1).max(1024).optional()
 });
 var artifactStoragePathSchema = external_exports.string().min(1).max(1024).refine(
   (value) => !value.includes("\0") && !value.startsWith("/") && !value.startsWith("\\") && !/^[A-Za-z]:[\\/]/u.test(value) && !value.split(/[\\/]/u).includes(".."),
@@ -53812,6 +53813,21 @@ var releaseRunArtifactSchema = external_exports.object({
   role: external_exports.string().trim().min(1).max(128),
   contentType: artifactContentTypeSchema.optional()
 });
+var releaseRunBomComponentSchema = external_exports.object({
+  reference: external_exports.string().trim().min(1).max(64),
+  mpn: external_exports.string().trim().min(1).max(128).optional(),
+  manufacturer: external_exports.string().trim().min(1).max(128).optional(),
+  value: external_exports.string().trim().min(1).max(256).optional(),
+  footprint: external_exports.string().trim().min(1).max(256).optional(),
+  quantity: external_exports.number().int().positive().max(1e6).optional(),
+  dnp: external_exports.boolean().optional(),
+  lifecycle: external_exports.string().trim().min(1).max(64).optional(),
+  identityKey: external_exports.string().regex(/^[0-9a-f]{16}$/u).optional()
+}).strict();
+var releaseRunBoardBomSchema = external_exports.object({
+  project: external_exports.string().trim().min(1).max(1024),
+  components: external_exports.array(releaseRunBomComponentSchema).max(5e3)
+}).strict();
 var releaseRunReportLinkSchema = external_exports.object({
   label: external_exports.string().trim().min(1).max(160),
   url: external_exports.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "report link must use HTTPS")
@@ -53932,7 +53948,10 @@ var releaseRunResultBaseSchema = external_exports.object({
   reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([]),
   readiness: releaseRunReadinessSchema.optional(),
   waivers: releaseRunWaiversSchema.optional(),
-  hardwareImpact: hardwareImpactV1Schema.optional()
+  hardwareImpact: hardwareImpactV1Schema.optional(),
+  // Optional with no default: a default would materialise the key on every legacy
+  // payload and change its terminal-result digest, breaking replay detection.
+  boms: external_exports.array(releaseRunBoardBomSchema).max(50).optional()
 }).strict();
 var releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context) => {
   const expected = inferredConclusion(value);
