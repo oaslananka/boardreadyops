@@ -2,7 +2,7 @@
 # maintainer explicitly applies the `queue-me` label; automation must never add
 # that label. Repository rulesets remain the authoritative merge gate.
 merge_queue:
-  mode: parallel
+  mode: serial
   max_parallel_checks: 1
   status_comments: outcomes
   reset_on_external_merge: always

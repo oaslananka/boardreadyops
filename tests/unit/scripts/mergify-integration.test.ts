@@ -43,7 +43,9 @@ describe("Mergify integration contract", () => {
     expect(mergify).not.toContain("check-success = ci / security");
   });
 
-  it("uses identical single-step queue and merge conditions with the strict required-check ruleset", () => {
+  it("uses serial in-place queue checks with the strict required-check ruleset", () => {
+    expect(mergify).toContain("mode: serial");
+    expect(mergify).not.toContain("mode: parallel");
     expect(mergify).toContain("max_parallel_checks: 1");
     expect(mergify).toContain("batch_size: 1");
     expect(mergify).toContain("checks_timeout: null");
