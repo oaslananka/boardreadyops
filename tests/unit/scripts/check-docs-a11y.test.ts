@@ -8,8 +8,10 @@ import {
   filterPa11yIssues,
   formatPa11yFailures,
   pa11yOptions,
+  pageUrlForFile,
   readToolchainChromePath,
   runPa11yPageWithRetry,
+  sitePathPrefixFromUrl,
 } from "../../../scripts/check-docs-a11y.mjs";
 
 describe("check-docs-a11y", () => {
@@ -25,6 +27,19 @@ describe("check-docs-a11y", () => {
       path.join(siteDir, "index.html"),
       path.join(siteDir, "reports", "html", "index.html"),
     ]);
+  });
+
+  it("serves generated pages under the canonical site URL path", () => {
+    const siteDir = path.join("tmp", "site");
+    const home = path.join(siteDir, "index.html");
+    const notFound = path.join(siteDir, "404.html");
+
+    expect(sitePathPrefixFromUrl("https://docs.boardreadyops.com/")).toBe("/");
+    expect(sitePathPrefixFromUrl("https://oaslananka.github.io/boardreadyops/")).toBe("/boardreadyops/");
+    expect(pageUrlForFile("http://127.0.0.1:4321", siteDir, home, "/")).toBe("http://127.0.0.1:4321/index.html");
+    expect(pageUrlForFile("http://127.0.0.1:4321", siteDir, notFound, "/boardreadyops/")).toBe(
+      "http://127.0.0.1:4321/boardreadyops/404.html",
+    );
   });
 
   it("formats pa11y failures with page-relative selectors", () => {

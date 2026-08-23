@@ -23,6 +23,14 @@ describe("documentation accessibility regressions", () => {
     expect(css).toContain(".md-header .md-source__fact");
   });
 
+  it("keeps the BoardReadyOps docs dark-scheme brand colors above WCAG AA contrast", () => {
+    expect(contrastRatio("#f4fff8", "#070d0a")).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("#5cf5a0", "#070d0a")).toBeGreaterThanOrEqual(4.5);
+    expect(css).toContain("--md-default-bg-color: var(--bro-docs-bg)");
+    expect(css).toContain("--md-default-fg-color: var(--bro-docs-text)");
+    expect(css).toContain("--md-accent-fg-color: var(--bro-docs-accent)");
+  });
+
   it("documents the hosted investigation accessibility and bounded-data contract", () => {
     expect(accessibilityDocumentation).toContain("hosted Next.js run investigation");
     expect(accessibilityDocumentation).toContain("Status and severity always include a visible text label and an icon");

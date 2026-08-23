@@ -112,7 +112,8 @@ export async function main(root = process.cwd()) {
       },
     );
     const pages = await collectHtmlFiles(siteDir);
-    const server = await startStaticServer(siteDir);
+    const sitePathPrefix = await readSitePathPrefix(root);
+    const server = await startStaticServer(siteDir, sitePathPrefix);
     const { default: pa11y } = await import("pa11y");
     const { default: puppeteer } = await import("puppeteer");
     const failures = [];
@@ -124,7 +125,7 @@ export async function main(root = process.cwd()) {
         process.stderr.write(`pa11y ${index + 1}/${pages.length}: ${relativePage}\n`);
         const issues = await runPa11yPageWithRetry(
           pa11y,
-          pageUrlForFile(server.origin, siteDir, page),
+          pageUrlForFile(server.origin, siteDir, page, sitePathPrefix),
           browser,
           PA11Y_PAGE_ATTEMPTS,
           async () => {
@@ -149,9 +150,23 @@ export async function main(root = process.cwd()) {
   }
 }
 
-export function pageUrlForFile(origin, siteDir, file) {
+export function sitePathPrefixFromUrl(siteUrl) {
+  const pathname = new URL(siteUrl).pathname || "/";
+  return pathname.endsWith("/") ? pathname : `${pathname}/`;
+}
+
+async function readSitePathPrefix(root) {
+  const config = await readFile(path.join(root, "mkdocs.yml"), "utf8");
+  const siteUrl = /^site_url:\s*(\S+)\s*$/mu.exec(config)?.[1];
+  if (!siteUrl) {
+    throw new Error("mkdocs.yml must define site_url for accessibility routing");
+  }
+  return sitePathPrefixFromUrl(siteUrl);
+}
+
+export function pageUrlForFile(origin, siteDir, file, sitePathPrefix = "/boardreadyops/") {
   const relativePage = path.relative(siteDir, file).split(path.sep).map(encodeURIComponent).join("/");
-  return `${origin}/boardreadyops/${relativePage}`;
+  return `${origin}${sitePathPrefix}${relativePage}`;
 }
 
 export async function createChromeLaunchConfig(root = process.cwd()) {
@@ -206,11 +221,11 @@ export async function readToolchainChromePath(root = process.cwd()) {
   }
 }
 
-async function startStaticServer(siteDir) {
+async function startStaticServer(siteDir, sitePathPrefix) {
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
-      const file = await resolveRequestPath(siteDir, url.pathname);
+      const file = await resolveRequestPath(siteDir, url.pathname, sitePathPrefix);
       if (!file) {
         response.writeHead(404);
         response.end("Not found");
@@ -240,12 +255,11 @@ async function startStaticServer(siteDir) {
   };
 }
 
-async function resolveRequestPath(siteDir, pathname) {
-  const base = "/boardreadyops/";
-  if (!pathname.startsWith(base)) {
+async function resolveRequestPath(siteDir, pathname, sitePathPrefix) {
+  if (!pathname.startsWith(sitePathPrefix)) {
     return undefined;
   }
-  const relative = decodeURIComponent(pathname.slice(base.length)) || "index.html";
+  const relative = decodeURIComponent(pathname.slice(sitePathPrefix.length)) || "index.html";
   const candidate = path.resolve(siteDir, relative);
   const root = path.resolve(siteDir);
   if (candidate !== root && !candidate.startsWith(`${root}${path.sep}`)) {
