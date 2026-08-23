@@ -22,6 +22,7 @@ export const findingSchema = z.object({
   severity: findingSeveritySchema,
   message: z.string().min(1).max(4000),
   path: z.string().min(1).max(1024).optional(),
+  project: z.string().trim().min(1).max(1024).optional(),
 });
 
 const artifactStoragePathSchema = z
@@ -47,6 +48,30 @@ export const releaseRunArtifactSchema = z.object({
   role: z.string().trim().min(1).max(128),
   contentType: artifactContentTypeSchema.optional(),
 });
+
+export const releaseRunBomComponentSchema = z
+  .object({
+    reference: z.string().trim().min(1).max(64),
+    mpn: z.string().trim().min(1).max(128).optional(),
+    manufacturer: z.string().trim().min(1).max(128).optional(),
+    value: z.string().trim().min(1).max(256).optional(),
+    footprint: z.string().trim().min(1).max(256).optional(),
+    quantity: z.number().int().positive().max(1_000_000).optional(),
+    dnp: z.boolean().optional(),
+    lifecycle: z.string().trim().min(1).max(64).optional(),
+    identityKey: z
+      .string()
+      .regex(/^[0-9a-f]{16}$/u)
+      .optional(),
+  })
+  .strict();
+
+export const releaseRunBoardBomSchema = z
+  .object({
+    project: z.string().trim().min(1).max(1024),
+    components: z.array(releaseRunBomComponentSchema).max(5000),
+  })
+  .strict();
 
 export const releaseRunReportLinkSchema = z.object({
   label: z.string().trim().min(1).max(160),
@@ -218,6 +243,9 @@ const releaseRunResultBaseSchema = z
     readiness: releaseRunReadinessSchema.optional(),
     waivers: releaseRunWaiversSchema.optional(),
     hardwareImpact: hardwareImpactV1Schema.optional(),
+    // Optional with no default: a default would materialise the key on every legacy
+    // payload and change its terminal-result digest, breaking replay detection.
+    boms: z.array(releaseRunBoardBomSchema).max(50).optional(),
   })
   .strict();
 
@@ -253,5 +281,7 @@ export const runnerTerminalResultRequestSchema = runnerLeaseContextSchema
   });
 
 export type CreateReleaseRunRequest = z.infer<typeof createReleaseRunRequestSchema>;
+export type ReleaseRunBomComponent = z.infer<typeof releaseRunBomComponentSchema>;
+export type ReleaseRunBoardBom = z.infer<typeof releaseRunBoardBomSchema>;
 export type ReleaseRunResult = z.infer<typeof releaseRunResultSchema>;
 export type RunnerTerminalResultRequest = z.infer<typeof runnerTerminalResultRequestSchema>;

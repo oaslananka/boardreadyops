@@ -252,3 +252,66 @@ describe("release run result contract", () => {
     }
   });
 });
+
+describe("board attribution and BOM rows", () => {
+  const base = {
+    version: 1 as const,
+    status: "completed" as const,
+    decision: "pass" as const,
+    findings: [],
+    artifacts: [],
+    metrics: {},
+    reportLinks: [],
+  };
+
+  it("accepts a payload with no board attribution and leaves the fields absent", () => {
+    const parsed = releaseRunResultSchema.parse(base);
+    expect(parsed).not.toHaveProperty("boms");
+  });
+
+  it("accepts per-board BOM rows and finding project attribution", () => {
+    const parsed = releaseRunResultSchema.parse({
+      ...base,
+      findings: [
+        {
+          ruleId: "bom.lifecycle",
+          severity: "medium",
+          message: "U1 lifecycle status is nrnd.",
+          path: "hardware/mainboard/mainboard.kicad_pcb",
+          project: "hardware/mainboard/mainboard.kicad_pro",
+        },
+      ],
+      boms: [
+        {
+          project: "hardware/mainboard/mainboard.kicad_pro",
+          components: [
+            { reference: "U1", mpn: "STM32F103C8T6", manufacturer: "ST", quantity: 1, dnp: false },
+            { reference: "R1", value: "10k", quantity: 4 },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed.findings[0]?.project).toBe("hardware/mainboard/mainboard.kicad_pro");
+    expect(parsed.boms?.[0]?.components).toHaveLength(2);
+    expect(parsed.boms?.[0]?.components[0]?.mpn).toBe("STM32F103C8T6");
+  });
+
+  it("rejects a BOM entry with no project attribution", () => {
+    expect(() =>
+      releaseRunResultSchema.parse({
+        ...base,
+        boms: [{ components: [{ reference: "U1" }] }],
+      }),
+    ).toThrow();
+  });
+
+  it("rejects a component with no reference", () => {
+    expect(() =>
+      releaseRunResultSchema.parse({
+        ...base,
+        boms: [{ project: "board.kicad_pro", components: [{ mpn: "STM32F103C8T6" }] }],
+      }),
+    ).toThrow();
+  });
+});
