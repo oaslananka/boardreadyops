@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type CopyButtonProps = Readonly<{
   label: string;
@@ -15,23 +15,45 @@ function copyStatusMessage(status: "copied" | "failed" | "idle"): string {
 
 export function CopyButton({ label, value }: CopyButtonProps) {
   const [status, setStatus] = useState<"copied" | "failed" | "idle">("idle");
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   async function copy(): Promise<void> {
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
     try {
       const clipboard = (globalThis.navigator as unknown as { clipboard?: { writeText(input: string): Promise<void> } })
         .clipboard;
       if (!clipboard) throw new Error("clipboard unavailable");
       await clipboard.writeText(value);
       setStatus("copied");
+      timeoutRef.current = setTimeout(() => {
+        setStatus("idle");
+        timeoutRef.current = null;
+      }, 2000);
     } catch {
       setStatus("failed");
+      timeoutRef.current = setTimeout(() => {
+        setStatus("idle");
+        timeoutRef.current = null;
+      }, 2500);
     }
   }
 
   return (
     <span className="copy-control">
       <button className="button button-secondary button-compact" type="button" onClick={copy}>
-        {label}
+        {status === "copied" ? "Copied ✓" : status === "failed" ? "Copy failed" : label}
       </button>
       <span className="sr-only" aria-live="polite">
         {copyStatusMessage(status)}

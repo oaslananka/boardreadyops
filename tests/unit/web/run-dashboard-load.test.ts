@@ -191,4 +191,55 @@ describe("run dashboard environment loader", () => {
     });
     expect(mocks.close).toHaveBeenCalledOnce();
   });
+
+  describe("demo fixture environment guard", () => {
+    it("returns demo fixture when NODE_ENV is development and DATABASE_URL is unconfigured", async () => {
+      const result = await loadRunDashboard("demo-1", { NODE_ENV: "development" }, {}, dependencies);
+      expect(result).toMatchObject({
+        state: "found",
+        run: expect.objectContaining({ id: "demo-1", repository: "boardreadyops/drone-flight-controller" }),
+      });
+      expect(mocks.createQueryExecutor).not.toHaveBeenCalled();
+    });
+
+    it("returns demo fixture when NODE_ENV is test and DATABASE_URL is unconfigured", async () => {
+      const result = await loadRunDashboard("demo-pass", { NODE_ENV: "test" }, {}, dependencies);
+      expect(result).toMatchObject({
+        state: "found",
+        run: expect.objectContaining({ id: "demo-pass", decision: "pass" }),
+      });
+      expect(mocks.createQueryExecutor).not.toHaveBeenCalled();
+    });
+
+    it("NEVER returns demo fixture when NODE_ENV is production without DATABASE_URL", async () => {
+      const result = await loadRunDashboard("demo-1", { NODE_ENV: "production" }, {}, dependencies);
+      expect(result).toEqual({ state: "not-configured" });
+      expect(mocks.createQueryExecutor).not.toHaveBeenCalled();
+    });
+
+    it("returns not-configured for non-demo runId when DATABASE_URL is unconfigured in development", async () => {
+      const result = await loadRunDashboard("real-run-99", { NODE_ENV: "development" }, {}, dependencies);
+      expect(result).toEqual({ state: "not-configured" });
+      expect(mocks.createQueryExecutor).not.toHaveBeenCalled();
+    });
+
+    it("uses database executor when DATABASE_URL is configured, even for demo runId", async () => {
+      mocks.configuredArtifactDownloadSigningKey.mockReturnValue(undefined);
+      mocks.query.mockResolvedValueOnce({ rows: [] });
+
+      const result = await loadRunDashboard(
+        "demo-db",
+        { DATABASE_URL: "postgresql://boardreadyops.test/database", NODE_ENV: "development" },
+        {},
+        dependencies,
+      );
+
+      expect(result).toEqual({ state: "not-found" });
+      expect(mocks.createQueryExecutor).toHaveBeenCalledWith({
+        connectionString: "postgresql://boardreadyops.test/database",
+        max: 5,
+      });
+      expect(mocks.close).toHaveBeenCalledOnce();
+    });
+  });
 });
