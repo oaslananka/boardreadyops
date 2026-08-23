@@ -47,4 +47,10 @@ describe("HomePage", () => {
     const links = collectLinks(HomePage());
     expect(links).toContain("/setup");
   });
+
+  it("links the landing navigation to product and how-it-works sections", () => {
+    const links = collectLinks(HomePage());
+    expect(links).toContain("#product");
+    expect(links).toContain("#how-it-works");
+  });
 });
