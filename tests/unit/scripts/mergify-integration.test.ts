@@ -14,6 +14,20 @@ const stableRequiredChecks = [
   "security / gate",
 ];
 
+function readQueueConditionList(name: "queue_conditions" | "merge_conditions"): string[] {
+  const lines = mergify.split(/\r?\n/u);
+  const markerIndex = lines.indexOf(`    ${name}:`);
+  if (markerIndex < 0) return [];
+
+  const prefix = "      - ";
+  const values: string[] = [];
+  for (const line of lines.slice(markerIndex + 1)) {
+    if (!line.startsWith(prefix)) break;
+    values.push(line.slice(prefix.length));
+  }
+  return values;
+}
+
 describe("Mergify integration contract", () => {
   it("requires an explicit maintainer queue admission signal", () => {
     expect(mergify).toContain("label = queue-me");
@@ -29,19 +43,18 @@ describe("Mergify integration contract", () => {
     expect(mergify).not.toContain("check-success = ci / security");
   });
 
-  it("uses single-step in-place queue checks compatible with the strict required-check ruleset", () => {
+  it("uses identical single-step queue and merge conditions with the strict required-check ruleset", () => {
     expect(mergify).toContain("max_parallel_checks: 1");
     expect(mergify).toContain("batch_size: 1");
     expect(mergify).toContain("checks_timeout: null");
-    const queueConditions = mergify.slice(
-      mergify.indexOf("    queue_conditions:"),
-      mergify.indexOf("pull_request_rules:"),
-    );
-    for (const check of stableRequiredChecks) {
-      expect(queueConditions).toContain(`check-success = ${check}`);
-    }
-    expect(queueConditions).toContain("- -draft");
-    expect(mergify).not.toContain("    merge_conditions:");
+    const queueConditions = readQueueConditionList("queue_conditions");
+    const mergeConditions = readQueueConditionList("merge_conditions");
+    expect(queueConditions).toEqual([
+      "label = queue-me",
+      "-draft",
+      ...stableRequiredChecks.map((check) => `check-success = ${check}`),
+    ]);
+    expect(mergeConditions).toEqual(queueConditions);
   });
 
   it("does not use unsupported Mergify condition attributes", () => {
