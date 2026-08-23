@@ -13,6 +13,7 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "../../tests/unit/web/app-shell.test.ts",
     "../../tests/unit/web/run-investigation-accessibility.test.ts",
     "../../tests/unit/web/repository-setup-page.test.ts",
     "../../tests/unit/web/brand-mark.test.ts",

@@ -34,22 +34,25 @@
 - `apps/web/components/brand-mark.tsx` — existing QFP-chip identity; no new brand dependency.
 - `apps/web/components/ui.tsx` — shared shell and primitives.
 - `apps/web/components/run-investigation.tsx` — evidence-control-room hierarchy; existing data contracts unchanged.
-- `tests/unit/web/app-shell.test.tsx` — new structural contract for the shared shell.
+- `tests/unit/web/app-shell.test.ts` — new structural contract for the shared shell.
 - `tests/unit/web/home-page.test.ts` — landing product/CTA/navigation contracts.
 - `tests/unit/web/repository-setup-page.test.ts` — setup journey and accessibility contracts.
 - `tests/unit/web/run-design-system.test.ts` — token/contrast/focus/reduced-motion contract.
 - `tests/unit/web/run-investigation-accessibility.test.ts` — run semantic/accessibility/snapshot coverage.
-- `tests/unit/web/run-state-pages.test.tsx` — new loading/error/not-found structural contract.
+- `tests/unit/web/run-state-pages.test.ts` — new loading/error/not-found structural contract.
 
 ### Task 1: Unify the shared visual token system and AppShell
 
 **Files:**
 - Modify: `apps/web/app/styles.css`
+- Modify: `tsconfig.json`
+- Modify: `apps/web/tsconfig.json`
 - Modify: `apps/web/components/ui.tsx`
 - Modify: `apps/web/components/brand-mark.tsx`
 - Modify: `tests/unit/web/brand-mark.test.ts`
-- Create: `tests/unit/web/app-shell.test.tsx`
+- Create: `tests/unit/web/app-shell.test.ts`
 - Modify: `tests/unit/web/run-design-system.test.ts`
+- Modify: `tests/unit/web/__snapshots__/run-investigation-accessibility.test.ts.snap`
 
 **Interfaces:**
 - Consumes: `BrandMarkLockup` from `apps/web/components/brand-mark.tsx`.
@@ -57,7 +60,7 @@
 
 - [ ] **Step 1: Write the failing shared-shell test**
 
-Create `tests/unit/web/app-shell.test.tsx`:
+Create `tests/unit/web/app-shell.test.ts`:
 
 ```ts
 import { renderToStaticMarkup } from "react-dom/server";
@@ -110,7 +113,7 @@ Keep the semantic success/warning/danger/info contrast assertions.
 Run:
 
 ```bash
-corepack pnpm exec vitest run tests/unit/web/app-shell.test.tsx tests/unit/web/run-design-system.test.ts
+corepack pnpm exec vitest run tests/unit/web/app-shell.test.ts tests/unit/web/run-design-system.test.ts
 ```
 
 Expected: FAIL because `AppShell` still renders the `BR` square and the `--bro-*` tokens do not exist.
@@ -233,9 +236,9 @@ Update `.site-header`, `.site-header-inner`, `.brand`, `.site-navigation`, `.sit
   *,
   *::before,
   *::after {
-    scroll-behavior: auto !important;
-    animation: none !important;
-    transition-duration: 0.01ms !important;
+    scroll-behavior: auto;
+    animation: none;
+    transition-duration: 0.01ms;
   }
 }
 ```
@@ -245,7 +248,7 @@ Update `.site-header`, `.site-header-inner`, `.brand`, `.site-navigation`, `.sit
 Run:
 
 ```bash
-corepack pnpm exec vitest run tests/unit/web/app-shell.test.tsx tests/unit/web/run-design-system.test.ts
+corepack pnpm exec vitest run tests/unit/web/app-shell.test.ts tests/unit/web/run-design-system.test.ts
 ```
 
 Expected: PASS.
@@ -253,7 +256,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit Task 1**
 
 ```bash
-git add apps/web/app/styles.css apps/web/components/ui.tsx apps/web/components/brand-mark.tsx tests/unit/web/brand-mark.test.ts tests/unit/web/app-shell.test.tsx tests/unit/web/run-design-system.test.ts
+git add tsconfig.json apps/web/tsconfig.json apps/web/app/styles.css apps/web/components/ui.tsx apps/web/components/brand-mark.tsx tests/unit/web/brand-mark.test.ts tests/unit/web/app-shell.test.ts tests/unit/web/run-design-system.test.ts tests/unit/web/__snapshots__/run-investigation-accessibility.test.ts.snap docs/superpowers/plans/2026-08-23-premium-product-ui.md
 git commit -m "feat(web): unify the premium application shell"
 ```
 
@@ -569,7 +572,7 @@ Keep the existing screen-reader score explanation.
 
 - [ ] **Step 4: Strengthen SummaryView hierarchy**
 
-Keep the existing `Panel` API and data sources. Add `className` support to `Panel` only if needed by passing an optional `className?: string` prop; if added, cover it in `app-shell.test.tsx`. The decision panel should remain first and use existing `SummaryDecisionAction` behavior. Move visual prominence to decision, blocking count, readiness, and authoritative source links; do not delete metadata.
+Keep the existing `Panel` API and data sources. Add `className` support to `Panel` only if needed by passing an optional `className?: string` prop; if added, cover it in `app-shell.test.ts`. The decision panel should remain first and use existing `SummaryDecisionAction` behavior. Move visual prominence to decision, blocking count, readiness, and authoritative source links; do not delete metadata.
 
 - [ ] **Step 5: Style run navigation and evidence surfaces**
 
@@ -665,14 +668,14 @@ git commit -m "feat(web): refine evidence investigation surfaces"
 - Modify: `apps/web/app/runs/[runId]/not-found.tsx`
 - Modify: `apps/web/components/ui.tsx`
 - Modify: `apps/web/app/styles.css`
-- Create: `tests/unit/web/run-state-pages.test.tsx`
+- Create: `tests/unit/web/run-state-pages.test.ts`
 
 **Interfaces:**
 - Existing Next.js error boundary `reset()` behavior and route semantics remain unchanged.
 
 - [ ] **Step 1: Write failing state-page structural tests**
 
-Create `tests/unit/web/run-state-pages.test.tsx` with server-render checks for loading and not-found and a direct component check for error copy. Assert these visible strings:
+Create `tests/unit/web/run-state-pages.test.ts` with server-render checks for loading and not-found and a direct component check for error copy. Assert these visible strings:
 
 ```ts
 expect(loadingMarkup).toContain("Loading run investigation");
@@ -686,7 +689,7 @@ expect(notFoundMarkup).toContain("run-state-surface");
 - [ ] **Step 2: Verify RED**
 
 ```bash
-corepack pnpm exec vitest run tests/unit/web/run-state-pages.test.tsx
+corepack pnpm exec vitest run tests/unit/web/run-state-pages.test.ts
 ```
 
 Expected: FAIL on the new `run-state-surface` contract.
@@ -739,7 +742,7 @@ Keep `EmptyState({ title, children, action })`. Update only the icon/markup clas
 - [ ] **Step 5: Verify state tests**
 
 ```bash
-corepack pnpm exec vitest run tests/unit/web/run-state-pages.test.tsx tests/unit/web/run-investigation-accessibility.test.ts
+corepack pnpm exec vitest run tests/unit/web/run-state-pages.test.ts tests/unit/web/run-investigation-accessibility.test.ts
 ```
 
 Expected: PASS.
@@ -747,7 +750,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit Task 6**
 
 ```bash
-git add apps/web/app/runs apps/web/components/ui.tsx apps/web/app/styles.css tests/unit/web/run-state-pages.test.tsx
+git add apps/web/app/runs apps/web/components/ui.tsx apps/web/app/styles.css tests/unit/web/run-state-pages.test.ts
 git commit -m "feat(web): polish investigation state surfaces"
 ```
 
@@ -763,12 +766,12 @@ git commit -m "feat(web): polish investigation state surfaces"
 
 ```bash
 corepack pnpm exec vitest run \
-  tests/unit/web/app-shell.test.tsx \
+  tests/unit/web/app-shell.test.ts \
   tests/unit/web/home-page.test.ts \
   tests/unit/web/repository-setup-page.test.ts \
   tests/unit/web/run-design-system.test.ts \
   tests/unit/web/run-investigation-accessibility.test.ts \
-  tests/unit/web/run-state-pages.test.tsx \
+  tests/unit/web/run-state-pages.test.ts \
   tests/unit/web/layout-metadata.test.ts
 ```
 
