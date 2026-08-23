@@ -698,14 +698,38 @@ code {
   color: var(--text-muted);
 }
 
+.run-state-surface {
+  display: grid;
+  min-height: clamp(22rem, 48vh, 34rem);
+  align-content: center;
+  padding: clamp(var(--space-4), 5vw, var(--space-7));
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-xl);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--bro-accent) 5%, transparent), transparent 52%),
+    var(--bro-bg-elevated);
+  box-shadow: var(--bro-shadow-soft);
+  gap: var(--space-5);
+}
+
+.run-state-surface > .panel,
+.run-state-surface > .alert {
+  width: 100%;
+  max-width: 48rem;
+  margin-inline: auto;
+}
+
 .empty-state {
   display: grid;
   max-width: 40rem;
   justify-items: start;
   padding: var(--space-6);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-muted);
+  border: 1px solid var(--bro-border-strong);
+  border-radius: var(--bro-radius-lg);
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--bro-accent) 4%, transparent), transparent 48%),
+    var(--bro-surface-sunken);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bro-text) 4%, transparent);
 }
 
 .empty-state svg {
@@ -730,6 +754,12 @@ code {
 
 .empty-state-action {
   margin-top: var(--space-4);
+}
+
+.run-state-surface > .empty-state {
+  width: 100%;
+  max-width: 48rem;
+  margin-inline: auto;
 }
 
 .timeline {
@@ -1047,13 +1077,15 @@ code {
 }
 
 .loading-header {
-  height: 12rem;
-  margin-bottom: var(--space-5);
+  height: clamp(9rem, 18vw, 12rem);
+  margin-bottom: 0;
+  border: 1px solid var(--bro-border);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bro-text) 3%, transparent);
 }
 
 .skeleton {
-  border-radius: var(--radius-md);
-  background: linear-gradient(90deg, var(--surface-muted), var(--surface-strong), var(--surface-muted));
+  border-radius: var(--bro-radius-lg);
+  background: linear-gradient(90deg, var(--bro-surface), var(--bro-surface-strong), var(--bro-surface));
   background-size: 200% 100%;
   animation: skeleton-pulse 1.5s linear infinite;
 }
