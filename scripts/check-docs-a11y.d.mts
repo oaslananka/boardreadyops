@@ -43,6 +43,8 @@ export function collectHtmlFiles(siteDir: string): Promise<string[]>;
 
 export function formatPa11yFailures(siteDir: string, results: Pa11yPageResult[]): string;
 
-export function pageUrlForFile(origin: string, siteDir: string, file: string): string;
+export function sitePathPrefixFromUrl(siteUrl: string): string;
+
+export function pageUrlForFile(origin: string, siteDir: string, file: string, sitePathPrefix?: string): string;
 
 export function main(root?: string): Promise<void>;

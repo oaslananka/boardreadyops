@@ -1,5 +1,5 @@
 site_name: BoardReadyOps
-site_url: https://oaslananka.github.io/boardreadyops/
+site_url: https://docs.boardreadyops.com/
 repo_url: https://github.com/oaslananka/boardreadyops
 repo_name: oaslananka/boardreadyops
 edit_uri: edit/main/docs/
@@ -8,6 +8,8 @@ docs_dir: docs
 
 theme:
   name: material
+  logo: assets/boardreadyops-mark.svg
+  favicon: assets/boardreadyops-mark.svg
   palette:
     - scheme: default
       primary: indigo
