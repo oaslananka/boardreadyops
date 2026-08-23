@@ -137,7 +137,7 @@ async function writeTracked(
   environment = isolatedGitEnvironment(),
 ) {
   await writeFileRecursive(path.join(root, relativePath), content);
-  runGit(root, ["add", "-f", relativePath], environment);
+  runGit(root, ["add", relativePath], environment);
   runGit(root, ["commit", "--quiet", "-m", `update ${relativePath}`], environment);
 }
 
