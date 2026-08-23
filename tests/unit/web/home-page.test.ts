@@ -53,4 +53,16 @@ describe("HomePage", () => {
     expect(links).toContain("#product");
     expect(links).toContain("#how-it-works");
   });
+
+  it("shows real product proof without fabricated social proof", () => {
+    const text = collectText(HomePage());
+    expect(text).toContain("Pull request evidence");
+    expect(text).toContain("Manufacturing readiness");
+    expect(text).toContain("Authoritative in GitHub");
+    expect(text).not.toMatch(/trusted by|customers|teams worldwide|10,000|fortune 500/iu);
+  });
+
+  it("links documentation from the premium landing navigation", () => {
+    expect(collectLinks(HomePage())).toContain("https://docs.boardreadyops.com");
+  });
 });
