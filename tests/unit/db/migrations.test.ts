@@ -7,7 +7,10 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(39);
+    expect(cloudDatabaseSchemaVersion).toBe(40);
+    expect(cloudDatabaseModels).toContain("Board");
+    expect(cloudDatabaseModels).toContain("BoardBomSnapshot");
+    expect(cloudDatabaseModels).toContain("BoardBomComponent");
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -70,6 +73,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0037_runner_fleet_health.sql",
       "0038_runner_registration_revocation.sql",
       "0039_artifact_metadata_contract.sql",
+      "0040_board_bom_snapshots.sql",
     ]);
   });
 
