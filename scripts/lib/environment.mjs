@@ -1,7 +1,7 @@
 export function requiredEnvironmentValue(environment, name) {
   const value = environment[name];
   if (typeof value !== "string") {
-    throw new Error(`${name} is required`);
+    throw new TypeError(`${name} is required`);
   }
   const normalized = value.trim();
   if (normalized === "") {
