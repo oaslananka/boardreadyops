@@ -51,6 +51,16 @@ queue_rules:
       - check-success = ci / build
       - check-success = ci / verify-dist
       - check-success = security / gate
+    merge_conditions:
+      - label = queue-me
+      - -draft
+      - check-success = ci / risk-profile
+      - check-success = ci / lint
+      - check-success = ci / typecheck
+      - check-success = ci / test-unit
+      - check-success = ci / build
+      - check-success = ci / verify-dist
+      - check-success = security / gate
 
 pull_request_rules:
   - name: queue explicitly approved pull requests
