@@ -29,23 +29,19 @@ describe("Mergify integration contract", () => {
     expect(mergify).not.toContain("check-success = ci / security");
   });
 
-  it("uses in-place queue checks compatible with the strict required-check ruleset", () => {
+  it("uses single-step in-place queue checks compatible with the strict required-check ruleset", () => {
     expect(mergify).toContain("max_parallel_checks: 1");
+    expect(mergify).toContain("batch_size: 1");
     expect(mergify).toContain("checks_timeout: null");
     const queueConditions = mergify.slice(
       mergify.indexOf("    queue_conditions:"),
-      mergify.indexOf("    merge_conditions:"),
-    );
-    const mergeConditions = mergify.slice(
-      mergify.indexOf("    merge_conditions:"),
       mergify.indexOf("pull_request_rules:"),
     );
     for (const check of stableRequiredChecks) {
       expect(queueConditions).toContain(`check-success = ${check}`);
-      expect(mergeConditions).toContain(`check-success = ${check}`);
     }
     expect(queueConditions).toContain("- -draft");
-    expect(mergeConditions).toContain("- -draft");
+    expect(mergify).not.toContain("    merge_conditions:");
   });
 
   it("does not use unsupported Mergify condition attributes", () => {
