@@ -67,6 +67,16 @@ describe("repository setup preview page", () => {
     expect(markup).not.toContain("123456789");
   });
 
+  it("presents setup as a three-step guided journey", async () => {
+    const markup = await render({ preset: "prototype" });
+    expect(markup).toContain("1. Choose a release policy");
+    expect(markup).toContain("2. Review repository-owned files");
+    expect(markup).toContain("3. Validate readiness in GitHub Actions");
+    expect(markup).toContain('href="#policy-preset"');
+    expect(markup).toContain('href="#proposed-files"');
+    expect(markup).toContain('href="#readiness"');
+  });
+
   it("falls back safely and has no WCAG A/AA violations", async () => {
     const markup = await render({ preset: "not-a-preset" });
     expect(markup).toContain("Prototype fabrication");

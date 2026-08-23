@@ -36,7 +36,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     <AppShell>
       <main className="shell setup-page" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Repository setup" }]} />
-        <header className="page-heading">
+        <header className="page-heading setup-hero">
           <div>
             <p className="eyebrow">Repository setup preview</p>
             <h1>Choose a policy, review every file, then validate the default branch.</h1>
@@ -48,6 +48,21 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           </div>
           <StatusBadge value="preview" label="No repository changes are made here" />
         </header>
+
+        <nav className="setup-journey" aria-label="Repository setup steps">
+          <a href="#policy-preset">
+            <span className="setup-journey-index">01</span>
+            <strong>Choose a release policy</strong>
+          </a>
+          <a href="#proposed-files">
+            <span className="setup-journey-index">02</span>
+            <strong>Review repository-owned files</strong>
+          </a>
+          <a href="#readiness">
+            <span className="setup-journey-index">03</span>
+            <strong>Validate readiness in GitHub Actions</strong>
+          </a>
+        </nav>
 
         {hasInstallationHandoff ? (
           <Alert title="GitHub App installation handoff" tone="success">
@@ -73,7 +88,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
 
         <Panel
           id="policy-preset"
-          title="1. Select a policy preset"
+          title="1. Choose a release policy"
           description={`Preset contract v${repositorySetupPresetVersion}. Switching presets appends a new revision; previous runs retain their original policy provenance.`}
         >
           <div className="setup-preset-grid">
@@ -87,6 +102,9 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   <h3>{preset.name}</h3>
                   {preset.id === selected.id ? <StatusBadge value="selected" label="Selected" /> : null}
                 </div>
+                <p className="setup-preset-state">
+                  {preset.id === selected.id ? "Current preview" : "Available release policy"}
+                </p>
                 <p>{preset.description}</p>
                 <DefinitionGrid>
                   <Definition label="Release mode">{preset.releaseMode}</Definition>
@@ -106,7 +124,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
 
         <Panel
           id="proposed-files"
-          title="2. Review the proposed repository files"
+          title="2. Review repository-owned files"
           description="These are the only repository-owned files required for the setup flow. Commit them through a reviewed pull request."
         >
           <div className="setup-file-list">
@@ -154,7 +172,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
 
         <Panel
           id="readiness"
-          title="3. Validate workflow and configuration readiness"
+          title="3. Validate readiness in GitHub Actions"
           description="The control plane first inspects Actions and workflow metadata, then dispatches a short-lived probe owned by the target repository."
         >
           <ol className="setup-steps">
