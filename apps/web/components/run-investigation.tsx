@@ -52,8 +52,9 @@ function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunV
 export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
   return (
     <header className="run-header">
-      <div>
-        <p className="run-context">{run.repositoryPrivate ? "Private repository" : "Public repository"}</p>
+      <div className="run-header-copy">
+        <p className="run-context">Evidence control room</p>
+        <p className="run-repository-kind">{run.repositoryPrivate ? "Private repository" : "Public repository"}</p>
         <h1>{run.repository}</h1>
         <p className="run-subtitle">
           Run <code>{run.id}</code> · commit <code>{run.commitSha.slice(0, 12)}</code>
@@ -61,17 +62,17 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
       </div>
       <fieldset className="run-header-status">
         <legend className="sr-only">Run status summary</legend>
-        <StatusBadge value={run.status} />
-        <StatusBadge value={run.decision} label={`Decision: ${humanize(run.decision)}`} />
         <div className="score">
           <strong>{run.readinessScore ?? "—"}</strong>
-          <span>Readiness</span>
+          <span>Readiness score</span>
           <span className="sr-only">
             {run.readinessScore === undefined
               ? "Readiness score unavailable"
               : `Readiness score ${run.readinessScore} out of 100`}
           </span>
         </div>
+        <StatusBadge value={run.decision} label={`Decision: ${humanize(run.decision)}`} />
+        <StatusBadge value={run.status} />
       </fieldset>
     </header>
   );
