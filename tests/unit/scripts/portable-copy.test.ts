@@ -11,7 +11,7 @@ afterEach(async () => {
 });
 
 describe("portable directory copy", () => {
-  it("preserves directory symlink type for pnpm-style relative targets", async ({ skip }) => {
+  it("preserves directory symlink type for pnpm-style relative targets", async () => {
     const source = await mkdtemp(path.join(process.cwd(), ".portable-copy-directory-source-"));
     temporaryRoots.push(source);
     const packageDirectory = "next@16.2.11_@babel+core@7._be10f97c94e825087e2e0e278d75b52b";
@@ -19,15 +19,7 @@ describe("portable directory copy", () => {
     const sourceLink = path.join(source, "apps", "web", "node_modules", "next");
     await mkdir(path.dirname(sourceLink), { recursive: true });
     await mkdir(path.resolve(path.dirname(sourceLink), target), { recursive: true });
-    try {
-      await symlink(target, sourceLink, "dir");
-    } catch (error: unknown) {
-      if (process.platform === "win32" && (error as NodeJS.ErrnoException)?.code === "EPERM") {
-        skip("creating symlinks on Windows requires developer mode or elevated privilege");
-        return;
-      }
-      throw error;
-    }
+    await symlink(target, sourceLink, "dir");
 
     const destinationParent = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-web-standalone-regression-"));
     temporaryRoots.push(destinationParent);
