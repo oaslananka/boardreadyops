@@ -291,6 +291,39 @@ code {
   color: var(--text);
 }
 
+/* Sign-in state sits in the global navigation and inherits its type scale. */
+.viewer-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.viewer-login {
+  color: var(--bro-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.viewer-signin,
+.viewer-signout {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--bro-border);
+  border-radius: var(--radius-sm);
+  background: var(--bro-bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.viewer-signin:hover,
+.viewer-signout:hover {
+  border-color: var(--bro-border-accent);
+  color: var(--bro-accent-strong);
+}
+
 .site-footer {
   width: min(100% - 2rem, var(--content-width));
   margin: var(--space-7) auto 0;
