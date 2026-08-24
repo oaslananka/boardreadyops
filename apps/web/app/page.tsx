@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { BrandMarkIcon } from "../components/brand-mark.js";
+import { ViewerNav } from "../components/viewer-nav.js";
 import "./landing.css";
 
 const installUrl = "https://github.com/apps/boardreadyops/installations/new";
@@ -78,6 +80,10 @@ export default function HomePage() {
           <a href="#product">Product</a>
           <a href="#how-it-works">How it works</a>
           <a href="https://docs.boardreadyops.com">Docs</a>
+          {/* Suspended so reading the session never delays the landing navigation. */}
+          <Suspense fallback={null}>
+            <ViewerNav />
+          </Suspense>
           <a className="landing-nav-cta" href={installUrl}>
             Install on GitHub
           </a>

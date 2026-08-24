@@ -8,6 +8,7 @@ import {
 } from "@boardreadyops/cloud-core/repository-setup";
 import Link from "next/link";
 import { Alert, AppShell, Breadcrumbs, Definition, DefinitionGrid, Panel, StatusBadge } from "../../components/ui.js";
+import { ViewerNav } from "../../components/viewer-nav.js";
 
 export const metadata = {
   title: "Repository setup preview · BoardReadyOps",
@@ -33,7 +34,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   const workflowSource = `https://github.com/oaslananka/boardreadyops/blob/v1/.github/workflows/${repositorySetupWorkflowPath}`;
 
   return (
-    <AppShell>
+    <AppShell viewerNav={<ViewerNav />}>
       <main className="shell setup-page" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Repository setup" }]} />
         <header className="page-heading setup-hero">
