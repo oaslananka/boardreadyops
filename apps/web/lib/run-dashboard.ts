@@ -834,6 +834,246 @@ export async function lookupRunDashboard(
   };
 }
 
+function buildDemoRun(runId: string, filters: RunDashboardFilters = {}): RunDetail {
+  const isFailure = runId.includes("fail");
+  const baseFindings: FindingDetail[] = [
+    {
+      id: "f-1",
+      ruleId: "bom.missing-mpn",
+      severity: isFailure ? "critical" : "high",
+      message: "Capacitor C12 (0.1uF 50V 0603) has missing manufacturer part number in active BOM variant.",
+      path: "hardware/power-stage.kicad_sch",
+      kind: "bom",
+      waivedAt: undefined,
+    },
+    {
+      id: "f-2",
+      ruleId: "manufacturing.polarity-markers",
+      severity: "medium",
+      message: "Diode D4 silk screen polarity dot is within 0.15mm of solder mask boundary.",
+      path: "hardware/flight-controller.kicad_pcb",
+      kind: "manufacturing",
+      waivedAt: undefined,
+    },
+    {
+      id: "f-3",
+      ruleId: "design.copper-balance",
+      severity: "medium",
+      message: "Inner copper layer In1.Cu has 18% surface imbalance compared to In2.Cu.",
+      path: "hardware/flight-controller.kicad_pcb",
+      kind: "design",
+      waivedAt: undefined,
+    },
+    {
+      id: "f-4",
+      ruleId: "firmware.stm32cubemx-pin-contract",
+      severity: "low",
+      message: "Pin PB6 (I2C1_SCL) declared as internal pull-up in CubeMX IOC but schematic has external 2.2k pull-up.",
+      path: "firmware/ioc/board.ioc",
+      kind: "firmware",
+      waivedAt: undefined,
+    },
+    {
+      id: "f-5",
+      ruleId: "pinmap.collision",
+      severity: "info",
+      message: "SWD header debug connector shares test point TP3 with SPI1_MOSI.",
+      path: "hardware/debug.kicad_sch",
+      kind: "pinmap",
+      waivedAt: undefined,
+    },
+  ];
+
+  const search = filters.findingSearch?.toLowerCase() ?? "";
+  const severityFilter = filters.findingSeverity?.toLowerCase();
+  const filteredFindings = baseFindings.filter((finding) => {
+    if (severityFilter && finding.severity.toLowerCase() !== severityFilter) return false;
+    if (search && !finding.ruleId.toLowerCase().includes(search) && !finding.message.toLowerCase().includes(search)) {
+      return false;
+    }
+    return true;
+  });
+
+  const baseArtifacts: ArtifactDetail[] = [
+    {
+      id: "art-1",
+      kind: "report",
+      name: "boardreadyops.report.html",
+      sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      bytes: 148520,
+      role: "primary",
+      contentType: "text/html",
+      executionAttemptId: "att-1",
+      uploadedAt: "2026-08-23T18:01:20.000Z",
+      downloadUrl: "#",
+      availability: "available",
+      retention: "no-automatic-expiry",
+      retentionUntil: undefined,
+    },
+    {
+      id: "art-2",
+      kind: "findings",
+      name: "findings.json",
+      sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+      bytes: 12450,
+      role: "evidence",
+      contentType: "application/json",
+      executionAttemptId: "att-1",
+      uploadedAt: "2026-08-23T18:01:21.000Z",
+      downloadUrl: "#",
+      availability: "available",
+      retention: "no-automatic-expiry",
+      retentionUntil: undefined,
+    },
+    {
+      id: "art-3",
+      kind: "bom",
+      name: "hbom.csv",
+      sha256: "486ea46224d104cedcb0f97f6bef2357cc7379c617e202b364f0ddd032b29a56",
+      bytes: 38200,
+      role: "evidence",
+      contentType: "text/csv",
+      executionAttemptId: "att-1",
+      uploadedAt: "2026-08-23T18:01:22.000Z",
+      downloadUrl: "#",
+      availability: "available",
+      retention: "no-automatic-expiry",
+      retentionUntil: undefined,
+    },
+    {
+      id: "art-4",
+      kind: "manufacturing",
+      name: "gerber_fabrication_pack.zip",
+      sha256: "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+      bytes: 2840500,
+      role: "output",
+      contentType: "application/zip",
+      executionAttemptId: "att-1",
+      uploadedAt: "2026-08-23T18:01:23.000Z",
+      downloadUrl: "#",
+      availability: "available",
+      retention: "retained-until",
+      retentionUntil: "2026-11-23T18:01:23.000Z",
+    },
+  ];
+
+  return {
+    id: runId,
+    status: isFailure ? "failed" : "completed",
+    decision: isFailure ? "fail" : "pass",
+    commitSha: "f8a92b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a",
+    ref: "refs/pull/42/head",
+    pullRequestNumber: 42,
+    triggerKind: "pull_request",
+    startedAt: "2026-08-23T18:00:00.000Z",
+    completedAt: "2026-08-23T18:01:25.000Z",
+    durationMs: 85_000,
+    boardReadyOpsVersion: "1.24.0",
+    kicadVersion: "9.0.0",
+    githubCheckRunId: "987654321",
+    readinessScore: isFailure ? 42 : 94,
+    resultContractVersion: 1,
+    conclusion: isFailure ? "failure" : "success",
+    metrics: {
+      readinessScore: isFailure ? 42 : 94,
+      criticalFindings: isFailure ? 1 : 0,
+      highFindings: 1,
+      mediumFindings: 2,
+      lowFindings: 1,
+      totalRulesEvaluated: 32,
+    },
+    reportLinks: [{ label: "Hardware Summary", url: "https://boardreadyops.example/runs/demo/artifacts/art-1" }],
+    lastPublicationAttemptAt: "2026-08-23T18:01:26.000Z",
+    githubCheckPublishedAt: "2026-08-23T18:01:27.000Z",
+    githubCommentPublishedAt: undefined,
+    lastPublicationError: undefined,
+    repository: "boardreadyops/drone-flight-controller",
+    repositoryPrivate: false,
+    trustMode: "standard",
+    safeModeReasons: [],
+    setupPreset: "production-release",
+    setupPresetVersion: 2,
+    setupRevision: 4,
+    setupWorkflowContractVersion: 1,
+    setupWorkflowStatus: "synced",
+    setupConfigStatus: "valid",
+    investigationState: isFailure ? "failed" : "completed",
+    reconciliationCount: 0,
+    deadLetterCount: 0,
+    lastActivityAt: "2026-08-23T18:01:25.000Z",
+    findings: filteredFindings,
+    findingsPage: { page: 1, pageSize: 25, total: filteredFindings.length, totalPages: 1 },
+    artifacts: baseArtifacts,
+    artifactsPage: { page: 1, pageSize: 25, total: baseArtifacts.length, totalPages: 1 },
+    artifactLifecycle: { deleted: 0, missing: 0, pendingDeletion: 0, failedDeletion: 0 },
+    attempts: [
+      {
+        id: "att-1",
+        attemptNumber: 1,
+        status: isFailure ? "failed" : "completed",
+        createdAt: "2026-08-23T18:00:00.000Z",
+        dispatchRequestedAt: "2026-08-23T18:00:01.000Z",
+        dispatchedAt: "2026-08-23T18:00:02.000Z",
+        startedAt: "2026-08-23T18:00:05.000Z",
+        heartbeatAt: "2026-08-23T18:01:20.000Z",
+        completedAt: "2026-08-23T18:01:25.000Z",
+        retryAfterAt: undefined,
+        workflowDispatchId: "128492019",
+        workflowRunUrl: "https://github.com/boardreadyops/drone-flight-controller/actions/runs/128492019",
+        failureClass: isFailure ? "HardVerificationFailure" : undefined,
+        failureMessage: isFailure ? "Critical BOM rule violated: missing manufacturer part number." : undefined,
+        resultDigest: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      },
+    ],
+    transitions: [
+      {
+        entityType: "release_run",
+        executionAttemptId: "att-1",
+        fromStatus: "running",
+        toStatus: isFailure ? "failed" : "completed",
+        fromVersion: 2,
+        toVersion: 3,
+        reasonCode: isFailure ? "terminal_failure" : "terminal_success",
+        occurredAt: "2026-08-23T18:01:25.000Z",
+      },
+      {
+        entityType: "execution_attempt",
+        executionAttemptId: "att-1",
+        fromStatus: "leased",
+        toStatus: isFailure ? "failed" : "completed",
+        fromVersion: 1,
+        toVersion: 2,
+        reasonCode: "result_recorded",
+        occurredAt: "2026-08-23T18:01:24.000Z",
+      },
+    ],
+    // Two boards, one carrying a part already at lifecycle risk, so the demo shows what the
+    // supply signals look like rather than an empty panel.
+    boards: [
+      {
+        boardId: "demo-board-mainboard",
+        project: "hardware/mainboard/mainboard.kicad_pro",
+        displayName: "mainboard",
+        capturedAt: "2026-08-23T18:01:23.000Z",
+        componentCount: 148,
+        identifiedComponentCount: 141,
+        unidentifiedComponentCount: 7,
+        riskyLifecycleCount: isFailure ? 3 : 1,
+      },
+      {
+        boardId: "demo-board-sensor",
+        project: "hardware/sensor/sensor.kicad_pro",
+        displayName: "sensor",
+        capturedAt: "2026-08-23T18:01:23.000Z",
+        componentCount: 32,
+        identifiedComponentCount: 32,
+        unidentifiedComponentCount: 0,
+        riskyLifecycleCount: 0,
+      },
+    ],
+  };
+}
+
 export async function loadRunDashboard(
   runId: string,
   environment: RunDashboardEnvironment = process.env,
@@ -841,7 +1081,13 @@ export async function loadRunDashboard(
   dependencies: RunDashboardLoaderDependencies = defaultRunDashboardLoaderDependencies,
 ): Promise<RunLookupResult> {
   const connectionString = environment.DATABASE_URL;
-  if (!connectionString) return { state: "not-configured" };
+  if (!connectionString) {
+    const isDevOrTest = environment.NODE_ENV === "development" || environment.NODE_ENV === "test";
+    if (isDevOrTest && runId.startsWith("demo")) {
+      return { state: "found", run: buildDemoRun(runId, filters) };
+    }
+    return { state: "not-configured" };
+  }
 
   const baseUrl = environment.BOARDREADYOPS_PUBLIC_URL ?? environment.NEXT_PUBLIC_APP_URL;
   const key = dependencies.configuredArtifactDownloadSigningKey(environment);

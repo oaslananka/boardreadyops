@@ -1499,6 +1499,17 @@ code {
   line-height: 1.75;
 }
 
+/* Small uppercase label above a heading, carried over from the landing page work. */
+.eyebrow {
+  margin-bottom: var(--space-2);
+  color: var(--bro-accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .setup-journey {
   display: grid;
   gap: var(--space-3);
