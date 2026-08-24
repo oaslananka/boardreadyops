@@ -142,15 +142,26 @@ recording one would corrupt run history and readiness scoring.
 
 ## Rollout
 
-1. Extend the result contract with optional board attribution and BOM rows, so
-   older runners remain compatible.
-2. Add the `boards`, `board_bom_snapshots`, and `board_bom_components` tables and
-   persist snapshots on terminal result ingestion.
-3. Emit BOM rows from the CLI result payload.
-4. Surface boards and their current component list in the dashboard.
+1. **Done.** Extend the result contract with optional board attribution and BOM
+   rows, so older runners remain compatible.
+2. **Done.** Add the `boards`, `board_bom_snapshots`, and `board_bom_components`
+   tables (schema v40) and persist snapshots on terminal result ingestion.
+3. **Done.** Emit BOM rows from the CLI, the self-hosted runner, and the hosted
+   GitHub Actions workflow.
+4. **Done.** Surface boards and their captured component list in the dashboard.
 5. Add the component-intelligence provider interface and one implementation
    behind it.
 6. Add the scheduled evaluation job and its notification surface.
 
-Steps 1 through 3 are the subject of the first implementation plan. Steps 5 and 6
-require a provider decision recorded in a separate ADR.
+Steps 5 and 6 depend on a provider decision recorded separately in
+[ADR-0012](0012-component-intelligence-provider.md); no provider interface is
+fixed until that decision is made.
+
+### What step 3 established
+
+Board attribution only accepts a BOM the project can claim: a declared override,
+an explicit workspace `--bom`, or a file inside the project's own directory.
+Without one it falls back to that project's schematic rather than to a
+workspace-wide file search, which would otherwise hand one board's BOM to every
+other board in a monorepo and drive supply findings against parts a board never
+used.
