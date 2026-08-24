@@ -6,8 +6,9 @@ import {
   RunUnavailable,
   type SearchParameterMap,
 } from "../../../../components/run-investigation.js";
-import { loadRunDashboard } from "../../../../lib/run-dashboard.js";
+import { loadRunDashboard, runDashboardLoaderDependencies } from "../../../../lib/run-dashboard.js";
 import { shouldLiveRefreshRun } from "../../../../lib/run-live-refresh.js";
+import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,11 @@ type PageProps = Readonly<{
 
 export default async function ArtifactsPage({ params, searchParams }: PageProps) {
   const [{ runId }, query] = await Promise.all([params, searchParams]);
-  const result = await loadRunDashboard(runId, process.env, filtersFromSearchParameters(query));
+  const viewer = await viewerAuthorization();
+  const result = await loadRunDashboard(runId, process.env, filtersFromSearchParameters(query), {
+    ...runDashboardLoaderDependencies,
+    authorizeRepository: viewer.authorizeRepository,
+  });
   if (result.state === "not-found") notFound();
   if (result.state === "not-configured") return <RunUnavailable runId={runId} />;
   return (

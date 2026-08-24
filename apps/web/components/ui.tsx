@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandMarkLockup } from "./brand-mark.js";
+import { ViewerControls } from "./viewer-controls.js";
 
 export type StatusTone = "danger" | "info" | "neutral" | "success" | "warning";
 
@@ -91,7 +92,7 @@ export function StatusBadge({ value, label }: Readonly<{ value: string | undefin
   );
 }
 
-export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
+export function AppShell({ children, viewerLogin }: Readonly<{ children: ReactNode; viewerLogin?: string }>) {
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -105,6 +106,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
           <nav className="site-navigation" aria-label="Global navigation">
             <Link href="/setup">Repository setup</Link>
             <a href="https://docs.boardreadyops.com">Documentation</a>
+            <ViewerControls login={viewerLogin} />
           </nav>
         </div>
       </header>

@@ -194,12 +194,25 @@ type RunDashboardLoaderDependencies = Readonly<{
   authorizeRepository?: (repository: RunDashboardRepository) => boolean | Promise<boolean>;
 }>;
 
-const defaultRunDashboardLoaderDependencies: RunDashboardLoaderDependencies = {
+/**
+ * Loader dependencies without a viewer.
+ *
+ * Exported so a page can spread these and add `authorizeRepository` for the signed-in viewer.
+ * Without one, a private repository resolves to "not found" — the safe default, and the reason
+ * `tests/unit/web/run-page-authorization.test.ts` asserts every run page supplies an authorizer
+ * rather than relying on anyone remembering to.
+ *
+ * The viewer helper is not wired in here because it reads request-scoped cookies through
+ * `next/headers`, which only the app's own compilation resolves.
+ */
+export const runDashboardLoaderDependencies: RunDashboardLoaderDependencies = {
   artifactDownloadExpiry,
   artifactDownloadUrl,
   configuredArtifactDownloadSigningKey,
   createQueryExecutor: createPgQueryExecutor,
 };
+
+const defaultRunDashboardLoaderDependencies = runDashboardLoaderDependencies;
 
 type RunDashboardRepository = {
   id: string;
