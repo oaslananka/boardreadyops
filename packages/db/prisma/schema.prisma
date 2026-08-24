@@ -31,6 +31,7 @@ model Repository {
   disabledAt     DateTime?    @map("disabled_at")
   installation   Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
   runs           ReleaseRun[]
+  boards         Board[]
 
   @@unique([installationId, owner, name])
   @@map("repositories")
@@ -61,6 +62,7 @@ model ReleaseRun {
   artifacts                 Artifact[]
   result                    ReleaseRunResult?
   attempts                  ReleaseRunAttempt[]
+  bomSnapshots              BoardBomSnapshot[]
 
   @@index([repositoryId, startedAt])
   @@index([commitSha])
@@ -139,4 +141,54 @@ model ReleaseRunResult {
 
   @@index([receivedAt(sort: Desc), runId(sort: Desc)])
   @@map("release_run_results")
+}
+
+model Board {
+  id           String             @id @default(uuid())
+  repositoryId String             @map("repository_id")
+  projectPath  String             @map("project_path")
+  displayName  String             @map("display_name")
+  firstSeenAt  DateTime           @default(now()) @map("first_seen_at")
+  lastSeenAt   DateTime           @default(now()) @map("last_seen_at")
+  archivedAt   DateTime?          @map("archived_at")
+  repository   Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  snapshots    BoardBomSnapshot[]
+
+  @@unique([repositoryId, projectPath], map: "boards_repository_project_idx")
+  @@index([repositoryId, lastSeenAt(sort: Desc)], map: "boards_repository_active_idx")
+  @@map("boards")
+}
+
+model BoardBomSnapshot {
+  id             String              @id @default(uuid())
+  boardId        String              @map("board_id")
+  runId          String              @map("run_id")
+  commitSha      String              @map("commit_sha")
+  componentCount Int                 @default(0) @map("component_count")
+  capturedAt     DateTime            @default(now()) @map("captured_at")
+  board          Board               @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  run            ReleaseRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  components     BoardBomComponent[]
+
+  @@unique([boardId, runId], map: "board_bom_snapshots_board_run_idx")
+  @@index([boardId, capturedAt(sort: Desc), id], map: "board_bom_snapshots_board_captured_idx")
+  @@map("board_bom_snapshots")
+}
+
+model BoardBomComponent {
+  id                 String           @id @default(uuid())
+  snapshotId         String           @map("snapshot_id")
+  reference          String
+  mpn                String?
+  manufacturer       String?
+  value              String?
+  footprint          String?
+  quantity           Int?
+  dnp                Boolean          @default(false)
+  lifecycleAtCapture String?          @map("lifecycle_at_capture")
+  identityKey        String?          @map("identity_key")
+  snapshot           BoardBomSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, reference], map: "board_bom_components_snapshot_idx")
+  @@map("board_bom_components")
 }

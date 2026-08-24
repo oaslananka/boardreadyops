@@ -103,6 +103,7 @@ describe("run dashboard environment loader", () => {
       { rows: [] },
       { rows: [] },
       { rows: [] },
+      { rows: [] },
     ]) {
       mocks.query.mockResolvedValueOnce(result);
     }
@@ -133,6 +134,7 @@ describe("run dashboard environment loader", () => {
       { rows: [runRow()] },
       { rows: [{ total: 0 }] },
       { rows: [{ total: 1 }] },
+      { rows: [] },
       { rows: [] },
       { rows: [] },
       { rows: [] },

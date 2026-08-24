@@ -103433,6 +103433,21 @@ function computeReadiness(input) {
   };
 }
 
+// src/core/result.ts
+function projectBomComponent(row) {
+  return {
+    reference: row.reference,
+    ...row.value === void 0 ? {} : { value: row.value },
+    ...row.footprint === void 0 ? {} : { footprint: row.footprint },
+    ...row.manufacturer === void 0 ? {} : { manufacturer: row.manufacturer },
+    ...row.mpn === void 0 ? {} : { mpn: row.mpn },
+    ...row.lifecycle === void 0 ? {} : { lifecycle: row.lifecycle },
+    ...row.dnp === void 0 ? {} : { dnp: row.dnp },
+    ...row.quantity === void 0 ? {} : { quantity: row.quantity },
+    ...row.identityKey === void 0 ? {} : { identityKey: row.identityKey }
+  };
+}
+
 // src/core/suppressions.ts
 function applySuppressions(findings, suppressions = [], now = /* @__PURE__ */ new Date()) {
   if (suppressions.length === 0) {
@@ -103574,7 +103589,8 @@ async function runPipeline(input = {}, logger7) {
     waiverResult: postProcessed.waiverResult,
     policy: postProcessed.policy,
     pluginLoad,
-    projects
+    projects,
+    boms: postProcessed.boms
   });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
   ctx.options.signal?.throwIfAborted();
@@ -103711,6 +103727,7 @@ async function postProcessPhase(ctx, findings, projects) {
     waiverResult.expired.length
   );
   const summary2 = summarizeFindings(effectiveFindings, ctx.options.failOn);
+  const boms = await resolveProjectBoms(ctx, projects);
   const policy = ctx.config.policy ? evaluatePolicy(ctx.config.policy, {
     summary: summary2,
     readiness,
@@ -103718,7 +103735,53 @@ async function postProcessPhase(ctx, findings, projects) {
     expiredWaivers: waiverResult.expired.length,
     staleWaivers: waiverResult.active.filter((waiver) => waiver.stale).length
   }) : void 0;
-  return { effectiveFindings, fabrication, readiness, summary: summary2, waiverResult, policy };
+  return { effectiveFindings, fabrication, readiness, summary: summary2, waiverResult, policy, boms };
+}
+function explicitWorkspaceBom(options) {
+  return options.bom && options.bom !== "auto" ? options.bom : void 0;
+}
+async function bomWithinProject(root, project) {
+  const projectDirectory = project.projectFile.split("/").slice(0, -1).join("/");
+  const prefix2 = projectDirectory.length > 0 ? `${projectDirectory}/` : "";
+  const found = await globFiles(root, [
+    `${prefix2}**/bom*.csv`,
+    `${prefix2}**/*bom*.csv`,
+    `${prefix2}**/bom*.tsv`,
+    `${prefix2}**/*bom*.tsv`
+  ]);
+  const first = found[0];
+  if (!first) return void 0;
+  const relative = import_node_path41.default.relative(root, first).split(import_node_path41.default.sep).join("/");
+  return relative.startsWith("..") ? void 0 : relative;
+}
+async function resolveProjectBoms(ctx, projects) {
+  const boms = [];
+  for (const project of projects) {
+    const projectConfig = configForProject(ctx.root, ctx.config, project);
+    const override = projectConfig.projects?.[0];
+    const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
+    const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
+    const attributableBom = declaredBom ?? await bomWithinProject(ctx.root, project);
+    const scoped = {
+      root: ctx.root,
+      projects: [project],
+      config: projectConfig,
+      options: { ...ctx.options, bom: attributableBom ?? ctx.options.bom },
+      logger: ctx.logger
+    };
+    try {
+      const { bomRows, schematicRows } = await loadBomContext(scoped);
+      const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
+      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
+    } catch (error52) {
+      ctx.logger.debug("pipeline.bom.unresolved", {
+        project: project.projectFile,
+        reason: error52 instanceof Error ? error52.message : String(error52)
+      });
+      boms.push({ project: project.projectFile, components: [] });
+    }
+  }
+  return boms;
 }
 function assembleRunResult({
   ctx,
@@ -103729,7 +103792,8 @@ function assembleRunResult({
   waiverResult,
   policy,
   pluginLoad,
-  projects
+  projects,
+  boms
 }) {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   const releaseMode = ctx.options.releaseMode;
@@ -103746,6 +103810,7 @@ function assembleRunResult({
     ...policy ? { policy } : {},
     ...ctx.config.waivers && ctx.config.waivers.length > 0 ? { waivers: { active: waiverResult.active, expired: waiverResult.expired } } : {},
     projects,
+    boms,
     findings: effectiveFindings,
     fabrication,
     plugins: pluginLoad.plugins,

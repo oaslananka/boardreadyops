@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { type ReleaseRunResult, releaseRunResultSchema } from "@boardreadyops/contracts";
+import { createSqlBoardBomStore } from "@boardreadyops/db/board-bom-store";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { verifyGitHubActionsOidcToken } from "../../../../../lib/github-actions-oidc.js";
@@ -457,6 +458,40 @@ async function readResultRequest(request: Request, dependencies: ResultRouteDepe
     };
   }
   return { value: { runId, executionAttemptId, result: parsed.data } };
+}
+
+/**
+ * Records one BOM snapshot per reported board, after the terminal result is accepted.
+ *
+ * Snapshots are unique per (board, run), so a replayed result is a no-op and this is safe
+ * to call for both accepted and replayed outcomes. A snapshot failure must never turn an
+ * accepted result into a failure: the runner has already done its work and cannot usefully
+ * retry, so the error is surfaced as a warning the same way optional comment publication is.
+ */
+async function recordBoardBomSnapshots(
+  executor: ResultQueryExecutor,
+  dependencies: ResultRouteDependencies,
+  input: ParsedResultRequest,
+  row: QueryRow,
+): Promise<string | undefined> {
+  const boms = input.result.boms;
+  if (!boms || boms.length === 0) return undefined;
+
+  const repositoryId = stringCell(row, "repository_id");
+  const commitSha = stringCell(row, "commit_sha");
+  if (!repositoryId || !commitSha) return "Board BOM snapshot skipped: run repository or commit is unavailable.";
+
+  try {
+    await createSqlBoardBomStore(executor, { now: dependencies.now }).recordSnapshots({
+      runId: input.runId,
+      repositoryId,
+      commitSha,
+      boms,
+    });
+    return undefined;
+  } catch {
+    return "Board BOM snapshot could not be recorded for this run.";
+  }
 }
 
 async function persistRunnerResult(
@@ -934,6 +969,8 @@ async function persistRunnerResult(
             effective.id,
             effective.github_check_run_id,
             effective.pull_request_number,
+            effective.repository_id,
+            (select release_runs.commit_sha from release_runs where release_runs.id = effective.id) as commit_sha,
             repositories.owner,
             repositories.name,
             installations.github_installation_id,
@@ -1204,6 +1241,8 @@ export async function handleResultRequest(
   );
   if (rejection) return rejection;
 
+  const snapshotWarning = await recordBoardBomSnapshots(executor, dependencies, requestRead.value, persisted.row);
+
   const publication = await publishTerminalResult(
     executor,
     dependencies,
@@ -1212,6 +1251,8 @@ export async function handleResultRequest(
     persisted.completedAt,
   );
   if (publication.response) return publication.response;
+
+  if (snapshotWarning) publication.publicationWarnings.push(snapshotWarning);
 
   const responseStatus = persistenceOutcome === "replayed" ? "replayed" : "accepted";
   return Response.json(

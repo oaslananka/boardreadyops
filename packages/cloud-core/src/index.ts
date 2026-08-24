@@ -2,6 +2,8 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 
+export * from "./component-intelligence.js";
+export * from "./entitlements.js";
 export * from "./runner-request-signature.js";
 
 export interface VerifyGitHubWebhookOptions {

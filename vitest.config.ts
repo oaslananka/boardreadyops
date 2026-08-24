@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { transform } from "esbuild";
 import { defineConfig } from "vitest/config";
 
@@ -32,6 +33,15 @@ export default defineConfig({
       },
     },
   ],
+  resolve: {
+    alias: {
+      // next/font/google ships empty; Next replaces loader calls at build time, so importing
+      // any module that calls one would throw here without a stub.
+      // fileURLToPath, not pathname: stripping a leading slash by hand only produces a
+      // valid path on Windows and breaks the alias everywhere else.
+      "next/font/google": fileURLToPath(new URL("tests/stubs/next-font-google.ts", import.meta.url)),
+    },
+  },
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],

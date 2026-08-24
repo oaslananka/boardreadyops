@@ -46504,6 +46504,21 @@ function computeReadiness(input) {
   };
 }
 
+// src/core/result.ts
+function projectBomComponent(row) {
+  return {
+    reference: row.reference,
+    ...row.value === void 0 ? {} : { value: row.value },
+    ...row.footprint === void 0 ? {} : { footprint: row.footprint },
+    ...row.manufacturer === void 0 ? {} : { manufacturer: row.manufacturer },
+    ...row.mpn === void 0 ? {} : { mpn: row.mpn },
+    ...row.lifecycle === void 0 ? {} : { lifecycle: row.lifecycle },
+    ...row.dnp === void 0 ? {} : { dnp: row.dnp },
+    ...row.quantity === void 0 ? {} : { quantity: row.quantity },
+    ...row.identityKey === void 0 ? {} : { identityKey: row.identityKey }
+  };
+}
+
 // src/core/suppressions.ts
 function applySuppressions(findings, suppressions = [], now = /* @__PURE__ */ new Date()) {
   if (suppressions.length === 0) {
@@ -46645,7 +46660,8 @@ async function runPipeline(input = {}, logger) {
     waiverResult: postProcessed.waiverResult,
     policy: postProcessed.policy,
     pluginLoad,
-    projects
+    projects,
+    boms: postProcessed.boms
   });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
   ctx.options.signal?.throwIfAborted();
@@ -46782,6 +46798,7 @@ async function postProcessPhase(ctx, findings, projects) {
     waiverResult.expired.length
   );
   const summary = summarizeFindings(effectiveFindings, ctx.options.failOn);
+  const boms = await resolveProjectBoms(ctx, projects);
   const policy = ctx.config.policy ? evaluatePolicy(ctx.config.policy, {
     summary,
     readiness,
@@ -46789,7 +46806,53 @@ async function postProcessPhase(ctx, findings, projects) {
     expiredWaivers: waiverResult.expired.length,
     staleWaivers: waiverResult.active.filter((waiver) => waiver.stale).length
   }) : void 0;
-  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy };
+  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy, boms };
+}
+function explicitWorkspaceBom(options) {
+  return options.bom && options.bom !== "auto" ? options.bom : void 0;
+}
+async function bomWithinProject(root, project) {
+  const projectDirectory = project.projectFile.split("/").slice(0, -1).join("/");
+  const prefix = projectDirectory.length > 0 ? `${projectDirectory}/` : "";
+  const found = await globFiles(root, [
+    `${prefix}**/bom*.csv`,
+    `${prefix}**/*bom*.csv`,
+    `${prefix}**/bom*.tsv`,
+    `${prefix}**/*bom*.tsv`
+  ]);
+  const first = found[0];
+  if (!first) return void 0;
+  const relative = import_node_path42.default.relative(root, first).split(import_node_path42.default.sep).join("/");
+  return relative.startsWith("..") ? void 0 : relative;
+}
+async function resolveProjectBoms(ctx, projects) {
+  const boms = [];
+  for (const project of projects) {
+    const projectConfig = configForProject(ctx.root, ctx.config, project);
+    const override = projectConfig.projects?.[0];
+    const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
+    const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
+    const attributableBom = declaredBom ?? await bomWithinProject(ctx.root, project);
+    const scoped = {
+      root: ctx.root,
+      projects: [project],
+      config: projectConfig,
+      options: { ...ctx.options, bom: attributableBom ?? ctx.options.bom },
+      logger: ctx.logger
+    };
+    try {
+      const { bomRows, schematicRows } = await loadBomContext(scoped);
+      const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
+      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
+    } catch (error51) {
+      ctx.logger.debug("pipeline.bom.unresolved", {
+        project: project.projectFile,
+        reason: error51 instanceof Error ? error51.message : String(error51)
+      });
+      boms.push({ project: project.projectFile, components: [] });
+    }
+  }
+  return boms;
 }
 function assembleRunResult({
   ctx,
@@ -46800,7 +46863,8 @@ function assembleRunResult({
   waiverResult,
   policy,
   pluginLoad,
-  projects
+  projects,
+  boms
 }) {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   const releaseMode = ctx.options.releaseMode;
@@ -46817,6 +46881,7 @@ function assembleRunResult({
     ...policy ? { policy } : {},
     ...ctx.config.waivers && ctx.config.waivers.length > 0 ? { waivers: { active: waiverResult.active, expired: waiverResult.expired } } : {},
     projects,
+    boms,
     findings: effectiveFindings,
     fabrication,
     plugins: pluginLoad.plugins,
@@ -53797,7 +53862,8 @@ var findingSchema = external_exports.object({
   ruleId: external_exports.string().min(1).max(256),
   severity: findingSeveritySchema,
   message: external_exports.string().min(1).max(4e3),
-  path: external_exports.string().min(1).max(1024).optional()
+  path: external_exports.string().min(1).max(1024).optional(),
+  project: external_exports.string().trim().min(1).max(1024).optional()
 });
 var artifactStoragePathSchema = external_exports.string().min(1).max(1024).refine(
   (value) => !value.includes("\0") && !value.startsWith("/") && !value.startsWith("\\") && !/^[A-Za-z]:[\\/]/u.test(value) && !value.split(/[\\/]/u).includes(".."),
@@ -53812,6 +53878,21 @@ var releaseRunArtifactSchema = external_exports.object({
   role: external_exports.string().trim().min(1).max(128),
   contentType: artifactContentTypeSchema.optional()
 });
+var releaseRunBomComponentSchema = external_exports.object({
+  reference: external_exports.string().trim().min(1).max(64),
+  mpn: external_exports.string().trim().min(1).max(128).optional(),
+  manufacturer: external_exports.string().trim().min(1).max(128).optional(),
+  value: external_exports.string().trim().min(1).max(256).optional(),
+  footprint: external_exports.string().trim().min(1).max(256).optional(),
+  quantity: external_exports.number().int().positive().max(1e6).optional(),
+  dnp: external_exports.boolean().optional(),
+  lifecycle: external_exports.string().trim().min(1).max(64).optional(),
+  identityKey: external_exports.string().regex(/^[0-9a-f]{16}$/u).optional()
+}).strict();
+var releaseRunBoardBomSchema = external_exports.object({
+  project: external_exports.string().trim().min(1).max(1024),
+  components: external_exports.array(releaseRunBomComponentSchema).max(5e3)
+}).strict();
 var releaseRunReportLinkSchema = external_exports.object({
   label: external_exports.string().trim().min(1).max(160),
   url: external_exports.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "report link must use HTTPS")
@@ -53932,7 +54013,10 @@ var releaseRunResultBaseSchema = external_exports.object({
   reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([]),
   readiness: releaseRunReadinessSchema.optional(),
   waivers: releaseRunWaiversSchema.optional(),
-  hardwareImpact: hardwareImpactV1Schema.optional()
+  hardwareImpact: hardwareImpactV1Schema.optional(),
+  // Optional with no default: a default would materialise the key on every legacy
+  // payload and change its terminal-result digest, breaking replay detection.
+  boms: external_exports.array(releaseRunBoardBomSchema).max(50).optional()
 }).strict();
 var releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context) => {
   const expected = inferredConclusion(value);
@@ -54895,6 +54979,15 @@ async function publishArtifacts(client, job, artifacts) {
   }
   return published;
 }
+function boundedBoms(boms) {
+  return boms.slice(0, 50).map((bom) => ({
+    project: bom.project.slice(0, 1024),
+    components: bom.components.filter((component) => component.reference.trim().length > 0).slice(0, 5e3).map((component) => ({
+      ...component,
+      reference: component.reference.slice(0, 64)
+    }))
+  }));
+}
 function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
   const completed = execution.exitCode === 0 || execution.exitCode === 1;
   const decision = decisionFromExitCode(execution.exitCode);
@@ -54902,7 +54995,8 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
     ruleId: finding2.ruleId.slice(0, 256),
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
     message: finding2.message.slice(0, 4e3),
-    ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {}
+    ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {},
+    ...finding2.project ? { project: finding2.project.slice(0, 1024) } : {}
   })) : [
     {
       ruleId: "runner.execution",
@@ -54935,6 +55029,9 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
     ...execution.report?.readiness ? { readiness: execution.report.readiness } : {},
     ...execution.report?.waivers ? { waivers: execution.report.waivers } : {},
     ...execution.report?.hardwareImpact ? { hardwareImpact: execution.report.hardwareImpact } : {},
+    // Spread an empty object when there is nothing to report so `boms` stays absent rather
+    // than becoming [], which would change the terminal result digest for every legacy run.
+    ...execution.report?.boms?.length ? { boms: boundedBoms(execution.report.boms) } : {},
     reportLinks: []
   });
 }
@@ -55878,6 +55975,12 @@ var findings_schema_default = {
     projects: {
       type: "array"
     },
+    boms: {
+      type: "array",
+      items: {
+        $ref: "#/$defs/projectBom"
+      }
+    },
     findings: {
       type: "array",
       items: {
@@ -56616,6 +56719,53 @@ var findings_schema_default = {
         },
         permissions: {
           $ref: "#/$defs/pluginPermissions"
+        }
+      }
+    },
+    projectBom: {
+      type: "object",
+      additionalProperties: false,
+      required: ["project", "components"],
+      properties: {
+        project: {
+          type: "string"
+        },
+        components: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["reference"],
+            properties: {
+              reference: {
+                type: "string"
+              },
+              value: {
+                type: "string"
+              },
+              footprint: {
+                type: "string"
+              },
+              manufacturer: {
+                type: "string"
+              },
+              mpn: {
+                type: "string"
+              },
+              lifecycle: {
+                type: "string"
+              },
+              dnp: {
+                type: "boolean"
+              },
+              quantity: {
+                type: "number"
+              },
+              identityKey: {
+                type: "string"
+              }
+            }
+          }
         }
       }
     }
