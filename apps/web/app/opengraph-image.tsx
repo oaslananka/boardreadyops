@@ -14,17 +14,17 @@ export default function OpengraphImage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0a0f0d",
+        background: "#0b0e13",
         padding: 80,
       }}
     >
       <div style={{ marginBottom: 36, display: "flex" }}>
         <BrandMarkIcon size={88} />
       </div>
-      <div style={{ fontSize: 56, fontWeight: 700, color: "#f4fff8", textAlign: "center", lineHeight: 1.2 }}>
+      <div style={{ fontSize: 56, fontWeight: 700, color: "#ece5d3", textAlign: "center", lineHeight: 1.2 }}>
         Release evidence that leads to a decision.
       </div>
-      <div style={{ fontSize: 26, color: "#9fc9ae", marginTop: 24, textAlign: "center" }}>
+      <div style={{ fontSize: 26, color: "#c69a3e", marginTop: 24, textAlign: "center" }}>
         BoardReadyOps — release readiness for KiCad hardware
       </div>
     </div>,

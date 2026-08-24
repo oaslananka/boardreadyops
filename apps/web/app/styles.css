@@ -1,27 +1,36 @@
+/*
+ * BoardReadyOps evidence ledger.
+ *
+ * The subject is a record a board signs off on, not a terminal session, so the surface reads
+ * as ink and paper: a near-black ground, warm parchment text, and one brass accent reserved
+ * for the decision. Structure comes from hairlines and type weight rather than glow, which
+ * keeps semantic colour (pass / warning / danger) from competing with a decorative accent.
+ */
 :root {
   color-scheme: dark;
-  --bro-bg: #070d0a;
-  --bro-bg-elevated: #0b1310;
-  --bro-surface: #0f1914;
-  --bro-surface-strong: #14231b;
-  --bro-surface-sunken: #08100c;
-  --bro-border: #24362c;
-  --bro-border-strong: #3d5948;
-  --bro-border-accent: rgba(63, 224, 138, 0.45);
-  --bro-text: #f4fff8;
-  --bro-text-muted: #b9cfbf;
-  --bro-text-subtle: #8fa596;
-  --bro-accent: #3fe08a;
-  --bro-accent-strong: #5cf5a0;
-  --bro-accent-soft: #9fc9ae;
-  --bro-accent-contrast: #06130c;
-  --bro-focus: #f8e16c;
-  --bro-shadow: 0 24px 72px rgba(0, 0, 0, 0.34);
-  --bro-shadow-soft: 0 14px 36px rgba(0, 0, 0, 0.2);
-  --bro-radius-sm: 0.625rem;
-  --bro-radius-md: 0.9rem;
-  --bro-radius-lg: 1.25rem;
-  --bro-radius-xl: 1.75rem;
+  --bro-bg: #0b0e13;
+  --bro-bg-elevated: #10141b;
+  --bro-surface: #141924;
+  --bro-surface-strong: #1a2030;
+  --bro-surface-sunken: #080b10;
+  --bro-border: #232a38;
+  --bro-border-strong: #333c4e;
+  --bro-border-accent: rgba(198, 154, 62, 0.5);
+  --bro-text: #ece5d3;
+  --bro-text-muted: #a9b0bd;
+  --bro-text-subtle: #79818f;
+  --bro-accent: #c69a3e;
+  --bro-accent-strong: #e3b662;
+  --bro-accent-soft: #d9c9a4;
+  --bro-accent-contrast: #0b0e13;
+  --bro-focus: #e3b662;
+  --bro-shadow: 0 24px 72px rgba(0, 0, 0, 0.55);
+  --bro-shadow-soft: 0 14px 36px rgba(0, 0, 0, 0.35);
+  /* Ledger geometry: near-square, so the surface reads as a filed document, not a widget. */
+  --bro-radius-sm: 0.25rem;
+  --bro-radius-md: 0.35rem;
+  --bro-radius-lg: 0.5rem;
+  --bro-radius-xl: 0.65rem;
   --bro-motion-fast: 140ms;
   --bro-motion-medium: 220ms;
   --bro-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -47,24 +56,29 @@
   --radius-lg: var(--bro-radius-lg);
   --shadow: var(--bro-shadow);
 
-  --code: #a9eec8;
-  --skip-text: #10140e;
-  --success: #72e8aa;
-  --success-surface: #0b2e20;
-  --success-border: #33785a;
-  --warning: #f6d77a;
-  --warning-surface: #34280b;
-  --warning-border: #8b6b25;
-  --danger: #ffabb4;
-  --danger-surface: #35151b;
-  --danger-border: #8b3847;
-  --info: #9ed9c1;
-  --info-surface: #102a22;
-  --info-border: #386e5b;
-  --background-glow: rgba(63, 224, 138, 0.1);
-  --header-backdrop: rgba(7, 13, 10, 0.9);
-  --header-border: rgba(61, 89, 72, 0.62);
-  --shadow-soft-color: rgba(0, 0, 0, 0.2);
+  --code: #d9c9a4;
+  --skip-text: #0b0e13;
+  /*
+   * Semantic tones are muted toward the ledger palette rather than kept at full saturation.
+   * They still clear WCAG AA on the ink ground, but they read as annotations on a record
+   * instead of signal lights, so a single warning does not shout louder than the decision.
+   */
+  --success: #7fb894;
+  --success-surface: #12241a;
+  --success-border: #38614a;
+  --warning: #d9a85c;
+  --warning-surface: #2a2113;
+  --warning-border: #6d5628;
+  --danger: #d98a76;
+  --danger-surface: #2b1815;
+  --danger-border: #74392e;
+  --info: #8aa8c4;
+  --info-surface: #151f29;
+  --info-border: #3a5164;
+  --background-glow: rgba(198, 154, 62, 0.07);
+  --header-backdrop: rgba(11, 14, 19, 0.9);
+  --header-border: rgba(51, 60, 78, 0.75);
+  --shadow-soft-color: rgba(0, 0, 0, 0.35);
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -73,8 +87,14 @@
   --space-6: 2rem;
   --space-7: 3rem;
   --content-width: 78rem;
-  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /*
+   * The three faces are loaded by next/font in app/layout.tsx, which self-hosts them and
+   * exposes each as a CSS variable. The stacks below stay as real fallbacks for the moment
+   * before the webfont settles, and for any surface rendered outside the app shell.
+   */
+  --font-display: var(--font-display-loaded, Newsreader), Georgia, "Iowan Old Style", serif;
+  --font-ui: var(--font-ui-loaded, Inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-loaded, "JetBrains Mono"), "SFMono-Regular", Consolas, monospace;
 }
 
 * {
@@ -89,12 +109,21 @@ html {
 body {
   min-width: 20rem;
   margin: 0;
-  background: radial-gradient(circle at 15% -10%, var(--background-glow), transparent 32rem), var(--background);
+  /* A faint ruled grain, the way a ledger page is ruled, instead of an ambient accent glow. */
+  background:
+    repeating-linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bro-text) 2%, transparent) 0 1px,
+      transparent 1px 2.25rem
+    ),
+    radial-gradient(ellipse 60% 40% at 50% -8%, var(--background-glow), transparent 70%), var(--background);
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 1rem;
   line-height: 1.6;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
 }
 
 a {
@@ -132,27 +161,35 @@ p {
   margin-top: 0;
 }
 
+/*
+ * Headings carry the ledger voice: a serif at normal weight rather than a heavy grotesk.
+ * Restraint is the point — the display face earns its place by being the only thing on the
+ * page set in it, so the eye reads headings as titles of a record rather than as shouting.
+ */
 h1,
 h2,
 h3 {
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 h1 {
   max-width: 22ch;
   margin-bottom: var(--space-3);
-  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-size: clamp(2rem, 5vw, 3.25rem);
 }
 
 h2 {
   margin-bottom: var(--space-2);
-  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
 }
 
 h3 {
   margin-bottom: var(--space-2);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
 }
 
 code {
@@ -311,10 +348,8 @@ code {
   padding: clamp(1.5rem, 4vw, 2.5rem);
   border-color: var(--bro-border);
   border-radius: var(--bro-radius-xl);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--bro-accent) 7%, transparent), transparent 46%),
-    linear-gradient(180deg, var(--bro-surface-strong), var(--bro-bg-elevated));
-  box-shadow: var(--bro-shadow);
+  background: var(--bro-bg-elevated);
+  box-shadow: var(--bro-shadow-soft);
 }
 
 .run-context {
@@ -350,16 +385,21 @@ code {
 .score {
   display: grid;
   min-width: 5.5rem;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-strong);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--bro-border-accent);
   border-radius: var(--radius-md);
-  background: var(--surface-muted);
+  background: var(--bro-surface-sunken);
   text-align: center;
 }
 
 .score strong {
+  color: var(--bro-text);
   font-family: var(--font-mono);
-  font-size: 1.4rem;
+  font-size: clamp(1.9rem, 3vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .score > span:not(.sr-only) {
@@ -1431,15 +1471,13 @@ code {
   box-shadow: var(--bro-shadow-soft);
 }
 
+/* Same filing-edge rule as the run header, so setup reads as the first page of the record. */
 .setup-hero::after {
   position: absolute;
-  width: 16rem;
-  height: 16rem;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--bro-accent) 8%, transparent);
+  width: 3px;
+  background: linear-gradient(180deg, var(--bro-accent), color-mix(in srgb, var(--bro-accent) 15%, transparent));
   content: "";
-  filter: blur(4rem);
-  inset: -8rem -5rem auto auto;
+  inset: 0 auto 0 0;
   pointer-events: none;
 }
 
@@ -1668,15 +1706,17 @@ code {
 
 /* Premium run evidence control room */
 
+/*
+ * The signature element: a brass rule down the filing edge of the record, the way a bound
+ * ledger is stitched. It replaces the blurred accent orb — one deliberate mark instead of
+ * ambient decoration, and the only place the accent appears at full strength.
+ */
 .run-header::after {
   position: absolute;
-  width: 18rem;
-  height: 18rem;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--bro-accent) 8%, transparent);
+  width: 3px;
+  background: linear-gradient(180deg, var(--bro-accent), color-mix(in srgb, var(--bro-accent) 15%, transparent));
   content: "";
-  filter: blur(5rem);
-  inset: -10rem -6rem auto auto;
+  inset: 0 auto 0 0;
   pointer-events: none;
 }
 

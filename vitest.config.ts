@@ -32,6 +32,13 @@ export default defineConfig({
       },
     },
   ],
+  resolve: {
+    alias: {
+      // next/font/google ships empty; Next replaces loader calls at build time, so importing
+      // any module that calls one would throw here without a stub.
+      "next/font/google": new URL("tests/stubs/next-font-google.ts", import.meta.url).pathname.slice(1),
+    },
+  },
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
