@@ -46645,7 +46645,8 @@ async function runPipeline(input = {}, logger) {
     waiverResult: postProcessed.waiverResult,
     policy: postProcessed.policy,
     pluginLoad,
-    projects
+    projects,
+    boms: postProcessed.boms
   });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
   ctx.options.signal?.throwIfAborted();
@@ -46782,6 +46783,7 @@ async function postProcessPhase(ctx, findings, projects) {
     waiverResult.expired.length
   );
   const summary = summarizeFindings(effectiveFindings, ctx.options.failOn);
+  const boms = await resolveProjectBoms(ctx, projects);
   const policy = ctx.config.policy ? evaluatePolicy(ctx.config.policy, {
     summary,
     readiness,
@@ -46789,7 +46791,36 @@ async function postProcessPhase(ctx, findings, projects) {
     expiredWaivers: waiverResult.expired.length,
     staleWaivers: waiverResult.active.filter((waiver) => waiver.stale).length
   }) : void 0;
-  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy };
+  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy, boms };
+}
+async function resolveProjectBoms(ctx, projects) {
+  const boms = [];
+  for (const project of projects) {
+    const projectConfig = configForProject(ctx.root, ctx.config, project);
+    const override = projectConfig.projects?.[0];
+    const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
+    const scoped = {
+      root: ctx.root,
+      projects: [project],
+      config: projectConfig,
+      options: {
+        ...ctx.options,
+        bom: variantMatch?.bom ?? override?.bom ?? ctx.options.bom
+      },
+      logger: ctx.logger
+    };
+    try {
+      const { bomRows, schematicRows } = await loadBomContext(scoped);
+      boms.push({ project: project.projectFile, components: bomRows.length > 0 ? bomRows : schematicRows });
+    } catch (error51) {
+      ctx.logger.debug("pipeline.bom.unresolved", {
+        project: project.projectFile,
+        reason: error51 instanceof Error ? error51.message : String(error51)
+      });
+      boms.push({ project: project.projectFile, components: [] });
+    }
+  }
+  return boms;
 }
 function assembleRunResult({
   ctx,
@@ -46800,7 +46831,8 @@ function assembleRunResult({
   waiverResult,
   policy,
   pluginLoad,
-  projects
+  projects,
+  boms
 }) {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   const releaseMode = ctx.options.releaseMode;
@@ -46817,6 +46849,7 @@ function assembleRunResult({
     ...policy ? { policy } : {},
     ...ctx.config.waivers && ctx.config.waivers.length > 0 ? { waivers: { active: waiverResult.active, expired: waiverResult.expired } } : {},
     projects,
+    boms,
     findings: effectiveFindings,
     fabrication,
     plugins: pluginLoad.plugins,

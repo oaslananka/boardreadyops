@@ -1,3 +1,4 @@
+import type { BomRow } from "../bom/types.js";
 import type { BomRiskSummary } from "./bom-risk.js";
 import type { ReleaseMode } from "./config.types.js";
 import type { ProjectContext } from "./context.js";
@@ -8,6 +9,12 @@ import type { LoadedPlugin } from "./plugin-loader.js";
 import type { PolicyEvaluation } from "./policy.js";
 import type { ReadinessScore } from "./readiness.js";
 import type { WaiverStatus } from "./waivers.js";
+
+/** The component rows resolved for one KiCad project, as the BOM rules saw them. */
+export interface ProjectBom {
+  project: string;
+  components: BomRow[];
+}
 
 export interface RunResult {
   schemaVersion: 1;
@@ -24,6 +31,7 @@ export interface RunResult {
   policy?: PolicyEvaluation | undefined;
   waivers?: { active: WaiverStatus[]; expired: WaiverStatus[] } | undefined;
   projects: ProjectContext[];
+  boms?: ProjectBom[] | undefined;
   findings: Finding[];
   fabrication: FabricationSnapshot;
   hardwareImpact?: HardwareImpactV1 | undefined;
