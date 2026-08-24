@@ -116,7 +116,11 @@ export async function runSupplyWatchPass(
     options.observationTtlMs ?? defaultObservationTtlMs,
     provider.cachePolicy.maximumCacheAgeMs,
   );
-  const cacheShareable = provider.cachePolicy.shareableAcrossTenants;
+  // Caching is only permitted when the licence allows both retaining a result and reusing it
+  // for another licensee. Some distributor terms forbid storing any portion of the content, so
+  // a zero retention window means the cache is bypassed rather than written and instantly
+  // expired — storing it at all would be the breach, not serving it.
+  const cacheUsable = provider.cachePolicy.shareableAcrossTenants && provider.cachePolicy.maximumCacheAgeMs > 0;
   const intervalMs = options.intervalMs ?? defaultIntervalMs;
   const retryIntervalMs = options.retryIntervalMs ?? defaultRetryIntervalMs;
   const limit = options.maximumBoardsPerRun ?? defaultMaximumBoardsPerRun;
@@ -145,7 +149,7 @@ export async function runSupplyWatchPass(
       // A non-transferable licence means one installation's answer may not serve another, and
       // the observation cache is shared, so it is bypassed entirely rather than leaked across
       // tenants. Every installation then pays for its own lookups.
-      const cached = cacheShareable ? await store.freshObservations(now, parts) : new Map();
+      const cached = cacheUsable ? await store.freshObservations(now, parts) : new Map();
       const missing = parts.filter((part) => !cached.has(componentKey(part)));
 
       if (missing.length > 0 && provider.name === "none") {
@@ -162,7 +166,7 @@ export async function runSupplyWatchPass(
       if (missing.length > 0) {
         report.partsQueried += missing.length;
         const observed = await provider.lookup(missing);
-        if (cacheShareable) {
+        if (cacheUsable) {
           const expiresAt = new Date(now.getTime() + observationTtlMs);
           report.observationsRecorded += await store.recordObservations(
             observed.map((observation) => ({

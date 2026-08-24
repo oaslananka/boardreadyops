@@ -197,4 +197,23 @@ describe("supply watch pass", () => {
     expect(report.partsQueried).toBe(2);
     expect(report.boardsEvaluated).toBe(1);
   });
+  it("stores nothing for a provider whose terms forbid retaining results", async () => {
+    const { store } = storeWith([board()]);
+    const provider: ComponentIntelligenceProvider = {
+      name: "no-retention",
+      // Some distributor terms forbid caching, recording or storing any portion of the content.
+      cachePolicy: { maximumCacheAgeMs: 0, shareableAcrossTenants: true },
+      async lookup(parts) {
+        return parts.map((part) => ({ ...part, status: "eol" as const, source: "no-retention", observedAt: now }));
+      },
+    };
+
+    const report = await runSupplyWatchPass(store, provider, now);
+
+    // Writing a row and expiring it immediately would still be storing it.
+    expect(store.freshObservations).not.toHaveBeenCalled();
+    expect(store.recordObservations).not.toHaveBeenCalled();
+    // The finding is still raised: the watch works, it just cannot keep the evidence cached.
+    expect(report.findingsOpened).toBe(2);
+  });
 });

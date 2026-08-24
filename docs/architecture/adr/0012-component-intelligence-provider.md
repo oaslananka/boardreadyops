@@ -76,8 +76,19 @@ catalogue and stock.
 
 Trade-off: each covers only its own catalogue and its own view of lifecycle, so
 coverage is partial and inconsistent across vendors. Running several multiplies
-integration and reconciliation work. Best as a supplement or as a
-customer-supplied key, not as the sole source.
+integration and reconciliation work.
+
+**Mouser's terms are stricter than Nexar's, not looser.** Read on 2026-08-24 via
+[mouser.com/en/apiterms](https://www.mouser.com/en/apiterms/): users are prohibited from
+"caching, recording, pre-fetching, or otherwise storing any portion of the Mouser Electronics
+Content", from "bulk download" operations, and from using the content "to update or create
+their own database". That is no retention window at all, not a short one.
+
+Digi-Key's API terms sit behind a developer-account login and could not be read here. They
+must be checked from an authenticated account before Digi-Key is relied on.
+
+The pattern across every source examined is consistent: these restrictions protect the
+distributors supplying the data, so expect them by default rather than as an exception.
 
 ### Enterprise obsolescence databases (SiliconExpert, Z2Data, and peers)
 
@@ -134,6 +145,9 @@ clean, so the gap is visible rather than silent.
   requires, never less, and a provider suggesting a longer expiry cannot extend it.
 - `shareableAcrossTenants: false` bypasses the shared observation cache entirely — no read and
   no write — so one licensee's answer can never serve another.
+- `maximumCacheAgeMs: 0` also bypasses it entirely, for terms like Mouser's that forbid storing
+  any portion of the content. Writing a row and expiring it immediately would still be storing
+  it. The watch still raises findings; it simply cannot keep the evidence cached.
 
 A provider cannot be plugged in without declaring both, and both are covered by tests.
 

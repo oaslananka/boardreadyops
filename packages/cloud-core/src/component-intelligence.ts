@@ -45,7 +45,12 @@ export type ComponentObservation = {
  * silently outlives whichever vendor it was written for.
  */
 export type ProviderCachePolicy = {
-  /** Longest a result may be retained, per the provider's own terms. */
+  /**
+   * Longest a result may be retained, per the provider's own terms.
+   *
+   * Zero means the terms forbid storing results at all, which some distributor APIs require.
+   * The watch then never reads or writes the observation cache for that provider.
+   */
   maximumCacheAgeMs: number;
   /**
    * Whether a result fetched for one installation may answer another installation's question.
