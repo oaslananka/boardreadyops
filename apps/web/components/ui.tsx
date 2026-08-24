@@ -1,7 +1,6 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 import { BrandMarkLockup } from "./brand-mark.js";
-import { ViewerControls } from "./viewer-controls.js";
 
 export type StatusTone = "danger" | "info" | "neutral" | "success" | "warning";
 
@@ -92,7 +91,12 @@ export function StatusBadge({ value, label }: Readonly<{ value: string | undefin
   );
 }
 
-export function AppShell({ children, viewerLogin }: Readonly<{ children: ReactNode; viewerLogin?: string }>) {
+/**
+ * `viewerNav` is a slot rather than something AppShell imports itself. Error boundaries are
+ * client components and also render this shell, so importing the session reader here would
+ * pull `next/headers` into a client bundle and fail the build.
+ */
+export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode; viewerNav?: ReactNode }>) {
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -106,7 +110,7 @@ export function AppShell({ children, viewerLogin }: Readonly<{ children: ReactNo
           <nav className="site-navigation" aria-label="Global navigation">
             <Link href="/setup">Repository setup</Link>
             <a href="https://docs.boardreadyops.com">Documentation</a>
-            <ViewerControls login={viewerLogin} />
+            {viewerNav ? <Suspense fallback={null}>{viewerNav}</Suspense> : null}
           </nav>
         </div>
       </header>

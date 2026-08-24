@@ -21,6 +21,7 @@ import {
   Panel,
   StatusBadge,
 } from "./ui.js";
+import { ViewerNav } from "./viewer-nav.js";
 
 export type RunView = "artifacts" | "attempts" | "audit" | "findings" | "publication" | "summary";
 
@@ -86,7 +87,7 @@ export function RunPageFrame({
 }: Readonly<{ run: RunDetail; active: RunView; children: ReactNode; liveRefresh?: boolean }>) {
   const currentLabel = navigationItems.find((item) => item.view === active)?.label ?? "Run";
   return (
-    <AppShell>
+    <AppShell viewerNav={<ViewerNav />}>
       <main className="shell" id="main-content">
         <Breadcrumbs
           items={[
@@ -107,7 +108,7 @@ export function RunPageFrame({
 
 export function RunUnavailable({ runId }: Readonly<{ runId: string }>) {
   return (
-    <AppShell>
+    <AppShell viewerNav={<ViewerNav />}>
       <main className="shell compact-shell" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Run unavailable" }]} />
         <Alert title="Run dashboard is not configured" tone="warning">
