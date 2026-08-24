@@ -238,6 +238,43 @@ jobs:
                 ? { path: boundedText(finding.resource.path, "unknown", 1024) }
                 : {}),
             }));
+            const rawBoms = reportAvailable && Array.isArray(report.boms) ? report.boms : [];
+            const componentText = (value, maximum) => {
+              const normalized = String(value ?? "").trim();
+              return normalized.length > 0 ? normalized.slice(0, maximum) : undefined;
+            };
+            const positiveCount = (value) => {
+              const numeric = Number(value);
+              return Number.isSafeInteger(numeric) && numeric > 0 && numeric <= 1000000 ? numeric : undefined;
+            };
+            const defined = (entries) => Object.fromEntries(entries.filter(([, value]) => value !== undefined));
+            const boms = rawBoms
+              .filter((bom) => typeof bom?.project === "string" && Array.isArray(bom.components))
+              .slice(0, 50)
+              .map((bom) => ({
+                project: boundedText(bom.project, "unknown.kicad_pro", 1024),
+                components: bom.components
+                  .filter((component) => componentText(component?.reference, 64) !== undefined)
+                  .slice(0, 5000)
+                  .map((component) =>
+                    defined([
+                      ["reference", componentText(component.reference, 64)],
+                      ["mpn", componentText(component.mpn, 128)],
+                      ["manufacturer", componentText(component.manufacturer, 128)],
+                      ["value", componentText(component.value, 256)],
+                      ["footprint", componentText(component.footprint, 256)],
+                      ["quantity", positiveCount(component.quantity)],
+                      ["dnp", typeof component.dnp === "boolean" ? component.dnp : undefined],
+                      ["lifecycle", componentText(component.lifecycle, 64)],
+                      [
+                        "identityKey",
+                        /^[0-9a-f]{16}$/.test(String(component.identityKey ?? ""))
+                          ? String(component.identityKey)
+                          : undefined,
+                      ],
+                    ]),
+                  ),
+              }));
             const summary = reportAvailable ? report.summary : {};
             const actionsRunUrl =
               `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
@@ -262,11 +299,30 @@ jobs:
               },
               reportLinks,
               ...(hardwareImpact ? { hardwareImpact } : {}),
+              ...(boms.length > 0 ? { boms } : {}),
             };
-            while (Buffer.byteLength(JSON.stringify(payload), "utf8") > 900 * 1024 && findings.length > 0) {
+            const payloadTooLarge = () => Buffer.byteLength(JSON.stringify(payload), "utf8") > 900 * 1024;
+            // Bound the transmitted component count before measuring. The contract permits
+            // 50 boards of 5000 components, which serialises far past the transmit budget;
+            // trimming up front keeps the size checks below to a few dozen serialisations
+            // instead of one per dropped component.
+            let componentBudget = 20000;
+            for (const bom of boms) {
+              if (bom.components.length > componentBudget) bom.components = bom.components.slice(0, componentBudget);
+              componentBudget -= bom.components.length;
+            }
+            // Shed BOM rows before findings: a finding is a decision input for this release,
+            // while a BOM row is supplementary evidence that the next run re-reports. Whole
+            // boards are dropped so this terminates in at most one pass per board.
+            while (payloadTooLarge() && boms.length > 0) {
+              boms.pop();
+            }
+            if (boms.length === 0) delete payload.boms;
+            while (payloadTooLarge() && findings.length > 0) {
               findings.pop();
             }
             payload.metrics.findings_transmitted = findings.length;
+            payload.metrics.boms_transmitted = boms.length;
 
             const audience = `boardreadyops-cloud:${runId}:${executionAttemptId}:${targetSha}:${trustMode}:${safeModeReasons || "none"}`;
             const oidcToken = await core.getIDToken(audience);

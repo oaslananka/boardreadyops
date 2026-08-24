@@ -137,4 +137,31 @@ describe("readiness runner workflow security contract", () => {
     expect(workflow).not.toContain("GITHUB_APP_PRIVATE_KEY");
     expect(workflow).not.toContain("BOARDREADYOPS_RUNNER_RESULT_KEY");
   });
+  it("forwards per-board BOM rows within the contract bounds", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain("const rawBoms = reportAvailable && Array.isArray(report.boms) ? report.boms : [];");
+    expect(workflow).toContain(".slice(0, 50)");
+    expect(workflow).toContain(".slice(0, 5000)");
+    expect(workflow).toContain("...(boms.length > 0 ? { boms } : {})");
+  });
+
+  it("sheds BOM rows before findings when the payload exceeds its transmit budget", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    expect(workflow).toContain("while (payloadTooLarge() && boms.length > 0)");
+    expect(workflow).toContain("while (payloadTooLarge() && findings.length > 0)");
+    expect(workflow).toContain("payload.metrics.boms_transmitted = boms.length;");
+    expect(workflow).toContain("if (boms.length === 0) delete payload.boms;");
+  });
+
+  it("bounds the transmitted component count before measuring the payload", async () => {
+    const workflow = await readFile(workflowPath, "utf8");
+
+    // Sizing must not re-serialise the payload once per dropped component: the contract
+    // permits 50 boards of 5000 rows, which would stall the callback job for minutes.
+    expect(workflow).toContain("let componentBudget = 20000;");
+    expect(workflow).toContain("boms.pop();");
+    expect(workflow).not.toContain("boms[largest].components.pop()");
+  });
 });
