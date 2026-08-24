@@ -100,6 +100,16 @@
       "types": "./src/repository-setup-store.ts",
       "import": "./src/repository-setup-store.ts",
       "default": "./src/repository-setup-store.ts"
+    },
+    "./board-supply-watch-store": {
+      "types": "./src/board-supply-watch-store.ts",
+      "import": "./src/board-supply-watch-store.ts",
+      "default": "./src/board-supply-watch-store.ts"
+    },
+    "./entitlement-store": {
+      "types": "./src/entitlement-store.ts",
+      "import": "./src/entitlement-store.ts",
+      "default": "./src/entitlement-store.ts"
     }
   },
   "devDependencies": {
