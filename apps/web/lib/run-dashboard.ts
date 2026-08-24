@@ -101,7 +101,7 @@ type TransitionDetail = {
  * `unidentifiedComponentCount` is the count without a manufacturer part number. Those parts
  * cannot be matched against supplier data later, so the gap is reported rather than hidden.
  */
-export type RunBoardDetail = {
+type RunBoardDetail = {
   boardId: string;
   project: string;
   displayName: string;

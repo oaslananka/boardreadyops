@@ -21,7 +21,7 @@ export type WatchBoard = {
   snapshotId: string | undefined;
 };
 
-export type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "failed";
+type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "failed";
 
 export type SupplyWatchStore = {
   claimDueBoards(now: Date, limit: number): Promise<WatchBoard[]>;

@@ -1,4 +1,3 @@
-import type { BomRow } from "../bom/types.js";
 import type { BomRiskSummary } from "./bom-risk.js";
 import type { ReleaseMode } from "./config.types.js";
 import type { ProjectContext } from "./context.js";
@@ -13,7 +12,7 @@ import type { WaiverStatus } from "./waivers.js";
 /**
  * One component of a project's BOM.
  *
- * Deliberately narrower than {@link BomRow}: it omits `raw`, which echoes every column of
+ * Deliberately narrower than a resolved BOM row: it omits `raw`, which echoes every column of
  * the source CSV, including internal cost, supplier, or notes columns a team may not intend
  * to publish in a report artifact. Mirrors the lean shape `fabrication.bom` already uses.
  */
@@ -35,8 +34,13 @@ export interface ProjectBom {
   components: ProjectBomComponent[];
 }
 
-/** Narrows a resolved BOM row to the publishable component fields. */
-export function projectBomComponent(row: BomRow): ProjectBomComponent {
+/**
+ * Narrows a resolved BOM row to the publishable component fields.
+ *
+ * Takes the row structurally rather than importing `BomRow`: `core` may not depend on `bom`
+ * under the layering rules that scripts/verify-structure.mjs enforces.
+ */
+export function projectBomComponent(row: ProjectBomComponent): ProjectBomComponent {
   return {
     reference: row.reference,
     ...(row.value === undefined ? {} : { value: row.value }),
