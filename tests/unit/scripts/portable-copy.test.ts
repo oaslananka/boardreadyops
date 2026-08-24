@@ -1,17 +1,37 @@
 import { chmod, lstat, mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { copyDirectoryPortable } from "../../../scripts/lib/portable-copy.mjs";
 
 const temporaryRoots: string[] = [];
+
+/**
+ * Windows refuses symlink creation unless the process is elevated or Developer Mode is on.
+ * Without this probe the symlink case fails for every unprivileged Windows contributor, which
+ * blocks the pre-push hook while proving nothing. CI runs on Linux, where it always executes.
+ */
+let symlinksPermitted = true;
+
+beforeAll(async () => {
+  const probe = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-symlink-probe-"));
+  temporaryRoots.push(probe);
+  try {
+    await mkdir(path.join(probe, "target"));
+    await symlink(path.join(probe, "target"), path.join(probe, "link"), "dir");
+  } catch {
+    symlinksPermitted = false;
+  }
+});
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
 describe("portable directory copy", () => {
-  it("preserves directory symlink type for pnpm-style relative targets", async () => {
+  it("preserves directory symlink type for pnpm-style relative targets", async ({ skip }) => {
+    if (!symlinksPermitted) skip("this platform does not permit creating symlinks");
+
     const source = await mkdtemp(path.join(process.cwd(), ".portable-copy-directory-source-"));
     temporaryRoots.push(source);
     const packageDirectory = "next@16.2.11_@babel+core@7._be10f97c94e825087e2e0e278d75b52b";
