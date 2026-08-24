@@ -103,6 +103,18 @@ function sampleRun(): RunDetail {
     artifactLifecycle: { deleted: 1, missing: 1, pendingDeletion: 1, failedDeletion: 0 },
     attempts: [],
     transitions: [],
+    boards: [
+      {
+        boardId: "7b000000-0000-4000-8000-0000000000b1",
+        project: "hardware/mainboard/mainboard.kicad_pro",
+        displayName: "mainboard",
+        capturedAt: "2026-07-10T16:05:00.000Z",
+        componentCount: 3,
+        identifiedComponentCount: 2,
+        unidentifiedComponentCount: 1,
+        riskyLifecycleCount: 1,
+      },
+    ],
   };
 }
 
