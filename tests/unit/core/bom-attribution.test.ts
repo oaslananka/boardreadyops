@@ -112,4 +112,23 @@ describe("BOM attribution on the run result", () => {
     expect(components.map((component) => component.reference)).toEqual(["U1", "R1"]);
     expect(components[0]?.mpn).toBe("STM32F103C8T6");
   });
+
+  it("does not republish unrecognised source columns from the BOM", async () => {
+    const root = await writeFixture({
+      "main.kicad_pro": "{}",
+      "main.kicad_sch": emptySchematic,
+      "main.kicad_pcb": emptyBoard,
+      "bom.csv": [
+        "Reference,MPN,Internal Cost,Supplier Notes",
+        "U1,STM32F103C8T6,42.50,confidential-vendor-terms",
+      ].join("\n"),
+    });
+
+    const result = await runPipeline({ path: root, rules: ["release.revision-set"], failOn: "never" });
+
+    const serialized = JSON.stringify(result.boms);
+    expect(serialized).not.toContain("confidential-vendor-terms");
+    expect(serialized).not.toContain("42.50");
+    expect(result.boms?.[0]?.components[0]?.mpn).toBe("STM32F103C8T6");
+  });
 });

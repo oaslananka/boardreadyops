@@ -46504,6 +46504,21 @@ function computeReadiness(input) {
   };
 }
 
+// src/core/result.ts
+function projectBomComponent(row) {
+  return {
+    reference: row.reference,
+    ...row.value === void 0 ? {} : { value: row.value },
+    ...row.footprint === void 0 ? {} : { footprint: row.footprint },
+    ...row.manufacturer === void 0 ? {} : { manufacturer: row.manufacturer },
+    ...row.mpn === void 0 ? {} : { mpn: row.mpn },
+    ...row.lifecycle === void 0 ? {} : { lifecycle: row.lifecycle },
+    ...row.dnp === void 0 ? {} : { dnp: row.dnp },
+    ...row.quantity === void 0 ? {} : { quantity: row.quantity },
+    ...row.identityKey === void 0 ? {} : { identityKey: row.identityKey }
+  };
+}
+
 // src/core/suppressions.ts
 function applySuppressions(findings, suppressions = [], now = /* @__PURE__ */ new Date()) {
   if (suppressions.length === 0) {
@@ -46811,7 +46826,8 @@ async function resolveProjectBoms(ctx, projects) {
     };
     try {
       const { bomRows, schematicRows } = await loadBomContext(scoped);
-      boms.push({ project: project.projectFile, components: bomRows.length > 0 ? bomRows : schematicRows });
+      const resolved = bomRows.length > 0 ? bomRows : schematicRows;
+      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
     } catch (error51) {
       ctx.logger.debug("pipeline.bom.unresolved", {
         project: project.projectFile,

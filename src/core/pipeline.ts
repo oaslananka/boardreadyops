@@ -28,7 +28,7 @@ import { createLogger, type Logger } from "./logger.js";
 import { loadPlugins } from "./plugin-loader.js";
 import { evaluatePolicy } from "./policy.js";
 import { computeReadiness, type ReadinessScore } from "./readiness.js";
-import type { ProjectBom, RunResult } from "./result.js";
+import { type ProjectBom, projectBomComponent, type RunResult } from "./result.js";
 import { listRules } from "./rule-registry.js";
 import { applySuppressions } from "./suppressions.js";
 import { applyWaivers } from "./waivers.js";
@@ -291,7 +291,8 @@ async function resolveProjectBoms(ctx: PipelineContext, projects: ProjectContext
     };
     try {
       const { bomRows, schematicRows } = await loadBomContext(scoped);
-      boms.push({ project: project.projectFile, components: bomRows.length > 0 ? bomRows : schematicRows });
+      const resolved = bomRows.length > 0 ? bomRows : schematicRows;
+      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
     } catch (error) {
       // Snapshot collection must never fail a run that is not about the BOM. An unreadable
       // or stale configured BOM path is reported by the BOM rules when they are enabled;
