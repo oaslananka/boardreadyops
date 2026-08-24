@@ -56,7 +56,12 @@ export type SupplyWatchStore = {
 };
 
 export type SupplyWatchOptions = {
-  /** How long a cached observation stays fresh. Lifecycle state changes slowly. */
+  /**
+   * How long a cached observation stays fresh.
+   *
+   * Always clamped down to the provider's own `maximumCacheAgeMs`: a deployment may choose to
+   * refresh more often than the licence requires, never less.
+   */
   observationTtlMs?: number;
   /** Gap until a board is evaluated again after a successful pass. */
   intervalMs?: number;
@@ -82,7 +87,9 @@ export type SupplyWatchReport = {
   failures: number;
 };
 
-const defaultObservationTtlMs = 7 * 24 * 60 * 60 * 1000;
+// Deliberately below the 24-hour retention cap common in component data licences, so the
+// default is safe even against a provider that under-declares its own policy.
+const defaultObservationTtlMs = 12 * 60 * 60 * 1000;
 const defaultIntervalMs = 24 * 60 * 60 * 1000;
 const defaultRetryIntervalMs = 60 * 60 * 1000;
 const defaultMaximumBoardsPerRun = 100;
@@ -104,7 +111,12 @@ export async function runSupplyWatchPass(
   now: Date,
   options: SupplyWatchOptions = {},
 ): Promise<SupplyWatchReport> {
-  const observationTtlMs = options.observationTtlMs ?? defaultObservationTtlMs;
+  // The licence wins over the configured value, never the other way round.
+  const observationTtlMs = Math.min(
+    options.observationTtlMs ?? defaultObservationTtlMs,
+    provider.cachePolicy.maximumCacheAgeMs,
+  );
+  const cacheShareable = provider.cachePolicy.shareableAcrossTenants;
   const intervalMs = options.intervalMs ?? defaultIntervalMs;
   const retryIntervalMs = options.retryIntervalMs ?? defaultRetryIntervalMs;
   const limit = options.maximumBoardsPerRun ?? defaultMaximumBoardsPerRun;
@@ -130,7 +142,10 @@ export async function runSupplyWatchPass(
       }
 
       const parts = queryablePartsOf(board.components);
-      const cached = await store.freshObservations(now, parts);
+      // A non-transferable licence means one installation's answer may not serve another, and
+      // the observation cache is shared, so it is bypassed entirely rather than leaked across
+      // tenants. Every installation then pays for its own lookups.
+      const cached = cacheShareable ? await store.freshObservations(now, parts) : new Map();
       const missing = parts.filter((part) => !cached.has(componentKey(part)));
 
       if (missing.length > 0 && provider.name === "none") {
@@ -147,10 +162,16 @@ export async function runSupplyWatchPass(
       if (missing.length > 0) {
         report.partsQueried += missing.length;
         const observed = await provider.lookup(missing);
-        const expiresAt = new Date(now.getTime() + observationTtlMs);
-        report.observationsRecorded += await store.recordObservations(
-          observed.map((observation) => ({ ...observation, expiresAt: observation.expiresAt ?? expiresAt })),
-        );
+        if (cacheShareable) {
+          const expiresAt = new Date(now.getTime() + observationTtlMs);
+          report.observationsRecorded += await store.recordObservations(
+            observed.map((observation) => ({
+              ...observation,
+              // Never retained past the licence's cap, even if the provider suggests longer.
+              expiresAt: new Date(Math.min((observation.expiresAt ?? expiresAt).getTime(), expiresAt.getTime())),
+            })),
+          );
+        }
         for (const observation of observed) statuses.set(componentKey(observation), observation.status);
       }
 

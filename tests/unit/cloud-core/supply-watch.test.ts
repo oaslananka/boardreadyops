@@ -50,6 +50,7 @@ function providerReturning(
 ): ComponentIntelligenceProvider {
   return {
     name: "test-provider",
+    cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
     async lookup(parts) {
       return parts.flatMap((part) => {
         const status = statuses[part.mpn];
@@ -117,6 +118,7 @@ describe("supply watch pass", () => {
     const { store, completions } = storeWith(boards);
     const provider: ComponentIntelligenceProvider = {
       name: "flaky",
+      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
       async lookup(parts) {
         if (parts.length > 0 && completions.length === 0) throw new Error("provider unavailable");
         return parts.map((part) => ({ ...part, status: "active" as const, source: "flaky", observedAt: now }));
@@ -134,6 +136,7 @@ describe("supply watch pass", () => {
     const { store, completions } = storeWith([board({ boardId: "board-failing" })]);
     const provider: ComponentIntelligenceProvider = {
       name: "always-failing",
+      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
       async lookup() {
         throw new Error("provider unavailable");
       },
@@ -143,5 +146,55 @@ describe("supply watch pass", () => {
 
     expect(completions[0]?.outcome).toBe("failed");
     expect(completions[0]?.nextDueAt.toISOString()).toBe("2026-08-24T13:00:00.000Z");
+  });
+  it("never retains an observation longer than the provider's licence permits", async () => {
+    const { store } = storeWith([board()]);
+    const provider: ComponentIntelligenceProvider = {
+      name: "capped",
+      // Component data licences commonly cap retention at 24 hours.
+      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
+      async lookup(parts) {
+        return parts.map((part) => ({
+          ...part,
+          status: "active" as const,
+          source: "capped",
+          observedAt: now,
+          // A provider suggesting a year must not be able to extend retention past its own cap.
+          expiresAt: new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
+        }));
+      },
+    };
+
+    await runSupplyWatchPass(store, provider, now, { observationTtlMs: 30 * 24 * 60 * 60 * 1000 });
+
+    const recorded = (store.recordObservations as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] ?? [];
+    for (const observation of recorded) {
+      expect(observation.expiresAt.getTime()).toBeLessThanOrEqual(now.getTime() + 24 * 60 * 60 * 1000);
+    }
+  });
+
+  it("does not share cached results across tenants when the licence is non-transferable", async () => {
+    const { store } = storeWith([board()]);
+    const provider: ComponentIntelligenceProvider = {
+      name: "non-transferable",
+      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: false },
+      async lookup(parts) {
+        return parts.map((part) => ({
+          ...part,
+          status: "active" as const,
+          source: "non-transferable",
+          observedAt: now,
+        }));
+      },
+    };
+
+    const report = await runSupplyWatchPass(store, provider, now);
+
+    // The shared observation cache is bypassed entirely rather than serving one licensee's
+    // answer to another, so every part is looked up and nothing is written to it.
+    expect(store.freshObservations).not.toHaveBeenCalled();
+    expect(store.recordObservations).not.toHaveBeenCalled();
+    expect(report.partsQueried).toBe(2);
+    expect(report.boardsEvaluated).toBe(1);
   });
 });

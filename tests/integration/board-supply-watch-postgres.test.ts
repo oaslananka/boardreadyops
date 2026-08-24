@@ -84,6 +84,7 @@ describeDatabase("board supply watch", () => {
       store,
       {
         name: "integration-provider",
+        cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
         async lookup(parts) {
           return parts
             .filter((part) => part.mpn === "WATCH-EOL-1")
@@ -121,6 +122,7 @@ describeDatabase("board supply watch", () => {
       store,
       {
         name: "integration-provider",
+        cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
         async lookup(parts) {
           lookups += parts.length;
           return [];
@@ -156,6 +158,7 @@ describeDatabase("board supply watch", () => {
       store,
       {
         name: "integration-provider",
+        cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
         async lookup(parts) {
           return parts.map((part) => ({
             ...part,

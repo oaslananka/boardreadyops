@@ -35,9 +35,33 @@ export type ComponentObservation = {
   expiresAt?: Date | undefined;
 };
 
+/**
+ * What a provider's terms permit doing with its results.
+ *
+ * This is licence policy, not tuning. Component data terms commonly cap how long a result may
+ * be retained and forbid reusing one licensee's results to serve another, so a provider that
+ * declares the wrong values here puts the deployment in breach. Declaring it on the provider
+ * keeps the limit next to the vendor it belongs to instead of in a shared default that
+ * silently outlives whichever vendor it was written for.
+ */
+export type ProviderCachePolicy = {
+  /** Longest a result may be retained, per the provider's own terms. */
+  maximumCacheAgeMs: number;
+  /**
+   * Whether a result fetched for one installation may answer another installation's question.
+   *
+   * False for most commercial component APIs, whose licences are non-transferable. When false
+   * the watch does not read or write the shared observation cache at all: every installation
+   * pays for its own lookups, which is the price of staying inside the licence.
+   */
+  shareableAcrossTenants: boolean;
+};
+
 export type ComponentIntelligenceProvider = {
   /** Short stable identifier recorded on every observation this provider produces. */
   readonly name: string;
+  /** The retention and sharing limits this provider's terms impose. */
+  readonly cachePolicy: ProviderCachePolicy;
   /**
    * Resolves lifecycle status for the supplied parts.
    *
@@ -57,6 +81,8 @@ export type ComponentIntelligenceProvider = {
 export function createNullComponentIntelligenceProvider(): ComponentIntelligenceProvider {
   return {
     name: "none",
+    // Answers nothing, so nothing is ever cached; the values are the safest possible.
+    cachePolicy: { maximumCacheAgeMs: 0, shareableAcrossTenants: false },
     async lookup() {
       return [];
     },

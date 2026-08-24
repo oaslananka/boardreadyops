@@ -49,12 +49,25 @@ Do not treat this as a detail to settle later. It is the decision.
 
 ### Nexar (Octopart)
 
-Aggregates catalogue, lifecycle, and distributor stock across many distributors
-through one GraphQL API. Broadest single-source coverage, self-serve onboarding,
-documented for programmatic use.
+Aggregates catalogue, lifecycle, and distributor stock across many distributors through one
+GraphQL API. Broadest single-source coverage, self-serve onboarding, documented for
+programmatic use.
 
-Trade-off: usage-based cost that scales with lookups, so the caching terms
-determine whether it is affordable at scale.
+**Its published terms rule out the shared-cache model.** Read on 2026-08-24 at
+[nexar.com/api/legal](https://nexar.com/api/legal):
+
+| Clause | Text | Consequence |
+|---|---|---|
+| §1.2(vi) | prohibits "use the Nexar API to cache and/or store data for more than twenty-four (24) hours" | A weekly or even daily watch cannot reuse a cached answer beyond one day. |
+| §1.1 / §1.2(i) | a "non-exclusive, revocable, non-transferable, non-sublicensable, limited license"; may not "sublicense, lease, loan, assign, commercially share or otherwise transfer or distribute" | One installation's result may not answer another installation's question, so a cross-tenant cache is not available. |
+| §1.6 | "mass aggregation of Altium data for predictive analytics of any kind is prohibited"; excludes "historical trends in pricing and inventory" | The accumulated observation history cannot become a retained dataset or an analytics asset. |
+
+This does not disqualify Nexar; it disqualifies operating Nexar as one shared BoardReadyOps
+subscription serving every customer. Under a customer's own credentials the same terms are
+satisfiable, because each licensee queries for themselves.
+
+These clauses are quoted from the public page on the date above and are not legal advice.
+Confirm the current terms, and anything a negotiated agreement changes, before relying on them.
 
 ### Distributor APIs (Digi-Key, Mouser, and peers)
 
@@ -86,32 +99,50 @@ an enterprise option alongside a default provider.
 
 ## Recommendation
 
-Adopt a **provider-agnostic interface with Nexar as the first implementation**,
-and treat customer-supplied credentials as a first-class alternative rather than
-an afterthought.
+**Customer-supplied credentials are the default; a shared subscription is the exception.**
+
+The caching question this ADR was written to raise now has an answer for the leading
+candidate, and the answer is no. Nexar's terms forbid both the retention window and the
+cross-tenant reuse a shared hosted cache depends on. Any provider aggregating distributor
+data is likely to carry similar terms, because the restriction protects their suppliers
+rather than being a Nexar preference.
+
+So the shape inverts from what this ADR first assumed: BoardReadyOps performs lookups under
+each customer's own credentials and retains only what that customer already has rights to.
+A BoardReadyOps-operated subscription remains possible for any provider whose terms permit
+serving multiple end customers, but that is now the case to prove rather than the default.
 
 Reasoning:
 
 - The interface, not the vendor, is the durable decision. `LifecycleSourceType`
   already models multiple sources, so no single provider needs to be permanent.
-- Nexar gives the broadest coverage from one integration, which matters most
-  while the feature is proving its value.
-- Customer-supplied credentials cover the enterprise case and the case where
-  caching terms turn out to be too restrictive to operate a shared cache.
+- Per-customer credentials satisfy restrictive terms without renegotiating them, and
+  remove the per-lookup cost from BoardReadyOps' own margin.
+- It changes what the paid tier sells: not resold component data, but the scheduling,
+  attribution, history, and alerting around data the customer is already entitled to.
+  That is defensible under any provider's terms.
 
-Before implementing, confirm in writing:
+The cost is a worse first run: a customer must obtain a key before the watch does anything.
+The `no_provider` outcome already models that state honestly rather than reporting a board as
+clean, so the gap is visible rather than silent.
 
-1. whether results may be cached, for how long, and whether a cache may be
-   shared across customers;
-2. whether derived state — "this MPN was NRND on this date" — may be retained
-   after the cached record expires, since the evidence record depends on it;
-3. the rate limit and cost per lookup at the volume a weekly watch implies; and
-4. whether attribution is required where data is displayed.
+### Encoded in the implementation
 
-If caching across tenants is not permitted, the shared-service model does not
-work at acceptable cost and customer-supplied credentials should become the
-default rather than the alternative. That outcome is survivable, but it must be
-discovered before the scheduled job is built, not after.
+`ProviderCachePolicy` makes these limits part of the provider contract rather than a comment:
+
+- `maximumCacheAgeMs` clamps retention. A deployment may refresh more often than the licence
+  requires, never less, and a provider suggesting a longer expiry cannot extend it.
+- `shareableAcrossTenants: false` bypasses the shared observation cache entirely — no read and
+  no write — so one licensee's answer can never serve another.
+
+A provider cannot be plugged in without declaring both, and both are covered by tests.
+
+### Still to confirm per provider
+
+1. whether derived state — "this MPN was NRND on this date" — may be retained after the cached
+   record expires, since the evidence record depends on it and §1.6-style clauses restrict it;
+2. rate limit and cost per lookup at the volume a scheduled watch implies; and
+3. whether attribution is required wherever the data is displayed.
 
 ## Consequences
 
