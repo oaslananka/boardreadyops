@@ -55959,6 +55959,12 @@ var findings_schema_default = {
     projects: {
       type: "array"
     },
+    boms: {
+      type: "array",
+      items: {
+        $ref: "#/$defs/projectBom"
+      }
+    },
     findings: {
       type: "array",
       items: {
@@ -56697,6 +56703,53 @@ var findings_schema_default = {
         },
         permissions: {
           $ref: "#/$defs/pluginPermissions"
+        }
+      }
+    },
+    projectBom: {
+      type: "object",
+      additionalProperties: false,
+      required: ["project", "components"],
+      properties: {
+        project: {
+          type: "string"
+        },
+        components: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["reference"],
+            properties: {
+              reference: {
+                type: "string"
+              },
+              value: {
+                type: "string"
+              },
+              footprint: {
+                type: "string"
+              },
+              manufacturer: {
+                type: "string"
+              },
+              mpn: {
+                type: "string"
+              },
+              lifecycle: {
+                type: "string"
+              },
+              dnp: {
+                type: "boolean"
+              },
+              quantity: {
+                type: "number"
+              },
+              identityKey: {
+                type: "string"
+              }
+            }
+          }
         }
       }
     }
