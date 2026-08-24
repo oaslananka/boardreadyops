@@ -778,4 +778,80 @@ describe("serveRunnerWorker", () => {
 
     expect(runnerClient.claim).not.toHaveBeenCalled();
   });
+  it("publishes board attribution and BOM rows when the report carries them", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-bom-"));
+    roots.push(workspace);
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(
+        async (): Promise<RunnerExecutionOutput> => ({
+          exitCode: 0,
+          report: {
+            findings: [
+              {
+                ruleId: "bom.lifecycle",
+                severity: "medium",
+                message: "U1 lifecycle status is nrnd.",
+                project: "hardware/mainboard/mainboard.kicad_pro",
+                resource: { path: "hardware/mainboard/mainboard.kicad_pcb" },
+              },
+            ],
+            summary: { total: 1, critical: 0, high: 0, medium: 1, low: 0, info: 0 },
+            boms: [
+              {
+                project: "hardware/mainboard/mainboard.kicad_pro",
+                components: [
+                  { reference: "U1", mpn: "STM32F103C8T6", manufacturer: "ST", quantity: 1 },
+                  { reference: "R1", value: "10k", quantity: 4 },
+                ],
+              },
+            ],
+          },
+          artifacts: [],
+        }),
+      ),
+    });
+
+    await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", artifactMode: "metadata-only" },
+      overrides,
+    );
+
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result.boms).toHaveLength(1);
+    expect(terminal?.result.boms?.[0]?.project).toBe("hardware/mainboard/mainboard.kicad_pro");
+    expect(terminal?.result.boms?.[0]?.components.map((component) => component.reference)).toEqual(["U1", "R1"]);
+    expect(terminal?.result.findings[0]?.project).toBe("hardware/mainboard/mainboard.kicad_pro");
+  });
+
+  it("leaves boms absent when the report has none so the result digest is unchanged", async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-runner-no-bom-"));
+    roots.push(workspace);
+    const runnerClient = client();
+    const overrides = dependencies(runnerClient.value);
+    Object.assign(overrides, {
+      checkoutSource: vi.fn(async () => workspace),
+      executePipeline: vi.fn(
+        async (): Promise<RunnerExecutionOutput> => ({
+          exitCode: 0,
+          report: { findings: [], summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 } },
+          artifacts: [],
+        }),
+      ),
+    });
+
+    await runRunnerWorkerOnce(
+      { identityFile: "/identity/runner.json", runnerVersion: "1.26.1", artifactMode: "metadata-only" },
+      overrides,
+    );
+
+    const terminal = (
+      runnerClient.publishTerminalResult.mock.calls as unknown as Array<[RunnerTerminalResultRequest]>
+    )[0]?.[0];
+    expect(terminal?.result).not.toHaveProperty("boms");
+  });
 });

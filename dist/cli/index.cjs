@@ -54963,6 +54963,15 @@ async function publishArtifacts(client, job, artifacts) {
   }
   return published;
 }
+function boundedBoms(boms) {
+  return boms.slice(0, 50).map((bom) => ({
+    project: bom.project.slice(0, 1024),
+    components: bom.components.filter((component) => component.reference.trim().length > 0).slice(0, 5e3).map((component) => ({
+      ...component,
+      reference: component.reference.slice(0, 64)
+    }))
+  }));
+}
 function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
   const completed = execution.exitCode === 0 || execution.exitCode === 1;
   const decision = decisionFromExitCode(execution.exitCode);
@@ -54970,7 +54979,8 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
     ruleId: finding2.ruleId.slice(0, 256),
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
     message: finding2.message.slice(0, 4e3),
-    ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {}
+    ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {},
+    ...finding2.project ? { project: finding2.project.slice(0, 1024) } : {}
   })) : [
     {
       ruleId: "runner.execution",
@@ -55003,6 +55013,9 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
     ...execution.report?.readiness ? { readiness: execution.report.readiness } : {},
     ...execution.report?.waivers ? { waivers: execution.report.waivers } : {},
     ...execution.report?.hardwareImpact ? { hardwareImpact: execution.report.hardwareImpact } : {},
+    // Spread an empty object when there is nothing to report so `boms` stays absent rather
+    // than becoming [], which would change the terminal result digest for every legacy run.
+    ...execution.report?.boms?.length ? { boms: boundedBoms(execution.report.boms) } : {},
     reportLinks: []
   });
 }
