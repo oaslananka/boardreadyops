@@ -3,6 +3,7 @@ import path from "node:path";
 import { boardReadyVersion } from "../generated/version.js";
 import { dispatchNotifications, notificationPayloadFromResult } from "../notifiers/dispatch.js";
 import { registerBuiltInRules } from "../rules/_index.js";
+import { loadBomContext } from "../rules/bom/shared.js";
 import { captureFabricationSnapshot } from "../rules/fabrication-snapshot.js";
 import { globFiles } from "../util/glob.js";
 import { normalizePathInput } from "../util/path.js";
@@ -27,7 +28,7 @@ import { createLogger, type Logger } from "./logger.js";
 import { loadPlugins } from "./plugin-loader.js";
 import { evaluatePolicy } from "./policy.js";
 import { computeReadiness, type ReadinessScore } from "./readiness.js";
-import type { RunResult } from "./result.js";
+import { type ProjectBom, projectBomComponent, type RunResult } from "./result.js";
 import { listRules } from "./rule-registry.js";
 import { applySuppressions } from "./suppressions.js";
 import { applyWaivers } from "./waivers.js";
@@ -82,6 +83,7 @@ export async function runPipeline(
     policy: postProcessed.policy,
     pluginLoad,
     projects,
+    boms: postProcessed.boms,
   });
   const notificationResults = await dispatchNotificationsPhase(ctx, result);
   ctx.options.signal?.throwIfAborted();
@@ -246,6 +248,7 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
     waiverResult.expired.length,
   );
   const summary = summarizeFindings(effectiveFindings, ctx.options.failOn);
+  const boms = await resolveProjectBoms(ctx, projects);
 
   const policy = ctx.config.policy
     ? evaluatePolicy(ctx.config.policy, {
@@ -257,7 +260,80 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
       })
     : undefined;
 
-  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy };
+  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy, boms };
+}
+
+/**
+ * Resolves the component rows for each discovered project.
+ *
+ * Reuses `loadBomContext` so the emitted rows are exactly the ones the BOM rules evaluated,
+ * including their CSV-over-schematic precedence. A project with no resolvable BOM keeps an
+ * empty entry rather than disappearing: absence of component data is itself a signal, and a
+ * missing board would silently drop out of downstream supply tracking.
+ */
+/** The workspace-level `--bom` when the caller named a real path rather than leaving it automatic. */
+function explicitWorkspaceBom(options: PipelineOptions): string | undefined {
+  return options.bom && options.bom !== "auto" ? options.bom : undefined;
+}
+
+/**
+ * Finds a BOM file inside a project's own directory.
+ *
+ * Board attribution may only use a BOM the project can claim. The rules' shared resolver
+ * searches the whole workspace, which is correct for a single-board repository but would
+ * hand one board's CSV to every other board in a hardware monorepo.
+ */
+async function bomWithinProject(root: string, project: ProjectContext): Promise<string | undefined> {
+  const projectDirectory = project.projectFile.split("/").slice(0, -1).join("/");
+  const prefix = projectDirectory.length > 0 ? `${projectDirectory}/` : "";
+  const found = await globFiles(root, [
+    `${prefix}**/bom*.csv`,
+    `${prefix}**/*bom*.csv`,
+    `${prefix}**/bom*.tsv`,
+    `${prefix}**/*bom*.tsv`,
+  ]);
+  const first = found[0];
+  if (!first) return undefined;
+  const relative = path.relative(root, first).split(path.sep).join("/");
+  return relative.startsWith("..") ? undefined : relative;
+}
+
+async function resolveProjectBoms(ctx: PipelineContext, projects: ProjectContext[]): Promise<ProjectBom[]> {
+  const boms: ProjectBom[] = [];
+  for (const project of projects) {
+    // Resolve the same per-project config and BOM override the rules ran under, so a
+    // workspace with project-local `bom:` entries attributes the right file to each board.
+    const projectConfig = configForProject(ctx.root, ctx.config, project);
+    const override = projectConfig.projects?.[0];
+    const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
+    const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
+    const attributableBom = declaredBom ?? (await bomWithinProject(ctx.root, project));
+    const scoped: RuleContext = {
+      root: ctx.root,
+      projects: [project],
+      config: projectConfig,
+      options: { ...ctx.options, bom: attributableBom ?? ctx.options.bom },
+      logger: ctx.logger,
+    };
+    try {
+      const { bomRows, schematicRows } = await loadBomContext(scoped);
+      // Without a BOM this project can claim, any rows discovered came from a workspace-wide
+      // search and may belong to a different board. Attributing them here would report parts
+      // this board does not contain, so fall back to its own schematic instead.
+      const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
+      boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
+    } catch (error) {
+      // Snapshot collection must never fail a run that is not about the BOM. An unreadable
+      // or stale configured BOM path is reported by the BOM rules when they are enabled;
+      // here it degrades to an empty component list.
+      ctx.logger.debug("pipeline.bom.unresolved", {
+        project: project.projectFile,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      boms.push({ project: project.projectFile, components: [] });
+    }
+  }
+  return boms;
 }
 
 interface AssembleRunResultOptions {
@@ -268,6 +344,7 @@ interface AssembleRunResultOptions {
   summary: ReturnType<typeof summarizeFindings>;
   waiverResult: ReturnType<typeof applyWaivers>;
   policy: ReturnType<typeof evaluatePolicy> | undefined;
+  boms: ProjectBom[];
   pluginLoad: Awaited<ReturnType<typeof loadPlugins>>;
   projects: ProjectContext[];
 }
@@ -282,6 +359,7 @@ function assembleRunResult({
   policy,
   pluginLoad,
   projects,
+  boms,
 }: AssembleRunResultOptions): RunResult {
   const bomRisk = bomRiskSummaryFromFindings(effectiveFindings);
   const releaseMode = ctx.options.releaseMode;
@@ -300,6 +378,7 @@ function assembleRunResult({
       ? { waivers: { active: waiverResult.active, expired: waiverResult.expired } }
       : {}),
     projects,
+    boms,
     findings: effectiveFindings,
     fabrication,
     plugins: pluginLoad.plugins,

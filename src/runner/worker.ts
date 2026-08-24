@@ -57,10 +57,12 @@ type RunnerExecutionReport = {
   readiness?: NonNullable<ReleaseRunResult["readiness"]>;
   waivers?: NonNullable<ReleaseRunResult["waivers"]>;
   hardwareImpact?: NonNullable<ReleaseRunResult["hardwareImpact"]>;
+  boms?: NonNullable<ReleaseRunResult["boms"]>;
   findings: Array<{
     ruleId: string;
     severity: "critical" | "high" | "medium" | "low" | "info";
     message: string;
+    project?: string;
     resource: { path?: string };
   }>;
 };
@@ -431,6 +433,26 @@ async function publishArtifacts(
   return published;
 }
 
+/**
+ * Applies the release-run contract's bounds to reported BOMs.
+ *
+ * The contract caps boards per run and components per board, and rejects a component whose
+ * reference is empty. Trimming here keeps a large workspace from failing the whole callback
+ * on a schema violation the runner can resolve itself.
+ */
+function boundedBoms(boms: NonNullable<ReleaseRunResult["boms"]>): NonNullable<ReleaseRunResult["boms"]> {
+  return boms.slice(0, 50).map((bom) => ({
+    project: bom.project.slice(0, 1024),
+    components: bom.components
+      .filter((component) => component.reference.trim().length > 0)
+      .slice(0, 5000)
+      .map((component) => ({
+        ...component,
+        reference: component.reference.slice(0, 64),
+      })),
+  }));
+}
+
 function terminalResultFromExecution(
   job: RunnerClaimedJob,
   execution: RunnerExecutionOutput,
@@ -445,6 +467,7 @@ function terminalResultFromExecution(
         severity: finding.severity === "critical" ? ("error" as const) : finding.severity,
         message: finding.message.slice(0, 4000),
         ...(finding.resource.path ? { path: finding.resource.path.slice(0, 1024) } : {}),
+        ...(finding.project ? { project: finding.project.slice(0, 1024) } : {}),
       }))
     : [
         {
@@ -478,6 +501,9 @@ function terminalResultFromExecution(
     ...(execution.report?.readiness ? { readiness: execution.report.readiness } : {}),
     ...(execution.report?.waivers ? { waivers: execution.report.waivers } : {}),
     ...(execution.report?.hardwareImpact ? { hardwareImpact: execution.report.hardwareImpact } : {}),
+    // Spread an empty object when there is nothing to report so `boms` stays absent rather
+    // than becoming [], which would change the terminal result digest for every legacy run.
+    ...(execution.report?.boms?.length ? { boms: boundedBoms(execution.report.boms) } : {}),
     reportLinks: [],
   });
 }

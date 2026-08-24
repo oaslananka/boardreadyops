@@ -18,7 +18,16 @@ function executorWithResults(results: unknown[]): {
 }
 
 function emptyDashboardRows(): unknown[] {
-  return [{ rows: [{ total: 0 }] }, { rows: [{ total: 0 }] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }];
+  // run, findingCount, artifactCount, attempts, transitions, boards, findings, artifacts
+  return [
+    { rows: [{ total: 0 }] },
+    { rows: [{ total: 0 }] },
+    { rows: [] },
+    { rows: [] },
+    { rows: [] },
+    { rows: [] },
+    { rows: [] },
+  ];
 }
 
 function baseRunRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -145,7 +154,7 @@ describe("run dashboard data", () => {
     const result = await lookupRunDashboard("public-run", executor);
 
     expect(result).toMatchObject({ state: "found", run: { repositoryPrivate: false } });
-    expect(query).toHaveBeenCalledTimes(7);
+    expect(query).toHaveBeenCalledTimes(8);
   });
 
   it("loads a private repository dashboard only after explicit repository authorization", async () => {
@@ -168,7 +177,7 @@ describe("run dashboard data", () => {
       name: "hardware",
       private: true,
     });
-    expect(query).toHaveBeenCalledTimes(7);
+    expect(query).toHaveBeenCalledTimes(8);
   });
 
   it("normalizes malformed scalar, collection, and report-link values", async () => {
@@ -186,6 +195,7 @@ describe("run dashboard data", () => {
       { rows: [malformedRow] },
       { rows: [{ total: "9007199254740992" }] },
       { rows: "not-an-array" },
+      { rows: [] },
       { rows: [] },
       { rows: [] },
       { rows: [] },
@@ -347,6 +357,7 @@ describe("run dashboard data", () => {
           },
         ],
       },
+      { rows: [] },
       {
         rows: [
           {
@@ -468,8 +479,8 @@ describe("run dashboard data", () => {
     const runSql = String(query.mock.calls[0]?.[0]);
     const findingCountSql = String(query.mock.calls[1]?.[0]);
     const artifactCountSql = String(query.mock.calls[2]?.[0]);
-    const findingSql = String(query.mock.calls[5]?.[0]);
-    const artifactSql = String(query.mock.calls[6]?.[0]);
+    const findingSql = String(query.mock.calls[6]?.[0]);
+    const artifactSql = String(query.mock.calls[7]?.[0]);
     expect(runSql).toContain("control_plane_reconciliation_items");
     expect(runSql).toContain("dead_letter_count");
     expect(runSql).toContain("last_activity_at");
@@ -478,7 +489,7 @@ describe("run dashboard data", () => {
     expect(findingSql).toContain("findings.waived_at is not null");
     expect(findingSql).toContain("limit $4");
     expect(findingSql).toContain("offset $5");
-    expect(query.mock.calls[5]?.[1]).toEqual(["run-123", "%board\\_100\\%%", "error", 10, 10]);
+    expect(query.mock.calls[6]?.[1]).toEqual(["run-123", "%board\\_100\\%%", "error", 10, 10]);
     expect(artifactCountSql).toContain("lower(artifacts.kind)");
     expect(artifactCountSql).toContain("artifact_deletion_jobs.release_run_id = $1");
     expect(artifactCountSql).toContain("deletion_outcome = 'deleted'");
@@ -489,10 +500,10 @@ describe("run dashboard data", () => {
     expect(artifactSql).toContain("artifacts.bytes desc");
     expect(artifactSql).toContain("limit $5");
     expect(artifactSql).toContain("offset $6");
-    expect(query.mock.calls[6]?.[1]).toEqual(["run-123", "%release%", "primary", "release-archive", 10, 0]);
+    expect(query.mock.calls[7]?.[1]).toEqual(["run-123", "%release%", "primary", "release-archive", 10, 0]);
     expect(artifactSql).not.toContain("storage_path");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
-    expect(query).toHaveBeenCalledTimes(7);
+    expect(query).toHaveBeenCalledTimes(8);
   });
 
   it("surfaces stale, reconciliation, dead-letter, and partial-data states from durable data", async () => {
@@ -528,8 +539,8 @@ describe("run dashboard data", () => {
     });
     expect(query.mock.calls[2]?.[1]).toEqual(["run-state"]);
     expect(String(query.mock.calls[1]?.[0])).toContain("findings.waived_at is null");
-    expect(String(query.mock.calls[5]?.[0])).toContain("findings.rule_id asc");
-    expect(String(query.mock.calls[6]?.[0])).toContain("artifacts.name asc");
+    expect(String(query.mock.calls[6]?.[0])).toContain("findings.rule_id asc");
+    expect(String(query.mock.calls[7]?.[0])).toContain("artifacts.name asc");
   });
 });
 

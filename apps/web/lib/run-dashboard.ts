@@ -95,6 +95,23 @@ type TransitionDetail = {
   occurredAt: string;
 };
 
+/**
+ * One board's BOM as this run captured it.
+ *
+ * `unidentifiedComponentCount` is the count without a manufacturer part number. Those parts
+ * cannot be matched against supplier data later, so the gap is reported rather than hidden.
+ */
+type RunBoardDetail = {
+  boardId: string;
+  project: string;
+  displayName: string;
+  capturedAt: string;
+  componentCount: number;
+  identifiedComponentCount: number;
+  unidentifiedComponentCount: number;
+  riskyLifecycleCount: number;
+};
+
 export type RunDetail = {
   id: string;
   status: string;
@@ -139,6 +156,7 @@ export type RunDetail = {
   artifactLifecycle: ArtifactLifecycleSummary;
   attempts: AttemptDetail[];
   transitions: TransitionDetail[];
+  boards: RunBoardDetail[];
 };
 
 export type RunDashboardFilters = {
@@ -548,7 +566,7 @@ export async function lookupRunDashboard(
   const findingScope = findingPredicates(runId, filters);
   const artifactScope = artifactPredicates(runId, filters);
 
-  const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult] = await Promise.all([
+  const [findingCountResult, artifactCountResult, attemptsResult, transitionsResult, boardsResult] = await Promise.all([
     executor.query(`select count(*)::int as total from findings where ${findingScope.sql}`, findingScope.parameters),
     executor.query(
       `select count(*)::int as total,
@@ -600,6 +618,26 @@ export async function lookupRunDashboard(
        where release_run_id = $1
        order by occurred_at desc, id desc
        limit 100`,
+      [runId],
+    ),
+    executor.query(
+      `select boards.id as board_id,
+              boards.project_path,
+              boards.display_name,
+              snapshot.captured_at,
+              snapshot.component_count::int as component_count,
+              count(component.id) filter (where component.mpn is not null)::int as identified_component_count,
+              count(component.id) filter (where component.mpn is null)::int as unidentified_component_count,
+              count(component.id) filter (
+                where lower(component.lifecycle_at_capture) in ('eol', 'nrnd', 'obsolete', 'discontinued')
+              )::int as risky_lifecycle_count
+       from board_bom_snapshots as snapshot
+       join boards on boards.id = snapshot.board_id
+       left join board_bom_components as component on component.snapshot_id = snapshot.id
+       where snapshot.run_id = $1
+       group by boards.id, boards.project_path, boards.display_name, snapshot.captured_at, snapshot.component_count
+       order by boards.project_path
+       limit 50`,
       [runId],
     ),
   ]);
@@ -710,6 +748,19 @@ export async function lookupRunDashboard(
     }),
   );
 
+  const boards = rows(boardsResult).map(
+    (row): RunBoardDetail => ({
+      boardId: requiredString(row, "board_id"),
+      project: requiredString(row, "project_path"),
+      displayName: requiredString(row, "display_name"),
+      capturedAt: requiredString(row, "captured_at"),
+      componentCount: numberValue(row, "component_count") ?? 0,
+      identifiedComponentCount: numberValue(row, "identified_component_count") ?? 0,
+      unidentifiedComponentCount: numberValue(row, "unidentified_component_count") ?? 0,
+      riskyLifecycleCount: numberValue(row, "risky_lifecycle_count") ?? 0,
+    }),
+  );
+
   const status = requiredString(runRow, "status");
   const reconciliationCount = numberValue(runRow, "reconciliation_count") ?? 0;
   const deadLetterCount = numberValue(runRow, "dead_letter_count") ?? 0;
@@ -778,6 +829,7 @@ export async function lookupRunDashboard(
       artifactLifecycle,
       attempts,
       transitions,
+      boards,
     },
   };
 }
@@ -993,6 +1045,30 @@ function buildDemoRun(runId: string, filters: RunDashboardFilters = {}): RunDeta
         toVersion: 2,
         reasonCode: "result_recorded",
         occurredAt: "2026-08-23T18:01:24.000Z",
+      },
+    ],
+    // Two boards, one carrying a part already at lifecycle risk, so the demo shows what the
+    // supply signals look like rather than an empty panel.
+    boards: [
+      {
+        boardId: "demo-board-mainboard",
+        project: "hardware/mainboard/mainboard.kicad_pro",
+        displayName: "mainboard",
+        capturedAt: "2026-08-23T18:01:23.000Z",
+        componentCount: 148,
+        identifiedComponentCount: 141,
+        unidentifiedComponentCount: 7,
+        riskyLifecycleCount: isFailure ? 3 : 1,
+      },
+      {
+        boardId: "demo-board-sensor",
+        project: "hardware/sensor/sensor.kicad_pro",
+        displayName: "sensor",
+        capturedAt: "2026-08-23T18:01:23.000Z",
+        componentCount: 32,
+        identifiedComponentCount: 32,
+        unidentifiedComponentCount: 0,
+        riskyLifecycleCount: 0,
       },
     ],
   };

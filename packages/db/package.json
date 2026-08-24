@@ -31,6 +31,11 @@
       "import": "./src/pg-executor.ts",
       "default": "./src/pg-executor.ts"
     },
+    "./board-bom-store": {
+      "types": "./src/board-bom-store.ts",
+      "import": "./src/board-bom-store.ts",
+      "default": "./src/board-bom-store.ts"
+    },
     "./audit-log-store": {
       "types": "./src/audit-log-store.ts",
       "import": "./src/audit-log-store.ts",
@@ -95,6 +100,16 @@
       "types": "./src/repository-setup-store.ts",
       "import": "./src/repository-setup-store.ts",
       "default": "./src/repository-setup-store.ts"
+    },
+    "./board-supply-watch-store": {
+      "types": "./src/board-supply-watch-store.ts",
+      "import": "./src/board-supply-watch-store.ts",
+      "default": "./src/board-supply-watch-store.ts"
+    },
+    "./entitlement-store": {
+      "types": "./src/entitlement-store.ts",
+      "import": "./src/entitlement-store.ts",
+      "default": "./src/entitlement-store.ts"
     }
   },
   "devDependencies": {

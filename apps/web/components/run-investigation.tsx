@@ -201,6 +201,59 @@ function SummaryDecisionAction({ runId, blockingCount }: Readonly<{ runId: strin
   );
 }
 
+function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
+  if (run.boards.length === 0) return null;
+  const totalComponents = run.boards.reduce((sum, board) => sum + board.componentCount, 0);
+  return (
+    <Panel
+      id="boards"
+      title="Boards in this run"
+      description={`Components captured per board, kept as the record of what ${
+        run.boards.length === 1 ? "this board" : "these boards"
+      } shipped with.`}
+    >
+      <ul className="compact-list">
+        {run.boards.map((board) => (
+          <li key={board.boardId}>
+            <div>
+              <strong>{board.displayName}</strong>
+              {board.riskyLifecycleCount > 0 ? (
+                <StatusBadge value="warning" label={`${board.riskyLifecycleCount} at lifecycle risk`} />
+              ) : null}
+            </div>
+            <p>
+              <code>{board.project}</code>
+            </p>
+            <dl className="inline-definitions">
+              <div>
+                <dt>Components</dt>
+                <dd>{board.componentCount}</dd>
+              </div>
+              <div>
+                <dt>With part number</dt>
+                <dd>{board.identifiedComponentCount}</dd>
+              </div>
+              <div>
+                <dt>Without part number</dt>
+                <dd>{board.unidentifiedComponentCount}</dd>
+              </div>
+              <div>
+                <dt>Captured</dt>
+                <dd>{formatRunDate(board.capturedAt)}</dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+      {totalComponents === 0 ? (
+        <p className="cell-note">
+          No components were captured. Add a BOM to each board so its parts can be tracked between releases.
+        </p>
+      ) : null}
+    </Panel>
+  );
+}
+
 export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   const blockingFindings = run.findings.filter(
     (finding) => ["critical", "error", "high"].includes(finding.severity.toLowerCase()) && !finding.waivedAt,
@@ -248,6 +301,8 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
           <Definition label="Last activity">{formatRunDate(run.lastActivityAt)}</Definition>
         </DefinitionGrid>
       </Panel>
+
+      <BoardsPanel run={run} />
 
       <Panel
         title="Source and runtime"
