@@ -157,6 +157,23 @@ describeDatabase("board BOM store", () => {
     expect(result.componentsWritten).toBe(2);
   });
 
+  it("enrols a newly discovered board in supply watch", async () => {
+    // Without this the watch never becomes due for any board created after the watch
+    // migration ran, so the feature would silently never evaluate anything.
+    const watch = rows(
+      await database().query(
+        `select watch.board_id, watch.enabled
+         from board_supply_watch as watch
+         join boards on boards.id = watch.board_id
+         where boards.repository_id = $1 and boards.project_path = $2`,
+        [repositoryId, "hardware/mainboard/mainboard.kicad_pro"],
+      ),
+    );
+
+    expect(watch).toHaveLength(1);
+    expect(watch[0]?.enabled).toBe(true);
+  });
+
   it("refuses a board whose run belongs to another repository", async () => {
     const store = createSqlBoardBomStore(database());
     await expect(

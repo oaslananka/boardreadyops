@@ -129,6 +129,15 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
                  archived_at = null
            returning boards.id, boards.project_path
          ),
+         enrolled_watch as (
+           -- A board is only ever discovered here, so this is the one place that can enrol it
+           -- in supply watch. Without it a board created after the watch migration would never
+           -- become due and would silently go unwatched.
+           insert into board_supply_watch (board_id)
+           select upserted_boards.id from upserted_boards
+           on conflict (board_id) do nothing
+           returning board_id
+         ),
          inserted_snapshots as (
            insert into board_bom_snapshots (board_id, run_id, commit_sha, component_count, captured_at)
            select upserted_boards.id,
