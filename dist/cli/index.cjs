@@ -46808,25 +46808,41 @@ async function postProcessPhase(ctx, findings, projects) {
   }) : void 0;
   return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy, boms };
 }
+function explicitWorkspaceBom(options) {
+  return options.bom && options.bom !== "auto" ? options.bom : void 0;
+}
+async function bomWithinProject(root, project) {
+  const projectDirectory = project.projectFile.split("/").slice(0, -1).join("/");
+  const prefix = projectDirectory.length > 0 ? `${projectDirectory}/` : "";
+  const found = await globFiles(root, [
+    `${prefix}**/bom*.csv`,
+    `${prefix}**/*bom*.csv`,
+    `${prefix}**/bom*.tsv`,
+    `${prefix}**/*bom*.tsv`
+  ]);
+  const first = found[0];
+  if (!first) return void 0;
+  const relative = import_node_path42.default.relative(root, first).split(import_node_path42.default.sep).join("/");
+  return relative.startsWith("..") ? void 0 : relative;
+}
 async function resolveProjectBoms(ctx, projects) {
   const boms = [];
   for (const project of projects) {
     const projectConfig = configForProject(ctx.root, ctx.config, project);
     const override = projectConfig.projects?.[0];
     const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
+    const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
+    const attributableBom = declaredBom ?? await bomWithinProject(ctx.root, project);
     const scoped = {
       root: ctx.root,
       projects: [project],
       config: projectConfig,
-      options: {
-        ...ctx.options,
-        bom: variantMatch?.bom ?? override?.bom ?? ctx.options.bom
-      },
+      options: { ...ctx.options, bom: attributableBom ?? ctx.options.bom },
       logger: ctx.logger
     };
     try {
       const { bomRows, schematicRows } = await loadBomContext(scoped);
-      const resolved = bomRows.length > 0 ? bomRows : schematicRows;
+      const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
       boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
     } catch (error51) {
       ctx.logger.debug("pipeline.bom.unresolved", {

@@ -113,6 +113,26 @@ describe("BOM attribution on the run result", () => {
     expect(components[0]?.mpn).toBe("STM32F103C8T6");
   });
 
+  it("does not lend one board's BOM to a sibling board that has none", async () => {
+    const root = await writeFixture({
+      "hardware/mainboard/mainboard.kicad_pro": "{}",
+      "hardware/mainboard/mainboard.kicad_sch": emptySchematic,
+      "hardware/mainboard/mainboard.kicad_pcb": emptyBoard,
+      "hardware/mainboard/bom.csv": ["Reference,MPN", "U1,MAINBOARD-ONLY-PART"].join("\n"),
+      "hardware/sensor/sensor.kicad_pro": "{}",
+      "hardware/sensor/sensor.kicad_sch": emptySchematic,
+      "hardware/sensor/sensor.kicad_pcb": emptyBoard,
+    });
+
+    const result = await runPipeline({ path: root, rules: ["release.revision-set"], failOn: "never" });
+
+    const byProject = new Map(result.boms?.map((bom) => [bom.project, bom.components]) ?? []);
+    expect(byProject.get("hardware/mainboard/mainboard.kicad_pro")?.map((row) => row.mpn)).toEqual([
+      "MAINBOARD-ONLY-PART",
+    ]);
+    expect(byProject.get("hardware/sensor/sensor.kicad_pro")).toEqual([]);
+  });
+
   it("does not republish unrecognised source columns from the BOM", async () => {
     const root = await writeFixture({
       "main.kicad_pro": "{}",

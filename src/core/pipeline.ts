@@ -271,6 +271,33 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
  * empty entry rather than disappearing: absence of component data is itself a signal, and a
  * missing board would silently drop out of downstream supply tracking.
  */
+/** The workspace-level `--bom` when the caller named a real path rather than leaving it automatic. */
+function explicitWorkspaceBom(options: PipelineOptions): string | undefined {
+  return options.bom && options.bom !== "auto" ? options.bom : undefined;
+}
+
+/**
+ * Finds a BOM file inside a project's own directory.
+ *
+ * Board attribution may only use a BOM the project can claim. The rules' shared resolver
+ * searches the whole workspace, which is correct for a single-board repository but would
+ * hand one board's CSV to every other board in a hardware monorepo.
+ */
+async function bomWithinProject(root: string, project: ProjectContext): Promise<string | undefined> {
+  const projectDirectory = project.projectFile.split("/").slice(0, -1).join("/");
+  const prefix = projectDirectory.length > 0 ? `${projectDirectory}/` : "";
+  const found = await globFiles(root, [
+    `${prefix}**/bom*.csv`,
+    `${prefix}**/*bom*.csv`,
+    `${prefix}**/bom*.tsv`,
+    `${prefix}**/*bom*.tsv`,
+  ]);
+  const first = found[0];
+  if (!first) return undefined;
+  const relative = path.relative(root, first).split(path.sep).join("/");
+  return relative.startsWith("..") ? undefined : relative;
+}
+
 async function resolveProjectBoms(ctx: PipelineContext, projects: ProjectContext[]): Promise<ProjectBom[]> {
   const boms: ProjectBom[] = [];
   for (const project of projects) {
@@ -279,19 +306,21 @@ async function resolveProjectBoms(ctx: PipelineContext, projects: ProjectContext
     const projectConfig = configForProject(ctx.root, ctx.config, project);
     const override = projectConfig.projects?.[0];
     const variantMatch = override?.variants?.find((variant) => variant.name === ctx.options.variant);
+    const declaredBom = variantMatch?.bom ?? override?.bom ?? explicitWorkspaceBom(ctx.options);
+    const attributableBom = declaredBom ?? (await bomWithinProject(ctx.root, project));
     const scoped: RuleContext = {
       root: ctx.root,
       projects: [project],
       config: projectConfig,
-      options: {
-        ...ctx.options,
-        bom: variantMatch?.bom ?? override?.bom ?? ctx.options.bom,
-      },
+      options: { ...ctx.options, bom: attributableBom ?? ctx.options.bom },
       logger: ctx.logger,
     };
     try {
       const { bomRows, schematicRows } = await loadBomContext(scoped);
-      const resolved = bomRows.length > 0 ? bomRows : schematicRows;
+      // Without a BOM this project can claim, any rows discovered came from a workspace-wide
+      // search and may belong to a different board. Attributing them here would report parts
+      // this board does not contain, so fall back to its own schematic instead.
+      const resolved = attributableBom && bomRows.length > 0 ? bomRows : schematicRows;
       boms.push({ project: project.projectFile, components: resolved.map(projectBomComponent) });
     } catch (error) {
       // Snapshot collection must never fail a run that is not about the BOM. An unreadable
