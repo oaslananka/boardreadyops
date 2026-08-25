@@ -108,6 +108,7 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
             <BrandMarkLockup size={24} className="brand-lockup" />
           </Link>
           <nav className="site-navigation" aria-label="Global navigation">
+            <Link href="/dashboard">Dashboard</Link>
             <Link href="/setup">Repository setup</Link>
             <Link href="/settings/component-intelligence">Component intelligence</Link>
             <a href="https://docs.boardreadyops.com">Documentation</a>
