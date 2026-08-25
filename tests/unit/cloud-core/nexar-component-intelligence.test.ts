@@ -28,7 +28,7 @@ function stubFetch(
   token: Response = jsonResponse({ access_token: "t", expires_in: 3600 }),
 ) {
   return vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    if (String(url).includes("identity.nexar.com")) return token;
+    if (new URL(String(url)).hostname === "identity.nexar.com") return token;
     return graphql(JSON.parse(String(init?.body ?? "{}")));
   }) as unknown as typeof globalThis.fetch;
 }
@@ -142,7 +142,9 @@ describe("nexar component intelligence", () => {
     await nexar.lookup([{ mpn: "A" }]);
     await nexar.lookup([{ mpn: "B" }]);
 
-    const tokenCalls = vi.mocked(fetchImpl).mock.calls.filter(([url]) => String(url).includes("identity.nexar.com"));
+    const tokenCalls = vi
+      .mocked(fetchImpl)
+      .mock.calls.filter(([url]) => new URL(String(url)).hostname === "identity.nexar.com");
     expect(tokenCalls).toHaveLength(1);
   });
 
@@ -188,7 +190,9 @@ describe("nexar component intelligence", () => {
 
     await nexar.lookup(Array.from({ length: 45 }, (_, index) => ({ mpn: `PART-${index}` })));
 
-    const graphqlCalls = vi.mocked(fetchImpl).mock.calls.filter(([url]) => String(url).includes("api.nexar.com"));
+    const graphqlCalls = vi
+      .mocked(fetchImpl)
+      .mock.calls.filter(([url]) => new URL(String(url)).hostname === "api.nexar.com");
     expect(graphqlCalls).toHaveLength(3);
   });
 

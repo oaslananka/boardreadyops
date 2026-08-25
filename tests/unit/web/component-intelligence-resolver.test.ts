@@ -165,7 +165,7 @@ describe("component intelligence resolver", () => {
       cipher,
       now: () => now,
       fetch: (async (url: string | URL | Request) =>
-        String(url).includes("identity.nexar.com")
+        new URL(String(url)).hostname === "identity.nexar.com"
           ? new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }), { status: 200 })
           : new Response("upstream down", { status: 502 })) as typeof globalThis.fetch,
     });
@@ -184,7 +184,7 @@ describe("component intelligence resolver", () => {
       cipher,
       now: () => now,
       fetch: (async (url: string | URL | Request) =>
-        String(url).includes("identity.nexar.com")
+        new URL(String(url)).hostname === "identity.nexar.com"
           ? new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }), { status: 200 })
           : new Response(JSON.stringify({ data: { supMultiMatch: [] } }), { status: 200 })) as typeof globalThis.fetch,
     });
@@ -202,7 +202,7 @@ describe("component intelligence resolver", () => {
       cipher,
       now: () => now,
       fetch: (async (url: string | URL | Request) =>
-        String(url).includes("identity.nexar.com")
+        new URL(String(url)).hostname === "identity.nexar.com"
           ? new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }), { status: 200 })
           : new Response(JSON.stringify({ data: { supMultiMatch: [] } }), { status: 200 })) as typeof globalThis.fetch,
     });
