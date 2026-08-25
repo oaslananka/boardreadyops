@@ -8,6 +8,33 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.34.0](https://github.com/oaslananka/boardreadyops/compare/v1.33.0...v1.34.0) (2026-08-25)
+
+
+### Features
+
+* board identity, BOM snapshots, and continuous supply watch ([#480](https://github.com/oaslananka/boardreadyops/issues/480)) ([0010b8f](https://github.com/oaslananka/boardreadyops/commit/0010b8ffeecfcb5723928f1fafabeae4de2bd7dc))
+* **cloud:** add production readiness soak monitor ([#466](https://github.com/oaslananka/boardreadyops/issues/466)) ([113d57c](https://github.com/oaslananka/boardreadyops/commit/113d57cf7a1b9936f820d44e3c040beb81242af9))
+* **core:** meter supply watch enrolment against the plan ([#489](https://github.com/oaslananka/boardreadyops/issues/489)) ([b35a0d6](https://github.com/oaslananka/boardreadyops/commit/b35a0d60054ddc7eab026145e3abf6ba4a53b2d9))
+* deliver premium product UI experience ([#475](https://github.com/oaslananka/boardreadyops/issues/475)) ([92b194a](https://github.com/oaslananka/boardreadyops/commit/92b194ad7310c114284b03645bd2a5f519901fb1))
+* **docs:** brand the canonical documentation site ([#474](https://github.com/oaslananka/boardreadyops/issues/474)) ([715b3c1](https://github.com/oaslananka/boardreadyops/commit/715b3c14a834d346359190952b47ee4ff1bf01eb))
+* **release:** authorize dashboard viewers so private runs are reachable ([#481](https://github.com/oaslananka/boardreadyops/issues/481)) ([1fc4f46](https://github.com/oaslananka/boardreadyops/commit/1fc4f46976b34d9f9c5dcec812297da36631b443))
+* unify premium product experience ([#469](https://github.com/oaslananka/boardreadyops/issues/469)) ([94326b0](https://github.com/oaslananka/boardreadyops/commit/94326b0feade133ad773a82b101ccbdc54893967))
+* **web:** add terminal circuit-board marketing landing page ([#468](https://github.com/oaslananka/boardreadyops/issues/468)) ([a5399d4](https://github.com/oaslananka/boardreadyops/commit/a5399d4a3fe68617e12b4f5b58da3491e6754f22))
+
+
+### Bug Fixes
+
+* **ci:** align Mergify queue and merge conditions ([#472](https://github.com/oaslananka/boardreadyops/issues/472)) ([fd02e60](https://github.com/oaslananka/boardreadyops/commit/fd02e601fd5a9c46839621485ec14791a493aa46))
+* **ci:** force serial Mergify in-place checks ([#473](https://github.com/oaslananka/boardreadyops/issues/473)) ([f1abda9](https://github.com/oaslananka/boardreadyops/commit/f1abda9f5e1616e655c24ba547d991793054701d))
+* **ci:** make Mergify queue checks single-step ([#470](https://github.com/oaslananka/boardreadyops/issues/470)) ([2d99fee](https://github.com/oaslananka/boardreadyops/commit/2d99fee50c186688b2a84d624cef73cbb57f483e))
+* **core:** complete Check Runs for terminal runs that never reported ([#483](https://github.com/oaslananka/boardreadyops/issues/483)) ([5e19ec0](https://github.com/oaslananka/boardreadyops/commit/5e19ec00186263362cb5bf7ec0066e1a4dbd020b))
+* **core:** let a signed result correct a verdict that was only inferred ([#484](https://github.com/oaslananka/boardreadyops/issues/484)) ([d4edd2c](https://github.com/oaslananka/boardreadyops/commit/d4edd2cc0549039d6b92452b0d483652182c5be9))
+* **core:** stop blanking installation identity, and make db:migrate run on Windows ([#488](https://github.com/oaslananka/boardreadyops/issues/488)) ([7d0792b](https://github.com/oaslananka/boardreadyops/commit/7d0792ba09d700fcf78bd2a63d1cb115f8cb2ef4))
+* **report:** show sign-in state in every navigation bar ([#482](https://github.com/oaslananka/boardreadyops/issues/482)) ([01cf6d5](https://github.com/oaslananka/boardreadyops/commit/01cf6d52a20a4c725ac57995f45b8016401e0c51))
+* **test:** honor fixture runRules in unit helpers ([#471](https://github.com/oaslananka/boardreadyops/issues/471)) ([a1d7aa7](https://github.com/oaslananka/boardreadyops/commit/a1d7aa7d6f3bffdd299d89a8582bd80502da4e2a))
+* use typed error for invalid environment values ([#476](https://github.com/oaslananka/boardreadyops/issues/476)) ([0aa398c](https://github.com/oaslananka/boardreadyops/commit/0aa398c020754309191cf16a1b0ccc216771c7f9))
+
 ## [1.33.0](https://github.com/oaslananka/boardreadyops/compare/v1.32.1...v1.33.0) (2026-08-22)
 
 
