@@ -24,6 +24,11 @@
       "import": "./src/durable-lifecycle-planner.ts",
       "default": "./src/durable-lifecycle-planner.ts"
     },
+    "./nexar-component-intelligence": {
+      "types": "./src/nexar-component-intelligence.ts",
+      "import": "./src/nexar-component-intelligence.ts",
+      "default": "./src/nexar-component-intelligence.ts"
+    },
     "./credential-encryption": {
       "types": "./src/credential-encryption.ts",
       "import": "./src/credential-encryption.ts",
