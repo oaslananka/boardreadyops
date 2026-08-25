@@ -617,6 +617,14 @@ async function persistRunnerResult(
                     when $3 in ('completed', 'failed', 'timed_out')
                       and existing.terminal_result_digest = $7
                     then 'replayed'
+                    -- No digest means the run was failed by inference, not by a reported
+                    -- result: reconciliation saw the GitHub workflow fail and had to guess.
+                    -- A signed result for the still-current attempt outranks that guess, so
+                    -- it corrects the verdict instead of being rejected while the pull
+                    -- request keeps a blocking check for a board that passed.
+                    when existing.terminal_result_digest is null
+                      and $3 in ('completed', 'failed', 'timed_out')
+                    then 'accepted'
                     else 'conflicting_terminal_result'
                   end
                 when existing.persisted_result_digest = $13 then 'replayed'
