@@ -16,6 +16,9 @@ function board(overrides: Partial<WatchBoard> = {}): WatchBoard {
   return {
     boardId: "board-1",
     snapshotId: "snapshot-1",
+    // Existing cases assert evaluation behaviour, so the default fixture is on a tier that
+    // includes supply watch; the entitlement cases below override it.
+    planTier: "pro",
     components: [
       { mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" },
       { mpn: "RC0603FR-0710KL", manufacturer: "Yageo", reference: "R1" },
@@ -51,12 +54,14 @@ function providerReturning(
   return {
     name: "test-provider",
     cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
-    async lookup(parts) {
-      return parts.flatMap((part) => {
+    // Spied so a test can assert the provider was never reached, which is the whole point of
+    // the entitlement and cache-bypass cases.
+    lookup: vi.fn(async (parts: readonly { mpn: string; manufacturer?: string | undefined }[]) =>
+      parts.flatMap((part) => {
         const status = statuses[part.mpn];
         return status ? [{ ...part, status, source: "test-provider", observedAt: now }] : [];
-      });
-    },
+      }),
+    ),
   };
 }
 
@@ -103,6 +108,41 @@ describe("supply watch pass", () => {
     expect(report.boardsEvaluated).toBe(0);
     expect(report.boardsSkipped).toBe(1);
     expect(store.reconcileFindings).not.toHaveBeenCalled();
+  });
+
+  it("never queries the provider for a board whose plan excludes supply watch", async () => {
+    const { store, completions } = storeWith([board({ planTier: "free" })]);
+    const provider = providerReturning({ STM32F103C8T6: "eol" });
+
+    const report = await runSupplyWatchPass(store, provider, now);
+
+    expect(completions[0]?.outcome).toBe("not_entitled");
+    expect(report.boardsEvaluated).toBe(0);
+    expect(report.boardsSkipped).toBe(1);
+    // The part is end of life, so a leak here would both breach the plan and spend a lookup.
+    expect(provider.lookup).not.toHaveBeenCalled();
+    expect(store.reconcileFindings).not.toHaveBeenCalled();
+  });
+
+  it("treats an unreadable plan tier as unentitled rather than granting the capability", async () => {
+    // A row written by a newer deployment, or corrupted by hand, must fail closed.
+    const { store, completions } = storeWith([board({ planTier: "enterprise-unlimited" })]);
+    const provider = providerReturning({ STM32F103C8T6: "eol" });
+
+    await runSupplyWatchPass(store, provider, now);
+
+    expect(completions[0]?.outcome).toBe("not_entitled");
+    expect(provider.lookup).not.toHaveBeenCalled();
+  });
+
+  it("keeps a board due after skipping it for entitlement, so upgrading resumes the watch", async () => {
+    const { store, completions } = storeWith([board({ planTier: "free" })]);
+
+    await runSupplyWatchPass(store, providerReturning({}), now);
+
+    // Rescheduled on the normal interval rather than disabled: the board stays enrolled and
+    // its BOM evidence keeps accruing, so raising the plan needs no backfill.
+    expect(completions[0]?.nextDueAt.getTime()).toBeGreaterThan(now.getTime());
   });
 
   it("skips a board that has captured no components", async () => {

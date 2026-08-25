@@ -10,6 +10,8 @@ export type DueBoard = {
   installationId: string;
   snapshotId: string | undefined;
   components: readonly { mpn: string; manufacturer: string | undefined; reference: string }[];
+  /** Stored plan tier of the owning installation; the pass decides what it permits. */
+  planTier: string | null | undefined;
 };
 
 export type ObservationInput = {
@@ -31,7 +33,7 @@ export type SupplyFindingInput = {
   severity: "critical" | "high" | "medium";
 };
 
-export type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "failed";
+export type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
 
 export type BoardSupplyWatchStore = {
   /** Boards whose watch is due, newest BOM snapshot attached, bounded per call. */
@@ -110,6 +112,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
                 boards.project_path,
                 boards.display_name,
                 repositories.installation_id,
+                installations.plan_tier,
                 newest.snapshot_id,
                 coalesce(
                   (select jsonb_agg(jsonb_build_object(
@@ -124,6 +127,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
          from due
          join boards on boards.id = due.board_id
          join repositories on repositories.id = boards.repository_id
+         join installations on installations.id = repositories.installation_id
          left join newest on newest.board_id = due.board_id
          order by boards.project_path`,
         [now.toISOString(), limit],
@@ -137,6 +141,7 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           projectPath: required(row, "project_path"),
           displayName: required(row, "display_name"),
           installationId: required(row, "installation_id"),
+          planTier: text(row, "plan_tier"),
           snapshotId: text(row, "snapshot_id"),
           components: (parsed as Record<string, unknown>[]).map((component) => ({
             mpn: String(component.mpn ?? ""),
