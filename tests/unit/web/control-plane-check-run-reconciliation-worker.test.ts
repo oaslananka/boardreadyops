@@ -34,6 +34,7 @@ const context: ControlPlaneCheckRunReconciliationContext = {
   githubCheckRunId: 77,
   runStatus: "completed",
   expectedConclusion: "success",
+  resultReported: true,
   completedAt: "2026-07-23T17:55:00.000Z",
   deadlineAt: "2026-07-23T18:10:00.000Z",
 };
@@ -156,6 +157,32 @@ describe("control-plane Check Run reconciliation", () => {
     expect(deps.operations.applyCheckRunReconciliation).toHaveBeenCalledWith(
       expect.objectContaining({ action: "updated", observedStatus: "in_progress" }),
     );
+  });
+
+  it("completes a run that never reported without claiming a result was restored", async () => {
+    // A dispatched workflow that never starts produces no result. The Check Run still has to be
+    // completed so the pull request stops waiting, but saying it was restored from an accepted
+    // signed result would be a lie about evidence that does not exist.
+    const deps = dependencies({ kind: "present", status: "in_progress" });
+    const resultless: ControlPlaneCheckRunReconciliationContext = {
+      ...context,
+      runStatus: "failed",
+      expectedConclusion: "failure",
+      resultReported: false,
+    };
+    vi.mocked(deps.operations.loadCheckRunReconciliationContext).mockResolvedValue(resultless);
+
+    await expect(processControlPlaneCheckRunReconciliation(item, deps)).resolves.toEqual({
+      reconciliationId: "reconciliation-check-1",
+      status: "applied",
+      outcomeCode: "github_check_run_reconciled_without_result",
+    });
+
+    const published = vi.mocked(deps.github.completeCheckRun).mock.calls[0]?.[0];
+    expect(published?.conclusion).toBe("failure");
+    expect(published?.title).toBe("BoardReadyOps result: no result reported");
+    expect(String(published?.summary)).toContain("without reporting a result");
+    expect(String(published?.summary)).not.toContain("signed terminal result");
   });
 
   it("reschedules a temporary 404 before the explicit deadline", async () => {

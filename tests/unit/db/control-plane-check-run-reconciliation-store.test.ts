@@ -65,6 +65,7 @@ describe("Check Run reconciliation operations store", () => {
                 github_check_run_id: "77",
                 run_status: "completed",
                 expected_conclusion: "success",
+                result_reported: true,
                 completed_at: new Date("2026-07-23T17:55:00.000Z"),
                 deadline_at: new Date("2026-07-23T18:30:00.000Z"),
               },
@@ -94,6 +95,7 @@ describe("Check Run reconciliation operations store", () => {
       githubCheckRunId: 77,
       runStatus: "completed",
       expectedConclusion: "success",
+      resultReported: true,
       completedAt: "2026-07-23T17:55:00.000Z",
       deadlineAt: "2026-07-23T18:30:00.000Z",
     });
@@ -114,6 +116,79 @@ describe("Check Run reconciliation operations store", () => {
       "success",
       "observed_current",
     ]);
+  });
+
+  it("carries through a terminal run that never reported a result", async () => {
+    const executor: SqlQueryExecutor = {
+      async query() {
+        return {
+          rows: [
+            {
+              reconciliation_id: "reconciliation-check-1",
+              installation_id: "installation-1",
+              github_installation_id: "123",
+              repository_id: "repository-1",
+              repository_owner: "octo",
+              repository_name: "board",
+              repository_full_name: "octo/board",
+              release_run_id: "run-1",
+              commit_sha: "a".repeat(40),
+              github_check_run_id: "77",
+              run_status: "failed",
+              expected_conclusion: "failure",
+              result_reported: false,
+              completed_at: new Date("2026-07-23T17:55:00.000Z"),
+              deadline_at: new Date("2026-07-23T18:30:00.000Z"),
+            },
+          ],
+        };
+      },
+    };
+    const store = createSqlControlPlaneOperationsStore(executor, { now: () => now });
+
+    await expect(
+      store.loadCheckRunReconciliationContext({
+        reconciliationId: "reconciliation-check-1",
+        workerId: "worker-1",
+      }),
+    ).resolves.toMatchObject({ runStatus: "failed", expectedConclusion: "failure", resultReported: false });
+  });
+
+  it("assumes a result was reported when the column predates the migration", async () => {
+    // A database still on schema v41 returns no result_reported column. Reading that as "no
+    // result" would make the worker announce a missing result on every repair it performs.
+    const executor: SqlQueryExecutor = {
+      async query() {
+        return {
+          rows: [
+            {
+              reconciliation_id: "reconciliation-check-1",
+              installation_id: "installation-1",
+              github_installation_id: "123",
+              repository_id: "repository-1",
+              repository_owner: "octo",
+              repository_name: "board",
+              repository_full_name: "octo/board",
+              release_run_id: "run-1",
+              commit_sha: "a".repeat(40),
+              github_check_run_id: "77",
+              run_status: "completed",
+              expected_conclusion: "success",
+              completed_at: new Date("2026-07-23T17:55:00.000Z"),
+              deadline_at: new Date("2026-07-23T18:30:00.000Z"),
+            },
+          ],
+        };
+      },
+    };
+    const store = createSqlControlPlaneOperationsStore(executor, { now: () => now });
+
+    await expect(
+      store.loadCheckRunReconciliationContext({
+        reconciliationId: "reconciliation-check-1",
+        workerId: "worker-1",
+      }),
+    ).resolves.toMatchObject({ resultReported: true });
   });
 
   it("records a stable publication failure without raw GitHub content", async () => {

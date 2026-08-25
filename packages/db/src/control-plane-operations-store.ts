@@ -65,6 +65,8 @@ export type ControlPlaneCheckRunReconciliationContext = {
   githubCheckRunId: number;
   runStatus: string;
   expectedConclusion: "failure" | "neutral" | "success" | "timed_out";
+  /** False when the run reached a terminal state without ever reporting a result. */
+  resultReported: boolean;
   completedAt: string;
   deadlineAt: string;
 };
@@ -498,6 +500,7 @@ function decodedCheckRunReconciliationContext(
     githubCheckRunId,
     runStatus: requiredText(row, "run_status", "Check Run reconciliation context"),
     expectedConclusion,
+    resultReported: row.boolean("result_reported") ?? true,
     completedAt: requiredTimestamp(row, "completed_at", "Check Run reconciliation context"),
     deadlineAt: requiredTimestamp(row, "deadline_at", "Check Run reconciliation context"),
   };

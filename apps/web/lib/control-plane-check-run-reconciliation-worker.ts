@@ -49,10 +49,23 @@ function checkRunScope(context: ControlPlaneCheckRunReconciliationContext) {
   };
 }
 
-function recoveryPresentation(conclusion: ControlPlaneCheckRunReconciliationContext["expectedConclusion"]): {
+function recoveryPresentation(
+  conclusion: ControlPlaneCheckRunReconciliationContext["expectedConclusion"],
+  resultReported: boolean,
+): {
   title: string;
   summary: string;
 } {
+  if (!resultReported) {
+    // Saying the result was "restored" here would be untrue: the execution never reported one.
+    // The check is completed so the pull request stops waiting, and says why.
+    return {
+      title: "BoardReadyOps result: no result reported",
+      summary:
+        "The execution for this commit ended without reporting a result, so BoardReadyOps completed this Check Run rather than leaving it pending. Open the BoardReadyOps run and the workflow logs to see why the execution did not report.",
+    };
+  }
+
   const title =
     conclusion === "success"
       ? "BoardReadyOps result: ready to release"
@@ -170,7 +183,7 @@ async function repairCheckRun(
   deadline: Date,
 ): Promise<ProcessControlPlaneCheckRunReconciliationResult | undefined> {
   try {
-    const presentation = recoveryPresentation(context.expectedConclusion);
+    const presentation = recoveryPresentation(context.expectedConclusion, context.resultReported);
     await dependencies.github.completeCheckRun({
       ...checkRunScope(context),
       runId: context.releaseRunId,
@@ -252,6 +265,13 @@ export async function processControlPlaneCheckRunReconciliation(
   return {
     reconciliationId: item.reconciliationId,
     status,
-    outcomeCode: status === "already_published" ? "already_published" : "github_check_run_reconciled",
+    // Mirrors the code the database records, so the worker log and the audit event agree on
+    // whether a result existed at all.
+    outcomeCode:
+      status === "already_published"
+        ? "already_published"
+        : context.resultReported
+          ? "github_check_run_reconciled"
+          : "github_check_run_reconciled_without_result",
   };
 }
