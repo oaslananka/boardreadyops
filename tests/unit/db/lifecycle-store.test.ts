@@ -118,6 +118,31 @@ describe("SQL GitHub App metadata store", () => {
     ]);
   });
 
+  it("never blanks a known account when an event arrives without one", async () => {
+    // installation_repositories deliveries carry no account. Taking the excluded value
+    // unconditionally replaced a known login with an empty string on every such event,
+    // which is how all four production installations ended up with no account identity.
+    const { calls, executor } = recordingExecutor();
+    const store = createSqlGitHubAppMetadataStore(executor, {
+      now: () => new Date("2026-07-04T00:00:00.000Z"),
+      id: () => "installation-row-id",
+    });
+
+    await store.upsertInstallation({
+      type: "installation.upsert",
+      installation: { id: 12345 },
+    });
+
+    const sql = calls[0]?.sql ?? "";
+    expect(sql).toContain("when excluded.account_login <> '' then excluded.account_login");
+    expect(sql).toContain("else installations.account_login");
+    expect(sql).toContain("when excluded.account_type <> '' then excluded.account_type");
+    expect(sql).toContain("else installations.account_type");
+    // The empty placeholder is still what gets bound; the SQL is what must ignore it.
+    expect(calls[0]?.params?.[2]).toBe("");
+    expect(calls[0]?.params?.[3]).toBe("");
+  });
+
   it("upserts repositories under an installation", async () => {
     const { calls, executor } = recordingExecutor();
     const store = createSqlGitHubAppMetadataStore(executor, {

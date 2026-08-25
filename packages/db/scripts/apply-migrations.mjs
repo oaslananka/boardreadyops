@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import pg from "pg";
 
 const { Pool } = pg;
@@ -88,7 +88,10 @@ export async function applyCloudMigrations({ connectionString, dryRun = false } 
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL, not string concatenation: on Windows process.argv[1] is a drive path with
+// backslashes while import.meta.url is a file:/// URL, so the old comparison never matched
+// and running this script directly did nothing at all - silently, reporting success.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   applyCloudMigrations({
     connectionString: process.env.DATABASE_URL,
     dryRun: envFlag("BOARDREADYOPS_DB_MIGRATE_DRY_RUN"),

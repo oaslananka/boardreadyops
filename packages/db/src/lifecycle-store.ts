@@ -249,8 +249,17 @@ export function createSqlGitHubAppMetadataStore(
            values ($1, $2, $3, $4, $5, null)
            on conflict (github_installation_id)
            do update set
-             account_login = excluded.account_login,
-             account_type = excluded.account_type,
+             -- Only overwrite when the event actually carried the account. Events such as
+             -- installation_repositories arrive without one, and blindly taking the excluded
+             -- value replaced a known login with an empty string on every such delivery.
+             account_login = case
+               when excluded.account_login <> '' then excluded.account_login
+               else installations.account_login
+             end,
+             account_type = case
+               when excluded.account_type <> '' then excluded.account_type
+               else installations.account_type
+             end,
              suspended_at = case
                when $6::text is not null
                  and not exists (select 1 from audit_events where id = $6::text)
