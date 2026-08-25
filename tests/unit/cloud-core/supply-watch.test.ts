@@ -5,6 +5,7 @@ import {
   createNullComponentIntelligenceProvider,
 } from "../../../packages/cloud-core/src/component-intelligence.js";
 import {
+  constantComponentIntelligence,
   runSupplyWatchPass,
   type SupplyWatchStore,
   type WatchBoard,
@@ -15,6 +16,7 @@ const now = new Date("2026-08-24T12:00:00.000Z");
 function board(overrides: Partial<WatchBoard> = {}): WatchBoard {
   return {
     boardId: "board-1",
+    installationId: "installation-1",
     snapshotId: "snapshot-1",
     // Existing cases assert evaluation behaviour, so the default fixture is on a tier that
     // includes supply watch; the entitlement cases below override it.
@@ -68,7 +70,11 @@ function providerReturning(
 describe("supply watch pass", () => {
   it("raises a finding for a part that went end of life with no commit involved", async () => {
     const { store, reconciled } = storeWith([board()]);
-    const report = await runSupplyWatchPass(store, providerReturning({ STM32F103C8T6: "eol" }), now);
+    const report = await runSupplyWatchPass(
+      store,
+      constantComponentIntelligence(providerReturning({ STM32F103C8T6: "eol" })),
+      now,
+    );
 
     expect(report.boardsEvaluated).toBe(1);
     expect(reconciled[0]?.open).toEqual([
@@ -78,7 +84,11 @@ describe("supply watch pass", () => {
 
   it("does not raise findings for parts that are still active", async () => {
     const { store, reconciled } = storeWith([board()]);
-    await runSupplyWatchPass(store, providerReturning({ STM32F103C8T6: "active", "RC0603FR-0710KL": "active" }), now);
+    await runSupplyWatchPass(
+      store,
+      constantComponentIntelligence(providerReturning({ STM32F103C8T6: "active", "RC0603FR-0710KL": "active" })),
+      now,
+    );
 
     expect(reconciled[0]?.open).toEqual([]);
   });
@@ -94,7 +104,7 @@ describe("supply watch pass", () => {
     const provider = providerReturning({ "RC0603FR-0710KL": "active" });
     const lookup = vi.spyOn(provider, "lookup");
 
-    const report = await runSupplyWatchPass(store, provider, now);
+    const report = await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
 
     expect(report.partsQueried).toBe(1);
     expect(lookup.mock.calls[0]?.[0]).toEqual([{ mpn: "RC0603FR-0710KL", manufacturer: "Yageo" }]);
@@ -102,7 +112,11 @@ describe("supply watch pass", () => {
 
   it("records no_provider instead of reporting a clean board when nothing is configured", async () => {
     const { store, completions } = storeWith([board()]);
-    const report = await runSupplyWatchPass(store, createNullComponentIntelligenceProvider(), now);
+    const report = await runSupplyWatchPass(
+      store,
+      constantComponentIntelligence(createNullComponentIntelligenceProvider()),
+      now,
+    );
 
     expect(completions[0]?.outcome).toBe("no_provider");
     expect(report.boardsEvaluated).toBe(0);
@@ -114,7 +128,7 @@ describe("supply watch pass", () => {
     const { store, completions } = storeWith([board({ planTier: "free" })]);
     const provider = providerReturning({ STM32F103C8T6: "eol" });
 
-    const report = await runSupplyWatchPass(store, provider, now);
+    const report = await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
 
     expect(completions[0]?.outcome).toBe("not_entitled");
     expect(report.boardsEvaluated).toBe(0);
@@ -129,7 +143,7 @@ describe("supply watch pass", () => {
     const { store, completions } = storeWith([board({ planTier: "enterprise-unlimited" })]);
     const provider = providerReturning({ STM32F103C8T6: "eol" });
 
-    await runSupplyWatchPass(store, provider, now);
+    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
 
     expect(completions[0]?.outcome).toBe("not_entitled");
     expect(provider.lookup).not.toHaveBeenCalled();
@@ -138,16 +152,82 @@ describe("supply watch pass", () => {
   it("keeps a board due after skipping it for entitlement, so upgrading resumes the watch", async () => {
     const { store, completions } = storeWith([board({ planTier: "free" })]);
 
-    await runSupplyWatchPass(store, providerReturning({}), now);
+    await runSupplyWatchPass(store, constantComponentIntelligence(providerReturning({})), now);
 
     // Rescheduled on the normal interval rather than disabled: the board stays enrolled and
     // its BOM evidence keeps accruing, so raising the plan needs no backfill.
     expect(completions[0]?.nextDueAt.getTime()).toBeGreaterThan(now.getTime());
   });
 
+  it("runs each installation's lookups under its own provider", async () => {
+    // The whole point of resolving per installation: two customers on their own credentials
+    // must never be served by one shared licence.
+    const first = providerReturning({ STM32F103C8T6: "eol" });
+    const second = providerReturning({ STM32F103C8T6: "active" });
+    const seen: string[] = [];
+    const { store, reconciled } = storeWith([
+      board({ boardId: "board-a", installationId: "installation-a" }),
+      board({ boardId: "board-b", installationId: "installation-b" }),
+    ]);
+
+    await runSupplyWatchPass(
+      store,
+      async (installationId) => {
+        seen.push(installationId);
+        return installationId === "installation-a" ? first : second;
+      },
+      now,
+    );
+
+    expect(seen).toEqual(["installation-a", "installation-b"]);
+    expect(first.lookup).toHaveBeenCalledTimes(1);
+    expect(second.lookup).toHaveBeenCalledTimes(1);
+    // Only the installation whose provider reported end of life gets a finding.
+    expect(reconciled.find((entry) => entry.boardId === "board-a")?.open).toHaveLength(1);
+    expect(reconciled.find((entry) => entry.boardId === "board-b")?.open).toHaveLength(0);
+  });
+
+  it("applies each provider's own cache policy rather than a process-wide one", async () => {
+    // A provider forbidden from cross-tenant reuse must bypass the shared cache even when
+    // another installation in the same pass is allowed to use it.
+    const restricted: ComponentIntelligenceProvider = {
+      ...providerReturning({ STM32F103C8T6: "eol" }),
+      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: false },
+    };
+    const permissive = providerReturning({ STM32F103C8T6: "eol" });
+    const cached = new Map([
+      [
+        componentKey({ mpn: "STM32F103C8T6", manufacturer: "ST" }),
+        { status: "active", source: "cache", observedAt: now.toISOString() },
+      ],
+      [
+        componentKey({ mpn: "RC0603FR-0710KL", manufacturer: "Yageo" }),
+        { status: "active", source: "cache", observedAt: now.toISOString() },
+      ],
+    ]);
+    const { store } = storeWith(
+      [
+        board({ boardId: "board-restricted", installationId: "installation-restricted" }),
+        board({ boardId: "board-permissive", installationId: "installation-permissive" }),
+      ],
+      cached,
+    );
+
+    await runSupplyWatchPass(
+      store,
+      async (installationId) => (installationId === "installation-restricted" ? restricted : permissive),
+      now,
+    );
+
+    // The restricted installation ignores the cache and queries; the permissive one is served
+    // entirely from it and never reaches its provider.
+    expect(restricted.lookup).toHaveBeenCalledTimes(1);
+    expect(permissive.lookup).not.toHaveBeenCalled();
+  });
+
   it("skips a board that has captured no components", async () => {
     const { store, completions } = storeWith([board({ components: [], snapshotId: undefined })]);
-    const report = await runSupplyWatchPass(store, providerReturning({}), now);
+    const report = await runSupplyWatchPass(store, constantComponentIntelligence(providerReturning({})), now);
 
     expect(completions[0]?.outcome).toBe("skipped_no_snapshot");
     expect(report.boardsSkipped).toBe(1);
@@ -165,7 +245,7 @@ describe("supply watch pass", () => {
       },
     };
 
-    const report = await runSupplyWatchPass(store, provider, now);
+    const report = await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
 
     expect(report.failures).toBe(1);
     expect(report.boardsEvaluated).toBe(1);
@@ -182,7 +262,10 @@ describe("supply watch pass", () => {
       },
     };
 
-    await runSupplyWatchPass(store, provider, now, { intervalMs: 86_400_000, retryIntervalMs: 3_600_000 });
+    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now, {
+      intervalMs: 86_400_000,
+      retryIntervalMs: 3_600_000,
+    });
 
     expect(completions[0]?.outcome).toBe("failed");
     expect(completions[0]?.nextDueAt.toISOString()).toBe("2026-08-24T13:00:00.000Z");
@@ -205,7 +288,9 @@ describe("supply watch pass", () => {
       },
     };
 
-    await runSupplyWatchPass(store, provider, now, { observationTtlMs: 30 * 24 * 60 * 60 * 1000 });
+    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now, {
+      observationTtlMs: 30 * 24 * 60 * 60 * 1000,
+    });
 
     const recorded = (store.recordObservations as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] ?? [];
     for (const observation of recorded) {
@@ -228,7 +313,7 @@ describe("supply watch pass", () => {
       },
     };
 
-    const report = await runSupplyWatchPass(store, provider, now);
+    const report = await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
 
     // The shared observation cache is bypassed entirely rather than serving one licensee's
     // answer to another, so every part is looked up and nothing is written to it.
@@ -248,7 +333,7 @@ describe("supply watch pass", () => {
       },
     };
 
-    const report = await runSupplyWatchPass(store, provider, now);
+    const report = await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
 
     // Writing a row and expiring it immediately would still be storing it.
     expect(store.freshObservations).not.toHaveBeenCalled();
