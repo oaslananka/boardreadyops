@@ -27,12 +27,22 @@ export type RecordBoardBomSnapshotsInput = {
   repositoryId: string;
   commitSha: string;
   boms: readonly BoardBomInput[];
+  /**
+   * How many boards this installation's plan may keep under supply watch.
+   *
+   * Required rather than defaulted: a caller that cannot resolve the plan must not silently
+   * get unlimited watching. The limit itself is plan policy and lives in cloud-core, so only
+   * the resolved number crosses into this layer.
+   */
+  watchedBoardLimit: number;
 };
 
 export type RecordBoardBomSnapshotsResult = {
   boardsTouched: number;
   snapshotsWritten: number;
   componentsWritten: number;
+  /** Boards newly placed under supply watch; fewer than reported means the plan limit was hit. */
+  boardsEnrolled: number;
 };
 
 export type BoardBomStore = {
@@ -68,7 +78,7 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
   return {
     async recordSnapshots(input) {
       if (input.boms.length === 0) {
-        return { boardsTouched: 0, snapshotsWritten: 0, componentsWritten: 0 };
+        return { boardsTouched: 0, snapshotsWritten: 0, componentsWritten: 0, boardsEnrolled: 0 };
       }
       if (input.boms.length > maximumBoardsPerRun) {
         throw new Error(`a release run may report at most ${maximumBoardsPerRun} boards`);
@@ -105,8 +115,11 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
 
       const result = await executor.query(
         `with run_scope as (
-           select release_runs.id as run_id, release_runs.repository_id
+           select release_runs.id as run_id,
+                  release_runs.repository_id,
+                  repositories.installation_id
            from release_runs
+           join repositories on repositories.id = release_runs.repository_id
            where release_runs.id = $1
              and release_runs.repository_id = $2
          ),
@@ -133,8 +146,30 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
            -- A board is only ever discovered here, so this is the one place that can enrol it
            -- in supply watch. Without it a board created after the watch migration would never
            -- become due and would silently go unwatched.
+           --
+           -- Enrolment is also the metered action: the plan limits how many boards are watched,
+           -- not how many exist. Boards beyond the limit are still recorded here with their full
+           -- BOM history, so raising the plan later starts watching them without having lost any
+           -- evidence. Existing enrolments count across the whole installation, because that is
+           -- the unit the plan is sold in.
            insert into board_supply_watch (board_id)
-           select upserted_boards.id from upserted_boards
+           select candidate.id
+           from (
+             select upserted_boards.id,
+                    row_number() over (order by upserted_boards.project_path) as position
+             from upserted_boards
+             where not exists (
+               select 1 from board_supply_watch existing where existing.board_id = upserted_boards.id
+             )
+           ) as candidate
+           cross join run_scope
+           where (
+             select count(*)
+             from board_supply_watch watched
+             join boards on boards.id = watched.board_id
+             join repositories on repositories.id = boards.repository_id
+             where repositories.installation_id = run_scope.installation_id
+           ) + candidate.position <= $6::int
            on conflict (board_id) do nothing
            returning board_id
          ),
@@ -185,8 +220,16 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
          select (select count(*) from upserted_boards)::int as boards_touched,
                 (select count(*) from inserted_snapshots)::int as snapshots_written,
                 (select count(*) from inserted_components)::int as components_written,
+                (select count(*) from enrolled_watch)::int as boards_enrolled,
                 (select count(*) from run_scope)::int as run_matches`,
-        [input.runId, input.repositoryId, input.commitSha, boardsJson, at],
+        [
+          input.runId,
+          input.repositoryId,
+          input.commitSha,
+          boardsJson,
+          at,
+          Math.max(0, Math.trunc(input.watchedBoardLimit)),
+        ],
       );
 
       const row = rows(result)[0];
@@ -198,6 +241,7 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
         boardsTouched: integerColumn(row, "boards_touched"),
         snapshotsWritten: integerColumn(row, "snapshots_written"),
         componentsWritten: integerColumn(row, "components_written"),
+        boardsEnrolled: integerColumn(row, "boards_enrolled"),
       };
     },
   };
