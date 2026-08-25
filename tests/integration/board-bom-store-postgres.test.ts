@@ -73,7 +73,7 @@ describeDatabase("board BOM store", () => {
       ],
     });
 
-    expect(result).toEqual({ boardsTouched: 1, snapshotsWritten: 1, componentsWritten: 2 });
+    expect(result).toEqual({ boardsTouched: 1, snapshotsWritten: 1, componentsWritten: 2, boardsEnrolled: 1 });
 
     const boards = rows(
       await database().query("select project_path, display_name from boards where repository_id = $1", [repositoryId]),
