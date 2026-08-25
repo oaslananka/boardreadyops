@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { hostname } from "node:os";
-import { createNullComponentIntelligenceProvider } from "@boardreadyops/cloud-core/component-intelligence";
-import { constantComponentIntelligence, runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
+import { configuredCredentialCipher } from "@boardreadyops/cloud-core/credential-encryption";
+import { runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
 import {
   type ClaimedArtifactDeletion,
   createSqlArtifactDeletionStore,
@@ -17,11 +17,13 @@ import {
   type ClaimedControlPlaneOutboxEffect,
   createSqlControlPlaneOutboxStore,
 } from "@boardreadyops/db/control-plane-outbox-store";
+import { createSqlInstallationCredentialStore } from "@boardreadyops/db/installation-credential-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlRetentionMaintenanceStore } from "@boardreadyops/db/retention-maintenance-store";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
 import { processArtifactDeletion } from "./lib/artifact-deletion-worker.js";
 import { resolveControlPlaneRetentionConfiguration } from "./lib/cloud-runtime-config.js";
+import { createComponentIntelligenceResolver } from "./lib/component-intelligence-resolver.js";
 import { processControlPlaneCheckRunReconciliation } from "./lib/control-plane-check-run-reconciliation-worker.js";
 import { processControlPlaneLifecycleReconciliation } from "./lib/control-plane-lifecycle-reconciliation-worker.js";
 import { processControlPlaneOutboxEffect } from "./lib/control-plane-outbox-worker.js";
@@ -153,11 +155,15 @@ const retentionMaintenance = createSqlRetentionMaintenanceStore(executor, {
 });
 const operations = createSqlControlPlaneOperationsStore(executor);
 const supplyWatchStore = createSqlBoardSupplyWatchStore(executor);
-// A resolver rather than one provider: the recommended model is customer-supplied credentials,
-// so each installation's lookups run under its own licence. Until credential storage exists
-// every installation resolves to the null provider, and the pass records no_provider rather
-// than reporting an unchecked board as clean.
-const resolveComponentIntelligence = constantComponentIntelligence(createNullComponentIntelligenceProvider());
+// Each installation's lookups run under its own licence, so the provider is resolved per
+// installation from the credential that installation supplied. Without an encryption key
+// configured this resolves to the null provider for everyone, and the pass records
+// no_provider rather than reporting an unchecked board as clean.
+const resolveComponentIntelligence = createComponentIntelligenceResolver({
+  credentials: createSqlInstallationCredentialStore(executor),
+  cipher: configuredCredentialCipher(process.env),
+  onDiagnostic: (event, detail) => log("warn", event, detail),
+});
 const controlPlaneSlo = createControlPlaneSloEvaluator();
 const outbox = createSqlControlPlaneOutboxStore(executor);
 const artifactDeletions = createSqlArtifactDeletionStore(executor);
