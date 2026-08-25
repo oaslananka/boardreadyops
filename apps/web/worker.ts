@@ -1,9 +1,12 @@
 import { createServer } from "node:http";
 import { hostname } from "node:os";
+import { createNullComponentIntelligenceProvider } from "@boardreadyops/cloud-core/component-intelligence";
+import { runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
 import {
   type ClaimedArtifactDeletion,
   createSqlArtifactDeletionStore,
 } from "@boardreadyops/db/artifact-deletion-store";
+import { createSqlBoardSupplyWatchStore } from "@boardreadyops/db/board-supply-watch-store";
 import { type ClaimedControlPlaneJob, createSqlControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 import {
   type ClaimedControlPlaneReconciliationItem,
@@ -128,6 +131,13 @@ const retentionCleanupIntervalMilliseconds = integerEnvironment(
   86_400_000,
 );
 const retentionCleanupBatchSize = integerEnvironment("BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE", 1_000, 1, 10_000);
+const supplyWatchIntervalMilliseconds = integerEnvironment(
+  "BOARDREADYOPS_SUPPLY_WATCH_INTERVAL_MS",
+  3_600_000,
+  60_000,
+  86_400_000,
+);
+const supplyWatchBoardsPerPass = integerEnvironment("BOARDREADYOPS_SUPPLY_WATCH_BOARDS_PER_PASS", 50, 1, 500);
 const retention = resolveControlPlaneRetentionConfiguration();
 const healthPort = integerEnvironment("BOARDREADYOPS_WORKER_HEALTH_PORT", 3001, 1, 65_535);
 const databasePoolMaximum = integerEnvironment(
@@ -142,6 +152,10 @@ const retentionMaintenance = createSqlRetentionMaintenanceStore(executor, {
   defaultBatchSize: retentionCleanupBatchSize,
 });
 const operations = createSqlControlPlaneOperationsStore(executor);
+const supplyWatchStore = createSqlBoardSupplyWatchStore(executor);
+// Swapping this for a real provider is the only change needed to start evaluating boards;
+// everything downstream already honours its cache policy and the plan gate.
+const componentIntelligenceProvider = createNullComponentIntelligenceProvider();
 const controlPlaneSlo = createControlPlaneSloEvaluator();
 const outbox = createSqlControlPlaneOutboxStore(executor);
 const artifactDeletions = createSqlArtifactDeletionStore(executor);
@@ -203,6 +217,7 @@ let lastSuccessfulArtifactDeletionAt: string | undefined;
 let lastSuccessfulRetentionCleanupAt: string | undefined;
 let nextMetricsAt = 0;
 let nextRetentionCleanupAt = 0;
+let nextSupplyWatchAt = 0;
 let nextLifecycleReconciliationDetectionAt = 0;
 let nextReconciliationDetectionAt = 0;
 let nextCheckRunReconciliationDetectionAt = 0;
@@ -413,6 +428,31 @@ async function detectCheckRunReconciliationCandidates(currentTime: number): Prom
     if (detected > 0) log("info", "worker.check_run_reconciliation_detected", { detected });
   } catch (error) {
     log("warn", "worker.check_run_reconciliation_detection_failed", { errorClass: errorClass(error) });
+  }
+}
+
+async function runSupplyWatch(currentTime: number): Promise<void> {
+  if (currentTime < nextSupplyWatchAt) return;
+  nextSupplyWatchAt = currentTime + supplyWatchIntervalMilliseconds;
+
+  try {
+    // No component-intelligence provider is configured yet, so this resolves to the null
+    // provider and every due board completes as no_provider. That is deliberate: the pass
+    // records honestly that nothing looked at the board rather than reporting it clean, and
+    // wiring the schedule now means adding a provider is a substitution rather than a change
+    // to the control plane. Boards on a plan without supply watch are skipped before any
+    // lookup, so this costs nothing on the free tier either.
+    const report = await runSupplyWatchPass(supplyWatchStore, componentIntelligenceProvider, new Date(currentTime), {
+      intervalMs: supplyWatchIntervalMilliseconds,
+      maximumBoardsPerRun: supplyWatchBoardsPerPass,
+      onError: (boardId, error) =>
+        log("warn", "worker.supply_watch_board_failed", { boardId, errorClass: errorClass(error) }),
+    });
+    if (report.boardsEvaluated > 0 || report.boardsSkipped > 0 || report.failures > 0) {
+      log("info", "worker.supply_watch_pass", { ...report });
+    }
+  } catch (error) {
+    log("warn", "worker.supply_watch_failed", { errorClass: errorClass(error) });
   }
 }
 
@@ -784,6 +824,7 @@ async function runMaintenanceLoop(): Promise<void> {
     await detectLifecycleReconciliationCandidates(currentTime);
     await detectWorkflowReconciliationCandidates(currentTime);
     await detectCheckRunReconciliationCandidates(currentTime);
+    await runSupplyWatch(currentTime);
     await purgeExpiredRetentionData(currentTime);
     await sleep(1000);
   }

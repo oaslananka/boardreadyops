@@ -31,8 +31,10 @@ beforeAll(async () => {
   await database().query("delete from installations where id = $1", [installationId]);
   await database().query("delete from component_lifecycle_observations where lower(mpn) = lower($1)", ["WATCH-EOL-1"]);
   await database().query(
-    `insert into installations (id, github_installation_id, account_login, account_type)
-     values ($1, 47201, 'supply-watch', 'Organization')`,
+    // A tier that includes supply watch: these cases assert evaluation behaviour, and the
+    // default 'free' tier is deliberately excluded from the capability.
+    `insert into installations (id, github_installation_id, account_login, account_type, plan_tier)
+     values ($1, 47201, 'supply-watch', 'Organization', 'pro')`,
     [installationId],
   );
   await database().query(
@@ -108,6 +110,49 @@ describeDatabase("board supply watch", () => {
     expect(findings[0]?.severity).toBe("high");
     expect(findings[0]?.reference).toBe("U1");
     expect(findings[0]?.resolved_at).toBeNull();
+  });
+
+  it("skips the board and never queries the provider when the plan excludes supply watch", async () => {
+    const store = createSqlBoardSupplyWatchStore(database());
+    await database().query("update installations set plan_tier = 'free' where id = $1", [installationId]);
+    await database().query("update board_supply_watch set next_due_at = $2 where board_id = $1", [boardId, now]);
+    let lookups = 0;
+
+    try {
+      const report = await runSupplyWatchPass(
+        store,
+        {
+          name: "integration-provider",
+          cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
+          async lookup(parts) {
+            lookups += 1;
+            return parts.map((part) => ({
+              ...part,
+              status: "eol" as const,
+              source: "integration-provider",
+              observedAt: now,
+            }));
+          },
+        },
+        now,
+      );
+
+      expect(report.boardsEvaluated).toBe(0);
+      expect(report.boardsSkipped).toBe(1);
+      // The part would come back end of life, so a leak here costs a lookup the plan did not buy.
+      expect(lookups).toBe(0);
+
+      const watch = rows(
+        await database().query("select last_outcome, next_due_at from board_supply_watch where board_id = $1", [
+          boardId,
+        ]),
+      );
+      expect(watch[0]?.last_outcome).toBe("not_entitled");
+      // Still due later rather than disabled, so upgrading the plan resumes the watch.
+      expect(new Date(String(watch[0]?.next_due_at)).getTime()).toBeGreaterThan(now.getTime());
+    } finally {
+      await database().query("update installations set plan_tier = 'pro' where id = $1", [installationId]);
+    }
   });
 
   it("caches the observation so the next pass does not re-query the provider", async () => {
