@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { planLimits, planTierOf } from "@boardreadyops/cloud-core/entitlements";
 import { type ReleaseRunResult, releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createSqlBoardBomStore } from "@boardreadyops/db/board-bom-store";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
@@ -481,13 +482,21 @@ async function recordBoardBomSnapshots(
   const commitSha = stringCell(row, "commit_sha");
   if (!repositoryId || !commitSha) return "Board BOM snapshot skipped: run repository or commit is unavailable.";
 
+  // Plan policy lives in cloud-core; only the resolved number crosses into the db layer, so
+  // packages/db never learns what a plan is. An unreadable tier degrades to free.
+  const watchedBoardLimit = planLimits(planTierOf(stringCell(row, "plan_tier"))).watchedBoards;
+
   try {
-    await createSqlBoardBomStore(executor, { now: dependencies.now }).recordSnapshots({
+    const recorded = await createSqlBoardBomStore(executor, { now: dependencies.now }).recordSnapshots({
       runId: input.runId,
       repositoryId,
       commitSha,
       boms,
+      watchedBoardLimit,
     });
+    // Evidence is recorded for every board regardless; only the ongoing watch is metered, so
+    // a board past the plan limit is a silent no-op here rather than a failed result.
+    void recorded.boardsEnrolled;
     return undefined;
   } catch {
     return "Board BOM snapshot could not be recorded for this run.";
@@ -982,6 +991,7 @@ async function persistRunnerResult(
             repositories.owner,
             repositories.name,
             installations.github_installation_id,
+            installations.plan_tier,
             effective.trust_mode,
             effective.safe_mode_reasons,
             coalesce(updated.completed_at, effective.completed_at) as completed_at,
