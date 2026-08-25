@@ -44,8 +44,13 @@ export async function viewerAuthorization(
   environment: Readonly<Record<string, string | undefined>> = process.env,
   now: Date = new Date(),
 ): Promise<ViewerAuthorization> {
+  // cookies() is read unconditionally, and that is the point: reading it is what marks a page
+  // as per-request. Gating the call on configuration made a page's dynamism depend on whether
+  // SESSION_SECRET happened to be set during `next build`. It is not passed to the build, so
+  // the landing page was prerendered in its signed-out state and kept serving that HTML to
+  // everyone, signed in or not.
+  const token = (await cookies()).get(sessionCookieName)?.value;
   const secret = configuredSessionSecret(environment);
-  const token = secret ? (await cookies()).get(sessionCookieName)?.value : undefined;
   const session = secret && token ? decodeUserSession(token, secret, now) : undefined;
 
   const authorizeInstallation = async (installationId: string): Promise<boolean> => {
