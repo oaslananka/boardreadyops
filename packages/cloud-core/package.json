@@ -24,6 +24,16 @@
       "import": "./src/durable-lifecycle-planner.ts",
       "default": "./src/durable-lifecycle-planner.ts"
     },
+    "./component-intelligence": {
+      "types": "./src/component-intelligence.ts",
+      "import": "./src/component-intelligence.ts",
+      "default": "./src/component-intelligence.ts"
+    },
+    "./supply-watch": {
+      "types": "./src/supply-watch.ts",
+      "import": "./src/supply-watch.ts",
+      "default": "./src/supply-watch.ts"
+    },
     "./entitlements": {
       "types": "./src/entitlements.ts",
       "import": "./src/entitlements.ts",

@@ -6,6 +6,7 @@ import {
   queryablePartsOf,
   supplyFindingSeverity,
 } from "./component-intelligence.js";
+import { planTierOf, supplyWatchEnabled } from "./entitlements.js";
 
 /**
  * Continuous supply watch.
@@ -19,9 +20,17 @@ export type WatchBoard = {
   boardId: string;
   components: readonly { mpn: string; manufacturer: string | undefined; reference: string }[];
   snapshotId: string | undefined;
+  /**
+   * The stored plan tier of the installation that owns this board.
+   *
+   * Carried on the board rather than resolved per pass because a single pass spans
+   * installations, and an unreadable value must degrade to the least privileged tier rather
+   * than granting a paid capability by accident.
+   */
+  planTier: string | null | undefined;
 };
 
-type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "failed";
+type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
 
 export type SupplyWatchStore = {
   claimDueBoards(now: Date, limit: number): Promise<WatchBoard[]>;
@@ -139,6 +148,16 @@ export async function runSupplyWatchPass(
 
   for (const board of boards) {
     try {
+      // Supply watch is a paid capability. A board on a plan without it stays enrolled and
+      // keeps accumulating BOM evidence, so raising the plan starts watching it with no
+      // backfill; it is simply never queried. Reported as its own outcome because every other
+      // value would misdescribe it - 'evaluated' claims a check that did not happen.
+      if (!supplyWatchEnabled(planTierOf(board.planTier))) {
+        report.boardsSkipped += 1;
+        await store.completeEvaluation(board.boardId, "not_entitled", now, new Date(now.getTime() + intervalMs));
+        continue;
+      }
+
       if (!board.snapshotId || board.components.length === 0) {
         report.boardsSkipped += 1;
         await store.completeEvaluation(board.boardId, "skipped_no_snapshot", now, new Date(now.getTime() + intervalMs));
