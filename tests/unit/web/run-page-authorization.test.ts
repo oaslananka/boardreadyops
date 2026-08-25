@@ -37,6 +37,16 @@ describe("run page authorization", () => {
     expect(failures).toEqual([]);
   });
 
+  it("reads cookies unconditionally, so a page rendering the viewer stays per-request", async () => {
+    // Gating cookies() on SESSION_SECRET made a page's dynamism depend on whether that variable
+    // was set during `next build`. It is not passed to the build, so the landing page was
+    // prerendered signed-out and kept serving that HTML to everyone who signed in afterwards.
+    const source = await readFile(join(process.cwd(), "apps/web/lib/viewer-authorization.ts"), "utf8");
+
+    expect(source).toContain("const token = (await cookies()).get(sessionCookieName)?.value;");
+    expect(source).not.toMatch(/secret\s*\?\s*\(await cookies\(\)\)/u);
+  });
+
   it("never hardcodes an authorizer that always allows", async () => {
     for (const page of await runPagePaths()) {
       const source = await readFile(page, "utf8");
