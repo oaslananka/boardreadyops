@@ -1976,3 +1976,54 @@ code {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Repository listings. Native tables rather than a grid of cards: these are rows of
+   comparable facts, and a table gives screen readers the row/column relationships for free. */
+.repository-table-wrap {
+  overflow-x: auto;
+}
+
+.repository-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.repository-table th,
+.repository-table td {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--bro-border);
+  vertical-align: middle;
+}
+
+.repository-table thead th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bro-text-muted, inherit);
+  border-bottom-color: var(--bro-border-strong);
+}
+
+.repository-table tbody tr:last-child th,
+.repository-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.repository-private {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--bro-border-strong);
+  border-radius: var(--bro-radius-sm);
+  padding: 0.05rem 0.35rem;
+  font-weight: 500;
+}
+
+.repository-when {
+  display: block;
+  font-size: 0.8rem;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}

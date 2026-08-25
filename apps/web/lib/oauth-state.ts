@@ -16,15 +16,24 @@ const maximumReturnPathLength = 512;
  * Constrains where sign-in may send the browser afterwards.
  *
  * Only a same-site absolute path is allowed. A full URL, a protocol-relative `//host` path, or
- * anything with a backslash is discarded in favour of the dashboard root, so the sign-in link
- * cannot be used as an open redirect.
+ * anything with a backslash is discarded in favour of the dashboard, so the sign-in link cannot
+ * be used as an open redirect.
+ *
+ * The fallback is the dashboard rather than the landing page: somebody who has just signed in
+ * wants to see their repositories, and returning them to the marketing page made sign-in look
+ * like it had done nothing.
  */
+/** Where a signed-in viewer belongs when nothing more specific was requested. */
+const signedInLandingPath = "/dashboard";
+
 export function safeReturnPath(value: string | null | undefined): string {
-  if (typeof value !== "string" || value.length === 0 || value.length > maximumReturnPathLength) return "/";
-  if (!value.startsWith("/")) return "/";
-  if (value.startsWith("//")) return "/";
-  if (value.includes("\\")) return "/";
-  if (value.includes("://")) return "/";
+  if (typeof value !== "string" || value.length === 0 || value.length > maximumReturnPathLength) {
+    return signedInLandingPath;
+  }
+  if (!value.startsWith("/")) return signedInLandingPath;
+  if (value.startsWith("//")) return signedInLandingPath;
+  if (value.includes("\\")) return signedInLandingPath;
+  if (value.includes("://")) return signedInLandingPath;
   return value;
 }
 
