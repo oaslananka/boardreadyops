@@ -61,6 +61,7 @@ describeDatabase("board BOM store", () => {
       runId: runOneId,
       repositoryId,
       commitSha: commitOne,
+      watchedBoardLimit: 100,
       boms: [
         {
           project: "hardware/mainboard/mainboard.kicad_pro",
@@ -72,7 +73,7 @@ describeDatabase("board BOM store", () => {
       ],
     });
 
-    expect(result).toEqual({ boardsTouched: 1, snapshotsWritten: 1, componentsWritten: 2 });
+    expect(result).toEqual({ boardsTouched: 1, snapshotsWritten: 1, componentsWritten: 2, boardsEnrolled: 1 });
 
     const boards = rows(
       await database().query("select project_path, display_name from boards where repository_id = $1", [repositoryId]),
@@ -88,6 +89,7 @@ describeDatabase("board BOM store", () => {
       runId: runTwoId,
       repositoryId,
       commitSha: commitTwo,
+      watchedBoardLimit: 100,
       boms: [
         {
           project: "hardware/mainboard/mainboard.kicad_pro",
@@ -115,6 +117,7 @@ describeDatabase("board BOM store", () => {
       runId: runOneId,
       repositoryId,
       commitSha: commitOne,
+      watchedBoardLimit: 100,
       boms: [
         {
           project: "hardware/mainboard/mainboard.kicad_pro",
@@ -146,6 +149,7 @@ describeDatabase("board BOM store", () => {
       runId: runTwoId,
       repositoryId,
       commitSha: commitTwo,
+      watchedBoardLimit: 100,
       boms: [
         { project: "hardware/sensor/sensor.kicad_pro", components: [{ reference: "U1" }] },
         { project: "hardware/sensor/sensor.kicad_pro", components: [{ reference: "U1" }, { reference: "U2" }] },
@@ -174,6 +178,64 @@ describeDatabase("board BOM store", () => {
     expect(watch[0]?.enabled).toBe(true);
   });
 
+  it("meters supply watch enrolment by the plan limit while still recording evidence", async () => {
+    const store = createSqlBoardBomStore(database());
+    await database().query(
+      "delete from board_supply_watch where board_id in (select id from boards where repository_id = $1)",
+      [repositoryId],
+    );
+
+    // A free-tier installation watches one board. Three are reported: all three keep their
+    // BOM evidence, only one is put under watch.
+    const result = await store.recordSnapshots({
+      runId: runOneId,
+      repositoryId,
+      commitSha: commitOne,
+      watchedBoardLimit: 1,
+      boms: [
+        { project: "limit/a/a.kicad_pro", components: [{ reference: "U1" }] },
+        { project: "limit/b/b.kicad_pro", components: [{ reference: "U2" }] },
+        { project: "limit/c/c.kicad_pro", components: [{ reference: "U3" }] },
+      ],
+    });
+
+    expect(result.boardsTouched).toBe(3);
+    expect(result.boardsEnrolled).toBe(1);
+
+    const watched = rows(
+      await database().query(
+        `select count(*)::int as total
+           from board_supply_watch w
+           join boards b on b.id = w.board_id
+          where b.repository_id = $1`,
+        [repositoryId],
+      ),
+    );
+    expect(watched[0]?.total).toBe(1);
+
+    // Evidence is untouched by the limit: every reported board still has a snapshot.
+    const snapshots = rows(
+      await database().query(
+        `select count(*)::int as total
+           from board_bom_snapshots s
+           join boards b on b.id = s.board_id
+          where b.repository_id = $1 and b.project_path like 'limit/%'`,
+        [repositoryId],
+      ),
+    );
+    expect(snapshots[0]?.total).toBe(3);
+
+    // A later run on the same installation must not enrol more once the limit is reached.
+    const second = await store.recordSnapshots({
+      runId: runTwoId,
+      repositoryId,
+      commitSha: commitTwo,
+      watchedBoardLimit: 1,
+      boms: [{ project: "limit/d/d.kicad_pro", components: [{ reference: "U4" }] }],
+    });
+    expect(second.boardsEnrolled).toBe(0);
+  });
+
   it("refuses a board whose run belongs to another repository", async () => {
     const store = createSqlBoardBomStore(database());
     await expect(
@@ -181,6 +243,7 @@ describeDatabase("board BOM store", () => {
         runId: runOneId,
         repositoryId: "40000000-0000-4000-8000-0000000000ff",
         commitSha: commitOne,
+        watchedBoardLimit: 100,
         boms: [{ project: "other.kicad_pro", components: [{ reference: "U1" }] }],
       }),
     ).rejects.toThrow(/repository/u);

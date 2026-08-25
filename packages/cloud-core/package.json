@@ -24,6 +24,11 @@
       "import": "./src/durable-lifecycle-planner.ts",
       "default": "./src/durable-lifecycle-planner.ts"
     },
+    "./entitlements": {
+      "types": "./src/entitlements.ts",
+      "import": "./src/entitlements.ts",
+      "default": "./src/entitlements.ts"
+    },
     "./runner-request-signature": {
       "types": "./src/runner-request-signature.ts",
       "import": "./src/runner-request-signature.ts",
