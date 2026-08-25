@@ -22,6 +22,14 @@ export const sessionLifetimeMs = 8 * 60 * 60 * 1000;
 export type ViewerAuthorization = {
   session: UserSession | undefined;
   authorizeRepository: (repository: { installationId: string }) => Promise<boolean>;
+  /**
+   * Whether the viewer may act on an installation itself.
+   *
+   * Same check as authorizeRepository, named for what the caller is actually asking. Settings
+   * pages act on an installation rather than a repository, and reading a repository-shaped
+   * helper there invites someone to pass the wrong id.
+   */
+  authorizeInstallation: (installationId: string) => Promise<boolean>;
 };
 
 /**
@@ -40,13 +48,16 @@ export async function viewerAuthorization(
   const token = secret ? (await cookies()).get(sessionCookieName)?.value : undefined;
   const session = secret && token ? decodeUserSession(token, secret, now) : undefined;
 
+  const authorizeInstallation = async (installationId: string): Promise<boolean> => {
+    if (!session) return false;
+    const githubInstallationId = await githubInstallationIdFor(installationId, environment);
+    return githubInstallationId !== undefined && sessionAllowsInstallation(session, githubInstallationId);
+  };
+
   return {
     session,
-    authorizeRepository: async (repository) => {
-      if (!session) return false;
-      const githubInstallationId = await githubInstallationIdFor(repository.installationId, environment);
-      return githubInstallationId !== undefined && sessionAllowsInstallation(session, githubInstallationId);
-    },
+    authorizeRepository: async (repository) => authorizeInstallation(repository.installationId),
+    authorizeInstallation,
   };
 }
 

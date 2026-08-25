@@ -109,6 +109,7 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
           </Link>
           <nav className="site-navigation" aria-label="Global navigation">
             <Link href="/setup">Repository setup</Link>
+            <Link href="/settings/component-intelligence">Component intelligence</Link>
             <a href="https://docs.boardreadyops.com">Documentation</a>
             {viewerNav ? <Suspense fallback={null}>{viewerNav}</Suspense> : null}
           </nav>
