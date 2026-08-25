@@ -24,7 +24,7 @@ const maximumReturnPathLength = 512;
  * like it had done nothing.
  */
 /** Where a signed-in viewer belongs when nothing more specific was requested. */
-export const signedInLandingPath = "/dashboard";
+const signedInLandingPath = "/dashboard";
 
 export function safeReturnPath(value: string | null | undefined): string {
   if (typeof value !== "string" || value.length === 0 || value.length > maximumReturnPathLength) {

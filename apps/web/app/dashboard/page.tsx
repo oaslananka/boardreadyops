@@ -9,18 +9,13 @@ export const metadata = {
   description: "Repositories BoardReadyOps is watching, their latest release readiness, and open findings.",
 };
 
-type PageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
-
 function when(value: string | undefined): string {
   if (!value) return "never";
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? "unknown" : new Date(parsed).toISOString().replace("T", " ").slice(0, 16);
 }
 
-export default async function DashboardPage({ searchParams }: PageProps) {
-  await searchParams;
+export default async function DashboardPage() {
   const viewer = await viewerAuthorization();
   const groups = await loadViewerRepositories(viewer.session);
   const total = groups.reduce((sum, group) => sum + group.repositories.length, 0);

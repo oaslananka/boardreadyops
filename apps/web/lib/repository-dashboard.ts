@@ -12,7 +12,7 @@ import type { UserSession } from "./user-session.js";
  * it is never selected.
  */
 
-export type RepositorySummary = {
+type RepositorySummary = {
   id: string;
   accountLogin: string;
   owner: string;
@@ -149,7 +149,7 @@ export async function loadViewerRepositories(
   }
 }
 
-export type RepositoryRun = {
+type RepositoryRun = {
   id: string;
   status: string;
   decision: string | undefined;
