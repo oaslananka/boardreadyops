@@ -35,7 +35,10 @@ export default async function RepositoryPage({ params }: PageProps) {
 
   // A repository the viewer cannot administer answers the same as one that does not exist, so
   // this page cannot be used to discover which repositories are enrolled.
-  if (!detail) notFound();
+  //
+  // Returned rather than called bare: notFound() never returns, but saying so explicitly keeps
+  // the narrowing obvious to a reader, and to any analyser that does not model Next's helpers.
+  if (!detail) return notFound();
 
   const { repository, runs, supplyFindings } = detail;
 
