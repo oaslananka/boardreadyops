@@ -19,7 +19,8 @@
     "../../tests/unit/web/repository-setup-page.test.ts",
     "../../tests/unit/web/brand-mark.test.ts",
     "../../tests/unit/web/home-page.test.ts",
-    "../../tests/unit/web/layout-metadata.test.ts"
+    "../../tests/unit/web/layout-metadata.test.ts",
+    "../../tests/unit/web/component-credential-routes.test.ts"
   ],
   "exclude": ["node_modules"]
 }

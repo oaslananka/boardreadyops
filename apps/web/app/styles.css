@@ -1919,3 +1919,60 @@ code {
 #audit .definition-grid > div {
   background: var(--bro-surface-sunken);
 }
+
+/* Settings forms. Deliberately plain: these accept a third-party secret, so the markup stays
+   a native form that works without JavaScript rather than a controlled component. */
+.settings-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  max-width: 34rem;
+}
+
+.settings-form label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.settings-form input {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--bro-border);
+  border-radius: var(--bro-radius-sm);
+  font: inherit;
+  background: var(--bro-surface);
+  color: inherit;
+}
+
+.settings-form input:focus-visible {
+  outline: var(--bro-focus);
+  outline-offset: 1px;
+}
+
+.settings-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.settings-form-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: var(--bro-radius-sm);
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--bro-accent);
+  color: var(--bro-accent-contrast);
+}
+
+.settings-form-actions button.secondary {
+  background: transparent;
+  color: inherit;
+  border-color: var(--bro-border-strong);
+}
+
+.settings-form-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
