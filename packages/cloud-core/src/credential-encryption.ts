@@ -52,7 +52,7 @@ export function createCredentialCipher(primaryKey: string, retiredKeys: readonly
     encrypt(plaintext) {
       if (plaintext.length === 0) throw new Error("refusing to encrypt an empty credential");
       const iv = randomBytes(ivBytes);
-      const cipher = createCipheriv(algorithm, primary, iv);
+      const cipher = createCipheriv(algorithm, primary, iv, { authTagLength: tagBytes });
       const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
       const tag = cipher.getAuthTag();
       return [
@@ -75,7 +75,11 @@ export function createCredentialCipher(primaryKey: string, retiredKeys: readonly
 
       for (const key of all) {
         try {
-          const decipher = createDecipheriv(algorithm, key, iv);
+          // authTagLength is pinned rather than inferred: without it GCM will accept a
+          // truncated tag, and a shorter tag is exactly what an attacker forging a ciphertext
+          // would supply. The length check above already rejects those, but stating it here
+          // means the guarantee does not depend on that check staying in place.
+          const decipher = createDecipheriv(algorithm, key, iv, { authTagLength: tagBytes });
           decipher.setAuthTag(tag);
           const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
           return plaintext.toString("utf8");

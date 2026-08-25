@@ -54,6 +54,17 @@ describe("credential encryption", () => {
     expect(cipher.decrypt(tampered)).toBeUndefined();
   });
 
+  it("rejects a truncated authentication tag", () => {
+    // GCM will accept a shortened tag unless authTagLength is pinned, and a short tag is what
+    // an attacker forging a ciphertext supplies.
+    const cipher = createCredentialCipher(keyA);
+    const parts = cipher.encrypt("secret").split(".");
+    const shortTag = Buffer.from(parts[2] ?? "", "base64url").subarray(0, 8);
+    const truncated = [parts[0], parts[1], shortTag.toString("base64url"), parts[3]].join(".");
+
+    expect(cipher.decrypt(truncated)).toBeUndefined();
+  });
+
   it("rejects malformed envelopes without throwing", () => {
     const cipher = createCredentialCipher(keyA);
 
