@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runSupplyWatchPass } from "../../packages/cloud-core/src/supply-watch.js";
+import { constantComponentIntelligence, runSupplyWatchPass } from "../../packages/cloud-core/src/supply-watch.js";
 import { createSqlBoardSupplyWatchStore } from "../../packages/db/src/board-supply-watch-store.js";
 import { createPgQueryExecutor } from "../../packages/db/src/pg-executor.js";
 import { getPostgresTestConnectionString } from "../../scripts/postgres-test-contract.mjs";
@@ -84,7 +84,7 @@ describeDatabase("board supply watch", () => {
     const store = createSqlBoardSupplyWatchStore(database());
     const report = await runSupplyWatchPass(
       store,
-      {
+      constantComponentIntelligence({
         name: "integration-provider",
         cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
         async lookup(parts) {
@@ -92,7 +92,7 @@ describeDatabase("board supply watch", () => {
             .filter((part) => part.mpn === "WATCH-EOL-1")
             .map((part) => ({ ...part, status: "eol" as const, source: "integration-provider", observedAt: now }));
         },
-      },
+      }),
       now,
     );
 
@@ -121,7 +121,7 @@ describeDatabase("board supply watch", () => {
     try {
       const report = await runSupplyWatchPass(
         store,
-        {
+        constantComponentIntelligence({
           name: "integration-provider",
           cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
           async lookup(parts) {
@@ -133,7 +133,7 @@ describeDatabase("board supply watch", () => {
               observedAt: now,
             }));
           },
-        },
+        }),
         now,
       );
 
@@ -165,14 +165,14 @@ describeDatabase("board supply watch", () => {
     let lookups = 0;
     const report = await runSupplyWatchPass(
       store,
-      {
+      constantComponentIntelligence({
         name: "integration-provider",
         cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
         async lookup(parts) {
           lookups += parts.length;
           return [];
         },
-      },
+      }),
       new Date(now.getTime() + 60_000),
       {
         onError: (boardId, error) => {
@@ -201,7 +201,7 @@ describeDatabase("board supply watch", () => {
 
     const report = await runSupplyWatchPass(
       store,
-      {
+      constantComponentIntelligence({
         name: "integration-provider",
         cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: true },
         async lookup(parts) {
@@ -212,7 +212,7 @@ describeDatabase("board supply watch", () => {
             observedAt: later,
           }));
         },
-      },
+      }),
       later,
     );
 

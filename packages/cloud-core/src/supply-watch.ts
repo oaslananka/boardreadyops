@@ -20,6 +20,8 @@ export type WatchBoard = {
   boardId: string;
   components: readonly { mpn: string; manufacturer: string | undefined; reference: string }[];
   snapshotId: string | undefined;
+  /** Installation that owns this board; selects whose credentials the lookup runs under. */
+  installationId: string;
   /**
    * The stored plan tier of the installation that owns this board.
    *
@@ -114,22 +116,27 @@ const defaultMaximumBoardsPerRun = 100;
  * because one provider call threw would go quietly blind, which is the failure this feature
  * exists to prevent.
  */
+/**
+ * Chooses the provider a given installation's lookups run under.
+ *
+ * A function rather than a single provider because the recommended model is customer-supplied
+ * credentials: each installation queries under its own licence, so one shared instance would
+ * be exactly the cross-tenant use those licences forbid. Resolving per installation also lets
+ * one customer's missing or revoked key degrade to `no_provider` without affecting anyone else.
+ */
+export type ComponentIntelligenceResolver = (installationId: string) => Promise<ComponentIntelligenceProvider>;
+
+/** Wraps one provider as a resolver, for deployments and tests with a single configuration. */
+export function constantComponentIntelligence(provider: ComponentIntelligenceProvider): ComponentIntelligenceResolver {
+  return async () => provider;
+}
+
 export async function runSupplyWatchPass(
   store: SupplyWatchStore,
-  provider: ComponentIntelligenceProvider,
+  resolveProvider: ComponentIntelligenceResolver,
   now: Date,
   options: SupplyWatchOptions = {},
 ): Promise<SupplyWatchReport> {
-  // The licence wins over the configured value, never the other way round.
-  const observationTtlMs = Math.min(
-    options.observationTtlMs ?? defaultObservationTtlMs,
-    provider.cachePolicy.maximumCacheAgeMs,
-  );
-  // Caching is only permitted when the licence allows both retaining a result and reusing it
-  // for another licensee. Some distributor terms forbid storing any portion of the content, so
-  // a zero retention window means the cache is bypassed rather than written and instantly
-  // expired — storing it at all would be the breach, not serving it.
-  const cacheUsable = provider.cachePolicy.shareableAcrossTenants && provider.cachePolicy.maximumCacheAgeMs > 0;
   const intervalMs = options.intervalMs ?? defaultIntervalMs;
   const retryIntervalMs = options.retryIntervalMs ?? defaultRetryIntervalMs;
   const limit = options.maximumBoardsPerRun ?? defaultMaximumBoardsPerRun;
@@ -163,6 +170,20 @@ export async function runSupplyWatchPass(
         await store.completeEvaluation(board.boardId, "skipped_no_snapshot", now, new Date(now.getTime() + intervalMs));
         continue;
       }
+
+      const provider = await resolveProvider(board.installationId);
+      // The licence wins over the configured value, never the other way round, and it is this
+      // installation's licence: policy is read from the resolved provider rather than a
+      // process-wide one, so two installations on different providers cannot share a window.
+      const observationTtlMs = Math.min(
+        options.observationTtlMs ?? defaultObservationTtlMs,
+        provider.cachePolicy.maximumCacheAgeMs,
+      );
+      // Caching is only permitted when the licence allows both retaining a result and reusing
+      // it for another licensee. Some distributor terms forbid storing any portion of the
+      // content, so a zero retention window bypasses the cache rather than writing and
+      // instantly expiring it - storing it at all would be the breach, not serving it.
+      const cacheUsable = provider.cachePolicy.shareableAcrossTenants && provider.cachePolicy.maximumCacheAgeMs > 0;
 
       const parts = queryablePartsOf(board.components);
       // A non-transferable licence means one installation's answer may not serve another, and

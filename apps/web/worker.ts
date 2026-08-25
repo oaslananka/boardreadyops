@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { hostname } from "node:os";
 import { createNullComponentIntelligenceProvider } from "@boardreadyops/cloud-core/component-intelligence";
-import { runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
+import { constantComponentIntelligence, runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
 import {
   type ClaimedArtifactDeletion,
   createSqlArtifactDeletionStore,
@@ -153,9 +153,11 @@ const retentionMaintenance = createSqlRetentionMaintenanceStore(executor, {
 });
 const operations = createSqlControlPlaneOperationsStore(executor);
 const supplyWatchStore = createSqlBoardSupplyWatchStore(executor);
-// Swapping this for a real provider is the only change needed to start evaluating boards;
-// everything downstream already honours its cache policy and the plan gate.
-const componentIntelligenceProvider = createNullComponentIntelligenceProvider();
+// A resolver rather than one provider: the recommended model is customer-supplied credentials,
+// so each installation's lookups run under its own licence. Until credential storage exists
+// every installation resolves to the null provider, and the pass records no_provider rather
+// than reporting an unchecked board as clean.
+const resolveComponentIntelligence = constantComponentIntelligence(createNullComponentIntelligenceProvider());
 const controlPlaneSlo = createControlPlaneSloEvaluator();
 const outbox = createSqlControlPlaneOutboxStore(executor);
 const artifactDeletions = createSqlArtifactDeletionStore(executor);
@@ -442,7 +444,7 @@ async function runSupplyWatch(currentTime: number): Promise<void> {
     // wiring the schedule now means adding a provider is a substitution rather than a change
     // to the control plane. Boards on a plan without supply watch are skipped before any
     // lookup, so this costs nothing on the free tier either.
-    const report = await runSupplyWatchPass(supplyWatchStore, componentIntelligenceProvider, new Date(currentTime), {
+    const report = await runSupplyWatchPass(supplyWatchStore, resolveComponentIntelligence, new Date(currentTime), {
       intervalMs: supplyWatchIntervalMilliseconds,
       maximumBoardsPerRun: supplyWatchBoardsPerPass,
       onError: (boardId, error) =>
