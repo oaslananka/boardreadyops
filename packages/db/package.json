@@ -101,6 +101,11 @@
       "import": "./src/repository-setup-store.ts",
       "default": "./src/repository-setup-store.ts"
     },
+    "./installation-credential-store": {
+      "types": "./src/installation-credential-store.ts",
+      "import": "./src/installation-credential-store.ts",
+      "default": "./src/installation-credential-store.ts"
+    },
     "./board-supply-watch-store": {
       "types": "./src/board-supply-watch-store.ts",
       "import": "./src/board-supply-watch-store.ts",

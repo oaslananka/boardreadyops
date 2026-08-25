@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(44);
+    expect(cloudDatabaseSchemaVersion).toBe(45);
     expect(cloudDatabaseModels).toContain("BoardSupplyWatch");
     expect(cloudDatabaseModels).toContain("ComponentLifecycleObservation");
     expect(cloudDatabaseModels).toContain("Board");
@@ -80,6 +80,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0042_check_run_reconciliation_without_result.sql",
       "0043_signed_result_corrects_inferred_failure.sql",
       "0044_supply_watch_entitlement_outcome.sql",
+      "0045_installation_component_credentials.sql",
     ]);
   });
 

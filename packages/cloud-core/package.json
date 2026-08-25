@@ -24,6 +24,11 @@
       "import": "./src/durable-lifecycle-planner.ts",
       "default": "./src/durable-lifecycle-planner.ts"
     },
+    "./credential-encryption": {
+      "types": "./src/credential-encryption.ts",
+      "import": "./src/credential-encryption.ts",
+      "default": "./src/credential-encryption.ts"
+    },
     "./component-intelligence": {
       "types": "./src/component-intelligence.ts",
       "import": "./src/component-intelligence.ts",
