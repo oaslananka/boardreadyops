@@ -24,7 +24,7 @@ Do not run `pre-commit install`; `scripts/prepare.mjs` configures `.husky` as th
 - Semgrep `v1.170.0` with the project rule set in `.semgrep.yml`;
 - actionlint v1.7.12 for GitHub Actions syntax and semantic validation;
 - zizmor v1.27.0 for GitHub Actions security analysis at medium severity and above;
-- OSV-Scanner v2.3.8 as an explicit manual dependency vulnerability scan.
+- OSV-Scanner v2.5.1 as an explicit manual dependency vulnerability scan.
 
 The Semgrep hook examines staged JavaScript and TypeScript files and rejects shell-command-string execution through Node's `child_process` APIs. actionlint and zizmor examine changed workflow YAML files. Full CI runs both workflow linters over every workflow even when a local hook is explicitly bypassed.
 

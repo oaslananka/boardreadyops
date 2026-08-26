@@ -322,17 +322,17 @@ describe("dependency and security automation configuration", () => {
     expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.3");
 
     expect(preCommit).toContain("repo: https://github.com/google/osv-scanner");
-    expect(preCommit).toContain("rev: v2.3.8");
+    expect(preCommit).toContain("rev: v2.5.1");
     expect(preCommit).toContain("id: osv-scanner");
     expect(preCommit).toContain("stages: [manual]");
     expect(huskyPrePush).toContain("pre-commit run --hook-stage pre-push --all-files");
 
     expect(securityWorkflow).not.toContain("security-events: write\n    env:");
     expect(securityWorkflow).toContain(
-      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
+      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67",
     );
     expect(securityWorkflow).toContain(
-      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
+      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67",
     );
     expect(securityWorkflow).toContain("github.event_name == 'push' || github.event_name == 'workflow_dispatch'");
     expect(osvWorkflow).not.toContain("pull_request:");
@@ -342,12 +342,12 @@ describe("dependency and security automation configuration", () => {
     expect(osvWorkflow).toContain("security-events: write");
     expect(osvWorkflow).not.toContain("osv-scanner-reusable-pr.yml");
     expect(osvWorkflow).toContain(
-      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2",
+      "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67",
     );
     expect(osvWorkflow).toContain("fail-on-vuln: true");
     expect(osvWorkflow).not.toContain("secrets.");
 
-    expect(securityDocs).toContain("OSV-Scanner v2.3.8");
+    expect(securityDocs).toContain("OSV-Scanner v2.5.1");
     expect(securityDocs).toContain("No account, API token, or hosted scan quota is required");
     expect(securityDocs).toContain("does not run on pull requests or pushes");
   });
