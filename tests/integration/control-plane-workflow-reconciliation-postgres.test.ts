@@ -499,4 +499,68 @@ describeDatabase("GitHub workflow PostgreSQL reconciliation", () => {
       },
     ]);
   });
+
+  it("dead-letters a spent item instead of rescheduling it back onto the queue", async () => {
+    const fixture = await createFixture("exhausted");
+    const workerId = `${testPrefix}-worker-exhausted`;
+    const claimed = await detectAndClaim(fixture, workerId);
+
+    // Spend the budget. A workflow that never settles reaches this on its own; forcing it keeps
+    // the test to the behaviour under examination rather than a dozen round trips.
+    await database().query(`update control_plane_reconciliation_items set attempt_count = max_attempts where id = $1`, [
+      claimed.reconciliationId,
+    ]);
+
+    await expect(
+      fixture.store.rescheduleReconciliationItem({
+        reconciliationId: claimed.reconciliationId,
+        workerId,
+        nextCheckAt: new Date(fixture.now.valueOf() + 1000),
+        outcomeCode: "github_workflow_in_progress",
+      }),
+    ).resolves.toBe("dead_letter");
+
+    expect(
+      rows(
+        await database().query(
+          `select status, public_failure_reason, completed_at is not null as completed
+             from control_plane_reconciliation_items where id = $1`,
+          [claimed.reconciliationId],
+        ),
+      ),
+    ).toEqual([{ status: "dead_letter", public_failure_reason: "operator_replay_required", completed: true }]);
+  });
+
+  it("keeps claiming while an exhausted item sits on the queue", async () => {
+    // The regression this guards. An exhausted item left at 'available' made the claim attempt
+    // attempt_count + 1, which violates control_plane_reconciliation_attempts_valid. Postgres
+    // aborts the whole statement, so every other waiting item stopped being claimed too and the
+    // worker crash-looped.
+    const poisoned = await createFixture("poisoned");
+    const poisonedClaim = await detectAndClaim(poisoned, `${testPrefix}-worker-poisoned`);
+    await database().query(
+      `update control_plane_reconciliation_items
+          set status = 'available', attempt_count = max_attempts,
+              lease_owner = null, lease_expires_at = null
+        where id = $1`,
+      [poisonedClaim.reconciliationId],
+    );
+
+    const healthy = await createFixture("healthy");
+    await expect(
+      healthy.store.detectWorkflowReconciliationCandidates({
+        observationDelaySeconds: 300,
+        terminalDeadlineSeconds: 1800,
+        limit: 10,
+      }),
+    ).resolves.toBe(1);
+
+    const claimed = await healthy.store.claimWorkflowReconciliationItems({
+      workerId: `${testPrefix}-worker-healthy`,
+      limit: 10,
+    });
+
+    expect(claimed.map((item) => item.reconciliationId)).not.toContain(poisonedClaim.reconciliationId);
+    expect(claimed.length).toBeGreaterThan(0);
+  });
 });
