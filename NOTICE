@@ -1213,7 +1213,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `hasown@2.0.3`
   - Description: A robust, ES3 compatible, "has own property" predicate.
   - Homepage: https://github.com/inspect-js/hasOwn#readme
-- `hono@4.12.34`
+- `hono@4.13.3`
   - Description: Web framework built on Web Standards
   - Homepage: https://hono.dev
 - `hoopy@0.1.4`
