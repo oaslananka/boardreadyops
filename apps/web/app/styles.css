@@ -2027,3 +2027,107 @@ code {
   opacity: 0.75;
   font-variant-numeric: tabular-nums;
 }
+
+/* The run verdict.
+
+   Sized to be read from across a desk, because that is how somebody uses it: they open the
+   run, get the answer, and either carry on or start fixing. Everything else on the page is
+   evidence for this sentence.
+
+   Colour here carries the state and nothing else. The brand gold is deliberately absent —
+   if gold means "BoardReadyOps" everywhere, it cannot also mean "look at this". */
+.run-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin: 1.25rem 0 0.5rem;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid var(--border-strong);
+  border-left-width: 4px;
+  border-radius: var(--bro-radius-lg);
+  background: var(--surface);
+}
+
+.run-verdict-copy {
+  min-width: min(100%, 22rem);
+  flex: 1 1 24rem;
+}
+
+.run-verdict-headline {
+  margin: 0;
+  /* Scales with the viewport so it stays the largest thing on the page on a laptop and does
+     not wrap awkwardly on a narrow window. */
+  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+
+.run-verdict-detail {
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 60ch;
+}
+
+.run-verdict-action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.65rem 1.15rem;
+  border-radius: var(--bro-radius-sm);
+  border: 1px solid var(--border-strong);
+  font-weight: 600;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface-strong);
+  transition: border-color var(--bro-motion-fast) var(--bro-ease);
+}
+
+.run-verdict-action:hover {
+  border-color: var(--bro-border-accent);
+}
+
+.run-verdict-action:focus-visible {
+  outline: var(--bro-focus);
+  outline-offset: 2px;
+}
+
+.run-verdict[data-tone="success"] {
+  border-left-color: var(--success);
+  background: var(--success-surface);
+}
+
+.run-verdict[data-tone="success"] .run-verdict-headline {
+  color: var(--success);
+}
+
+.run-verdict[data-tone="danger"] {
+  border-left-color: var(--danger);
+  background: var(--danger-surface);
+}
+
+.run-verdict[data-tone="danger"] .run-verdict-headline {
+  color: var(--danger);
+}
+
+.run-verdict[data-tone="warning"] {
+  border-left-color: var(--warning);
+  background: var(--warning-surface);
+}
+
+.run-verdict[data-tone="warning"] .run-verdict-headline {
+  color: var(--warning);
+}
+
+.run-verdict[data-tone="info"] {
+  border-left-color: var(--info);
+  background: var(--info-surface);
+}
+
+.run-verdict[data-tone="info"] .run-verdict-headline {
+  color: var(--info);
+}
