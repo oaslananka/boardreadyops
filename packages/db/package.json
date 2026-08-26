@@ -118,7 +118,7 @@
     }
   },
   "devDependencies": {
-    "prisma": "7.8.0",
+    "prisma": "7.9.1",
     "@types/pg": "8.23.1"
   },
   "dependencies": {
