@@ -7,6 +7,7 @@ type AttemptDetail = RunDetail["attempts"][number];
 type FindingDetail = RunDetail["findings"][number];
 
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
+import { runVerdict } from "../lib/run-verdict.js";
 import { CopyButton } from "./copy-button.js";
 import { RunLiveRefresh } from "./run-live-refresh.js";
 import {
@@ -54,7 +55,7 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
   return (
     <header className="run-header">
       <div className="run-header-copy">
-        <p className="run-context">Evidence control room</p>
+        <p className="run-context">Release readiness</p>
         <p className="run-repository-kind">{run.repositoryPrivate ? "Private repository" : "Public repository"}</p>
         <h1>{run.repository}</h1>
         <p className="run-subtitle">
@@ -62,7 +63,7 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
         </p>
       </div>
       <fieldset className="run-header-status">
-        <legend className="sr-only">Run status summary</legend>
+        <legend className="sr-only">Readiness score</legend>
         <div className="score">
           <strong>{run.readinessScore ?? "—"}</strong>
           <span>Readiness score</span>
@@ -72,8 +73,6 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
               : `Readiness score ${run.readinessScore} out of 100`}
           </span>
         </div>
-        <StatusBadge value={run.decision} label={`Decision: ${humanize(run.decision)}`} />
-        <StatusBadge value={run.status} />
       </fieldset>
     </header>
   );
@@ -97,12 +96,39 @@ export function RunPageFrame({
           ]}
         />
         <RunHeader run={run} />
+        <RunVerdictBanner run={run} />
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
         <RunNavigation runId={run.id} active={active} />
         <RunStateNotice run={run} />
         <div className="page-content">{children}</div>
       </main>
     </AppShell>
+  );
+}
+
+/**
+ * The answer, before anything else on the page.
+ *
+ * Deliberately not a Panel: a panel is one card among many and reads as another section to
+ * scan. This is the sentence the reader came for, so it is given the top of the page, the
+ * largest type on it, and a single next step.
+ */
+function RunVerdictBanner({ run }: Readonly<{ run: RunDetail }>) {
+  const verdict = runVerdict(run);
+  return (
+    <section className="run-verdict" data-tone={verdict.tone} aria-labelledby="run-verdict-headline">
+      <div className="run-verdict-copy">
+        <h2 className="run-verdict-headline" id="run-verdict-headline">
+          {verdict.headline}
+        </h2>
+        <p className="run-verdict-detail">{verdict.detail}</p>
+      </div>
+      {verdict.action ? (
+        <Link className="run-verdict-action" href={verdict.action.href}>
+          {verdict.action.label}
+        </Link>
+      ) : undefined}
+    </section>
   );
 }
 
@@ -187,21 +213,6 @@ function githubRepositoryBaseUrl(run: RunDetail): string {
   return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`;
 }
 
-function SummaryDecisionAction({ runId, blockingCount }: Readonly<{ runId: string; blockingCount: number }>) {
-  if (blockingCount > 0) {
-    return (
-      <Link className="button button-primary" href={`/runs/${runId}/findings?findingState=active&findingSort=severity`}>
-        Review {blockingCount} blocking finding{blockingCount === 1 ? "" : "s"}
-      </Link>
-    );
-  }
-  return (
-    <Link className="button button-primary" href={`/runs/${runId}/artifacts`}>
-      Verify release evidence
-    </Link>
-  );
-}
-
 function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
   if (run.boards.length === 0) return null;
   const totalComponents = run.boards.reduce((sum, board) => sum + board.componentCount, 0);
@@ -256,41 +267,13 @@ function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
 }
 
 export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
-  const blockingFindings = run.findings.filter(
-    (finding) => ["critical", "error", "high"].includes(finding.severity.toLowerCase()) && !finding.waivedAt,
-  );
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
     <>
-      <Panel
-        id="decision"
-        title="Release decision"
-        description="The current normalized decision and the shortest next action."
-      >
-        <div className="decision-layout">
-          <div className="decision-primary">
-            <StatusBadge value={run.decision ?? run.conclusion ?? run.status} />
-            <p className="decision-copy">{decisionCopy(run, blockingFindings.length)}</p>
-          </div>
-          <div className="decision-actions">
-            <SummaryDecisionAction runId={run.id} blockingCount={blockingFindings.length} />
-            <Link className="button button-secondary" href={`/runs/${run.id}/attempts`}>
-              Inspect execution
-            </Link>
-          </div>
-        </div>
-      </Panel>
-
       <Panel title="Run summary" description="Repository, source, execution, and result metadata." id="summary">
         <DefinitionGrid>
-          <Definition label="Status">
-            <StatusBadge value={run.status} />
-          </Definition>
-          <Definition label="Decision">
-            <StatusBadge value={run.decision} />
-          </Definition>
-          <Definition label="Conclusion">
-            <StatusBadge value={run.conclusion} />
+          <Definition label="Outcome">
+            <StatusBadge value={run.decision ?? run.conclusion ?? run.status} />
           </Definition>
           <Definition label="Trigger">{humanize(run.triggerKind)}</Definition>
           <Definition label="Pull request">
@@ -409,19 +392,6 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
       </div>
     </>
   );
-}
-
-function decisionCopy(run: RunDetail, blockingCount: number): string {
-  if (run.decision === "pass" || run.conclusion === "success") {
-    return "The normalized result is ready for evidence review. Verify the authoritative artifacts and workflow source before release.";
-  }
-  if (blockingCount > 0) {
-    return `${blockingCount} active high-severity finding${blockingCount === 1 ? " blocks" : "s block"} release readiness.`;
-  }
-  if (run.investigationState === "current" || run.investigationState === "reconciliation") {
-    return "The run is still converging. Follow the execution timeline before making a release decision.";
-  }
-  return "The current result is not release-ready. Inspect attempts, findings, and publication state for the stable failure reason.";
 }
 
 export function AttemptTimeline({ attempts }: Readonly<{ attempts: AttemptDetail[] }>) {
