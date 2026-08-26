@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { BrandMarkIcon } from "../components/brand-mark.js";
-import { ViewerNav } from "../components/viewer-nav.js";
+import { installUrl, LandingHeroActions, LandingNavActions } from "../components/landing-actions.js";
 import "./landing.css";
-
-const installUrl = "https://github.com/apps/boardreadyops/installations/new";
 
 const proofItems = [
   "DRC / ERC and design-rule evidence",
@@ -82,11 +80,8 @@ export default function HomePage() {
           <a href="https://docs.boardreadyops.com">Docs</a>
           {/* Suspended so reading the session never delays the landing navigation. */}
           <Suspense fallback={null}>
-            <ViewerNav />
+            <LandingNavActions />
           </Suspense>
-          <a className="landing-nav-cta" href={installUrl}>
-            Install on GitHub
-          </a>
         </nav>
       </header>
 
@@ -101,13 +96,16 @@ export default function HomePage() {
                 is ready to fabricate. Your repository stays exactly where it is.
               </p>
               <div className="landing-cta-row">
-                <a className="landing-button-primary" href={installUrl}>
-                  <span>Install on GitHub</span>
-                  <span aria-hidden="true">↗</span>
-                </a>
-                <Link className="landing-button-secondary" href="/setup">
-                  Preview repository setup
-                </Link>
+                <Suspense
+                  fallback={
+                    <a className="landing-button-primary" href={installUrl}>
+                      <span>Install on GitHub</span>
+                      <span aria-hidden="true">↗</span>
+                    </a>
+                  }
+                >
+                  <LandingHeroActions />
+                </Suspense>
               </div>
               <ul className="landing-hero-notes" aria-label="What BoardReadyOps does">
                 <li>Runs on every pull request</li>
@@ -116,46 +114,50 @@ export default function HomePage() {
               </ul>
             </div>
 
-            <aside className="landing-evidence-stack" aria-label="Release evidence flow">
+            <aside className="landing-evidence-stack" aria-label="What a run looks like">
               <div className="landing-evidence-header">
                 <span className="landing-live-dot" aria-hidden="true" />
-                <span>Release evidence</span>
+                <span>Release readiness</span>
                 <code>pull_request</code>
               </div>
               <div className="landing-evidence-decision">
                 <div>
-                  <span className="landing-evidence-label">Normalized decision</span>
-                  <strong>Review readiness</strong>
+                  <span className="landing-evidence-label">The verdict</span>
+                  <strong>Ready to fabricate</strong>
                 </div>
-                <span className="landing-state-pill">Evidence linked</span>
+                <span className="landing-state-pill">Every check passed</span>
               </div>
               <ol className="landing-evidence-rows">
                 <li>
                   <span className="landing-evidence-index">01</span>
                   <div>
-                    <strong>Source revision</strong>
-                    <span className="landing-evidence-description">Commit, ref, Check Run, workflow identity</span>
+                    <strong>The commit it checked</strong>
+                    <span className="landing-evidence-description">Exact revision, branch, and Check Run</span>
                   </div>
-                  <span className="landing-row-state">Bound</span>
+                  <span className="landing-row-state">Pinned</span>
                 </li>
                 <li>
                   <span className="landing-evidence-index">02</span>
                   <div>
-                    <strong>Normalized findings</strong>
-                    <span className="landing-evidence-description">Design, BOM, manufacturing, release gates</span>
+                    <strong>What it found</strong>
+                    <span className="landing-evidence-description">
+                      Layout, schematic, BOM, and manufacturing checks
+                    </span>
                   </div>
-                  <span className="landing-row-state">Bounded</span>
+                  <span className="landing-row-state">Explained</span>
                 </li>
                 <li>
                   <span className="landing-evidence-index">03</span>
                   <div>
-                    <strong>Release artifacts</strong>
-                    <span className="landing-evidence-description">Checksums, provenance, availability, retention</span>
+                    <strong>The files it produced</strong>
+                    <span className="landing-evidence-description">Reports and outputs, each with a checksum</span>
                   </div>
-                  <span className="landing-row-state">Traceable</span>
+                  <span className="landing-row-state">Downloadable</span>
                 </li>
               </ol>
-              <p className="landing-evidence-footnote">Repository source and workflow output remain authoritative.</p>
+              <p className="landing-evidence-footnote">
+                Your repository and its workflow logs stay the source of truth.
+              </p>
             </aside>
           </div>
         </section>

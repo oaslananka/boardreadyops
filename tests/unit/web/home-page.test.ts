@@ -17,8 +17,12 @@ function collectLinks(node: ReactNode, hrefs: string[] = []): string[] {
     return hrefs;
   }
   if (isValidElement(node)) {
-    const props = node.props as { href?: string; children?: ReactNode };
+    const props = node.props as { href?: string; children?: ReactNode; fallback?: ReactNode };
     if (typeof props.href === "string") hrefs.push(props.href);
+    // Suspense keeps its fallback in a prop rather than children. The landing page's primary
+    // calls to action are session-dependent and live behind one, so a walker that skipped the
+    // fallback would report the page as having no primary action at all.
+    if (props.fallback !== undefined) collectLinks(props.fallback, hrefs);
     collectLinks(props.children, hrefs);
   }
   return hrefs;
@@ -37,9 +41,12 @@ describe("HomePage", () => {
     expect(text).toContain("Authoritative sources");
   });
 
-  it("links every Install on GitHub CTA to the App install URL", () => {
+  it("offers a signed-out reader somewhere to install from", () => {
     const links = collectLinks(HomePage());
     const installLinks = links.filter((href) => href === "https://github.com/apps/boardreadyops/installations/new");
+
+    // A signed-in reader gets "Open dashboard" in both of these places instead; asking somebody
+    // who already installed to install again is what this page used to do.
     expect(installLinks.length).toBeGreaterThanOrEqual(2);
   });
 
