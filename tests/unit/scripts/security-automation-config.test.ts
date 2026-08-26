@@ -199,7 +199,7 @@ describe("dependency and security automation configuration", () => {
       "@hono/node-server@<2.0.12": "2.0.12",
       "brace-expansion@>=5 <5.0.9": "5.0.9",
       "fast-uri@>=3 <3.1.5": "3.1.5",
-      "hono@<4.12.34": "4.12.34",
+      "hono@<4.12.34": "4.13.3",
       "ip-address@<10.3.1": "10.3.1",
       "nanoid@<3.3.17": "3.3.18",
       "postcss@<8.5.23": "8.5.26",
