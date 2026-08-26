@@ -109,7 +109,7 @@ describe("dependency and security automation configuration", () => {
     expect(renovateWorkflow.jobs?.renovate?.env?.CI).toBe("true");
     expect(renovate.postUpgradeTasks).toEqual({
       commands: ["corepack pnpm run renovate:post-upgrade"],
-      fileFilters: ["NOTICE", "dist/**"],
+      fileFilters: ["NOTICE", "dist/**", "pnpm-workspace.yaml"],
       executionMode: "branch",
     });
     expect(renovate.ignorePaths).toEqual(

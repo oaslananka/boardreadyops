@@ -25,7 +25,7 @@
   "postUpdateOptions": ["pnpmDedupe"],
   "postUpgradeTasks": {
     "commands": ["corepack pnpm run renovate:post-upgrade"],
-    "fileFilters": ["NOTICE", "dist/**"],
+    "fileFilters": ["NOTICE", "dist/**", "pnpm-workspace.yaml"],
     "executionMode": "branch"
   },
   "lockFileMaintenance": {
