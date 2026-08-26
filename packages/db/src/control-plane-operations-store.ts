@@ -176,7 +176,7 @@ export type ControlPlaneOperationsStore = {
     workerId: string;
     nextCheckAt: Date;
     outcomeCode: string;
-  }): Promise<"rescheduled" | "stale">;
+  }): Promise<"dead_letter" | "rescheduled" | "stale">;
   applyLifecycleReconciliation(input: {
     reconciliationId: string;
     workerId: string;
@@ -751,7 +751,10 @@ export function createSqlControlPlaneOperationsStore(
           input.outcomeCode,
         ],
       );
-      return databaseRows(result)[0]?.text("outcome") === "rescheduled" ? "rescheduled" : "stale";
+      // An item that has spent its attempt budget is dead-lettered rather than rescheduled, and
+      // that is worth reporting: collapsing it into "stale" would read as nothing happened.
+      const outcome = databaseRows(result)[0]?.text("outcome");
+      return outcome === "rescheduled" || outcome === "dead_letter" ? outcome : "stale";
     },
 
     async applyLifecycleReconciliation(input) {
