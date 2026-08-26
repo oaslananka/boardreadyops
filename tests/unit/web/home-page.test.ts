@@ -34,11 +34,11 @@ describe("HomePage", () => {
     expect(text).toContain("Catch board mistakes before the fab does.");
   });
 
-  it("shows the three feature-grid headings from the existing copy", () => {
+  it("shows the three feature-grid headings", () => {
     const text = collectText(HomePage());
     expect(text).toContain("Decision first");
-    expect(text).toContain("Bounded investigation");
-    expect(text).toContain("Authoritative sources");
+    expect(text).toContain("Finding things");
+    expect(text).toContain("Back to the source");
   });
 
   it("offers a signed-out reader somewhere to install from", () => {
