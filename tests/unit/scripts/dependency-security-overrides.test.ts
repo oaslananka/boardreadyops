@@ -9,7 +9,9 @@ describe("dependency security overrides", () => {
     };
     const lockfile = await readFile("pnpm-lock.yaml", "utf8");
 
-    expect(workspace.overrides?.["pa11y>puppeteer"]).toBe("25.8.0");
+    // The audited stack is Puppeteer 25. Which patch of it Pa11y sits on is free to move; a
+    // major move is not, because that is a different browser stack and a different audit.
+    expect(workspace.overrides?.["pa11y>puppeteer"]).toMatch(/^25\.\d+\.\d+$/u);
     expect(lockfile).not.toContain("extract-zip@2.0.1");
   });
 });

@@ -9,6 +9,53 @@ async function repositoryFile(path: string): Promise<string> {
   return await readFile(join(repositoryRoot, path), "utf8");
 }
 
+/** Compare dotted releases. Every pin in this repository is a plain release, no prerelease tags. */
+function compareVersions(left: string, right: string): number {
+  const parse = (value: string): number[] => value.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const [a, b] = [parse(left), parse(right)];
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const difference = (a[index] ?? 0) - (b[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+/**
+ * The package an override key selects.
+ *
+ * A key reads [parent>]*name[@range], and both halves can contain the other's delimiter --
+ * 'archiver>readdir-glob' selects through a parent, 'fast-uri@>=3 <3.1.5' carries a range with
+ * its own > inside. So the range comes off first, or the last > lands in the middle of it. A
+ * range always opens with an @ following the name; the only other @ is a scope marker, which
+ * sits at the start or straight after a > separator.
+ */
+function overridePackage(key: string): string {
+  let range = -1;
+  for (let index = 1; index < key.length; index += 1) {
+    if (key[index] === "@" && key[index - 1] !== ">") {
+      range = index;
+      break;
+    }
+  }
+  const named = range === -1 ? key : key.slice(0, range);
+  return named.includes(">") ? named.slice(named.lastIndexOf(">") + 1) : named;
+}
+
+/**
+ * The first release an override key treats as safe. 'hono@<4.12.34' is vulnerable below
+ * 4.12.34, so 4.12.34 itself is safe; 'esbuild@<=0.24.2' covers 0.24.2 as well, so nothing at
+ * or below it is. A key with no upper bound is a straight pin and has nothing to compare.
+ */
+function firstSafeRelease(key: string): { version: string; inclusive: boolean } | undefined {
+  const bound = /<(=?)\s*(\d[\w.]*)/u.exec(key);
+  return bound?.[2] ? { version: bound[2], inclusive: bound[1] !== "=" } : undefined;
+}
+
+/** The lowest release a resolution can land on: '>=9.2.2' and '9.2.2' both floor at 9.2.2. */
+function lowestResolved(value: string): string {
+  return value.replace(/^[>=~^\s]+/u, "").trim();
+}
+
 describe("dependency and security automation configuration", () => {
   it("verifies NOTICE compliance without mutating the CI checkout", async () => {
     const workflow = await repositoryFile(".github/workflows/ci.yml");
@@ -164,23 +211,6 @@ describe("dependency and security automation configuration", () => {
     expect(workspace.minimumReleaseAge).toBe(10_080);
     expect(workspace.trustPolicy).toBe("no-downgrade");
     expect(workspace.blockExoticSubdeps).toBe(true);
-    expect(workspace.minimumReleaseAgeExclude).toEqual(
-      expect.arrayContaining([
-        "@hono/node-server@2.0.12",
-        "fast-uri@3.1.5",
-        "hono@4.12.34",
-        "ip-address@10.3.1",
-        "renovate@43.272.4",
-        "@renovatebot/osv-offline-db@3.0.9",
-        "@renovatebot/osv-offline@3.0.9",
-        "brace-expansion@5.0.9",
-        "deepmerge-ts@8.0.0",
-        "js-yaml@5.2.2 || 4.3.1",
-        "nanoid@3.3.17 || 3.3.18",
-        "undici@8.9.0",
-        "valibot@1.4.2",
-      ]),
-    );
     expect(workspace.minimumReleaseAgeExclude).not.toEqual(
       expect.arrayContaining([
         "@hono/node-server@2.0.10",
@@ -193,19 +223,78 @@ describe("dependency and security automation configuration", () => {
       ]),
     );
     expect(workspace.trustPolicyExclude).toEqual(["@yarnpkg/libzip@3.2.2", "semver@6.3.1"]);
-    expect(workspace.overrides).toMatchObject({
-      "archiver>readdir-glob": "3.0.0",
-      "@prisma/config>deepmerge-ts": "8.0.0",
-      "@hono/node-server@<2.0.12": "2.0.12",
-      "brace-expansion@>=5 <5.0.9": "5.0.9",
-      "fast-uri@>=3 <3.1.5": "3.1.5",
-      "hono@<4.12.34": "4.13.3",
-      "ip-address@<10.3.1": "10.3.1",
-      "nanoid@<3.3.17": "3.3.18",
-      "postcss@<8.5.23": "8.5.26",
-      "undici@<8.9.0": "8.9.0",
-      valibot: "1.4.2",
+
+    const overrides = workspace.overrides ?? {};
+
+    // Which packages are protected, named rather than versioned. Dropping a protection still
+    // fails here; raising one does not.
+    expect([...new Set(Object.keys(overrides).map(overridePackage))].sort()).toEqual([
+      "@babel/core",
+      "@hono/node-server",
+      "@octokit/plugin-paginate-rest",
+      "@octokit/request",
+      "@octokit/request-error",
+      "brace-expansion",
+      "deepmerge-ts",
+      "diff",
+      "esbuild",
+      "fast-uri",
+      "glob",
+      "hono",
+      "ip-address",
+      "js-yaml",
+      "linkify-it",
+      "nanoid",
+      "postcss",
+      "puppeteer",
+      "qs",
+      "readdir-glob",
+      "sharp",
+      "undici",
+      "valibot",
+      "vite",
+      "ws",
+    ]);
+
+    // The guarantee the exact-version pins used to stand in for: no override may resolve below
+    // the release its own key declares safe. This holds through any bump and fails the moment a
+    // protection is weakened -- which is what the pins were really protecting, at the cost of
+    // needing a human edit for every raise. Renovate cannot make that edit, and it force-pushes
+    // its branches, so it could not live on the branch that needed it either.
+    const weakened = Object.entries(overrides).flatMap(([key, value]) => {
+      const safe = firstSafeRelease(key);
+      if (!safe) return [];
+      const comparison = compareVersions(lowestResolved(String(value)), safe.version);
+      const holds = safe.inclusive ? comparison >= 0 : comparison > 0;
+      return holds ? [] : [`${key} resolves to ${value}, below the ${safe.version} it calls safe`];
     });
+
+    expect(weakened).toEqual([]);
+
+    // And nothing may be waved past the release quarantine that the overrides call vulnerable.
+    const safeReleases = new Map(
+      Object.entries(overrides).flatMap(([key]) => {
+        const safe = firstSafeRelease(key);
+        return safe ? [[overridePackage(key), safe] as const] : [];
+      }),
+    );
+    const unsafeAdmissions = (workspace.minimumReleaseAgeExclude ?? []).flatMap((entry) => {
+      const name = overridePackage(entry);
+      const safe = safeReleases.get(name);
+      if (!safe) return [];
+      return entry
+        .slice(name.length + 1)
+        .split("||")
+        .map((part) => part.trim())
+        .filter((version) => {
+          const comparison = compareVersions(version, safe.version);
+          return !(safe.inclusive ? comparison >= 0 : comparison > 0);
+        })
+        .map((version) => `${name}@${version} is admitted below the ${safe.version} it calls safe`);
+    });
+
+    expect(unsafeAdmissions).toEqual([]);
+    expect(workspace.minimumReleaseAgeExclude?.length).toBeGreaterThan(0);
     expect(workspace.overrides).not.toHaveProperty("@hono/node-server");
     expect(workspace.overrides).not.toHaveProperty("postcss");
     expect(workspace.overrides).not.toHaveProperty("undici@<6.23.0");
@@ -312,14 +401,24 @@ describe("dependency and security automation configuration", () => {
     const securityDocs = await repositoryFile("docs/security-automation.md");
     const workspace = await repositoryFile("pnpm-workspace.yaml");
 
-    expect(packageJson.devDependencies?.["js-yaml"]).toBe("5.2.3");
+    // Pinned exactly rather than to a range, and never below the release the override for the
+    // same package calls safe. The version itself is free to move; the quarantine test above
+    // holds every override to its own declared-safe floor.
+    const jsYaml = packageJson.devDependencies?.["js-yaml"] ?? "";
+    expect(jsYaml).toMatch(/^\d+\.\d+\.\d+$/u);
+    expect(compareVersions(jsYaml, "4.3.0")).toBeGreaterThanOrEqual(0);
+
     expect(workspace).not.toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
-    expect(workspace).toContain("'archiver>readdir-glob': 3.0.0");
-    expect(workspace).toContain("'brace-expansion@>=5 <5.0.9': 5.0.9");
-    expect(workspace).toContain("'fast-uri@>=3 <3.1.5': 3.1.5");
-    expect(workspace).toContain("js-yaml@>=4 <4.3.0: 4.3.1");
-    expect(workspace).toContain("linkify-it@>=5 <5.0.2: 5.0.2");
-    expect(workspace).toContain("ws@>=8 <8.21.1: 8.21.3");
+    for (const override of [
+      "'archiver>readdir-glob':",
+      "'brace-expansion@>=5 <5.0.9':",
+      "'fast-uri@>=3 <3.1.5':",
+      "js-yaml@>=4 <4.3.0:",
+      "linkify-it@>=5 <5.0.2:",
+      "ws@>=8 <8.21.1:",
+    ]) {
+      expect(workspace).toContain(override);
+    }
 
     expect(preCommit).toContain("repo: https://github.com/google/osv-scanner");
     expect(preCommit).toContain("rev: v2.5.1");
