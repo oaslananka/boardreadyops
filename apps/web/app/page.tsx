@@ -5,26 +5,26 @@ import { installUrl, LandingHeroActions, LandingNavActions } from "../components
 import "./landing.css";
 
 const proofItems = [
-  "DRC / ERC and design-rule evidence",
-  "BOM and sourcing integrity",
-  "Manufacturing package completeness",
-  "Versioned findings, artifacts, and checksums",
+  "Layout and schematic rule checks",
+  "Parts you can actually buy",
+  "A complete manufacturing package",
+  "Every result tied to a file and a checksum",
 ] as const;
 
 const workflowSteps = [
   {
     number: "01",
     title: "Connect the repository",
-    body: "Install the GitHub App and keep source authority, branch protection, and workflow history in GitHub.",
+    body: "Install the GitHub App. Your source, branch protection and workflow history stay where they are.",
   },
   {
     number: "02",
-    title: "Evaluate the exact revision",
-    body: "BoardReadyOps normalizes KiCad, BOM, manufacturing, and release evidence for the pull-request revision.",
+    title: "Check the exact commit",
+    body: "KiCad, BOM and manufacturing checks run against the commit in the pull request, not a moving branch.",
   },
   {
     number: "03",
-    title: "Investigate before release",
+    title: "Decide before you order",
     body: "Start with the verdict, then open the findings, files and execution history behind it.",
   },
 ] as const;
@@ -32,33 +32,33 @@ const workflowSteps = [
 const capabilities = [
   {
     eyebrow: "Design",
-    title: "DRC and ERC evidence",
-    body: "Keep electrical and physical rule findings attached to the source revision that produced them.",
+    title: "Layout and schematic",
+    body: "Every rule violation stays attached to the commit that introduced it.",
   },
   {
     eyebrow: "Supply chain",
-    title: "BOM integrity",
-    body: "Surface missing MPNs, lifecycle risk, sourcing gaps, and variant consistency before handoff.",
+    title: "Bill of materials",
+    body: "Missing part numbers, parts going end of life, and gaps between variants — before handoff.",
   },
   {
     eyebrow: "Manufacturing",
     title: "Manufacturing readiness",
-    body: "Check fabrication and assembly package completeness, drill coverage, markings, and release outputs.",
+    body: "Gerbers, drill files, markings and assembly outputs, checked for completeness.",
   },
   {
-    eyebrow: "Evidence",
-    title: "Checksums and artifacts",
+    eyebrow: "Traceability",
+    title: "Nothing unaccounted for",
     body: "Every result traces back to a versioned file, its checksum, and the workflow run that produced it.",
   },
   {
-    eyebrow: "Investigation",
-    title: "Bounded data access",
+    eyebrow: "Speed",
+    title: "Fast on a long history",
     body: "Search, filter and sort without waiting for your whole history to load.",
   },
   {
     eyebrow: "Publication",
-    title: "GitHub-native decision trail",
-    body: "Follow Check Run, pull-request, workflow, and publication state without creating a second source of truth.",
+    title: "It all lives in GitHub",
+    body: "Check Runs, pull requests and workflow logs stay in GitHub. No second place to look.",
   },
 ] as const;
 
@@ -223,7 +223,7 @@ export default function HomePage() {
                 </div>
                 <ul className="landing-control-room-statuses">
                   <li className="landing-state-pill">Decision first</li>
-                  <li className="landing-state-pill landing-state-pill-muted">Evidence bounded</li>
+                  <li className="landing-state-pill landing-state-pill-muted">Loads fast</li>
                 </ul>
               </header>
               <div className="landing-control-room-grid">
@@ -240,14 +240,14 @@ export default function HomePage() {
                   </div>
                 </article>
                 <article>
-                  <span className="landing-card-kicker">Bounded investigation</span>
-                  <h3>Search the evidence, not an unbounded history.</h3>
-                  <p>Filter findings and artifacts while server-side pagination keeps tenant data bounded.</p>
+                  <span className="landing-card-kicker">Finding things</span>
+                  <h3>Search what matters, not everything you have ever run.</h3>
+                  <p>Filter findings and files without pulling your whole history down the wire.</p>
                 </article>
                 <article>
-                  <span className="landing-card-kicker">Authoritative sources</span>
-                  <h3>Every conclusion stays traceable.</h3>
-                  <p>Return to source commits, checks, workflow runs, pull requests, artifacts, and checksums.</p>
+                  <span className="landing-card-kicker">Back to the source</span>
+                  <h3>Every answer links back to where it came from.</h3>
+                  <p>One click to the commit, the Check Run, the workflow run, the pull request, or the file itself.</p>
                 </article>
               </div>
             </div>
@@ -258,8 +258,8 @@ export default function HomePage() {
           <div className="landing-shell">
             <div className="landing-section-heading landing-section-heading-wide">
               <p className="landing-section-kicker">Engineering coverage</p>
-              <h2 id="capabilities-heading">Checks that stay tied to the source revision.</h2>
-              <p>One visual language across design evidence, manufacturing evidence, and release provenance.</p>
+              <h2 id="capabilities-heading">Every check stays tied to the commit it ran on.</h2>
+              <p>Layout, supply chain and manufacturing all reported the same way, so nothing needs translating.</p>
             </div>
             <div className="landing-capability-grid">
               {capabilities.map((capability) => (
@@ -290,7 +290,7 @@ export default function HomePage() {
               </div>
               <div>
                 <dt>Investigation</dt>
-                <dd>Normalized, privacy-bounded findings and artifact metadata</dd>
+                <dd>Findings and file details only — never your board design itself</dd>
               </div>
               <div>
                 <dt>Decision trail</dt>
@@ -326,8 +326,8 @@ export default function HomePage() {
             BoardReadyOps
           </span>
           <p>
-            Normalized release evidence for hardware teams. Repository source and full workflow logs remain
-            authoritative in GitHub.
+            Release readiness checks for hardware teams. Your repository and its full workflow logs stay the source of
+            truth.
           </p>
           <a href="https://docs.boardreadyops.com">Documentation</a>
         </div>
