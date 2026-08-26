@@ -9,7 +9,7 @@ describe("dependency security overrides", () => {
     };
     const lockfile = await readFile("pnpm-lock.yaml", "utf8");
 
-    expect(workspace.overrides?.["pa11y>puppeteer"]).toBe("25.2.1");
+    expect(workspace.overrides?.["pa11y>puppeteer"]).toBe("25.8.0");
     expect(lockfile).not.toContain("extract-zip@2.0.1");
   });
 });
