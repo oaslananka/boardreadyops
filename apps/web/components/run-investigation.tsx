@@ -446,17 +446,13 @@ export function AttemptTimeline({ attempts }: Readonly<{ attempts: AttemptDetail
 export function AttemptsView({ run }: Readonly<{ run: RunDetail }>) {
   return (
     <>
-      <Panel
-        title="Execution attempts"
-        description="Newest attempts first, bounded to the latest 50 records."
-        id="attempts"
-      >
+      <Panel title="Execution attempts" description="Newest first, up to 50 attempts." id="attempts">
         <AttemptTimeline attempts={run.attempts} />
       </Panel>
 
       <Panel
         title="Lifecycle transitions"
-        description="Privacy-bounded transition evidence, newest first and limited to 100 records."
+        description="State changes only, never board content. Newest first, up to 100."
         id="transitions"
       >
         {run.transitions.length === 0 ? (
@@ -605,11 +601,7 @@ export function FindingsView({
   const current = stringSearchParameters(searchParameters);
   const group = filtersFromSearchParameters(searchParameters).findingGroup ?? "none";
   return (
-    <Panel
-      title="Findings"
-      description="Search, filter, group, sort, and page through normalized findings without loading the complete result set."
-      id="findings"
-    >
+    <Panel title="Findings" description="Find what you need without loading every finding at once." id="findings">
       <form className="filter-bar" method="get" action={`/runs/${run.id}/findings`}>
         <label>
           <span>Search findings</span>
@@ -763,7 +755,7 @@ export function ArtifactsView({
   return (
     <Panel
       title="Artifacts"
-      description="Authoritative checksums, availability, retention responsibility, and bounded download access."
+      description="Checksums, availability, how long each file is kept, and who can download it."
       id="artifacts"
       actions={
         latestWorkflowRunUrl ? (
@@ -893,11 +885,7 @@ function ArtifactRow({ artifact }: Readonly<{ artifact: ArtifactDetail }>) {
 export function PublicationView({ run }: Readonly<{ run: RunDetail }>) {
   return (
     <>
-      <Panel
-        title="Publication status"
-        description="When normalized evidence was published to GitHub surfaces."
-        id="publication"
-      >
+      <Panel title="Publication status" description="When these results were posted back to GitHub." id="publication">
         <DefinitionGrid>
           <Definition label="Last publication attempt">{formatRunDate(run.lastPublicationAttemptAt)}</Definition>
           <Definition label="Check Run published">{formatRunDate(run.githubCheckPublishedAt)}</Definition>
@@ -958,7 +946,7 @@ export function AuditView({ run }: Readonly<{ run: RunDetail }>) {
     <>
       <Panel
         title="Audit and recovery evidence"
-        description="Privacy-bounded operational records are separated from customer-facing run content."
+        description="Operational records are kept apart from your board content, and never mixed into it."
         id="audit"
       >
         <Alert title="Operator authentication required" tone="info">

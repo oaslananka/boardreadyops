@@ -27,7 +27,7 @@ function collectLinks(node: ReactNode, hrefs: string[] = []): string[] {
 describe("HomePage", () => {
   it("shows the primary headline", () => {
     const text = collectText(HomePage());
-    expect(text).toContain("Release evidence that leads to a decision.");
+    expect(text).toContain("Catch board mistakes before the fab does.");
   });
 
   it("shows the three feature-grid headings from the existing copy", () => {
@@ -58,7 +58,7 @@ describe("HomePage", () => {
     const text = collectText(HomePage());
     expect(text).toContain("Pull request evidence");
     expect(text).toContain("Manufacturing readiness");
-    expect(text).toContain("Authoritative in GitHub");
+    expect(text).toContain("Your repository stays the source of truth");
     expect(text).not.toMatch(/trusted by|customers|teams worldwide|10,000|fortune 500/iu);
   });
 
