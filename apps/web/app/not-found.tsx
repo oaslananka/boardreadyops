@@ -8,14 +8,14 @@ export default function NotFound() {
         <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Page not found" }]} />
         <section className="run-state-surface">
           <EmptyState
-            title="404 — Page not found"
+            title="This page does not exist"
             action={
               <Link className="button button-primary" href="/">
                 Return to home
               </Link>
             }
           >
-            <p>The requested page or route does not exist or has been relocated.</p>
+            <p>The link may be out of date — or the page may have moved.</p>
           </EmptyState>
         </section>
       </main>

@@ -11,8 +11,8 @@ export default function RunError({
       <main className="shell compact-shell" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Run error" }]} />
         <section className="run-state-surface">
-          <Alert title="Run investigation could not be loaded" tone="danger">
-            <p>The request failed without exposing database or tenant details. Retry the bounded dashboard query.</p>
+          <Alert title="Could not load this run" tone="danger">
+            <p>Something went wrong on our side. Try again — the run itself is unaffected.</p>
             {error.digest ? (
               <p>
                 Support reference: <code>{error.digest}</code>

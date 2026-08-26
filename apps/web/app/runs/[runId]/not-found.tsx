@@ -8,16 +8,14 @@ export default function RunNotFound() {
         <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Run unavailable" }]} />
         <section className="run-state-surface">
           <EmptyState
-            title="Run not found or no longer available"
+            title="This run is not available"
             action={
               <Link className="button button-primary" href="/">
                 Return home
               </Link>
             }
           >
-            <p>
-              The identifier is invalid, unauthorized for this deployment, expired, or removed by a lifecycle operation.
-            </p>
+            <p>The link may be wrong, the run may have aged out, or it may belong to a repository you cannot see.</p>
           </EmptyState>
         </section>
       </main>
