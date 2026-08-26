@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { BrandMarkIcon } from "../components/brand-mark.js";
 import { installUrl, LandingHeroActions, LandingNavActions } from "../components/landing-actions.js";
+import { ThemeToggle } from "../components/theme-toggle.js";
 import "./landing.css";
 
 const proofItems = [
@@ -81,6 +82,7 @@ export default function HomePage() {
           {/* Suspended so reading the session never delays the landing navigation. */}
           <Suspense fallback={null}>
             <LandingNavActions />
+            <ThemeToggle />
           </Suspense>
         </nav>
       </header>

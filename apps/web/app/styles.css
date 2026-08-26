@@ -18,7 +18,7 @@
   --bro-border-accent: rgba(198, 154, 62, 0.5);
   --bro-text: #ece5d3;
   --bro-text-muted: #a9b0bd;
-  --bro-text-subtle: #79818f;
+  --bro-text-subtle: #7a828f;
   --bro-accent: #c69a3e;
   --bro-accent-strong: #e3b662;
   --bro-accent-soft: #d9c9a4;
@@ -95,6 +95,100 @@
   --font-display: var(--font-display-loaded, Newsreader), Georgia, "Iowan Old Style", serif;
   --font-ui: var(--font-ui-loaded, Inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-mono-loaded, "JetBrains Mono"), "SFMono-Regular", Consolas, monospace;
+}
+
+/*
+ * The same ledger in daylight.
+ *
+ * Dark sets warm parchment on a cool near-black ground; this turns that over rather than
+ * bleaching it -- warm paper, cool ink, and the brass accent taken down far enough to carry
+ * text on paper instead of glowing on ink. Only the primitives are restated; everything
+ * downstream already reads them through the semantic aliases.
+ *
+ * Emitted twice on purpose: the media query serves a reader whose system asks for light, and
+ * the attribute serves one who chose it. CSS cannot share a declaration block between the two,
+ * so a unit test asserts they never drift apart.
+ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bro-bg: #f6f2e8;
+    --bro-bg-elevated: #fbf9f3;
+    --bro-surface: #fffdf8;
+    --bro-surface-strong: #efe9db;
+    --bro-surface-sunken: #e8e1d0;
+    --bro-border: #dcd3c0;
+    --bro-border-strong: #b9ac91;
+    --bro-border-accent: rgba(125, 95, 24, 0.55);
+    --bro-text: #12161d;
+    --bro-text-muted: #454d5b;
+    --bro-text-subtle: #626b7a;
+    --bro-accent: #7d5f18;
+    --bro-accent-strong: #634b12;
+    --bro-accent-soft: #6b4f14;
+    --bro-accent-contrast: #fffdf8;
+    --bro-focus: #7d5f18;
+    --bro-shadow: 0 24px 72px rgba(40, 33, 18, 0.14);
+    --bro-shadow-soft: 0 14px 36px rgba(40, 33, 18, 0.1);
+    --code: #6b4f14;
+    --skip-text: #fffdf8;
+    --success: #2f6b48;
+    --success-surface: #e6f2ea;
+    --success-border: #a8c9b6;
+    --warning: #7a5313;
+    --warning-surface: #f7eeda;
+    --warning-border: #d3b787;
+    --danger: #a33a26;
+    --danger-surface: #fbe9e5;
+    --danger-border: #dda99c;
+    --info: #2c5876;
+    --info-surface: #e7eff6;
+    --info-border: #a3bed3;
+    --background-glow: rgba(125, 95, 24, 0.06);
+    --header-backdrop: rgba(246, 242, 232, 0.9);
+    --header-border: rgba(185, 172, 145, 0.75);
+    --shadow-soft-color: rgba(40, 33, 18, 0.1);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bro-bg: #f6f2e8;
+  --bro-bg-elevated: #fbf9f3;
+  --bro-surface: #fffdf8;
+  --bro-surface-strong: #efe9db;
+  --bro-surface-sunken: #e8e1d0;
+  --bro-border: #dcd3c0;
+  --bro-border-strong: #b9ac91;
+  --bro-border-accent: rgba(125, 95, 24, 0.55);
+  --bro-text: #12161d;
+  --bro-text-muted: #454d5b;
+  --bro-text-subtle: #626b7a;
+  --bro-accent: #7d5f18;
+  --bro-accent-strong: #634b12;
+  --bro-accent-soft: #6b4f14;
+  --bro-accent-contrast: #fffdf8;
+  --bro-focus: #7d5f18;
+  --bro-shadow: 0 24px 72px rgba(40, 33, 18, 0.14);
+  --bro-shadow-soft: 0 14px 36px rgba(40, 33, 18, 0.1);
+  --code: #6b4f14;
+  --skip-text: #fffdf8;
+  --success: #2f6b48;
+  --success-surface: #e6f2ea;
+  --success-border: #a8c9b6;
+  --warning: #7a5313;
+  --warning-surface: #f7eeda;
+  --warning-border: #d3b787;
+  --danger: #a33a26;
+  --danger-surface: #fbe9e5;
+  --danger-border: #dda99c;
+  --info: #2c5876;
+  --info-surface: #e7eff6;
+  --info-border: #a3bed3;
+  --background-glow: rgba(125, 95, 24, 0.06);
+  --header-backdrop: rgba(246, 242, 232, 0.9);
+  --header-border: rgba(185, 172, 145, 0.75);
+  --shadow-soft-color: rgba(40, 33, 18, 0.1);
 }
 
 * {
@@ -2178,4 +2272,80 @@ code {
 .timeline time,
 code {
   font-variant-numeric: tabular-nums;
+}
+
+/* The theme switch.
+ *
+ * Which icon shows is decided here rather than in the component, using the same conditions the
+ * palette itself is chosen by. A button whose contents depend on stored state cannot render
+ * identically on the server; letting the stylesheet answer means there is nothing to mismatch.
+ * The icon shown is the one the reader is going towards. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    color var(--bro-motion-fast) var(--bro-ease),
+    border-color var(--bro-motion-fast) var(--bro-ease),
+    background var(--bro-motion-fast) var(--bro-ease);
+}
+
+.theme-toggle:hover {
+  color: var(--accent-strong);
+  border-color: var(--border-strong);
+  background: var(--surface-strong);
+}
+
+.theme-toggle:focus-visible {
+  outline: var(--bro-focus);
+  outline-offset: 2px;
+}
+
+.theme-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Dark is the default ground, so the sun shows: it is where the reader would be going. */
+.theme-icon-moon {
+  display: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .theme-icon-sun {
+    display: none;
+  }
+
+  :root:not([data-theme="dark"]) .theme-icon-moon {
+    display: block;
+  }
+}
+
+:root[data-theme="light"] .theme-icon-sun {
+  display: none;
+}
+
+:root[data-theme="light"] .theme-icon-moon {
+  display: block;
+}
+
+:root[data-theme="dark"] .theme-icon-sun {
+  display: block;
+}
+
+:root[data-theme="dark"] .theme-icon-moon {
+  display: none;
 }

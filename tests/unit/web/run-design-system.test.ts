@@ -26,7 +26,7 @@ function contrast(foreground: string, background: string): number {
 
 describe("hosted dashboard design system", () => {
   it("keeps raw color values inside the token declaration", () => {
-    const withoutTokens = css.replace(/:root\s*\{[\s\S]*?\}/u, "");
+    const withoutTokens = css.replaceAll(/:root[^{]*\{[^{}]*\}/gu, "");
     const rawColorPattern = /#[0-9a-fA-F]{3,8}(?![0-9A-Za-z_-])|rgba?\(/u;
     expect(".sample { color: #fff; }").toMatch(rawColorPattern);
     expect("#decision { color: var(--bro-text); }").not.toMatch(rawColorPattern);
@@ -37,6 +37,7 @@ describe("hosted dashboard design system", () => {
     expect(css).toContain("--bro-text:");
     expect(css).toContain("--bro-motion-fast:");
     expect(css).toContain("color-scheme: dark");
+    expect(css).toContain("color-scheme: light");
     expect(css).toContain("--space-7");
     expect(css).toContain("--radius-lg");
     expect(css).toContain("--focus");
