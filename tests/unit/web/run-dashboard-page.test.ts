@@ -71,14 +71,12 @@ describe("run investigation routes", () => {
   });
 
   it("defines explicit loading, failure, unavailable, expired, stale, recovery, and partial states", () => {
-    expect(readFileSync("apps/web/app/runs/[runId]/loading.tsx", "utf8")).toContain("Loading run investigation");
-    expect(readFileSync("apps/web/app/runs/[runId]/error.tsx", "utf8")).toContain(
-      "Run investigation could not be loaded",
-    );
+    expect(readFileSync("apps/web/app/runs/[runId]/loading.tsx", "utf8")).toContain("Loading this run");
+    expect(readFileSync("apps/web/app/runs/[runId]/error.tsx", "utf8")).toContain("Could not load this run");
     const notFoundPage = readFileSync("apps/web/app/runs/[runId]/not-found.tsx", "utf8");
-    expect(notFoundPage).toContain("not found or no longer available");
-    expect(notFoundPage).toContain("unauthorized");
-    expect(notFoundPage).toContain("expired");
+    expect(notFoundPage).toContain("This run is not available");
+    expect(notFoundPage).toContain("a repository you cannot see");
+    expect(notFoundPage).toContain("aged out");
     expect(component).toContain("This run may be stale");
     expect(component).toContain("Reconciliation is active");
     expect(component).toContain("Recovery requires operator action");

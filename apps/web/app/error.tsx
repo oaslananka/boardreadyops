@@ -11,8 +11,11 @@ export default function GlobalError({
       <main className="shell compact-shell" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Application error" }]} />
         <section className="run-state-surface">
-          <Alert title="Application error" tone="danger">
-            <p>An unexpected error occurred while loading this page.</p>
+          <Alert title="Something went wrong" tone="danger">
+            <p>
+              This page did not load. Trying again usually works; if it keeps happening, the run is still safe in
+              GitHub.
+            </p>
             {error.digest ? (
               <p>
                 Diagnostic reference: <code>{error.digest}</code>
