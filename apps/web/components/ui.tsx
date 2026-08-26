@@ -119,8 +119,8 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
       {children}
       <footer className="site-footer">
         <p>
-          BoardReadyOps presents normalized release evidence. Repository source and full workflow logs remain
-          authoritative in GitHub.
+          BoardReadyOps checks whether a board is ready to fabricate. Your repository and its full workflow logs stay
+          the source of truth.
         </p>
       </footer>
     </>
