@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { type ReactNode, Suspense } from "react";
 import { BrandMarkLockup } from "./brand-mark.js";
+import { ThemeToggle } from "./theme-toggle.js";
 
 export type StatusTone = "danger" | "info" | "neutral" | "success" | "warning";
 
@@ -113,6 +114,7 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
             <Link href="/settings/component-intelligence">Component intelligence</Link>
             <a href="https://docs.boardreadyops.com">Documentation</a>
             {viewerNav ? <Suspense fallback={null}>{viewerNav}</Suspense> : null}
+            <ThemeToggle />
           </nav>
         </div>
       </header>

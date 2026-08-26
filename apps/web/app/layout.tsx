@@ -28,26 +28,39 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://boardreadyops.com"),
   title: { default: "BoardReadyOps Cloud", template: "%s · BoardReadyOps" },
-  description: "Accessible release investigation for KiCad hardware projects.",
+  description: "Checks whether a KiCad board is ready to fabricate, on every pull request.",
   openGraph: {
-    title: "BoardReadyOps — Release evidence that leads to a decision.",
+    title: "BoardReadyOps — Catch board mistakes before the fab does.",
     description:
-      "Automated DFM/DFA checks on every pull request, a traceable evidence chain, and a single go/no-go call — before it ships to manufacturing.",
+      "KiCad's checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
     url: "https://boardreadyops.com",
     siteName: "BoardReadyOps",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "BoardReadyOps — Release evidence that leads to a decision.",
+    title: "BoardReadyOps — Catch board mistakes before the fab does.",
     description:
-      "Automated DFM/DFA checks on every pull request, a traceable evidence chain, and a single go/no-go call — before it ships to manufacturing.",
+      "KiCad's checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
   },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Runs before the first paint so a reader who chose a theme never sees the other one
+            flash first. <html> carries the page background, so the attribute has to land here
+            rather than once the body renders. Readers who never chose are left alone, and the
+            stylesheet answers their system preference instead. */}
+        <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: a literal with no interpolation, and it has to run before paint.
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{var t=localStorage.getItem("boardreadyops-theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}',
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
