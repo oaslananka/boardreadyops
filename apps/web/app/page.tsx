@@ -27,7 +27,7 @@ const workflowSteps = [
   {
     number: "03",
     title: "Investigate before release",
-    body: "Start with the decision, then open bounded findings, artifacts, execution attempts, and publication evidence.",
+    body: "Start with the verdict, then open the findings, files and execution history behind it.",
   },
 ] as const;
 
@@ -50,12 +50,12 @@ const capabilities = [
   {
     eyebrow: "Evidence",
     title: "Checksums and artifacts",
-    body: "Trace normalized results to versioned artifacts, checksums, and repository-owned workflow output.",
+    body: "Every result traces back to a versioned file, its checksum, and the workflow run that produced it.",
   },
   {
     eyebrow: "Investigation",
     title: "Bounded data access",
-    body: "Search, filter, group, sort, and page through evidence without loading an unbounded tenant history.",
+    body: "Search, filter and sort without waiting for your whole history to load.",
   },
   {
     eyebrow: "Publication",
@@ -95,10 +95,10 @@ export default function HomePage() {
           <div className="landing-shell landing-hero-layout">
             <div className="landing-hero-copy">
               <p className="landing-kicker">Hardware release intelligence for KiCad</p>
-              <h1 id="landing-heading">Release evidence that leads to a decision.</h1>
+              <h1 id="landing-heading">Catch board mistakes before the fab does.</h1>
               <p className="landing-hero-lede">
-                Turn every pull request into a traceable manufacturing-readiness decision without moving repository
-                authority out of GitHub.
+                BoardReadyOps runs KiCad&apos;s checks on every pull request and tells you in one line whether the board
+                is ready to fabricate. Your repository stays exactly where it is.
               </p>
               <div className="landing-cta-row">
                 <a className="landing-button-primary" href={installUrl}>
@@ -109,10 +109,10 @@ export default function HomePage() {
                   Preview repository setup
                 </Link>
               </div>
-              <ul className="landing-hero-notes" aria-label="Product boundaries">
-                <li>Pull-request native</li>
-                <li>Evidence first</li>
-                <li>Repository authority preserved</li>
+              <ul className="landing-hero-notes" aria-label="What BoardReadyOps does">
+                <li>Runs on every pull request</li>
+                <li>Shows its working</li>
+                <li>Your repository stays in charge</li>
               </ul>
             </div>
 
@@ -164,10 +164,10 @@ export default function HomePage() {
           <div className="landing-shell landing-proof-layout">
             <div className="landing-section-heading">
               <p className="landing-section-kicker">Pull request evidence</p>
-              <h2 id="proof-heading">Pull request evidence, normalized for a release decision.</h2>
+              <h2 id="proof-heading">Every pull request, reviewed like a design review.</h2>
               <p>
-                BoardReadyOps turns heterogeneous hardware checks into one investigation surface while keeping the
-                underlying GitHub evidence reachable.
+                DRC, ERC, BOM and manufacturing checks arrive as one answer instead of several logs, and every part of
+                it links back to the GitHub run it came from.
               </p>
             </div>
             <ul className="landing-proof-list">
@@ -205,11 +205,11 @@ export default function HomePage() {
         <section className="landing-control-room" id="product" aria-labelledby="control-room-heading">
           <div className="landing-shell">
             <div className="landing-section-heading landing-section-heading-wide">
-              <p className="landing-section-kicker">Product surface</p>
-              <h2 id="control-room-heading">An evidence control room for hardware releases.</h2>
+              <p className="landing-section-kicker">What you see</p>
+              <h2 id="control-room-heading">The answer first. The reasons underneath.</h2>
               <p>
-                Read the release decision first, then move into only the evidence required to understand or challenge
-                it.
+                Open a run and the verdict is the first thing on the page. Everything below it is there to explain that
+                verdict, or to let you argue with it.
               </p>
             </div>
 
@@ -275,10 +275,10 @@ export default function HomePage() {
           <div className="landing-shell landing-trust-layout">
             <div className="landing-section-heading">
               <p className="landing-section-kicker">Trust boundary</p>
-              <h2 id="trust-heading">Authoritative in GitHub.</h2>
+              <h2 id="trust-heading">Your repository stays the source of truth.</h2>
               <p>
-                BoardReadyOps is an investigation and normalization layer. Source, branch protections, pull requests,
-                checks, and complete workflow logs stay in the repository you already govern.
+                BoardReadyOps reads and reports; it does not take custody of anything. Your source, branch protections,
+                pull requests, checks and full workflow logs stay in the repository you already run.
               </p>
             </div>
             <dl className="landing-trust-grid">
@@ -302,7 +302,7 @@ export default function HomePage() {
           <div className="landing-shell landing-footer-cta-inner">
             <div>
               <p className="landing-section-kicker">Next release</p>
-              <h2 id="landing-cta-heading">Bring release evidence into your next pull request.</h2>
+              <h2 id="landing-cta-heading">Check your next board before you order it.</h2>
             </div>
             <div className="landing-cta-row">
               <a className="landing-button-primary" href={installUrl}>

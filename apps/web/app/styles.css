@@ -1924,52 +1924,68 @@ code {
    a native form that works without JavaScript rather than a controlled component. */
 .settings-form {
   display: grid;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
   max-width: 34rem;
 }
 
 .settings-form label {
   font-weight: 600;
   font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 .settings-form input {
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--bro-border);
-  border-radius: var(--bro-radius-sm);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   font: inherit;
-  background: var(--bro-surface);
+  background: var(--surface-sunken);
   color: inherit;
+  transition: border-color var(--bro-motion-fast) var(--bro-ease);
+}
+
+.settings-form input:hover {
+  border-color: var(--border-strong);
 }
 
 .settings-form input:focus-visible {
   outline: var(--bro-focus);
   outline-offset: 1px;
+  border-color: var(--bro-border-accent);
 }
 
 .settings-form-actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
   flex-wrap: wrap;
 }
 
 .settings-form-actions button {
-  padding: 0.5rem 1rem;
-  border-radius: var(--bro-radius-sm);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
   background: var(--bro-accent);
   color: var(--bro-accent-contrast);
+  transition: background var(--bro-motion-fast) var(--bro-ease);
+}
+
+.settings-form-actions button:hover:not(:disabled) {
+  background: var(--bro-accent-strong);
 }
 
 .settings-form-actions button.secondary {
   background: transparent;
   color: inherit;
-  border-color: var(--bro-border-strong);
+  border-color: var(--border-strong);
+}
+
+.settings-form-actions button.secondary:hover:not(:disabled) {
+  background: var(--surface-strong);
 }
 
 .settings-form-actions button:disabled {
@@ -1978,7 +1994,8 @@ code {
 }
 
 /* Repository listings. Native tables rather than a grid of cards: these are rows of
-   comparable facts, and a table gives screen readers the row/column relationships for free. */
+   comparable facts, and a table gives screen readers the row and column relationships for
+   free. Numerals are tabular so counts line up down a column instead of drifting. */
 .repository-table-wrap {
   overflow-x: auto;
 }
@@ -1992,17 +2009,30 @@ code {
 .repository-table th,
 .repository-table td {
   text-align: left;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--bro-border);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 
+.repository-table td {
+  font-variant-numeric: tabular-nums;
+}
+
 .repository-table thead th {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--bro-text-muted, inherit);
-  border-bottom-color: var(--bro-border-strong);
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--text-subtle);
+  border-bottom-color: var(--border-strong);
+}
+
+.repository-table tbody tr {
+  transition: background var(--bro-motion-fast) var(--bro-ease);
+}
+
+.repository-table tbody tr:hover {
+  background: var(--surface-strong);
 }
 
 .repository-table tbody tr:last-child th,
@@ -2011,20 +2041,22 @@ code {
 }
 
 .repository-private {
-  margin-left: 0.5rem;
-  font-size: 0.75rem;
+  margin-left: var(--space-2);
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--bro-border-strong);
-  border-radius: var(--bro-radius-sm);
-  padding: 0.05rem 0.35rem;
-  font-weight: 500;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.45em;
+  font-weight: 600;
+  color: var(--text-subtle);
+  vertical-align: middle;
 }
 
 .repository-when {
   display: block;
   font-size: 0.8rem;
-  opacity: 0.75;
+  color: var(--text-subtle);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2034,20 +2066,21 @@ code {
    run, get the answer, and either carry on or start fixing. Everything else on the page is
    evidence for this sentence.
 
-   Colour here carries the state and nothing else. The brand gold is deliberately absent —
-   if gold means "BoardReadyOps" everywhere, it cannot also mean "look at this". */
+   Colour here carries the state and nothing else. The brand gold is deliberately absent — if
+   gold means "BoardReadyOps" everywhere, it cannot also mean "look at this". */
 .run-verdict {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 1.25rem;
-  margin: 1.25rem 0 0.5rem;
-  padding: 1.5rem 1.75rem;
+  gap: var(--space-5);
+  margin: var(--space-5) 0 var(--space-2);
+  padding: var(--space-5) var(--space-6);
   border: 1px solid var(--border-strong);
-  border-left-width: 4px;
-  border-radius: var(--bro-radius-lg);
+  border-left-width: 3px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
+  box-shadow: var(--bro-shadow-soft);
 }
 
 .run-verdict-copy {
@@ -2057,38 +2090,43 @@ code {
 
 .run-verdict-headline {
   margin: 0;
+  font-family: var(--font-display);
   /* Scales with the viewport so it stays the largest thing on the page on a laptop and does
-     not wrap awkwardly on a narrow window. */
-  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.25rem);
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  font-weight: 700;
+     not wrap awkwardly in a narrow window. */
+  font-size: clamp(1.6rem, 1.1rem + 1.8vw, 2.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  font-weight: 600;
 }
 
 .run-verdict-detail {
-  margin: 0.5rem 0 0;
+  margin: var(--space-2) 0 0;
   font-size: 1.05rem;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text-muted);
-  max-width: 60ch;
+  max-width: 62ch;
+  text-wrap: pretty;
 }
 
 .run-verdict-action {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  padding: 0.65rem 1.15rem;
-  border-radius: var(--bro-radius-sm);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   font-weight: 600;
   text-decoration: none;
   color: inherit;
   background: var(--surface-strong);
-  transition: border-color var(--bro-motion-fast) var(--bro-ease);
+  transition:
+    border-color var(--bro-motion-fast) var(--bro-ease),
+    background var(--bro-motion-fast) var(--bro-ease);
 }
 
 .run-verdict-action:hover {
   border-color: var(--bro-border-accent);
+  background: var(--background-elevated);
 }
 
 .run-verdict-action:focus-visible {
@@ -2130,4 +2168,14 @@ code {
 
 .run-verdict[data-tone="info"] .run-verdict-headline {
   color: var(--info);
+}
+
+/* Numerals that sit in columns or get compared against each other are tabular, so digits keep
+   their place instead of shifting as values change. */
+.definition-grid dd,
+.inline-definitions dd,
+.score strong,
+.timeline time,
+code {
+  font-variant-numeric: tabular-nums;
 }
