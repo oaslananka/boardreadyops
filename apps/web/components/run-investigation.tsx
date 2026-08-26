@@ -164,8 +164,8 @@ export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
     return (
       <Alert title="This run has partial data" tone="warning">
         <p>
-          The logical run is terminal, but no accepted versioned result contract is attached. GitHub workflow evidence
-          remains authoritative while the publication gap is investigated.
+          This run finished, but no signed result ever arrived. Until that gap is explained, the workflow logs in GitHub
+          are the record to trust.
         </p>
         <Link href={`/runs/${run.id}/publication`}>Review publication state</Link>
       </Alert>
@@ -201,7 +201,7 @@ export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
   if (run.investigationState === "superseded") {
     return (
       <Alert title="A newer run superseded this result" tone="neutral">
-        <p>This page remains historical evidence. Use the latest Check Run for the authoritative release decision.</p>
+        <p>This page is kept for history. For the current answer, use the newest Check Run.</p>
       </Alert>
     );
   }
@@ -326,7 +326,7 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
             {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
           </Definition>
         </DefinitionGrid>
-        <nav className="source-links" aria-label="Authoritative GitHub sources">
+        <nav className="source-links" aria-label="Open this run in GitHub">
           <a href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}`}>Open source commit</a>
           <a href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}/checks`}>
             Open GitHub checks
@@ -917,14 +917,10 @@ export function PublicationView({ run }: Readonly<{ run: RunDetail }>) {
           </DefinitionGrid>
         )}
       </Panel>
-      <Panel
-        title="Authoritative report links"
-        description="HTTPS links supplied by the accepted runner result."
-        id="reports"
-      >
+      <Panel title="Reports" description="HTTPS links supplied by the accepted runner result." id="reports">
         {run.reportLinks.length === 0 ? (
           <EmptyState title="No report links">
-            <p>Use the Check Run and repository-owned workflow output as the authoritative source.</p>
+            <p>The Check Run and the workflow logs in your repository have the full detail.</p>
           </EmptyState>
         ) : (
           <ul className="link-list">

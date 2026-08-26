@@ -7,7 +7,7 @@ export default function LoadingRun() {
         <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Loading run" }]} />
         <section className="run-state-surface">
           <div className="loading-header skeleton" />
-          <Panel title="Loading run investigation" description="Fetching normalized run state and bounded evidence.">
+          <Panel title="Loading this run" description="Fetching the results.">
             <div className="skeleton skeleton-line" />
             <div className="skeleton skeleton-line short" />
           </Panel>

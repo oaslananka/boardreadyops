@@ -90,7 +90,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
         <Panel
           id="policy-preset"
           title="1. Choose a release policy"
-          description={`Preset contract v${repositorySetupPresetVersion}. Switching presets appends a new revision; previous runs retain their original policy provenance.`}
+          description={`Preset v${repositorySetupPresetVersion}. Switching presets starts a new revision; runs you have already done keep the policy they were checked against.`}
         >
           <div className="setup-preset-grid">
             {repositorySetupPresets.map((preset) => (
@@ -228,7 +228,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                 <tr>
                   <th scope="row">Repository</th>
                   <td>Pull requests: read</td>
-                  <td>Associate runs and publication with authoritative pull requests.</td>
+                  <td>Attach each run to the pull request it belongs to.</td>
                 </tr>
                 <tr>
                   <th scope="row">Repository</th>

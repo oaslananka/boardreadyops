@@ -57,7 +57,7 @@ describe("run route state pages", () => {
   it("renders loading inside the shared premium state surface", () => {
     const loadingMarkup = renderToStaticMarkup(createElement(LoadingRun));
 
-    expect(loadingMarkup).toContain("Loading run investigation");
+    expect(loadingMarkup).toContain("Loading this run");
     expect(loadingMarkup).toContain('aria-busy="true"');
     expect(loadingMarkup).toContain("run-state-surface");
   });
@@ -65,7 +65,7 @@ describe("run route state pages", () => {
   it("renders run-level not-found inside the shared premium state surface", () => {
     const notFoundMarkup = renderToStaticMarkup(createElement(RunNotFound));
 
-    expect(notFoundMarkup).toContain("Run not found or no longer available");
+    expect(notFoundMarkup).toContain("This run is not available");
     expect(notFoundMarkup).toContain("Return home");
     expect(notFoundMarkup).toContain("run-state-surface");
   });
@@ -73,7 +73,8 @@ describe("run route state pages", () => {
   it("renders root not-found with UTF-8 dash and returns home", () => {
     const rootNotFoundMarkup = renderToStaticMarkup(createElement(NotFound));
 
-    expect(rootNotFoundMarkup).toContain("404 — Page not found");
+    expect(rootNotFoundMarkup).toContain("This page does not exist");
+    expect(rootNotFoundMarkup).toContain("out of date — or the page");
     expect(rootNotFoundMarkup).toContain("Return to home");
     expect(rootNotFoundMarkup).toContain("run-state-surface");
   });
@@ -84,8 +85,8 @@ describe("run route state pages", () => {
       createElement(RunError, { error: Object.assign(new Error("internal"), { digest: "support-ref" }), reset }),
     );
 
-    expect(errorMarkup).toContain("Run investigation could not be loaded");
-    expect(errorMarkup).toContain("without exposing database or tenant details");
+    expect(errorMarkup).toContain("Could not load this run");
+    expect(errorMarkup).toContain("the run itself is unaffected");
     expect(errorMarkup).toContain("support-ref");
     expect(errorMarkup).toContain("Retry");
     expect(errorMarkup).toContain("run-state-surface");
@@ -101,8 +102,8 @@ describe("run route state pages", () => {
       }),
     );
 
-    expect(errorMarkup).toContain("Application error");
-    expect(errorMarkup).toContain("An unexpected error occurred while loading this page.");
+    expect(errorMarkup).toContain("Something went wrong");
+    expect(errorMarkup).toContain("Trying again usually works");
     expect(errorMarkup).toContain("diag-abc-123");
     expect(errorMarkup).toContain("Retry");
     expect(errorMarkup).toContain("run-state-surface");
