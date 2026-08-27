@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(45);
+    expect(cloudDatabaseSchemaVersion).toBe(48);
     expect(cloudDatabaseModels).toContain("BoardSupplyWatch");
     expect(cloudDatabaseModels).toContain("ComponentLifecycleObservation");
     expect(cloudDatabaseModels).toContain("Board");
@@ -83,6 +83,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0045_installation_component_credentials.sql",
       "0046_reconciliation_attempt_budget_guard.sql",
       "0047_seat_based_entitlement_tiers.sql",
+      "0048_review_domain_spine.sql",
     ]);
   });
 

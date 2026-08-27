@@ -1,4 +1,4 @@
-export const cloudDatabaseSchemaVersion = 45;
+export const cloudDatabaseSchemaVersion = 48;
 
 export const cloudDatabaseModels = [
   "Installation",
@@ -31,6 +31,17 @@ export const cloudDatabaseModels = [
   "ControlPlaneOutbox",
   "ControlPlaneReconciliationItem",
   "ControlPlaneReplayOperation",
+  "Review",
+  "ReviewRevision",
+  "FindingDecision",
+  "FindingAssignment",
+  "ReviewComment",
+  "ReviewApproval",
+  "UploadManifest",
+  "VisualSnapshot",
+  "ExternalReviewLink",
 ] as const;
 
 export type CloudDatabaseModel = (typeof cloudDatabaseModels)[number];
+
+export * from "./review-store.js";

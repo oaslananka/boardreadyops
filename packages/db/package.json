@@ -123,6 +123,7 @@
   },
   "dependencies": {
     "@boardreadyops/cloud-core": "workspace:*",
+    "@boardreadyops/contracts": "workspace:*",
     "pg": "8.16.3"
   }
 }
