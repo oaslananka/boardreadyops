@@ -64,6 +64,7 @@ export function ChecklistApprovalsTab({
       <Panel
         title="Hardware Verification Checklist"
         description={`${completedCount} of ${checklist.length} verification items completed.`}
+        tone="raised"
       >
         <div className="checklist-progress-bar-wrap">
           <div
@@ -74,7 +75,10 @@ export function ChecklistApprovalsTab({
 
         <div className="checklist-items-list">
           {checklist.map((item) => (
-            <label key={item.id} className={`checklist-item-row ${item.completed ? "completed" : ""}`}>
+            <label
+              key={item.id}
+              className={`checklist-item-row panel surface-default ${item.completed ? "completed" : ""}`}
+            >
               <input
                 type="checkbox"
                 checked={item.completed}
@@ -111,8 +115,9 @@ export function ChecklistApprovalsTab({
       <Panel
         title="Formal Approvals & Sign-Off Ledger"
         description="Append-only cryptographic record of engineering sign-offs bound to head evidence digests."
+        tone="default"
       >
-        <div className="approvals-table-wrap">
+        <div className="signoff-ledger approvals-table-wrap">
           <table className="approvals-table">
             <thead>
               <tr>

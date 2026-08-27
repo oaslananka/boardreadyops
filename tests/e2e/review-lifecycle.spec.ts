@@ -17,13 +17,14 @@ const REVIEW_PATH = "/reviews/rev_gateway_42";
 async function openReviewAndWaitForHydration(page: Page) {
   await page.goto(REVIEW_PATH);
   // The tab bar is a client component; clicking before hydration completes is a no-op.
-  await page.getByRole("button", { name: "Approve Review" }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: /Approve review/i }).waitFor({ state: "visible" });
   await page.waitForTimeout(1500);
 }
 
 async function openTab(page: Page, name: string) {
-  await page.getByRole("button", { name }).click();
-  await expect(page.getByRole("button", { name })).toHaveClass(/active/);
+  const tab = page.getByRole("tab").filter({ hasText: name });
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
 }
 
 test.describe("Review lifecycle", () => {
@@ -175,5 +176,21 @@ test.describe("Review lifecycle", () => {
     await openTab(page, "Discussion (3)");
     await expect(page.getByPlaceholder("Leave an engineering review note or question...")).toBeVisible();
     await expect(page.getByRole("button", { name: "Post Comment" })).toBeVisible();
+  });
+
+  test("17. Mobile navigation is operable and the review page has no body overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(REVIEW_PATH);
+    const navBtn = page.getByRole("button", { name: "Open navigation" });
+    if (await navBtn.isVisible()) {
+      await navBtn.click();
+      await expect(page.getByRole("navigation", { name: "Product navigation" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(navBtn).toBeFocused();
+    }
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(overflow).toBe(false);
   });
 });

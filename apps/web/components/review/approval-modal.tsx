@@ -29,7 +29,7 @@ export function ApprovalModal({ type, evidenceDigest, onConfirm, onClose }: Appr
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="approval-modal-title">
-      <div className="modal-panel">
+      <div className="modal-panel panel surface-raised">
         <header className="modal-header">
           <h2 id="approval-modal-title">{isApprove ? "Record Engineering Sign-Off" : "Request Hardware Changes"}</h2>
           <button type="button" className="modal-close-button" onClick={onClose} aria-label="Close modal">

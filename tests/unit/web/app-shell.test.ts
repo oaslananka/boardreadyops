@@ -1,10 +1,12 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "../../../apps/web/components/ui.js";
 
+vi.mock("next/navigation", () => ({ usePathname: () => "/work" }));
+
 describe("AppShell", () => {
-  it("uses the BoardReadyOps brand lockup and stable global destinations", () => {
+  it("uses the grouped product shell and stable global destinations", () => {
     const markup = renderToStaticMarkup(
       createElement(AppShell, null, createElement("main", { id: "main-content" }, "content")),
     );
@@ -14,6 +16,10 @@ describe("AppShell", () => {
     expect(markup).toContain('href="/setup"');
     expect(markup).toContain('href="https://docs.boardreadyops.com"');
     expect(markup).toContain('href="#main-content"');
+    expect(markup).toContain('class="product-shell"');
+    expect(markup).toContain("product-rail");
+    expect(markup).toContain("product-context-bar");
+    expect(markup.match(/href="\/settings\/billing"/gu)).toHaveLength(1);
     expect(markup).not.toContain(">BR<");
   });
 });

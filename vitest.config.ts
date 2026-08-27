@@ -10,7 +10,8 @@ export default defineConfig({
       name: "web-tsx-tests",
       enforce: "pre",
       async transform(code, id) {
-        if (!id.includes("/apps/web/") || !id.endsWith(".tsx")) return;
+        const normalizedId = id.replaceAll("\\", "/");
+        if (!normalizedId.includes("/apps/web/") || !normalizedId.endsWith(".tsx")) return;
         return await transform(code, {
           loader: "tsx",
           jsx: "automatic",
@@ -40,6 +41,8 @@ export default defineConfig({
       // fileURLToPath, not pathname: stripping a leading slash by hand only produces a
       // valid path on Windows and breaks the alias everywhere else.
       "next/font/google": fileURLToPath(new URL("tests/stubs/next-font-google.ts", import.meta.url)),
+      "next/headers": fileURLToPath(new URL("tests/stubs/next-headers.ts", import.meta.url)),
+      "next/navigation": fileURLToPath(new URL("apps/web/node_modules/next/navigation.js", import.meta.url)),
     },
   },
   test: {

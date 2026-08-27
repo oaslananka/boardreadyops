@@ -72,4 +72,14 @@ describe("HomePage", () => {
   it("links documentation from the premium landing navigation", () => {
     expect(collectLinks(HomePage())).toContain("https://docs.boardreadyops.com");
   });
+
+  it("uses Foundry tokens in landing styles and defines landing-product-proof", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const landingCss = await readFile("apps/web/app/landing.css", "utf8");
+    expect(landingCss).toContain("var(--foundry-canvas)");
+    expect(landingCss).toContain("var(--foundry-copper)");
+    const page = await readFile("apps/web/app/page.tsx", "utf8");
+    expect(page).toContain("landing-product-proof");
+    expect(page).not.toMatch(/trusted by|customers|teams worldwide/i);
+  });
 });

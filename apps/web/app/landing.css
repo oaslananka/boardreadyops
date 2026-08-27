@@ -3,12 +3,12 @@
   background:
     radial-gradient(
       ellipse 70% 40% at 50% -10%,
-      color-mix(in srgb, var(--bro-accent) 14%, transparent),
+      color-mix(in srgb, var(--foundry-copper) 14%, transparent),
       transparent 60rem
     ),
-    radial-gradient(circle at 85% 30%, color-mix(in srgb, var(--bro-accent) 5%, transparent), transparent 38rem),
-    var(--bro-bg);
-  color: var(--bro-text);
+    radial-gradient(circle at 85% 30%, color-mix(in srgb, var(--foundry-copper) 5%, transparent), transparent 38rem),
+    var(--foundry-canvas);
+  color: var(--foundry-ink);
   font-family: var(--font-ui);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

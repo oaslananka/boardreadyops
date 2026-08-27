@@ -35,9 +35,9 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="shell setup-page" id="main-content">
+      <main className="page-frame operational-page setup-page" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Repository setup" }]} />
-        <header className="page-heading setup-hero">
+        <header className="page-intro setup-hero">
           <div>
             <p className="eyebrow">Repository setup preview</p>
             <h1>Choose a policy, review every file, then validate the default branch.</h1>
@@ -52,16 +52,16 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
 
         <nav className="setup-journey" aria-label="Repository setup steps">
           <a href="#policy-preset">
-            <span className="setup-journey-index">01</span>
-            <strong>Choose a release policy</strong>
+            <span className="setup-progress-index setup-journey-index">01</span>
+            <strong>1. Choose a release policy</strong>
           </a>
           <a href="#proposed-files">
-            <span className="setup-journey-index">02</span>
-            <strong>Review repository-owned files</strong>
+            <span className="setup-progress-index setup-journey-index">02</span>
+            <strong>2. Review repository-owned files</strong>
           </a>
           <a href="#readiness">
-            <span className="setup-journey-index">03</span>
-            <strong>Validate readiness in GitHub Actions</strong>
+            <span className="setup-progress-index setup-journey-index">03</span>
+            <strong>3. Validate readiness in GitHub Actions</strong>
           </a>
         </nav>
 

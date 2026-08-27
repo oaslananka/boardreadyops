@@ -22,9 +22,9 @@ export default async function DashboardPage() {
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="shell" id="main-content">
+      <main className="page-frame operational-page" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Dashboard" }]} />
-        <header className="page-heading">
+        <header className="page-intro">
           <h1>Dashboard</h1>
           <p>Repositories BoardReadyOps is watching, with the latest release readiness for each.</p>
         </header>

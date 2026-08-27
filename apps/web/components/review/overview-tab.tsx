@@ -18,42 +18,47 @@ export function OverviewTab({ review }: { review: DemoReview }) {
 
   return (
     <div className="overview-tab-content">
-      <div className="readiness-summary-cards">
-        <div className={`readiness-card ${isReadyForFab ? "ready" : "blocked"}`}>
-          <div className="readiness-card-icon">{isReadyForFab ? "✓" : "!"}</div>
-          <div className="readiness-card-text">
-            <h3>{isReadyForFab ? "Ready for Fabrication" : "Fabrication Gate Blocked"}</h3>
-            <p>
-              {isReadyForFab
-                ? "All checklist items complete, no blocking findings, and evidence digest approved."
-                : `${blockingFindings.length} blocking finding(s), ${review.checklist.length - completedChecklist.length} checklist item(s) pending.`}
-            </p>
-          </div>
+      <section className={`decision-band readiness-band ${isReadyForFab ? "ready" : "blocked"}`}>
+        <div className="readiness-lead">
+          <h3>{isReadyForFab ? "Ready for Fabrication" : "Fabrication Gate Blocked"}</h3>
+          <p>
+            {isReadyForFab
+              ? "All checklist items complete, no blocking findings, and evidence digest approved."
+              : `${blockingFindings.length} blocking finding(s), ${review.checklist.length - completedChecklist.length} checklist item(s) pending.`}
+          </p>
         </div>
-
-        <div className="metrics-grid">
-          <div className="metric-box">
-            <span className="metric-value">{blockingFindings.length}</span>
-            <span className="metric-label">Blocking Errors</span>
-          </div>
-          <div className="metric-box">
-            <span className="metric-value">{waivedFindings.length}</span>
-            <span className="metric-label">Waived / Accepted</span>
-          </div>
-          <div className="metric-box">
-            <span className="metric-value">
+        <div className="metric-strip">
+          <span className="metric-pill">
+            <strong>{blockingFindings.length}</strong> blockers
+          </span>
+          <span className="metric-pill">
+            <strong>{waivedFindings.length}</strong> waived
+          </span>
+          <span className="metric-pill">
+            <strong>
               {completedChecklist.length}/{review.checklist.length}
-            </span>
-            <span className="metric-label">Checklist Done</span>
-          </div>
-          <div className="metric-box">
-            <span className="metric-value">{validApprovals.length}</span>
-            <span className="metric-label">Approvals</span>
-          </div>
+            </strong>{" "}
+            checklist
+          </span>
+          <span className="metric-pill">
+            <strong>{validApprovals.length}</strong> approvals
+          </span>
         </div>
-      </div>
+      </section>
 
-      <Panel title="Review Details & Metadata">
+      <Panel title="Changed Hardware Surfaces" tone="default">
+        <div className="changed-files-list">
+          {review.changedFiles.map((file) => (
+            <div key={file.path} className="changed-file-row">
+              <span className={`file-status-badge ${file.status}`}>{file.status}</span>
+              <code className="file-path">{file.path}</code>
+              <span className="changes-count">+{file.changesCount} lines</span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="Review Details & Metadata" tone="inset">
         <DefinitionGrid>
           <Definition label="Repository">{review.repositoryName}</Definition>
           <Definition label="Author">{review.createdBy}</Definition>
@@ -70,18 +75,6 @@ export function OverviewTab({ review }: { review: DemoReview }) {
             <StatusBadge value={review.evidenceState === "current" ? "pass" : "warning"} label={review.evidenceState} />
           </Definition>
         </DefinitionGrid>
-      </Panel>
-
-      <Panel title="Changed Hardware Surfaces">
-        <div className="changed-files-list">
-          {review.changedFiles.map((file) => (
-            <div key={file.path} className="changed-file-row">
-              <span className={`file-status-badge ${file.status}`}>{file.status}</span>
-              <code className="file-path">{file.path}</code>
-              <span className="changes-count">+{file.changesCount} lines</span>
-            </div>
-          ))}
-        </div>
       </Panel>
     </div>
   );

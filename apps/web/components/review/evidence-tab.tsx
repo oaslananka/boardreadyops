@@ -4,12 +4,13 @@ import { Panel } from "../ui.js";
 
 export function EvidenceTab({ review }: { review: DemoReview }) {
   return (
-    <div className="evidence-tab-content">
+    <div className="provenance-chain evidence-tab-content">
       <Panel
         title="Evidence Pack Manifest"
         description="Immutable cryptographic records and artifact digests for this hardware revision."
+        tone="raised"
       >
-        <div className="evidence-digest-summary-box panel">
+        <div className="evidence-digest-summary-box panel surface-inset">
           <div className="summary-left">
             <span className="summary-title">Head Evidence Digest (SHA-256):</span>
             <code className="summary-digest">{review.evidenceDigest}</code>
@@ -66,8 +67,9 @@ export function EvidenceTab({ review }: { review: DemoReview }) {
       <Panel
         title="Offline Verification & Governance"
         description="Verify this hardware evidence package offline using the BoardReadyOps CLI."
+        tone="default"
       >
-        <div className="cli-verify-code-block panel">
+        <div className="cli-verify-code-block panel surface-inset">
           <div className="code-block-header">
             <span>Terminal Command</span>
             <CopyButton

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AppShell, Breadcrumbs, EmptyState, Panel } from "../../components/ui.js";
+import { AppShell, Breadcrumbs, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
 
@@ -24,19 +24,34 @@ export default function MyWorkPage() {
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="shell my-work-shell" id="main-content">
+      <main className="page-frame" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "My Work" }]} />
 
-        <header className="page-heading">
+        <header className="page-intro">
           <h1>My Work</h1>
           <p>Active items requiring your attention, triage, engineering decisions, or review sign-off.</p>
         </header>
 
-        <div className="my-work-grid">
-          <section className="work-section">
+        <section className="work-queue-summary decision-band" aria-label="Queue summary">
+          <div className="metric-strip">
+            <span className="metric-pill">
+              <strong>{assignedFindings.length}</strong> assigned findings
+            </span>
+            <span className="metric-pill">
+              <strong>{awaitingReviews.length}</strong> awaiting review
+            </span>
+            <span className="metric-pill">
+              <strong>{changesRequested.length}</strong> changes requested
+            </span>
+          </div>
+        </section>
+
+        <div className="work-workspace-grid">
+          <section className="work-primary-queue">
             <Panel
               title="Assigned Findings"
               description="DRC, clearance, and BOM findings assigned to you for disposition."
+              tone="raised"
             >
               {assignedFindings.length === 0 ? (
                 <EmptyState title="No assigned findings">
@@ -45,33 +60,41 @@ export default function MyWorkPage() {
               ) : (
                 <div className="work-findings-list">
                   {assignedFindings.map((finding) => (
-                    <div key={finding.fingerprint} className="work-finding-card panel">
-                      <div className="card-top">
-                        <span className={`severity-pill ${finding.severity}`}>{finding.severity}</span>
-                        <code className="rule-name">{finding.ruleId}</code>
-                        <span className="repo-tag">{finding.review.repositoryName}</span>
+                    <article key={finding.fingerprint} className="work-finding-row panel surface-default">
+                      <div className="finding-row-lead">
+                        <div className="finding-meta">
+                          <StatusBadge
+                            value={
+                              finding.severity === "critical" || finding.severity === "error" ? "danger" : "warning"
+                            }
+                            label={finding.severity}
+                          />
+                          <code className="rule-id">{finding.ruleId}</code>
+                          <span className="repo-tag">{finding.review.repositoryName}</span>
+                          <span className="pr-tag">PR #{finding.review.pullRequestNumber}</span>
+                        </div>
+                        <p className="finding-message">{finding.message}</p>
+                        <span className="finding-path">
+                          <code>{finding.path}</code>
+                        </span>
                       </div>
-                      <p className="msg">{finding.message}</p>
-                      <div className="card-bot">
-                        <span className="loc">📄 {finding.path}</span>
-                        <Link
-                          href={`/reviews/${finding.review.id}?tab=findings`}
-                          className="button button-small button-secondary"
-                        >
+                      <div className="finding-row-action">
+                        <Link href={`/reviews/${finding.review.id}?tab=findings`} className="button button-secondary">
                           Triage in PR #{finding.review.pullRequestNumber} →
                         </Link>
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
               )}
             </Panel>
           </section>
 
-          <section className="work-section">
+          <aside className="work-secondary-queues">
             <Panel
               title="Awaiting Your Review"
               description="Hardware pull requests waiting for engineering review or sign-off."
+              tone="default"
             >
               {awaitingReviews.length === 0 ? (
                 <EmptyState title="No pending reviews">
@@ -80,7 +103,7 @@ export default function MyWorkPage() {
               ) : (
                 <div className="work-reviews-list">
                   {awaitingReviews.map((r) => (
-                    <div key={r.id} className="work-review-card panel">
+                    <article key={r.id} className="work-review-card panel surface-inset">
                       <div className="card-top">
                         <span className="repo-title">{r.repositoryName}</span>
                         <span className="pr-tag">PR #{r.pullRequestNumber}</span>
@@ -88,11 +111,11 @@ export default function MyWorkPage() {
                       <h4>{r.title}</h4>
                       <div className="card-bot">
                         <span className="author">Author: {r.createdBy}</span>
-                        <Link href={`/reviews/${r.id}`} className="button button-small button-primary">
+                        <Link href={`/reviews/${r.id}`} className="button button-primary button-small">
                           Open Review →
                         </Link>
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
               )}
@@ -102,26 +125,27 @@ export default function MyWorkPage() {
               <Panel
                 title="Changes Requested on Your PRs"
                 description="Revisions requiring design updates before fabrication."
+                tone="critical"
               >
                 <div className="work-reviews-list">
                   {changesRequested.map((r) => (
-                    <div key={r.id} className="work-review-card panel">
+                    <article key={r.id} className="work-review-card panel surface-inset">
                       <div className="card-top">
                         <span className="repo-title">{r.repositoryName}</span>
                         <span className="pr-tag">PR #{r.pullRequestNumber}</span>
                       </div>
                       <h4>{r.title}</h4>
                       <div className="card-bot">
-                        <Link href={`/reviews/${r.id}?tab=discussion`} className="button button-small button-danger">
+                        <Link href={`/reviews/${r.id}?tab=discussion`} className="button button-secondary button-small">
                           View Required Changes →
                         </Link>
                       </div>
-                    </div>
+                    </article>
                   ))}
                 </div>
               </Panel>
             ) : null}
-          </section>
+          </aside>
         </div>
       </main>
     </AppShell>

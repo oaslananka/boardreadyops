@@ -164,7 +164,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="landing-proof" aria-labelledby="proof-heading">
+        <section className="landing-proof landing-product-proof" aria-labelledby="proof-heading">
           <div className="landing-shell landing-proof-layout">
             <div className="landing-section-heading">
               <p className="landing-section-kicker">Pull request evidence</p>

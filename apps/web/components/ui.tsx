@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { type ReactNode, Suspense } from "react";
-import { BrandMarkLockup } from "./brand-mark.js";
-import { ThemeToggle } from "./theme-toggle.js";
+import type { ReactNode } from "react";
+import { ProductNavigation } from "./product-navigation.js";
 
 export type StatusTone = "danger" | "info" | "neutral" | "success" | "warning";
 
@@ -99,43 +98,28 @@ export function StatusBadge({ value, label }: Readonly<{ value: string | undefin
  */
 export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode; viewerNav?: ReactNode }>) {
   return (
-    <>
+    <div className="product-shell">
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
-      <header className="site-header">
-        <div className="site-header-inner">
-          <Link className="brand" href="/" aria-label="BoardReadyOps home">
-            <BrandMarkLockup size={24} className="brand-lockup" />
-          </Link>
-          <nav className="site-navigation" aria-label="Global navigation">
-            <Link href="/work">My Work</Link>
-            <Link href="/reviews">Reviews</Link>
-            <Link href="/dashboard">Projects</Link>
-            <Link href="/setup">Setup</Link>
-            <Link href="/policies">Policies</Link>
-            <Link href="/evidence">Evidence</Link>
-            <Link href="/insights">Insights</Link>
-            <Link href="/settings/billing">Billing</Link>
-            <Link href="/settings/security">Security</Link>
-            <Link href="/settings/data">Data</Link>
-            <Link href="/settings/tokens">Tokens</Link>
-            <a href="https://docs.boardreadyops.com" target="_blank" rel="noreferrer">
-              Docs
-            </a>
-            {viewerNav ? <Suspense fallback={null}>{viewerNav}</Suspense> : null}
-            <ThemeToggle />
-          </nav>
-        </div>
-      </header>
-      {children}
-      <footer className="site-footer">
-        <p>
-          BoardReadyOps checks whether a board is ready to fabricate. Your repository and its full workflow logs stay
-          the source of truth.
-        </p>
-      </footer>
-    </>
+      <ProductNavigation viewerNav={viewerNav} />
+      <div className="product-stage">
+        <header className="product-context-bar">
+          <span className="context-kicker">Hardware release workspace</span>
+          <span className="command-hint" aria-hidden="true">
+            Search <kbd>⌘</kbd>
+            <kbd>K</kbd>
+          </span>
+        </header>
+        {children}
+        <footer className="site-footer">
+          <p>
+            BoardReadyOps checks whether a board is ready to fabricate. Your repository and its full workflow logs stay
+            the source of truth.
+          </p>
+        </footer>
+      </div>
+    </div>
   );
 }
 
@@ -155,22 +139,21 @@ export function Breadcrumbs({ items }: Readonly<{ items: BreadcrumbItem[] }>) {
   );
 }
 
-export function Panel({
-  children,
-  title,
-  description,
-  actions,
-  id,
-}: Readonly<{
+export type PanelTone = "default" | "raised" | "inset" | "critical";
+
+export type PanelProps = {
   children: ReactNode;
   title: string;
   description?: string;
   actions?: ReactNode;
   id?: string;
-}>) {
+  tone?: PanelTone;
+};
+
+export function Panel({ children, title, description, actions, id, tone = "default" }: Readonly<PanelProps>) {
   const headingId = id ? `${id}-heading` : undefined;
   return (
-    <section className="panel" id={id} aria-labelledby={headingId}>
+    <section className={`panel surface-${tone}`} id={id} aria-labelledby={headingId}>
       <header className="panel-header">
         <div>
           <h2 id={headingId}>{title}</h2>

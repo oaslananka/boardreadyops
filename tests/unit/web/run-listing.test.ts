@@ -60,3 +60,22 @@ describe("run listing page size", () => {
     expect(normalizedRunListingLimit(10)).toBe(10);
   });
 });
+
+describe("loadViewerRuns", () => {
+  it("returns empty runs when session is undefined or has no installations", async () => {
+    const { loadViewerRuns } = await import("../../../apps/web/lib/run-listing.js");
+    expect(await loadViewerRuns(undefined)).toEqual({ state: "ok", runs: [], next: undefined });
+    expect(await loadViewerRuns({ login: "alice", installationIds: [] })).toEqual({
+      state: "ok",
+      runs: [],
+      next: undefined,
+    });
+  });
+
+  it("returns not-configured state when DATABASE_URL is not set", async () => {
+    const { loadViewerRuns } = await import("../../../apps/web/lib/run-listing.js");
+    expect(await loadViewerRuns({ login: "alice", installationIds: [123] }, {}, {})).toEqual({
+      state: "not-configured",
+    });
+  });
+});

@@ -122,6 +122,15 @@ const TEXT_PAIRS: [string, string][] = [
   ["--info", "--info-surface"],
   ["--info", "--surface"],
   ["--skip-text", "--accent"],
+  ["--foundry-ink", "--foundry-canvas-subdued"],
+  ["--foundry-ink", "--foundry-surface-strong"],
+  ["--foundry-copper", "--foundry-canvas"],
+];
+
+/** Non-text UI boundaries and secondary material accents. */
+const NON_TEXT_PAIRS: [string, string][] = [
+  ["--foundry-brass", "--foundry-canvas"],
+  ["--foundry-copper-strong", "--foundry-surface"],
 ];
 
 const THEMES = [
@@ -150,6 +159,13 @@ describe("palette contrast", () => {
       const theme = themeFor(selector);
       for (const ground of ["--background", "--surface"]) {
         expect(contrast(resolve(theme, dark, "--focus"), resolve(theme, dark, ground))).toBeGreaterThanOrEqual(3);
+      }
+    });
+
+    it(`keeps material boundaries visible in ${label}`, () => {
+      const theme = themeFor(selector);
+      for (const [foreground, background] of NON_TEXT_PAIRS) {
+        expect(contrast(resolve(theme, dark, foreground), resolve(theme, dark, background))).toBeGreaterThanOrEqual(3);
       }
     });
   }
