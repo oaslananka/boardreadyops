@@ -139,25 +139,10 @@ export class ReviewStore {
 
     const revisionId = randomUUID();
 
-    // Insert revision first
-    await this.db.query(
-      `insert into review_revisions (
-        id, review_id, sequence, base_run_id, head_run_id, base_commit_sha, head_commit_sha, evidence_digest, created_at
-      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        revisionId,
-        reviewId,
-        nextSeq,
-        input.baseRunId ?? null,
-        input.headRunId,
-        input.baseCommitSha ?? null,
-        input.headCommitSha,
-        input.evidenceDigest,
-        now,
-      ],
-    );
-
-    // Upsert review record
+    // Upsert the review record first: review_revisions.review_id has a foreign key to
+    // reviews.id, so the review must exist before a revision can reference it (there is no
+    // FK the other way — reviews.current_revision_id is set here even though that revision
+    // row doesn't exist until the next statement).
     const reviewResult = await this.db.query(
       `insert into reviews (
         id, repository_id, pull_request_number, title, status, decision, base_run_id, head_run_id, current_revision_id, created_by, created_at, updated_at
@@ -178,6 +163,23 @@ export class ReviewStore {
         input.headRunId,
         revisionId,
         createdBy,
+        now,
+      ],
+    );
+
+    await this.db.query(
+      `insert into review_revisions (
+        id, review_id, sequence, base_run_id, head_run_id, base_commit_sha, head_commit_sha, evidence_digest, created_at
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        revisionId,
+        reviewId,
+        nextSeq,
+        input.baseRunId ?? null,
+        input.headRunId,
+        input.baseCommitSha ?? null,
+        input.headCommitSha,
+        input.evidenceDigest,
         now,
       ],
     );
