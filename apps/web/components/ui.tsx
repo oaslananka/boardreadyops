@@ -112,6 +112,7 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
             <Link href="/work">My Work</Link>
             <Link href="/reviews">Reviews</Link>
             <Link href="/dashboard">Repositories</Link>
+            <Link href="/setup">Setup</Link>
             <Link href="/settings/tokens">API Tokens</Link>
             <Link href="/settings/billing">Billing</Link>
             <a href="https://docs.boardreadyops.com" target="_blank" rel="noreferrer">

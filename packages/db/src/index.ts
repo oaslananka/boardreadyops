@@ -1,4 +1,4 @@
-export const cloudDatabaseSchemaVersion = 50;
+export const cloudDatabaseSchemaVersion = 51;
 
 export const cloudDatabaseModels = [
   "Installation",
@@ -41,11 +41,13 @@ export const cloudDatabaseModels = [
   "VisualSnapshot",
   "ExternalReviewLink",
   "ApiToken",
+  "ExternalReviewInvitation",
 ] as const;
 
 export type CloudDatabaseModel = (typeof cloudDatabaseModels)[number];
 
 export * from "./api-token-store.js";
+export * from "./external-review-store.js";
 export * from "./finding-decision-store.js";
 export * from "./review-approval-store.js";
 export * from "./review-collaboration-store.js";

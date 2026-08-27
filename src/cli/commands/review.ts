@@ -158,3 +158,83 @@ export async function reviewPublishCommand(
     return 1;
   }
 }
+
+export interface ReviewVerifyOptions extends CommonCliOptions {
+  ledger?: string;
+  digest?: string;
+  repo?: string;
+  artifacts?: string;
+}
+
+export async function reviewVerifyCommand(
+  target: string | undefined,
+  options: ReviewVerifyOptions,
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
+): Promise<number> {
+  const root = target ?? process.cwd();
+  const ledgerPath =
+    options.ledger ??
+    (target?.endsWith(".json")
+      ? target
+      : ([
+          `${root}/evidence-ledger.json`,
+          `${root}/artifacts/evidence-ledger.json`,
+          `${root}/.boardreadyops/evidence-ledger.json`,
+        ].find((p) => {
+          try {
+            return require("node:fs").existsSync(p);
+          } catch {
+            return false;
+          }
+        }) ?? `${root}/evidence-ledger.json`));
+
+  streams.stdout.write(`\n🔒 Verifying Hardware Review Evidence Ledger...\n`);
+  streams.stdout.write(`  Ledger File: ${ledgerPath}\n`);
+
+  try {
+    const { verifyReviewEvidenceOffline } = await import("../../release/evidence.js");
+    const result = await verifyReviewEvidenceOffline(ledgerPath, options.artifacts ?? root);
+
+    if (options.digest && options.digest.toLowerCase() !== result.expectedDigest.toLowerCase()) {
+      result.errors.push(`Expected digest ${options.digest} does not match ledger digest ${result.expectedDigest}`);
+      result.verified = false;
+    }
+
+    streams.stdout.write(`\n--- Verification Summary ---\n`);
+    streams.stdout.write(`  Calculated Digest: ${result.calculatedDigest}\n`);
+    streams.stdout.write(`  Expected Digest:   ${result.expectedDigest}\n`);
+    streams.stdout.write(`  Manifest Check:    ${result.manifestCheckPassed ? "PASS" : "FAIL"}\n`);
+
+    if (result.tamperedItems.length > 0) {
+      streams.stderr.write(`\n❌ Tampered Artifacts Detected:\n`);
+      for (const item of result.tamperedItems) {
+        streams.stderr.write(`  - ${item}\n`);
+      }
+    }
+
+    if (result.missingItems.length > 0) {
+      streams.stderr.write(`\n⚠️ Missing Artifacts:\n`);
+      for (const item of result.missingItems) {
+        streams.stderr.write(`  - ${item}\n`);
+      }
+    }
+
+    if (result.errors.length > 0) {
+      streams.stderr.write(`\n❌ Integrity Errors:\n`);
+      for (const err of result.errors) {
+        streams.stderr.write(`  - ${err}\n`);
+      }
+    }
+
+    if (result.verified) {
+      streams.stdout.write(`\n✔ Hardware Review Evidence Cryptographically Verified (PASS)!\n\n`);
+      return 0;
+    }
+
+    streams.stderr.write(`\n❌ Evidence Verification Failed (TAMPERED / INVALID)\n\n`);
+    return 1;
+  } catch (error) {
+    streams.stderr.write(`❌ Verification error: ${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
+}

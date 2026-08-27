@@ -29,7 +29,12 @@ import {
   releaseSignCommand,
   releaseVerifyCommand,
 } from "./commands/release.js";
-import { type ReviewPublishOptions, reviewPublishCommand } from "./commands/review.js";
+import {
+  type ReviewPublishOptions,
+  type ReviewVerifyOptions,
+  reviewPublishCommand,
+  reviewVerifyCommand,
+} from "./commands/review.js";
 import { addCommonOptions, type CommonCliOptions, runCommand } from "./commands/run.js";
 import {
   type RunnerActivateCliOptions,
@@ -349,6 +354,18 @@ export function registerAllCommands(
       .option("--pr <number>", "pull request number", (v) => Number(v)),
   ).action(async (pathInput: string | undefined, options: ReviewPublishOptions) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
+  });
+
+  addCommonOptions(
+    review
+      .command("verify")
+      .description("cryptographically verify a hardware review evidence ledger offline")
+      .argument("[path]", "path to evidence-ledger.json or review bundle directory")
+      .option("--ledger <path>", "explicit path to evidence-ledger.json")
+      .option("--digest <sha>", "expected composite evidence digest")
+      .option("--artifacts <path>", "directory containing local artifacts to verify"),
+  ).action(async (pathInput: string | undefined, options: ReviewVerifyOptions) => {
+    process.exitCode = await reviewVerifyCommand(pathInput, options, streams);
   });
 }
 

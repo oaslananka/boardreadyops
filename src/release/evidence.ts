@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import type {
+  EvidenceItem,
+  EvidenceLedgerDocument,
+  LedgerApprovalRecord,
+  LedgerChecklistRecord,
+  LedgerDecisionRecord,
+  LedgerVerificationResult,
+} from "@boardreadyops/contracts";
 import type { RunResult } from "../core/result.js";
 import { boardReadyVersion } from "../generated/version.js";
 import { formatJson } from "../report/json.js";
@@ -369,4 +377,190 @@ function cleanObject<T extends Record<string, unknown>>(value: T): T {
 function isInside(root: string, target: string): boolean {
   const relative = path.relative(root, target);
   return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+export function canonicalJsonStringify(obj: unknown): string {
+  if (obj === null || typeof obj !== "object") {
+    return JSON.stringify(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return `[${obj.map(canonicalJsonStringify).join(",")}]`;
+  }
+
+  const sortedKeys = Object.keys(obj as Record<string, unknown>).sort();
+  const pairs = sortedKeys.map((key) => {
+    const val = (obj as Record<string, unknown>)[key];
+    return `${JSON.stringify(key)}:${canonicalJsonStringify(val)}`;
+  });
+  return `{${pairs.join(",")}}`;
+}
+
+export function calculateEvidenceDigest(params: {
+  manifest: EvidenceItem[];
+  decisions: LedgerDecisionRecord[];
+  approvals: LedgerApprovalRecord[];
+  checklist: LedgerChecklistRecord[];
+}): string {
+  const sortedManifest = [...params.manifest].sort((a, b) => a.path.localeCompare(b.path));
+  const sortedDecisions = [...params.decisions].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+  const sortedApprovals = [...params.approvals].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const sortedChecklist = [...params.checklist].sort((a, b) => a.id.localeCompare(b.id));
+
+  const composite = {
+    manifest: sortedManifest.map((m) => ({
+      name: m.name,
+      path: m.path,
+      type: m.type,
+      sizeBytes: m.sizeBytes,
+      sha256: m.sha256,
+    })),
+    decisions: sortedDecisions.map((d) => ({
+      fingerprint: d.fingerprint,
+      disposition: d.disposition,
+      reason: d.reason,
+      owner: d.owner,
+      expiresAt: d.expiresAt ?? null,
+      timestamp: d.timestamp,
+    })),
+    approvals: sortedApprovals.map((a) => ({
+      approverId: a.approverId,
+      status: a.status,
+      reason: a.reason ?? "",
+      isBreakGlass: a.isBreakGlass ?? false,
+      timestamp: a.timestamp,
+    })),
+    checklist: sortedChecklist.map((c) => ({
+      id: c.id,
+      title: c.title,
+      completed: c.completed,
+      completedBy: c.completedBy ?? "",
+      completedAt: c.completedAt ?? "",
+    })),
+  };
+
+  const canonical = canonicalJsonStringify(composite);
+  return createHash("sha256").update(canonical, "utf8").digest("hex");
+}
+
+export async function writeReviewEvidenceLedger(options: {
+  outputDir: string;
+  repository: string;
+  baseSha: string;
+  headSha: string;
+  manifest: EvidenceItem[];
+  decisions: LedgerDecisionRecord[];
+  approvals: LedgerApprovalRecord[];
+  checklist: LedgerChecklistRecord[];
+  evidenceState?: "current" | "stale" | "invalid";
+}): Promise<{ ledgerPath: string; manifestPath: string; evidenceDigest: string }> {
+  await fs.mkdir(options.outputDir, { recursive: true });
+
+  const evidenceDigest = calculateEvidenceDigest({
+    manifest: options.manifest,
+    decisions: options.decisions,
+    approvals: options.approvals,
+    checklist: options.checklist,
+  });
+
+  const ledgerDoc: EvidenceLedgerDocument = {
+    version: 1,
+    repository: options.repository,
+    baseSha: options.baseSha,
+    headSha: options.headSha,
+    evidenceState: options.evidenceState ?? "current",
+    evidenceDigest,
+    manifest: options.manifest,
+    decisions: options.decisions,
+    approvals: options.approvals,
+    checklist: options.checklist,
+    createdAt: new Date().toISOString(),
+  };
+
+  const ledgerPath = path.join(options.outputDir, "evidence-ledger.json");
+  const manifestPath = path.join(options.outputDir, "manifest.json");
+
+  await fs.writeFile(ledgerPath, JSON.stringify(ledgerDoc, null, 2), "utf8");
+  await fs.writeFile(manifestPath, JSON.stringify(options.manifest, null, 2), "utf8");
+
+  return { ledgerPath, manifestPath, evidenceDigest };
+}
+
+export async function verifyReviewEvidenceOffline(
+  ledgerFilePath: string,
+  artifactsRootDir?: string,
+): Promise<LedgerVerificationResult> {
+  const content = await fs.readFile(ledgerFilePath, "utf8");
+  const ledgerDoc = JSON.parse(content) as EvidenceLedgerDocument;
+
+  const fileHashes: Record<string, string> = {};
+  const baseDir = artifactsRootDir ?? path.dirname(ledgerFilePath);
+
+  for (const item of ledgerDoc.manifest) {
+    const candidatePaths = [
+      path.resolve(baseDir, item.path),
+      path.resolve(baseDir, item.name),
+      path.resolve(baseDir, "artifacts", item.name),
+      path.resolve(baseDir, "artifacts", item.path),
+    ];
+
+    for (const candidate of candidatePaths) {
+      try {
+        const fileContent = await fs.readFile(candidate);
+        const hash = createHash("sha256").update(fileContent).digest("hex");
+        fileHashes[item.path] = hash;
+        fileHashes[item.name] = hash;
+        break;
+      } catch {
+        // Continue searching
+      }
+    }
+  }
+
+  const tamperedItems: string[] = [];
+  const missingItems: string[] = [];
+  const errors: string[] = [];
+
+  let manifestCheckPassed = true;
+  for (const item of ledgerDoc.manifest) {
+    const actualHash = fileHashes[item.path] ?? fileHashes[item.name];
+    if (!actualHash) {
+      missingItems.push(item.path);
+      manifestCheckPassed = false;
+    } else if (actualHash.toLowerCase() !== item.sha256.toLowerCase()) {
+      tamperedItems.push(`${item.path} (expected ${item.sha256.slice(0, 8)}..., got ${actualHash.slice(0, 8)}...)`);
+      manifestCheckPassed = false;
+    }
+  }
+
+  const calculatedDigest = calculateEvidenceDigest({
+    manifest: ledgerDoc.manifest,
+    decisions: ledgerDoc.decisions,
+    approvals: ledgerDoc.approvals,
+    checklist: ledgerDoc.checklist,
+  });
+
+  if (calculatedDigest !== ledgerDoc.evidenceDigest) {
+    errors.push(
+      `Evidence digest mismatch: calculated ${calculatedDigest.slice(0, 12)}... but document specifies ${ledgerDoc.evidenceDigest.slice(0, 12)}...`,
+    );
+  }
+
+  for (const d of ledgerDoc.decisions) {
+    if (d.disposition === "accepted_risk" && d.reason.trim().length < 20) {
+      errors.push(`Invalid decision on ${d.fingerprint.slice(0, 8)}: accepted_risk requires min 20 char reason.`);
+    }
+  }
+
+  const verified = manifestCheckPassed && calculatedDigest === ledgerDoc.evidenceDigest && errors.length === 0;
+
+  return {
+    verified,
+    calculatedDigest,
+    expectedDigest: ledgerDoc.evidenceDigest,
+    manifestCheckPassed,
+    tamperedItems,
+    missingItems,
+    errors,
+  };
 }

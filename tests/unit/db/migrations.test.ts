@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(50);
+    expect(cloudDatabaseSchemaVersion).toBe(51);
     expect(cloudDatabaseModels).toContain("ApiToken");
     expect(cloudDatabaseModels).toContain("FindingDecision");
     expect(cloudDatabaseModels).toContain("FindingAssignment");
@@ -91,6 +91,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0048_review_domain_spine.sql",
       "0049_api_tokens.sql",
       "0050_finding_collaboration.sql",
+      "0051_external_reviews.sql",
     ]);
   });
 

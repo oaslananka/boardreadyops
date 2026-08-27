@@ -42,9 +42,19 @@ export function resolveToolchainPaths(repositoryRoot, cacheRoot = defaultCacheRo
   };
 }
 
-const modeNormalizationExcludes = new Set([".git", ".boardreadyops", "node_modules"]);
+const modeNormalizationExcludes = new Set([
+  ".git",
+  ".boardreadyops",
+  "node_modules",
+  ".next",
+  ".turbo",
+  "dist",
+  ".worktrees",
+  "worktrees",
+]);
 
 export async function normalizeRepositoryModes(repositoryRoot) {
+  if (process.platform === "win32") return 0;
   let changed = 0;
   await walkRepositoryDirectories(repositoryRoot, async (directory, info) => {
     if ((info.mode & 0o2000) === 0) return;
@@ -55,6 +65,7 @@ export async function normalizeRepositoryModes(repositoryRoot) {
 }
 
 async function repositoryModesAreNormalized(repositoryRoot) {
+  if (process.platform === "win32") return true;
   let normalized = true;
   await walkRepositoryDirectories(repositoryRoot, async (_directory, info) => {
     if ((info.mode & 0o2000) !== 0) normalized = false;
@@ -63,17 +74,17 @@ async function repositoryModesAreNormalized(repositoryRoot) {
 }
 
 async function walkRepositoryDirectories(repositoryRoot, visitor) {
-  async function visit(directory, isRoot = false) {
+  async function visit(directory) {
     const info = await lstat(directory);
     await visitor(directory, info);
     const entries = await readdir(directory, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      if (isRoot && modeNormalizationExcludes.has(entry.name)) continue;
+      if (modeNormalizationExcludes.has(entry.name)) continue;
       await visit(path.join(directory, entry.name));
     }
   }
-  await visit(repositoryRoot, true);
+  await visit(repositoryRoot);
 }
 
 export function buildBootstrapPlan(
@@ -249,10 +260,13 @@ export async function probeToolchain(config, paths) {
   const env = buildToolchainEnvironment(paths);
   const browserPath = (await readOptional(paths.browserPathFile))?.trim() || undefined;
   const browserExecutable = browserPath ? await isExecutable(browserPath) : false;
-  let browserVersion =
-    browserPath && browserExecutable ? await commandVersion(browserPath, ["--version"], env) : undefined;
-  if (browserPath && browserExecutable && !browserVersion && process.platform === "win32") {
-    browserVersion = config.browser.name;
+  let browserVersion;
+  if (browserPath && browserExecutable) {
+    if (process.platform === "win32") {
+      browserVersion = config.browser.name;
+    } else {
+      browserVersion = await commandVersion(browserPath, ["--version"], env);
+    }
   }
   return {
     platform: process.platform,
@@ -505,22 +519,17 @@ async function firstCommandVersion(candidates, env) {
 
 async function commandVersion(command, args, env) {
   try {
-    const isWin = process.platform === "win32";
-    const cmd =
-      isWin && !command.includes(".") && !command.includes("/") && !command.includes("\\") ? `${command}.cmd` : command;
-    const result = await capture(cmd, args, { cwd: defaultRepositoryRoot, env });
+    const result = await capture(command, args, { cwd: defaultRepositoryRoot, env });
     return normalizePrefixedVersion(`${result.stdout}\n${result.stderr}`.trim());
   } catch {
-    try {
-      const result = await capture(command, args, {
-        cwd: defaultRepositoryRoot,
-        env,
-        shell: process.platform === "win32",
-      });
-      return normalizePrefixedVersion(`${result.stdout}\n${result.stderr}`.trim());
-    } catch {
-      return undefined;
+    const isWin = process.platform === "win32";
+    if (isWin && !command.includes(".") && !command.includes("/") && !command.includes("\\")) {
+      try {
+        const result = await capture(`${command}.cmd`, args, { cwd: defaultRepositoryRoot, env });
+        return normalizePrefixedVersion(`${result.stdout}\n${result.stderr}`.trim());
+      } catch {}
     }
+    return undefined;
   }
 }
 
@@ -731,6 +740,7 @@ export function buildCorepackInstallCommand(platform = process.platform, env = p
     return {
       command: env.ComSpec || env.COMSPEC || "cmd.exe",
       args: ["/d", "/s", "/c", "corepack install"],
+      windowsVerbatimArguments: true,
     };
   }
   return { command: "corepack", args: ["install"] };
@@ -760,12 +770,31 @@ export async function installCorepackWithRetry({
   throw new Error(`Corepack install failed after ${attempts} attempts: ${diagnosticReason(lastError)}`);
 }
 
+function quoteWindowsArg(arg) {
+  if (!arg) return '""';
+  if (/[\s"&|<>^%]/.test(arg)) {
+    return `"${arg.replaceAll('"', '""')}"`;
+  }
+  return arg;
+}
+
 function resolveExecutableInvocation(command, args, env = process.env) {
   if (process.platform === "win32") {
     const lower = String(command).toLowerCase();
-    if (lower === "corepack" || lower === "pnpm") {
+    const base = path.basename(lower);
+    if (
+      lower === "corepack" ||
+      lower === "pnpm" ||
+      base === "corepack.cmd" ||
+      base === "pnpm.cmd" ||
+      base === "corepack.bat" ||
+      base === "pnpm.bat" ||
+      base.endsWith(".cmd") ||
+      base.endsWith(".bat")
+    ) {
       const comspec = env.ComSpec || env.COMSPEC || "cmd.exe";
-      return { command: comspec, args: ["/d", "/s", "/c", command, ...args] };
+      const fullCmd = [command, ...args.map(quoteWindowsArg)].join(" ");
+      return { command: comspec, args: ["/d", "/s", "/c", fullCmd], windowsVerbatimArguments: true };
     }
   }
   return { command, args };
@@ -773,7 +802,11 @@ function resolveExecutableInvocation(command, args, env = process.env) {
 
 async function run(command, args, options) {
   const invocation = resolveExecutableInvocation(command, args, options?.env);
-  const child = spawn(invocation.command, invocation.args, { ...options, stdio: "inherit" });
+  const child = spawn(invocation.command, invocation.args, {
+    ...options,
+    windowsVerbatimArguments: invocation.windowsVerbatimArguments,
+    stdio: "inherit",
+  });
   const code = await new Promise((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (value, signal) => resolve(value ?? (signal ? 1 : 0)));
@@ -786,6 +819,7 @@ async function capture(command, args, options) {
   return new Promise((resolve, reject) => {
     const child = spawn(invocation.command, invocation.args, {
       ...options,
+      windowsVerbatimArguments: invocation.windowsVerbatimArguments,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";

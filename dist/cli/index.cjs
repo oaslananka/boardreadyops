@@ -6,6 +6,14 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
+};
 var __commonJS = (cb, mod) => function __require() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
@@ -34,6 +42,259 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/generated/version.ts
+var boardReadyVersion;
+var init_version = __esm({
+  "src/generated/version.ts"() {
+    "use strict";
+    boardReadyVersion = "1.34.0";
+  }
+});
+
+// src/i18n/en.ts
+var en;
+var init_en = __esm({
+  "src/i18n/en.ts"() {
+    "use strict";
+    en = {
+      "cli.baseline.captured": "Captured {count} {findingWord} in {path}.",
+      "cli.baseline.diff": "Added: {added}\nRemoved: {removed}\nUnchanged: {unchanged}",
+      "cli.baseline.notFound": "Baseline not found: {path}.",
+      "cli.baseline.pruned": "Pruned {count} baseline {findingWord}.",
+      "cli.baseline.removed": "Removed {path}.",
+      "cli.error.configuration": "Configuration error: {error}",
+      "cli.error.concurrencyPositiveInteger": "concurrency must be a positive integer",
+      "cli.error.environment.kicadMissing": "Environment error: kicad-cli not available.",
+      "cli.error.unexpected": "unexpected CLI error",
+      "cli.explain.error.unknownRule": "Unknown rule: {ruleId}",
+      "cli.explain.error.unsupportedRule": "Rule {ruleId} does not support explanation.",
+      "cli.init.created": "created boardreadyops.yml",
+      "cli.init.exists": "boardreadyops.yml already exists",
+      "cli.init.invalidProfile": "Unknown profile: {profile}. Available: basic, ci, manufacturing, strict",
+      "cli.init.workflowCreated": "created GitHub Actions workflow",
+      "cli.init.workflowExists": "GitHub Actions workflow already exists",
+      "doctor.check.action": "Action / Workflow",
+      "doctor.check.adapters": "Adapters",
+      "doctor.check.kicad": "KiCad",
+      "doctor.check.repository": "Repository",
+      "doctor.check.runtime": "Runtime",
+      "doctor.check.suppressions": "Suppressions",
+      "doctor.error.unknownCheck": "Unknown doctor check: {check}. Available checks: {checks}",
+      "doctor.error.unknownFormat": "Unknown doctor format: {format}. Available formats: text, json",
+      "doctor.recommendation.action.noWorkflow": "Add the BoardReadyOps GitHub Action workflow for pull request preflight.",
+      "doctor.recommendation.action.permissions": "Add `permissions: { pull-requests: write }` or `permissions: { issues: write }` to the BoardReadyOps job.",
+      "doctor.recommendation.action.pinCheckout": "Pin actions/checkout to an immutable commit SHA.",
+      "doctor.recommendation.action.workflowYaml": "Fix the BoardReadyOps workflow YAML before relying on action diagnostics.",
+      "doctor.recommendation.adapters.nexar": "Set NEXAR_CLIENT_ID and NEXAR_CLIENT_SECRET for Nexar-backed lifecycle checks.",
+      "doctor.recommendation.kicad": "Install KiCad CLI to run DRC and ERC checks.",
+      "doctor.recommendation.repository.config": "Fix boardreadyops.yml before running repository checks.",
+      "doctor.recommendation.repository.gerbers": "Generate Gerber outputs from KiCad before CI.",
+      "doctor.recommendation.repository.projects": "Add a .kicad_pro project before CI.",
+      "doctor.recommendation.runtime.node": "Install a supported Node.js 22 or 24 runtime.",
+      "doctor.recommendation.runtime.npm": "Install npm for package-based BoardReadyOps workflows.",
+      "doctor.recommendations": "Recommendations",
+      "doctor.severity.fail": "fail",
+      "doctor.severity.info": "info",
+      "doctor.severity.pass": "pass",
+      "doctor.severity.warn": "warn",
+      "doctor.title": "BoardReadyOps Doctor - Environment & Repository Diagnosis",
+      "doctor.action.checkoutPinned": "actions/checkout is SHA-pinned.",
+      "doctor.action.checkoutUnpinned": "actions/checkout is not SHA-pinned.",
+      "doctor.action.noWorkflow": "No .github/workflows/boardreadyops.yml workflow found.",
+      "doctor.action.permissionsConfigured": "permissions: pull-requests or issues write configured.",
+      "doctor.action.permissionsMissing": "permissions: pull-requests or issues write missing for PR comments.",
+      "doctor.action.workflowFound": "{path} found.",
+      "doctor.action.workflowUnreadable": "Unable to read or parse {path} workflow.",
+      "doctor.adapters.nexarMissing": "Nexar credentials not present.",
+      "doctor.adapters.nexarPresent": "Nexar credentials present.",
+      "doctor.kicad.drcAvailable": "DRC available.",
+      "doctor.kicad.ercAvailable": "ERC available.",
+      "doctor.kicad.found": "kicad-cli{version} found at {path}.",
+      "doctor.kicad.missing": "kicad-cli not found.",
+      "doctor.repository.configFound": "{file} found and valid.",
+      "doctor.repository.configInvalid": "boardreadyops configuration is invalid: {errors}",
+      "doctor.repository.gerberOutput.word": "output",
+      "doctor.repository.gerberOutput.word.plural": "outputs",
+      "doctor.repository.gerbersDiscovered": "{count} Gerber {outputWord} found.",
+      "doctor.repository.noConfig": "No boardreadyops configuration file found; defaults are valid.",
+      "doctor.repository.noGerbers": "No Gerber outputs found.",
+      "doctor.repository.noProjects": "No KiCad projects discovered.",
+      "doctor.repository.project.word": "project",
+      "doctor.repository.project.word.plural": "projects",
+      "doctor.repository.projectsDiscovered": "{count} KiCad {projectWord} discovered.",
+      "doctor.runtime.boardreadyops": "boardreadyops: v{version}",
+      "doctor.runtime.node": "Node: {version} (supported majors: {majors})",
+      "doctor.runtime.npm": "npm: v{version}",
+      "doctor.runtime.npmMissing": "npm not found.",
+      "doctor.suppressions.baselineFound": "{file} baseline found.",
+      "doctor.suppressions.noBaseline": "No baseline captured.",
+      "doctor.suppressions.noSuppressions": "No suppressions file found.",
+      "doctor.suppressions.suppressionsFound": "{file} suppressions file found.",
+      "report.allProjects": "All projects",
+      "report.allRules": "All rules",
+      "report.allSeverities": "All severities",
+      "report.artifacts": "Artifacts",
+      "report.bom": "BOM",
+      "report.bomDiffTruncated": "BOM diff truncated.",
+      "report.confidence": "Confidence",
+      "report.context": "Context",
+      "report.count": "Count",
+      "report.current": "Current",
+      "report.decision.fail": "Fail",
+      "report.decision.pass": "Pass",
+      "report.decision.policyFail": "Policy: fail",
+      "report.decision.policyPass": "Policy: pass",
+      "report.decision.readiness": "Readiness score: {score}/100.",
+      "report.decision.summary": "{total} findings \u2014 {critical} critical, {high} high.",
+      "report.decision.title": "Release Decision",
+      "report.details": "Details",
+      "report.diff.changes": "Changes",
+      "report.diff.output": "Output",
+      "report.diff.status.added": "Added",
+      "report.diff.status.changed": "Changed",
+      "report.diff.status.removed": "Removed",
+      "report.diff.status.unchanged": "Unchanged",
+      "report.fabricationChanges": "Fabrication Changes",
+      "report.filterFindings": "Filter findings",
+      "report.filterableFindingList": "Filterable finding list",
+      "report.finding": "Finding",
+      "report.finding.count": "{count} {findingWord}",
+      "report.finding.word": "finding",
+      "report.finding.word.plural": "findings",
+      "report.findings": "Findings",
+      "report.fix": "Fix",
+      "report.generatedMetadata": "Generated {date} by {tool} {version}. {threshold}",
+      "report.groupedByRule": "Findings grouped by rule",
+      "report.location.board": "board",
+      "report.location.column": "column {column}",
+      "report.location.line": "line {line}",
+      "report.location.lines": "lines {startLine}-{endLine}",
+      "report.manufacturingOutputs": "Manufacturing Outputs",
+      "report.metric": "Metric",
+      "report.moreNewFindings": "...and {count} more new {findingWord}.",
+      "report.newFindings": "New Findings",
+      "report.noBomChanges": "No BOM changes recorded.",
+      "report.noFindings": "No findings.",
+      "report.noFix": "No fix suggestion provided.",
+      "report.noLocation": "No location provided.",
+      "report.noProjects": "No projects were reported.",
+      "report.noReferences": "No references provided.",
+      "report.noRules": "No rules produced findings.",
+      "report.output.added": "{count} added",
+      "report.output.changed": "{count} changed",
+      "report.output.removed": "{count} removed",
+      "report.perProjectBreakdown": "Per-project Breakdown",
+      "report.perRuleGrouping": "Per-rule Grouping",
+      "report.previous": "Previous",
+      "report.project": "Project",
+      "report.readiness.evidence": "Evidence checklist",
+      "report.readiness.evidenceStatus": "Status",
+      "report.readiness.findingsSummary": "{blocking} blocking, {nonBlocking} non-blocking findings",
+      "report.readiness.importance": "Importance",
+      "report.readiness.missing": "missing",
+      "report.readiness.noProfile": "No vendor profile configured.",
+      "report.readiness.output": "Output",
+      "report.readiness.present": "present",
+      "report.readiness.profile": "Profile: {name} ({id})",
+      "report.readiness.recommended": "recommended",
+      "report.readiness.required": "required",
+      "report.readiness.status.atRisk": "At risk",
+      "report.readiness.status.blocked": "Blocked",
+      "report.readiness.status.ready": "Ready",
+      "report.readiness.title": "Release Readiness",
+      "report.readiness.warnings": "Warnings",
+      "report.ref": "Ref",
+      "report.references": "References",
+      "report.resource": "Resource",
+      "report.rule": "Rule",
+      "report.severity": "Severity",
+      "report.severityCounts": "Severity counts",
+      "report.status": "Status",
+      "report.summaryBySeverity": "Summary by Severity",
+      "report.threshold.failed": "Threshold failed.",
+      "report.threshold.passed": "Threshold passed.",
+      "report.title": "BoardReadyOps Report",
+      "report.topFindings": "Top Findings",
+      "report.total": "Total",
+      "report.unassigned": "Unassigned",
+      "report.waivers.approvedBy": "Approved by",
+      "report.waivers.active": "active",
+      "report.waivers.caption": "Release waivers and approvals",
+      "report.waivers.evidence": "Evidence",
+      "report.waivers.expired": "expired",
+      "report.waivers.expires": "Expires",
+      "report.waivers.owner": "Owner",
+      "report.waivers.reason": "Reason",
+      "report.waivers.rule": "Rule",
+      "report.waivers.stale": "stale",
+      "report.waivers.state": "State",
+      "report.waivers.title": "Waivers",
+      "report.bomRisk.title": "BOM Supply-Chain Risk",
+      "report.bomRisk.overallScore": "Overall BOM risk score",
+      "report.bomRisk.components": "at-risk components",
+      "report.bomRisk.noRisk": "No BOM supply-chain risk detected.",
+      "report.releaseMode.title": "Release Mode",
+      "report.releaseMode.prototype": "Controlled risk is allowed. Missing recommended outputs and expired waivers are advisory.",
+      "report.releaseMode.pilot": "Stricter review applies. Missing recommended outputs are advisory but flagged.",
+      "report.releaseMode.production": "Strict mode. Missing recommended outputs and expired waivers block the release.",
+      "severity.critical": "Critical",
+      "severity.high": "High",
+      "severity.info": "Info",
+      "severity.low": "Low",
+      "severity.medium": "Medium"
+    };
+  }
+});
+
+// src/i18n/catalog.ts
+var catalogs;
+var init_catalog = __esm({
+  "src/i18n/catalog.ts"() {
+    "use strict";
+    init_en();
+    catalogs = {
+      en
+    };
+  }
+});
+
+// src/i18n/t.ts
+function resolveLocale(env = process.env) {
+  return normalizeLocale(env.BOARDREADY_LOCALE) ?? normalizeLocale(env.LANG) ?? "en";
+}
+function t(key, params = {}, locale = resolveLocale()) {
+  const catalog = locale === "__PSEUDO__" ? catalogs.en : catalogs[locale];
+  const template = catalog[key];
+  const values = { ...params };
+  if (template.includes("{findingWord}")) {
+    values.findingWord = typeof params.count === "number" && params.count === 1 ? catalog["report.finding.word"] : catalog["report.finding.word.plural"];
+  }
+  const rendered = template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => {
+    const value = values[name];
+    return value === void 0 ? match : String(value);
+  });
+  return locale === "__PSEUDO__" ? `[[${rendered}]]` : rendered;
+}
+function normalizeLocale(value) {
+  if (!value) {
+    return void 0;
+  }
+  if (value === "__PSEUDO__") {
+    return "__PSEUDO__";
+  }
+  const normalized = value.toLowerCase().replace(/_/g, "-");
+  if (normalized === "en" || normalized.startsWith("en-")) {
+    return "en";
+  }
+  return void 0;
+}
+var init_t = __esm({
+  "src/i18n/t.ts"() {
+    "use strict";
+    init_catalog();
+  }
+});
 
 // node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
@@ -12783,6 +13044,67 @@ var require_dist2 = __commonJS({
   }
 });
 
+// src/util/path.ts
+function toPosixPath(value) {
+  return value.replaceAll("\\", "/");
+}
+function normalizePathInput(value) {
+  return import_node_path4.default.sep === "\\" ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/");
+}
+function normalizeRelative(root, target) {
+  const relative = import_node_path4.default.relative(root, target);
+  return toPosixPath(relative === "" ? "." : relative);
+}
+function matchesProjectScope(resourcePath, configuredProject) {
+  const normalizedResource = normalizeResourcePath(resourcePath);
+  const normalizedProject = normalizeResourcePath(configuredProject).replace(/\/$/, "");
+  return !normalizedProject || normalizedProject === "." || normalizedResource === normalizedProject || normalizedResource.startsWith(`${normalizedProject}/`);
+}
+function normalizeResourcePath(value) {
+  return import_node_path4.default.posix.normalize(value.replaceAll("\\", "/")).replace(/^\.\//, "");
+}
+function isInside(parent, child) {
+  const relative = import_node_path4.default.relative(parent, child);
+  return relative === "" || !relative.startsWith("..") && !import_node_path4.default.isAbsolute(relative);
+}
+async function displayPath(root, target) {
+  const absoluteRoot = await resolveExistingPathAlias(import_node_path4.default.resolve(root));
+  const absoluteTarget = import_node_path4.default.resolve(target);
+  const comparableTarget = await resolveExistingPathAlias(absoluteTarget);
+  if (isInside(absoluteRoot, comparableTarget)) {
+    return normalizeRelative(absoluteRoot, comparableTarget);
+  }
+  if (isInside(absoluteRoot, absoluteTarget)) {
+    return normalizeRelative(absoluteRoot, absoluteTarget);
+  }
+  return `<outside-root>/${import_node_path4.default.basename(absoluteTarget)}`;
+}
+async function resolveExistingPathAlias(target) {
+  const missingSegments = [];
+  let current = import_node_path4.default.resolve(target);
+  while (true) {
+    try {
+      const real = await import_promises3.default.realpath(current);
+      return missingSegments.length > 0 ? import_node_path4.default.join(real, ...missingSegments.toReversed()) : real;
+    } catch {
+      const parent = import_node_path4.default.dirname(current);
+      if (parent === current) {
+        return target;
+      }
+      missingSegments.push(import_node_path4.default.basename(current));
+      current = parent;
+    }
+  }
+}
+var import_promises3, import_node_path4;
+var init_path = __esm({
+  "src/util/path.ts"() {
+    "use strict";
+    import_promises3 = __toESM(require("node:fs/promises"), 1);
+    import_node_path4 = __toESM(require("node:path"), 1);
+  }
+});
+
 // node_modules/fast-glob/out/utils/array.js
 var require_array = __commonJS({
   "node_modules/fast-glob/out/utils/array.js"(exports2) {
@@ -18528,6 +18850,1139 @@ var require_out4 = __commonJS({
   }
 });
 
+// node_modules/mustache/mustache.mjs
+function isFunction(object2) {
+  return typeof object2 === "function";
+}
+function typeStr(obj) {
+  return isArray(obj) ? "array" : typeof obj;
+}
+function escapeRegExp(string4) {
+  return string4.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, "\\$&");
+}
+function hasProperty(obj, propName) {
+  return obj != null && typeof obj === "object" && propName in obj;
+}
+function primitiveHasOwnProperty(primitive, propName) {
+  return primitive != null && typeof primitive !== "object" && primitive.hasOwnProperty && primitive.hasOwnProperty(propName);
+}
+function testRegExp(re, string4) {
+  return regExpTest.call(re, string4);
+}
+function isWhitespace(string4) {
+  return !testRegExp(nonSpaceRe, string4);
+}
+function escapeHtml(string4) {
+  return String(string4).replace(/[&<>"'`=\/]/g, function fromEntityMap(s) {
+    return entityMap[s];
+  });
+}
+function parseTemplate(template, tags) {
+  if (!template)
+    return [];
+  var lineHasNonSpace = false;
+  var sections = [];
+  var tokens = [];
+  var spaces = [];
+  var hasTag = false;
+  var nonSpace = false;
+  var indentation = "";
+  var tagIndex = 0;
+  function stripSpace() {
+    if (hasTag && !nonSpace) {
+      while (spaces.length)
+        delete tokens[spaces.pop()];
+    } else {
+      spaces = [];
+    }
+    hasTag = false;
+    nonSpace = false;
+  }
+  var openingTagRe, closingTagRe, closingCurlyRe;
+  function compileTags2(tagsToCompile) {
+    if (typeof tagsToCompile === "string")
+      tagsToCompile = tagsToCompile.split(spaceRe, 2);
+    if (!isArray(tagsToCompile) || tagsToCompile.length !== 2)
+      throw new Error("Invalid tags: " + tagsToCompile);
+    openingTagRe = new RegExp(escapeRegExp(tagsToCompile[0]) + "\\s*");
+    closingTagRe = new RegExp("\\s*" + escapeRegExp(tagsToCompile[1]));
+    closingCurlyRe = new RegExp("\\s*" + escapeRegExp("}" + tagsToCompile[1]));
+  }
+  compileTags2(tags || mustache.tags);
+  var scanner = new Scanner(template);
+  var start, type, value, chr, token, openSection;
+  while (!scanner.eos()) {
+    start = scanner.pos;
+    value = scanner.scanUntil(openingTagRe);
+    if (value) {
+      for (var i = 0, valueLength = value.length; i < valueLength; ++i) {
+        chr = value.charAt(i);
+        if (isWhitespace(chr)) {
+          spaces.push(tokens.length);
+          indentation += chr;
+        } else {
+          nonSpace = true;
+          lineHasNonSpace = true;
+          indentation += " ";
+        }
+        tokens.push(["text", chr, start, start + 1]);
+        start += 1;
+        if (chr === "\n") {
+          stripSpace();
+          indentation = "";
+          tagIndex = 0;
+          lineHasNonSpace = false;
+        }
+      }
+    }
+    if (!scanner.scan(openingTagRe))
+      break;
+    hasTag = true;
+    type = scanner.scan(tagRe) || "name";
+    scanner.scan(whiteRe);
+    if (type === "=") {
+      value = scanner.scanUntil(equalsRe);
+      scanner.scan(equalsRe);
+      scanner.scanUntil(closingTagRe);
+    } else if (type === "{") {
+      value = scanner.scanUntil(closingCurlyRe);
+      scanner.scan(curlyRe);
+      scanner.scanUntil(closingTagRe);
+      type = "&";
+    } else {
+      value = scanner.scanUntil(closingTagRe);
+    }
+    if (!scanner.scan(closingTagRe))
+      throw new Error("Unclosed tag at " + scanner.pos);
+    if (type == ">") {
+      token = [type, value, start, scanner.pos, indentation, tagIndex, lineHasNonSpace];
+    } else {
+      token = [type, value, start, scanner.pos];
+    }
+    tagIndex++;
+    tokens.push(token);
+    if (type === "#" || type === "^") {
+      sections.push(token);
+    } else if (type === "/") {
+      openSection = sections.pop();
+      if (!openSection)
+        throw new Error('Unopened section "' + value + '" at ' + start);
+      if (openSection[1] !== value)
+        throw new Error('Unclosed section "' + openSection[1] + '" at ' + start);
+    } else if (type === "name" || type === "{" || type === "&") {
+      nonSpace = true;
+    } else if (type === "=") {
+      compileTags2(value);
+    }
+  }
+  stripSpace();
+  openSection = sections.pop();
+  if (openSection)
+    throw new Error('Unclosed section "' + openSection[1] + '" at ' + scanner.pos);
+  return nestTokens(squashTokens(tokens));
+}
+function squashTokens(tokens) {
+  var squashedTokens = [];
+  var token, lastToken;
+  for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+    token = tokens[i];
+    if (token) {
+      if (token[0] === "text" && lastToken && lastToken[0] === "text") {
+        lastToken[1] += token[1];
+        lastToken[3] = token[3];
+      } else {
+        squashedTokens.push(token);
+        lastToken = token;
+      }
+    }
+  }
+  return squashedTokens;
+}
+function nestTokens(tokens) {
+  var nestedTokens = [];
+  var collector = nestedTokens;
+  var sections = [];
+  var token, section;
+  for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+    token = tokens[i];
+    switch (token[0]) {
+      case "#":
+      case "^":
+        collector.push(token);
+        sections.push(token);
+        collector = token[4] = [];
+        break;
+      case "/":
+        section = sections.pop();
+        section[5] = token[2];
+        collector = sections.length > 0 ? sections[sections.length - 1][4] : nestedTokens;
+        break;
+      default:
+        collector.push(token);
+    }
+  }
+  return nestedTokens;
+}
+function Scanner(string4) {
+  this.string = string4;
+  this.tail = string4;
+  this.pos = 0;
+}
+function Context(view, parentContext) {
+  this.view = view;
+  this.cache = { ".": this.view };
+  this.parent = parentContext;
+}
+function Writer() {
+  this.templateCache = {
+    _cache: {},
+    set: function set2(key, value) {
+      this._cache[key] = value;
+    },
+    get: function get(key) {
+      return this._cache[key];
+    },
+    clear: function clear() {
+      this._cache = {};
+    }
+  };
+}
+var objectToString, isArray, regExpTest, nonSpaceRe, entityMap, whiteRe, spaceRe, equalsRe, curlyRe, tagRe, mustache, defaultWriter, mustache_default;
+var init_mustache = __esm({
+  "node_modules/mustache/mustache.mjs"() {
+    objectToString = Object.prototype.toString;
+    isArray = Array.isArray || function isArrayPolyfill(object2) {
+      return objectToString.call(object2) === "[object Array]";
+    };
+    regExpTest = RegExp.prototype.test;
+    nonSpaceRe = /\S/;
+    entityMap = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+      "/": "&#x2F;",
+      "`": "&#x60;",
+      "=": "&#x3D;"
+    };
+    whiteRe = /\s*/;
+    spaceRe = /\s+/;
+    equalsRe = /\s*=/;
+    curlyRe = /\s*\}/;
+    tagRe = /#|\^|\/|>|\{|&|=|!/;
+    Scanner.prototype.eos = function eos() {
+      return this.tail === "";
+    };
+    Scanner.prototype.scan = function scan(re) {
+      var match = this.tail.match(re);
+      if (!match || match.index !== 0)
+        return "";
+      var string4 = match[0];
+      this.tail = this.tail.substring(string4.length);
+      this.pos += string4.length;
+      return string4;
+    };
+    Scanner.prototype.scanUntil = function scanUntil(re) {
+      var index = this.tail.search(re), match;
+      switch (index) {
+        case -1:
+          match = this.tail;
+          this.tail = "";
+          break;
+        case 0:
+          match = "";
+          break;
+        default:
+          match = this.tail.substring(0, index);
+          this.tail = this.tail.substring(index);
+      }
+      this.pos += match.length;
+      return match;
+    };
+    Context.prototype.push = function push(view) {
+      return new Context(view, this);
+    };
+    Context.prototype.lookup = function lookup(name) {
+      var cache = this.cache;
+      var value;
+      if (cache.hasOwnProperty(name)) {
+        value = cache[name];
+      } else {
+        var context = this, intermediateValue, names, index, lookupHit = false;
+        while (context) {
+          if (name.indexOf(".") > 0) {
+            intermediateValue = context.view;
+            names = name.split(".");
+            index = 0;
+            while (intermediateValue != null && index < names.length) {
+              if (index === names.length - 1)
+                lookupHit = hasProperty(intermediateValue, names[index]) || primitiveHasOwnProperty(intermediateValue, names[index]);
+              intermediateValue = intermediateValue[names[index++]];
+            }
+          } else {
+            intermediateValue = context.view[name];
+            lookupHit = hasProperty(context.view, name);
+          }
+          if (lookupHit) {
+            value = intermediateValue;
+            break;
+          }
+          context = context.parent;
+        }
+        cache[name] = value;
+      }
+      if (isFunction(value))
+        value = value.call(this.view);
+      return value;
+    };
+    Writer.prototype.clearCache = function clearCache() {
+      if (typeof this.templateCache !== "undefined") {
+        this.templateCache.clear();
+      }
+    };
+    Writer.prototype.parse = function parse3(template, tags) {
+      var cache = this.templateCache;
+      var cacheKey = template + ":" + (tags || mustache.tags).join(":");
+      var isCacheEnabled = typeof cache !== "undefined";
+      var tokens = isCacheEnabled ? cache.get(cacheKey) : void 0;
+      if (tokens == void 0) {
+        tokens = parseTemplate(template, tags);
+        isCacheEnabled && cache.set(cacheKey, tokens);
+      }
+      return tokens;
+    };
+    Writer.prototype.render = function render(template, view, partials, config2) {
+      var tags = this.getConfigTags(config2);
+      var tokens = this.parse(template, tags);
+      var context = view instanceof Context ? view : new Context(view, void 0);
+      return this.renderTokens(tokens, context, partials, template, config2);
+    };
+    Writer.prototype.renderTokens = function renderTokens(tokens, context, partials, originalTemplate, config2) {
+      var buffer = "";
+      var token, symbol2, value;
+      for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+        value = void 0;
+        token = tokens[i];
+        symbol2 = token[0];
+        if (symbol2 === "#") value = this.renderSection(token, context, partials, originalTemplate, config2);
+        else if (symbol2 === "^") value = this.renderInverted(token, context, partials, originalTemplate, config2);
+        else if (symbol2 === ">") value = this.renderPartial(token, context, partials, config2);
+        else if (symbol2 === "&") value = this.unescapedValue(token, context);
+        else if (symbol2 === "name") value = this.escapedValue(token, context, config2);
+        else if (symbol2 === "text") value = this.rawValue(token);
+        if (value !== void 0)
+          buffer += value;
+      }
+      return buffer;
+    };
+    Writer.prototype.renderSection = function renderSection(token, context, partials, originalTemplate, config2) {
+      var self = this;
+      var buffer = "";
+      var value = context.lookup(token[1]);
+      function subRender(template) {
+        return self.render(template, context, partials, config2);
+      }
+      if (!value) return;
+      if (isArray(value)) {
+        for (var j = 0, valueLength = value.length; j < valueLength; ++j) {
+          buffer += this.renderTokens(token[4], context.push(value[j]), partials, originalTemplate, config2);
+        }
+      } else if (typeof value === "object" || typeof value === "string" || typeof value === "number") {
+        buffer += this.renderTokens(token[4], context.push(value), partials, originalTemplate, config2);
+      } else if (isFunction(value)) {
+        if (typeof originalTemplate !== "string")
+          throw new Error("Cannot use higher-order sections without the original template");
+        value = value.call(context.view, originalTemplate.slice(token[3], token[5]), subRender);
+        if (value != null)
+          buffer += value;
+      } else {
+        buffer += this.renderTokens(token[4], context, partials, originalTemplate, config2);
+      }
+      return buffer;
+    };
+    Writer.prototype.renderInverted = function renderInverted(token, context, partials, originalTemplate, config2) {
+      var value = context.lookup(token[1]);
+      if (!value || isArray(value) && value.length === 0)
+        return this.renderTokens(token[4], context, partials, originalTemplate, config2);
+    };
+    Writer.prototype.indentPartial = function indentPartial(partial2, indentation, lineHasNonSpace) {
+      var filteredIndentation = indentation.replace(/[^ \t]/g, "");
+      var partialByNl = partial2.split("\n");
+      for (var i = 0; i < partialByNl.length; i++) {
+        if (partialByNl[i].length && (i > 0 || !lineHasNonSpace)) {
+          partialByNl[i] = filteredIndentation + partialByNl[i];
+        }
+      }
+      return partialByNl.join("\n");
+    };
+    Writer.prototype.renderPartial = function renderPartial(token, context, partials, config2) {
+      if (!partials) return;
+      var tags = this.getConfigTags(config2);
+      var value = isFunction(partials) ? partials(token[1]) : partials[token[1]];
+      if (value != null) {
+        var lineHasNonSpace = token[6];
+        var tagIndex = token[5];
+        var indentation = token[4];
+        var indentedValue = value;
+        if (tagIndex == 0 && indentation) {
+          indentedValue = this.indentPartial(value, indentation, lineHasNonSpace);
+        }
+        var tokens = this.parse(indentedValue, tags);
+        return this.renderTokens(tokens, context, partials, indentedValue, config2);
+      }
+    };
+    Writer.prototype.unescapedValue = function unescapedValue(token, context) {
+      var value = context.lookup(token[1]);
+      if (value != null)
+        return value;
+    };
+    Writer.prototype.escapedValue = function escapedValue(token, context, config2) {
+      var escape2 = this.getConfigEscape(config2) || mustache.escape;
+      var value = context.lookup(token[1]);
+      if (value != null)
+        return typeof value === "number" && escape2 === mustache.escape ? String(value) : escape2(value);
+    };
+    Writer.prototype.rawValue = function rawValue(token) {
+      return token[1];
+    };
+    Writer.prototype.getConfigTags = function getConfigTags(config2) {
+      if (isArray(config2)) {
+        return config2;
+      } else if (config2 && typeof config2 === "object") {
+        return config2.tags;
+      } else {
+        return void 0;
+      }
+    };
+    Writer.prototype.getConfigEscape = function getConfigEscape(config2) {
+      if (config2 && typeof config2 === "object" && !isArray(config2)) {
+        return config2.escape;
+      } else {
+        return void 0;
+      }
+    };
+    mustache = {
+      name: "mustache.js",
+      version: "4.2.0",
+      tags: ["{{", "}}"],
+      clearCache: void 0,
+      escape: void 0,
+      parse: void 0,
+      render: void 0,
+      Scanner: void 0,
+      Context: void 0,
+      Writer: void 0,
+      /**
+       * Allows a user to override the default caching strategy, by providing an
+       * object with set, get and clear methods. This can also be used to disable
+       * the cache by setting it to the literal `undefined`.
+       */
+      set templateCache(cache) {
+        defaultWriter.templateCache = cache;
+      },
+      /**
+       * Gets the default or overridden caching object from the default writer.
+       */
+      get templateCache() {
+        return defaultWriter.templateCache;
+      }
+    };
+    defaultWriter = new Writer();
+    mustache.clearCache = function clearCache2() {
+      return defaultWriter.clearCache();
+    };
+    mustache.parse = function parse4(template, tags) {
+      return defaultWriter.parse(template, tags);
+    };
+    mustache.render = function render2(template, view, partials, config2) {
+      if (typeof template !== "string") {
+        throw new TypeError('Invalid template! Template should be a "string" but "' + typeStr(template) + '" was given as the first argument for mustache#render(template, view, partials)');
+      }
+      return defaultWriter.render(template, view, partials, config2);
+    };
+    mustache.escape = escapeHtml;
+    mustache.Scanner = Scanner;
+    mustache.Context = Context;
+    mustache.Writer = Writer;
+    mustache_default = mustache;
+  }
+});
+
+// src/report/fabrication-summary.ts
+function outputChangeSummary(output, locale) {
+  if (output.status !== "changed") {
+    return "";
+  }
+  return [
+    output.changed > 0 ? t("report.output.changed", { count: output.changed }, locale) : "",
+    output.added > 0 ? t("report.output.added", { count: output.added }, locale) : "",
+    output.removed > 0 ? t("report.output.removed", { count: output.removed }, locale) : ""
+  ].filter(Boolean).join(", ");
+}
+var init_fabrication_summary = __esm({
+  "src/report/fabrication-summary.ts"() {
+    "use strict";
+    init_t();
+  }
+});
+
+// src/report/finding-context.ts
+function reportFindingContext(finding2) {
+  return {
+    stableId: finding2.fingerprint.slice(0, 12),
+    fingerprint: finding2.fingerprint,
+    location: reportLocation(finding2),
+    help: reportHelp(finding2)
+  };
+}
+function reportLocation(finding2) {
+  const base = finding2.resource.path;
+  if (finding2.location?.region) {
+    const region = finding2.location.region;
+    const colSuffix = region.startColumn ? `:${region.startColumn}` : "";
+    const start = `:${region.startLine}${colSuffix}`;
+    const end = region.endLine !== region.startLine ? `-${region.endLine}` : "";
+    return `${base}${start}${end}`;
+  }
+  if (finding2.location?.line) {
+    const column = finding2.location.column ? `:${finding2.location.column}` : "";
+    return `${base}:${finding2.location.line}${column}`;
+  }
+  if (finding2.location?.boardCoordinates) {
+    const coordinates = finding2.location.boardCoordinates;
+    return `${base}:${coordinates.layer ?? "board"}@${reportCoordinate(coordinates.x)}${coordinates.units},${reportCoordinate(
+      coordinates.y
+    )}${coordinates.units}`;
+  }
+  return base;
+}
+function reportHelp(finding2) {
+  if (finding2.fix?.description) {
+    return finding2.fix.description;
+  }
+  if (finding2.references?.[0]) {
+    return finding2.references[0];
+  }
+  return "See the BoardReadyOps rule documentation for remediation guidance.";
+}
+function reportCoordinate(value) {
+  if (Object.is(value, -0)) {
+    return "0";
+  }
+  if (Number.isInteger(value)) {
+    return value.toString();
+  }
+  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+function reportCoordinateWithUnits(value, units) {
+  return `${reportCoordinate(value)}${units}`;
+}
+var init_finding_context = __esm({
+  "src/report/finding-context.ts"() {
+    "use strict";
+  }
+});
+
+// src/report/templates/pr-comment.mustache
+var pr_comment_default;
+var init_pr_comment = __esm({
+  "src/report/templates/pr-comment.mustache"() {
+    pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
+  }
+});
+
+// src/report/templates/summary.mustache
+var summary_default;
+var init_summary = __esm({
+  "src/report/templates/summary.mustache"() {
+    summary_default = "# {{labels.reportTitle}}\n\n| {{labels.metric}} | {{labels.count}} |\n| --- | ---: |\n| {{labels.total}} | {{summary.total}} |\n| {{labels.critical}} | {{summary.critical}} |\n| {{labels.high}} | {{summary.high}} |\n| {{labels.medium}} | {{summary.medium}} |\n| {{labels.low}} | {{summary.low}} |\n| {{labels.info}} | {{summary.info}} |\n";
+  }
+});
+
+// src/report/markdown.ts
+function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
+  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : void 0;
+  const topFindings2 = result.findings.slice(0, 10).map(markdownFinding);
+  const fixFindings = result.findings.filter((finding2) => finding2.fix).slice(0, 10).map(markdownFinding);
+  const plugins = (result.plugins ?? []).map((plugin) => ({
+    ...plugin,
+    permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
+  }));
+  const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
+  const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : void 0;
+  return mustache_default.render(
+    pr_comment_default,
+    {
+      ...result,
+      hasFindings: result.findings.length > 0,
+      topFindings: topFindings2,
+      hasFixes: fixFindings.length > 0,
+      fixFindings,
+      hasArtifacts: artifacts.length > 0,
+      hasPlugins: plugins.length > 0,
+      plugins,
+      artifacts,
+      hasFabricationDiff: Boolean(fabricationView),
+      fabrication: fabricationView,
+      hasBomRisk: Boolean(bomRiskView),
+      bomRisk: bomRiskView,
+      hasReleaseMode: Boolean(releaseModeView),
+      releaseModeView,
+      labels: markdownLabels(locale)
+    },
+    { summary: summary_default }
+  );
+}
+function formatFabricationDiff(diff, locale) {
+  const addedFindings = diff.findings.added.slice(0, 10);
+  return {
+    ...diff,
+    bom: {
+      ...diff.bom,
+      hasRows: diff.bom.rows.length > 0,
+      rows: diff.bom.rows.map((row) => ({
+        ...row,
+        previous: row.previous || "-",
+        current: row.current || "-"
+      }))
+    },
+    outputs: diff.outputs.map((output) => ({
+      ...output,
+      summary: outputChangeSummary(output, locale)
+    })),
+    findings: {
+      ...diff.findings,
+      hasAdded: diff.findings.added.length > 0,
+      added: addedFindings,
+      addedTruncated: diff.findings.added.length > addedFindings.length,
+      addedRemaining: diff.findings.added.length - addedFindings.length,
+      addedRemainingLabel: t(
+        "report.moreNewFindings",
+        { count: diff.findings.added.length - addedFindings.length },
+        locale
+      )
+    }
+  };
+}
+function markdownLabels(locale) {
+  return {
+    artifacts: t("report.artifacts", {}, locale),
+    bom: t("report.bom", {}, locale),
+    bomDiffTruncated: t("report.bomDiffTruncated", {}, locale),
+    bomRiskTitle: t("report.bomRisk.title", {}, locale),
+    bomRiskComponents: t("report.bomRisk.components", {}, locale),
+    count: t("report.count", {}, locale),
+    critical: t("severity.critical", {}, locale),
+    current: t("report.current", {}, locale),
+    fabricationChanges: t("report.fabricationChanges", {}, locale),
+    fix: t("report.fix", {}, locale),
+    high: t("severity.high", {}, locale),
+    info: t("severity.info", {}, locale),
+    low: t("severity.low", {}, locale),
+    manufacturingOutputs: t("report.manufacturingOutputs", {}, locale),
+    plugins: "Plugins",
+    medium: t("severity.medium", {}, locale),
+    metric: t("report.metric", {}, locale),
+    newFindings: t("report.newFindings", {}, locale),
+    noBomChanges: t("report.noBomChanges", {}, locale),
+    noFindings: t("report.noFindings", {}, locale),
+    previous: t("report.previous", {}, locale),
+    ref: t("report.ref", {}, locale),
+    releaseModeTitle: t("report.releaseMode.title", {}, locale),
+    reportTitle: t("report.title", {}, locale),
+    status: t("report.status", {}, locale),
+    topFindings: t("report.topFindings", {}, locale),
+    total: t("report.total", {}, locale)
+  };
+}
+function formatBomRisk(risk) {
+  const atRiskComponents = risk.components.filter((c) => c.riskLevel !== "none").map((c) => {
+    const parts = [];
+    if (c.factors.missingMpn) parts.push("no MPN");
+    if (c.factors.missingManufacturer) parts.push("no manufacturer");
+    if (c.factors.noSuppliers) parts.push("no suppliers");
+    else if (c.factors.singleSourceNoAlternates) parts.push("single source");
+    return { ...c, factorsSummary: parts.join(", ") || "\u2014" };
+  });
+  return {
+    overallRiskScore: risk.overallRiskScore,
+    overallRiskLevel: risk.overallRiskLevel,
+    totalComponents: risk.totalComponents,
+    atRiskCount: atRiskComponents.length,
+    atRiskComponents
+  };
+}
+function markdownFinding(finding2) {
+  return {
+    ...finding2,
+    report: reportFindingContext(finding2)
+  };
+}
+function formatReleaseMode(mode, locale) {
+  return {
+    mode,
+    badge: RELEASE_MODE_BADGE[mode],
+    description: t(`report.releaseMode.${mode}`, {}, locale)
+  };
+}
+var RELEASE_MODE_BADGE;
+var init_markdown = __esm({
+  "src/report/markdown.ts"() {
+    "use strict";
+    init_mustache();
+    init_t();
+    init_fabrication_summary();
+    init_finding_context();
+    init_pr_comment();
+    init_summary();
+    RELEASE_MODE_BADGE = {
+      prototype: "\u{1F52C} Prototype",
+      pilot: "\u{1F9EA} Pilot",
+      production: "\u{1F3ED} Production"
+    };
+  }
+});
+
+// src/report/json.ts
+function formatJson(result) {
+  return `${JSON.stringify(result, null, 2)}
+`;
+}
+var init_json = __esm({
+  "src/report/json.ts"() {
+    "use strict";
+  }
+});
+
+// src/release/evidence.ts
+var evidence_exports = {};
+__export(evidence_exports, {
+  calculateEvidenceDigest: () => calculateEvidenceDigest,
+  canonicalJsonStringify: () => canonicalJsonStringify,
+  verifyManifestCoverage: () => verifyManifestCoverage,
+  verifyReleaseEvidenceBundle: () => verifyReleaseEvidenceBundle,
+  verifyReviewEvidenceOffline: () => verifyReviewEvidenceOffline,
+  writeReleaseEvidenceBundle: () => writeReleaseEvidenceBundle,
+  writeReviewEvidenceLedger: () => writeReviewEvidenceLedger
+});
+async function writeReleaseEvidenceBundle(root, result, options) {
+  const outputDir = import_node_path56.default.resolve(root, options.outputDir);
+  await import_promises19.default.rm(outputDir, { recursive: true, force: true });
+  await import_promises19.default.mkdir(import_node_path56.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
+  await import_promises19.default.mkdir(import_node_path56.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
+  const artifacts = [];
+  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)));
+  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)));
+  artifacts.push(...await copyManufacturingArtifacts(root, outputDir));
+  if (options.includeGenerated) {
+    artifacts.push(...await copyGeneratedOutputs(root, outputDir, options.includeGenerated));
+  }
+  artifacts.sort((left, right) => left.path.localeCompare(right.path));
+  const gaps = evidenceGaps(root, result, artifacts).sort(
+    (left, right) => `${left.kind}:${left.path}`.localeCompare(`${right.kind}:${right.path}`)
+  );
+  const manifest = {
+    schemaVersion: 2,
+    tool: { name: "boardreadyops", version: boardReadyVersion },
+    generatedAt: options.generatedAt ?? (/* @__PURE__ */ new Date()).toISOString(),
+    git: cleanObject({ sha: options.gitSha, dirty: options.gitDirty }),
+    decision: evidenceDecision(result, gaps),
+    summary: result.summary,
+    projects: result.projects,
+    layout: { ...BUNDLE_LAYOUT },
+    artifacts,
+    gaps,
+    provenance: cleanObject(options.provenance ?? {}),
+    verification: { algorithm: "sha256", artifactCount: artifacts.length }
+  };
+  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
+  await import_promises19.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
+`, "utf8");
+  const checksumsPath = import_node_path56.default.join(outputDir, "checksums.txt");
+  await import_promises19.default.writeFile(checksumsPath, formatChecksumsTxt(artifacts), "utf8");
+  return { outputDir, manifestPath, checksumsPath, manifest };
+}
+function evidenceDecision(result, gaps) {
+  const reasons = [];
+  if (result.summary.failed) {
+    reasons.push(`validation reported ${result.summary.total} finding(s) (max severity ${result.summary.maxSeverity})`);
+  }
+  if (gaps.length > 0) {
+    reasons.push(`bundle has ${gaps.length} evidence gap(s) requiring review`);
+  }
+  return { status: result.summary.failed ? "fail" : "pass", reasons };
+}
+function formatChecksumsTxt(artifacts) {
+  return `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n")}
+`;
+}
+async function verifyManifestCoverage(bundleDir) {
+  const outputDir = import_node_path56.default.resolve(bundleDir);
+  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
+  const readResult = await readBundleManifest(manifestPath);
+  if (!readResult.ok) {
+    return { ok: false, manifestPath, uncovered: [], errors: readResult.errors };
+  }
+  const manifest = readResult.manifest;
+  const covered = new Set((manifest.artifacts ?? []).map((artifact) => import_node_path56.default.resolve(outputDir, artifact.path)));
+  const SKIP = /* @__PURE__ */ new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
+  const allFiles = [];
+  await collectFiles(outputDir, allFiles);
+  const uncovered = allFiles.filter((file2) => !SKIP.has(import_node_path56.default.basename(file2)) && !covered.has(file2)).map((file2) => import_node_path56.default.relative(outputDir, file2).split(import_node_path56.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
+  return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
+}
+async function verifyReleaseEvidenceBundle(bundleDir) {
+  const outputDir = import_node_path56.default.resolve(bundleDir);
+  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
+  const readResult = await readBundleManifest(manifestPath);
+  if (!readResult.ok) {
+    return { ok: false, manifestPath, checked: 0, errors: readResult.errors };
+  }
+  const manifest = readResult.manifest;
+  const errors = [];
+  for (const artifact of manifest.artifacts ?? []) {
+    const artifactPath = import_node_path56.default.resolve(outputDir, artifact.path);
+    if (!isInside2(outputDir, artifactPath)) {
+      errors.push(`${artifact.path}: path escapes bundle directory`);
+      continue;
+    }
+    try {
+      const actual = await fileDigest2(artifactPath);
+      if (actual.sha256 !== artifact.sha256 || actual.bytes !== artifact.bytes) {
+        errors.push(`${artifact.path}: checksum or size mismatch`);
+      }
+    } catch (error51) {
+      errors.push(`${artifact.path}: ${error51 instanceof Error ? error51.message : String(error51)}`);
+    }
+  }
+  return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors };
+}
+async function readBundleManifest(manifestPath) {
+  try {
+    const manifest = JSON.parse(await import_promises19.default.readFile(manifestPath, "utf8"));
+    return { ok: true, manifest };
+  } catch (error51) {
+    return {
+      ok: false,
+      errors: [`manifest could not be read: ${error51 instanceof Error ? error51.message : String(error51)}`]
+    };
+  }
+}
+async function writeReport(outputDir, relativePath, content) {
+  const target = import_node_path56.default.join(outputDir, relativePath);
+  await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
+  await import_promises19.default.writeFile(target, content, "utf8");
+  const digest2 = await fileDigest2(target);
+  return { path: relativePath, kind: "report", ...digest2 };
+}
+async function copyManufacturingArtifacts(root, outputDir) {
+  const files = await discoverManufacturingArtifacts(root);
+  const artifacts = [];
+  for (const source of files) {
+    const relativeSource = normalizeRelative(root, source);
+    const targetRelative = import_node_path56.default.join("artifacts", relativeSource).split(import_node_path56.default.sep).join("/");
+    const target = import_node_path56.default.join(outputDir, targetRelative);
+    await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
+    await import_promises19.default.copyFile(source, target);
+    const digest2 = await fileDigest2(target);
+    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest2 });
+  }
+  return artifacts;
+}
+async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
+  const sourceDir = import_node_path56.default.resolve(root, includeGenerated);
+  if (sourceDir === outputDir || isInside2(outputDir, sourceDir) || isInside2(sourceDir, outputDir)) {
+    return [];
+  }
+  const files = [];
+  await collectFiles(sourceDir, files);
+  files.sort((left, right) => left.localeCompare(right));
+  const artifacts = [];
+  for (const source of files) {
+    const relativeSource = normalizeRelative(sourceDir, source);
+    const targetRelative = import_node_path56.default.join(BUNDLE_LAYOUT.generated, relativeSource).split(import_node_path56.default.sep).join("/");
+    const target = import_node_path56.default.join(outputDir, targetRelative);
+    await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
+    await import_promises19.default.copyFile(source, target);
+    const digest2 = await fileDigest2(target);
+    artifacts.push({
+      path: targetRelative,
+      sourcePath: normalizeRelative(root, source),
+      kind: "generated",
+      ...digest2
+    });
+  }
+  return artifacts;
+}
+async function discoverManufacturingArtifacts(root) {
+  const discovered = [];
+  for (const directory of FABRICATION_DIRS) {
+    await collectFiles(import_node_path56.default.join(root, directory), discovered);
+  }
+  return [...new Set(discovered)].filter(
+    (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path56.default.extname(file2).toLowerCase()) || import_node_path56.default.basename(file2).toLowerCase().includes("readme")
+  ).sort((left, right) => left.localeCompare(right));
+}
+async function collectFiles(directory, output) {
+  let entries;
+  try {
+    entries = await import_promises19.default.readdir(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const target = import_node_path56.default.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      await collectFiles(target, output);
+    } else if (entry.isFile()) {
+      output.push(target);
+    }
+  }
+}
+function evidenceGaps(root, result, artifacts) {
+  const gaps = [];
+  for (const project of result.projects) {
+    if (project.boardFiles.length === 0) {
+      gaps.push({
+        kind: "missing-project-file",
+        path: project.root,
+        message: "Project has no discovered KiCad PCB file."
+      });
+    }
+    if (project.schematicFiles.length === 0) {
+      gaps.push({
+        kind: "missing-project-file",
+        path: project.root,
+        message: "Project has no discovered KiCad schematic file."
+      });
+    }
+  }
+  const kinds = new Set(artifacts.map((artifact) => artifact.kind));
+  for (const [kind, message] of [
+    ["gerber", "No Gerber fabrication output was included in the evidence bundle."],
+    ["drill", "No drill output was included in the evidence bundle."],
+    ["bom", "No BOM output was included in the evidence bundle."],
+    ["cpl", "No component placement output was included in the evidence bundle."]
+  ]) {
+    if (!kinds.has(kind)) {
+      gaps.push({ kind: "missing-artifact", path: root, message });
+    }
+  }
+  return gaps;
+}
+function artifactKind(file2) {
+  const lower = import_node_path56.default.basename(file2).toLowerCase();
+  const extension = import_node_path56.default.extname(lower);
+  if (extension === ".drl" || extension === ".xln") {
+    return "drill";
+  }
+  if (extension.startsWith(".g") || lower.includes("gerber")) {
+    return "gerber";
+  }
+  if (lower.includes("bom") || lower.includes("bill-of-materials")) {
+    return "bom";
+  }
+  if (lower.includes("cpl") || lower.includes("pos") || lower.includes("centroid")) {
+    return "cpl";
+  }
+  if (FABRICATION_DIRS.some((name) => file2.split(import_node_path56.default.sep).includes(name))) {
+    return "fabrication";
+  }
+  return "other";
+}
+async function fileDigest2(file2) {
+  const content = await import_promises19.default.readFile(file2);
+  return { sha256: (0, import_node_crypto7.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
+}
+function cleanObject(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== void 0));
+}
+function isInside2(root, target) {
+  const relative = import_node_path56.default.relative(root, target);
+  return Boolean(relative) && !relative.startsWith("..") && !import_node_path56.default.isAbsolute(relative);
+}
+function canonicalJsonStringify(obj) {
+  if (obj === null || typeof obj !== "object") {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return `[${obj.map(canonicalJsonStringify).join(",")}]`;
+  }
+  const sortedKeys = Object.keys(obj).sort();
+  const pairs = sortedKeys.map((key) => {
+    const val = obj[key];
+    return `${JSON.stringify(key)}:${canonicalJsonStringify(val)}`;
+  });
+  return `{${pairs.join(",")}}`;
+}
+function calculateEvidenceDigest(params) {
+  const sortedManifest = [...params.manifest].sort((a, b) => a.path.localeCompare(b.path));
+  const sortedDecisions = [...params.decisions].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+  const sortedApprovals = [...params.approvals].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const sortedChecklist = [...params.checklist].sort((a, b) => a.id.localeCompare(b.id));
+  const composite = {
+    manifest: sortedManifest.map((m) => ({
+      name: m.name,
+      path: m.path,
+      type: m.type,
+      sizeBytes: m.sizeBytes,
+      sha256: m.sha256
+    })),
+    decisions: sortedDecisions.map((d) => ({
+      fingerprint: d.fingerprint,
+      disposition: d.disposition,
+      reason: d.reason,
+      owner: d.owner,
+      expiresAt: d.expiresAt ?? null,
+      timestamp: d.timestamp
+    })),
+    approvals: sortedApprovals.map((a) => ({
+      approverId: a.approverId,
+      status: a.status,
+      reason: a.reason ?? "",
+      isBreakGlass: a.isBreakGlass ?? false,
+      timestamp: a.timestamp
+    })),
+    checklist: sortedChecklist.map((c) => ({
+      id: c.id,
+      title: c.title,
+      completed: c.completed,
+      completedBy: c.completedBy ?? "",
+      completedAt: c.completedAt ?? ""
+    }))
+  };
+  const canonical = canonicalJsonStringify(composite);
+  return (0, import_node_crypto7.createHash)("sha256").update(canonical, "utf8").digest("hex");
+}
+async function writeReviewEvidenceLedger(options) {
+  await import_promises19.default.mkdir(options.outputDir, { recursive: true });
+  const evidenceDigest = calculateEvidenceDigest({
+    manifest: options.manifest,
+    decisions: options.decisions,
+    approvals: options.approvals,
+    checklist: options.checklist
+  });
+  const ledgerDoc = {
+    version: 1,
+    repository: options.repository,
+    baseSha: options.baseSha,
+    headSha: options.headSha,
+    evidenceState: options.evidenceState ?? "current",
+    evidenceDigest,
+    manifest: options.manifest,
+    decisions: options.decisions,
+    approvals: options.approvals,
+    checklist: options.checklist,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  const ledgerPath = import_node_path56.default.join(options.outputDir, "evidence-ledger.json");
+  const manifestPath = import_node_path56.default.join(options.outputDir, "manifest.json");
+  await import_promises19.default.writeFile(ledgerPath, JSON.stringify(ledgerDoc, null, 2), "utf8");
+  await import_promises19.default.writeFile(manifestPath, JSON.stringify(options.manifest, null, 2), "utf8");
+  return { ledgerPath, manifestPath, evidenceDigest };
+}
+async function verifyReviewEvidenceOffline(ledgerFilePath, artifactsRootDir) {
+  const content = await import_promises19.default.readFile(ledgerFilePath, "utf8");
+  const ledgerDoc = JSON.parse(content);
+  const fileHashes = {};
+  const baseDir = artifactsRootDir ?? import_node_path56.default.dirname(ledgerFilePath);
+  for (const item2 of ledgerDoc.manifest) {
+    const candidatePaths = [
+      import_node_path56.default.resolve(baseDir, item2.path),
+      import_node_path56.default.resolve(baseDir, item2.name),
+      import_node_path56.default.resolve(baseDir, "artifacts", item2.name),
+      import_node_path56.default.resolve(baseDir, "artifacts", item2.path)
+    ];
+    for (const candidate of candidatePaths) {
+      try {
+        const fileContent = await import_promises19.default.readFile(candidate);
+        const hash2 = (0, import_node_crypto7.createHash)("sha256").update(fileContent).digest("hex");
+        fileHashes[item2.path] = hash2;
+        fileHashes[item2.name] = hash2;
+        break;
+      } catch {
+      }
+    }
+  }
+  const tamperedItems = [];
+  const missingItems = [];
+  const errors = [];
+  let manifestCheckPassed = true;
+  for (const item2 of ledgerDoc.manifest) {
+    const actualHash = fileHashes[item2.path] ?? fileHashes[item2.name];
+    if (!actualHash) {
+      missingItems.push(item2.path);
+      manifestCheckPassed = false;
+    } else if (actualHash.toLowerCase() !== item2.sha256.toLowerCase()) {
+      tamperedItems.push(`${item2.path} (expected ${item2.sha256.slice(0, 8)}..., got ${actualHash.slice(0, 8)}...)`);
+      manifestCheckPassed = false;
+    }
+  }
+  const calculatedDigest = calculateEvidenceDigest({
+    manifest: ledgerDoc.manifest,
+    decisions: ledgerDoc.decisions,
+    approvals: ledgerDoc.approvals,
+    checklist: ledgerDoc.checklist
+  });
+  if (calculatedDigest !== ledgerDoc.evidenceDigest) {
+    errors.push(
+      `Evidence digest mismatch: calculated ${calculatedDigest.slice(0, 12)}... but document specifies ${ledgerDoc.evidenceDigest.slice(0, 12)}...`
+    );
+  }
+  for (const d of ledgerDoc.decisions) {
+    if (d.disposition === "accepted_risk" && d.reason.trim().length < 20) {
+      errors.push(`Invalid decision on ${d.fingerprint.slice(0, 8)}: accepted_risk requires min 20 char reason.`);
+    }
+  }
+  const verified = manifestCheckPassed && calculatedDigest === ledgerDoc.evidenceDigest && errors.length === 0;
+  return {
+    verified,
+    calculatedDigest,
+    expectedDigest: ledgerDoc.evidenceDigest,
+    manifestCheckPassed,
+    tamperedItems,
+    missingItems,
+    errors
+  };
+}
+var import_node_crypto7, import_promises19, import_node_path56, FABRICATION_DIRS, MANUFACTURING_EXTENSIONS, BUNDLE_LAYOUT;
+var init_evidence = __esm({
+  "src/release/evidence.ts"() {
+    "use strict";
+    import_node_crypto7 = require("node:crypto");
+    import_promises19 = __toESM(require("node:fs/promises"), 1);
+    import_node_path56 = __toESM(require("node:path"), 1);
+    init_version();
+    init_json();
+    init_markdown();
+    init_path();
+    FABRICATION_DIRS = ["fab", "fabrication", "manufacturing", "gerbers", "gerber", "production"];
+    MANUFACTURING_EXTENSIONS = /* @__PURE__ */ new Set([
+      ".gbr",
+      ".gbl",
+      ".gtl",
+      ".gbs",
+      ".gts",
+      ".gbo",
+      ".gto",
+      ".gm1",
+      ".gko",
+      ".drl",
+      ".xln",
+      ".pos",
+      ".csv",
+      ".tsv",
+      ".xlsx",
+      ".pdf",
+      ".step",
+      ".stp",
+      ".zip"
+    ]);
+    BUNDLE_LAYOUT = { reports: "reports", artifacts: "artifacts", generated: "generated" };
+  }
+});
+
 // src/cli/index.ts
 var index_exports = {};
 __export(index_exports, {
@@ -21904,233 +23359,9 @@ function useColor() {
 // node_modules/commander/index.js
 var program = new Command();
 
-// src/generated/version.ts
-var boardReadyVersion = "1.34.0";
-
-// src/i18n/en.ts
-var en = {
-  "cli.baseline.captured": "Captured {count} {findingWord} in {path}.",
-  "cli.baseline.diff": "Added: {added}\nRemoved: {removed}\nUnchanged: {unchanged}",
-  "cli.baseline.notFound": "Baseline not found: {path}.",
-  "cli.baseline.pruned": "Pruned {count} baseline {findingWord}.",
-  "cli.baseline.removed": "Removed {path}.",
-  "cli.error.configuration": "Configuration error: {error}",
-  "cli.error.concurrencyPositiveInteger": "concurrency must be a positive integer",
-  "cli.error.environment.kicadMissing": "Environment error: kicad-cli not available.",
-  "cli.error.unexpected": "unexpected CLI error",
-  "cli.explain.error.unknownRule": "Unknown rule: {ruleId}",
-  "cli.explain.error.unsupportedRule": "Rule {ruleId} does not support explanation.",
-  "cli.init.created": "created boardreadyops.yml",
-  "cli.init.exists": "boardreadyops.yml already exists",
-  "cli.init.invalidProfile": "Unknown profile: {profile}. Available: basic, ci, manufacturing, strict",
-  "cli.init.workflowCreated": "created GitHub Actions workflow",
-  "cli.init.workflowExists": "GitHub Actions workflow already exists",
-  "doctor.check.action": "Action / Workflow",
-  "doctor.check.adapters": "Adapters",
-  "doctor.check.kicad": "KiCad",
-  "doctor.check.repository": "Repository",
-  "doctor.check.runtime": "Runtime",
-  "doctor.check.suppressions": "Suppressions",
-  "doctor.error.unknownCheck": "Unknown doctor check: {check}. Available checks: {checks}",
-  "doctor.error.unknownFormat": "Unknown doctor format: {format}. Available formats: text, json",
-  "doctor.recommendation.action.noWorkflow": "Add the BoardReadyOps GitHub Action workflow for pull request preflight.",
-  "doctor.recommendation.action.permissions": "Add `permissions: { pull-requests: write }` or `permissions: { issues: write }` to the BoardReadyOps job.",
-  "doctor.recommendation.action.pinCheckout": "Pin actions/checkout to an immutable commit SHA.",
-  "doctor.recommendation.action.workflowYaml": "Fix the BoardReadyOps workflow YAML before relying on action diagnostics.",
-  "doctor.recommendation.adapters.nexar": "Set NEXAR_CLIENT_ID and NEXAR_CLIENT_SECRET for Nexar-backed lifecycle checks.",
-  "doctor.recommendation.kicad": "Install KiCad CLI to run DRC and ERC checks.",
-  "doctor.recommendation.repository.config": "Fix boardreadyops.yml before running repository checks.",
-  "doctor.recommendation.repository.gerbers": "Generate Gerber outputs from KiCad before CI.",
-  "doctor.recommendation.repository.projects": "Add a .kicad_pro project before CI.",
-  "doctor.recommendation.runtime.node": "Install a supported Node.js 22 or 24 runtime.",
-  "doctor.recommendation.runtime.npm": "Install npm for package-based BoardReadyOps workflows.",
-  "doctor.recommendations": "Recommendations",
-  "doctor.severity.fail": "fail",
-  "doctor.severity.info": "info",
-  "doctor.severity.pass": "pass",
-  "doctor.severity.warn": "warn",
-  "doctor.title": "BoardReadyOps Doctor - Environment & Repository Diagnosis",
-  "doctor.action.checkoutPinned": "actions/checkout is SHA-pinned.",
-  "doctor.action.checkoutUnpinned": "actions/checkout is not SHA-pinned.",
-  "doctor.action.noWorkflow": "No .github/workflows/boardreadyops.yml workflow found.",
-  "doctor.action.permissionsConfigured": "permissions: pull-requests or issues write configured.",
-  "doctor.action.permissionsMissing": "permissions: pull-requests or issues write missing for PR comments.",
-  "doctor.action.workflowFound": "{path} found.",
-  "doctor.action.workflowUnreadable": "Unable to read or parse {path} workflow.",
-  "doctor.adapters.nexarMissing": "Nexar credentials not present.",
-  "doctor.adapters.nexarPresent": "Nexar credentials present.",
-  "doctor.kicad.drcAvailable": "DRC available.",
-  "doctor.kicad.ercAvailable": "ERC available.",
-  "doctor.kicad.found": "kicad-cli{version} found at {path}.",
-  "doctor.kicad.missing": "kicad-cli not found.",
-  "doctor.repository.configFound": "{file} found and valid.",
-  "doctor.repository.configInvalid": "boardreadyops configuration is invalid: {errors}",
-  "doctor.repository.gerberOutput.word": "output",
-  "doctor.repository.gerberOutput.word.plural": "outputs",
-  "doctor.repository.gerbersDiscovered": "{count} Gerber {outputWord} found.",
-  "doctor.repository.noConfig": "No boardreadyops configuration file found; defaults are valid.",
-  "doctor.repository.noGerbers": "No Gerber outputs found.",
-  "doctor.repository.noProjects": "No KiCad projects discovered.",
-  "doctor.repository.project.word": "project",
-  "doctor.repository.project.word.plural": "projects",
-  "doctor.repository.projectsDiscovered": "{count} KiCad {projectWord} discovered.",
-  "doctor.runtime.boardreadyops": "boardreadyops: v{version}",
-  "doctor.runtime.node": "Node: {version} (supported majors: {majors})",
-  "doctor.runtime.npm": "npm: v{version}",
-  "doctor.runtime.npmMissing": "npm not found.",
-  "doctor.suppressions.baselineFound": "{file} baseline found.",
-  "doctor.suppressions.noBaseline": "No baseline captured.",
-  "doctor.suppressions.noSuppressions": "No suppressions file found.",
-  "doctor.suppressions.suppressionsFound": "{file} suppressions file found.",
-  "report.allProjects": "All projects",
-  "report.allRules": "All rules",
-  "report.allSeverities": "All severities",
-  "report.artifacts": "Artifacts",
-  "report.bom": "BOM",
-  "report.bomDiffTruncated": "BOM diff truncated.",
-  "report.confidence": "Confidence",
-  "report.context": "Context",
-  "report.count": "Count",
-  "report.current": "Current",
-  "report.decision.fail": "Fail",
-  "report.decision.pass": "Pass",
-  "report.decision.policyFail": "Policy: fail",
-  "report.decision.policyPass": "Policy: pass",
-  "report.decision.readiness": "Readiness score: {score}/100.",
-  "report.decision.summary": "{total} findings \u2014 {critical} critical, {high} high.",
-  "report.decision.title": "Release Decision",
-  "report.details": "Details",
-  "report.diff.changes": "Changes",
-  "report.diff.output": "Output",
-  "report.diff.status.added": "Added",
-  "report.diff.status.changed": "Changed",
-  "report.diff.status.removed": "Removed",
-  "report.diff.status.unchanged": "Unchanged",
-  "report.fabricationChanges": "Fabrication Changes",
-  "report.filterFindings": "Filter findings",
-  "report.filterableFindingList": "Filterable finding list",
-  "report.finding": "Finding",
-  "report.finding.count": "{count} {findingWord}",
-  "report.finding.word": "finding",
-  "report.finding.word.plural": "findings",
-  "report.findings": "Findings",
-  "report.fix": "Fix",
-  "report.generatedMetadata": "Generated {date} by {tool} {version}. {threshold}",
-  "report.groupedByRule": "Findings grouped by rule",
-  "report.location.board": "board",
-  "report.location.column": "column {column}",
-  "report.location.line": "line {line}",
-  "report.location.lines": "lines {startLine}-{endLine}",
-  "report.manufacturingOutputs": "Manufacturing Outputs",
-  "report.metric": "Metric",
-  "report.moreNewFindings": "...and {count} more new {findingWord}.",
-  "report.newFindings": "New Findings",
-  "report.noBomChanges": "No BOM changes recorded.",
-  "report.noFindings": "No findings.",
-  "report.noFix": "No fix suggestion provided.",
-  "report.noLocation": "No location provided.",
-  "report.noProjects": "No projects were reported.",
-  "report.noReferences": "No references provided.",
-  "report.noRules": "No rules produced findings.",
-  "report.output.added": "{count} added",
-  "report.output.changed": "{count} changed",
-  "report.output.removed": "{count} removed",
-  "report.perProjectBreakdown": "Per-project Breakdown",
-  "report.perRuleGrouping": "Per-rule Grouping",
-  "report.previous": "Previous",
-  "report.project": "Project",
-  "report.readiness.evidence": "Evidence checklist",
-  "report.readiness.evidenceStatus": "Status",
-  "report.readiness.findingsSummary": "{blocking} blocking, {nonBlocking} non-blocking findings",
-  "report.readiness.importance": "Importance",
-  "report.readiness.missing": "missing",
-  "report.readiness.noProfile": "No vendor profile configured.",
-  "report.readiness.output": "Output",
-  "report.readiness.present": "present",
-  "report.readiness.profile": "Profile: {name} ({id})",
-  "report.readiness.recommended": "recommended",
-  "report.readiness.required": "required",
-  "report.readiness.status.atRisk": "At risk",
-  "report.readiness.status.blocked": "Blocked",
-  "report.readiness.status.ready": "Ready",
-  "report.readiness.title": "Release Readiness",
-  "report.readiness.warnings": "Warnings",
-  "report.ref": "Ref",
-  "report.references": "References",
-  "report.resource": "Resource",
-  "report.rule": "Rule",
-  "report.severity": "Severity",
-  "report.severityCounts": "Severity counts",
-  "report.status": "Status",
-  "report.summaryBySeverity": "Summary by Severity",
-  "report.threshold.failed": "Threshold failed.",
-  "report.threshold.passed": "Threshold passed.",
-  "report.title": "BoardReadyOps Report",
-  "report.topFindings": "Top Findings",
-  "report.total": "Total",
-  "report.unassigned": "Unassigned",
-  "report.waivers.approvedBy": "Approved by",
-  "report.waivers.active": "active",
-  "report.waivers.caption": "Release waivers and approvals",
-  "report.waivers.evidence": "Evidence",
-  "report.waivers.expired": "expired",
-  "report.waivers.expires": "Expires",
-  "report.waivers.owner": "Owner",
-  "report.waivers.reason": "Reason",
-  "report.waivers.rule": "Rule",
-  "report.waivers.stale": "stale",
-  "report.waivers.state": "State",
-  "report.waivers.title": "Waivers",
-  "report.bomRisk.title": "BOM Supply-Chain Risk",
-  "report.bomRisk.overallScore": "Overall BOM risk score",
-  "report.bomRisk.components": "at-risk components",
-  "report.bomRisk.noRisk": "No BOM supply-chain risk detected.",
-  "report.releaseMode.title": "Release Mode",
-  "report.releaseMode.prototype": "Controlled risk is allowed. Missing recommended outputs and expired waivers are advisory.",
-  "report.releaseMode.pilot": "Stricter review applies. Missing recommended outputs are advisory but flagged.",
-  "report.releaseMode.production": "Strict mode. Missing recommended outputs and expired waivers block the release.",
-  "severity.critical": "Critical",
-  "severity.high": "High",
-  "severity.info": "Info",
-  "severity.low": "Low",
-  "severity.medium": "Medium"
-};
-
-// src/i18n/catalog.ts
-var catalogs = {
-  en
-};
-
-// src/i18n/t.ts
-function resolveLocale(env = process.env) {
-  return normalizeLocale(env.BOARDREADY_LOCALE) ?? normalizeLocale(env.LANG) ?? "en";
-}
-function t(key, params = {}, locale = resolveLocale()) {
-  const catalog = locale === "__PSEUDO__" ? catalogs.en : catalogs[locale];
-  const template = catalog[key];
-  const values = { ...params };
-  if (template.includes("{findingWord}")) {
-    values.findingWord = typeof params.count === "number" && params.count === 1 ? catalog["report.finding.word"] : catalog["report.finding.word.plural"];
-  }
-  const rendered = template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => {
-    const value = values[name];
-    return value === void 0 ? match : String(value);
-  });
-  return locale === "__PSEUDO__" ? `[[${rendered}]]` : rendered;
-}
-function normalizeLocale(value) {
-  if (!value) {
-    return void 0;
-  }
-  if (value === "__PSEUDO__") {
-    return "__PSEUDO__";
-  }
-  const normalized = value.toLowerCase().replace(/_/g, "-");
-  if (normalized === "en" || normalized.startsWith("en-")) {
-    return "en";
-  }
-  return void 0;
-}
+// src/cli/index.ts
+init_version();
+init_t();
 
 // src/cli/commands/baseline.ts
 var import_promises15 = __toESM(require("node:fs/promises"), 1);
@@ -22139,6 +23370,7 @@ var import_node_path43 = __toESM(require("node:path"), 1);
 // src/core/baseline.ts
 var import_promises2 = __toESM(require("node:fs/promises"), 1);
 var import_node_path3 = __toESM(require("node:path"), 1);
+init_version();
 
 // src/util/fs.ts
 var import_node_crypto = require("node:crypto");
@@ -25321,60 +26553,8 @@ var config_schema_default = {
   }
 };
 
-// src/util/path.ts
-var import_promises3 = __toESM(require("node:fs/promises"), 1);
-var import_node_path4 = __toESM(require("node:path"), 1);
-function toPosixPath(value) {
-  return value.replaceAll("\\", "/");
-}
-function normalizePathInput(value) {
-  return import_node_path4.default.sep === "\\" ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/");
-}
-function normalizeRelative(root, target) {
-  const relative = import_node_path4.default.relative(root, target);
-  return toPosixPath(relative === "" ? "." : relative);
-}
-function matchesProjectScope(resourcePath, configuredProject) {
-  const normalizedResource = normalizeResourcePath(resourcePath);
-  const normalizedProject = normalizeResourcePath(configuredProject).replace(/\/$/, "");
-  return !normalizedProject || normalizedProject === "." || normalizedResource === normalizedProject || normalizedResource.startsWith(`${normalizedProject}/`);
-}
-function normalizeResourcePath(value) {
-  return import_node_path4.default.posix.normalize(value.replaceAll("\\", "/")).replace(/^\.\//, "");
-}
-function isInside(parent, child) {
-  const relative = import_node_path4.default.relative(parent, child);
-  return relative === "" || !relative.startsWith("..") && !import_node_path4.default.isAbsolute(relative);
-}
-async function displayPath(root, target) {
-  const absoluteRoot = await resolveExistingPathAlias(import_node_path4.default.resolve(root));
-  const absoluteTarget = import_node_path4.default.resolve(target);
-  const comparableTarget = await resolveExistingPathAlias(absoluteTarget);
-  if (isInside(absoluteRoot, comparableTarget)) {
-    return normalizeRelative(absoluteRoot, comparableTarget);
-  }
-  if (isInside(absoluteRoot, absoluteTarget)) {
-    return normalizeRelative(absoluteRoot, absoluteTarget);
-  }
-  return `<outside-root>/${import_node_path4.default.basename(absoluteTarget)}`;
-}
-async function resolveExistingPathAlias(target) {
-  const missingSegments = [];
-  let current = import_node_path4.default.resolve(target);
-  while (true) {
-    try {
-      const real = await import_promises3.default.realpath(current);
-      return missingSegments.length > 0 ? import_node_path4.default.join(real, ...missingSegments.toReversed()) : real;
-    } catch {
-      const parent = import_node_path4.default.dirname(current);
-      if (parent === current) {
-        return target;
-      }
-      missingSegments.push(import_node_path4.default.basename(current));
-      current = parent;
-    }
-  }
-}
+// src/core/config.ts
+init_path();
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);
@@ -25558,6 +26738,7 @@ function validateLoaded(config2, file2) {
 // src/core/pipeline.ts
 var import_promises14 = __toESM(require("node:fs/promises"), 1);
 var import_node_path42 = __toESM(require("node:path"), 1);
+init_version();
 
 // src/notifiers/Notifier.ts
 function isNotifierEnabled(config2) {
@@ -25979,6 +27160,7 @@ function listRules() {
 
 // src/rules/helpers.ts
 var import_node_path6 = __toESM(require("node:path"), 1);
+init_path();
 function rule(meta3, run) {
   return { meta: meta3, run };
 }
@@ -26877,6 +28059,7 @@ function boolValue(value) {
 
 // src/util/glob.ts
 var import_fast_glob = __toESM(require_out4(), 1);
+init_path();
 async function globFiles(root, patterns) {
   const results = await (0, import_fast_glob.default)(patterns, {
     cwd: root,
@@ -43929,6 +45112,7 @@ var layerStackupRule = rule(
 
 // src/rules/manufacturing/outputs-present.ts
 var import_node_path31 = __toESM(require("node:path"), 1);
+init_path();
 
 // src/vendor/outputs.ts
 var VENDOR_OUTPUT_KINDS = ["gerber", "drill", "bom", "position", "pdf", "step"];
@@ -45567,6 +46751,7 @@ function registerBuiltInRules() {
 var import_node_crypto4 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = require("node:fs");
 var import_node_path38 = __toESM(require("node:path"), 1);
+init_path();
 var manufacturingPatterns = {
   gerber: ["**/*.gbr", "**/*.gbrjob"],
   drill: ["**/*.drl"],
@@ -45675,6 +46860,9 @@ async function outputFromRows(kind, rows2) {
   };
 }
 
+// src/core/pipeline.ts
+init_path();
+
 // src/core/bom-risk.ts
 var RISK_LEVELS = /* @__PURE__ */ new Set(["critical", "high", "medium", "low", "none"]);
 function isRiskLevel(v) {
@@ -45745,6 +46933,7 @@ function defaultConcurrency() {
 // src/core/discovery.ts
 var import_promises12 = __toESM(require("node:fs/promises"), 1);
 var import_node_path39 = __toESM(require("node:path"), 1);
+init_path();
 async function discoverProjects(root, explicitProject) {
   const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path39.default.resolve(file2));
   const contexts = [];
@@ -46631,6 +47820,7 @@ function projectBomComponent(row) {
 }
 
 // src/core/suppressions.ts
+init_path();
 function applySuppressions(findings, suppressions = [], now = /* @__PURE__ */ new Date()) {
   if (suppressions.length === 0) {
     return findings;
@@ -46688,6 +47878,7 @@ function addFindingReference(target, value) {
 }
 
 // src/core/waivers.ts
+init_path();
 function applyWaivers(findings, waivers = [], now = /* @__PURE__ */ new Date()) {
   if (waivers.length === 0) {
     return { active: [], expired: [], findings };
@@ -47290,6 +48481,7 @@ function projectShapeFindings(projects) {
 }
 
 // src/cli/commands/baseline.ts
+init_t();
 var captureBaselineCommand = async (pathInput, options, streams) => {
   return withBaselineRoot(pathInput, options.config, streams, async (root, file2) => {
     const result = await currentResult(root, options.config, true);
@@ -47391,6 +48583,8 @@ function baselineDisplayPath(root, file2) {
 // src/cli/commands/run.ts
 var import_node_fs4 = __toESM(require("node:fs"), 1);
 var import_node_path45 = __toESM(require("node:path"), 1);
+init_version();
+init_t();
 
 // src/report/annotations.ts
 function formatAnnotation(finding2) {
@@ -47425,664 +48619,15 @@ function escapeProperty(value) {
   return escapeData(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
 }
 
-// node_modules/mustache/mustache.mjs
-var objectToString = Object.prototype.toString;
-var isArray = Array.isArray || function isArrayPolyfill(object2) {
-  return objectToString.call(object2) === "[object Array]";
-};
-function isFunction(object2) {
-  return typeof object2 === "function";
-}
-function typeStr(obj) {
-  return isArray(obj) ? "array" : typeof obj;
-}
-function escapeRegExp(string4) {
-  return string4.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, "\\$&");
-}
-function hasProperty(obj, propName) {
-  return obj != null && typeof obj === "object" && propName in obj;
-}
-function primitiveHasOwnProperty(primitive, propName) {
-  return primitive != null && typeof primitive !== "object" && primitive.hasOwnProperty && primitive.hasOwnProperty(propName);
-}
-var regExpTest = RegExp.prototype.test;
-function testRegExp(re, string4) {
-  return regExpTest.call(re, string4);
-}
-var nonSpaceRe = /\S/;
-function isWhitespace(string4) {
-  return !testRegExp(nonSpaceRe, string4);
-}
-var entityMap = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-  "/": "&#x2F;",
-  "`": "&#x60;",
-  "=": "&#x3D;"
-};
-function escapeHtml(string4) {
-  return String(string4).replace(/[&<>"'`=\/]/g, function fromEntityMap(s) {
-    return entityMap[s];
-  });
-}
-var whiteRe = /\s*/;
-var spaceRe = /\s+/;
-var equalsRe = /\s*=/;
-var curlyRe = /\s*\}/;
-var tagRe = /#|\^|\/|>|\{|&|=|!/;
-function parseTemplate(template, tags) {
-  if (!template)
-    return [];
-  var lineHasNonSpace = false;
-  var sections = [];
-  var tokens = [];
-  var spaces = [];
-  var hasTag = false;
-  var nonSpace = false;
-  var indentation = "";
-  var tagIndex = 0;
-  function stripSpace() {
-    if (hasTag && !nonSpace) {
-      while (spaces.length)
-        delete tokens[spaces.pop()];
-    } else {
-      spaces = [];
-    }
-    hasTag = false;
-    nonSpace = false;
-  }
-  var openingTagRe, closingTagRe, closingCurlyRe;
-  function compileTags2(tagsToCompile) {
-    if (typeof tagsToCompile === "string")
-      tagsToCompile = tagsToCompile.split(spaceRe, 2);
-    if (!isArray(tagsToCompile) || tagsToCompile.length !== 2)
-      throw new Error("Invalid tags: " + tagsToCompile);
-    openingTagRe = new RegExp(escapeRegExp(tagsToCompile[0]) + "\\s*");
-    closingTagRe = new RegExp("\\s*" + escapeRegExp(tagsToCompile[1]));
-    closingCurlyRe = new RegExp("\\s*" + escapeRegExp("}" + tagsToCompile[1]));
-  }
-  compileTags2(tags || mustache.tags);
-  var scanner = new Scanner(template);
-  var start, type, value, chr, token, openSection;
-  while (!scanner.eos()) {
-    start = scanner.pos;
-    value = scanner.scanUntil(openingTagRe);
-    if (value) {
-      for (var i = 0, valueLength = value.length; i < valueLength; ++i) {
-        chr = value.charAt(i);
-        if (isWhitespace(chr)) {
-          spaces.push(tokens.length);
-          indentation += chr;
-        } else {
-          nonSpace = true;
-          lineHasNonSpace = true;
-          indentation += " ";
-        }
-        tokens.push(["text", chr, start, start + 1]);
-        start += 1;
-        if (chr === "\n") {
-          stripSpace();
-          indentation = "";
-          tagIndex = 0;
-          lineHasNonSpace = false;
-        }
-      }
-    }
-    if (!scanner.scan(openingTagRe))
-      break;
-    hasTag = true;
-    type = scanner.scan(tagRe) || "name";
-    scanner.scan(whiteRe);
-    if (type === "=") {
-      value = scanner.scanUntil(equalsRe);
-      scanner.scan(equalsRe);
-      scanner.scanUntil(closingTagRe);
-    } else if (type === "{") {
-      value = scanner.scanUntil(closingCurlyRe);
-      scanner.scan(curlyRe);
-      scanner.scanUntil(closingTagRe);
-      type = "&";
-    } else {
-      value = scanner.scanUntil(closingTagRe);
-    }
-    if (!scanner.scan(closingTagRe))
-      throw new Error("Unclosed tag at " + scanner.pos);
-    if (type == ">") {
-      token = [type, value, start, scanner.pos, indentation, tagIndex, lineHasNonSpace];
-    } else {
-      token = [type, value, start, scanner.pos];
-    }
-    tagIndex++;
-    tokens.push(token);
-    if (type === "#" || type === "^") {
-      sections.push(token);
-    } else if (type === "/") {
-      openSection = sections.pop();
-      if (!openSection)
-        throw new Error('Unopened section "' + value + '" at ' + start);
-      if (openSection[1] !== value)
-        throw new Error('Unclosed section "' + openSection[1] + '" at ' + start);
-    } else if (type === "name" || type === "{" || type === "&") {
-      nonSpace = true;
-    } else if (type === "=") {
-      compileTags2(value);
-    }
-  }
-  stripSpace();
-  openSection = sections.pop();
-  if (openSection)
-    throw new Error('Unclosed section "' + openSection[1] + '" at ' + scanner.pos);
-  return nestTokens(squashTokens(tokens));
-}
-function squashTokens(tokens) {
-  var squashedTokens = [];
-  var token, lastToken;
-  for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
-    token = tokens[i];
-    if (token) {
-      if (token[0] === "text" && lastToken && lastToken[0] === "text") {
-        lastToken[1] += token[1];
-        lastToken[3] = token[3];
-      } else {
-        squashedTokens.push(token);
-        lastToken = token;
-      }
-    }
-  }
-  return squashedTokens;
-}
-function nestTokens(tokens) {
-  var nestedTokens = [];
-  var collector = nestedTokens;
-  var sections = [];
-  var token, section;
-  for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
-    token = tokens[i];
-    switch (token[0]) {
-      case "#":
-      case "^":
-        collector.push(token);
-        sections.push(token);
-        collector = token[4] = [];
-        break;
-      case "/":
-        section = sections.pop();
-        section[5] = token[2];
-        collector = sections.length > 0 ? sections[sections.length - 1][4] : nestedTokens;
-        break;
-      default:
-        collector.push(token);
-    }
-  }
-  return nestedTokens;
-}
-function Scanner(string4) {
-  this.string = string4;
-  this.tail = string4;
-  this.pos = 0;
-}
-Scanner.prototype.eos = function eos() {
-  return this.tail === "";
-};
-Scanner.prototype.scan = function scan(re) {
-  var match = this.tail.match(re);
-  if (!match || match.index !== 0)
-    return "";
-  var string4 = match[0];
-  this.tail = this.tail.substring(string4.length);
-  this.pos += string4.length;
-  return string4;
-};
-Scanner.prototype.scanUntil = function scanUntil(re) {
-  var index = this.tail.search(re), match;
-  switch (index) {
-    case -1:
-      match = this.tail;
-      this.tail = "";
-      break;
-    case 0:
-      match = "";
-      break;
-    default:
-      match = this.tail.substring(0, index);
-      this.tail = this.tail.substring(index);
-  }
-  this.pos += match.length;
-  return match;
-};
-function Context(view, parentContext) {
-  this.view = view;
-  this.cache = { ".": this.view };
-  this.parent = parentContext;
-}
-Context.prototype.push = function push(view) {
-  return new Context(view, this);
-};
-Context.prototype.lookup = function lookup(name) {
-  var cache = this.cache;
-  var value;
-  if (cache.hasOwnProperty(name)) {
-    value = cache[name];
-  } else {
-    var context = this, intermediateValue, names, index, lookupHit = false;
-    while (context) {
-      if (name.indexOf(".") > 0) {
-        intermediateValue = context.view;
-        names = name.split(".");
-        index = 0;
-        while (intermediateValue != null && index < names.length) {
-          if (index === names.length - 1)
-            lookupHit = hasProperty(intermediateValue, names[index]) || primitiveHasOwnProperty(intermediateValue, names[index]);
-          intermediateValue = intermediateValue[names[index++]];
-        }
-      } else {
-        intermediateValue = context.view[name];
-        lookupHit = hasProperty(context.view, name);
-      }
-      if (lookupHit) {
-        value = intermediateValue;
-        break;
-      }
-      context = context.parent;
-    }
-    cache[name] = value;
-  }
-  if (isFunction(value))
-    value = value.call(this.view);
-  return value;
-};
-function Writer() {
-  this.templateCache = {
-    _cache: {},
-    set: function set2(key, value) {
-      this._cache[key] = value;
-    },
-    get: function get(key) {
-      return this._cache[key];
-    },
-    clear: function clear() {
-      this._cache = {};
-    }
-  };
-}
-Writer.prototype.clearCache = function clearCache() {
-  if (typeof this.templateCache !== "undefined") {
-    this.templateCache.clear();
-  }
-};
-Writer.prototype.parse = function parse3(template, tags) {
-  var cache = this.templateCache;
-  var cacheKey = template + ":" + (tags || mustache.tags).join(":");
-  var isCacheEnabled = typeof cache !== "undefined";
-  var tokens = isCacheEnabled ? cache.get(cacheKey) : void 0;
-  if (tokens == void 0) {
-    tokens = parseTemplate(template, tags);
-    isCacheEnabled && cache.set(cacheKey, tokens);
-  }
-  return tokens;
-};
-Writer.prototype.render = function render(template, view, partials, config2) {
-  var tags = this.getConfigTags(config2);
-  var tokens = this.parse(template, tags);
-  var context = view instanceof Context ? view : new Context(view, void 0);
-  return this.renderTokens(tokens, context, partials, template, config2);
-};
-Writer.prototype.renderTokens = function renderTokens(tokens, context, partials, originalTemplate, config2) {
-  var buffer = "";
-  var token, symbol2, value;
-  for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
-    value = void 0;
-    token = tokens[i];
-    symbol2 = token[0];
-    if (symbol2 === "#") value = this.renderSection(token, context, partials, originalTemplate, config2);
-    else if (symbol2 === "^") value = this.renderInverted(token, context, partials, originalTemplate, config2);
-    else if (symbol2 === ">") value = this.renderPartial(token, context, partials, config2);
-    else if (symbol2 === "&") value = this.unescapedValue(token, context);
-    else if (symbol2 === "name") value = this.escapedValue(token, context, config2);
-    else if (symbol2 === "text") value = this.rawValue(token);
-    if (value !== void 0)
-      buffer += value;
-  }
-  return buffer;
-};
-Writer.prototype.renderSection = function renderSection(token, context, partials, originalTemplate, config2) {
-  var self = this;
-  var buffer = "";
-  var value = context.lookup(token[1]);
-  function subRender(template) {
-    return self.render(template, context, partials, config2);
-  }
-  if (!value) return;
-  if (isArray(value)) {
-    for (var j = 0, valueLength = value.length; j < valueLength; ++j) {
-      buffer += this.renderTokens(token[4], context.push(value[j]), partials, originalTemplate, config2);
-    }
-  } else if (typeof value === "object" || typeof value === "string" || typeof value === "number") {
-    buffer += this.renderTokens(token[4], context.push(value), partials, originalTemplate, config2);
-  } else if (isFunction(value)) {
-    if (typeof originalTemplate !== "string")
-      throw new Error("Cannot use higher-order sections without the original template");
-    value = value.call(context.view, originalTemplate.slice(token[3], token[5]), subRender);
-    if (value != null)
-      buffer += value;
-  } else {
-    buffer += this.renderTokens(token[4], context, partials, originalTemplate, config2);
-  }
-  return buffer;
-};
-Writer.prototype.renderInverted = function renderInverted(token, context, partials, originalTemplate, config2) {
-  var value = context.lookup(token[1]);
-  if (!value || isArray(value) && value.length === 0)
-    return this.renderTokens(token[4], context, partials, originalTemplate, config2);
-};
-Writer.prototype.indentPartial = function indentPartial(partial2, indentation, lineHasNonSpace) {
-  var filteredIndentation = indentation.replace(/[^ \t]/g, "");
-  var partialByNl = partial2.split("\n");
-  for (var i = 0; i < partialByNl.length; i++) {
-    if (partialByNl[i].length && (i > 0 || !lineHasNonSpace)) {
-      partialByNl[i] = filteredIndentation + partialByNl[i];
-    }
-  }
-  return partialByNl.join("\n");
-};
-Writer.prototype.renderPartial = function renderPartial(token, context, partials, config2) {
-  if (!partials) return;
-  var tags = this.getConfigTags(config2);
-  var value = isFunction(partials) ? partials(token[1]) : partials[token[1]];
-  if (value != null) {
-    var lineHasNonSpace = token[6];
-    var tagIndex = token[5];
-    var indentation = token[4];
-    var indentedValue = value;
-    if (tagIndex == 0 && indentation) {
-      indentedValue = this.indentPartial(value, indentation, lineHasNonSpace);
-    }
-    var tokens = this.parse(indentedValue, tags);
-    return this.renderTokens(tokens, context, partials, indentedValue, config2);
-  }
-};
-Writer.prototype.unescapedValue = function unescapedValue(token, context) {
-  var value = context.lookup(token[1]);
-  if (value != null)
-    return value;
-};
-Writer.prototype.escapedValue = function escapedValue(token, context, config2) {
-  var escape2 = this.getConfigEscape(config2) || mustache.escape;
-  var value = context.lookup(token[1]);
-  if (value != null)
-    return typeof value === "number" && escape2 === mustache.escape ? String(value) : escape2(value);
-};
-Writer.prototype.rawValue = function rawValue(token) {
-  return token[1];
-};
-Writer.prototype.getConfigTags = function getConfigTags(config2) {
-  if (isArray(config2)) {
-    return config2;
-  } else if (config2 && typeof config2 === "object") {
-    return config2.tags;
-  } else {
-    return void 0;
-  }
-};
-Writer.prototype.getConfigEscape = function getConfigEscape(config2) {
-  if (config2 && typeof config2 === "object" && !isArray(config2)) {
-    return config2.escape;
-  } else {
-    return void 0;
-  }
-};
-var mustache = {
-  name: "mustache.js",
-  version: "4.2.0",
-  tags: ["{{", "}}"],
-  clearCache: void 0,
-  escape: void 0,
-  parse: void 0,
-  render: void 0,
-  Scanner: void 0,
-  Context: void 0,
-  Writer: void 0,
-  /**
-   * Allows a user to override the default caching strategy, by providing an
-   * object with set, get and clear methods. This can also be used to disable
-   * the cache by setting it to the literal `undefined`.
-   */
-  set templateCache(cache) {
-    defaultWriter.templateCache = cache;
-  },
-  /**
-   * Gets the default or overridden caching object from the default writer.
-   */
-  get templateCache() {
-    return defaultWriter.templateCache;
-  }
-};
-var defaultWriter = new Writer();
-mustache.clearCache = function clearCache2() {
-  return defaultWriter.clearCache();
-};
-mustache.parse = function parse4(template, tags) {
-  return defaultWriter.parse(template, tags);
-};
-mustache.render = function render2(template, view, partials, config2) {
-  if (typeof template !== "string") {
-    throw new TypeError('Invalid template! Template should be a "string" but "' + typeStr(template) + '" was given as the first argument for mustache#render(template, view, partials)');
-  }
-  return defaultWriter.render(template, view, partials, config2);
-};
-mustache.escape = escapeHtml;
-mustache.Scanner = Scanner;
-mustache.Context = Context;
-mustache.Writer = Writer;
-var mustache_default = mustache;
-
-// src/report/fabrication-summary.ts
-function outputChangeSummary(output, locale) {
-  if (output.status !== "changed") {
-    return "";
-  }
-  return [
-    output.changed > 0 ? t("report.output.changed", { count: output.changed }, locale) : "",
-    output.added > 0 ? t("report.output.added", { count: output.added }, locale) : "",
-    output.removed > 0 ? t("report.output.removed", { count: output.removed }, locale) : ""
-  ].filter(Boolean).join(", ");
-}
-
-// src/report/finding-context.ts
-function reportFindingContext(finding2) {
-  return {
-    stableId: finding2.fingerprint.slice(0, 12),
-    fingerprint: finding2.fingerprint,
-    location: reportLocation(finding2),
-    help: reportHelp(finding2)
-  };
-}
-function reportLocation(finding2) {
-  const base = finding2.resource.path;
-  if (finding2.location?.region) {
-    const region = finding2.location.region;
-    const colSuffix = region.startColumn ? `:${region.startColumn}` : "";
-    const start = `:${region.startLine}${colSuffix}`;
-    const end = region.endLine !== region.startLine ? `-${region.endLine}` : "";
-    return `${base}${start}${end}`;
-  }
-  if (finding2.location?.line) {
-    const column = finding2.location.column ? `:${finding2.location.column}` : "";
-    return `${base}:${finding2.location.line}${column}`;
-  }
-  if (finding2.location?.boardCoordinates) {
-    const coordinates = finding2.location.boardCoordinates;
-    return `${base}:${coordinates.layer ?? "board"}@${reportCoordinate(coordinates.x)}${coordinates.units},${reportCoordinate(
-      coordinates.y
-    )}${coordinates.units}`;
-  }
-  return base;
-}
-function reportHelp(finding2) {
-  if (finding2.fix?.description) {
-    return finding2.fix.description;
-  }
-  if (finding2.references?.[0]) {
-    return finding2.references[0];
-  }
-  return "See the BoardReadyOps rule documentation for remediation guidance.";
-}
-function reportCoordinate(value) {
-  if (Object.is(value, -0)) {
-    return "0";
-  }
-  if (Number.isInteger(value)) {
-    return value.toString();
-  }
-  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
-}
-function reportCoordinateWithUnits(value, units) {
-  return `${reportCoordinate(value)}${units}`;
-}
-
-// src/report/templates/pr-comment.mustache
-var pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
-
-// src/report/templates/summary.mustache
-var summary_default = "# {{labels.reportTitle}}\n\n| {{labels.metric}} | {{labels.count}} |\n| --- | ---: |\n| {{labels.total}} | {{summary.total}} |\n| {{labels.critical}} | {{summary.critical}} |\n| {{labels.high}} | {{summary.high}} |\n| {{labels.medium}} | {{summary.medium}} |\n| {{labels.low}} | {{summary.low}} |\n| {{labels.info}} | {{summary.info}} |\n";
-
-// src/report/markdown.ts
-function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
-  const fabricationView = fabrication ? formatFabricationDiff(fabrication, locale) : void 0;
-  const topFindings2 = result.findings.slice(0, 10).map(markdownFinding);
-  const fixFindings = result.findings.filter((finding2) => finding2.fix).slice(0, 10).map(markdownFinding);
-  const plugins = (result.plugins ?? []).map((plugin) => ({
-    ...plugin,
-    permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
-  }));
-  const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
-  const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : void 0;
-  return mustache_default.render(
-    pr_comment_default,
-    {
-      ...result,
-      hasFindings: result.findings.length > 0,
-      topFindings: topFindings2,
-      hasFixes: fixFindings.length > 0,
-      fixFindings,
-      hasArtifacts: artifacts.length > 0,
-      hasPlugins: plugins.length > 0,
-      plugins,
-      artifacts,
-      hasFabricationDiff: Boolean(fabricationView),
-      fabrication: fabricationView,
-      hasBomRisk: Boolean(bomRiskView),
-      bomRisk: bomRiskView,
-      hasReleaseMode: Boolean(releaseModeView),
-      releaseModeView,
-      labels: markdownLabels(locale)
-    },
-    { summary: summary_default }
-  );
-}
-function formatFabricationDiff(diff, locale) {
-  const addedFindings = diff.findings.added.slice(0, 10);
-  return {
-    ...diff,
-    bom: {
-      ...diff.bom,
-      hasRows: diff.bom.rows.length > 0,
-      rows: diff.bom.rows.map((row) => ({
-        ...row,
-        previous: row.previous || "-",
-        current: row.current || "-"
-      }))
-    },
-    outputs: diff.outputs.map((output) => ({
-      ...output,
-      summary: outputChangeSummary(output, locale)
-    })),
-    findings: {
-      ...diff.findings,
-      hasAdded: diff.findings.added.length > 0,
-      added: addedFindings,
-      addedTruncated: diff.findings.added.length > addedFindings.length,
-      addedRemaining: diff.findings.added.length - addedFindings.length,
-      addedRemainingLabel: t(
-        "report.moreNewFindings",
-        { count: diff.findings.added.length - addedFindings.length },
-        locale
-      )
-    }
-  };
-}
-function markdownLabels(locale) {
-  return {
-    artifacts: t("report.artifacts", {}, locale),
-    bom: t("report.bom", {}, locale),
-    bomDiffTruncated: t("report.bomDiffTruncated", {}, locale),
-    bomRiskTitle: t("report.bomRisk.title", {}, locale),
-    bomRiskComponents: t("report.bomRisk.components", {}, locale),
-    count: t("report.count", {}, locale),
-    critical: t("severity.critical", {}, locale),
-    current: t("report.current", {}, locale),
-    fabricationChanges: t("report.fabricationChanges", {}, locale),
-    fix: t("report.fix", {}, locale),
-    high: t("severity.high", {}, locale),
-    info: t("severity.info", {}, locale),
-    low: t("severity.low", {}, locale),
-    manufacturingOutputs: t("report.manufacturingOutputs", {}, locale),
-    plugins: "Plugins",
-    medium: t("severity.medium", {}, locale),
-    metric: t("report.metric", {}, locale),
-    newFindings: t("report.newFindings", {}, locale),
-    noBomChanges: t("report.noBomChanges", {}, locale),
-    noFindings: t("report.noFindings", {}, locale),
-    previous: t("report.previous", {}, locale),
-    ref: t("report.ref", {}, locale),
-    releaseModeTitle: t("report.releaseMode.title", {}, locale),
-    reportTitle: t("report.title", {}, locale),
-    status: t("report.status", {}, locale),
-    topFindings: t("report.topFindings", {}, locale),
-    total: t("report.total", {}, locale)
-  };
-}
-function formatBomRisk(risk) {
-  const atRiskComponents = risk.components.filter((c) => c.riskLevel !== "none").map((c) => {
-    const parts = [];
-    if (c.factors.missingMpn) parts.push("no MPN");
-    if (c.factors.missingManufacturer) parts.push("no manufacturer");
-    if (c.factors.noSuppliers) parts.push("no suppliers");
-    else if (c.factors.singleSourceNoAlternates) parts.push("single source");
-    return { ...c, factorsSummary: parts.join(", ") || "\u2014" };
-  });
-  return {
-    overallRiskScore: risk.overallRiskScore,
-    overallRiskLevel: risk.overallRiskLevel,
-    totalComponents: risk.totalComponents,
-    atRiskCount: atRiskComponents.length,
-    atRiskComponents
-  };
-}
-function markdownFinding(finding2) {
-  return {
-    ...finding2,
-    report: reportFindingContext(finding2)
-  };
-}
-var RELEASE_MODE_BADGE = {
-  prototype: "\u{1F52C} Prototype",
-  pilot: "\u{1F9EA} Pilot",
-  production: "\u{1F3ED} Production"
-};
-function formatReleaseMode(mode, locale) {
-  return {
-    mode,
-    badge: RELEASE_MODE_BADGE[mode],
-    description: t(`report.releaseMode.${mode}`, {}, locale)
-  };
-}
+// src/cli/commands/run.ts
+init_markdown();
+init_path();
 
 // src/cli/output.ts
 var import_node_path44 = __toESM(require("node:path"), 1);
+
+// src/report/html.ts
+init_t();
 
 // src/report/html-css.ts
 var reportCss = `:root {
@@ -48575,6 +49120,9 @@ var reportCss = `:root {
   `;
 
 // src/report/html-render.ts
+init_t();
+init_fabrication_summary();
+init_finding_context();
 var severities = ["critical", "high", "medium", "low", "info"];
 function renderDecisionSection(result, locale) {
   const status = result.summary.failed ? "fail" : "pass";
@@ -49187,13 +49735,11 @@ function htmlAttr(value) {
   return htmlEscape(value).replaceAll("'", "&#39;");
 }
 
-// src/report/json.ts
-function formatJson(result) {
-  return `${JSON.stringify(result, null, 2)}
-`;
-}
+// src/cli/output.ts
+init_json();
 
 // src/report/junit.ts
+init_finding_context();
 function formatJunit(result) {
   const cases = result.findings.map((finding2) => {
     const context = reportFindingContext(finding2);
@@ -49221,7 +49767,11 @@ function failureBody(finding2, context) {
   return xml(JSON.stringify(payload));
 }
 
+// src/cli/output.ts
+init_markdown();
+
 // src/report/sarif.ts
+init_finding_context();
 function formatSarif(result) {
   const rules = /* @__PURE__ */ new Map();
   for (const finding2 of result.findings) {
@@ -49345,6 +49895,7 @@ function sarifPositiveInteger(value) {
 }
 
 // src/cli/output.ts
+init_path();
 async function writeReports(result, root, outputs, loaded, stdout, locale = "en") {
   const targets = {
     json: outputs.json ?? configOutput(loaded, "json"),
@@ -49818,6 +50369,8 @@ function isPathLike(value) {
 
 // src/cli/commands/doctor.ts
 var import_node_path47 = __toESM(require("node:path"), 1);
+init_version();
+init_t();
 
 // src/cli/commands/doctor-workflow.ts
 var import_node_path46 = __toESM(require("node:path"), 1);
@@ -50254,6 +50807,7 @@ function plural(count) {
 
 // src/cli/commands/explain.ts
 var import_node_path48 = __toESM(require("node:path"), 1);
+init_t();
 async function explainCommand(ruleId6, pathInput, streams) {
   const locale = resolveLocale();
   const root = await canonicalRoot(import_node_path48.default.resolve(pathInput ?? "."));
@@ -50330,10 +50884,12 @@ function formatExplanation(explanation) {
 // src/cli/commands/fix.ts
 var import_node_path50 = __toESM(require("node:path"), 1);
 var import_promises16 = require("node:readline/promises");
+init_path();
 
 // src/cli/fixes.ts
 var import_node_os3 = __toESM(require("node:os"), 1);
 var import_node_path49 = __toESM(require("node:path"), 1);
+init_path();
 
 // src/cli/fix-bom.ts
 function parseDelimitedDocument(text, file2) {
@@ -51264,6 +51820,7 @@ async function confirmApply(streams) {
 
 // src/cli/commands/generate.ts
 var import_node_path52 = __toESM(require("node:path"), 1);
+init_t();
 
 // src/release/generate.ts
 var import_node_crypto6 = require("node:crypto");
@@ -51322,6 +51879,7 @@ var generate_recipe_schema_default = {
 };
 
 // src/release/generate.ts
+init_version();
 var OUTPUT_KINDS = {
   gerbers: { source: "pcb", artifactKind: "gerber", isDirectory: true, defaultOutput: "gerbers" },
   drill: { source: "pcb", artifactKind: "drill", isDirectory: true, defaultOutput: "drill" },
@@ -51554,6 +52112,7 @@ function toPosix(value) {
 }
 
 // src/cli/commands/generate.ts
+init_path();
 async function generateCommand(pathInput, options, streams) {
   const locale = resolveLocale();
   const root = await canonicalRoot(import_node_path52.default.resolve(normalizePathInput(pathInput ?? ".")));
@@ -51648,6 +52207,7 @@ function writeSummary(outputDir, result, stdout) {
 var import_promises18 = require("node:fs/promises");
 var import_node_path53 = __toESM(require("node:path"), 1);
 var import_node_readline = __toESM(require("node:readline"), 1);
+init_t();
 var yamlHeader = `version: 1
 mode: `;
 function yamlFooter(failOn, reports) {
@@ -51887,6 +52447,8 @@ async function runInteractiveWizard(streams) {
 
 // src/cli/commands/plan.ts
 var import_node_path54 = __toESM(require("node:path"), 1);
+init_version();
+init_path();
 async function planCommand(pathInput, options, streams) {
   const root = await canonicalRoot(import_node_path54.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
@@ -52044,6 +52606,7 @@ function shellToken(value) {
 
 // src/cli/commands/policy.ts
 var import_node_path55 = __toESM(require("node:path"), 1);
+init_path();
 async function policyCommand(pathInput, options, streams) {
   const root = await canonicalRoot(import_node_path55.default.resolve(normalizePathInput(pathInput ?? ".")));
   const result = await runPipeline(pipelineInputFromCli(root, options, false));
@@ -52074,6 +52637,7 @@ var import_node_child_process3 = require("node:child_process");
 var import_promises21 = __toESM(require("node:fs/promises"), 1);
 var import_node_path58 = __toESM(require("node:path"), 1);
 var import_node_util3 = require("node:util");
+init_t();
 
 // src/core/diff/fabrication.ts
 function diffFabrication(previous, current, previousFindings, currentFindings, options = {}) {
@@ -52177,6 +52741,7 @@ function outputStatus(previous, current, changed, added, removed) {
 }
 
 // src/release/diff.ts
+init_version();
 function diffReleases(previous, current, options = {}) {
   const fabrication = diffFabrication(previous.fabrication, current.fabrication, previous.findings, current.findings, {
     ...options.maxBomRows === void 0 ? {} : { maxBomRows: options.maxBomRows }
@@ -52243,256 +52808,11 @@ function formatDelta(delta) {
   return delta > 0 ? `+${delta}` : `${delta}`;
 }
 
-// src/release/evidence.ts
-var import_node_crypto7 = require("node:crypto");
-var import_promises19 = __toESM(require("node:fs/promises"), 1);
-var import_node_path56 = __toESM(require("node:path"), 1);
-var FABRICATION_DIRS = ["fab", "fabrication", "manufacturing", "gerbers", "gerber", "production"];
-var MANUFACTURING_EXTENSIONS = /* @__PURE__ */ new Set([
-  ".gbr",
-  ".gbl",
-  ".gtl",
-  ".gbs",
-  ".gts",
-  ".gbo",
-  ".gto",
-  ".gm1",
-  ".gko",
-  ".drl",
-  ".xln",
-  ".pos",
-  ".csv",
-  ".tsv",
-  ".xlsx",
-  ".pdf",
-  ".step",
-  ".stp",
-  ".zip"
-]);
-var BUNDLE_LAYOUT = { reports: "reports", artifacts: "artifacts", generated: "generated" };
-async function writeReleaseEvidenceBundle(root, result, options) {
-  const outputDir = import_node_path56.default.resolve(root, options.outputDir);
-  await import_promises19.default.rm(outputDir, { recursive: true, force: true });
-  await import_promises19.default.mkdir(import_node_path56.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
-  await import_promises19.default.mkdir(import_node_path56.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
-  const artifacts = [];
-  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)));
-  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)));
-  artifacts.push(...await copyManufacturingArtifacts(root, outputDir));
-  if (options.includeGenerated) {
-    artifacts.push(...await copyGeneratedOutputs(root, outputDir, options.includeGenerated));
-  }
-  artifacts.sort((left, right) => left.path.localeCompare(right.path));
-  const gaps = evidenceGaps(root, result, artifacts).sort(
-    (left, right) => `${left.kind}:${left.path}`.localeCompare(`${right.kind}:${right.path}`)
-  );
-  const manifest = {
-    schemaVersion: 2,
-    tool: { name: "boardreadyops", version: boardReadyVersion },
-    generatedAt: options.generatedAt ?? (/* @__PURE__ */ new Date()).toISOString(),
-    git: cleanObject({ sha: options.gitSha, dirty: options.gitDirty }),
-    decision: evidenceDecision(result, gaps),
-    summary: result.summary,
-    projects: result.projects,
-    layout: { ...BUNDLE_LAYOUT },
-    artifacts,
-    gaps,
-    provenance: cleanObject(options.provenance ?? {}),
-    verification: { algorithm: "sha256", artifactCount: artifacts.length }
-  };
-  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
-  await import_promises19.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
-`, "utf8");
-  const checksumsPath = import_node_path56.default.join(outputDir, "checksums.txt");
-  await import_promises19.default.writeFile(checksumsPath, formatChecksumsTxt(artifacts), "utf8");
-  return { outputDir, manifestPath, checksumsPath, manifest };
-}
-function evidenceDecision(result, gaps) {
-  const reasons = [];
-  if (result.summary.failed) {
-    reasons.push(`validation reported ${result.summary.total} finding(s) (max severity ${result.summary.maxSeverity})`);
-  }
-  if (gaps.length > 0) {
-    reasons.push(`bundle has ${gaps.length} evidence gap(s) requiring review`);
-  }
-  return { status: result.summary.failed ? "fail" : "pass", reasons };
-}
-function formatChecksumsTxt(artifacts) {
-  return `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n")}
-`;
-}
-async function verifyReleaseEvidenceBundle(bundleDir) {
-  const outputDir = import_node_path56.default.resolve(bundleDir);
-  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
-  const readResult = await readBundleManifest(manifestPath);
-  if (!readResult.ok) {
-    return { ok: false, manifestPath, checked: 0, errors: readResult.errors };
-  }
-  const manifest = readResult.manifest;
-  const errors = [];
-  for (const artifact of manifest.artifacts ?? []) {
-    const artifactPath = import_node_path56.default.resolve(outputDir, artifact.path);
-    if (!isInside2(outputDir, artifactPath)) {
-      errors.push(`${artifact.path}: path escapes bundle directory`);
-      continue;
-    }
-    try {
-      const actual = await fileDigest2(artifactPath);
-      if (actual.sha256 !== artifact.sha256 || actual.bytes !== artifact.bytes) {
-        errors.push(`${artifact.path}: checksum or size mismatch`);
-      }
-    } catch (error51) {
-      errors.push(`${artifact.path}: ${error51 instanceof Error ? error51.message : String(error51)}`);
-    }
-  }
-  return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors };
-}
-async function readBundleManifest(manifestPath) {
-  try {
-    const manifest = JSON.parse(await import_promises19.default.readFile(manifestPath, "utf8"));
-    return { ok: true, manifest };
-  } catch (error51) {
-    return {
-      ok: false,
-      errors: [`manifest could not be read: ${error51 instanceof Error ? error51.message : String(error51)}`]
-    };
-  }
-}
-async function writeReport(outputDir, relativePath, content) {
-  const target = import_node_path56.default.join(outputDir, relativePath);
-  await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
-  await import_promises19.default.writeFile(target, content, "utf8");
-  const digest2 = await fileDigest2(target);
-  return { path: relativePath, kind: "report", ...digest2 };
-}
-async function copyManufacturingArtifacts(root, outputDir) {
-  const files = await discoverManufacturingArtifacts(root);
-  const artifacts = [];
-  for (const source of files) {
-    const relativeSource = normalizeRelative(root, source);
-    const targetRelative = import_node_path56.default.join("artifacts", relativeSource).split(import_node_path56.default.sep).join("/");
-    const target = import_node_path56.default.join(outputDir, targetRelative);
-    await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
-    await import_promises19.default.copyFile(source, target);
-    const digest2 = await fileDigest2(target);
-    artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest2 });
-  }
-  return artifacts;
-}
-async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
-  const sourceDir = import_node_path56.default.resolve(root, includeGenerated);
-  if (sourceDir === outputDir || isInside2(outputDir, sourceDir) || isInside2(sourceDir, outputDir)) {
-    return [];
-  }
-  const files = [];
-  await collectFiles(sourceDir, files);
-  files.sort((left, right) => left.localeCompare(right));
-  const artifacts = [];
-  for (const source of files) {
-    const relativeSource = normalizeRelative(sourceDir, source);
-    const targetRelative = import_node_path56.default.join(BUNDLE_LAYOUT.generated, relativeSource).split(import_node_path56.default.sep).join("/");
-    const target = import_node_path56.default.join(outputDir, targetRelative);
-    await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
-    await import_promises19.default.copyFile(source, target);
-    const digest2 = await fileDigest2(target);
-    artifacts.push({
-      path: targetRelative,
-      sourcePath: normalizeRelative(root, source),
-      kind: "generated",
-      ...digest2
-    });
-  }
-  return artifacts;
-}
-async function discoverManufacturingArtifacts(root) {
-  const discovered = [];
-  for (const directory of FABRICATION_DIRS) {
-    await collectFiles(import_node_path56.default.join(root, directory), discovered);
-  }
-  return [...new Set(discovered)].filter(
-    (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path56.default.extname(file2).toLowerCase()) || import_node_path56.default.basename(file2).toLowerCase().includes("readme")
-  ).sort((left, right) => left.localeCompare(right));
-}
-async function collectFiles(directory, output) {
-  let entries;
-  try {
-    entries = await import_promises19.default.readdir(directory, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const target = import_node_path56.default.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      await collectFiles(target, output);
-    } else if (entry.isFile()) {
-      output.push(target);
-    }
-  }
-}
-function evidenceGaps(root, result, artifacts) {
-  const gaps = [];
-  for (const project of result.projects) {
-    if (project.boardFiles.length === 0) {
-      gaps.push({
-        kind: "missing-project-file",
-        path: project.root,
-        message: "Project has no discovered KiCad PCB file."
-      });
-    }
-    if (project.schematicFiles.length === 0) {
-      gaps.push({
-        kind: "missing-project-file",
-        path: project.root,
-        message: "Project has no discovered KiCad schematic file."
-      });
-    }
-  }
-  const kinds = new Set(artifacts.map((artifact) => artifact.kind));
-  for (const [kind, message] of [
-    ["gerber", "No Gerber fabrication output was included in the evidence bundle."],
-    ["drill", "No drill output was included in the evidence bundle."],
-    ["bom", "No BOM output was included in the evidence bundle."],
-    ["cpl", "No component placement output was included in the evidence bundle."]
-  ]) {
-    if (!kinds.has(kind)) {
-      gaps.push({ kind: "missing-artifact", path: root, message });
-    }
-  }
-  return gaps;
-}
-function artifactKind(file2) {
-  const lower = import_node_path56.default.basename(file2).toLowerCase();
-  const extension = import_node_path56.default.extname(lower);
-  if (extension === ".drl" || extension === ".xln") {
-    return "drill";
-  }
-  if (extension.startsWith(".g") || lower.includes("gerber")) {
-    return "gerber";
-  }
-  if (lower.includes("bom") || lower.includes("bill-of-materials")) {
-    return "bom";
-  }
-  if (lower.includes("cpl") || lower.includes("pos") || lower.includes("centroid")) {
-    return "cpl";
-  }
-  if (FABRICATION_DIRS.some((name) => file2.split(import_node_path56.default.sep).includes(name))) {
-    return "fabrication";
-  }
-  return "other";
-}
-async function fileDigest2(file2) {
-  const content = await import_promises19.default.readFile(file2);
-  return { sha256: (0, import_node_crypto7.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
-}
-function cleanObject(value) {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== void 0));
-}
-function isInside2(root, target) {
-  const relative = import_node_path56.default.relative(root, target);
-  return Boolean(relative) && !relative.startsWith("..") && !import_node_path56.default.isAbsolute(relative);
-}
+// src/cli/commands/release.ts
+init_evidence();
 
 // src/release/handoff.ts
+init_version();
 var OUTPUT_DIRECTORIES = {
   gerber: "gerbers",
   drill: "drill",
@@ -52605,6 +52925,7 @@ function renderHandoffReadme(profile, plan, generatedAt) {
 }
 
 // src/release/prepare.ts
+init_version();
 function decideRelease(generate, validate2) {
   const reasons = [];
   if (validate2.status === "failed") {
@@ -52732,6 +53053,9 @@ function publicKeysMatch(publicKey, trustedPublicKeyPem) {
 function asMessage(error51) {
   return error51 instanceof Error ? error51.message : String(error51);
 }
+
+// src/cli/commands/release.ts
+init_path();
 
 // src/util/zip.ts
 var import_node_zlib = require("node:zlib");
@@ -53486,6 +53810,85 @@ async function reviewPublishCommand(target, options, streams) {
     return 1;
   }
 }
+async function reviewVerifyCommand(target, options, streams) {
+  const root = target ?? process.cwd();
+  const ledgerPath = options.ledger ?? (target?.endsWith(".json") ? target : [
+    `${root}/evidence-ledger.json`,
+    `${root}/artifacts/evidence-ledger.json`,
+    `${root}/.boardreadyops/evidence-ledger.json`
+  ].find((p) => {
+    try {
+      return require("node:fs").existsSync(p);
+    } catch {
+      return false;
+    }
+  }) ?? `${root}/evidence-ledger.json`);
+  streams.stdout.write(`
+\u{1F512} Verifying Hardware Review Evidence Ledger...
+`);
+  streams.stdout.write(`  Ledger File: ${ledgerPath}
+`);
+  try {
+    const { verifyReviewEvidenceOffline: verifyReviewEvidenceOffline2 } = await Promise.resolve().then(() => (init_evidence(), evidence_exports));
+    const result = await verifyReviewEvidenceOffline2(ledgerPath, options.artifacts ?? root);
+    if (options.digest && options.digest.toLowerCase() !== result.expectedDigest.toLowerCase()) {
+      result.errors.push(`Expected digest ${options.digest} does not match ledger digest ${result.expectedDigest}`);
+      result.verified = false;
+    }
+    streams.stdout.write(`
+--- Verification Summary ---
+`);
+    streams.stdout.write(`  Calculated Digest: ${result.calculatedDigest}
+`);
+    streams.stdout.write(`  Expected Digest:   ${result.expectedDigest}
+`);
+    streams.stdout.write(`  Manifest Check:    ${result.manifestCheckPassed ? "PASS" : "FAIL"}
+`);
+    if (result.tamperedItems.length > 0) {
+      streams.stderr.write(`
+\u274C Tampered Artifacts Detected:
+`);
+      for (const item2 of result.tamperedItems) {
+        streams.stderr.write(`  - ${item2}
+`);
+      }
+    }
+    if (result.missingItems.length > 0) {
+      streams.stderr.write(`
+\u26A0\uFE0F Missing Artifacts:
+`);
+      for (const item2 of result.missingItems) {
+        streams.stderr.write(`  - ${item2}
+`);
+      }
+    }
+    if (result.errors.length > 0) {
+      streams.stderr.write(`
+\u274C Integrity Errors:
+`);
+      for (const err of result.errors) {
+        streams.stderr.write(`  - ${err}
+`);
+      }
+    }
+    if (result.verified) {
+      streams.stdout.write(`
+\u2714 Hardware Review Evidence Cryptographically Verified (PASS)!
+
+`);
+      return 0;
+    }
+    streams.stderr.write(`
+\u274C Evidence Verification Failed (TAMPERED / INVALID)
+
+`);
+    return 1;
+  } catch (error51) {
+    streams.stderr.write(`\u274C Verification error: ${error51 instanceof Error ? error51.message : String(error51)}
+`);
+    return 1;
+  }
+}
 
 // src/cli/commands/runner.ts
 var import_node_path64 = __toESM(require("node:path"), 1);
@@ -54032,6 +54435,9 @@ async function assertPrivateFile(filePath, label) {
   }
 }
 
+// src/cli/commands/runner.ts
+init_version();
+
 // src/runner/identity.ts
 var import_node_crypto15 = require("node:crypto");
 var import_promises24 = require("node:fs/promises");
@@ -54412,6 +54818,119 @@ var reviewFindingDiffItemSchema = external_exports.object({
   activeDecision: findingDecisionSchema.optional(),
   assignment: findingAssignmentSchema.optional(),
   commentCount: external_exports.number().int().nonnegative()
+});
+
+// packages/contracts/src/evidence-ledger.ts
+var evidenceItemSchema = external_exports.object({
+  name: external_exports.string().min(1),
+  path: external_exports.string().min(1),
+  type: external_exports.string().min(1),
+  sizeBytes: external_exports.number().int().nonnegative(),
+  sha256: external_exports.string().min(64).max(64)
+});
+var ledgerDecisionRecordSchema = external_exports.object({
+  fingerprint: external_exports.string().min(64).max(64),
+  disposition: findingDispositionSchema,
+  reason: external_exports.string().min(1),
+  owner: external_exports.string().min(1),
+  expiresAt: external_exports.string().nullable().optional(),
+  timestamp: external_exports.string().datetime()
+});
+var ledgerApprovalRecordSchema = external_exports.object({
+  approverId: external_exports.string().min(1),
+  status: external_exports.enum(["approved", "changes_requested"]),
+  reason: external_exports.string().optional(),
+  isBreakGlass: external_exports.boolean().default(false),
+  timestamp: external_exports.string().datetime()
+});
+var ledgerChecklistRecordSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  title: external_exports.string().min(1),
+  completed: external_exports.boolean(),
+  completedBy: external_exports.string().optional(),
+  completedAt: external_exports.string().optional()
+});
+var evidenceLedgerDocumentSchema = external_exports.object({
+  version: external_exports.literal(1),
+  repository: external_exports.string().min(1),
+  baseSha: external_exports.string().min(7).max(64),
+  headSha: external_exports.string().min(7).max(64),
+  evidenceState: external_exports.enum(["current", "stale", "invalid"]),
+  evidenceDigest: external_exports.string().min(64).max(64),
+  manifest: external_exports.array(evidenceItemSchema),
+  decisions: external_exports.array(ledgerDecisionRecordSchema),
+  approvals: external_exports.array(ledgerApprovalRecordSchema),
+  checklist: external_exports.array(ledgerChecklistRecordSchema),
+  createdAt: external_exports.string().datetime()
+});
+var ledgerVerificationResultSchema = external_exports.object({
+  verified: external_exports.boolean(),
+  calculatedDigest: external_exports.string().min(64).max(64),
+  expectedDigest: external_exports.string().min(64).max(64),
+  manifestCheckPassed: external_exports.boolean(),
+  tamperedItems: external_exports.array(external_exports.string()),
+  missingItems: external_exports.array(external_exports.string()),
+  errors: external_exports.array(external_exports.string())
+});
+
+// packages/contracts/src/external-review.ts
+var externalReviewScopeSchema = external_exports.enum(["read_only", "comment_only", "approve_only"]);
+var externalReviewInvitationSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  tenantId: external_exports.string().min(1),
+  reviewId: external_exports.string().min(1),
+  recipientEmail: external_exports.string().email(),
+  recipientName: external_exports.string().min(1),
+  scope: externalReviewScopeSchema,
+  tokenHash: external_exports.string().min(64).max(64),
+  expiresAt: external_exports.string().datetime(),
+  revokedAt: external_exports.string().datetime().nullable().optional(),
+  createdById: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime()
+});
+var createExternalReviewRequestSchema = external_exports.object({
+  recipientEmail: external_exports.string().email(),
+  recipientName: external_exports.string().min(1),
+  scope: externalReviewScopeSchema,
+  expiresInDays: external_exports.number().int().min(1).max(90).default(14)
+});
+
+// packages/contracts/src/snapshots.ts
+var snapshotFormatSchema = external_exports.enum(["svg", "png", "webp"]);
+var snapshotKindSchema = external_exports.enum(["schematic", "pcb_layer", "3d_render"]);
+var canvasAnchorKindSchema = external_exports.enum(["component", "net", "finding", "comment", "zone"]);
+var canvasAnchorSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  kind: canvasAnchorKindSchema,
+  targetRef: external_exports.string().optional(),
+  x: external_exports.number(),
+  y: external_exports.number(),
+  width: external_exports.number().optional(),
+  height: external_exports.number().optional(),
+  sheet: external_exports.string().optional(),
+  layer: external_exports.string().optional(),
+  metadata: external_exports.record(external_exports.string(), external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean()])).optional()
+});
+var snapshotArtifactSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  name: external_exports.string().min(1),
+  kind: snapshotKindSchema,
+  format: snapshotFormatSchema,
+  sheetOrLayer: external_exports.string().min(1),
+  width: external_exports.number().positive(),
+  height: external_exports.number().positive(),
+  content: external_exports.string().optional(),
+  // SVG string or data URL
+  sha256: external_exports.string().min(64).max(64),
+  anchors: external_exports.array(canvasAnchorSchema).default([])
+});
+var snapshotManifestSchema = external_exports.object({
+  version: external_exports.literal(1),
+  baseSha: external_exports.string().min(7).max(64),
+  headSha: external_exports.string().min(7).max(64),
+  baseSnapshots: external_exports.array(snapshotArtifactSchema),
+  headSnapshots: external_exports.array(snapshotArtifactSchema),
+  createdAt: external_exports.string().datetime()
 });
 
 // packages/contracts/src/index.ts
@@ -55880,6 +56399,7 @@ function safeMessage(error51) {
 
 // src/cli/commands/sbom.ts
 var import_node_path65 = __toESM(require("node:path"), 1);
+init_t();
 
 // src/report/hbom.ts
 function formatHbom(result) {
@@ -55994,6 +56514,7 @@ function purlFromRow(row) {
 }
 
 // src/cli/commands/sbom.ts
+init_path();
 async function sbomCommand(pathInput, options, streams) {
   const format = options.format ?? "cyclonedx";
   if (format !== "cyclonedx") {
@@ -57680,6 +58201,11 @@ function registerAllCommands(program2, streams) {
     review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", (v) => Number(v))
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
+  });
+  addCommonOptions(
+    review.command("verify").description("cryptographically verify a hardware review evidence ledger offline").argument("[path]", "path to evidence-ledger.json or review bundle directory").option("--ledger <path>", "explicit path to evidence-ledger.json").option("--digest <sha>", "expected composite evidence digest").option("--artifacts <path>", "directory containing local artifacts to verify")
+  ).action(async (pathInput, options) => {
+    process.exitCode = await reviewVerifyCommand(pathInput, options, streams);
   });
 }
 function runnerSeconds(value) {
