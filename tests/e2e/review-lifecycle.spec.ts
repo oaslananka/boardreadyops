@@ -176,4 +176,20 @@ test.describe("Review lifecycle", () => {
     await expect(page.getByPlaceholder("Leave an engineering review note or question...")).toBeVisible();
     await expect(page.getByRole("button", { name: "Post Comment" })).toBeVisible();
   });
+
+  test("17. Mobile navigation is operable and the review page has no body overflow", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(REVIEW_PATH);
+    const navBtn = page.getByRole("button", { name: "Open navigation" });
+    if (await navBtn.isVisible()) {
+      await navBtn.click();
+      await expect(page.getByRole("navigation", { name: "Product navigation" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(navBtn).toBeFocused();
+    }
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(overflow).toBe(false);
+  });
 });
