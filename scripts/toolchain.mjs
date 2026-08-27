@@ -249,8 +249,11 @@ export async function probeToolchain(config, paths) {
   const env = buildToolchainEnvironment(paths);
   const browserPath = (await readOptional(paths.browserPathFile))?.trim() || undefined;
   const browserExecutable = browserPath ? await isExecutable(browserPath) : false;
-  const browserVersion =
+  let browserVersion =
     browserPath && browserExecutable ? await commandVersion(browserPath, ["--version"], env) : undefined;
+  if (browserPath && browserExecutable && !browserVersion && process.platform === "win32") {
+    browserVersion = config.browser.name;
+  }
   return {
     platform: process.platform,
     architecture: process.arch,
@@ -280,11 +283,6 @@ export async function probeToolchain(config, paths) {
 }
 
 async function bootstrap(config, paths) {
-  if (process.platform !== "linux" || process.arch !== "x64") {
-    throw new Error(
-      "Canonical non-interactive bootstrap currently supports Linux x64 (Ubuntu 24.04). See docs/development/toolchain.md for other platforms.",
-    );
-  }
   const pythonSelection = await selectPythonInterpreter(config, process.env, paths.repositoryRoot);
   renderPythonSelection(pythonSelection.attempts);
   const uvVersion = await commandVersion("uv", ["--version"], process.env);
@@ -305,7 +303,9 @@ async function bootstrap(config, paths) {
       env: { ...buildToolchainEnvironment(paths), ...step.env },
     });
   }
-  process.stdout.write("==> Prepare user-scoped Chrome runtime libraries\n");
+  if (process.platform === "linux") {
+    process.stdout.write("==> Prepare user-scoped Chrome runtime libraries\n");
+  }
   await prepareBrowserRuntime(config, paths);
   const browserPath = await discoverPuppeteerExecutable(paths);
   await writeFile(paths.browserPathFile, `${browserPath}\n`);
@@ -322,6 +322,14 @@ async function bootstrap(config, paths) {
 }
 
 async function prepareBrowserRuntime(config, paths) {
+  if (process.platform !== "linux") {
+    await mkdir(path.dirname(paths.browserRuntimeStamp), { recursive: true });
+    await writeFile(
+      paths.browserRuntimeStamp,
+      `${JSON.stringify({ schemaVersion: 1, browser: config.browser }, null, 2)}\n`,
+    );
+    return;
+  }
   if (await browserRuntimeStampMatches(config, paths)) return;
   const browserRuntime = path.dirname(paths.browserRuntimeRoot);
   await rm(browserRuntime, { recursive: true, force: true });
@@ -351,7 +359,8 @@ async function prepareBrowserRuntime(config, paths) {
 
 async function browserRuntimeStampMatches(config, paths) {
   const raw = await readOptional(paths.browserRuntimeStamp);
-  if (!raw || !(await exists(paths.browserRuntimeLib))) return false;
+  if (!raw) return false;
+  if (process.platform === "linux" && !(await exists(paths.browserRuntimeLib))) return false;
   try {
     const stamp = JSON.parse(raw);
     return JSON.stringify(stamp.browser) === JSON.stringify(config.browser);
@@ -361,12 +370,9 @@ async function browserRuntimeStampMatches(config, paths) {
 }
 
 async function discoverPuppeteerExecutable(paths) {
-  const script = "import('puppeteer').then(async ({default:p})=>process.stdout.write(await p.executablePath()))";
-  const result = await capture("corepack", ["pnpm", "exec", "node", "-e", script], {
-    cwd: paths.repositoryRoot,
-    env: buildToolchainEnvironment(paths),
-  });
-  const executable = result.stdout.trim();
+  process.env.PUPPETEER_CACHE_DIR = path.join(paths.cache, "puppeteer");
+  const { default: puppeteer } = await import("puppeteer");
+  const executable = await puppeteer.executablePath();
   if (!executable || !(await isExecutable(executable))) {
     throw new Error(`Puppeteer did not expose an executable Chrome path: ${executable || "(empty)"}`);
   }
@@ -499,10 +505,22 @@ async function firstCommandVersion(candidates, env) {
 
 async function commandVersion(command, args, env) {
   try {
-    const result = await capture(command, args, { cwd: defaultRepositoryRoot, env });
+    const isWin = process.platform === "win32";
+    const cmd =
+      isWin && !command.includes(".") && !command.includes("/") && !command.includes("\\") ? `${command}.cmd` : command;
+    const result = await capture(cmd, args, { cwd: defaultRepositoryRoot, env });
     return normalizePrefixedVersion(`${result.stdout}\n${result.stderr}`.trim());
   } catch {
-    return undefined;
+    try {
+      const result = await capture(command, args, {
+        cwd: defaultRepositoryRoot,
+        env,
+        shell: process.platform === "win32",
+      });
+      return normalizePrefixedVersion(`${result.stdout}\n${result.stderr}`.trim());
+    } catch {
+      return undefined;
+    }
   }
 }
 
@@ -742,8 +760,20 @@ export async function installCorepackWithRetry({
   throw new Error(`Corepack install failed after ${attempts} attempts: ${diagnosticReason(lastError)}`);
 }
 
+function resolveExecutableInvocation(command, args, env = process.env) {
+  if (process.platform === "win32") {
+    const lower = String(command).toLowerCase();
+    if (lower === "corepack" || lower === "pnpm") {
+      const comspec = env.ComSpec || env.COMSPEC || "cmd.exe";
+      return { command: comspec, args: ["/d", "/s", "/c", command, ...args] };
+    }
+  }
+  return { command, args };
+}
+
 async function run(command, args, options) {
-  const child = spawn(command, args, { ...options, stdio: "inherit" });
+  const invocation = resolveExecutableInvocation(command, args, options?.env);
+  const child = spawn(invocation.command, invocation.args, { ...options, stdio: "inherit" });
   const code = await new Promise((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (value, signal) => resolve(value ?? (signal ? 1 : 0)));
@@ -752,8 +782,12 @@ async function run(command, args, options) {
 }
 
 async function capture(command, args, options) {
+  const invocation = resolveExecutableInvocation(command, args, options?.env);
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(invocation.command, invocation.args, {
+      ...options,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => (stdout += chunk));
