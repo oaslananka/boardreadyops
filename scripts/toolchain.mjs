@@ -778,6 +778,18 @@ function quoteWindowsArg(arg) {
   return arg;
 }
 
+/**
+ * `%ComSpec%` is attacker-influenceable environment data; only trust it as the shell
+ * executable when it actually names cmd.exe, otherwise fall back to the well-known default
+ * so an unexpected value can never redirect this spawn to an arbitrary absolute path.
+ */
+function trustedComspec(value) {
+  if (value && path.basename(value).toLowerCase() === "cmd.exe") {
+    return value;
+  }
+  return "cmd.exe";
+}
+
 function resolveExecutableInvocation(command, args, env = process.env) {
   if (process.platform === "win32") {
     const lower = String(command).toLowerCase();
@@ -792,7 +804,7 @@ function resolveExecutableInvocation(command, args, env = process.env) {
       base.endsWith(".cmd") ||
       base.endsWith(".bat")
     ) {
-      const comspec = env.ComSpec || env.COMSPEC || "cmd.exe";
+      const comspec = trustedComspec(env.ComSpec || env.COMSPEC);
       const fullCmd = [command, ...args.map(quoteWindowsArg)].join(" ");
       return { command: comspec, args: ["/d", "/s", "/c", fullCmd], windowsVerbatimArguments: true };
     }
