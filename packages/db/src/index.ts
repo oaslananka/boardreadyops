@@ -58,4 +58,5 @@ export * from "./finding-decision-store.js";
 export * from "./review-approval-store.js";
 export * from "./review-collaboration-store.js";
 export * from "./review-comment-store.js";
+export * from "./review-policy-store.js";
 export * from "./review-store.js";

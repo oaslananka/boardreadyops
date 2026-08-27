@@ -126,4 +126,89 @@ describe("Decision Engine", () => {
     expect(eval2.decision).toBe("approved");
     expect(eval2.blockers.length).toBe(0);
   });
+
+  it("blocks on a 'high' severity finding when the policy severity gate is 'high', unlike the default gate", () => {
+    const headEvidenceDigest = "a".repeat(64);
+    const findings = [{ fingerprint: "fp-1", severity: "high", ruleId: "clearance", path: "board.kicad_pcb" }];
+
+    const withoutPolicy = evaluateReviewReadiness({
+      findings,
+      decisions: new Map(),
+      approvals: [],
+      checklist: [],
+      headEvidenceDigest,
+    });
+    expect(withoutPolicy.blockers.some((b) => b.type === "unresolved_finding")).toBe(false);
+
+    const withPolicy = evaluateReviewReadiness({
+      findings,
+      decisions: new Map(),
+      approvals: [],
+      checklist: [],
+      headEvidenceDigest,
+      policy: { requiredChecklist: [], requiredRoles: [], severityGate: "high" },
+    });
+    expect(withPolicy.blockers.some((b) => b.type === "unresolved_finding")).toBe(true);
+  });
+
+  it("blocks when a policy-required checklist item was never added to the review", () => {
+    const headEvidenceDigest = "a".repeat(64);
+
+    const result = evaluateReviewReadiness({
+      findings: [],
+      decisions: new Map(),
+      approvals: [],
+      checklist: [{ id: "chk-1", title: "Verify silk", completed: true }],
+      headEvidenceDigest,
+      policy: { requiredChecklist: ["Verify silk", "Check DFM"], requiredRoles: [] },
+    });
+
+    expect(result.blockers).toContainEqual(
+      expect.objectContaining({
+        type: "missing_required_checklist_item",
+        message: expect.stringContaining("Check DFM"),
+      }),
+    );
+    expect(
+      result.blockers.some((b) => b.type === "missing_required_checklist_item" && b.message.includes("Verify silk")),
+    ).toBe(false);
+  });
+
+  it("blocks when a policy-required approver role has no matching approval, and passes once one exists", () => {
+    const headEvidenceDigest = "a".repeat(64);
+    const approvals = [
+      {
+        id: "rapp-1",
+        evidenceDigest: headEvidenceDigest,
+        approverId: "alice",
+        status: "approved" as const,
+      },
+    ];
+
+    const withoutRoleData = evaluateReviewReadiness({
+      findings: [],
+      decisions: new Map(),
+      approvals,
+      checklist: [],
+      headEvidenceDigest,
+      requiredApprovalsCount: 1,
+      policy: { requiredChecklist: [], requiredRoles: ["hardware-lead"] },
+    });
+    expect(withoutRoleData.blockers).toContainEqual(
+      expect.objectContaining({ type: "missing_required_approver_role" }),
+    );
+
+    const withRoleData = evaluateReviewReadiness({
+      findings: [],
+      decisions: new Map(),
+      approvals,
+      checklist: [],
+      headEvidenceDigest,
+      requiredApprovalsCount: 1,
+      policy: { requiredChecklist: [], requiredRoles: ["hardware-lead"] },
+      approverRoles: new Map([["alice", ["hardware-lead"]]]),
+    });
+    expect(withRoleData.blockers.some((b) => b.type === "missing_required_approver_role")).toBe(false);
+    expect(withRoleData.isReady).toBe(true);
+  });
 });
