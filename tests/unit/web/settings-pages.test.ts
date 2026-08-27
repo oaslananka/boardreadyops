@@ -1,7 +1,25 @@
 import { readFile } from "node:fs/promises";
+import React from "react";
+import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import SettingsLayout from "../../../apps/web/app/settings/layout.js";
 
 describe("settings pages and operational layout", () => {
+  it("renders SettingsLayout with navigation links and children slot", () => {
+    const html = renderToString(
+      SettingsLayout({
+        children: React.createElement("div", { id: "test-child" }, "Child Content"),
+      }),
+    );
+    expect(html).toContain("Workspace Settings");
+    expect(html).toContain("/settings/billing");
+    expect(html).toContain("/settings/security");
+    expect(html).toContain("/settings/data");
+    expect(html).toContain("/settings/tokens");
+    expect(html).toContain("/settings/component-intelligence");
+    expect(html).toContain("Child Content");
+  });
+
   it("provides settings navigation with all five destinations", async () => {
     const settingsLayout = await readFile("apps/web/app/settings/layout.tsx", "utf8");
     for (const route of ["billing", "security", "data", "tokens", "component-intelligence"]) {
