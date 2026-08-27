@@ -32,7 +32,7 @@
   "browser": {
     "provider": "puppeteer",
     "name": "chrome",
-    "puppeteerVersion": "25.2.1",
+    "puppeteerVersion": "25.8.0",
     "ubuntuRuntimePackages": [
       "libatk1.0-0t64",
       "libatk-bridge2.0-0t64",
