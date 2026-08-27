@@ -122,12 +122,27 @@ describe("action gate detection", () => {
     );
   });
 
-  it("rejects unsafe workspace paths and artifact names", () => {
+  it("rejects unsafe workspace paths, artifact names, and invalid cloud upload modes", () => {
     vi.stubEnv("INPUT_PATH", "../outside");
     expect(() => readActionInputs(path.resolve("."))).toThrow("Input path must stay inside GITHUB_WORKSPACE");
 
     vi.unstubAllEnvs();
     vi.stubEnv("INPUT_ARTIFACT-NAME", "bad/name");
     expect(() => readActionInputs(path.resolve("."))).toThrow("artifact-name must be a non-empty artifact name.");
+
+    vi.unstubAllEnvs();
+    vi.stubEnv("INPUT_CLOUD-UPLOAD", "invalid-mode");
+    expect(() => readActionInputs(path.resolve("."))).toThrow(
+      "Input cloud-upload must be metadata, snapshots, or source.",
+    );
+  });
+
+  it("parses valid cloud-upload input", () => {
+    vi.stubEnv("INPUT_CLOUD-UPLOAD", "snapshots");
+    vi.stubEnv("INPUT_CLOUD-SERVER", "https://custom.boardreadyops.com");
+    expect(readActionInputs(path.resolve("."))).toMatchObject({
+      cloudUpload: "snapshots",
+      cloudServer: "https://custom.boardreadyops.com",
+    });
   });
 });

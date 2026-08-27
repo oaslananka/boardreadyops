@@ -47,6 +47,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@electric-sql/pglite-tools@0.3.3`
   - Description: Tools for working with PGlite databases
   - Homepage: https://pglite.dev
+- `@playwright/test@1.55.1`
+  - Description: A high-level API to automate web browsers
+  - Homepage: https://playwright.dev
 - `@prisma/config@7.9.1`
   - Description: Internal package used to define and read Prisma configuration files
   - Homepage: https://github.com/prisma/prisma#readme
@@ -171,6 +174,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mutation-testing-report-schema@3.7.3`
   - Description: The json schema for a mutation testing report.
   - Homepage: https://github.com/stryker-mutator/mutation-testing-elements/tree/master/packages/elements#readme
+- `playwright@1.55.1`
+  - Description: A high-level API to automate web browsers
+  - Homepage: https://playwright.dev
+- `playwright-core@1.55.1`
+  - Description: A high-level API to automate web browsers
+  - Homepage: https://playwright.dev
 - `prisma@7.9.1`
   - Description: Prisma is an open-source database toolkit. It includes a JavaScript/TypeScript ORM for Node.js, migrations and a modern GUI to view and edit the data in your database. You can use Prisma in new projects or add it to an existing one.
   - Homepage: https://www.prisma.io

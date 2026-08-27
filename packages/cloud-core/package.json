@@ -62,5 +62,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@boardreadyops/contracts": "workspace:*"
   }
 }

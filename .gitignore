@@ -20,6 +20,12 @@ SHA256SUMS
 # Next.js app build output
 apps/web/.next/
 
+# Playwright E2E output
+/test-results/
+/playwright-report/
+/blob-report/
+tests/e2e/.auth/
+
 **/node_modules/
 
 # Repository-local reproducible validation toolchain

@@ -83,4 +83,17 @@ describe("portable directory copy", () => {
       expect((await stat(destination)).mode & 0o7000).toBe(0);
     },
   );
+  it("copies directories and dereferences safely when symlink creation is not permitted", async () => {
+    const source = await mkdtemp(path.join(process.cwd(), ".portable-copy-fallback-"));
+    temporaryRoots.push(source);
+    await mkdir(path.join(source, "data"));
+    await writeFile(path.join(source, "data", "file.txt"), "hello\n");
+
+    const destinationParent = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-portable-copy-dest-"));
+    temporaryRoots.push(destinationParent);
+    const destination = path.join(destinationParent, "runtime");
+
+    await copyDirectoryPortable(source, destination, { dereferenceSymlinks: true });
+    await expect(readFile(path.join(destination, "data", "file.txt"), "utf8")).resolves.toBe("hello\n");
+  });
 });

@@ -274,6 +274,7 @@ exit 0
     expect(buildCorepackInstallCommand("win32", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
       command: "C:\\Windows\\System32\\cmd.exe",
       args: ["/d", "/s", "/c", "corepack install"],
+      windowsVerbatimArguments: true,
     });
     expect(buildCorepackInstallCommand("linux", {})).toEqual({ command: "corepack", args: ["install"] });
   });

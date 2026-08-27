@@ -29,6 +29,12 @@ import {
   releaseSignCommand,
   releaseVerifyCommand,
 } from "./commands/release.js";
+import {
+  type ReviewPublishOptions,
+  type ReviewVerifyOptions,
+  reviewPublishCommand,
+  reviewVerifyCommand,
+} from "./commands/review.js";
 import { addCommonOptions, type CommonCliOptions, runCommand } from "./commands/run.js";
 import {
   type RunnerActivateCliOptions,
@@ -330,6 +336,37 @@ export function registerAllCommands(
       process.exitCode = await pruneBaselineCommand(pathInput, options, streams);
     },
   );
+
+  const review = program.command("review").description("manage and publish hardware reviews");
+  addCommonOptions(
+    review
+      .command("publish")
+      .description("publish hardware review and evidence pack to cloud")
+      .argument("[path]", "directory to scan")
+      .option("--base <commit>", "base git commit or run id for diff computation")
+      .option("--head <commit>", "head git commit (defaults to HEAD)")
+      .option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata")
+      .option("--dry-run", "simulate review publish without uploading")
+      .option("--token <token>", "workspace API token")
+      .option("--server <url>", "BoardReadyOps cloud server URL")
+      .option("--title <title>", "review title")
+      .option("--repo <repo>", "target repository identifier")
+      .option("--pr <number>", "pull request number", (v) => Number(v)),
+  ).action(async (pathInput: string | undefined, options: ReviewPublishOptions) => {
+    process.exitCode = await reviewPublishCommand(pathInput, options, streams);
+  });
+
+  addCommonOptions(
+    review
+      .command("verify")
+      .description("cryptographically verify a hardware review evidence ledger offline")
+      .argument("[path]", "path to evidence-ledger.json or review bundle directory")
+      .option("--ledger <path>", "explicit path to evidence-ledger.json")
+      .option("--digest <sha>", "expected composite evidence digest")
+      .option("--artifacts <path>", "directory containing local artifacts to verify"),
+  ).action(async (pathInput: string | undefined, options: ReviewVerifyOptions) => {
+    process.exitCode = await reviewVerifyCommand(pathInput, options, streams);
+  });
 }
 
 function runnerSeconds(value: string): number {
