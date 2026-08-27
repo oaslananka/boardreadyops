@@ -41,13 +41,13 @@ export function DiscussionTab({
 
   return (
     <div className="discussion-tab-content">
-      <Panel title="Review Discussion & Threads">
+      <Panel title="Review Discussion & Threads" tone="raised">
         <div className="comment-timeline">
           {comments.length === 0 ? (
             <p className="empty-notice">No comments posted yet. Start the conversation below.</p>
           ) : (
             comments.map((cmt) => (
-              <div key={cmt.id} className={`comment-card panel ${cmt.status}`}>
+              <div key={cmt.id} className={`comment-card panel surface-default ${cmt.status}`}>
                 <header className="comment-header">
                   <div className="comment-author-info">
                     <span className="author-name">{cmt.authorId}</span>

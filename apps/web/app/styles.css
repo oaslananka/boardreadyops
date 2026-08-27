@@ -15,7 +15,7 @@
   --foundry-surface-strong: #27231d;
   --foundry-ink: #f2ecde;
   --foundry-ink-muted: #afa590;
-  --foundry-ink-subtle: #807766;
+  --foundry-ink-subtle: #948a76;
   --foundry-line: #3b352b;
   --foundry-line-strong: #655b49;
   --foundry-copper: #d16a4d;
@@ -24,20 +24,20 @@
   --foundry-brass: #d2a64a;
   --rail-width: 248px;
   --rail-width-compact: 72px;
-  --bro-bg: var(--foundry-canvas);
-  --bro-bg-elevated: var(--foundry-canvas-subdued);
-  --bro-surface: var(--foundry-surface);
-  --bro-surface-strong: var(--foundry-surface-strong);
+  --bro-bg: #13120f;
+  --bro-bg-elevated: #191713;
+  --bro-surface: #1e1b17;
+  --bro-surface-strong: #27231d;
   --bro-surface-sunken: #0f0e0c;
-  --bro-border: var(--foundry-line);
-  --bro-border-strong: var(--foundry-line-strong);
+  --bro-border: #3b352b;
+  --bro-border-strong: #655b49;
   --bro-border-accent: rgba(198, 154, 62, 0.5);
-  --bro-text: var(--foundry-ink);
-  --bro-text-muted: var(--foundry-ink-muted);
+  --bro-text: #f2ecde;
+  --bro-text-muted: #afa590;
   --bro-text-subtle: #948a76;
-  --bro-accent: var(--foundry-copper);
-  --bro-accent-strong: var(--foundry-copper-strong);
-  --bro-accent-soft: var(--foundry-brass);
+  --bro-accent: #d16a4d;
+  --bro-accent-strong: #e48060;
+  --bro-accent-soft: #d2a64a;
   --bro-accent-contrast: var(--foundry-canvas);
   --bro-focus: var(--foundry-brass);
   --bro-shadow: 0 24px 72px rgba(0, 0, 0, 0.55);
@@ -538,7 +538,7 @@ code {
   overflow: hidden auto;
   border-right: 1px solid var(--foundry-line);
   background: var(--foundry-canvas-subdued);
-  box-shadow: 12px 0 40px rgba(0, 0, 0, 0.08);
+  box-shadow: 12px 0 40px var(--shadow-soft-color);
   transition: width var(--bro-motion-medium) var(--bro-ease);
 }
 
@@ -727,7 +727,7 @@ code {
     height: 100%;
     padding: 0;
     border: 0;
-    background: rgba(0, 0, 0, 0.58);
+    background: var(--shadow-soft-color);
     cursor: default;
   }
 
@@ -3113,6 +3113,239 @@ code {
 .file-status-badge.deleted {
   background: var(--danger-surface);
   color: var(--danger);
+}
+
+/* Review Canvas & Instrument Toolbar */
+.review-canvas-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overflow: hidden;
+}
+
+.canvas-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.toolbar-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.canvas-sheet-select {
+  max-width: 180px;
+  font-size: 0.85rem;
+  padding: var(--space-1) var(--space-2);
+}
+
+.view-mode-tabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  border: 1px solid var(--border);
+}
+
+.mode-btn {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: calc(var(--radius-sm) - 2px);
+  cursor: pointer;
+  transition: all var(--bro-motion-fast) var(--bro-ease);
+}
+
+.mode-btn:hover {
+  color: var(--text);
+}
+
+.mode-btn.active {
+  background: var(--surface-raised);
+  color: var(--foundry-copper);
+  font-weight: 600;
+  box-shadow: 0 1px 2px var(--shadow-soft-color);
+}
+
+.opacity-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.opacity-slider {
+  width: 90px;
+  accent-color: var(--foundry-copper);
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.zoom-btn {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.zoom-btn:hover {
+  background: var(--surface-raised);
+}
+
+.zoom-level {
+  font-size: 0.8rem;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted);
+  min-width: 42px;
+  text-align: center;
+}
+
+.canvas-viewport {
+  position: relative;
+  width: 100%;
+  min-height: 480px;
+  max-height: 700px;
+  background: var(--surface-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  user-select: none;
+}
+
+.canvas-transform-wrapper {
+  position: absolute;
+  inset: 0;
+}
+
+.split-viewport-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  height: 100%;
+}
+
+.split-pane {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.pane-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  z-index: 5;
+}
+
+.canvas-layers-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.svg-render-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.canvas-markers-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+
+.canvas-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform var(--bro-motion-fast) var(--bro-ease);
+}
+
+.canvas-marker:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+  z-index: 10;
+}
+
+.finding-marker.severity-critical,
+.finding-marker.severity-error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.finding-marker.severity-warning {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.marker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 /* Findings Tab & Triage */

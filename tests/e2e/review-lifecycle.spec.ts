@@ -17,7 +17,7 @@ const REVIEW_PATH = "/reviews/rev_gateway_42";
 async function openReviewAndWaitForHydration(page: Page) {
   await page.goto(REVIEW_PATH);
   // The tab bar is a client component; clicking before hydration completes is a no-op.
-  await page.getByRole("button", { name: "Approve Review" }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: /Approve review/i }).waitFor({ state: "visible" });
   await page.waitForTimeout(1500);
 }
 
