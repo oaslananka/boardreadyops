@@ -8,29 +8,45 @@
  */
 :root {
   color-scheme: dark;
-  --bro-bg: #0b0e13;
-  --bro-bg-elevated: #10141b;
-  --bro-surface: #141924;
-  --bro-surface-strong: #1a2030;
-  --bro-surface-sunken: #080b10;
-  --bro-border: #232a38;
-  --bro-border-strong: #333c4e;
+  /* Foundry Editorial material system. Existing semantic aliases consume these primitives. */
+  --foundry-canvas: #13120f;
+  --foundry-canvas-subdued: #191713;
+  --foundry-surface: #1e1b17;
+  --foundry-surface-strong: #27231d;
+  --foundry-ink: #f2ecde;
+  --foundry-ink-muted: #afa590;
+  --foundry-ink-subtle: #807766;
+  --foundry-line: #3b352b;
+  --foundry-line-strong: #655b49;
+  --foundry-copper: #d16a4d;
+  --foundry-copper-strong: #e48060;
+  --foundry-copper-soft: #46261e;
+  --foundry-brass: #d2a64a;
+  --rail-width: 248px;
+  --rail-width-compact: 72px;
+  --bro-bg: var(--foundry-canvas);
+  --bro-bg-elevated: var(--foundry-canvas-subdued);
+  --bro-surface: var(--foundry-surface);
+  --bro-surface-strong: var(--foundry-surface-strong);
+  --bro-surface-sunken: #0f0e0c;
+  --bro-border: var(--foundry-line);
+  --bro-border-strong: var(--foundry-line-strong);
   --bro-border-accent: rgba(198, 154, 62, 0.5);
-  --bro-text: #ece5d3;
-  --bro-text-muted: #a9b0bd;
-  --bro-text-subtle: #7a828f;
-  --bro-accent: #c69a3e;
-  --bro-accent-strong: #e3b662;
-  --bro-accent-soft: #d9c9a4;
-  --bro-accent-contrast: #0b0e13;
-  --bro-focus: #e3b662;
+  --bro-text: var(--foundry-ink);
+  --bro-text-muted: var(--foundry-ink-muted);
+  --bro-text-subtle: #948a76;
+  --bro-accent: var(--foundry-copper);
+  --bro-accent-strong: var(--foundry-copper-strong);
+  --bro-accent-soft: var(--foundry-brass);
+  --bro-accent-contrast: var(--foundry-canvas);
+  --bro-focus: var(--foundry-brass);
   --bro-shadow: 0 24px 72px rgba(0, 0, 0, 0.55);
   --bro-shadow-soft: 0 14px 36px rgba(0, 0, 0, 0.35);
   /* Ledger geometry: near-square, so the surface reads as a filed document, not a widget. */
-  --bro-radius-sm: 0.25rem;
-  --bro-radius-md: 0.35rem;
-  --bro-radius-lg: 0.5rem;
-  --bro-radius-xl: 0.65rem;
+  --bro-radius-sm: 4px;
+  --bro-radius-md: 8px;
+  --bro-radius-lg: 12px;
+  --bro-radius-xl: 12px;
   --bro-motion-fast: 140ms;
   --bro-motion-medium: 220ms;
   --bro-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -112,22 +128,35 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
-    --bro-bg: #f6f2e8;
-    --bro-bg-elevated: #fbf9f3;
-    --bro-surface: #fffdf8;
-    --bro-surface-strong: #efe9db;
-    --bro-surface-sunken: #e8e1d0;
-    --bro-border: #dcd3c0;
-    --bro-border-strong: #b9ac91;
+    --foundry-canvas: #f1ede3;
+    --foundry-canvas-subdued: #e9e2d4;
+    --foundry-surface: #fbf8f0;
+    --foundry-surface-strong: #fffdf8;
+    --foundry-ink: #1a1915;
+    --foundry-ink-muted: #686154;
+    --foundry-ink-subtle: #8b8374;
+    --foundry-line: #d8cfbd;
+    --foundry-line-strong: #a99c83;
+    --foundry-copper: #a44730;
+    --foundry-copper-strong: #7d3323;
+    --foundry-copper-soft: #f1d8cd;
+    --foundry-brass: #9a701e;
+    --bro-bg: var(--foundry-canvas);
+    --bro-bg-elevated: var(--foundry-canvas-subdued);
+    --bro-surface: var(--foundry-surface);
+    --bro-surface-strong: var(--foundry-surface-strong);
+    --bro-surface-sunken: #e4dccd;
+    --bro-border: var(--foundry-line);
+    --bro-border-strong: var(--foundry-line-strong);
     --bro-border-accent: rgba(125, 95, 24, 0.55);
-    --bro-text: #12161d;
-    --bro-text-muted: #454d5b;
-    --bro-text-subtle: #626b7a;
-    --bro-accent: #7d5f18;
-    --bro-accent-strong: #634b12;
-    --bro-accent-soft: #6b4f14;
-    --bro-accent-contrast: #fffdf8;
-    --bro-focus: #7d5f18;
+    --bro-text: var(--foundry-ink);
+    --bro-text-muted: var(--foundry-ink-muted);
+    --bro-text-subtle: #686154;
+    --bro-accent: var(--foundry-copper);
+    --bro-accent-strong: var(--foundry-copper-strong);
+    --bro-accent-soft: var(--foundry-brass);
+    --bro-accent-contrast: var(--foundry-surface-strong);
+    --bro-focus: var(--foundry-copper-strong);
     --bro-shadow: 0 24px 72px rgba(40, 33, 18, 0.14);
     --bro-shadow-soft: 0 14px 36px rgba(40, 33, 18, 0.1);
     --code: #6b4f14;
@@ -153,22 +182,35 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bro-bg: #f6f2e8;
-  --bro-bg-elevated: #fbf9f3;
-  --bro-surface: #fffdf8;
-  --bro-surface-strong: #efe9db;
-  --bro-surface-sunken: #e8e1d0;
-  --bro-border: #dcd3c0;
-  --bro-border-strong: #b9ac91;
+  --foundry-canvas: #f1ede3;
+  --foundry-canvas-subdued: #e9e2d4;
+  --foundry-surface: #fbf8f0;
+  --foundry-surface-strong: #fffdf8;
+  --foundry-ink: #1a1915;
+  --foundry-ink-muted: #686154;
+  --foundry-ink-subtle: #8b8374;
+  --foundry-line: #d8cfbd;
+  --foundry-line-strong: #a99c83;
+  --foundry-copper: #a44730;
+  --foundry-copper-strong: #7d3323;
+  --foundry-copper-soft: #f1d8cd;
+  --foundry-brass: #9a701e;
+  --bro-bg: var(--foundry-canvas);
+  --bro-bg-elevated: var(--foundry-canvas-subdued);
+  --bro-surface: var(--foundry-surface);
+  --bro-surface-strong: var(--foundry-surface-strong);
+  --bro-surface-sunken: #e4dccd;
+  --bro-border: var(--foundry-line);
+  --bro-border-strong: var(--foundry-line-strong);
   --bro-border-accent: rgba(125, 95, 24, 0.55);
-  --bro-text: #12161d;
-  --bro-text-muted: #454d5b;
-  --bro-text-subtle: #626b7a;
-  --bro-accent: #7d5f18;
-  --bro-accent-strong: #634b12;
-  --bro-accent-soft: #6b4f14;
-  --bro-accent-contrast: #fffdf8;
-  --bro-focus: #7d5f18;
+  --bro-text: var(--foundry-ink);
+  --bro-text-muted: var(--foundry-ink-muted);
+  --bro-text-subtle: #686154;
+  --bro-accent: var(--foundry-copper);
+  --bro-accent-strong: var(--foundry-copper-strong);
+  --bro-accent-soft: var(--foundry-brass);
+  --bro-accent-contrast: var(--foundry-surface-strong);
+  --bro-focus: var(--foundry-copper-strong);
   --bro-shadow: 0 24px 72px rgba(40, 33, 18, 0.14);
   --bro-shadow-soft: 0 14px 36px rgba(40, 33, 18, 0.1);
   --code: #6b4f14;
@@ -3130,4 +3172,19 @@ code {
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+  }
+
+  .status-badge,
+  .panel,
+  .button,
+  input,
+  select,
+  textarea {
+    border: 1px solid CanvasText;
+  }
 }
