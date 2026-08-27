@@ -45681,11 +45681,14 @@ function isRiskLevel(v) {
   return typeof v === "string" && RISK_LEVELS.has(v);
 }
 function bomRiskSummaryFromFindings(findings) {
-  const riskFindings = findings.filter((f) => f.ruleId === "bom.risk-score" && f.details);
-  if (riskFindings.length === 0) {
+  const riskFindings = findings.filter(
+    (f) => f.ruleId === "bom.risk-score" && f.details !== void 0
+  );
+  const [firstFinding] = riskFindings;
+  if (firstFinding === void 0) {
     return void 0;
   }
-  const firstDetails = riskFindings[0].details;
+  const firstDetails = firstFinding.details;
   const totalComponents = typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
   const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
   const components = riskFindings.map((f) => {
