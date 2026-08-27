@@ -118,6 +118,8 @@ Product-quality HTML release dashboard with decision overview, score cards, gene
 
 BOM and CPL diff between two release candidates or evidence bundles. JSON, Markdown, and HTML outputs for PR comments and dashboard sections.
 
+> **Foundation landed:** the per-finding stable identity this diff engine needs (`Finding.fingerprint`) already existed locally (`src/core/diff/run.ts::diffRuns`) but was dropped at the cloud boundary. It now crosses the wire in `findingSchema` and `hardwareImpactV1Schema.evidence` ([ADR-0013](architecture/adr/0013-finding-fingerprint-wire-contract.md)), optional and backward compatible with an already-deployed CLI/Action. Cloud-side consumption (persisting fingerprints, cross-run lookup) is not yet built.
+
 ### 8. Variant-Aware Hardware Release ([Epic #268](https://github.com/oaslananka/boardreadyops/issues/268))
 
 Prototype and production variant support across generation, validation, packaging, and release decisions. `--variant` flag and variant-specific output paths.
@@ -153,6 +155,10 @@ Native GitHub App with check run lifecycle, PR comment strategy, and dashboard/e
 ### 16. Cloud Dashboard & Vercel Control Plane ([Epic #276](https://github.com/oaslananka/boardreadyops/issues/276))
 
 Hosted web dashboard and API on Vercel with GitHub App integration, artifact storage, and execution plane for KiCad-heavy jobs.
+
+> **Foundation landed:** `GET /api/v1/runs` is now a real, cursor-paginated, session-authenticated, tenant-scoped listing (`apps/web/lib/run-listing.ts`) rather than the previous hardcoded-empty stub — the first real product API surface beyond the runner protocol and dashboard pages. Bearer-token auth for the CLI (`BOARDREADYOPS_TOKEN`) still needs its own token-issuance design before it can be added. Object storage beyond the local filesystem driver is scoped out for now: it needs a redesign of the runner upload protocol (proxy-through-server today vs. presigned direct-to-storage URLs) that already-deployed runner binaries depend on, which deserves its own design pass rather than a drive-by change.
+>
+> Plan entitlement tiers were renamed to match the product strategy's Free/Team/Business naming, with a migration that preserves every installation's existing entitlements ([ADR-0014](architecture/adr/0014-seat-based-entitlement-tier-rename.md)). Stripe webhook signature verification exists as a tested primitive (`verifyStripeWebhook` in `@boardreadyops/cloud-core`); the route, event-idempotency store, and entitlement projection it would back are not yet built.
 
 ### 17. Golden Demo & Bad-Board Zoo ([Epic #277](https://github.com/oaslananka/boardreadyops/issues/277))
 
