@@ -16,6 +16,8 @@ describe("Interactive Review Components", () => {
       }),
     );
     expect(markup).toContain("findings-triage-toolbar");
+    expect(markup).toContain("finding-scan-row");
+    expect(markup).toContain("finding-detail-grid");
     expect(markup).toContain("kicad/track-clearance");
   });
 
@@ -26,6 +28,7 @@ describe("Interactive Review Components", () => {
       }),
     );
     expect(markup).toContain("Review Discussion");
+    expect(markup).toContain("engineering-thread");
     expect(markup).toContain("alex.kumar@acme.corp");
   });
 
@@ -39,5 +42,6 @@ describe("Interactive Review Components", () => {
     );
     expect(markup).toContain("Hardware Verification Checklist");
     expect(markup).toContain("Formal Approvals");
+    expect(markup).toContain("signoff-ledger");
   });
 });

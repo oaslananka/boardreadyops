@@ -14,8 +14,9 @@
       "!.stryker-tmp",
       "!site",
       "!sbom.cyclonedx.json",
-      "!**/node_modules",
-      "!apps/web/.next"
+      "!apps/web/.next",
+      "!playwright-report",
+      "!test-results"
     ]
   },
   "formatter": {

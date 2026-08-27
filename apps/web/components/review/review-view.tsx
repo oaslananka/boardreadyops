@@ -147,8 +147,12 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
         onRequestChanges={() => setApprovalModalType("request_changes")}
       />
 
-      <nav className="review-tabs-navigation" aria-label="Review Sections">
+      <div className="review-workspace-nav review-tabs-navigation" aria-label="Review workspace" role="tablist">
         <button
+          id="tab-overview"
+          role="tab"
+          aria-selected={activeTab === "overview"}
+          aria-controls="panel-overview"
           type="button"
           className={`review-tab-link ${activeTab === "overview" ? "active" : ""}`}
           onClick={() => setActiveTab("overview")}
@@ -156,6 +160,10 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
           Overview
         </button>
         <button
+          id="tab-changes"
+          role="tab"
+          aria-selected={activeTab === "changes"}
+          aria-controls="panel-changes"
           type="button"
           className={`review-tab-link ${activeTab === "changes" ? "active" : ""}`}
           onClick={() => setActiveTab("changes")}
@@ -163,6 +171,10 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
           Changes ({review.changedFiles.length})
         </button>
         <button
+          id="tab-findings"
+          role="tab"
+          aria-selected={activeTab === "findings"}
+          aria-controls="panel-findings"
           type="button"
           className={`review-tab-link ${activeTab === "findings" ? "active" : ""}`}
           onClick={() => setActiveTab("findings")}
@@ -171,6 +183,10 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
           {blockingCount > 0 ? <span className="tab-pill danger">{blockingCount}</span> : null}
         </button>
         <button
+          id="tab-discussion"
+          role="tab"
+          aria-selected={activeTab === "discussion"}
+          aria-controls="panel-discussion"
           type="button"
           className={`review-tab-link ${activeTab === "discussion" ? "active" : ""}`}
           onClick={() => setActiveTab("discussion")}
@@ -178,6 +194,10 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
           Discussion ({review.comments.length})
         </button>
         <button
+          id="tab-checklist"
+          role="tab"
+          aria-selected={activeTab === "checklist"}
+          aria-controls="panel-checklist"
           type="button"
           className={`review-tab-link ${activeTab === "checklist" ? "active" : ""}`}
           onClick={() => setActiveTab("checklist")}
@@ -186,15 +206,19 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
           {incompleteChecklistCount > 0 ? <span className="tab-pill warning">{incompleteChecklistCount}</span> : null}
         </button>
         <button
+          id="tab-evidence"
+          role="tab"
+          aria-selected={activeTab === "evidence"}
+          aria-controls="panel-evidence"
           type="button"
           className={`review-tab-link ${activeTab === "evidence" ? "active" : ""}`}
           onClick={() => setActiveTab("evidence")}
         >
           Evidence
         </button>
-      </nav>
+      </div>
 
-      <main className="review-tab-body">
+      <main id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="review-tab-body">
         {activeTab === "overview" ? <OverviewTab review={review} /> : null}
         {activeTab === "changes" ? <ChangesTab review={review} /> : null}
         {activeTab === "findings" ? (

@@ -36,7 +36,7 @@ export function DecisionModal({ finding, targetDisposition, onConfirm, onClose }
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="decision-modal-title">
-      <div className="modal-panel">
+      <div className="modal-panel panel surface-raised">
         <header className="modal-header">
           <h2 id="decision-modal-title">
             Record Finding Decision: <span className="text-highlight">{targetDisposition.replace("_", " ")}</span>

@@ -13,6 +13,7 @@ export function ChangesTab({ review }: { review: DemoReview }) {
       <Panel
         title="Schematic & PCB Canvas"
         description="Rendered from this revision's actual findings and changed sheets/layers. Pan, zoom, and open a finding marker for detail."
+        tone="raised"
       >
         {!hasSchematicOrPcbChanges || !review.headSnapshots || review.headSnapshots.length === 0 ? (
           <p className="empty-notice">No schematic or PCB files modified in this revision.</p>
@@ -24,13 +25,14 @@ export function ChangesTab({ review }: { review: DemoReview }) {
       <Panel
         title="PCB Layout & Stackup Changes"
         description="Copper traces, via placements, and keepout boundary modifications."
+        tone="default"
       >
         {pcbs.length === 0 ? (
           <p className="empty-notice">No PCB files modified.</p>
         ) : (
           <div className="pcb-diff-grid">
             {pcbs.map((pcb) => (
-              <div key={pcb.path} className="pcb-card panel">
+              <div key={pcb.path} className="pcb-card panel surface-default">
                 <div className="pcb-card-header">
                   <h4>{pcb.path.split("/").pop()}</h4>
                   <span className={`file-status-badge ${pcb.status}`}>{pcb.status}</span>
@@ -42,7 +44,7 @@ export function ChangesTab({ review }: { review: DemoReview }) {
         )}
       </Panel>
 
-      <Panel title="Bill of Materials (BOM) Delta">
+      <Panel title="Bill of Materials (BOM) Delta" tone="default">
         {review.bomChanges.length === 0 ? (
           <p className="empty-notice">No BOM changes recorded for this revision.</p>
         ) : (

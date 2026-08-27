@@ -1,5 +1,5 @@
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -346,5 +346,84 @@ describe("runner artifact transport routes", () => {
     expect(response.status).toBe(409);
     expect(completeUpload).not.toHaveBeenCalled();
     expect(failUpload).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 if completeUpload metadata persistence fails", async () => {
+    beginUpload.mockResolvedValue({
+      status: "accepted",
+      artifactId,
+      runId,
+      executionAttemptId: attemptId,
+      leaseId,
+      storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
+      declaredBytes: 5,
+      expectedSha256: createHash("sha256").update("hello").digest("hex"),
+    });
+    completeUpload.mockRejectedValue(new Error("Database offline"));
+
+    const response = await handleRunnerArtifactUploadRequest(
+      uploadRequest("hello"),
+      artifactId,
+      dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(failUpload).toHaveBeenCalledWith({
+      artifactId,
+      uploadToken,
+      reason: "Artifact metadata persistence failed.",
+    });
+  });
+
+  it("returns 410 if completed upload status is expired", async () => {
+    beginUpload.mockResolvedValue({
+      status: "accepted",
+      artifactId,
+      runId,
+      executionAttemptId: attemptId,
+      leaseId,
+      storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
+      declaredBytes: 5,
+      expectedSha256: createHash("sha256").update("hello").digest("hex"),
+    });
+    completeUpload.mockResolvedValue({ status: "expired" });
+
+    const response = await handleRunnerArtifactUploadRequest(
+      uploadRequest("hello"),
+      artifactId,
+      dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
+    );
+
+    expect(response.status).toBe(410);
+  });
+
+  it("returns 409 if artifact destination already exists", async () => {
+    const finalPath = path.join(requireStorageRoot(), runId, attemptId, `${artifactId}.bin`);
+    await mkdir(path.dirname(finalPath), { recursive: true });
+    await writeFile(finalPath, "already-exists");
+
+    beginUpload.mockResolvedValue({
+      status: "accepted",
+      artifactId,
+      runId,
+      executionAttemptId: attemptId,
+      leaseId,
+      storagePath: `${runId}/${attemptId}/${artifactId}.bin`,
+      declaredBytes: 5,
+      expectedSha256: createHash("sha256").update("hello").digest("hex"),
+    });
+
+    const response = await handleRunnerArtifactUploadRequest(
+      uploadRequest("hello"),
+      artifactId,
+      dependencies({ ARTIFACT_STORAGE_DRIVER: "local", ARTIFACT_STORAGE_ROOT: storageRoot }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(failUpload).toHaveBeenCalledWith({
+      artifactId,
+      uploadToken,
+      reason: "Artifact destination already exists or is unavailable.",
+    });
   });
 });
