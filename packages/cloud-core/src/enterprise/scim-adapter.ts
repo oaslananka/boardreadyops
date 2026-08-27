@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 export type ScimUser = {
   id: string;
   externalId: string | null;
@@ -24,7 +26,7 @@ export class InMemoryScimAdapter implements ScimAdapter {
   }
   async provisionUser(tenantId: string, input: Omit<ScimUser, "id">): Promise<ScimUser> {
     const map = this.ensure(tenantId);
-    const id = `scim_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const id = `scim_${randomUUID()}`;
     const user: ScimUser = { id, ...input };
     map.set(id, user);
     return user;

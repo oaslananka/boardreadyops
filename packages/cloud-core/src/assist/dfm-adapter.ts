@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 export type DfmVendor = "valor" | "generic";
 type DfmStatus = "pending" | "running" | "passed" | "failed" | "needs_review";
 
@@ -35,7 +37,7 @@ export class InMemoryDfmAdapter implements DfmAdapter {
     artifactKey: string;
     profile: string;
   }): Promise<DfmSubmission> {
-    const id = `dfm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = `dfm_${randomUUID()}`;
     const sub: DfmSubmission = {
       id,
       tenantId: input.tenantId,

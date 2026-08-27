@@ -94,10 +94,7 @@ export function computeFindingDiff(
       const headRank = severityRank[headFinding.severity] ?? 1;
       const baseRank = severityRank[baseFinding.severity] ?? 1;
 
-      if (headRank > baseRank) {
-        diffState = "regressed";
-        counts.regressed += 1;
-      } else if (baseFinding.currentDisposition === "fixed") {
+      if (headRank > baseRank || baseFinding.currentDisposition === "fixed") {
         diffState = "regressed";
         counts.regressed += 1;
       } else {
@@ -154,9 +151,16 @@ export function computeFindingDiff(
   };
 }
 
+// Ordinal (code-unit) compare, not localeCompare: this order feeds a SHA-256 digest, and
+// localeCompare's collation can vary across ICU builds/locales — it must stay byte-identical
+// everywhere the digest is computed.
+function ordinalCompare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export function computeEvidenceDigest(input: EvidenceDigestInput): string {
-  const sortedFingerprints = [...input.findingFingerprints].sort();
-  const sortedArtifacts = [...(input.artifactDigests ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedFingerprints = [...input.findingFingerprints].sort(ordinalCompare);
+  const sortedArtifacts = [...(input.artifactDigests ?? [])].sort((a, b) => ordinalCompare(a.name, b.name));
 
   const canonicalPayload = JSON.stringify({
     toolVersion: input.toolVersion,
