@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS external_review_invitations (
   id TEXT PRIMARY KEY,
-  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL,
   review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
   recipient_email TEXT NOT NULL,
   recipient_name TEXT NOT NULL,
