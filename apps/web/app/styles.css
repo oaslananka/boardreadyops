@@ -1649,8 +1649,6 @@ code {
   min-width: 14rem;
 }
 
-.artifact-table tbody th span,
-.artifact-table tbody th time,
 .cell-note {
   display: block;
   margin-top: var(--space-1);
