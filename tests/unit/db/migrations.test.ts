@@ -7,8 +7,12 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(49);
+    expect(cloudDatabaseSchemaVersion).toBe(50);
     expect(cloudDatabaseModels).toContain("ApiToken");
+    expect(cloudDatabaseModels).toContain("FindingDecision");
+    expect(cloudDatabaseModels).toContain("FindingAssignment");
+    expect(cloudDatabaseModels).toContain("ReviewComment");
+    expect(cloudDatabaseModels).toContain("ReviewApproval");
     expect(cloudDatabaseModels).toContain("BoardSupplyWatch");
     expect(cloudDatabaseModels).toContain("ComponentLifecycleObservation");
     expect(cloudDatabaseModels).toContain("Board");
@@ -86,6 +90,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0047_seat_based_entitlement_tiers.sql",
       "0048_review_domain_spine.sql",
       "0049_api_tokens.sql",
+      "0050_finding_collaboration.sql",
     ]);
   });
 
