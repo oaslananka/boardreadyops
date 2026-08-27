@@ -8,6 +8,16 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./runner-protocol": {
+      "types": "./src/runner-protocol.ts",
+      "import": "./src/runner-protocol.ts",
+      "default": "./src/runner-protocol.ts"
+    },
+    "./review": {
+      "types": "./src/review.ts",
+      "import": "./src/review.ts",
+      "default": "./src/review.ts"
     }
   },
   "scripts": {

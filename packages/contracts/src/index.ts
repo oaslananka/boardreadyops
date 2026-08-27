@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { artifactContentTypeSchema, runnerLeaseContextSchema } from "./runner-protocol.js";
 
+export * from "./review.js";
 export * from "./runner-protocol.js";
 
 export const releaseRunStatusSchema = z.enum(["queued", "running", "completed", "timed_out", "failed"]);
