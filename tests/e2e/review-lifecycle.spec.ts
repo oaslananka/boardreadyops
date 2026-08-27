@@ -67,14 +67,18 @@ test.describe("Review lifecycle", () => {
     await expect(page.getByText(uniqueBody)).toBeVisible();
   });
 
-  test("5. Assignee is visible per finding (no assignment control wired up yet)", async ({ page }) => {
-    // FindingsTab currently only displays `finding.assignees`; there is no UI action to
-    // change it (the onAssign callback is accepted but never invoked from this component).
-    // This test documents the current, real state rather than asserting a control that
-    // does not exist.
+  test("5. Assigning a finding via the assignee input adds it to that finding's card", async ({ page }) => {
     await openReviewAndWaitForHydration(page);
     await openTab(page, "Findings (6)");
     await expect(page.getByText("sarah.chen@acme.corp").first()).toBeVisible();
+
+    const card = page.locator(".finding-triage-card").first();
+    const uniqueAssignee = `e2e.reviewer.${Date.now()}@acme.corp`;
+    await card.locator(".assignee-input").fill(uniqueAssignee);
+    await card.locator(".assignee-add-btn").click();
+
+    await expect(card.getByText(uniqueAssignee)).toBeVisible();
+    await expect(card.locator(".assignee-input")).toHaveValue("");
   });
 
   test("6. Checklist & Approvals tab reflects pending items and prior invalidated approval", async ({ page }) => {
