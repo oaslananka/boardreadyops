@@ -105377,6 +105377,845 @@ function sarifPositiveInteger(value) {
 // src/action/cloud-publish.ts
 var import_node_crypto6 = require("node:crypto");
 
+// packages/contracts/src/runner-protocol.ts
+var lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
+var capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
+var githubOwnerPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
+var githubRepositoryPattern = /^[A-Za-z0-9_.-]{1,100}$/u;
+var strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+var artifactContentTypePattern = /^[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*\/[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*$/u;
+var runnerProtocolVersionSchema = external_exports.literal(1);
+var runnerWorkerClassSchema = external_exports.enum(["managed", "self_hosted"]);
+var runnerSigningAlgorithmSchema = external_exports.literal("ed25519");
+var runnerIdentifierSchema = external_exports.string().regex(lowercaseUuidPattern, "identifier must be a lowercase UUID");
+var runnerRequestTimestampSchema = external_exports.number().int().nonnegative().max(9999999999);
+var runnerRequestNonceSchema = external_exports.string().min(22).max(128).regex(base64UrlPattern);
+var runnerRequestSignatureSchema = external_exports.string().length(86).regex(base64UrlPattern);
+var runnerVersionSchema = external_exports.string().max(64).regex(strictVersionPattern).refine(
+  (value) => value.split(".").every((component) => Number.isSafeInteger(Number(component))),
+  "version components must be safe integers"
+);
+var runnerLeaseSecretSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern);
+var runnerEnrollmentTokenSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern);
+var runnerCapabilitySchema = external_exports.string().trim().min(1).max(128).regex(capabilityPattern);
+var artifactContentTypeSchema = external_exports.string().trim().min(3).max(255).regex(artifactContentTypePattern, "artifact content type must be a media type without parameters").transform((value) => value.toLowerCase());
+var runnerSafeModeReasonSchema = external_exports.enum(["draft-pull-request", "fork-pull-request", "private-repository"]);
+var runnerSignedRequestEnvelopeSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  algorithm: runnerSigningAlgorithmSchema,
+  workerClass: runnerWorkerClassSchema,
+  runnerId: runnerIdentifierSchema,
+  runnerVersion: runnerVersionSchema.optional(),
+  runnerVersionSignature: runnerRequestSignatureSchema.optional(),
+  timestamp: runnerRequestTimestampSchema,
+  nonce: runnerRequestNonceSchema,
+  signature: runnerRequestSignatureSchema
+}).strict().superRefine((value, context5) => {
+  if (value.runnerVersion === void 0 !== (value.runnerVersionSignature === void 0)) {
+    context5.addIssue({
+      code: "custom",
+      path: [value.runnerVersion === void 0 ? "runnerVersion" : "runnerVersionSignature"],
+      message: "runner version and version signature must be supplied together"
+    });
+  }
+});
+var runnerClaimRequestSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  workerClass: runnerWorkerClassSchema,
+  capabilities: external_exports.array(runnerCapabilitySchema).max(64).default([]),
+  labels: external_exports.array(runnerCapabilitySchema).max(32).default([])
+}).strict();
+var runnerRepositoryDescriptorSchema = external_exports.object({
+  owner: external_exports.string().regex(githubOwnerPattern),
+  name: external_exports.string().regex(githubRepositoryPattern),
+  commitSha: external_exports.string().regex(/^[0-9a-f]{40}$/u),
+  private: external_exports.boolean()
+}).strict();
+var runnerSafeModeSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  reasons: external_exports.array(runnerSafeModeReasonSchema).max(3)
+}).strict().superRefine((value, context5) => {
+  if (value.enabled && value.reasons.length === 0) {
+    context5.addIssue({
+      code: "custom",
+      path: ["reasons"],
+      message: "safe mode requires at least one reason"
+    });
+  }
+  if (!value.enabled && value.reasons.length > 0) {
+    context5.addIssue({
+      code: "custom",
+      path: ["reasons"],
+      message: "safe-mode reasons require safe mode to be enabled"
+    });
+  }
+});
+var runnerClaimedJobSchema = external_exports.object({
+  leaseId: runnerIdentifierSchema,
+  leaseToken: runnerLeaseSecretSchema,
+  runId: runnerIdentifierSchema,
+  executionAttemptId: runnerIdentifierSchema,
+  leaseExpiresAt: external_exports.string().datetime({ offset: true }),
+  maximumLeaseExpiresAt: external_exports.string().datetime({ offset: true }),
+  sourceMode: external_exports.enum(["broker", "customer_checkout"]),
+  repository: runnerRepositoryDescriptorSchema,
+  safeMode: runnerSafeModeSchema
+}).strict().superRefine((value, context5) => {
+  if (Date.parse(value.leaseExpiresAt) > Date.parse(value.maximumLeaseExpiresAt)) {
+    context5.addIssue({
+      code: "custom",
+      path: ["leaseExpiresAt"],
+      message: "lease expiry cannot exceed the maximum lease expiry"
+    });
+  }
+  if (value.sourceMode === "broker" && value.safeMode.reasons.includes("fork-pull-request")) {
+    context5.addIssue({
+      code: "custom",
+      path: ["sourceMode"],
+      message: "broker source mode cannot be assigned to fork pull requests"
+    });
+  }
+});
+var runnerClaimResponseSchema = external_exports.discriminatedUnion("status", [
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.literal("empty"),
+    retryAfterSeconds: external_exports.number().int().min(1).max(300)
+  }).strict(),
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.literal("claimed"),
+    job: runnerClaimedJobSchema
+  }).strict()
+]);
+var runnerLeaseContextSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  runId: runnerIdentifierSchema,
+  executionAttemptId: runnerIdentifierSchema,
+  leaseId: runnerIdentifierSchema,
+  leaseToken: runnerLeaseSecretSchema
+}).strict();
+var runnerLeaseStageSchema = external_exports.enum([
+  "claimed",
+  "preparing_source",
+  "running",
+  "uploading_artifacts",
+  "reporting"
+]);
+var runnerLeaseHeartbeatRequestSchema = runnerLeaseContextSchema.extend({
+  stage: runnerLeaseStageSchema,
+  progressPercent: external_exports.number().int().min(0).max(100).optional(),
+  message: external_exports.string().trim().min(1).max(500).optional()
+}).strict();
+var runnerLeaseHeartbeatResponseSchema = external_exports.union([
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.literal("active"),
+    leaseExpiresAt: external_exports.string().datetime({ offset: true }),
+    maximumLeaseExpiresAt: external_exports.string().datetime({ offset: true })
+  }).strict(),
+  external_exports.object({
+    protocolVersion: runnerProtocolVersionSchema,
+    status: external_exports.enum(["expired", "revoked", "completed", "stale"])
+  }).strict()
+]);
+var runnerLeaseRelinquishRequestSchema = runnerLeaseContextSchema.extend({
+  reason: external_exports.enum(["shutdown", "capacity", "operator", "job_error"]),
+  message: external_exports.string().trim().min(1).max(1e3).optional()
+}).strict();
+var runnerArtifactDeclarationSchema = external_exports.object({
+  kind: external_exports.string().trim().min(1).max(128),
+  name: external_exports.string().trim().min(1).max(256),
+  role: external_exports.string().trim().min(1).max(128),
+  bytes: external_exports.number().int().nonnegative().max(2147483647),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u).optional(),
+  contentType: artifactContentTypeSchema.optional()
+}).strict();
+var runnerArtifactCapabilityRequestSchema = runnerLeaseContextSchema.extend({
+  artifacts: external_exports.array(runnerArtifactDeclarationSchema).min(1).max(100)
+}).strict();
+function validArtifactStoragePath(value) {
+  const segments = value.split("/");
+  return !value.startsWith("/") && !value.includes("\\") && Array.from(value).every((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code >= 32 && code !== 127;
+  }) && segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+}
+var runnerArtifactUploadCapabilitySchema = external_exports.object({
+  artifactId: runnerIdentifierSchema,
+  storagePath: external_exports.string().trim().min(1).max(1024).refine(validArtifactStoragePath, "artifact storage path must remain relative to the configured artifact root"),
+  uploadUrl: external_exports.string().url().max(4096).refine((value) => new URL(value).protocol === "https:", "upload URL must use HTTPS"),
+  expiresAt: external_exports.string().datetime({ offset: true }),
+  maximumBytes: external_exports.number().int().nonnegative().max(2147483647)
+}).strict();
+var runnerArtifactCapabilityResponseSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  uploads: external_exports.array(runnerArtifactUploadCapabilitySchema).min(1).max(100)
+}).strict();
+var runnerRegistrationActivationRequestSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  enrollmentToken: runnerEnrollmentTokenSchema,
+  algorithm: runnerSigningAlgorithmSchema,
+  publicKey: external_exports.string().trim().min(32).max(16384),
+  capabilities: external_exports.array(runnerCapabilitySchema).max(64).default([])
+}).strict();
+var runnerRegistrationActivationResponseSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  status: external_exports.enum(["activated", "replayed"]),
+  registrationId: runnerIdentifierSchema
+}).strict();
+var runnerMutationResponseSchema = external_exports.object({
+  protocolVersion: runnerProtocolVersionSchema,
+  status: external_exports.enum(["accepted", "replayed"])
+}).strict();
+
+// packages/contracts/src/billing.ts
+var billingTierSchema = external_exports.enum(["free", "team", "business", "enterprise"]);
+var billingIntervalSchema = external_exports.enum(["month", "year"]);
+var billingCustomerSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  stripeCustomerId: external_exports.string().min(1).nullable(),
+  tier: billingTierSchema,
+  status: external_exports.enum(["active", "trialing", "past_due", "canceled", "incomplete"]),
+  trialEndsAt: external_exports.string().datetime().nullable(),
+  graceEndsAt: external_exports.string().datetime().nullable(),
+  currentPeriodEnd: external_exports.string().datetime().nullable(),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime()
+});
+var billingSubscriptionSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  stripeSubscriptionId: external_exports.string().min(1),
+  stripePriceId: external_exports.string().min(1),
+  tier: billingTierSchema,
+  interval: billingIntervalSchema,
+  status: external_exports.string().min(1),
+  quantity: external_exports.number().int().positive(),
+  currentPeriodStart: external_exports.string().datetime(),
+  currentPeriodEnd: external_exports.string().datetime(),
+  cancelAtPeriodEnd: external_exports.boolean(),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime()
+});
+var billingEventSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  tenantId: external_exports.string().min(1).nullable(),
+  type: external_exports.string().min(1),
+  stripeEventId: external_exports.string().min(1),
+  payload: external_exports.unknown(),
+  processedAt: external_exports.string().datetime().nullable(),
+  createdAt: external_exports.string().datetime()
+});
+var billingActivitySchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  actorId: external_exports.string().min(1),
+  actorType: external_exports.enum(["internal", "guest", "system"]),
+  action: external_exports.enum(["policy_update", "disposition", "release_create", "workspace_manage", "comment", "approval"]),
+  createdAt: external_exports.string().datetime()
+});
+var checkoutRequestSchema = external_exports.object({
+  tier: external_exports.enum(["team", "business"]),
+  interval: billingIntervalSchema.default("month"),
+  successUrl: external_exports.string().url().optional(),
+  cancelUrl: external_exports.string().url().optional()
+});
+var portalRequestSchema = external_exports.object({
+  returnUrl: external_exports.string().url().optional()
+});
+var billingPriceConfigSchema = external_exports.object({
+  teamMonthlyPriceId: external_exports.string().min(1),
+  teamYearlyPriceId: external_exports.string().min(1),
+  businessMonthlyPriceId: external_exports.string().min(1),
+  businessYearlyPriceId: external_exports.string().min(1)
+});
+
+// packages/contracts/src/review.ts
+var findingDiffStates = ["new", "persistent", "regressed", "resolved"];
+var findingDiffStateSchema = external_exports.enum(findingDiffStates);
+var findingDispositions = ["open", "fixed", "accepted_risk", "false_positive", "not_applicable"];
+var findingDispositionSchema = external_exports.enum(findingDispositions);
+var evidenceStates = ["current", "stale", "unavailable", "incomplete"];
+var evidenceStateSchema = external_exports.enum(evidenceStates);
+var reviewDecisions = ["pending", "approved", "changes_requested"];
+var reviewDecisionSchema = external_exports.enum(reviewDecisions);
+var reviewStatuses = ["draft", "active", "awaiting_decision", "completed", "superseded"];
+var reviewStatusSchema = external_exports.enum(reviewStatuses);
+var uploadModes = ["metadata", "snapshots", "source"];
+var uploadModeSchema = external_exports.enum(uploadModes);
+var sha256HexSchema = external_exports.string().regex(/^[0-9a-f]{64}$/u, "must be a 64-character lowercase SHA-256 hex digest");
+var commitShaSchema = external_exports.string().min(7).max(64);
+var reviewSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  repositoryId: external_exports.string().min(1),
+  pullRequestNumber: external_exports.number().int().positive().optional(),
+  title: external_exports.string().min(1).max(256),
+  status: reviewStatusSchema,
+  decision: reviewDecisionSchema,
+  baseRunId: external_exports.string().uuid().optional(),
+  headRunId: external_exports.string().uuid(),
+  currentRevisionId: external_exports.string().uuid(),
+  createdBy: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime(),
+  completedAt: external_exports.string().datetime().optional()
+});
+var reviewRevisionSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  sequence: external_exports.number().int().positive(),
+  baseRunId: external_exports.string().uuid().optional(),
+  headRunId: external_exports.string().uuid(),
+  baseCommitSha: commitShaSchema.optional(),
+  headCommitSha: commitShaSchema,
+  evidenceDigest: sha256HexSchema,
+  createdAt: external_exports.string().datetime()
+});
+var findingDecisionSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  findingFingerprint: sha256HexSchema,
+  disposition: findingDispositionSchema,
+  reason: external_exports.string().min(1).max(4e3),
+  actorId: external_exports.string().min(1),
+  evidenceDigest: sha256HexSchema,
+  expiresAt: external_exports.string().datetime().optional(),
+  createdAt: external_exports.string().datetime()
+});
+var createFindingDecisionRequestSchema = external_exports.object({
+  disposition: findingDispositionSchema,
+  reason: external_exports.string().min(1).max(4e3),
+  expiresAt: external_exports.string().datetime().optional(),
+  evidenceDigest: sha256HexSchema
+}).superRefine((data, ctx) => {
+  if (data.disposition === "accepted_risk") {
+    if (data.reason.trim().length < 20) {
+      ctx.addIssue({
+        code: external_exports.ZodIssueCode.custom,
+        message: "Accepted risk disposition requires a detailed reason of at least 20 characters",
+        path: ["reason"]
+      });
+    }
+  }
+});
+var findingAssignmentSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  findingFingerprint: sha256HexSchema,
+  assigneeId: external_exports.string().min(1),
+  assignedBy: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime()
+});
+var reviewCommentSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  findingFingerprint: sha256HexSchema.optional(),
+  parentCommentId: external_exports.string().uuid().optional(),
+  body: external_exports.string().min(1).max(1e4),
+  authorId: external_exports.string().min(1),
+  evidenceDigest: sha256HexSchema,
+  state: external_exports.enum(["open", "resolved", "stale"]),
+  createdAt: external_exports.string().datetime(),
+  resolvedAt: external_exports.string().datetime().optional()
+});
+var createReviewCommentRequestSchema = external_exports.object({
+  findingFingerprint: sha256HexSchema.optional(),
+  parentCommentId: external_exports.string().uuid().optional(),
+  body: external_exports.string().trim().min(1).max(1e4),
+  evidenceDigest: sha256HexSchema
+});
+var reviewApprovalSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  revisionId: external_exports.string().uuid(),
+  reviewerId: external_exports.string().min(1),
+  decision: external_exports.enum(["approved", "changes_requested"]),
+  evidenceDigest: sha256HexSchema,
+  createdAt: external_exports.string().datetime(),
+  invalidatedAt: external_exports.string().datetime().optional(),
+  invalidationReason: external_exports.string().max(1e3).optional()
+});
+var createReviewApprovalRequestSchema = external_exports.object({
+  decision: external_exports.enum(["approved", "changes_requested"]),
+  evidenceDigest: sha256HexSchema,
+  reason: external_exports.string().max(1e3).optional()
+});
+var uploadManifestItemSchema = external_exports.object({
+  kind: external_exports.string().min(1).max(64),
+  path: external_exports.string().min(1).max(1024),
+  contentType: external_exports.string().min(1).max(128),
+  bytes: external_exports.number().int().nonnegative().max(1073741824),
+  // 1GB limit per item
+  sha256: sha256HexSchema,
+  dataClass: external_exports.enum(["metadata", "snapshot", "source"])
+});
+var uploadManifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  uploadMode: uploadModeSchema,
+  repositoryId: external_exports.string().min(1),
+  commitSha: commitShaSchema,
+  toolVersion: external_exports.string().min(1),
+  configDigest: sha256HexSchema,
+  rulePackDigest: sha256HexSchema,
+  items: external_exports.array(uploadManifestItemSchema).max(5e3)
+}).superRefine((data, ctx) => {
+  const hasSource = data.items.some((item) => item.dataClass === "source");
+  if (hasSource && data.uploadMode !== "source") {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: "Manifest containing source files requires explicit uploadMode 'source'",
+      path: ["uploadMode"]
+    });
+  }
+});
+var visualSnapshotSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewRevisionId: external_exports.string().uuid(),
+  artifactId: external_exports.string().uuid(),
+  pageOrLayer: external_exports.string().min(1).max(256),
+  width: external_exports.number().int().positive(),
+  height: external_exports.number().int().positive(),
+  sha256: sha256HexSchema,
+  anchorMapSha256: sha256HexSchema
+});
+var externalReviewLinkSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  tokenDigest: sha256HexSchema,
+  createdBy: external_exports.string().min(1),
+  allowComments: external_exports.boolean(),
+  allowApprovals: external_exports.boolean(),
+  allowSnapshots: external_exports.boolean(),
+  allowSourceDownload: external_exports.boolean(),
+  expiresAt: external_exports.string().datetime(),
+  revokedAt: external_exports.string().datetime().optional(),
+  lastUsedAt: external_exports.string().datetime().optional(),
+  createdAt: external_exports.string().datetime()
+});
+var createExternalReviewLinkRequestSchema = external_exports.object({
+  allowComments: external_exports.boolean().default(true),
+  allowApprovals: external_exports.boolean().default(false),
+  allowSnapshots: external_exports.boolean().default(true),
+  allowSourceDownload: external_exports.boolean().default(false),
+  durationDays: external_exports.number().int().min(1).max(30).default(7)
+});
+var reviewFindingDiffItemSchema = external_exports.object({
+  fingerprint: sha256HexSchema,
+  ruleId: external_exports.string().min(1),
+  severity: external_exports.enum(["error", "high", "medium", "low", "info"]),
+  message: external_exports.string(),
+  path: external_exports.string().optional(),
+  project: external_exports.string().optional(),
+  diffState: findingDiffStateSchema,
+  currentDisposition: findingDispositionSchema,
+  activeDecision: findingDecisionSchema.optional(),
+  assignment: findingAssignmentSchema.optional(),
+  commentCount: external_exports.number().int().nonnegative()
+});
+
+// packages/contracts/src/evidence-ledger.ts
+var evidenceItemSchema = external_exports.object({
+  name: external_exports.string().min(1),
+  path: external_exports.string().min(1),
+  type: external_exports.string().min(1),
+  sizeBytes: external_exports.number().int().nonnegative(),
+  sha256: external_exports.string().min(64).max(64)
+});
+var ledgerDecisionRecordSchema = external_exports.object({
+  fingerprint: external_exports.string().min(64).max(64),
+  disposition: findingDispositionSchema,
+  reason: external_exports.string().min(1),
+  owner: external_exports.string().min(1),
+  expiresAt: external_exports.string().nullable().optional(),
+  timestamp: external_exports.string().datetime()
+});
+var ledgerApprovalRecordSchema = external_exports.object({
+  approverId: external_exports.string().min(1),
+  status: external_exports.enum(["approved", "changes_requested"]),
+  reason: external_exports.string().optional(),
+  isBreakGlass: external_exports.boolean().default(false),
+  timestamp: external_exports.string().datetime()
+});
+var ledgerChecklistRecordSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  title: external_exports.string().min(1),
+  completed: external_exports.boolean(),
+  completedBy: external_exports.string().optional(),
+  completedAt: external_exports.string().optional()
+});
+var evidenceLedgerDocumentSchema = external_exports.object({
+  version: external_exports.literal(1),
+  repository: external_exports.string().min(1),
+  baseSha: external_exports.string().min(7).max(64),
+  headSha: external_exports.string().min(7).max(64),
+  evidenceState: external_exports.enum(["current", "stale", "invalid"]),
+  evidenceDigest: external_exports.string().min(64).max(64),
+  manifest: external_exports.array(evidenceItemSchema),
+  decisions: external_exports.array(ledgerDecisionRecordSchema),
+  approvals: external_exports.array(ledgerApprovalRecordSchema),
+  checklist: external_exports.array(ledgerChecklistRecordSchema),
+  createdAt: external_exports.string().datetime()
+});
+var ledgerVerificationResultSchema = external_exports.object({
+  verified: external_exports.boolean(),
+  calculatedDigest: external_exports.string().min(64).max(64),
+  expectedDigest: external_exports.string().min(64).max(64),
+  manifestCheckPassed: external_exports.boolean(),
+  tamperedItems: external_exports.array(external_exports.string()),
+  missingItems: external_exports.array(external_exports.string()),
+  errors: external_exports.array(external_exports.string())
+});
+
+// packages/contracts/src/external-review.ts
+var externalReviewScopeSchema = external_exports.enum(["read_only", "comment_only", "approve_only"]);
+var externalReviewInvitationSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  tenantId: external_exports.string().min(1),
+  reviewId: external_exports.string().min(1),
+  recipientEmail: external_exports.string().email(),
+  recipientName: external_exports.string().min(1),
+  scope: externalReviewScopeSchema,
+  tokenHash: external_exports.string().min(64).max(64),
+  expiresAt: external_exports.string().datetime(),
+  revokedAt: external_exports.string().datetime().nullable().optional(),
+  createdById: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime()
+});
+var createExternalReviewRequestSchema = external_exports.object({
+  recipientEmail: external_exports.string().email(),
+  recipientName: external_exports.string().min(1),
+  scope: externalReviewScopeSchema,
+  expiresInDays: external_exports.number().int().min(1).max(90).default(14)
+});
+
+// packages/contracts/src/policy.ts
+var policySeverityGateSchema = external_exports.enum(["error", "high", "medium"]);
+var reviewPolicySchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  scope: external_exports.enum(["organization", "team", "repository"]),
+  scopeId: external_exports.string().min(1).nullable(),
+  name: external_exports.string().min(1).max(128),
+  description: external_exports.string().max(1e3).optional(),
+  requiredChecklist: external_exports.array(external_exports.string().min(1).max(128)).default([]),
+  requiredRoles: external_exports.array(external_exports.string().min(1).max(64)).default([]),
+  severityGate: policySeverityGateSchema.optional(),
+  requireEvidencePack: external_exports.boolean().default(false),
+  requireExternalReview: external_exports.boolean().default(false),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime()
+});
+var createPolicyInputSchema = external_exports.object({
+  scope: external_exports.enum(["organization", "team", "repository"]),
+  scopeId: external_exports.string().min(1).optional(),
+  name: external_exports.string().min(1).max(128),
+  description: external_exports.string().max(1e3).optional(),
+  requiredChecklist: external_exports.array(external_exports.string().min(1).max(128)).max(20).default([]),
+  requiredRoles: external_exports.array(external_exports.string().min(1).max(64)).max(10).default([]),
+  severityGate: policySeverityGateSchema.optional(),
+  requireEvidencePack: external_exports.boolean().default(false),
+  requireExternalReview: external_exports.boolean().default(false)
+});
+var effectivePolicySchema = external_exports.object({
+  policy: reviewPolicySchema,
+  sourceLayer: external_exports.enum(["organization", "team", "repository", "exception"]),
+  inheritedFrom: external_exports.string().min(1).nullable()
+});
+var policyDryRunResultSchema = external_exports.object({
+  affectedRepositories: external_exports.number().int().nonnegative(),
+  affectedReviews: external_exports.number().int().nonnegative(),
+  blockersIntroduced: external_exports.number().int().nonnegative(),
+  warnings: external_exports.array(external_exports.string()).default([])
+});
+
+// packages/contracts/src/snapshots.ts
+var snapshotFormatSchema = external_exports.enum(["svg", "png", "webp"]);
+var snapshotKindSchema = external_exports.enum(["schematic", "pcb_layer", "3d_render"]);
+var canvasAnchorKindSchema = external_exports.enum(["component", "net", "finding", "comment", "zone"]);
+var canvasAnchorSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  kind: canvasAnchorKindSchema,
+  targetRef: external_exports.string().optional(),
+  x: external_exports.number(),
+  y: external_exports.number(),
+  width: external_exports.number().optional(),
+  height: external_exports.number().optional(),
+  sheet: external_exports.string().optional(),
+  layer: external_exports.string().optional(),
+  metadata: external_exports.record(external_exports.string(), external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean()])).optional()
+});
+var snapshotArtifactSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  name: external_exports.string().min(1),
+  kind: snapshotKindSchema,
+  format: snapshotFormatSchema,
+  sheetOrLayer: external_exports.string().min(1),
+  width: external_exports.number().positive(),
+  height: external_exports.number().positive(),
+  content: external_exports.string().optional(),
+  // SVG string or data URL
+  sha256: external_exports.string().min(64).max(64),
+  anchors: external_exports.array(canvasAnchorSchema).default([])
+});
+var snapshotManifestSchema = external_exports.object({
+  version: external_exports.literal(1),
+  baseSha: external_exports.string().min(7).max(64),
+  headSha: external_exports.string().min(7).max(64),
+  baseSnapshots: external_exports.array(snapshotArtifactSchema),
+  headSnapshots: external_exports.array(snapshotArtifactSchema),
+  createdAt: external_exports.string().datetime()
+});
+
+// packages/contracts/src/storage.ts
+var beginUploadInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  repositoryId: external_exports.string().min(1),
+  reviewId: external_exports.string().uuid().optional(),
+  key: external_exports.string().min(1).max(1024),
+  contentType: external_exports.string().min(1).max(128),
+  bytes: external_exports.number().int().nonnegative(),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/)
+});
+var uploadCapabilitySchema = external_exports.object({
+  uploadId: external_exports.string().min(1),
+  key: external_exports.string().min(1),
+  url: external_exports.string().url().optional(),
+  expiresAt: external_exports.string().datetime(),
+  headers: external_exports.record(external_exports.string(), external_exports.string()).optional()
+});
+var completeUploadInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  key: external_exports.string().min(1),
+  uploadId: external_exports.string().min(1),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  bytes: external_exports.number().int().nonnegative()
+});
+var storedArtifactSchema = external_exports.object({
+  key: external_exports.string().min(1),
+  bytes: external_exports.number().int().nonnegative(),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  contentType: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime()
+});
+var downloadInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  key: external_exports.string().min(1)
+});
+var downloadCapabilitySchema = external_exports.object({
+  url: external_exports.string().url(),
+  expiresAt: external_exports.string().datetime(),
+  contentType: external_exports.string().min(1),
+  contentDisposition: external_exports.string().min(1)
+});
+var deleteObjectInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  key: external_exports.string().min(1)
+});
+
+// packages/contracts/src/index.ts
+var releaseRunStatusSchema = external_exports.enum(["queued", "running", "completed", "timed_out", "failed"]);
+var releaseDecisionSchema = external_exports.enum(["pass", "fail", "error"]);
+var releaseRunConclusionSchema = external_exports.enum(["success", "failure", "neutral", "timed_out"]);
+var triggerKindSchema = external_exports.enum(["push", "pr", "manual", "workflow_dispatch"]);
+var findingSeveritySchema = external_exports.enum(["error", "high", "medium", "low", "info"]);
+var findingFingerprintSchema = external_exports.string().regex(/^[0-9a-f]{64}$/u);
+var createReleaseRunRequestSchema = external_exports.object({
+  repositoryId: external_exports.string().min(1),
+  commitSha: external_exports.string().min(7).max(64),
+  ref: external_exports.string().min(1),
+  pullRequestNumber: external_exports.number().int().positive().optional(),
+  triggerKind: triggerKindSchema
+});
+var findingSchema = external_exports.object({
+  ruleId: external_exports.string().min(1).max(256),
+  severity: findingSeveritySchema,
+  message: external_exports.string().min(1).max(4e3),
+  path: external_exports.string().min(1).max(1024).optional(),
+  project: external_exports.string().trim().min(1).max(1024).optional(),
+  fingerprint: findingFingerprintSchema.optional()
+});
+var artifactStoragePathSchema = external_exports.string().min(1).max(1024).refine(
+  (value) => !value.includes("\0") && !value.startsWith("/") && !value.startsWith("\\") && !/^[A-Za-z]:[\\/]/u.test(value) && !value.split(/[\\/]/u).includes(".."),
+  "artifact storagePath must be a relative path within the configured artifact root"
+);
+var releaseRunArtifactSchema = external_exports.object({
+  kind: external_exports.string().trim().min(1).max(128),
+  name: external_exports.string().trim().min(1).max(256),
+  storagePath: artifactStoragePathSchema,
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/u),
+  bytes: external_exports.number().int().nonnegative().max(2147483647),
+  role: external_exports.string().trim().min(1).max(128),
+  contentType: artifactContentTypeSchema.optional()
+});
+var releaseRunBomComponentSchema = external_exports.object({
+  reference: external_exports.string().trim().min(1).max(64),
+  mpn: external_exports.string().trim().min(1).max(128).optional(),
+  manufacturer: external_exports.string().trim().min(1).max(128).optional(),
+  value: external_exports.string().trim().min(1).max(256).optional(),
+  footprint: external_exports.string().trim().min(1).max(256).optional(),
+  quantity: external_exports.number().int().positive().max(1e6).optional(),
+  dnp: external_exports.boolean().optional(),
+  lifecycle: external_exports.string().trim().min(1).max(64).optional(),
+  identityKey: external_exports.string().regex(/^[0-9a-f]{16}$/u).optional()
+}).strict();
+var releaseRunBoardBomSchema = external_exports.object({
+  project: external_exports.string().trim().min(1).max(1024),
+  components: external_exports.array(releaseRunBomComponentSchema).max(5e3)
+}).strict();
+var releaseRunReportLinkSchema = external_exports.object({
+  label: external_exports.string().trim().min(1).max(160),
+  url: external_exports.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "report link must use HTTPS")
+});
+var releaseRunMetricsSchema = external_exports.record(external_exports.string().trim().min(1).max(128), external_exports.number().finite()).refine((value) => Object.keys(value).length <= 100, "metrics must contain at most 100 entries");
+var releaseRunReadinessSchema = external_exports.object({
+  score: external_exports.number().int().min(0).max(100),
+  status: external_exports.enum(["ready", "at-risk", "blocked"]),
+  blocking: external_exports.number().int().nonnegative().max(1e4),
+  nonBlocking: external_exports.number().int().nonnegative().max(1e4),
+  missingRequired: external_exports.array(external_exports.string().trim().min(1).max(256)).max(100).default([]),
+  missingRecommended: external_exports.array(external_exports.string().trim().min(1).max(256)).max(100).default([]),
+  warnings: external_exports.array(external_exports.string().trim().min(1).max(1e3)).max(100).default([])
+}).strict();
+var releaseRunWaiverSchema = external_exports.object({
+  rule: external_exports.string().trim().min(1).max(256),
+  owner: external_exports.string().trim().min(1).max(256),
+  reason: external_exports.string().trim().min(1).max(2e3),
+  expires: external_exports.iso.date().optional(),
+  approvedBy: external_exports.string().trim().min(1).max(256).optional(),
+  evidence: external_exports.string().trim().min(1).max(2048).optional(),
+  stale: external_exports.boolean(),
+  expired: external_exports.boolean(),
+  matched: external_exports.number().int().nonnegative().max(1e4)
+}).strict();
+var releaseRunWaiversSchema = external_exports.object({
+  active: external_exports.array(releaseRunWaiverSchema).max(100).default([]),
+  expired: external_exports.array(releaseRunWaiverSchema).max(100).default([])
+}).strict();
+var hardwareImpactDomainSchema = external_exports.enum(["readiness", "findings", "bom", "manufacturing"]);
+var hardwareImpactRiskDirectionSchema = external_exports.enum(["increased", "decreased", "unchanged", "unknown"]);
+var hardwareImpactBaselineReasonSchema = external_exports.enum([
+  "not-found",
+  "invalid-artifact",
+  "unsupported-result",
+  "candidate-mismatch"
+]);
+var hardwareImpactShaSchema = external_exports.string().regex(/^[0-9a-f]{40}$/u);
+var hardwareImpactCountSchema = external_exports.number().int().nonnegative().max(1e4);
+var hardwareImpactReadinessStatusSchema = external_exports.enum(["ready", "at-risk", "blocked"]);
+var hardwareImpactEvidenceSeveritySchema = external_exports.enum(["critical", "error", "high", "medium", "low", "info"]);
+var hardwareImpactAvailableBaselineSchema = external_exports.object({ status: external_exports.literal("available"), sha: hardwareImpactShaSchema }).strict();
+var hardwareImpactUnavailableBaselineSchema = external_exports.object({
+  status: external_exports.literal("unavailable"),
+  sha: hardwareImpactShaSchema,
+  reason: hardwareImpactBaselineReasonSchema
+}).strict();
+var hardwareImpactEvidenceRefSchema = external_exports.object({
+  domain: hardwareImpactDomainSchema,
+  kind: external_exports.enum(["finding", "bom-row", "output", "readiness"]),
+  label: external_exports.string().trim().min(1).max(256),
+  path: external_exports.string().trim().min(1).max(256).optional(),
+  ruleId: external_exports.string().trim().min(1).max(256).optional(),
+  severity: hardwareImpactEvidenceSeveritySchema.optional(),
+  fingerprint: findingFingerprintSchema.optional()
+}).strict();
+var hardwareImpactV1Schema = external_exports.object({
+  version: external_exports.literal(1),
+  baseline: external_exports.discriminatedUnion("status", [
+    hardwareImpactAvailableBaselineSchema,
+    hardwareImpactUnavailableBaselineSchema
+  ]),
+  candidate: external_exports.object({ sha: hardwareImpactShaSchema }).strict(),
+  facts: external_exports.object({
+    readiness: external_exports.object({
+      previousScore: external_exports.number().int().min(0).max(100).nullable(),
+      currentScore: external_exports.number().int().min(0).max(100).nullable(),
+      scoreDelta: external_exports.number().int().min(-100).max(100).nullable(),
+      previousStatus: hardwareImpactReadinessStatusSchema.nullable(),
+      currentStatus: hardwareImpactReadinessStatusSchema.nullable(),
+      statusChanged: external_exports.boolean()
+    }).strict(),
+    findings: external_exports.object({
+      added: hardwareImpactCountSchema,
+      resolved: hardwareImpactCountSchema,
+      addedBlocking: hardwareImpactCountSchema,
+      resolvedBlocking: hardwareImpactCountSchema
+    }).strict(),
+    bom: external_exports.object({
+      added: hardwareImpactCountSchema,
+      removed: hardwareImpactCountSchema,
+      changed: hardwareImpactCountSchema,
+      truncated: external_exports.boolean()
+    }).strict(),
+    manufacturing: external_exports.object({
+      outputsAdded: hardwareImpactCountSchema,
+      outputsRemoved: hardwareImpactCountSchema,
+      outputsChanged: hardwareImpactCountSchema
+    }).strict()
+  }).strict(),
+  assessment: external_exports.object({
+    materialChange: external_exports.boolean(),
+    riskDirection: hardwareImpactRiskDirectionSchema,
+    affectedDomains: external_exports.array(hardwareImpactDomainSchema).max(4).refine((domains) => new Set(domains).size === domains.length, "affected domains must be unique")
+  }).strict(),
+  evidence: external_exports.array(hardwareImpactEvidenceRefSchema).max(12)
+}).strict();
+function inferredConclusion(input) {
+  if (input.status === "timed_out") {
+    return "timed_out";
+  }
+  if (input.status === "completed" && input.decision === "pass") {
+    return "success";
+  }
+  if (input.status === "failed" || input.decision === "fail" || input.decision === "error") {
+    return "failure";
+  }
+  return "neutral";
+}
+var releaseRunResultBaseSchema = external_exports.object({
+  version: external_exports.literal(1).default(1),
+  executionAttemptId: external_exports.string().uuid().optional(),
+  status: releaseRunStatusSchema,
+  conclusion: releaseRunConclusionSchema.optional(),
+  decision: releaseDecisionSchema.nullable(),
+  findings: external_exports.array(findingSchema).max(500).default([]),
+  artifacts: external_exports.array(releaseRunArtifactSchema).max(100).default([]),
+  metrics: releaseRunMetricsSchema.default({}),
+  reportLinks: external_exports.array(releaseRunReportLinkSchema).max(20).default([]),
+  readiness: releaseRunReadinessSchema.optional(),
+  waivers: releaseRunWaiversSchema.optional(),
+  hardwareImpact: hardwareImpactV1Schema.optional(),
+  // Optional with no default: a default would materialise the key on every legacy
+  // payload and change its terminal-result digest, breaking replay detection.
+  boms: external_exports.array(releaseRunBoardBomSchema).max(50).optional()
+}).strict();
+var releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context5) => {
+  const expected = inferredConclusion(value);
+  if (value.conclusion !== void 0 && value.conclusion !== expected) {
+    context5.addIssue({
+      code: "custom",
+      path: ["conclusion"],
+      message: `conclusion must be ${expected} for the supplied status and decision`
+    });
+  }
+}).transform((value) => ({
+  ...value,
+  conclusion: value.conclusion ?? inferredConclusion(value)
+}));
+var runnerTerminalResultRequestSchema = runnerLeaseContextSchema.extend({
+  result: releaseRunResultSchema
+}).strict().superRefine((value, context5) => {
+  if (value.result.executionAttemptId !== value.executionAttemptId) {
+    context5.addIssue({
+      code: "custom",
+      path: ["result", "executionAttemptId"],
+      message: "terminal result must be bound to the leased execution attempt"
+    });
+  }
+});
+
 // packages/cloud-core/src/review-diff.ts
 var import_node_crypto5 = require("node:crypto");
 function computeEvidenceDigest(input) {
