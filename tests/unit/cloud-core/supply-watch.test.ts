@@ -20,7 +20,7 @@ function board(overrides: Partial<WatchBoard> = {}): WatchBoard {
     snapshotId: "snapshot-1",
     // Existing cases assert evaluation behaviour, so the default fixture is on a tier that
     // includes supply watch; the entitlement cases below override it.
-    planTier: "pro",
+    planTier: "team",
     components: [
       { mpn: "STM32F103C8T6", manufacturer: "ST", reference: "U1" },
       { mpn: "RC0603FR-0710KL", manufacturer: "Yageo", reference: "R1" },

@@ -31,7 +31,7 @@ beforeAll(async () => {
   await database().query("delete from installations where id = $1", [installationId]);
   await database().query(
     `insert into installations (id, github_installation_id, account_login, account_type, plan_tier)
-     values ($1, 47301, 'entitlements', 'Organization', 'pro')`,
+     values ($1, 47301, 'entitlements', 'Organization', 'team')`,
     [installationId],
   );
   await database().query(
@@ -67,7 +67,7 @@ describeDatabase("entitlement store", () => {
     const store = createSqlEntitlementStore(database());
     const entitlement = await store.forRepository(repositoryId);
 
-    expect(entitlement?.tier).toBe("pro");
+    expect(entitlement?.tier).toBe("team");
     expect(entitlement?.watchedBoards).toBe(3);
   });
 
@@ -117,6 +117,6 @@ describeDatabase("entitlement store", () => {
 
     expect(entitlement?.tier).toBe("free");
 
-    await database().query("update installations set plan_tier = 'pro' where id = $1", [installationId]);
+    await database().query("update installations set plan_tier = 'team' where id = $1", [installationId]);
   });
 });

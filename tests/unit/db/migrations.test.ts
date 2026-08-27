@@ -82,6 +82,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0044_supply_watch_entitlement_outcome.sql",
       "0045_installation_component_credentials.sql",
       "0046_reconciliation_attempt_budget_guard.sql",
+      "0047_seat_based_entitlement_tiers.sql",
     ]);
   });
 
