@@ -1,6 +1,6 @@
 export type DataRegion = "us-east-1" | "eu-west-1" | "ap-northeast-1";
 
-export interface KmsAdapter {
+interface KmsAdapter {
   encrypt(tenantId: string, plaintext: string): Promise<{ ciphertext: string; keyId: string }>;
   decrypt(tenantId: string, ciphertext: string): Promise<string>;
   getDataRegion(tenantId: string): Promise<DataRegion>;

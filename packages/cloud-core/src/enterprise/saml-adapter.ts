@@ -13,7 +13,7 @@ export type SamlSession = {
   expiresAt: string;
 };
 
-export interface SamlAdapter {
+interface SamlAdapter {
   getConfig(tenantId: string): Promise<SamlConfig | null>;
   validateAssertion(samlResponse: string): Promise<SamlSession>;
   initiateLogout(session: SamlSession): Promise<string>;

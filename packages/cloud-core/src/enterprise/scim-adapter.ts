@@ -8,7 +8,7 @@ export type ScimUser = {
   active: boolean;
 };
 
-export interface ScimAdapter {
+interface ScimAdapter {
   provisionUser(tenantId: string, input: Omit<ScimUser, "id">): Promise<ScimUser>;
   deprovisionUser(tenantId: string, userId: string): Promise<void>;
   getUser(tenantId: string, userId: string): Promise<ScimUser | null>;

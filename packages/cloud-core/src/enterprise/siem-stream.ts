@@ -7,7 +7,7 @@ export type SiemEvent = {
   metadata: Record<string, unknown>;
 };
 
-export interface SiemStream {
+interface SiemStream {
   publish(event: SiemEvent): Promise<void>;
   exportForTenant(tenantId: string, since: string): Promise<SiemEvent[]>;
 }
