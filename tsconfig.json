@@ -36,6 +36,7 @@
     "tests/unit/web/home-page.test.ts",
     "tests/unit/web/layout-metadata.test.ts",
     "tests/unit/web/component-credential-routes.test.ts",
-    "tests/unit/web/reviews-api.test.ts"
+    "tests/unit/web/reviews-api.test.ts",
+    "tests/unit/web/review-collaboration-api.test.ts"
   ]
 }
