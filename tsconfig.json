@@ -37,6 +37,10 @@
     "tests/unit/web/layout-metadata.test.ts",
     "tests/unit/web/component-credential-routes.test.ts",
     "tests/unit/web/reviews-api.test.ts",
-    "tests/unit/web/review-collaboration-api.test.ts"
+    "tests/unit/web/review-collaboration-api.test.ts",
+    "tests/unit/web/my-work-page.test.ts",
+    "tests/unit/web/reviews-list-page.test.ts",
+    "tests/unit/web/review-detail-tabs.test.ts",
+    "tests/unit/web/keyboard-triage.test.ts"
   ]
 }

@@ -109,10 +109,14 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
             <BrandMarkLockup size={24} className="brand-lockup" />
           </Link>
           <nav className="site-navigation" aria-label="Global navigation">
-            <Link href="/dashboard">Dashboard</Link>
-            <Link href="/setup">Repository setup</Link>
-            <Link href="/settings/component-intelligence">Component intelligence</Link>
-            <a href="https://docs.boardreadyops.com">Documentation</a>
+            <Link href="/work">My Work</Link>
+            <Link href="/reviews">Reviews</Link>
+            <Link href="/dashboard">Repositories</Link>
+            <Link href="/settings/tokens">API Tokens</Link>
+            <Link href="/settings/billing">Billing</Link>
+            <a href="https://docs.boardreadyops.com" target="_blank" rel="noreferrer">
+              Docs
+            </a>
             {viewerNav ? <Suspense fallback={null}>{viewerNav}</Suspense> : null}
             <ThemeToggle />
           </nav>
