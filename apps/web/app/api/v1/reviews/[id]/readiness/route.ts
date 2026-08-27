@@ -7,9 +7,7 @@ import {
   ReviewPolicyStore,
   ReviewStore,
 } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { authenticateApiRequest } from "../../../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../../../lib/cloud-runtime-config.js";
+import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../../../lib/api-auth.js";
 
 export const runtime = "nodejs";
 
@@ -26,20 +24,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
+  const ctx = resolveRepositoryApiContext(auth, request);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
 
   const { id: reviewId } = await context.params;
-  const url = new URL(request.url);
-  const repositoryId = auth.repositoryId ?? url.searchParams.get("repositoryId");
-  if (!repositoryId) {
-    return Response.json({ ok: false, error: "repositoryId is required" }, { status: 400 });
-  }
-
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const reviewStore = new ReviewStore(executor);
     const review = await reviewStore.getReviewById(repositoryId, reviewId);

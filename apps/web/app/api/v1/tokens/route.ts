@@ -1,7 +1,7 @@
 import { ApiTokenStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../lib/api-auth.js";
+import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 
 export const runtime = "nodejs";
@@ -20,19 +20,10 @@ export async function GET(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
+  const ctx = resolveRepositoryApiContext(auth, request);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
 
-  const url = new URL(request.url);
-  const repositoryId = auth.repositoryId ?? url.searchParams.get("repositoryId");
-  if (!repositoryId) {
-    return Response.json({ ok: false, error: "repositoryId is required" }, { status: 400 });
-  }
-
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new ApiTokenStore(executor);
     const tokens = await store.listTokens(repositoryId);
@@ -99,21 +90,17 @@ export async function DELETE(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
+  const ctx = resolveRepositoryApiContext(auth, request);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
 
   const url = new URL(request.url);
   const tokenId = url.searchParams.get("tokenId");
-  const repositoryId = auth.repositoryId ?? url.searchParams.get("repositoryId");
-
-  if (!tokenId || !repositoryId) {
-    return Response.json({ ok: false, error: "tokenId and repositoryId are required" }, { status: 400 });
+  if (!tokenId) {
+    await executor.close();
+    return Response.json({ ok: false, error: "tokenId is required" }, { status: 400 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new ApiTokenStore(executor);
     const revoked = await store.revokeToken(repositoryId, tokenId);

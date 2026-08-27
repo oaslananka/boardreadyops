@@ -43,6 +43,8 @@
     "tests/unit/web/review-detail-tabs.test.ts",
     "tests/unit/web/keyboard-triage.test.ts",
     "tests/unit/web/review-canvas.test.ts",
-    "tests/integration/security-adversarial.test.ts"
+    "tests/integration/security-adversarial.test.ts",
+    "tests/integration/me-work-postgres.test.ts",
+    "tests/integration/external-review-links-postgres.test.ts"
   ]
 }
