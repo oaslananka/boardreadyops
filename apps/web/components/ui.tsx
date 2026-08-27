@@ -111,10 +111,15 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
           <nav className="site-navigation" aria-label="Global navigation">
             <Link href="/work">My Work</Link>
             <Link href="/reviews">Reviews</Link>
-            <Link href="/dashboard">Repositories</Link>
+            <Link href="/dashboard">Projects</Link>
             <Link href="/setup">Setup</Link>
-            <Link href="/settings/tokens">API Tokens</Link>
+            <Link href="/policies">Policies</Link>
+            <Link href="/evidence">Evidence</Link>
+            <Link href="/insights">Insights</Link>
             <Link href="/settings/billing">Billing</Link>
+            <Link href="/settings/security">Security</Link>
+            <Link href="/settings/data">Data</Link>
+            <Link href="/settings/tokens">Tokens</Link>
             <a href="https://docs.boardreadyops.com" target="_blank" rel="noreferrer">
               Docs
             </a>

@@ -54637,6 +54637,69 @@ var runnerMutationResponseSchema = external_exports.object({
   status: external_exports.enum(["accepted", "replayed"])
 }).strict();
 
+// packages/contracts/src/billing.ts
+var billingTierSchema = external_exports.enum(["free", "team", "business", "enterprise"]);
+var billingIntervalSchema = external_exports.enum(["month", "year"]);
+var billingCustomerSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  stripeCustomerId: external_exports.string().min(1).nullable(),
+  tier: billingTierSchema,
+  status: external_exports.enum(["active", "trialing", "past_due", "canceled", "incomplete"]),
+  trialEndsAt: external_exports.string().datetime().nullable(),
+  graceEndsAt: external_exports.string().datetime().nullable(),
+  currentPeriodEnd: external_exports.string().datetime().nullable(),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime()
+});
+var billingSubscriptionSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  stripeSubscriptionId: external_exports.string().min(1),
+  stripePriceId: external_exports.string().min(1),
+  tier: billingTierSchema,
+  interval: billingIntervalSchema,
+  status: external_exports.string().min(1),
+  quantity: external_exports.number().int().positive(),
+  currentPeriodStart: external_exports.string().datetime(),
+  currentPeriodEnd: external_exports.string().datetime(),
+  cancelAtPeriodEnd: external_exports.boolean(),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime()
+});
+var billingEventSchema = external_exports.object({
+  id: external_exports.string().min(1),
+  tenantId: external_exports.string().min(1).nullable(),
+  type: external_exports.string().min(1),
+  stripeEventId: external_exports.string().min(1),
+  payload: external_exports.unknown(),
+  processedAt: external_exports.string().datetime().nullable(),
+  createdAt: external_exports.string().datetime()
+});
+var billingActivitySchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  actorId: external_exports.string().min(1),
+  actorType: external_exports.enum(["internal", "guest", "system"]),
+  action: external_exports.enum(["policy_update", "disposition", "release_create", "workspace_manage", "comment", "approval"]),
+  createdAt: external_exports.string().datetime()
+});
+var checkoutRequestSchema = external_exports.object({
+  tier: external_exports.enum(["team", "business"]),
+  interval: billingIntervalSchema.default("month"),
+  successUrl: external_exports.string().url().optional(),
+  cancelUrl: external_exports.string().url().optional()
+});
+var portalRequestSchema = external_exports.object({
+  returnUrl: external_exports.string().url().optional()
+});
+var billingPriceConfigSchema = external_exports.object({
+  teamMonthlyPriceId: external_exports.string().min(1),
+  teamYearlyPriceId: external_exports.string().min(1),
+  businessMonthlyPriceId: external_exports.string().min(1),
+  businessYearlyPriceId: external_exports.string().min(1)
+});
+
 // packages/contracts/src/review.ts
 var findingDiffStates = ["new", "persistent", "regressed", "resolved"];
 var findingDiffStateSchema = external_exports.enum(findingDiffStates);
@@ -54895,6 +54958,46 @@ var createExternalReviewRequestSchema = external_exports.object({
   expiresInDays: external_exports.number().int().min(1).max(90).default(14)
 });
 
+// packages/contracts/src/policy.ts
+var policySeverityGateSchema = external_exports.enum(["error", "high", "medium"]);
+var reviewPolicySchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  tenantId: external_exports.string().min(1),
+  scope: external_exports.enum(["organization", "team", "repository"]),
+  scopeId: external_exports.string().min(1).nullable(),
+  name: external_exports.string().min(1).max(128),
+  description: external_exports.string().max(1e3).optional(),
+  requiredChecklist: external_exports.array(external_exports.string().min(1).max(128)).default([]),
+  requiredRoles: external_exports.array(external_exports.string().min(1).max(64)).default([]),
+  severityGate: policySeverityGateSchema.optional(),
+  requireEvidencePack: external_exports.boolean().default(false),
+  requireExternalReview: external_exports.boolean().default(false),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime()
+});
+var createPolicyInputSchema = external_exports.object({
+  scope: external_exports.enum(["organization", "team", "repository"]),
+  scopeId: external_exports.string().min(1).optional(),
+  name: external_exports.string().min(1).max(128),
+  description: external_exports.string().max(1e3).optional(),
+  requiredChecklist: external_exports.array(external_exports.string().min(1).max(128)).max(20).default([]),
+  requiredRoles: external_exports.array(external_exports.string().min(1).max(64)).max(10).default([]),
+  severityGate: policySeverityGateSchema.optional(),
+  requireEvidencePack: external_exports.boolean().default(false),
+  requireExternalReview: external_exports.boolean().default(false)
+});
+var effectivePolicySchema = external_exports.object({
+  policy: reviewPolicySchema,
+  sourceLayer: external_exports.enum(["organization", "team", "repository", "exception"]),
+  inheritedFrom: external_exports.string().min(1).nullable()
+});
+var policyDryRunResultSchema = external_exports.object({
+  affectedRepositories: external_exports.number().int().nonnegative(),
+  affectedReviews: external_exports.number().int().nonnegative(),
+  blockersIntroduced: external_exports.number().int().nonnegative(),
+  warnings: external_exports.array(external_exports.string()).default([])
+});
+
 // packages/contracts/src/snapshots.ts
 var snapshotFormatSchema = external_exports.enum(["svg", "png", "webp"]);
 var snapshotKindSchema = external_exports.enum(["schematic", "pcb_layer", "3d_render"]);
@@ -54931,6 +55034,52 @@ var snapshotManifestSchema = external_exports.object({
   baseSnapshots: external_exports.array(snapshotArtifactSchema),
   headSnapshots: external_exports.array(snapshotArtifactSchema),
   createdAt: external_exports.string().datetime()
+});
+
+// packages/contracts/src/storage.ts
+var beginUploadInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  repositoryId: external_exports.string().min(1),
+  reviewId: external_exports.string().uuid().optional(),
+  key: external_exports.string().min(1).max(1024),
+  contentType: external_exports.string().min(1).max(128),
+  bytes: external_exports.number().int().nonnegative(),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/)
+});
+var uploadCapabilitySchema = external_exports.object({
+  uploadId: external_exports.string().min(1),
+  key: external_exports.string().min(1),
+  url: external_exports.string().url().optional(),
+  expiresAt: external_exports.string().datetime(),
+  headers: external_exports.record(external_exports.string(), external_exports.string()).optional()
+});
+var completeUploadInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  key: external_exports.string().min(1),
+  uploadId: external_exports.string().min(1),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  bytes: external_exports.number().int().nonnegative()
+});
+var storedArtifactSchema = external_exports.object({
+  key: external_exports.string().min(1),
+  bytes: external_exports.number().int().nonnegative(),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  contentType: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime()
+});
+var downloadInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  key: external_exports.string().min(1)
+});
+var downloadCapabilitySchema = external_exports.object({
+  url: external_exports.string().url(),
+  expiresAt: external_exports.string().datetime(),
+  contentType: external_exports.string().min(1),
+  contentDisposition: external_exports.string().min(1)
+});
+var deleteObjectInputSchema = external_exports.object({
+  tenantId: external_exports.string().min(1),
+  key: external_exports.string().min(1)
 });
 
 // packages/contracts/src/index.ts
