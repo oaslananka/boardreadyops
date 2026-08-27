@@ -116,6 +116,43 @@ async function stopChild(child) {
   }
 }
 
+/**
+ * Runs a bundled esbuild entrypoint (worker.mjs or migrate.mjs) in place and asserts it gets
+ * past module resolution.
+ *
+ * These two files are built by scripts/build-control-plane-worker.mjs with `pg` deliberately
+ * left external (bundling it can break its optional native-binding dynamic requires), and they
+ * run outside Next's own route tracing -- unlike server.js, which the rest of this script
+ * verifies via a full isolated-copy smoke test. A file-presence check alone previously missed a
+ * real regression: pg resolved during `pnpm --filter @boardreadyops/web build` but was absent
+ * from the Docker image's pruned dependency set, so migrate.mjs crashed on
+ * `ERR_MODULE_NOT_FOUND` before it could even reach its own "DATABASE_URL is required" check.
+ * Actually spawning the file is the only way to catch that class of gap.
+ */
+async function assertEntrypointReachesOwnLogic(label, entrypoint, expectedStderrSubstring) {
+  const environment = { ...process.env };
+  delete environment.DATABASE_URL;
+
+  const child = spawn(process.execPath, [entrypoint], {
+    cwd: webRoot,
+    env: environment,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr = appendBounded(stderr, chunk);
+  });
+
+  const exitCode = await new Promise((resolveExit) => child.once("exit", resolveExit));
+
+  if (!stderr.includes(expectedStderrSubstring)) {
+    throw new Error(
+      `${label} did not reach its own logic (exit ${exitCode}); expected stderr to contain ${JSON.stringify(expectedStderrSubstring)}.\nstderr:\n${stderr}`,
+    );
+  }
+}
+
 async function main() {
   const serverSource = join(standaloneSource, "apps", "web", "server.js");
   if (!(await pathExists(serverSource))) {
@@ -127,6 +164,9 @@ async function main() {
   if (!(await pathExists(migrationSource))) {
     throw new Error("Cloud migration bundle is missing from the web build output.");
   }
+
+  await assertEntrypointReachesOwnLogic("migrate.mjs", migrationSource, "DATABASE_URL is required");
+  await assertEntrypointReachesOwnLogic("worker.mjs", workerSource, "DATABASE_URL");
 
   const temporaryRoot = await mkdtemp(join(tmpdir(), "boardreadyops-web-standalone-"));
   const isolatedRoot = join(temporaryRoot, "runtime");
