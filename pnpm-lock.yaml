@@ -48,6 +48,12 @@ importers:
       '@biomejs/biome':
         specifier: 2.5.8
         version: 2.5.8
+      '@boardreadyops/cloud-core':
+        specifier: workspace:*
+        version: link:packages/cloud-core
+      '@boardreadyops/contracts':
+        specifier: workspace:*
+        version: link:packages/contracts
       '@codecov/bundle-analyzer':
         specifier: 2.0.1
         version: 2.0.1
@@ -197,7 +203,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
 
-  packages/cloud-core: {}
+  packages/cloud-core:
+    dependencies:
+      '@boardreadyops/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/contracts:
     dependencies:
@@ -210,6 +220,9 @@ importers:
       '@boardreadyops/cloud-core':
         specifier: workspace:*
         version: link:../cloud-core
+      '@boardreadyops/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       pg:
         specifier: 8.16.3
         version: 8.16.3
