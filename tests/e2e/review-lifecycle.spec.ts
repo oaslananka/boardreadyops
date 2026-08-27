@@ -22,7 +22,7 @@ async function openReviewAndWaitForHydration(page: Page) {
 }
 
 async function openTab(page: Page, name: string) {
-  const tab = page.getByRole("tab", { name: new RegExp(name, "i") });
+  const tab = page.getByRole("tab").filter({ hasText: name });
   await tab.click();
   await expect(tab).toHaveAttribute("aria-selected", "true");
 }
