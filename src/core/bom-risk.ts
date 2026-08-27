@@ -59,24 +59,29 @@ function isRiskLevel(v: unknown): v is BomRiskLevel {
  * Called by the pipeline to attach the summary to `RunResult` without
  * re-running rule logic. Returns `undefined` when no relevant findings exist.
  */
+type RiskFinding = { ruleId: string; details: Record<string, unknown> };
+
 export function bomRiskSummaryFromFindings(
   findings: ReadonlyArray<{
     ruleId: string;
     details?: Record<string, unknown> | undefined;
   }>,
 ): BomRiskSummary | undefined {
-  const riskFindings = findings.filter((f) => f.ruleId === "bom.risk-score" && f.details);
-  if (riskFindings.length === 0) {
+  const riskFindings = findings.filter(
+    (f): f is RiskFinding => f.ruleId === "bom.risk-score" && f.details !== undefined,
+  );
+  const [firstFinding] = riskFindings;
+  if (firstFinding === undefined) {
     return undefined;
   }
 
-  const firstDetails = riskFindings[0]!.details!;
+  const firstDetails = firstFinding.details;
   const totalComponents =
     typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
   const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
 
   const components: BomComponentRisk[] = riskFindings.map((f) => {
-    const d = f.details!;
+    const d = f.details;
     const factors = (d.factors || {}) as BomRiskFactors;
     return {
       reference: typeof d.reference === "string" ? d.reference : String(d.reference ?? ""),

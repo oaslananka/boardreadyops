@@ -1,0 +1,15 @@
+-- Renames the top plan tier from 'team' to 'business' and reclaims 'team' as a new,
+-- lower entry-level paid tier (see packages/cloud-core/src/entitlements.ts).
+--
+-- Order matters: 'team' must be vacated to 'business' before application code starts
+-- treating a stored 'team' value as the new, lower tier. Reinterpreting the existing
+-- value in place -- without first moving it -- would silently downgrade an existing
+-- top-tier installation's entitlements (100 watched boards, unlimited retention) down
+-- to the new entry tier's limits.
+--
+-- 'pro' also moves to 'business' rather than to the new 'team': the new 'team' tier's
+-- limits are lower than 'pro' ever had, and remapping to 'business' is the only choice
+-- that guarantees no installation loses entitlements it already holds. Correcting an
+-- over-provisioned installation to the tier its subscription actually pays for is a
+-- billing/support action, not something a schema migration should decide.
+update installations set plan_tier = 'business' where plan_tier in ('pro', 'team');

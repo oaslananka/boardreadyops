@@ -192,11 +192,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* biome-ignore lint/style/noDescendingSpecificity: universal reduced-motion reset must apply after every other rule regardless of selector specificity */
   *,
   *::before,
   *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must override any component's own motion/duration/animation styles to honor the user's reduced-motion preference (WCAG 2.2) */
     scroll-behavior: auto !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must override any component's own motion/duration/animation styles to honor the user's reduced-motion preference (WCAG 2.2) */
     transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must override any component's own motion/duration/animation styles to honor the user's reduced-motion preference (WCAG 2.2) */
     animation: none !important;
   }
 }

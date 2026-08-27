@@ -102837,11 +102837,14 @@ function isRiskLevel(v) {
   return typeof v === "string" && RISK_LEVELS.has(v);
 }
 function bomRiskSummaryFromFindings(findings) {
-  const riskFindings = findings.filter((f) => f.ruleId === "bom.risk-score" && f.details);
-  if (riskFindings.length === 0) {
+  const riskFindings = findings.filter(
+    (f) => f.ruleId === "bom.risk-score" && f.details !== void 0
+  );
+  const [firstFinding] = riskFindings;
+  if (firstFinding === void 0) {
     return void 0;
   }
-  const firstDetails = riskFindings[0].details;
+  const firstDetails = firstFinding.details;
   const totalComponents = typeof firstDetails.totalComponents === "number" ? firstDetails.totalComponents : riskFindings.length;
   const overallRiskScore = typeof firstDetails.overallBomRiskScore === "number" ? firstDetails.overallBomRiskScore : 0;
   const components = riskFindings.map((f) => {
@@ -145025,7 +145028,8 @@ function findingEvidence(prefix2, finding2) {
     label: bounded(`${prefix2}: ${finding2.ruleId} \u2014 ${finding2.message}`),
     path: bounded(finding2.resourcePath),
     ruleId: bounded(finding2.ruleId),
-    severity: finding2.severity
+    severity: finding2.severity,
+    fingerprint: finding2.fingerprint
   };
 }
 function compareEvidence(left, right) {

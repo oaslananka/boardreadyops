@@ -224,6 +224,7 @@ function findingEvidence(prefix: string, finding: RunDiff["findings"]["added"][n
     path: bounded(finding.resourcePath),
     ruleId: bounded(finding.ruleId),
     severity: finding.severity,
+    fingerprint: finding.fingerprint,
   };
 }
 

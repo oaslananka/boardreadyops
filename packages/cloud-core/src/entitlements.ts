@@ -9,12 +9,18 @@
  * processor; a billing integration's only job is to keep `planTier` current. That keeps the
  * limits testable without a payment account and keeps a provider swap from touching policy.
  *
- * The metered unit is the watched board, not the seat. A hardware team is small while each
- * board is a five-figure asset whose respin costs weeks, so per-board tracks the value the
- * customer actually gets and grows as they grow.
+ * The product's billable unit is moving to the active seat (see the 2026-08-27 strategy
+ * plan); a hardware team pays per collaborator, not per board. That billing layer does not
+ * exist yet, so this module still meters what it can enforce today -- the watched board -- as
+ * a fair-use cap underneath whatever seat plan a customer is on.
+ *
+ * `team` used to be the top tier and is now the entry-level paid tier, with `business` above
+ * it; migration 0047_seat_based_entitlement_tiers.sql moves every installation that held the
+ * old `team` meaning (and `pro`, since retired) to `business` before this renaming ships, so a
+ * stored value is never silently reinterpreted into a lower tier than it already had.
  */
 
-export const planTiers = ["free", "pro", "team"] as const;
+export const planTiers = ["free", "team", "business"] as const;
 export type PlanTier = (typeof planTiers)[number];
 
 export type PlanLimits = {
@@ -30,8 +36,8 @@ export type PlanLimits = {
 
 const limits: Record<PlanTier, PlanLimits> = {
   free: { watchedBoards: 1, evidenceRetentionDays: 30, supplyWatch: false, handoffLinks: false },
-  pro: { watchedBoards: 10, evidenceRetentionDays: 365, supplyWatch: true, handoffLinks: true },
-  team: { watchedBoards: 100, evidenceRetentionDays: null, supplyWatch: true, handoffLinks: true },
+  team: { watchedBoards: 10, evidenceRetentionDays: 365, supplyWatch: true, handoffLinks: true },
+  business: { watchedBoards: 100, evidenceRetentionDays: null, supplyWatch: true, handoffLinks: true },
 };
 
 /**
