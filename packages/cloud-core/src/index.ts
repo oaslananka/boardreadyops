@@ -4,6 +4,7 @@ import { dirname, resolve, sep } from "node:path";
 
 export * from "./component-intelligence.js";
 export * from "./entitlements.js";
+export * from "./review-diff.js";
 export * from "./runner-request-signature.js";
 
 export interface VerifyGitHubWebhookOptions {
