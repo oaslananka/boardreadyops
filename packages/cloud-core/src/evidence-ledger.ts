@@ -1,79 +1,20 @@
 import { createHash } from "node:crypto";
-import type {
-  EvidenceItem,
-  EvidenceLedgerDocument,
-  LedgerApprovalRecord,
-  LedgerChecklistRecord,
-  LedgerDecisionRecord,
-  LedgerVerificationResult,
+import {
+  calculateEvidenceDigest,
+  canonicalJsonStringify,
+  type EvidenceItem,
+  type EvidenceLedgerDocument,
+  type LedgerApprovalRecord,
+  type LedgerChecklistRecord,
+  type LedgerDecisionRecord,
+  type LedgerVerificationResult,
 } from "@boardreadyops/contracts";
 
-export function canonicalJsonStringify(obj: unknown): string {
-  if (obj === null || typeof obj !== "object") {
-    return JSON.stringify(obj);
-  }
-
-  if (Array.isArray(obj)) {
-    return `[${obj.map(canonicalJsonStringify).join(",")}]`;
-  }
-
-  const sortedKeys = Object.keys(obj as Record<string, unknown>).sort();
-  const pairs = sortedKeys.map((key) => {
-    const val = (obj as Record<string, unknown>)[key];
-    return `${JSON.stringify(key)}:${canonicalJsonStringify(val)}`;
-  });
-  return `{${pairs.join(",")}}`;
-}
+export { calculateEvidenceDigest, canonicalJsonStringify };
 
 export function computeCanonicalHash(obj: unknown): string {
   const canonical = canonicalJsonStringify(obj);
   return createHash("sha256").update(canonical, "utf8").digest("hex");
-}
-
-export function calculateEvidenceDigest(params: {
-  manifest: EvidenceItem[];
-  decisions: LedgerDecisionRecord[];
-  approvals: LedgerApprovalRecord[];
-  checklist: LedgerChecklistRecord[];
-}): string {
-  const sortedManifest = [...params.manifest].sort((a, b) => a.path.localeCompare(b.path));
-  const sortedDecisions = [...params.decisions].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
-  const sortedApprovals = [...params.approvals].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  const sortedChecklist = [...params.checklist].sort((a, b) => a.id.localeCompare(b.id));
-
-  const composite = {
-    manifest: sortedManifest.map((m) => ({
-      name: m.name,
-      path: m.path,
-      type: m.type,
-      sizeBytes: m.sizeBytes,
-      sha256: m.sha256,
-    })),
-    decisions: sortedDecisions.map((d) => ({
-      fingerprint: d.fingerprint,
-      disposition: d.disposition,
-      reason: d.reason,
-      owner: d.owner,
-      expiresAt: d.expiresAt ?? null,
-      timestamp: d.timestamp,
-    })),
-    approvals: sortedApprovals.map((a) => ({
-      approverId: a.approverId,
-      status: a.status,
-      reason: a.reason ?? "",
-      isBreakGlass: a.isBreakGlass ?? false,
-      timestamp: a.timestamp,
-    })),
-    checklist: sortedChecklist.map((c) => ({
-      id: c.id,
-      title: c.title,
-      completed: c.completed,
-      completedBy: c.completedBy ?? "",
-      completedAt: c.completedAt ?? "",
-    })),
-  };
-
-  return computeCanonicalHash(composite);
 }
 
 export function buildEvidenceLedger(input: {
