@@ -16,7 +16,7 @@ export type AiAssistResult = {
   isProbabilistic: true;
 };
 
-export interface AiReviewAssistant {
+interface AiReviewAssistant {
   enabled(tenantId: string): boolean;
   summarize(input: AiAssistInput): Promise<AiAssistResult>;
 }

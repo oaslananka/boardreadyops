@@ -1,5 +1,5 @@
 export type DfmVendor = "valor" | "generic";
-export type DfmStatus = "pending" | "running" | "passed" | "failed" | "needs_review";
+type DfmStatus = "pending" | "running" | "passed" | "failed" | "needs_review";
 
 export type DfmSubmission = {
   id: string;
@@ -14,7 +14,7 @@ export type DfmSubmission = {
   updatedAt: string;
 };
 
-export interface DfmAdapter {
+interface DfmAdapter {
   submit(input: {
     tenantId: string;
     reviewId: string;
