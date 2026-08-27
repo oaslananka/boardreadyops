@@ -3,6 +3,7 @@ import {
   configuredSessionSecret,
   decodeUserSession,
   encodeUserSession,
+  sessionAllowsInstallation,
   type UserSession,
 } from "../../../apps/web/lib/user-session.js";
 
@@ -69,5 +70,10 @@ describe("user session cookie", () => {
     expect(configuredSessionSecret({ SESSION_SECRET: "s".repeat(32) })).toBe("s".repeat(32));
     expect(configuredSessionSecret({ SESSION_SECRET: "short" })).toBeUndefined();
     expect(configuredSessionSecret({})).toBeUndefined();
+  });
+
+  it("grants access only to installations listed on the session", () => {
+    expect(sessionAllowsInstallation(session(), 1001)).toBe(true);
+    expect(sessionAllowsInstallation(session(), 9999)).toBe(false);
   });
 });

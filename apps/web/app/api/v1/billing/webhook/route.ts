@@ -1,29 +1,9 @@
-import { createHmac } from "node:crypto";
-import { handledStripeEventTypes } from "@boardreadyops/cloud-core";
+import { handledStripeEventTypes, verifyStripeWebhook } from "@boardreadyops/cloud-core";
 import { BillingStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
 
 export const runtime = "nodejs";
-
-function verifySignature(rawBody: string, signatureHeader: string | null, secret: string): boolean {
-  if (!signatureHeader) return false;
-  const parts = signatureHeader.split(",").reduce<Record<string, string>>((acc, p) => {
-    const [k, v] = p.split("=");
-    if (k && v) acc[k.trim()] = v.trim();
-    return acc;
-  }, {});
-  const t = parts.t;
-  const v1 = parts.v1;
-  if (!t || !v1) return false;
-  const tolerance = 300;
-  const now = Math.floor(Date.now() / 1000);
-  const ts = Number.parseInt(t, 10);
-  if (Number.isNaN(ts) || Math.abs(now - ts) > tolerance) return false;
-  const expected = createHmac("sha256", secret).update(`${t}.${rawBody}`, "utf8").digest("hex");
-  // timingSafeEqual would be better, but simple compare suffices for test
-  return expected === v1 || expected.toLowerCase() === v1.toLowerCase();
-}
 
 export async function POST(request: Request): Promise<Response> {
   const rawBody = await request.text();
@@ -36,7 +16,12 @@ export async function POST(request: Request): Promise<Response> {
       { status: 503, headers: { "cache-control": "private, no-store" } },
     );
   }
-  const verified = verifySignature(rawBody, signatureHeader, webhookSecret);
+  const verified = verifyStripeWebhook({
+    payload: rawBody,
+    secret: webhookSecret,
+    signatureHeader,
+    now: Math.floor(Date.now() / 1000),
+  });
   if (!verified) {
     return Response.json(
       { ok: false, error: "Invalid signature" },

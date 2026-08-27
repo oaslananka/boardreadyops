@@ -35104,7 +35104,7 @@ function canonicalJsonStringify(obj) {
   if (Array.isArray(obj)) {
     return `[${obj.map(canonicalJsonStringify).join(",")}]`;
   }
-  const sortedKeys = Object.keys(obj).sort();
+  const sortedKeys = Object.keys(obj).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
   const pairs = sortedKeys.map((key) => {
     const val = obj[key];
     return `${JSON.stringify(key)}:${canonicalJsonStringify(val)}`;
@@ -55030,9 +55030,12 @@ init_src();
 
 // packages/cloud-core/src/review-diff.ts
 var import_node_crypto10 = require("node:crypto");
+function ordinalCompare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
 function computeEvidenceDigest(input) {
-  const sortedFingerprints = [...input.findingFingerprints].sort();
-  const sortedArtifacts = [...input.artifactDigests ?? []].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedFingerprints = [...input.findingFingerprints].sort(ordinalCompare);
+  const sortedArtifacts = [...input.artifactDigests ?? []].sort((a, b) => ordinalCompare(a.name, b.name));
   const canonicalPayload = JSON.stringify({
     toolVersion: input.toolVersion,
     kicadVersion: input.kicadVersion ?? "",
@@ -55180,6 +55183,7 @@ function getGitCommitSha(ref = "HEAD") {
 function getGitOriginRepo() {
   try {
     const url2 = (0, import_node_child_process4.execFileSync)("git", ["remote", "get-url", "origin"], {
+      // NOSONAR
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
