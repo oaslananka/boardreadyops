@@ -38,6 +38,15 @@ LABEL org.opencontainers.image.title="BoardReadyOps Cloud" \
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
+# worker.mjs and migrate.mjs (scripts/build-control-plane-worker.mjs) are esbuild bundles
+# built outside Next's own route tracing, with `pg` deliberately left external (it uses
+# dynamic requires for optional native bindings that bundlers mishandle). Next's standalone
+# output only includes what its tracer finds reachable from a traced page/route, so pg and
+# its own transitive dependencies (pg-types, pg-protocol, pg-connection-string, pgpass, ...)
+# are not guaranteed to be there -- copying the build stage's full, already-pnpm-resolved
+# node_modules (with real symlinks, unlike glob-based tracing) is what makes that resolution
+# correct regardless of which deps pg happens to need release to release.
+COPY --chown=node:node --from=build /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/apps/web/.next/standalone ./
 COPY --chown=node:node --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --chown=node:node --from=build /app/apps/web/.next/worker.mjs ./worker.mjs
