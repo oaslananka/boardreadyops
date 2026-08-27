@@ -42,7 +42,7 @@ export function DiscussionTab({
   return (
     <div className="discussion-tab-content">
       <Panel title="Review Discussion & Threads" tone="raised">
-        <div className="comment-timeline">
+        <div className="engineering-thread comment-timeline">
           {comments.length === 0 ? (
             <p className="empty-notice">No comments posted yet. Start the conversation below.</p>
           ) : (

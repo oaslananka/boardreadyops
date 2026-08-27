@@ -117,7 +117,7 @@ export function ChecklistApprovalsTab({
         description="Append-only cryptographic record of engineering sign-offs bound to head evidence digests."
         tone="default"
       >
-        <div className="approvals-table-wrap">
+        <div className="signoff-ledger approvals-table-wrap">
           <table className="approvals-table">
             <thead>
               <tr>

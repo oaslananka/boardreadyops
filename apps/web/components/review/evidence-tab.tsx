@@ -4,7 +4,7 @@ import { Panel } from "../ui.js";
 
 export function EvidenceTab({ review }: { review: DemoReview }) {
   return (
-    <div className="evidence-tab-content">
+    <div className="provenance-chain evidence-tab-content">
       <Panel
         title="Evidence Pack Manifest"
         description="Immutable cryptographic records and artifact digests for this hardware revision."

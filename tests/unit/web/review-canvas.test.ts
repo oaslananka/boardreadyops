@@ -12,6 +12,7 @@ describe("ReviewCanvas", () => {
   it("renders a data-uri image per sheet/layer snapshot, not raw inline SVG", () => {
     const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
     expect(markup).toContain("Schematic and PCB Review Canvas");
+    expect(markup).toContain('aria-label="Canvas instruments"');
     expect(markup).toContain("data:image/svg+xml");
     expect(markup).not.toContain("<svg");
   });

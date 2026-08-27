@@ -54,8 +54,9 @@ describe("Review Detail Tabs", () => {
   });
 
   it("renders EvidenceTab with artifact manifest and offline verify command", () => {
-    const evidence = EvidenceTab({ review });
+    const evidence = renderToStaticMarkup(createElement(EvidenceTab, { review }));
     expect(evidence).toBeDefined();
-    expect(evidence.props).toBeDefined();
+    expect(evidence).toContain("provenance-chain");
+    expect(evidence).toContain("Head Evidence Digest");
   });
 });

@@ -250,7 +250,8 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
             return (
               <article
                 key={finding.fingerprint}
-                className={`finding-triage-card panel ${isSelected ? "selected-row" : ""} ${isWaived ? "waived-card" : ""}`}
+                className={`finding-scan-row finding-triage-card panel ${isSelected ? "selected-row" : ""} ${isWaived ? "waived-card" : ""}`}
+                data-selected={isSelected}
                 onClick={() => setSelectedIndex(idx)}
                 onFocus={() => setSelectedIndex(idx)}
                 onKeyDown={(e) => {
@@ -291,7 +292,7 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
 
                 <p className="finding-card-message">{finding.message}</p>
 
-                <div className="finding-card-footer">
+                <div className="finding-detail-grid finding-card-footer">
                   <span className="finding-path">
                     📄 {finding.path} {finding.sheet ? `• Sheet: ${finding.sheet}` : ""}
                   </span>

@@ -120,7 +120,7 @@ export function ReviewCanvas({
   return (
     <div className="review-canvas-container panel">
       {/* Canvas Toolbar */}
-      <div className="canvas-toolbar">
+      <div className="canvas-toolbar" role="region" aria-label="Canvas instruments">
         <div className="toolbar-left">
           <label htmlFor="sheet-select" className="toolbar-label">
             Layer / Sheet:
