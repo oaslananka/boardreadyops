@@ -87,12 +87,12 @@ const SEVERITY_RANK: Record<string, number> = {
  * "insufficient-data" when fewer than 2 runs have a readiness score.
  */
 function computeScoreTrend(points: ReadinessDataPoint[]): ReleaseTrend["scoreTrend"] {
-  const scoredPoints = points.filter((point) => point.score !== null);
-  if (scoredPoints.length < 2) {
+  const scores = points.map((point) => point.score).filter((score): score is number => score !== null);
+  const [first] = scores;
+  const last = scores.at(-1);
+  if (first === undefined || last === undefined || scores.length < 2) {
     return "insufficient-data";
   }
-  const first = scoredPoints[0]!.score!;
-  const last = scoredPoints.at(-1)!.score!;
   const delta = last - first;
   if (delta > 2) return "improving";
   if (delta < -2) return "degrading";
@@ -105,7 +105,8 @@ function computeScoreTrend(points: ReadinessDataPoint[]): ReleaseTrend["scoreTre
  * @param runs  RunResult objects in chronological order (oldest first).
  */
 export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
-  if (runs.length === 0) {
+  const [firstRun] = runs;
+  if (firstRun === undefined) {
     return {
       runCount: 0,
       from: null,
@@ -117,6 +118,7 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
       scoreTrend: "insufficient-data",
     };
   }
+  const lastRun = runs.at(-1) ?? firstRun;
 
   const readiness: ReadinessDataPoint[] = runs.map((run) => ({
     generatedAt: run.generatedAt,
@@ -127,11 +129,11 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
 
   const recurringFindings = buildRecurringFindings(runs);
   const waivers: WaiverDataPoint[] = runs
-    .filter((run) => run.waivers !== undefined)
+    .filter((run): run is RunResult & { waivers: NonNullable<RunResult["waivers"]> } => run.waivers !== undefined)
     .map((run) => ({
       generatedAt: run.generatedAt,
-      activeCount: run.waivers!.active.length,
-      expiredCount: run.waivers!.expired.length,
+      activeCount: run.waivers.active.length,
+      expiredCount: run.waivers.expired.length,
     }));
 
   const artifactHealth: ArtifactHealthDataPoint[] = runs.map((run) => ({
@@ -143,8 +145,8 @@ export function buildReleaseTrends(runs: RunResult[]): ReleaseTrend {
 
   return {
     runCount: runs.length,
-    from: runs[0]!.generatedAt,
-    to: runs.at(-1)!.generatedAt,
+    from: firstRun.generatedAt,
+    to: lastRun.generatedAt,
     readiness,
     recurringFindings,
     waivers,

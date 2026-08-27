@@ -10,6 +10,11 @@ const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
 let githubIdentifier = 990_000_000;
 
+function requireExecutor(): NonNullable<typeof executor> {
+  if (!executor) throw new Error("DATABASE_URL is required");
+  return executor;
+}
+
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -161,7 +166,7 @@ describeDatabase("runner terminal-result PostgreSQL authorization", () => {
         status: "conflicting_replay",
       });
 
-      const nonceRows = await executor!.query(
+      const nonceRows = await requireExecutor().query(
         `select nonce_digest, request_digest
          from runner_request_nonces
          where runner_job_lease_id = $1 and request_digest is not null`,
@@ -194,7 +199,7 @@ describeDatabase("runner terminal-result PostgreSQL authorization", () => {
         }),
       ).resolves.toEqual({ status: "stale" });
 
-      const count = await executor!.query(
+      const count = await requireExecutor().query(
         `select count(*)::int as count
          from runner_request_nonces
          where runner_job_lease_id = $1 and nonce_digest = $2`,
@@ -212,13 +217,13 @@ describeDatabase("runner terminal-result PostgreSQL authorization", () => {
     const movedAt = at(fixture.base, 20);
 
     try {
-      await executor!.query(
+      await requireExecutor().query(
         `insert into release_run_attempts (
            id, run_id, attempt_number, status, created_at, started_at, heartbeat_at
          ) values ($1, $2, 2, 'in_progress', $3::timestamptz, $3::timestamptz, $3::timestamptz)`,
         [replacementAttemptId, fixture.runId, movedAt.toISOString()],
       );
-      await executor!.query(
+      await requireExecutor().query(
         `update release_runs
          set execution_attempt_id = $1, execution_attempt_started_at = $2::timestamptz, status = 'running'
          where id = $3`,
