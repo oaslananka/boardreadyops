@@ -139,22 +139,21 @@ export function Breadcrumbs({ items }: Readonly<{ items: BreadcrumbItem[] }>) {
   );
 }
 
-export function Panel({
-  children,
-  title,
-  description,
-  actions,
-  id,
-}: Readonly<{
+export type PanelTone = "default" | "raised" | "inset" | "critical";
+
+export type PanelProps = {
   children: ReactNode;
   title: string;
   description?: string;
   actions?: ReactNode;
   id?: string;
-}>) {
+  tone?: PanelTone;
+};
+
+export function Panel({ children, title, description, actions, id, tone = "default" }: Readonly<PanelProps>) {
   const headingId = id ? `${id}-heading` : undefined;
   return (
-    <section className="panel" id={id} aria-labelledby={headingId}>
+    <section className={`panel surface-${tone}`} id={id} aria-labelledby={headingId}>
       <header className="panel-header">
         <div>
           <h2 id={headingId}>{title}</h2>

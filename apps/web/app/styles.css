@@ -992,6 +992,68 @@ code {
   box-shadow: none;
 }
 
+.page-frame {
+  width: min(100% - 2.5rem, var(--content-width, 1440px));
+  margin-inline: auto;
+  padding-block: var(--space-5, 1.5rem) var(--space-7, 3rem);
+}
+
+.page-intro {
+  margin-bottom: var(--space-5, 1.5rem);
+}
+
+.page-intro h1 {
+  font-family: var(--font-display, var(--font-sans));
+  font-size: clamp(1.65rem, 2.5vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 0.4rem;
+  color: var(--text);
+}
+
+.page-intro p {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 72ch;
+  margin: 0;
+}
+
+.decision-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-strong);
+  margin-bottom: var(--space-5);
+}
+
+.metric-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.metric-strip .metric-value,
+.metric-strip strong {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
 .page-content {
   display: grid;
   gap: var(--space-5);
@@ -1001,8 +1063,36 @@ code {
   padding: var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, var(--background-elevated), var(--surface));
+  background: var(--surface);
   box-shadow: var(--bro-shadow-soft);
+}
+
+.panel.surface-default,
+.surface-default {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.panel.surface-raised,
+.surface-raised {
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--bro-shadow-soft);
+}
+
+.panel.surface-inset,
+.surface-inset {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.panel.surface-critical,
+.surface-critical {
+  background: var(--danger-surface);
+  border: 1px solid var(--danger-border);
+  border-left: 4px solid var(--danger);
+  box-shadow: none;
 }
 
 .panel-header {
@@ -2936,16 +3026,6 @@ code {
   text-align: center;
 }
 
-.metric-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.metric-label {
-  font-size: 0.75rem;
-  color: var(--bro-text-muted);
-}
-
 /* Changed Files */
 .changed-files-list {
   display: flex;
@@ -3002,7 +3082,7 @@ code {
 
 .tab-btn {
   padding: var(--space-1) var(--space-3);
-  border-radius: 20px;
+  border-radius: var(--radius-md);
   background: var(--surface-sunken);
   border: 1px solid var(--border);
   color: var(--bro-text-muted);

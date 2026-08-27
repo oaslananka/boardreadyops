@@ -27,4 +27,23 @@ describe("Foundry Editorial UI contract", () => {
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
     expect(css).toContain("@media (forced-colors: active)");
   });
+
+  it("defines intentional surface roles without oversized SaaS geometry", () => {
+    for (const selector of [".surface-raised", ".surface-inset", ".decision-band", ".metric-strip", ".page-intro"]) {
+      expect(css).toContain(selector);
+    }
+    expect(css).not.toMatch(/border-radius:\s*(2[0-9]|[3-9][0-9])px/);
+  });
+
+  it("renders panel tone variants with stable accessibility semantics", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { Panel } = await import("../../../apps/web/components/ui.js");
+    const markup = renderToStaticMarkup(
+      createElement(Panel, { title: "Gate Check", id: "gate", tone: "critical" }, "content"),
+    );
+    expect(markup).toContain("surface-critical");
+    expect(markup).toContain('id="gate"');
+    expect(markup).toContain('aria-labelledby="gate-heading"');
+  });
 });
