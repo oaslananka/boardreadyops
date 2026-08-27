@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { computeEvidenceDigest } from "@boardreadyops/cloud-core";
+import { mapFindingsForCloud } from "../core/cloud-findings.js";
 import type { Logger } from "../core/logger.js";
 import type { RunResult } from "../core/result.js";
 import type { ActionInputs } from "./inputs.js";
@@ -33,14 +34,7 @@ export async function publishActionRunToCloud(
   const prMatch = process.env.GITHUB_REF?.match(/refs\/pull\/(\d+)/);
   const pullRequestNumber = prMatch?.[1] ? Number(prMatch[1]) : undefined;
 
-  const findings = result.findings.map((f) => ({
-    ruleId: f.ruleId,
-    severity: f.severity === "critical" ? ("error" as const) : f.severity,
-    message: f.message,
-    path: f.resource.path,
-    project: f.project,
-    fingerprint: f.fingerprint,
-  }));
+  const findings = mapFindingsForCloud(result.findings);
 
   const rulePackDigest = createHash("sha256").update("boardreadyops-v1").digest("hex");
   const configDigest = createHash("sha256")

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { computeEvidenceDigest } from "@boardreadyops/cloud-core";
 import type { UploadMode } from "@boardreadyops/contracts";
+import { mapFindingsForCloud } from "../../core/cloud-findings.js";
 import { loadConfig } from "../../core/config.js";
 import { runPipeline } from "../../core/pipeline.js";
 import type { CommonCliOptions } from "./run.js";
@@ -69,14 +70,7 @@ export async function reviewPublishCommand(
     failOn: "never",
   });
 
-  const findings = result.findings.map((f) => ({
-    ruleId: f.ruleId,
-    severity: f.severity === "critical" ? ("error" as const) : f.severity,
-    message: f.message,
-    path: f.resource.path,
-    project: f.project,
-    fingerprint: f.fingerprint,
-  }));
+  const findings = mapFindingsForCloud(result.findings);
 
   const rulePackDigest = createHash("sha256").update("boardreadyops-v1").digest("hex");
   const configDigest = createHash("sha256").update(JSON.stringify(config)).digest("hex");
