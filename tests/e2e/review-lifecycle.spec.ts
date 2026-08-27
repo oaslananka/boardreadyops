@@ -22,8 +22,9 @@ async function openReviewAndWaitForHydration(page: Page) {
 }
 
 async function openTab(page: Page, name: string) {
-  await page.getByRole("button", { name }).click();
-  await expect(page.getByRole("button", { name })).toHaveClass(/active/);
+  const tab = page.getByRole("tab", { name: new RegExp(name, "i") });
+  await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
 }
 
 test.describe("Review lifecycle", () => {
