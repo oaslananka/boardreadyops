@@ -74,25 +74,22 @@ export async function authenticateApiRequest(
 }
 
 export interface RepositoryApiContext {
-  auth: AuthenticatedApiContext;
   repositoryId: string;
   executor: PgQueryExecutor;
 }
 
 /**
- * Authenticates a request, resolves its repositoryId (from the token or the ?repositoryId
- * query param), and opens a Postgres executor - the common prelude shared by every
- * repository-scoped API route. Callers own the returned executor and must close it.
+ * Resolves a repository-scoped route's repositoryId (from the token or the ?repositoryId
+ * query param) and opens a Postgres executor. Takes an already-resolved `auth` rather than
+ * calling authenticateApiRequest itself, so routes keep their own direct call to it - that
+ * direct import is what tests intercept with vi.spyOn(apiAuth, "authenticateApiRequest");
+ * an internal same-module call here would bypass that mock. Callers own the returned
+ * executor and must close it.
  */
-export async function requireRepositoryApiContext(
+export function resolveRepositoryApiContext(
+  auth: AuthenticatedApiContext,
   request: Request,
-  requiredScope?: ApiTokenScope,
-): Promise<RepositoryApiContext | Response> {
-  const auth = await authenticateApiRequest(request, requiredScope);
-  if (!auth.ok) {
-    return Response.json({ ok: false, error: auth.error }, { status: auth.status });
-  }
-
+): RepositoryApiContext | Response {
   const url = new URL(request.url);
   const repositoryId = auth.repositoryId ?? url.searchParams.get("repositoryId");
   if (!repositoryId) {
@@ -105,5 +102,5 @@ export async function requireRepositoryApiContext(
   }
 
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-  return { auth, repositoryId, executor };
+  return { repositoryId, executor };
 }

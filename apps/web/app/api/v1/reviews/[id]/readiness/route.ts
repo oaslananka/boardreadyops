@@ -7,7 +7,7 @@ import {
   ReviewPolicyStore,
   ReviewStore,
 } from "@boardreadyops/db";
-import { requireRepositoryApiContext } from "../../../../../../lib/api-auth.js";
+import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../../../lib/api-auth.js";
 
 export const runtime = "nodejs";
 
@@ -20,9 +20,13 @@ function toContractPolicy(record: ReviewPolicyRecord): ReviewPolicy {
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
-  const ctx = await requireRepositoryApiContext(request, "reviews:read");
+  const auth = await authenticateApiRequest(request, "reviews:read");
+  if (!auth.ok) {
+    return Response.json({ ok: false, error: auth.error }, { status: auth.status });
+  }
+  const ctx = resolveRepositoryApiContext(auth, request);
   if (ctx instanceof Response) return ctx;
-  const { auth, repositoryId, executor } = ctx;
+  const { repositoryId, executor } = ctx;
 
   const { id: reviewId } = await context.params;
   try {
