@@ -35,6 +35,7 @@ export default defineConfig({
       // calls at build time, so any module calling one throws without this stub. This config
       // runs the web tests for the cloud coverage gate and needs the same alias.
       "next/font/google": fileURLToPath(new URL("tests/stubs/next-font-google.ts", import.meta.url)),
+      "next/headers": fileURLToPath(new URL("tests/stubs/next-headers.ts", import.meta.url)),
       "next/navigation": fileURLToPath(new URL("apps/web/node_modules/next/navigation.js", import.meta.url)),
     },
   },
