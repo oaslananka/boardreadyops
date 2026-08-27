@@ -48,7 +48,7 @@ A finding emitted by a plugin rule against a project resource.
 
 ##### boardCoordinates.units
 
-> **units**: `"mm"` \| `"in"`
+> **units**: `"in"` \| `"mm"`
 
 ##### boardCoordinates.x
 
@@ -112,7 +112,7 @@ A finding emitted by a plugin rule against a project resource.
 
 #### kind
 
-> **kind**: `"project"` \| `"schematic"` \| `"pcb"` \| `"bom"` \| `"pinmap"` \| `"manifest"`
+> **kind**: `"project"` \| `"bom"` \| `"schematic"` \| `"pcb"` \| `"pinmap"` \| `"manifest"`
 
 #### path
 

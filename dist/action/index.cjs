@@ -21650,7 +21650,7 @@ var require_fetch = __commonJS({
     function handleFetchDone(response) {
       finalizeAndReportTiming(response, "fetch");
     }
-    function fetch2(input, init = void 0) {
+    function fetch3(input, init = void 0) {
       webidl.argumentLengthCheck(arguments, 1, "globalThis.fetch");
       let p = Promise.withResolvers();
       let requestObject;
@@ -22662,7 +22662,7 @@ var require_fetch = __commonJS({
       }
     }
     module2.exports = {
-      fetch: fetch2,
+      fetch: fetch3,
       Fetch,
       fetching,
       finalizeAndReportTiming
@@ -26835,7 +26835,7 @@ var require_undici = __commonJS({
       err.stack = stack ? `${stack}
 ${captureLines}` : capture.stack;
     }
-    module2.exports.fetch = function fetch2(init, options = void 0) {
+    module2.exports.fetch = function fetch3(init, options = void 0) {
       return fetchImpl(init, options).catch((err) => {
         if (currentFilename) {
           appendFetchStackTrace(err, currentFilename);
@@ -105374,6 +105374,99 @@ function sarifPositiveInteger(value) {
   return value;
 }
 
+// src/action/cloud-publish.ts
+var import_node_crypto6 = require("node:crypto");
+
+// packages/cloud-core/src/review-diff.ts
+var import_node_crypto5 = require("node:crypto");
+function computeEvidenceDigest(input) {
+  const sortedFingerprints = [...input.findingFingerprints].sort();
+  const sortedArtifacts = [...input.artifactDigests ?? []].sort((a, b) => a.name.localeCompare(b.name));
+  const canonicalPayload = JSON.stringify({
+    toolVersion: input.toolVersion,
+    kicadVersion: input.kicadVersion ?? "",
+    rulePackDigest: input.rulePackDigest,
+    configDigest: input.configDigest,
+    headCommitSha: input.headCommitSha,
+    baseCommitSha: input.baseCommitSha ?? "",
+    findings: sortedFingerprints,
+    artifacts: sortedArtifacts
+  });
+  return (0, import_node_crypto5.createHash)("sha256").update(canonicalPayload).digest("hex");
+}
+
+// src/action/cloud-publish.ts
+async function publishActionRunToCloud(result, inputs, _workspace, logger7) {
+  const token = process.env.BOARDREADYOPS_TOKEN;
+  const isRequested = Boolean(inputs.cloudUpload || token);
+  if (!isRequested) {
+    return {};
+  }
+  const server = (inputs.cloudServer ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(/\/$/, "");
+  const repositoryId = process.env.GITHUB_REPOSITORY ?? "github-repo";
+  const commitSha = process.env.GITHUB_SHA ?? "0".repeat(40);
+  const ref = process.env.GITHUB_REF ?? "refs/heads/main";
+  const prMatch = process.env.GITHUB_REF?.match(/refs\/pull\/(\d+)/);
+  const pullRequestNumber = prMatch?.[1] ? Number(prMatch[1]) : void 0;
+  const findings = result.findings.map((f) => ({
+    ruleId: f.ruleId,
+    severity: f.severity === "critical" ? "error" : f.severity,
+    message: f.message,
+    path: f.resource.path,
+    project: f.project,
+    fingerprint: f.fingerprint
+  }));
+  const rulePackDigest = (0, import_node_crypto6.createHash)("sha256").update("boardreadyops-v1").digest("hex");
+  const configDigest = (0, import_node_crypto6.createHash)("sha256").update(JSON.stringify(inputs.config ?? {})).digest("hex");
+  const evidenceDigest = computeEvidenceDigest({
+    toolVersion: "1.34.0",
+    rulePackDigest,
+    configDigest,
+    headCommitSha: commitSha,
+    findingFingerprints: findings.map((f) => f.fingerprint)
+  });
+  if (!token) {
+    logger7.info("action.cloud.skip", { reason: "cloud-upload requested but BOARDREADYOPS_TOKEN is not set" });
+    return { evidencePackId: evidenceDigest };
+  }
+  try {
+    const response = await fetch(`${server}/api/v1/runs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "Idempotency-Key": `action-${commitSha}-${evidenceDigest.slice(0, 16)}`
+      },
+      body: JSON.stringify({
+        repositoryId,
+        commitSha,
+        ref,
+        ...pullRequestNumber !== void 0 ? { pullRequestNumber } : {},
+        triggerKind: process.env.GITHUB_EVENT_NAME === "pull_request" ? "pr" : "push",
+        findings,
+        artifacts: [],
+        evidenceDigest,
+        title: `Action review for ${commitSha.slice(0, 8)}`
+      })
+    });
+    if (!response.ok) {
+      logger7.warn("action.cloud.error", { status: response.status });
+      return { evidencePackId: evidenceDigest };
+    }
+    const data = await response.json();
+    const fullReviewUrl = data.reviewUrl ? `${server}${data.reviewUrl}` : `${server}/runs/${data.runId}`;
+    logger7.info("action.cloud.published", { reviewUrl: fullReviewUrl, evidenceDigest });
+    return {
+      reviewUrl: fullReviewUrl,
+      ...data.runId ? { cloudRunId: data.runId } : {},
+      evidencePackId: evidenceDigest
+    };
+  } catch (error52) {
+    logger7.warn("action.cloud.network_error", { error: String(error52) });
+    return { evidencePackId: evidenceDigest };
+  }
+}
+
 // node_modules/@actions/github/lib/context.js
 var import_fs16 = require("fs");
 var import_os3 = require("os");
@@ -106087,8 +106180,8 @@ function isPlainObject4(value) {
 }
 var noop = () => "";
 async function fetchWrapper(requestOptions) {
-  const fetch2 = requestOptions.request?.fetch || globalThis.fetch;
-  if (!fetch2) {
+  const fetch3 = requestOptions.request?.fetch || globalThis.fetch;
+  if (!fetch3) {
     throw new Error(
       "fetch is not set. Please pass a fetch implementation as new Octokit({ request: { fetch }}). Learn more at https://github.com/octokit/octokit.js/#fetch-missing"
     );
@@ -106104,7 +106197,7 @@ async function fetchWrapper(requestOptions) {
   );
   let fetchResponse;
   try {
-    fetchResponse = await fetch2(requestOptions.url, {
+    fetchResponse = await fetch3(requestOptions.url, {
       method: requestOptions.method,
       body: body2,
       redirect: requestOptions.request?.redirect,
@@ -121702,7 +121795,7 @@ var AnonymousCredential = class extends Credential {
 };
 
 // node_modules/@azure/storage-common/dist/esm/credentials/StorageSharedKeyCredential.js
-var import_node_crypto5 = require("node:crypto");
+var import_node_crypto7 = require("node:crypto");
 
 // node_modules/@azure/storage-common/dist/esm/utils/SharedKeyComparator.js
 var table_lv0 = new Uint32Array([
@@ -122288,7 +122381,7 @@ var StorageSharedKeyCredential = class extends Credential {
    * @param stringToSign -
    */
   computeHMACSHA256(stringToSign) {
-    return (0, import_node_crypto5.createHmac)("sha256", this.accountKey).update(stringToSign, "utf8").digest("base64");
+    return (0, import_node_crypto7.createHmac)("sha256", this.accountKey).update(stringToSign, "utf8").digest("base64");
   }
 };
 
@@ -122662,7 +122755,7 @@ function storageRetryPolicy(options = {}) {
 }
 
 // node_modules/@azure/storage-common/dist/esm/policies/StorageSharedKeyCredentialPolicyV2.js
-var import_node_crypto6 = require("node:crypto");
+var import_node_crypto8 = require("node:crypto");
 var storageSharedKeyCredentialPolicyName = "storageSharedKeyCredentialPolicy";
 function storageSharedKeyCredentialPolicy(options) {
   function signRequest(request2) {
@@ -122684,7 +122777,7 @@ function storageSharedKeyCredentialPolicy(options) {
       getHeaderValueToSign(request2, HeaderConstants.IF_UNMODIFIED_SINCE),
       getHeaderValueToSign(request2, HeaderConstants.RANGE)
     ].join("\n") + "\n" + getCanonicalizedHeadersString(request2) + getCanonicalizedResourceString(request2);
-    const signature = (0, import_node_crypto6.createHmac)("sha256", options.accountKey).update(stringToSign, "utf8").digest("base64");
+    const signature = (0, import_node_crypto8.createHmac)("sha256", options.accountKey).update(stringToSign, "utf8").digest("base64");
     request2.headers.set(HeaderConstants.AUTHORIZATION, `SharedKey ${options.accountName}:${signature}`);
   }
   function getHeaderValueToSign(request2, headerName) {
@@ -122774,7 +122867,7 @@ function storageRequestFailureDetailsParserPolicy() {
 }
 
 // node_modules/@azure/storage-common/dist/esm/credentials/UserDelegationKeyCredential.js
-var import_node_crypto7 = require("node:crypto");
+var import_node_crypto9 = require("node:crypto");
 var UserDelegationKeyCredential = class {
   /**
    * Azure Storage account name; readonly.
@@ -122804,7 +122897,7 @@ var UserDelegationKeyCredential = class {
    * @param stringToSign -
    */
   computeHMACSHA256(stringToSign) {
-    return (0, import_node_crypto7.createHmac)("sha256", this.key).update(stringToSign, "utf8").digest("base64");
+    return (0, import_node_crypto9.createHmac)("sha256", this.key).update(stringToSign, "utf8").digest("base64");
   }
 };
 
@@ -145227,8 +145320,18 @@ function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cw
     logFileRetention: optionalNonNegativeInteger(
       getInput("log-file-retention") || process.env.BOARDREADY_LOG_FILE_RETENTION || "",
       "log-file-retention"
-    )
+    ),
+    cloudUpload: cloudUploadInput(getInput("cloud-upload")),
+    cloudServer: empty(getInput("cloud-server"))
   };
+}
+function cloudUploadInput(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return void 0;
+  if (trimmed === "metadata" || trimmed === "snapshots" || trimmed === "source") {
+    return trimmed;
+  }
+  throw new Error("Input cloud-upload must be metadata, snapshots, or source.");
 }
 function detectActionGate(event, ref) {
   if (event === "pull_request" || event === "pull_request_target") {
@@ -145346,6 +145449,9 @@ function setActionOutputs(result, paths) {
   setOutput("json-path", paths.json ?? "");
   setOutput("markdown-path", paths.markdown ?? "");
   setOutput("hbom-path", paths.hbom ?? "");
+  setOutput("review-url", paths.reviewUrl ?? "");
+  setOutput("cloud-run-id", paths.cloudRunId ?? "");
+  setOutput("evidence-pack-id", paths.evidencePackId ?? "");
 }
 
 // src/action/upload.ts
@@ -145435,7 +145541,8 @@ async function runAction() {
   if (inputs.annotations) {
     emitAnnotations(result.findings);
   }
-  setActionOutputs(result, written);
+  const cloudOutputs = await publishActionRunToCloud(result, inputs, workspace, logger7);
+  setActionOutputs(result, { ...written, ...cloudOutputs });
   await summary.addRaw(formatMarkdown(result)).write();
   const trustedWritesAllowed = inputs.executionPolicy !== "safe";
   if (trustedWritesAllowed && inputs.uploadArtifacts) {

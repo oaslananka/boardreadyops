@@ -53212,20 +53212,292 @@ async function gitState(root) {
   }
 }
 
+// src/cli/commands/review.ts
+var import_node_child_process4 = require("node:child_process");
+var import_node_crypto11 = require("node:crypto");
+
+// packages/cloud-core/src/review-diff.ts
+var import_node_crypto9 = require("node:crypto");
+function computeEvidenceDigest(input) {
+  const sortedFingerprints = [...input.findingFingerprints].sort();
+  const sortedArtifacts = [...input.artifactDigests ?? []].sort((a, b) => a.name.localeCompare(b.name));
+  const canonicalPayload = JSON.stringify({
+    toolVersion: input.toolVersion,
+    kicadVersion: input.kicadVersion ?? "",
+    rulePackDigest: input.rulePackDigest,
+    configDigest: input.configDigest,
+    headCommitSha: input.headCommitSha,
+    baseCommitSha: input.baseCommitSha ?? "",
+    findings: sortedFingerprints,
+    artifacts: sortedArtifacts
+  });
+  return (0, import_node_crypto9.createHash)("sha256").update(canonicalPayload).digest("hex");
+}
+
+// packages/cloud-core/src/runner-request-signature.ts
+var import_node_crypto10 = require("node:crypto");
+var canonicalPrefix = "boardreadyops-runner-request-v1";
+var canonicalBaseUrl = "https://boardreadyops.invalid";
+var lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
+var strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+function compareText(left, right) {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+function encodeQueryComponent(value) {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/gu,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+function assertLowercaseUuid(name, value) {
+  if (value === void 0) {
+    return "";
+  }
+  if (!lowercaseUuidPattern.test(value)) {
+    throw new Error(`${name} must be a lowercase UUID`);
+  }
+  return value;
+}
+function assertRunnerVersion(value) {
+  if (value.length > 64 || !strictVersionPattern.test(value) || value.split(".").some((component) => !Number.isSafeInteger(Number(component)))) {
+    throw new Error("runner version must be a strict major.minor.patch version");
+  }
+  return value;
+}
+function assertNonce(value) {
+  if (value.length < 22 || value.length > 128 || !base64UrlPattern.test(value)) {
+    throw new Error("runner request nonce must be 22-128 base64url characters");
+  }
+  return value;
+}
+function runnerRequestBodyDigest(body) {
+  return (0, import_node_crypto10.createHash)("sha256").update(body).digest("hex");
+}
+function normalizeRunnerRequestPath(path66) {
+  if (!path66.startsWith("/") || path66.startsWith("//") || path66.includes("#") || path66.includes("\\")) {
+    throw new Error("runner request path must be an absolute application path without a fragment");
+  }
+  const rawPath = path66.split("?", 1)[0] ?? path66;
+  if (/%2f|%5c/iu.test(rawPath)) {
+    throw new Error("runner request path cannot contain encoded path separators");
+  }
+  for (const segment of rawPath.split("/")) {
+    let decoded;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      throw new Error("runner request path contains invalid percent encoding");
+    }
+    if (decoded === "." || decoded === "..") {
+      throw new Error("runner request path cannot contain dot segments");
+    }
+  }
+  const url2 = new URL(path66, canonicalBaseUrl);
+  if (url2.origin !== canonicalBaseUrl) {
+    throw new Error("runner request path must remain within the application origin");
+  }
+  const query = [...url2.searchParams.entries()].sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+    const keyOrder = compareText(leftKey, rightKey);
+    return keyOrder === 0 ? compareText(leftValue, rightValue) : keyOrder;
+  }).map(([key, value]) => `${encodeQueryComponent(key)}=${encodeQueryComponent(value)}`).join("&");
+  return query.length === 0 ? url2.pathname : `${url2.pathname}?${query}`;
+}
+function canonicalRunnerRequest(input) {
+  const method = input.method.toUpperCase();
+  if (!/^[A-Z]+$/u.test(method)) {
+    throw new Error("runner request method must contain only ASCII letters");
+  }
+  if (!Number.isSafeInteger(input.timestamp) || input.timestamp < 0 || input.timestamp > 9999999999) {
+    throw new Error("runner request timestamp must be a non-negative integer in seconds");
+  }
+  if (input.workerClass !== "managed" && input.workerClass !== "self_hosted") {
+    throw new Error("unsupported runner worker class");
+  }
+  const fields = [
+    canonicalPrefix,
+    method,
+    normalizeRunnerRequestPath(input.path),
+    String(input.timestamp),
+    assertNonce(input.nonce),
+    input.workerClass,
+    assertLowercaseUuid("runnerId", input.runnerId),
+    assertLowercaseUuid("runId", input.runId),
+    assertLowercaseUuid("executionAttemptId", input.executionAttemptId),
+    assertLowercaseUuid("leaseId", input.leaseId)
+  ];
+  if (input.runnerVersion !== void 0) {
+    fields.push(`runner-version:${assertRunnerVersion(input.runnerVersion)}`);
+  }
+  fields.push(runnerRequestBodyDigest(input.body));
+  return fields.join("\n");
+}
+function signRunnerRequest(input) {
+  return (0, import_node_crypto10.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
+}
+
+// src/cli/commands/review.ts
+function getGitCommitSha(ref = "HEAD") {
+  try {
+    return (0, import_node_child_process4.execSync)(`git rev-parse ${ref}`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return "0".repeat(40);
+  }
+}
+function getGitOriginRepo() {
+  try {
+    const url2 = (0, import_node_child_process4.execSync)("git remote get-url origin", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const match = url2.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    return match ? match[1] : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function reviewPublishCommand(target, options, streams) {
+  const root = target ?? process.cwd();
+  const loaded = await loadConfig(root, options.config);
+  const config2 = loaded.config;
+  const headSha = options.head ?? getGitCommitSha("HEAD");
+  const baseSha = options.base ? getGitCommitSha(options.base) : void 0;
+  const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
+  const uploadMode = options.upload ?? "metadata";
+  const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
+    /\/$/,
+    ""
+  );
+  const token = options.token ?? process.env.BOARDREADYOPS_TOKEN;
+  streams.stdout.write(`
+\u{1F50D} Analyzing hardware preflight evidence in ${root}...
+`);
+  const result = await runPipeline({
+    cwd: root,
+    path: root,
+    ...options.config ? { config: options.config } : {},
+    rules: options.rule ?? [],
+    skips: options.skip ?? [],
+    executionPolicy: options.executionPolicy ?? "safe",
+    failOn: "never"
+  });
+  const findings = result.findings.map((f) => ({
+    ruleId: f.ruleId,
+    severity: f.severity === "critical" ? "error" : f.severity,
+    message: f.message,
+    path: f.resource.path,
+    project: f.project,
+    fingerprint: f.fingerprint
+  }));
+  const rulePackDigest = (0, import_node_crypto11.createHash)("sha256").update("boardreadyops-v1").digest("hex");
+  const configDigest = (0, import_node_crypto11.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
+  const evidenceDigest = computeEvidenceDigest({
+    toolVersion: "1.34.0",
+    rulePackDigest,
+    configDigest,
+    headCommitSha: headSha,
+    ...baseSha ? { baseCommitSha: baseSha } : {},
+    findingFingerprints: findings.map((f) => f.fingerprint),
+    artifactDigests: []
+  });
+  streams.stdout.write(`\u{1F4CA} Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)
+`);
+  if (options.dryRun) {
+    streams.stdout.write(`
+[DRY RUN] Review publish simulation:
+`);
+    streams.stdout.write(`  Repository: ${repositoryId}
+`);
+    streams.stdout.write(`  Commit:     ${headSha.slice(0, 8)}
+`);
+    if (baseSha) streams.stdout.write(`  Base:       ${baseSha.slice(0, 8)}
+`);
+    streams.stdout.write(`  Upload Mode: ${uploadMode}
+`);
+    streams.stdout.write(`  Findings:   ${findings.length}
+`);
+    streams.stdout.write(`  Digest:     ${evidenceDigest}
+`);
+    streams.stdout.write(`\u2714 Dry run completed successfully without network transmission.
+`);
+    return 0;
+  }
+  if (!token) {
+    streams.stderr.write(
+      `\u274C Error: BOARDREADYOPS_TOKEN is required for review publish. Pass --token or set env var.
+`
+    );
+    return 1;
+  }
+  streams.stdout.write(`\u{1F680} Publishing review to ${server}...
+`);
+  try {
+    const response = await fetch(`${server}/api/v1/runs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "Idempotency-Key": `publish-${headSha}-${evidenceDigest.slice(0, 16)}`
+      },
+      body: JSON.stringify({
+        repositoryId,
+        commitSha: headSha,
+        ref: "refs/heads/main",
+        pullRequestNumber: options.pr,
+        triggerKind: "manual",
+        findings,
+        artifacts: [],
+        evidenceDigest,
+        title: options.title ?? `Review for ${headSha.slice(0, 8)}`,
+        ...baseSha ? { baseCommitSha: baseSha } : {}
+      })
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      streams.stderr.write(`\u274C Server error (${response.status}): ${errText}
+`);
+      return 1;
+    }
+    const data = await response.json();
+    if (data.ok) {
+      const url2 = data.reviewUrl ? `${server}${data.reviewUrl}` : `${server}/runs/${data.runId}`;
+      streams.stdout.write(`
+\u2714 Hardware review published successfully!
+`);
+      streams.stdout.write(`\u{1F517} Review URL: ${url2}
+`);
+      streams.stdout.write(`\u{1F512} Evidence Digest: ${evidenceDigest}
+
+`);
+      return 0;
+    }
+    streams.stderr.write(`\u274C Unexpected server response.
+`);
+    return 1;
+  } catch (error51) {
+    streams.stderr.write(`\u274C Network error: ${error51 instanceof Error ? error51.message : String(error51)}
+`);
+    return 1;
+  }
+}
+
 // src/cli/commands/runner.ts
 var import_node_path64 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
-var import_node_child_process4 = require("node:child_process");
-var import_node_crypto10 = require("node:crypto");
+var import_node_child_process5 = require("node:child_process");
+var import_node_crypto13 = require("node:crypto");
 var import_promises22 = require("node:fs/promises");
 var import_node_os4 = __toESM(require("node:os"), 1);
 var import_node_path59 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-registration-enrollment-store.ts
-var import_node_crypto9 = require("node:crypto");
+var import_node_crypto12 = require("node:crypto");
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
-var base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
+var base64UrlPattern2 = /^[A-Za-z0-9_-]+$/u;
 var repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
 function rows(result) {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
@@ -53251,7 +53523,7 @@ function isoColumn(row, key) {
   return Number.isNaN(parsed.valueOf()) ? void 0 : parsed.toISOString();
 }
 function digest(value) {
-  return (0, import_node_crypto9.createHash)("sha256").update(value, "utf8").digest("hex");
+  return (0, import_node_crypto12.createHash)("sha256").update(value, "utf8").digest("hex");
 }
 function positiveInteger3(value, fallback, name, maximum) {
   const selected = value ?? fallback;
@@ -53271,7 +53543,7 @@ function normalizeUniqueStrings(values, options) {
   return [...new Set(normalized)].sort((left, right) => left.localeCompare(right));
 }
 function validSecret(value) {
-  return value.length >= 43 && value.length <= 256 && base64UrlPattern.test(value);
+  return value.length >= 43 && value.length <= 256 && base64UrlPattern2.test(value);
 }
 var revocationReasons = /* @__PURE__ */ new Set([
   "credential-rotation",
@@ -53285,8 +53557,8 @@ function validActorId(value) {
 }
 function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
   const now = options.now ?? (() => /* @__PURE__ */ new Date());
-  const id = options.id ?? import_node_crypto9.randomUUID;
-  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto9.randomBytes)(32).toString("base64url"));
+  const id = options.id ?? import_node_crypto12.randomUUID;
+  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto12.randomBytes)(32).toString("base64url"));
   const enrollmentTtlSeconds = positiveInteger3(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
   return {
     async issueEnrollment(input) {
@@ -53416,7 +53688,7 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
 var maximumPsqlOutputBytes = 1024 * 1024;
 var defaultDependencies = {
   query: executePsqlQuery,
-  token: () => (0, import_node_crypto10.randomBytes)(32).toString("base64url")
+  token: () => (0, import_node_crypto13.randomBytes)(32).toString("base64url")
 };
 async function issueRunnerEnrollment(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
@@ -53584,7 +53856,7 @@ function spawnPsql(args, environment) {
   if (process.platform !== "linux") {
     throw new Error("runner enrollment administration is supported only on Linux control-plane hosts");
   }
-  return (0, import_node_child_process4.spawn)("/usr/bin/psql", args, {
+  return (0, import_node_child_process5.spawn)("/usr/bin/psql", args, {
     env: environment,
     stdio: "pipe",
     windowsHide: true
@@ -53758,32 +54030,32 @@ async function assertPrivateFile(filePath, label) {
 }
 
 // src/runner/identity.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 var import_promises24 = require("node:fs/promises");
 var import_node_os5 = __toESM(require("node:os"), 1);
 var import_node_path60 = __toESM(require("node:path"), 1);
 
 // packages/contracts/src/runner-protocol.ts
-var lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
-var base64UrlPattern2 = /^[A-Za-z0-9_-]+$/u;
+var lowercaseUuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
 var capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
 var githubOwnerPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/u;
 var githubRepositoryPattern = /^[A-Za-z0-9_.-]{1,100}$/u;
-var strictVersionPattern = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+var strictVersionPattern2 = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 var artifactContentTypePattern = /^[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*\/[A-Za-z0-9][A-Za-z0-9!#$%&*+.^_~-]*$/u;
 var runnerProtocolVersionSchema = external_exports.literal(1);
 var runnerWorkerClassSchema = external_exports.enum(["managed", "self_hosted"]);
 var runnerSigningAlgorithmSchema = external_exports.literal("ed25519");
-var runnerIdentifierSchema = external_exports.string().regex(lowercaseUuidPattern, "identifier must be a lowercase UUID");
+var runnerIdentifierSchema = external_exports.string().regex(lowercaseUuidPattern2, "identifier must be a lowercase UUID");
 var runnerRequestTimestampSchema = external_exports.number().int().nonnegative().max(9999999999);
-var runnerRequestNonceSchema = external_exports.string().min(22).max(128).regex(base64UrlPattern2);
-var runnerRequestSignatureSchema = external_exports.string().length(86).regex(base64UrlPattern2);
-var runnerVersionSchema = external_exports.string().max(64).regex(strictVersionPattern).refine(
+var runnerRequestNonceSchema = external_exports.string().min(22).max(128).regex(base64UrlPattern3);
+var runnerRequestSignatureSchema = external_exports.string().length(86).regex(base64UrlPattern3);
+var runnerVersionSchema = external_exports.string().max(64).regex(strictVersionPattern2).refine(
   (value) => value.split(".").every((component) => Number.isSafeInteger(Number(component))),
   "version components must be safe integers"
 );
-var runnerLeaseSecretSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
-var runnerEnrollmentTokenSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern2);
+var runnerLeaseSecretSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern3);
+var runnerEnrollmentTokenSchema = external_exports.string().min(43).max(256).regex(base64UrlPattern3);
 var runnerCapabilitySchema = external_exports.string().trim().min(1).max(128).regex(capabilityPattern);
 var artifactContentTypeSchema = external_exports.string().trim().min(3).max(255).regex(artifactContentTypePattern, "artifact content type must be a media type without parameters").transform((value) => value.toLowerCase());
 var runnerSafeModeReasonSchema = external_exports.enum(["draft-pull-request", "fork-pull-request", "private-repository"]);
@@ -53955,6 +54227,189 @@ var runnerMutationResponseSchema = external_exports.object({
   protocolVersion: runnerProtocolVersionSchema,
   status: external_exports.enum(["accepted", "replayed"])
 }).strict();
+
+// packages/contracts/src/review.ts
+var findingDiffStates = ["new", "persistent", "regressed", "resolved"];
+var findingDiffStateSchema = external_exports.enum(findingDiffStates);
+var findingDispositions = ["open", "fixed", "accepted_risk", "false_positive", "not_applicable"];
+var findingDispositionSchema = external_exports.enum(findingDispositions);
+var evidenceStates = ["current", "stale", "unavailable", "incomplete"];
+var evidenceStateSchema = external_exports.enum(evidenceStates);
+var reviewDecisions = ["pending", "approved", "changes_requested"];
+var reviewDecisionSchema = external_exports.enum(reviewDecisions);
+var reviewStatuses = ["draft", "active", "awaiting_decision", "completed", "superseded"];
+var reviewStatusSchema = external_exports.enum(reviewStatuses);
+var uploadModes = ["metadata", "snapshots", "source"];
+var uploadModeSchema = external_exports.enum(uploadModes);
+var sha256HexSchema = external_exports.string().regex(/^[0-9a-f]{64}$/u, "must be a 64-character lowercase SHA-256 hex digest");
+var commitShaSchema = external_exports.string().min(7).max(64);
+var reviewSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  repositoryId: external_exports.string().min(1),
+  pullRequestNumber: external_exports.number().int().positive().optional(),
+  title: external_exports.string().min(1).max(256),
+  status: reviewStatusSchema,
+  decision: reviewDecisionSchema,
+  baseRunId: external_exports.string().uuid().optional(),
+  headRunId: external_exports.string().uuid(),
+  currentRevisionId: external_exports.string().uuid(),
+  createdBy: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime(),
+  updatedAt: external_exports.string().datetime(),
+  completedAt: external_exports.string().datetime().optional()
+});
+var reviewRevisionSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  sequence: external_exports.number().int().positive(),
+  baseRunId: external_exports.string().uuid().optional(),
+  headRunId: external_exports.string().uuid(),
+  baseCommitSha: commitShaSchema.optional(),
+  headCommitSha: commitShaSchema,
+  evidenceDigest: sha256HexSchema,
+  createdAt: external_exports.string().datetime()
+});
+var findingDecisionSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  findingFingerprint: sha256HexSchema,
+  disposition: findingDispositionSchema,
+  reason: external_exports.string().min(1).max(4e3),
+  actorId: external_exports.string().min(1),
+  evidenceDigest: sha256HexSchema,
+  expiresAt: external_exports.string().datetime().optional(),
+  createdAt: external_exports.string().datetime()
+});
+var createFindingDecisionRequestSchema = external_exports.object({
+  disposition: findingDispositionSchema,
+  reason: external_exports.string().min(1).max(4e3),
+  expiresAt: external_exports.string().datetime().optional(),
+  evidenceDigest: sha256HexSchema
+}).superRefine((data, ctx) => {
+  if (data.disposition === "accepted_risk") {
+    if (data.reason.trim().length < 20) {
+      ctx.addIssue({
+        code: external_exports.ZodIssueCode.custom,
+        message: "Accepted risk disposition requires a detailed reason of at least 20 characters",
+        path: ["reason"]
+      });
+    }
+  }
+});
+var findingAssignmentSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  findingFingerprint: sha256HexSchema,
+  assigneeId: external_exports.string().min(1),
+  assignedBy: external_exports.string().min(1),
+  createdAt: external_exports.string().datetime()
+});
+var reviewCommentSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  findingFingerprint: sha256HexSchema.optional(),
+  parentCommentId: external_exports.string().uuid().optional(),
+  body: external_exports.string().min(1).max(1e4),
+  authorId: external_exports.string().min(1),
+  evidenceDigest: sha256HexSchema,
+  state: external_exports.enum(["open", "resolved", "stale"]),
+  createdAt: external_exports.string().datetime(),
+  resolvedAt: external_exports.string().datetime().optional()
+});
+var createReviewCommentRequestSchema = external_exports.object({
+  findingFingerprint: sha256HexSchema.optional(),
+  parentCommentId: external_exports.string().uuid().optional(),
+  body: external_exports.string().trim().min(1).max(1e4),
+  evidenceDigest: sha256HexSchema
+});
+var reviewApprovalSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  revisionId: external_exports.string().uuid(),
+  reviewerId: external_exports.string().min(1),
+  decision: external_exports.enum(["approved", "changes_requested"]),
+  evidenceDigest: sha256HexSchema,
+  createdAt: external_exports.string().datetime(),
+  invalidatedAt: external_exports.string().datetime().optional(),
+  invalidationReason: external_exports.string().max(1e3).optional()
+});
+var createReviewApprovalRequestSchema = external_exports.object({
+  decision: external_exports.enum(["approved", "changes_requested"]),
+  evidenceDigest: sha256HexSchema,
+  reason: external_exports.string().max(1e3).optional()
+});
+var uploadManifestItemSchema = external_exports.object({
+  kind: external_exports.string().min(1).max(64),
+  path: external_exports.string().min(1).max(1024),
+  contentType: external_exports.string().min(1).max(128),
+  bytes: external_exports.number().int().nonnegative().max(1073741824),
+  // 1GB limit per item
+  sha256: sha256HexSchema,
+  dataClass: external_exports.enum(["metadata", "snapshot", "source"])
+});
+var uploadManifestSchema = external_exports.object({
+  schemaVersion: external_exports.literal(1),
+  uploadMode: uploadModeSchema,
+  repositoryId: external_exports.string().min(1),
+  commitSha: commitShaSchema,
+  toolVersion: external_exports.string().min(1),
+  configDigest: sha256HexSchema,
+  rulePackDigest: sha256HexSchema,
+  items: external_exports.array(uploadManifestItemSchema).max(5e3)
+}).superRefine((data, ctx) => {
+  const hasSource = data.items.some((item2) => item2.dataClass === "source");
+  if (hasSource && data.uploadMode !== "source") {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: "Manifest containing source files requires explicit uploadMode 'source'",
+      path: ["uploadMode"]
+    });
+  }
+});
+var visualSnapshotSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewRevisionId: external_exports.string().uuid(),
+  artifactId: external_exports.string().uuid(),
+  pageOrLayer: external_exports.string().min(1).max(256),
+  width: external_exports.number().int().positive(),
+  height: external_exports.number().int().positive(),
+  sha256: sha256HexSchema,
+  anchorMapSha256: sha256HexSchema
+});
+var externalReviewLinkSchema = external_exports.object({
+  id: external_exports.string().uuid(),
+  reviewId: external_exports.string().uuid(),
+  tokenDigest: sha256HexSchema,
+  createdBy: external_exports.string().min(1),
+  allowComments: external_exports.boolean(),
+  allowApprovals: external_exports.boolean(),
+  allowSnapshots: external_exports.boolean(),
+  allowSourceDownload: external_exports.boolean(),
+  expiresAt: external_exports.string().datetime(),
+  revokedAt: external_exports.string().datetime().optional(),
+  lastUsedAt: external_exports.string().datetime().optional(),
+  createdAt: external_exports.string().datetime()
+});
+var createExternalReviewLinkRequestSchema = external_exports.object({
+  allowComments: external_exports.boolean().default(true),
+  allowApprovals: external_exports.boolean().default(false),
+  allowSnapshots: external_exports.boolean().default(true),
+  allowSourceDownload: external_exports.boolean().default(false),
+  durationDays: external_exports.number().int().min(1).max(30).default(7)
+});
+var reviewFindingDiffItemSchema = external_exports.object({
+  fingerprint: sha256HexSchema,
+  ruleId: external_exports.string().min(1),
+  severity: external_exports.enum(["error", "high", "medium", "low", "info"]),
+  message: external_exports.string(),
+  path: external_exports.string().optional(),
+  project: external_exports.string().optional(),
+  diffState: findingDiffStateSchema,
+  currentDisposition: findingDispositionSchema,
+  activeDecision: findingDecisionSchema.optional(),
+  assignment: findingAssignmentSchema.optional(),
+  commentCount: external_exports.number().int().nonnegative()
+});
 
 // packages/contracts/src/index.ts
 var releaseRunStatusSchema = external_exports.enum(["queued", "running", "completed", "timed_out", "failed"]);
@@ -54158,118 +54613,8 @@ var runnerTerminalResultRequestSchema = runnerLeaseContextSchema.extend({
 });
 
 // src/runner/client.ts
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 var import_promises23 = require("node:fs/promises");
-
-// packages/cloud-core/src/runner-request-signature.ts
-var import_node_crypto11 = require("node:crypto");
-var canonicalPrefix = "boardreadyops-runner-request-v1";
-var canonicalBaseUrl = "https://boardreadyops.invalid";
-var lowercaseUuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
-var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
-var strictVersionPattern2 = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
-function compareText(left, right) {
-  if (left < right) {
-    return -1;
-  }
-  if (left > right) {
-    return 1;
-  }
-  return 0;
-}
-function encodeQueryComponent(value) {
-  return encodeURIComponent(value).replace(
-    /[!'()*]/gu,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
-  );
-}
-function assertLowercaseUuid(name, value) {
-  if (value === void 0) {
-    return "";
-  }
-  if (!lowercaseUuidPattern2.test(value)) {
-    throw new Error(`${name} must be a lowercase UUID`);
-  }
-  return value;
-}
-function assertRunnerVersion(value) {
-  if (value.length > 64 || !strictVersionPattern2.test(value) || value.split(".").some((component) => !Number.isSafeInteger(Number(component)))) {
-    throw new Error("runner version must be a strict major.minor.patch version");
-  }
-  return value;
-}
-function assertNonce(value) {
-  if (value.length < 22 || value.length > 128 || !base64UrlPattern3.test(value)) {
-    throw new Error("runner request nonce must be 22-128 base64url characters");
-  }
-  return value;
-}
-function runnerRequestBodyDigest(body) {
-  return (0, import_node_crypto11.createHash)("sha256").update(body).digest("hex");
-}
-function normalizeRunnerRequestPath(path66) {
-  if (!path66.startsWith("/") || path66.startsWith("//") || path66.includes("#") || path66.includes("\\")) {
-    throw new Error("runner request path must be an absolute application path without a fragment");
-  }
-  const rawPath = path66.split("?", 1)[0] ?? path66;
-  if (/%2f|%5c/iu.test(rawPath)) {
-    throw new Error("runner request path cannot contain encoded path separators");
-  }
-  for (const segment of rawPath.split("/")) {
-    let decoded;
-    try {
-      decoded = decodeURIComponent(segment);
-    } catch {
-      throw new Error("runner request path contains invalid percent encoding");
-    }
-    if (decoded === "." || decoded === "..") {
-      throw new Error("runner request path cannot contain dot segments");
-    }
-  }
-  const url2 = new URL(path66, canonicalBaseUrl);
-  if (url2.origin !== canonicalBaseUrl) {
-    throw new Error("runner request path must remain within the application origin");
-  }
-  const query = [...url2.searchParams.entries()].sort(([leftKey, leftValue], [rightKey, rightValue]) => {
-    const keyOrder = compareText(leftKey, rightKey);
-    return keyOrder === 0 ? compareText(leftValue, rightValue) : keyOrder;
-  }).map(([key, value]) => `${encodeQueryComponent(key)}=${encodeQueryComponent(value)}`).join("&");
-  return query.length === 0 ? url2.pathname : `${url2.pathname}?${query}`;
-}
-function canonicalRunnerRequest(input) {
-  const method = input.method.toUpperCase();
-  if (!/^[A-Z]+$/u.test(method)) {
-    throw new Error("runner request method must contain only ASCII letters");
-  }
-  if (!Number.isSafeInteger(input.timestamp) || input.timestamp < 0 || input.timestamp > 9999999999) {
-    throw new Error("runner request timestamp must be a non-negative integer in seconds");
-  }
-  if (input.workerClass !== "managed" && input.workerClass !== "self_hosted") {
-    throw new Error("unsupported runner worker class");
-  }
-  const fields = [
-    canonicalPrefix,
-    method,
-    normalizeRunnerRequestPath(input.path),
-    String(input.timestamp),
-    assertNonce(input.nonce),
-    input.workerClass,
-    assertLowercaseUuid("runnerId", input.runnerId),
-    assertLowercaseUuid("runId", input.runId),
-    assertLowercaseUuid("executionAttemptId", input.executionAttemptId),
-    assertLowercaseUuid("leaseId", input.leaseId)
-  ];
-  if (input.runnerVersion !== void 0) {
-    fields.push(`runner-version:${assertRunnerVersion(input.runnerVersion)}`);
-  }
-  fields.push(runnerRequestBodyDigest(input.body));
-  return fields.join("\n");
-}
-function signRunnerRequest(input) {
-  return (0, import_node_crypto11.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
-}
-
-// src/runner/client.ts
 var responseBodyLimitBytes = 1024 * 1024;
 var runnerProtocolHeaderNames = {
   protocolVersion: "x-boardreadyops-runner-protocol-version",
@@ -54308,7 +54653,7 @@ var RunnerControlPlaneClient = class {
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
-    this.nonce = options.nonce ?? (() => (0, import_node_crypto12.randomBytes)(24).toString("base64url"));
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto14.randomBytes)(24).toString("base64url"));
     this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
   }
   async claim(input) {
@@ -54453,7 +54798,7 @@ async function activateRunner(input) {
   }
 }
 async function loadRunnerPrivateKey(filePath) {
-  return (0, import_node_crypto12.createPrivateKey)(await (0, import_promises23.readFile)(filePath, "utf8"));
+  return (0, import_node_crypto14.createPrivateKey)(await (0, import_promises23.readFile)(filePath, "utf8"));
 }
 function normalizeControlPlaneUrl(value) {
   let url2;
@@ -54537,7 +54882,7 @@ async function activateRunnerIdentity(options) {
   const privateKeyFile = import_node_path60.default.join(identityDirectory, privateKeyName);
   const publicKeyFile = import_node_path60.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto13.generateKeyPairSync)("ed25519");
+  const generated = (0, import_node_crypto15.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
   const activated = await activateRunner({
@@ -54705,7 +55050,7 @@ var import_node_os6 = __toESM(require("node:os"), 1);
 var import_node_path62 = __toESM(require("node:path"), 1);
 
 // src/runner/source.ts
-var import_node_child_process5 = require("node:child_process");
+var import_node_child_process6 = require("node:child_process");
 var import_promises25 = require("node:fs/promises");
 var import_node_path61 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
@@ -54743,7 +55088,7 @@ async function checkoutRunnerSource(options) {
 }
 async function executeRunnerCommand(command, args, options) {
   return await new Promise((resolve, reject) => {
-    const child = (0, import_node_child_process5.spawn)(command, args, {
+    const child = (0, import_node_child_process6.spawn)(command, args, {
       cwd: options.cwd,
       env: options.env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -55238,7 +55583,7 @@ var RunnerShutdownError = class extends Error {
 };
 
 // src/cli/runner-pipeline.ts
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto16 = require("node:crypto");
 var import_promises27 = require("node:fs/promises");
 var import_node_path63 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
@@ -55342,7 +55687,7 @@ async function runnerArtifact(filePath, kind, name, role) {
     role,
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto14.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto16.createHash)("sha256").update(content).digest("hex")
   };
 }
 async function readRunReport(filePath) {
@@ -57327,6 +57672,12 @@ function registerAllCommands(program2, streams) {
       process.exitCode = await pruneBaselineCommand(pathInput, options, streams);
     }
   );
+  const review = program2.command("review").description("manage and publish hardware reviews");
+  addCommonOptions(
+    review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", (v) => Number(v))
+  ).action(async (pathInput, options) => {
+    process.exitCode = await reviewPublishCommand(pathInput, options, streams);
+  });
 }
 function runnerSeconds(value) {
   if (!/^[1-9]\d*$/u.test(value)) {
@@ -57422,6 +57773,7 @@ function rewriteDefaultCommand(argv) {
     "init",
     "baseline",
     "runner",
+    "review",
     "help"
   ]);
   const first = argv[0];

@@ -10,6 +10,7 @@ import { formatJson } from "../report/json.js";
 import { formatMarkdown } from "../report/markdown.js";
 import { formatSarif } from "../report/sarif.js";
 import { writeTextFile } from "../util/fs.js";
+import { publishActionRunToCloud } from "./cloud-publish.js";
 import { upsertPullRequestComment } from "./comment.js";
 import { buildActionHardwareImpact } from "./hardware-impact.js";
 import { readActionInputs } from "./inputs.js";
@@ -65,7 +66,8 @@ export async function runAction(): Promise<void> {
   if (inputs.annotations) {
     emitAnnotations(result.findings);
   }
-  setActionOutputs(result, written);
+  const cloudOutputs = await publishActionRunToCloud(result, inputs, workspace, logger);
+  setActionOutputs(result, { ...written, ...cloudOutputs });
   await core.summary.addRaw(formatMarkdown(result)).write();
   const trustedWritesAllowed = inputs.executionPolicy !== "safe";
   if (trustedWritesAllowed && inputs.uploadArtifacts) {
