@@ -974,4 +974,3 @@ Skip this commit when no final correction exists.
 - [ ] **Step 8: Final acceptance audit**
 
 Re-read all 10 acceptance criteria from the specification. For each criterion, cite one implementation file and one fresh verification command or browser observation. Report any unmet criterion as incomplete rather than weakening it.
-

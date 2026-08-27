@@ -392,4 +392,3 @@ The UI phase is complete only when:
 8. Target desktop and mobile screenshots show no clipping, overlap, body overflow, or generic card-grid regression.
 9. Lint, typecheck, unit, E2E, cloud build, standalone verification, and coverage gates pass from a clean tree.
 10. No new large UI dependency, fake product capability, or unrelated backend refactor is introduced.
-
