@@ -11,7 +11,7 @@ export interface FindingsTabProps {
   onAssign?: (fingerprint: string, assignee: string) => void;
 }
 
-export function FindingsTab({ findings: initialFindings, onUpdateDisposition, onAssign: _onAssign }: FindingsTabProps) {
+export function FindingsTab({ findings: initialFindings, onUpdateDisposition, onAssign }: FindingsTabProps) {
   const [findings, setFindings] = useState(initialFindings);
   const [selectedDiffState, setSelectedDiffState] = useState<string>("all");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
@@ -21,6 +21,7 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
     finding: DemoFinding;
     targetDisposition: FindingDisposition;
   } | null>(null);
+  const [assigneeDraft, setAssigneeDraft] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setFindings(initialFindings);
@@ -49,6 +50,19 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
       onUpdateDisposition?.(fingerprint, disposition);
     },
     [onUpdateDisposition],
+  );
+
+  const handleAssign = useCallback(
+    (fingerprint: string, assignee: string) => {
+      const trimmed = assignee.trim();
+      if (!trimmed) return;
+      setFindings((prev) =>
+        prev.map((f) => (f.fingerprint === fingerprint ? { ...f, assignees: [...f.assignees, trimmed] } : f)),
+      );
+      setAssigneeDraft((prev) => ({ ...prev, [fingerprint]: "" }));
+      onAssign?.(fingerprint, trimmed);
+    },
+    [onAssign],
   );
 
   // Keyboard triage shortcuts: J (next), K (prev), E (accept risk), F (false positive), O (open)
@@ -294,6 +308,33 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
                     <span className="assignee-val">
                       {finding.assignees.length > 0 ? finding.assignees.join(", ") : "Unassigned"}
                     </span>
+                    <input
+                      type="text"
+                      className="assignee-input"
+                      placeholder="Add assignee…"
+                      value={assigneeDraft[finding.fingerprint] ?? ""}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        setAssigneeDraft((prev) => ({ ...prev, [finding.fingerprint]: value }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="assignee-add-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");
+                      }}
+                    >
+                      Assign
+                    </button>
                   </div>
                 </div>
               </article>
