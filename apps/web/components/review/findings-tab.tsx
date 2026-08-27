@@ -221,6 +221,8 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
         </div>
       </div>
 
+      {/* Renders every filtered finding; not actually windowed yet, so a 10k-finding
+          review will mount 10k DOM nodes. Needs real windowing before that scale is safe. */}
       <div className="findings-virtual-list">
         {filteredFindings.length === 0 ? (
           <div className="panel empty-findings">

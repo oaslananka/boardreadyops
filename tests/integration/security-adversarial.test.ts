@@ -1,6 +1,9 @@
 import { createHmac } from "node:crypto";
 import { verifyStripeWebhook } from "@boardreadyops/cloud-core";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { DiscussionTab } from "../../apps/web/components/review/discussion-tab.js";
 import { decodeRunListingCursor } from "../../apps/web/lib/run-listing.js";
 
 describe("Security adversarial invariants", () => {
@@ -43,12 +46,27 @@ describe("Security adversarial invariants", () => {
     expect(verified).toBe(false);
   });
 
-  it("rejects XSS in comment body via sanitization check", () => {
-    const malicious = "<script>alert(1)</script><img src=x onerror=alert(2)>";
-    // In production, comment body is sanitized; here we verify that raw script tags are not rendered as HTML
-    const sanitized = malicious.replaceAll(/<script.*?>.*?<\/script>/gi, "").replaceAll(/onerror=/gi, "");
-    expect(sanitized).not.toContain("<script>");
-    expect(sanitized).not.toContain("onerror=");
+  it("renders a stored-XSS comment payload as inert escaped text, not executable markup", () => {
+    const malicious = '<script>alert(1)</script><img src=x onerror="alert(2)">';
+    const markup = renderToStaticMarkup(
+      createElement(DiscussionTab, {
+        comments: [
+          {
+            id: "cmt_xss",
+            authorId: "attacker@example.test",
+            authorType: "guest",
+            content: malicious,
+            status: "open",
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    );
+
+    expect(markup).not.toContain("<script>");
+    expect(markup).not.toContain("<img src=x");
+    expect(markup).toContain("&lt;script&gt;");
+    expect(markup).toContain("&lt;img src=x onerror=");
   });
 
   it("rejects path traversal in artifact key", async () => {

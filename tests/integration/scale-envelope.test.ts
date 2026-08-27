@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 describe("Performance and scale envelope", () => {
-  it("handles 10k findings virtualized payload within budget", () => {
+  it("filters and sorts a 10k-finding payload within the local-interaction budget", () => {
     const findings = Array.from({ length: 10_000 }, (_, i) => ({
       fingerprint: i.toString(16).padStart(64, "0"),
       ruleId: `rule.${i % 100}`,
