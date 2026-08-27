@@ -112,7 +112,7 @@ A finding emitted by a plugin rule against a project resource.
 
 #### kind
 
-> **kind**: `"project"` \| `"bom"` \| `"schematic"` \| `"pcb"` \| `"pinmap"` \| `"manifest"`
+> **kind**: `"project"` \| `"manifest"` \| `"schematic"` \| `"bom"` \| `"pcb"` \| `"pinmap"`
 
 #### path
 
