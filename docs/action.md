@@ -56,6 +56,8 @@ moves with stable releases.
 | `log-file` | `` | Optional log file path inside the workspace. |
 | `log-file-max-bytes` | `` | Rotate the log file after this many bytes. Empty uses the default. |
 | `log-file-retention` | `` | Number of rotated log files to keep. Empty uses the default. |
+| `cloud-upload` | `` | Upload findings and evidence pack to BoardReadyOps Cloud. One of metadata, snapshots, source. Empty disables. |
+| `cloud-server` | `https://app.boardreadyops.com` | BoardReadyOps Cloud instance URL. |
 
 ## Outputs
 
@@ -70,6 +72,9 @@ moves with stable releases.
 | `json-path` | JSON output path if produced. |
 | `markdown-path` | Markdown output path if produced. |
 | `hbom-path` | CycloneDX hardware SBOM output path if produced. |
+| `review-url` | URL of the created or updated cloud hardware review. |
+| `cloud-run-id` | Ingested cloud release run identifier. |
+| `evidence-pack-id` | Deterministic SHA-256 evidence digest for this review revision. |
 
 ## Pull request comments
 

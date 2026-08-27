@@ -22,6 +22,8 @@ export interface ActionInputs extends Partial<PipelineOptions> {
   logFile?: string | undefined;
   logFileMaxBytes?: number | undefined;
   logFileRetention?: number | undefined;
+  cloudUpload?: "metadata" | "snapshots" | "source" | undefined;
+  cloudServer?: string | undefined;
 }
 
 export function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cwd()): ActionInputs {
@@ -71,7 +73,18 @@ export function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? pro
       core.getInput("log-file-retention") || process.env.BOARDREADY_LOG_FILE_RETENTION || "",
       "log-file-retention",
     ),
+    cloudUpload: cloudUploadInput(core.getInput("cloud-upload")),
+    cloudServer: empty(core.getInput("cloud-server")),
   };
+}
+
+function cloudUploadInput(value: string): "metadata" | "snapshots" | "source" | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed === "metadata" || trimmed === "snapshots" || trimmed === "source") {
+    return trimmed;
+  }
+  throw new Error("Input cloud-upload must be metadata, snapshots, or source.");
 }
 
 export function detectActionGate(event: string, ref: string): string {

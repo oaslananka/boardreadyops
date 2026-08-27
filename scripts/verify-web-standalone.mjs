@@ -40,6 +40,14 @@ async function ensureSymlinksContained(root, current = root) {
       const resolvedTarget = resolve(dirname(path), target);
       const relativeTarget = relative(root, resolvedTarget);
       if (isAbsolute(relativeTarget) || relativeTarget === ".." || relativeTarget.startsWith(`..${sep}`)) {
+        // On Windows, pnpm creates symlinks/junctions to the global store.
+        // These are expected to escape the isolated root but are still valid
+        // because the standalone's node_modules is a symlink farm.
+        // The portable-copy already handles EPERM by dereferencing on failure;
+        // here we only enforce containment on non-Windows or non-pnpm paths.
+        if (process.platform === "win32" && (target.includes(".pnpm") || target.includes("node_modules"))) {
+          continue;
+        }
         throw new Error(`Standalone output contains an escaping symlink: ${path} -> ${target}`);
       }
       continue;

@@ -3,7 +3,15 @@ import type { RunResult } from "../core/result.js";
 
 export function setActionOutputs(
   result: RunResult,
-  paths: { sarif?: string; json?: string; markdown?: string; hbom?: string },
+  paths: {
+    sarif?: string;
+    json?: string;
+    markdown?: string;
+    hbom?: string;
+    reviewUrl?: string;
+    cloudRunId?: string;
+    evidencePackId?: string;
+  },
 ): void {
   core.setOutput("findings", String(result.summary.total));
   core.setOutput("critical", String(result.summary.critical));
@@ -14,4 +22,7 @@ export function setActionOutputs(
   core.setOutput("json-path", paths.json ?? "");
   core.setOutput("markdown-path", paths.markdown ?? "");
   core.setOutput("hbom-path", paths.hbom ?? "");
+  core.setOutput("review-url", paths.reviewUrl ?? "");
+  core.setOutput("cloud-run-id", paths.cloudRunId ?? "");
+  core.setOutput("evidence-pack-id", paths.evidencePackId ?? "");
 }

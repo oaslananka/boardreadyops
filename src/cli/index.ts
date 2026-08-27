@@ -56,6 +56,7 @@ function rewriteDefaultCommand(argv: string[]): string[] {
     "init",
     "baseline",
     "runner",
+    "review",
     "help",
   ]);
   const first = argv[0];

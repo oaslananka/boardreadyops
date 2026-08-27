@@ -122,6 +122,14 @@ inputs:
     description: Number of rotated log files to keep. Empty uses the default.
     required: false
     default: ""
+  cloud-upload:
+    description: Upload findings and evidence pack to BoardReadyOps Cloud. One of metadata, snapshots, source. Empty disables.
+    required: false
+    default: ""
+  cloud-server:
+    description: BoardReadyOps Cloud instance URL.
+    required: false
+    default: https://app.boardreadyops.com
 outputs:
   findings:
     description: Total finding count.
@@ -141,3 +149,9 @@ outputs:
     description: Markdown output path if produced.
   hbom-path:
     description: CycloneDX hardware SBOM output path if produced.
+  review-url:
+    description: URL of the created or updated cloud hardware review.
+  cloud-run-id:
+    description: Ingested cloud release run identifier.
+  evidence-pack-id:
+    description: Deterministic SHA-256 evidence digest for this review revision.

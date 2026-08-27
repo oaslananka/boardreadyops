@@ -15,8 +15,8 @@
     },
     "apps/web": {
       "entry": ["worker.ts"],
-      "project": ["lib/**/*.{ts,js}", "app/api/github/webhook/**/*.{ts,js}"]
+      "project": ["lib/**/*.{ts,js}", "app/api/github/webhook/**/*.{ts,js}", "components/review/**/*.{ts,tsx}"]
     }
   },
-  "ignoreBinaries": ["kicad-cli", "psql"]
+  "ignoreBinaries": ["psql"]
 }

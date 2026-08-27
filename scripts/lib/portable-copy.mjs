@@ -19,7 +19,25 @@ async function copyEntry(source, destination, options) {
     const target = await readlink(source);
     const targetMetadata = await stat(resolve(dirname(source), target));
     await mkdir(dirname(destination), { recursive: true });
-    await symlink(target, destination, targetMetadata.isDirectory() ? "dir" : "file");
+    try {
+      await symlink(target, destination, targetMetadata.isDirectory() ? "dir" : "file");
+    } catch (error) {
+      if (process.platform === "win32") {
+        if (targetMetadata.isDirectory()) {
+          try {
+            await symlink(target, destination, "junction");
+            return;
+          } catch {
+            // fallback to dereferencing
+          }
+        }
+        if (error?.code === "EPERM" || error?.code === "EACCES") {
+          await copyEntry(await realpath(source), destination, options);
+          return;
+        }
+      }
+      throw error;
+    }
     return;
   }
 
