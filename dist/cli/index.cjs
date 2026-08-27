@@ -53345,14 +53345,17 @@ function signRunnerRequest(input) {
 // src/cli/commands/review.ts
 function getGitCommitSha(ref = "HEAD") {
   try {
-    return (0, import_node_child_process4.execSync)(`git rev-parse ${ref}`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return (0, import_node_child_process4.execFileSync)("git", ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return "0".repeat(40);
   }
 }
 function getGitOriginRepo() {
   try {
-    const url2 = (0, import_node_child_process4.execSync)("git remote get-url origin", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const url2 = (0, import_node_child_process4.execFileSync)("git", ["remote", "get-url", "origin"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
     const match = url2.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
     return match ? match[1] : void 0;
   } catch {
