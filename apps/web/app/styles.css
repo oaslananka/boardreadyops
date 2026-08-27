@@ -3949,6 +3949,83 @@ code {
   }
 }
 
+/* Settings & Operational Pages Layout */
+.operational-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-frame {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-layout-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .settings-layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-navigation {
+  padding: var(--space-2);
+}
+
+.settings-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-nav-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all var(--bro-motion-fast) var(--bro-ease);
+}
+
+.settings-nav-link:hover {
+  color: var(--text);
+  background: var(--surface-muted);
+}
+
+.settings-nav-link.active,
+.settings-nav-link[aria-current="page"] {
+  color: var(--foundry-copper);
+  background: var(--surface-muted);
+  font-weight: 600;
+}
+
+.settings-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Setup Progress Index */
+.setup-progress-index {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  color: var(--foundry-copper);
+  font-weight: 700;
+}
+
 @media (forced-colors: active) {
   :focus-visible {
     outline: 2px solid CanvasText;

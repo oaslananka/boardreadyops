@@ -87,7 +87,7 @@ export function RunPageFrame({
   const currentLabel = navigationItems.find((item) => item.view === active)?.label ?? "Run";
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="shell" id="main-content">
+      <main className="page-frame operational-page" id="main-content">
         <Breadcrumbs
           items={[
             { href: "/", label: "BoardReadyOps" },
