@@ -1,10 +1,22 @@
-import { ReviewPolicyStore } from "@boardreadyops/db";
+import { type ReviewPolicyRecord, ReviewPolicyStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
 import { viewerAuthorization } from "../../../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
+
+async function getOwnedPolicyOrError(
+  store: ReviewPolicyStore,
+  id: string,
+  tenantId: string,
+): Promise<ReviewPolicyRecord | Response> {
+  const existing = await store.getPolicyById(id);
+  if (!existing || existing.tenantId !== tenantId) {
+    return Response.json({ ok: false, error: "Policy not found" }, { status: 404 });
+  }
+  return existing;
+}
 
 const updatePolicySchema = z.object({
   name: z.string().min(1).max(128).optional(),
@@ -44,11 +56,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new ReviewPolicyStore(executor);
-    const tenantId = viewer.session.login; // simplified tenant mapping
-    const existing = await store.getPolicyById(id);
-    if (!existing || existing.tenantId !== tenantId) {
-      return Response.json({ ok: false, error: "Policy not found" }, { status: 404 });
-    }
+    const owned = await getOwnedPolicyOrError(store, id, viewer.session.login);
+    if (owned instanceof Response) return owned;
     const updated = await store.updatePolicy(id, parsed.data);
     return Response.json({ ok: true, policy: updated });
   } finally {
@@ -72,11 +81,8 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new ReviewPolicyStore(executor);
-    const tenantId = viewer.session.login; // simplified tenant mapping
-    const existing = await store.getPolicyById(id);
-    if (!existing || existing.tenantId !== tenantId) {
-      return Response.json({ ok: false, error: "Policy not found" }, { status: 404 });
-    }
+    const owned = await getOwnedPolicyOrError(store, id, viewer.session.login);
+    if (owned instanceof Response) return owned;
     const deleted = await store.deletePolicy(id);
     return Response.json({ ok: deleted });
   } finally {

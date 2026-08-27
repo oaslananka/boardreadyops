@@ -2,7 +2,7 @@ import type { ReviewDecision, ReviewStatus } from "@boardreadyops/contracts";
 import { ReviewStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../lib/api-auth.js";
+import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 
 export const runtime = "nodejs";
@@ -23,19 +23,11 @@ export async function GET(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
+  const ctx = resolveRepositoryApiContext(auth, request);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
 
   const url = new URL(request.url);
-  const repositoryId = auth.repositoryId ?? url.searchParams.get("repositoryId");
-  if (!repositoryId) {
-    return Response.json({ ok: false, error: "repositoryId is required" }, { status: 400 });
-  }
-
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new ReviewStore(executor);
     const limit = url.searchParams.get("limit") ? Number(url.searchParams.get("limit")) : 20;

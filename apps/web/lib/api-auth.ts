@@ -1,5 +1,5 @@
 import { type ApiTokenScope, ApiTokenStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { createPgQueryExecutor, type PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
 import { viewerAuthorization } from "./viewer-authorization.js";
 
@@ -71,4 +71,36 @@ export async function authenticateApiRequest(
   }
 
   return { ok: false, error: "Authentication required", status: 401 };
+}
+
+export interface RepositoryApiContext {
+  repositoryId: string;
+  executor: PgQueryExecutor;
+}
+
+/**
+ * Resolves a repository-scoped route's repositoryId (from the token or the ?repositoryId
+ * query param) and opens a Postgres executor. Takes an already-resolved `auth` rather than
+ * calling authenticateApiRequest itself, so routes keep their own direct call to it - that
+ * direct import is what tests intercept with vi.spyOn(apiAuth, "authenticateApiRequest");
+ * an internal same-module call here would bypass that mock. Callers own the returned
+ * executor and must close it.
+ */
+export function resolveRepositoryApiContext(
+  auth: AuthenticatedApiContext,
+  request: Request,
+): RepositoryApiContext | Response {
+  const url = new URL(request.url);
+  const repositoryId = auth.repositoryId ?? url.searchParams.get("repositoryId");
+  if (!repositoryId) {
+    return Response.json({ ok: false, error: "repositoryId is required" }, { status: 400 });
+  }
+
+  const config = resolveCloudPersistenceConfiguration();
+  if (config.mode !== "postgres") {
+    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  }
+
+  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  return { repositoryId, executor };
 }
