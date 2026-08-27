@@ -86,9 +86,32 @@ export function evaluateFindingDecision(
 }
 
 export interface ReviewReadinessBlocker {
-  type: "unresolved_finding" | "incomplete_checklist" | "missing_approval" | "changes_requested";
+  type:
+    | "unresolved_finding"
+    | "incomplete_checklist"
+    | "missing_approval"
+    | "changes_requested"
+    | "missing_required_checklist_item"
+    | "missing_required_approver_role";
   message: string;
   referenceId?: string | undefined;
+}
+
+export interface ReviewReadinessPolicyGate {
+  requiredChecklist: string[];
+  requiredRoles: string[];
+  severityGate?: "error" | "high" | "medium" | null | undefined;
+}
+
+const SEVERITY_ORDER = ["info", "low", "medium", "high", "error"] as const;
+
+function isAtOrAboveSeverityGate(severity: string, gate: "error" | "high" | "medium"): boolean {
+  const severityRank = SEVERITY_ORDER.indexOf(severity as (typeof SEVERITY_ORDER)[number]);
+  const gateRank = SEVERITY_ORDER.indexOf(gate);
+  if (severityRank === -1 || gateRank === -1) {
+    return false;
+  }
+  return severityRank >= gateRank;
 }
 
 export interface ReviewReadinessEvaluation {
@@ -107,6 +130,8 @@ export function evaluateReviewReadiness(options: {
   checklist: ReviewChecklistItemLike[];
   headEvidenceDigest: string;
   requiredApprovalsCount?: number | undefined;
+  policy?: ReviewReadinessPolicyGate | null | undefined;
+  approverRoles?: Map<string, string[]> | undefined;
   now?: Date | undefined;
 }): ReviewReadinessEvaluation {
   const {
@@ -116,14 +141,19 @@ export function evaluateReviewReadiness(options: {
     checklist,
     headEvidenceDigest,
     requiredApprovalsCount = 1,
+    policy,
+    approverRoles,
     now = new Date(),
   } = options;
 
   const blockers: ReviewReadinessBlocker[] = [];
 
-  // 1. Check findings
+  // 1. Check findings against the policy severity gate (defaults to blocking only "error")
   for (const finding of findings) {
-    if (finding.severity === "error" || finding.severity === "critical") {
+    const isBlockingSeverity = policy?.severityGate
+      ? isAtOrAboveSeverityGate(finding.severity, policy.severityGate)
+      : finding.severity === "error" || finding.severity === "critical";
+    if (isBlockingSeverity) {
       const decision = decisions.get(finding.fingerprint);
       const evalResult = evaluateFindingDecision(finding, decision, now);
       if (!evalResult.isWaived) {
@@ -149,6 +179,19 @@ export function evaluateReviewReadiness(options: {
     }
   }
 
+  // 2b. Check policy-required checklist items exist at all (not just completed)
+  if (policy) {
+    const existingTitles = new Set(checklist.map((item) => item.title.trim().toLowerCase()));
+    for (const requiredTitle of policy.requiredChecklist) {
+      if (!existingTitles.has(requiredTitle.trim().toLowerCase())) {
+        blockers.push({
+          type: "missing_required_checklist_item",
+          message: `Policy requires checklist item not present on this review: ${requiredTitle}`,
+        });
+      }
+    }
+  }
+
   // 3. Check approvals
   // Filter valid approved records targeting the current head evidence digest
   const validApprovals = approvals.filter(
@@ -170,6 +213,23 @@ export function evaluateReviewReadiness(options: {
       type: "missing_approval",
       message: `Requires at least ${requiredApprovalsCount} approval(s), currently has ${validApprovals.length}`,
     });
+  }
+
+  // 4. Check policy-required approver roles, if a role directory was supplied.
+  // Without approverRoles, role coverage cannot be verified, so it fails closed rather than
+  // silently passing a governance requirement no data source can confirm.
+  if (policy && policy.requiredRoles.length > 0 && !changesRequested) {
+    for (const requiredRole of policy.requiredRoles) {
+      const hasApprovalFromRole = validApprovals.some((app) =>
+        approverRoles?.get(app.approverId)?.includes(requiredRole),
+      );
+      if (!hasApprovalFromRole) {
+        blockers.push({
+          type: "missing_required_approver_role",
+          message: `Policy requires approval from role "${requiredRole}", none found among current approvers`,
+        });
+      }
+    }
   }
 
   const isReady = blockers.length === 0;
