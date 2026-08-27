@@ -9,7 +9,7 @@ export type CloudFinding = {
   fingerprint: string;
 };
 
-export function mapFindingForCloud(finding: Finding): CloudFinding {
+function mapFindingForCloud(finding: Finding): CloudFinding {
   return {
     ruleId: finding.ruleId,
     severity: finding.severity === "critical" ? "error" : finding.severity,
