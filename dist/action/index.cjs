@@ -145028,7 +145028,8 @@ function findingEvidence(prefix2, finding2) {
     label: bounded(`${prefix2}: ${finding2.ruleId} \u2014 ${finding2.message}`),
     path: bounded(finding2.resourcePath),
     ruleId: bounded(finding2.ruleId),
-    severity: finding2.severity
+    severity: finding2.severity,
+    fingerprint: finding2.fingerprint
   };
 }
 function compareEvidence(left, right) {

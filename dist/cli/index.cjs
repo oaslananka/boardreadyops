@@ -53962,6 +53962,7 @@ var releaseDecisionSchema = external_exports.enum(["pass", "fail", "error"]);
 var releaseRunConclusionSchema = external_exports.enum(["success", "failure", "neutral", "timed_out"]);
 var triggerKindSchema = external_exports.enum(["push", "pr", "manual", "workflow_dispatch"]);
 var findingSeveritySchema = external_exports.enum(["error", "high", "medium", "low", "info"]);
+var findingFingerprintSchema = external_exports.string().regex(/^[0-9a-f]{64}$/u);
 var createReleaseRunRequestSchema = external_exports.object({
   repositoryId: external_exports.string().min(1),
   commitSha: external_exports.string().min(7).max(64),
@@ -53974,7 +53975,8 @@ var findingSchema = external_exports.object({
   severity: findingSeveritySchema,
   message: external_exports.string().min(1).max(4e3),
   path: external_exports.string().min(1).max(1024).optional(),
-  project: external_exports.string().trim().min(1).max(1024).optional()
+  project: external_exports.string().trim().min(1).max(1024).optional(),
+  fingerprint: findingFingerprintSchema.optional()
 });
 var artifactStoragePathSchema = external_exports.string().min(1).max(1024).refine(
   (value) => !value.includes("\0") && !value.startsWith("/") && !value.startsWith("\\") && !/^[A-Za-z]:[\\/]/u.test(value) && !value.split(/[\\/]/u).includes(".."),
@@ -54057,7 +54059,8 @@ var hardwareImpactEvidenceRefSchema = external_exports.object({
   label: external_exports.string().trim().min(1).max(256),
   path: external_exports.string().trim().min(1).max(256).optional(),
   ruleId: external_exports.string().trim().min(1).max(256).optional(),
-  severity: hardwareImpactEvidenceSeveritySchema.optional()
+  severity: hardwareImpactEvidenceSeveritySchema.optional(),
+  fingerprint: findingFingerprintSchema.optional()
 }).strict();
 var hardwareImpactV1Schema = external_exports.object({
   version: external_exports.literal(1),
@@ -55099,16 +55102,24 @@ function boundedBoms(boms) {
     }))
   }));
 }
+var wireFindingFingerprintPattern = /^[0-9a-f]{64}$/u;
+function wireFingerprint(fingerprint) {
+  return wireFindingFingerprintPattern.test(fingerprint) ? fingerprint : void 0;
+}
 function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
   const completed = execution.exitCode === 0 || execution.exitCode === 1;
   const decision = decisionFromExitCode(execution.exitCode);
-  const findings = execution.report ? execution.report.findings.slice(0, 500).map((finding2) => ({
-    ruleId: finding2.ruleId.slice(0, 256),
-    severity: finding2.severity === "critical" ? "error" : finding2.severity,
-    message: finding2.message.slice(0, 4e3),
-    ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {},
-    ...finding2.project ? { project: finding2.project.slice(0, 1024) } : {}
-  })) : [
+  const findings = execution.report ? execution.report.findings.slice(0, 500).map((finding2) => {
+    const fingerprint = wireFingerprint(finding2.fingerprint);
+    return {
+      ruleId: finding2.ruleId.slice(0, 256),
+      severity: finding2.severity === "critical" ? "error" : finding2.severity,
+      message: finding2.message.slice(0, 4e3),
+      ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {},
+      ...finding2.project ? { project: finding2.project.slice(0, 1024) } : {},
+      ...fingerprint ? { fingerprint } : {}
+    };
+  }) : [
     {
       ruleId: "runner.execution",
       severity: "error",
@@ -55305,7 +55316,8 @@ async function executeRunnerPipeline(workspace, job, options) {
       message: finding2.message,
       resource: {
         ...finding2.resource.path === void 0 ? {} : { path: finding2.resource.path }
-      }
+      },
+      fingerprint: finding2.fingerprint
     }))
   } : void 0;
   const artifacts = [];

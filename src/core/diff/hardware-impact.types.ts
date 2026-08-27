@@ -49,5 +49,6 @@ export interface HardwareImpactV1 {
     path?: string | undefined;
     ruleId?: string | undefined;
     severity?: string | undefined;
+    fingerprint?: string | undefined;
   }>;
 }
