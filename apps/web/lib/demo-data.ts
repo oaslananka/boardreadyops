@@ -4,6 +4,7 @@ import type {
   FindingDisposition,
   ReviewDecision,
   ReviewStatus,
+  SnapshotArtifact,
 } from "@boardreadyops/contracts";
 
 export interface DemoFinding {
@@ -52,7 +53,7 @@ export interface DemoApproval {
   invalidationReason?: string | undefined;
 }
 
-export interface DemoEvidenceItem {
+interface DemoEvidenceItem {
   name: string;
   type: "bom" | "drc" | "netlist" | "schematic" | "pcb" | "manifest";
   path: string;
@@ -83,6 +84,17 @@ export interface DemoReview {
   approvals: DemoApproval[];
   evidenceItems: DemoEvidenceItem[];
   changedFiles: Array<{ path: string; status: "modified" | "added" | "deleted"; changesCount: number }>;
+  bomChanges: DemoBomChange[];
+  /** Populated server-side (see `getDemoReview`); absent on the static fixtures below. */
+  headSnapshots?: SnapshotArtifact[];
+}
+
+interface DemoBomChange {
+  reference: string;
+  changeType: "added" | "removed" | "modified";
+  baseMpn?: string | undefined;
+  headMpn?: string | undefined;
+  manufacturer?: string | undefined;
 }
 
 export const DEMO_REVIEWS: DemoReview[] = [
@@ -108,6 +120,17 @@ export const DEMO_REVIEWS: DemoReview[] = [
       { path: "hardware/mainboard/can_fd_isolated.kicad_sch", status: "added", changesCount: 48 },
       { path: "hardware/mainboard/industrial_gateway.kicad_pcb", status: "modified", changesCount: 86 },
       { path: "hardware/bom/mainboard_bom.csv", status: "modified", changesCount: 6 },
+    ],
+    bomChanges: [
+      { reference: "U12", changeType: "added", headMpn: "ISO1042BDWR", manufacturer: "Texas Instruments" },
+      {
+        reference: "U1",
+        changeType: "modified",
+        baseMpn: "BQ24195RGER",
+        headMpn: "MP2617GL-Z",
+        manufacturer: "Monolithic Power Systems",
+      },
+      { reference: "C12", changeType: "modified", baseMpn: "GRM31CR71H106KA12L", manufacturer: "Murata" },
     ],
     findings: [
       {
@@ -314,6 +337,15 @@ export const DEMO_REVIEWS: DemoReview[] = [
     changedFiles: [
       { path: "rf/ble_sensor.kicad_pcb", status: "modified", changesCount: 32 },
       { path: "rf/antenna_matching.kicad_sch", status: "modified", changesCount: 12 },
+    ],
+    bomChanges: [
+      {
+        reference: "U1",
+        changeType: "modified",
+        baseMpn: "NRF52840-QIAA",
+        headMpn: "NRF52840-QFAA",
+        manufacturer: "Nordic Semiconductor",
+      },
     ],
     findings: [
       {

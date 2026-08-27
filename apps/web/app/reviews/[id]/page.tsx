@@ -3,6 +3,7 @@ import { ReviewView } from "../../../components/review/review-view.js";
 import { AppShell, Breadcrumbs } from "../../../components/ui.js";
 import { ViewerNav } from "../../../components/viewer-nav.js";
 import { DEMO_REVIEWS, getDemoReview } from "../../../lib/demo-data.js";
+import { buildDemoSnapshots } from "../../../lib/demo-snapshots.js";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -15,11 +16,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ReviewDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const review = getDemoReview(id) ?? DEMO_REVIEWS[0];
+  const baseReview = getDemoReview(id) ?? DEMO_REVIEWS[0];
 
-  if (!review) {
+  if (!baseReview) {
     notFound();
   }
+
+  const review = {
+    ...baseReview,
+    headSnapshots: buildDemoSnapshots(baseReview.changedFiles, baseReview.findings),
+  };
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
