@@ -46,6 +46,7 @@
     "test:int": "vitest run tests/integration --no-file-parallelism",
     "test:action": "corepack pnpm run build && vitest run tests/action",
     "test:a11y": "vitest run tests/unit/report/html.test.ts tests/unit/scripts/check-docs-a11y.test.ts && corepack pnpm run docs:a11y",
+    "test:e2e": "playwright test",
     "test:property": "vitest run tests/property",
     "test:snapshot": "vitest run tests/snapshot",
     "test:bench": "vitest bench",
