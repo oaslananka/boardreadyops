@@ -9,6 +9,16 @@ export const releaseRunConclusionSchema = z.enum(["success", "failure", "neutral
 export const triggerKindSchema = z.enum(["push", "pr", "manual", "workflow_dispatch"]);
 export const findingSeveritySchema = z.enum(["error", "high", "medium", "low", "info"]);
 
+/**
+ * A finding's stable identity, matching the local `Finding.fingerprint` format
+ * (`crypto.createHash("sha256").digest("hex")` in `src/core/findings.ts`).
+ *
+ * Optional on the wire: an older CLI/Action sends findings without it, and cloud must
+ * accept those. Present, it lets a finding be tracked across two runs of the same
+ * review instead of only appearing in aggregate before/after counts.
+ */
+export const findingFingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/u);
+
 export const createReleaseRunRequestSchema = z.object({
   repositoryId: z.string().min(1),
   commitSha: z.string().min(7).max(64),
@@ -23,6 +33,7 @@ export const findingSchema = z.object({
   message: z.string().min(1).max(4000),
   path: z.string().min(1).max(1024).optional(),
   project: z.string().trim().min(1).max(1024).optional(),
+  fingerprint: findingFingerprintSchema.optional(),
 });
 
 const artifactStoragePathSchema = z
@@ -151,6 +162,7 @@ export const hardwareImpactEvidenceRefSchema = z
     path: z.string().trim().min(1).max(256).optional(),
     ruleId: z.string().trim().min(1).max(256).optional(),
     severity: hardwareImpactEvidenceSeveritySchema.optional(),
+    fingerprint: findingFingerprintSchema.optional(),
   })
   .strict();
 

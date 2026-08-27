@@ -64,6 +64,7 @@ type RunnerExecutionReport = {
     message: string;
     project?: string;
     resource: { path?: string };
+    fingerprint: string;
   }>;
 };
 
@@ -453,6 +454,19 @@ function boundedBoms(boms: NonNullable<ReleaseRunResult["boms"]>): NonNullable<R
   }));
 }
 
+const wireFindingFingerprintPattern = /^[0-9a-f]{64}$/u;
+
+/**
+ * A plugin finding may set an arbitrary custom `fingerprint` (no format constraint in
+ * `@boardreadyops/plugin-sdk`), while the wire schema expects the sha256-hex digest
+ * `fingerprintFor()` produces. Rather than reject the whole result on a non-conforming
+ * value, the fingerprint is silently omitted — the same result as before this field
+ * existed on the wire at all, so a plugin with a custom fingerprint keeps working.
+ */
+function wireFingerprint(fingerprint: string): string | undefined {
+  return wireFindingFingerprintPattern.test(fingerprint) ? fingerprint : undefined;
+}
+
 function terminalResultFromExecution(
   job: RunnerClaimedJob,
   execution: RunnerExecutionOutput,
@@ -462,13 +476,17 @@ function terminalResultFromExecution(
   const completed = execution.exitCode === 0 || execution.exitCode === 1;
   const decision = decisionFromExitCode(execution.exitCode);
   const findings = execution.report
-    ? execution.report.findings.slice(0, 500).map((finding) => ({
-        ruleId: finding.ruleId.slice(0, 256),
-        severity: finding.severity === "critical" ? ("error" as const) : finding.severity,
-        message: finding.message.slice(0, 4000),
-        ...(finding.resource.path ? { path: finding.resource.path.slice(0, 1024) } : {}),
-        ...(finding.project ? { project: finding.project.slice(0, 1024) } : {}),
-      }))
+    ? execution.report.findings.slice(0, 500).map((finding) => {
+        const fingerprint = wireFingerprint(finding.fingerprint);
+        return {
+          ruleId: finding.ruleId.slice(0, 256),
+          severity: finding.severity === "critical" ? ("error" as const) : finding.severity,
+          message: finding.message.slice(0, 4000),
+          ...(finding.resource.path ? { path: finding.resource.path.slice(0, 1024) } : {}),
+          ...(finding.project ? { project: finding.project.slice(0, 1024) } : {}),
+          ...(fingerprint ? { fingerprint } : {}),
+        };
+      })
     : [
         {
           ruleId: "runner.execution",

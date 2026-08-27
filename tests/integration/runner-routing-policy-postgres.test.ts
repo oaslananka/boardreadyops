@@ -8,6 +8,11 @@ const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 8 }) : undefined;
 let githubIdentifier = 980_000_000;
+
+function requireExecutor(): NonNullable<typeof executor> {
+  if (!executor) throw new Error("DATABASE_URL is required");
+  return executor;
+}
 const testEpochMilliseconds = Date.now() + 120_000;
 
 type RoutingMode = "disabled" | "managed_only" | "self_hosted_preferred" | "self_hosted_required";
@@ -236,7 +241,7 @@ describeDatabase("runner execution routing policy", () => {
       const claimed = await selfHostedClaim(now, runnerId, "override-self");
       expect(claimed.status).toBe("claimed");
       const metadata = rows(
-        await executor!.query(
+        await requireExecutor().query(
           "select metadata from audit_events where release_run_id = $1 and event_type = 'runner.lease.claimed'",
           [runId],
         ),
@@ -268,7 +273,7 @@ describeDatabase("runner execution routing policy", () => {
       const claimed = await managedClaim(staleAt, managedIdentityId, "preferred-stale");
       expect(claimed.status).toBe("claimed");
       const metadata = rows(
-        await executor!.query(
+        await requireExecutor().query(
           "select metadata from audit_events where release_run_id = $1 and event_type = 'runner.lease.claimed'",
           [runId],
         ),

@@ -34,7 +34,7 @@ beforeAll(async () => {
     // A tier that includes supply watch: these cases assert evaluation behaviour, and the
     // default 'free' tier is deliberately excluded from the capability.
     `insert into installations (id, github_installation_id, account_login, account_type, plan_tier)
-     values ($1, 47201, 'supply-watch', 'Organization', 'pro')`,
+     values ($1, 47201, 'supply-watch', 'Organization', 'team')`,
     [installationId],
   );
   await database().query(
@@ -151,7 +151,7 @@ describeDatabase("board supply watch", () => {
       // Still due later rather than disabled, so upgrading the plan resumes the watch.
       expect(new Date(String(watch[0]?.next_due_at)).getTime()).toBeGreaterThan(now.getTime());
     } finally {
-      await database().query("update installations set plan_tier = 'pro' where id = $1", [installationId]);
+      await database().query("update installations set plan_tier = 'team' where id = $1", [installationId]);
     }
   });
 

@@ -89,6 +89,7 @@ export async function executeRunnerPipeline(
           resource: {
             ...(finding.resource.path === undefined ? {} : { path: finding.resource.path }),
           },
+          fingerprint: finding.fingerprint,
         })),
       }
     : undefined;
