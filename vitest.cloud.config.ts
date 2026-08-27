@@ -39,9 +39,13 @@ export default defineConfig({
   test: {
     environment: "node",
     include: [
+      "tests/unit/assist/**/*.test.ts",
       "tests/unit/cloud-core/**/*.test.ts",
       "tests/unit/contracts/**/*.test.ts",
       "tests/unit/db/**/*.test.ts",
+      "tests/unit/enterprise/**/*.test.ts",
+      "tests/unit/kicad/snapshots.test.ts",
+      "tests/unit/release/review-evidence-ledger.test.ts",
       "tests/unit/web/**/*.test.ts",
     ],
     setupFiles: ["tests/setup-env.ts"],

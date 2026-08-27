@@ -80,7 +80,10 @@ export function canonicalJsonStringify(obj: unknown): string {
     return `[${obj.map(canonicalJsonStringify).join(",")}]`;
   }
 
-  const sortedKeys = Object.keys(obj as Record<string, unknown>).sort();
+  // Ordinal (code-unit) compare, not localeCompare: this key order feeds a cryptographic
+  // digest, and localeCompare's collation can vary across ICU builds/locales — it must stay
+  // byte-identical to the default sort() behavior it's replacing, just made explicit.
+  const sortedKeys = Object.keys(obj as Record<string, unknown>).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const pairs = sortedKeys.map((key) => {
     const val = (obj as Record<string, unknown>)[key];
     return `${JSON.stringify(key)}:${canonicalJsonStringify(val)}`;

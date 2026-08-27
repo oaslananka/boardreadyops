@@ -106218,9 +106218,12 @@ var runnerTerminalResultRequestSchema = runnerLeaseContextSchema.extend({
 
 // packages/cloud-core/src/review-diff.ts
 var import_node_crypto5 = require("node:crypto");
+function ordinalCompare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
 function computeEvidenceDigest(input) {
-  const sortedFingerprints = [...input.findingFingerprints].sort();
-  const sortedArtifacts = [...input.artifactDigests ?? []].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedFingerprints = [...input.findingFingerprints].sort(ordinalCompare);
+  const sortedArtifacts = [...input.artifactDigests ?? []].sort((a, b) => ordinalCompare(a.name, b.name));
   const canonicalPayload = JSON.stringify({
     toolVersion: input.toolVersion,
     kicadVersion: input.kicadVersion ?? "",

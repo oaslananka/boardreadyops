@@ -19,8 +19,7 @@ export class InMemoryKmsAdapter implements KmsAdapter {
     const ciphertext = Buffer.from(plaintext, "utf8").toString("base64");
     return { ciphertext, keyId };
   }
-  async decrypt(tenantId: string, ciphertext: string): Promise<string> {
-    void tenantId;
+  async decrypt(_tenantId: string, ciphertext: string): Promise<string> {
     return Buffer.from(ciphertext, "base64").toString("utf8");
   }
   async getDataRegion(tenantId: string): Promise<DataRegion> {

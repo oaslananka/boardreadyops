@@ -1,3 +1,4 @@
+import { getStripePriceConfig } from "@boardreadyops/cloud-core";
 import { checkoutRequestSchema } from "@boardreadyops/contracts";
 import { viewerAuthorization } from "../../../../../lib/viewer-authorization.js";
 
@@ -27,13 +28,8 @@ export async function POST(request: Request): Promise<Response> {
       { status: 400, headers: { "cache-control": "private, no-store" } },
     );
   }
-  const priceConfig = {
-    teamMonthlyPriceId: process.env.STRIPE_TEAM_MONTHLY_PRICE_ID,
-    teamYearlyPriceId: process.env.STRIPE_TEAM_YEARLY_PRICE_ID,
-    businessMonthlyPriceId: process.env.STRIPE_BUSINESS_MONTHLY_PRICE_ID,
-    businessYearlyPriceId: process.env.STRIPE_BUSINESS_YEARLY_PRICE_ID,
-  };
-  if (!priceConfig.teamMonthlyPriceId || !priceConfig.businessMonthlyPriceId) {
+  const priceConfig = getStripePriceConfig();
+  if (!priceConfig) {
     return Response.json(
       { ok: false, error: "Billing not configured", code: "external_manual_action_required" },
       { status: 503, headers: { "cache-control": "private, no-store" } },

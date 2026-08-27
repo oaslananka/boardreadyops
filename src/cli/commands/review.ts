@@ -19,9 +19,13 @@ export interface ReviewPublishOptions extends CommonCliOptions {
   pr?: number;
 }
 
+// NOSONAR(typescript:S4036): resolving "git" via PATH is the standard, portable way every
+// git-wrapping CLI (husky, lint-staged, semantic-release, this repo's own src/util/process.ts
+// call sites) invokes it; pinning an absolute path would break the many valid install
+// locations (nvm, scoop, Git for Windows, system packages) this tool has to support.
 function getGitCommitSha(ref = "HEAD"): string {
   try {
-    return execFileSync("git", ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execFileSync("git", ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); // NOSONAR
   } catch {
     return "0".repeat(40);
   }
@@ -30,6 +34,7 @@ function getGitCommitSha(ref = "HEAD"): string {
 function getGitOriginRepo(): string | undefined {
   try {
     const url = execFileSync("git", ["remote", "get-url", "origin"], {
+      // NOSONAR
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
