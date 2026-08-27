@@ -105395,6 +105395,21 @@ function computeEvidenceDigest(input) {
   return (0, import_node_crypto5.createHash)("sha256").update(canonicalPayload).digest("hex");
 }
 
+// src/core/cloud-findings.ts
+function mapFindingForCloud(finding2) {
+  return {
+    ruleId: finding2.ruleId,
+    severity: finding2.severity === "critical" ? "error" : finding2.severity,
+    message: finding2.message,
+    path: finding2.resource.path,
+    project: finding2.project,
+    fingerprint: finding2.fingerprint
+  };
+}
+function mapFindingsForCloud(findings) {
+  return findings.map(mapFindingForCloud);
+}
+
 // src/action/cloud-publish.ts
 async function publishActionRunToCloud(result, inputs, _workspace, logger7) {
   const token = process.env.BOARDREADYOPS_TOKEN;
@@ -105408,14 +105423,7 @@ async function publishActionRunToCloud(result, inputs, _workspace, logger7) {
   const ref = process.env.GITHUB_REF ?? "refs/heads/main";
   const prMatch = process.env.GITHUB_REF?.match(/refs\/pull\/(\d+)/);
   const pullRequestNumber = prMatch?.[1] ? Number(prMatch[1]) : void 0;
-  const findings = result.findings.map((f) => ({
-    ruleId: f.ruleId,
-    severity: f.severity === "critical" ? "error" : f.severity,
-    message: f.message,
-    path: f.resource.path,
-    project: f.project,
-    fingerprint: f.fingerprint
-  }));
+  const findings = mapFindingsForCloud(result.findings);
   const rulePackDigest = (0, import_node_crypto6.createHash)("sha256").update("boardreadyops-v1").digest("hex");
   const configDigest = (0, import_node_crypto6.createHash)("sha256").update(JSON.stringify(inputs.config ?? {})).digest("hex");
   const evidenceDigest = computeEvidenceDigest({

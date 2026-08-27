@@ -53666,6 +53666,21 @@ function signRunnerRequest(input) {
   return (0, import_node_crypto10.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
 }
 
+// src/core/cloud-findings.ts
+function mapFindingForCloud(finding2) {
+  return {
+    ruleId: finding2.ruleId,
+    severity: finding2.severity === "critical" ? "error" : finding2.severity,
+    message: finding2.message,
+    path: finding2.resource.path,
+    project: finding2.project,
+    fingerprint: finding2.fingerprint
+  };
+}
+function mapFindingsForCloud(findings) {
+  return findings.map(mapFindingForCloud);
+}
+
 // src/cli/commands/review.ts
 function getGitCommitSha(ref = "HEAD") {
   try {
@@ -53711,14 +53726,7 @@ async function reviewPublishCommand(target, options, streams) {
     executionPolicy: options.executionPolicy ?? "safe",
     failOn: "never"
   });
-  const findings = result.findings.map((f) => ({
-    ruleId: f.ruleId,
-    severity: f.severity === "critical" ? "error" : f.severity,
-    message: f.message,
-    path: f.resource.path,
-    project: f.project,
-    fingerprint: f.fingerprint
-  }));
+  const findings = mapFindingsForCloud(result.findings);
   const rulePackDigest = (0, import_node_crypto11.createHash)("sha256").update("boardreadyops-v1").digest("hex");
   const configDigest = (0, import_node_crypto11.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
   const evidenceDigest = computeEvidenceDigest({
