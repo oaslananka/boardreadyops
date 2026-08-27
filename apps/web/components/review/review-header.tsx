@@ -39,9 +39,12 @@ export function ReviewHeader({
   const isApproved = decision === "approved";
   const isChangesRequested = decision === "changes_requested";
 
+  const decisionLabel = isApproved ? "Approved" : isChangesRequested ? "Changes requested" : "Awaiting decision";
+  const decisionTone = isApproved ? "passed" : isChangesRequested ? "failed" : "warning";
+
   return (
-    <header className="review-detail-header panel">
-      <div className="review-detail-header-top">
+    <header className="review-command-header panel surface-raised">
+      <div className="command-header-lead">
         <div className="review-meta-bar">
           <Link href="/reviews" className="review-back-link">
             ← Reviews
@@ -52,47 +55,44 @@ export function ReviewHeader({
           <span className="pr-badge">PR #{pullRequestNumber}</span>
           <span className="revision-pill">Rev {currentRevisionSequence}</span>
           <StatusBadge value={status} />
-          <StatusBadge
-            value={isApproved ? "passed" : isChangesRequested ? "failed" : "warning"}
-            label={isApproved ? "Approved" : isChangesRequested ? "Changes Requested" : "Awaiting Decision"}
-          />
         </div>
 
+        <h1 className="review-title">{title}</h1>
+
+        <div className="review-decision-summary">
+          <StatusBadge value={decisionTone} label={decisionLabel} />
+          <div className="evidence-digest-pill">
+            <span className="digest-label">Digest:</span>
+            <code className="digest-sha">
+              {evidenceDigest.slice(0, 10)}...{evidenceDigest.slice(-6)}
+            </code>
+            <CopyButton value={evidenceDigest} label="Copy digest" />
+            <span
+              className={`evidence-status-dot ${evidenceState === "current" ? "valid" : "stale"}`}
+              title={`Evidence is ${evidenceState}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="command-header-actions">
         <div className="review-actions-bar">
           <button
             type="button"
             className={`button ${isApproved ? "button-secondary" : "button-primary"}`}
             onClick={() => onApprove?.()}
           >
-            {isApproved ? "✓ Approved" : "Approve Review"}
+            {isApproved ? "✓ Approved" : "Approve review"}
           </button>
           <button type="button" className="button button-danger" onClick={() => onRequestChanges?.()}>
-            Request Changes
+            Request changes
           </button>
         </div>
-      </div>
 
-      <h1 className="review-title">{title}</h1>
-
-      <div className="review-commit-strip">
         <div className="commit-comparison">
-          <span className="commit-label">Base:</span>
-          <code className="commit-sha">{baseCommitSha.slice(0, 8)}</code>
+          <code>{baseCommitSha.slice(0, 7)}</code>
           <span className="arrow">→</span>
-          <span className="commit-label">Head:</span>
-          <code className="commit-sha">{headCommitSha.slice(0, 8)}</code>
-        </div>
-
-        <div className="evidence-digest-pill">
-          <span className="digest-label">Evidence Digest:</span>
-          <code className="digest-sha">
-            {evidenceDigest.slice(0, 12)}...{evidenceDigest.slice(-6)}
-          </code>
-          <CopyButton value={evidenceDigest} label="Copy digest" />
-          <span
-            className={`evidence-status-dot ${evidenceState === "current" ? "valid" : "stale"}`}
-            title={`Evidence is ${evidenceState}`}
-          />
+          <code>{headCommitSha.slice(0, 7)}</code>
         </div>
       </div>
     </header>

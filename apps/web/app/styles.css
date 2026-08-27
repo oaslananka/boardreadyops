@@ -2800,7 +2800,7 @@ code {
 
 .review-page-shell,
 .my-work-shell {
-  max-width: 1280px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: var(--space-4);
 }
@@ -2811,37 +2811,50 @@ code {
   gap: var(--space-4);
 }
 
+.review-command-header,
 .review-detail-header {
-  padding: var(--space-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.review-detail-header-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
+  gap: var(--space-4);
+  padding: 1.25rem 1.5rem;
+}
+
+@media (max-width: 960px) {
+  .review-command-header,
+  .review-detail-header {
+    position: static;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.command-header-lead {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .review-meta-bar {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
 }
 
 .review-back-link {
-  color: var(--bro-accent);
+  color: var(--foundry-copper);
   font-weight: 500;
   text-decoration: none;
 }
 
 .review-meta-bar .separator {
-  color: var(--bro-text-muted);
+  color: var(--text-muted);
 }
 
 .repo-name {
@@ -2849,13 +2862,36 @@ code {
 }
 
 .pr-badge,
-.revision-pill {
+.revision-pill,
+.revision-tag {
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
   font-family: var(--font-mono, monospace);
-  background: var(--surface-sunken);
+  background: var(--surface-muted);
   border: 1px solid var(--border);
+}
+
+.review-decision-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.command-header-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 960px) {
+  .command-header-actions {
+    width: 100%;
+    align-items: flex-start;
+  }
 }
 
 .review-actions-bar {
@@ -2864,42 +2900,32 @@ code {
 }
 
 .review-title {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  margin: var(--space-2) 0;
+  margin: 0.2rem 0;
   line-height: 1.25;
-}
-
-.review-commit-strip {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-  font-size: 0.85rem;
 }
 
 .commit-comparison {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  font-size: 0.85rem;
 }
 
 .commit-sha,
 .digest-sha {
   font-family: var(--font-mono, monospace);
   padding: 2px 6px;
-  background: var(--surface-sunken);
-  border-radius: 4px;
+  background: var(--surface-muted);
+  border-radius: var(--radius-sm);
 }
 
 .evidence-digest-pill {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  font-size: 0.85rem;
 }
 
 .evidence-status-dot {
@@ -2927,23 +2953,47 @@ code {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--bro-text-muted);
+  color: var(--text-muted);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  transition: all 0.15s ease;
+  white-space: nowrap;
+  transition:
+    color var(--bro-motion-fast) var(--bro-ease),
+    border-color var(--bro-motion-fast) var(--bro-ease);
 }
 
 .review-tab-link:hover {
-  color: var(--bro-text);
+  color: var(--text);
 }
 
-.review-tab-link.active {
-  color: var(--bro-accent);
-  border-bottom-color: var(--bro-accent);
+.review-tab-link.active,
+.review-tab-link[aria-selected="true"] {
+  color: var(--foundry-copper);
+  border-bottom-color: var(--foundry-copper);
+}
+
+.readiness-band {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: 1.25rem 1.5rem;
+}
+
+.readiness-lead h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.readiness-lead p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 .tab-pill {
