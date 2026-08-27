@@ -26,10 +26,5 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-    {
-      name: "admin",
-      use: { storageState: "tests/e2e/.auth/admin.json" },
-      dependencies: ["setup-admin"],
-    },
   ],
 });
