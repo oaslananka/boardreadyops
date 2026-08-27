@@ -1,13 +1,20 @@
 import { createHash } from "node:crypto";
 import type { CanvasAnchor, SnapshotArtifact } from "@boardreadyops/contracts";
-import type { Finding } from "../core/findings.js";
 import { parsePcb } from "./pcb.js";
 import { parseSchematic } from "./schematic.js";
+
+export type SnapshotFinding = {
+  fingerprint: string;
+  ruleId: string;
+  severity: string;
+  message: string;
+  details?: Record<string, unknown> | undefined;
+};
 
 export interface GenerateSnapshotsOptions {
   schematicFiles?: string[];
   pcbFiles?: string[];
-  findings?: Finding[];
+  findings?: SnapshotFinding[];
 }
 
 export function createSchematicSvg(
@@ -156,7 +163,7 @@ export function createPcbLayerSvg(
   return { svg, anchors };
 }
 
-function extractComponentReference(finding: Finding): string | undefined {
+function extractComponentReference(finding: SnapshotFinding): string | undefined {
   if (finding.details && typeof finding.details === "object") {
     const d = finding.details as Record<string, unknown>;
     const comp = d.component ?? d.reference ?? d.designator ?? d.symbol;
@@ -166,7 +173,7 @@ function extractComponentReference(finding: Finding): string | undefined {
   return match ? match[1] : undefined;
 }
 
-export function linkFindingAnchors(anchors: CanvasAnchor[], findings: Finding[]): CanvasAnchor[] {
+export function linkFindingAnchors(anchors: CanvasAnchor[], findings: SnapshotFinding[]): CanvasAnchor[] {
   const result = [...anchors];
 
   findings.forEach((finding) => {
