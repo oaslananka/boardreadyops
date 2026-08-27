@@ -46,6 +46,15 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
     }));
   }
 
+  function handleAssign(fingerprint: string, assignee: string) {
+    setReview((prev) => ({
+      ...prev,
+      findings: prev.findings.map((f) =>
+        f.fingerprint === fingerprint ? { ...f, assignees: [...f.assignees, assignee] } : f,
+      ),
+    }));
+  }
+
   function handleAddComment(comment: DemoComment) {
     setReview((prev) => ({
       ...prev,
@@ -189,7 +198,11 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
         {activeTab === "overview" ? <OverviewTab review={review} /> : null}
         {activeTab === "changes" ? <ChangesTab review={review} /> : null}
         {activeTab === "findings" ? (
-          <FindingsTab findings={review.findings} onUpdateDisposition={handleUpdateDisposition} />
+          <FindingsTab
+            findings={review.findings}
+            onUpdateDisposition={handleUpdateDisposition}
+            onAssign={handleAssign}
+          />
         ) : null}
         {activeTab === "discussion" ? (
           <DiscussionTab comments={review.comments} onAddComment={handleAddComment} />
