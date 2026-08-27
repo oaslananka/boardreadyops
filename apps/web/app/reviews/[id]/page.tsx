@@ -19,7 +19,7 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
   const baseReview = getDemoReview(id) ?? DEMO_REVIEWS[0];
 
   if (!baseReview) {
-    notFound();
+    return notFound();
   }
 
   const review = {

@@ -97,12 +97,8 @@ export async function POST(request: Request): Promise<Response> {
     // Here we mark as processed to prove idempotency
     await store.markEventProcessed(event.id);
 
-    // Handle payment_failed -> grace period
-    if (event.type === "invoice.payment_failed") {
-      const tenantId = (event.data as { customer?: string } | undefined)?.customer ?? "unknown";
-      // We don't have tenant mapping from Stripe customer in this minimal stub; in production we would lookup
-      void tenantId;
-    }
+    // invoice.payment_failed: grace-period tenant lookup from the Stripe customer ID is not
+    // implemented in this stub; the event is still durably recorded above via markEventProcessed.
     return Response.json(
       { ok: true, processed: true },
       { status: 200, headers: { "cache-control": "private, no-store" } },
