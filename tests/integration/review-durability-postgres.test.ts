@@ -147,6 +147,7 @@ describeDatabase("Review Durability & Atomic Approval Persistence (PostgreSQL)",
 
   it("safely handles concurrent / duplicate approval requests with database-level idempotency", async () => {
     const store = new ReviewApprovalStore(database());
+    const retryApprover = "idempotent.approver@company.com";
 
     // Send two identical concurrent approvals
     const [first, second] = await Promise.all([
@@ -155,7 +156,7 @@ describeDatabase("Review Durability & Atomic Approval Persistence (PostgreSQL)",
         reviewId,
         revisionId,
         evidenceDigest,
-        approverId: "senior.reviewer@company.com",
+        approverId: retryApprover,
         status: "approved",
         reason: "Retry attempt verified",
       }),
@@ -164,7 +165,7 @@ describeDatabase("Review Durability & Atomic Approval Persistence (PostgreSQL)",
         reviewId,
         revisionId,
         evidenceDigest,
-        approverId: "senior.reviewer@company.com",
+        approverId: retryApprover,
         status: "approved",
         reason: "Retry attempt verified",
       }),
@@ -177,9 +178,7 @@ describeDatabase("Review Durability & Atomic Approval Persistence (PostgreSQL)",
     // Database should only have 1 active approval record for this approver & status
     const allApprovals = await store.listApprovalsForReview(reviewId, repositoryId);
     expect(
-      allApprovals.filter(
-        (a) => a.approverId === "senior.reviewer@company.com" && a.status === "approved" && !a.invalidatedAt,
-      ),
+      allApprovals.filter((a) => a.approverId === retryApprover && a.status === "approved" && !a.invalidatedAt),
     ).toHaveLength(1);
   });
 
@@ -197,7 +196,7 @@ describeDatabase("Review Durability & Atomic Approval Persistence (PostgreSQL)",
     expect(review?.decision).toBe("approved");
     expect(review?.evidenceDigest).toBe(evidenceDigest);
     expect(review?.approvals.length).toBeGreaterThanOrEqual(1);
-    expect(review?.approvals[0]?.approverId).toBe("senior.reviewer@company.com");
+    expect(review?.approvals.map((a) => a.approverId)).toContain("senior.reviewer@company.com");
 
     // Verify evidence item reconstructed from canonical artifacts table without leaking internal storage_path
     expect(review?.evidenceItems).toBeDefined();
