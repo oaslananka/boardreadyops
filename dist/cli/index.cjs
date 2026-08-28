@@ -34837,7 +34837,7 @@ var init_runner_protocol = __esm({
 });
 
 // packages/contracts/src/billing.ts
-var billingTierSchema, billingIntervalSchema, billingCustomerSchema, billingSubscriptionSchema, billingEventSchema, billingActivitySchema, checkoutRequestSchema, portalRequestSchema, billingPriceConfigSchema;
+var billingTierSchema, billingIntervalSchema, billingCustomerSchema, billingSubscriptionSchema, billingEventSchema, marketplacePurchaseMetadataSchema, billingActivitySchema, checkoutRequestSchema, portalRequestSchema, billingPriceConfigSchema;
 var init_billing = __esm({
   "packages/contracts/src/billing.ts"() {
     "use strict";
@@ -34875,10 +34875,26 @@ var init_billing = __esm({
       id: external_exports.string().min(1),
       tenantId: external_exports.string().min(1).nullable(),
       type: external_exports.string().min(1),
-      stripeEventId: external_exports.string().min(1),
+      provider: external_exports.string().min(1).default("stripe"),
+      stripeEventId: external_exports.string().min(1).nullable().optional(),
+      deliveryId: external_exports.string().min(1).nullable().optional(),
       payload: external_exports.unknown(),
       processedAt: external_exports.string().datetime().nullable(),
       createdAt: external_exports.string().datetime()
+    });
+    marketplacePurchaseMetadataSchema = external_exports.object({
+      deliveryId: external_exports.string().min(1),
+      action: external_exports.string().min(1),
+      accountLogin: external_exports.string().min(1),
+      accountId: external_exports.number().int().optional(),
+      accountType: external_exports.string().optional(),
+      planId: external_exports.number().int().optional(),
+      planName: external_exports.string().optional(),
+      priceModel: external_exports.string().optional(),
+      billingCycle: external_exports.string().optional(),
+      effectiveDate: external_exports.string().optional(),
+      onFreeTrial: external_exports.boolean().optional(),
+      freeTrialEndsOn: external_exports.string().nullable().optional()
     });
     billingActivitySchema = external_exports.object({
       id: external_exports.string().uuid(),
