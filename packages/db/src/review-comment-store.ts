@@ -89,11 +89,20 @@ export class ReviewCommentStore {
     return record;
   }
 
-  async updateCommentStatus(commentId: string, status: CommentStatus): Promise<ReviewCommentRecord | undefined> {
-    const raw = await this.executor.query(
-      `UPDATE review_comments
+  async updateCommentStatus(
+    commentId: string,
+    status: CommentStatus,
+    scope?: { reviewId: string; repositoryId: string },
+  ): Promise<ReviewCommentRecord | undefined> {
+    const params: unknown[] = [commentId, status];
+    let query = `UPDATE review_comments
       SET status = $2, updated_at = NOW()
-      WHERE id = $1
+      WHERE id = $1`;
+    if (scope) {
+      params.push(scope.reviewId, scope.repositoryId);
+      query += ` AND review_id = $3 AND repository_id = $4`;
+    }
+    query += `
       RETURNING
         id,
         repository_id AS "repositoryId",
@@ -106,10 +115,9 @@ export class ReviewCommentStore {
         content,
         status,
         created_at AS "createdAt",
-        updated_at AS "updatedAt"`,
-      [commentId, status],
-    );
+        updated_at AS "updatedAt"`;
 
+    const raw = await this.executor.query(query, params);
     const rows = extractRows<ReviewCommentRecord>(raw);
     return rows[0];
   }

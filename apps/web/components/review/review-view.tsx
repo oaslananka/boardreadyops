@@ -1,6 +1,6 @@
 "use client";
 
-import type { FindingDisposition } from "@boardreadyops/contracts";
+import type { FindingDisposition, ReviewDecision } from "@boardreadyops/contracts";
 import { useState } from "react";
 import type { DemoApproval, DemoChecklistItem, DemoComment, DemoReview } from "../../lib/demo-data.js";
 import { ApprovalModal } from "./approval-modal.js";
@@ -14,10 +14,105 @@ import { ReviewHeader } from "./review-header.js";
 
 export type ReviewTabKey = "overview" | "changes" | "findings" | "discussion" | "checklist" | "evidence";
 
-export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
+interface ReviewNavigationTabsProps {
+  readonly activeTab: ReviewTabKey;
+  readonly changedFilesCount?: number | undefined;
+  readonly findingsCount: number;
+  readonly blockingCount: number;
+  readonly commentsCount: number;
+  readonly incompleteChecklistCount: number;
+  readonly onSelectTab: (tab: ReviewTabKey) => void;
+}
+
+function ReviewNavigationTabs({
+  activeTab,
+  changedFilesCount,
+  findingsCount,
+  blockingCount,
+  commentsCount,
+  incompleteChecklistCount,
+  onSelectTab,
+}: ReviewNavigationTabsProps) {
+  return (
+    <div className="review-workspace-nav review-tabs-navigation" aria-label="Review workspace" role="tablist">
+      <button
+        id="tab-overview"
+        role="tab"
+        aria-selected={activeTab === "overview"}
+        aria-controls="panel-overview"
+        type="button"
+        className={`review-tab-link ${activeTab === "overview" ? "active" : ""}`}
+        onClick={() => onSelectTab("overview")}
+      >
+        Overview
+      </button>
+      <button
+        id="tab-changes"
+        role="tab"
+        aria-selected={activeTab === "changes"}
+        aria-controls="panel-changes"
+        type="button"
+        className={`review-tab-link ${activeTab === "changes" ? "active" : ""}`}
+        onClick={() => onSelectTab("changes")}
+      >
+        Changes{changedFilesCount !== undefined ? ` (${changedFilesCount})` : ""}
+      </button>
+      <button
+        id="tab-findings"
+        role="tab"
+        aria-selected={activeTab === "findings"}
+        aria-controls="panel-findings"
+        type="button"
+        className={`review-tab-link ${activeTab === "findings" ? "active" : ""}`}
+        onClick={() => onSelectTab("findings")}
+      >
+        Findings ({findingsCount}){blockingCount > 0 ? <span className="tab-pill danger">{blockingCount}</span> : null}
+      </button>
+      <button
+        id="tab-discussion"
+        role="tab"
+        aria-selected={activeTab === "discussion"}
+        aria-controls="panel-discussion"
+        type="button"
+        className={`review-tab-link ${activeTab === "discussion" ? "active" : ""}`}
+        onClick={() => onSelectTab("discussion")}
+      >
+        Discussion ({commentsCount})
+      </button>
+      <button
+        id="tab-checklist"
+        role="tab"
+        aria-selected={activeTab === "checklist"}
+        aria-controls="panel-checklist"
+        type="button"
+        className={`review-tab-link ${activeTab === "checklist" ? "active" : ""}`}
+        onClick={() => onSelectTab("checklist")}
+      >
+        Checklist & Approvals
+        {incompleteChecklistCount > 0 ? <span className="tab-pill warning">{incompleteChecklistCount}</span> : null}
+      </button>
+      <button
+        id="tab-evidence"
+        role="tab"
+        aria-selected={activeTab === "evidence"}
+        aria-controls="panel-evidence"
+        type="button"
+        className={`review-tab-link ${activeTab === "evidence" ? "active" : ""}`}
+        onClick={() => onSelectTab("evidence")}
+      >
+        Evidence
+      </button>
+    </div>
+  );
+}
+
+export function ReviewView({ initialReview }: { readonly initialReview: DemoReview }) {
   const [review, setReview] = useState<DemoReview>(initialReview);
   const [activeTab, setActiveTab] = useState<ReviewTabKey>("overview");
   const [approvalModalType, setApprovalModalType] = useState<"approve" | "request_changes" | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationSuccess, setMutationSuccess] = useState<string | null>(null);
 
   const blockingCount = review.findings.filter(
     (f) => (f.severity === "error" || f.severity === "critical") && f.disposition === "open",
@@ -25,108 +120,296 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
 
   const incompleteChecklistCount = review.checklist.filter((c) => !c.completed).length;
 
-  function handleUpdateDisposition(
+  async function handleUpdateDisposition(
     fingerprint: string,
     disposition: FindingDisposition,
     reason?: string,
     owner?: string,
+    expiresAt?: string | null,
   ) {
-    setReview((prev) => ({
-      ...prev,
-      findings: prev.findings.map((f) =>
-        f.fingerprint === fingerprint
-          ? {
-              ...f,
-              disposition,
-              ...(reason ? { decisionReason: reason } : {}),
-              ...(owner ? { decisionOwner: owner } : {}),
-            }
-          : f,
-      ),
-    }));
-  }
+    if (submittingAction) return;
+    setSubmittingAction(`disposition_${fingerprint}`);
+    setMutationError(null);
+    setMutationSuccess(null);
+    const effectiveReason =
+      reason?.trim() ||
+      (disposition === "accepted_risk"
+        ? "Risk accepted by lead engineering sign-off review."
+        : `Disposition set to ${disposition}`);
+    const effectiveOwner = owner?.trim() || "reviewer";
 
-  function handleAssign(fingerprint: string, assignee: string) {
-    setReview((prev) => ({
-      ...prev,
-      findings: prev.findings.map((f) =>
-        f.fingerprint === fingerprint ? { ...f, assignees: [...f.assignees, assignee] } : f,
-      ),
-    }));
-  }
-
-  function handleAddComment(comment: DemoComment) {
-    setReview((prev) => ({
-      ...prev,
-      comments: [...prev.comments, comment],
-    }));
-  }
-
-  function handleToggleChecklist(id: string, completed: boolean) {
-    setReview((prev) => ({
-      ...prev,
-      checklist: prev.checklist.map((c) =>
-        c.id === id
-          ? {
-              id: c.id,
-              title: c.title,
-              completed,
-              ...(completed ? { completedBy: "current.user@company.com", completedAt: new Date().toISOString() } : {}),
-            }
-          : c,
-      ),
-    }));
-  }
-
-  function handleAddChecklist(title: string) {
-    const newItem: DemoChecklistItem = {
-      id: `chk_${Date.now()}`,
-      title,
-      completed: false,
-    };
-    setReview((prev) => ({
-      ...prev,
-      checklist: [...prev.checklist, newItem],
-    }));
-  }
-
-  function handleApprovalConfirm(data: { reason: string; isBreakGlass?: boolean }) {
-    if (!approvalModalType) return;
-
-    if (approvalModalType === "approve") {
-      const newApproval: DemoApproval = {
-        id: `app_${Date.now()}`,
-        approverId: "current.user@company.com",
-        status: "approved",
-        reason: data.reason || "Approved",
-        isBreakGlass: data.isBreakGlass ?? false,
-        evidenceDigest: review.evidenceDigest,
-        createdAt: new Date().toISOString(),
-      };
-
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/decisions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          findingFingerprint: fingerprint,
+          disposition,
+          reason: effectiveReason,
+          owner: effectiveOwner,
+          expiresAt: expiresAt ?? null,
+          evidenceDigest: review.evidenceDigest,
+        }),
+      });
+      const data = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setMutationError(`Failed to update disposition: ${data.error || res.statusText}`);
+        return;
+      }
       setReview((prev) => ({
         ...prev,
-        decision: "approved",
-        approvals: [newApproval, ...prev.approvals],
+        findings: prev.findings.map((f) =>
+          f.fingerprint === fingerprint
+            ? {
+                ...f,
+                disposition,
+                decisionReason: reason,
+                decisionOwner: owner,
+                decisionExpiresAt: expiresAt,
+              }
+            : f,
+        ),
       }));
-    } else {
-      const newReq: DemoApproval = {
-        id: `app_${Date.now()}`,
-        approverId: "current.user@company.com",
-        status: "changes_requested",
-        reason: data.reason,
-        evidenceDigest: review.evidenceDigest,
-        createdAt: new Date().toISOString(),
-      };
-
-      setReview((prev) => ({
-        ...prev,
-        decision: "changes_requested",
-        approvals: [newReq, ...prev.approvals],
-      }));
+      setMutationSuccess("Finding decision recorded.");
+    } catch (err) {
+      setMutationError(`Failed to record decision: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
     }
+  }
 
-    setApprovalModalType(null);
+  async function handleAssign(fingerprint: string, assignee: string) {
+    if (submittingAction) return;
+    setSubmittingAction(`assign_${fingerprint}`);
+    setMutationError(null);
+    setMutationSuccess(null);
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/assignments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          findingFingerprint: fingerprint,
+          assignee,
+        }),
+      });
+      const data = (await res.json()) as { ok: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setMutationError(`Failed to assign finding: ${data.error || res.statusText}`);
+        return;
+      }
+      setReview((prev) => ({
+        ...prev,
+        findings: prev.findings.map((f) =>
+          f.fingerprint === fingerprint
+            ? { ...f, assignees: f.assignees.includes(assignee) ? f.assignees : [...f.assignees, assignee] }
+            : f,
+        ),
+      }));
+      setMutationSuccess(`Assigned finding to ${assignee}.`);
+    } catch (err) {
+      setMutationError(`Failed to assign finding: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
+  async function handleAddComment(comment: DemoComment) {
+    if (submittingAction) return;
+    setSubmittingAction("comment");
+    setMutationError(null);
+    setMutationSuccess(null);
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/comments`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          content: comment.content,
+          ...(comment.findingFingerprint ? { findingFingerprint: comment.findingFingerprint } : {}),
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        comment?: {
+          id: string;
+          content: string;
+          authorId: string;
+          authorType: "internal" | "guest";
+          status?: "open" | "resolved" | "stale";
+          createdAt: string;
+          findingFingerprint?: string;
+        };
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.comment) {
+        setMutationError(`Failed to post comment: ${data.error || res.statusText}`);
+        return;
+      }
+      const saved = data.comment;
+      const mapped: DemoComment = {
+        id: saved.id,
+        content: saved.content,
+        authorId: saved.authorId,
+        authorType: saved.authorType,
+        status: saved.status === "stale" ? "outdated" : (saved.status ?? "open"),
+        createdAt: saved.createdAt,
+        ...(saved.findingFingerprint ? { findingFingerprint: saved.findingFingerprint } : {}),
+      };
+      setReview((prev) => ({
+        ...prev,
+        comments: [...prev.comments, mapped],
+      }));
+      setMutationSuccess("Comment posted.");
+    } catch (err) {
+      setMutationError(`Failed to post comment: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
+  async function handleToggleChecklist(id: string, completed: boolean) {
+    if (submittingAction) return;
+    setSubmittingAction(`chk_toggle_${id}`);
+    setMutationError(null);
+    setMutationSuccess(null);
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/checklist`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id,
+          completed,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        item?: { id: string; title: string; completed: boolean; completedBy?: string; completedAt?: string };
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.item) {
+        setMutationError(`Failed to update checklist item: ${data.error || res.statusText}`);
+        return;
+      }
+      const saved = data.item;
+      setReview((prev) => ({
+        ...prev,
+        checklist: prev.checklist.map((c) =>
+          c.id === id
+            ? {
+                id: saved.id,
+                title: saved.title,
+                completed: saved.completed,
+                completedBy: saved.completedBy,
+                completedAt: saved.completedAt,
+              }
+            : c,
+        ),
+      }));
+    } catch (err) {
+      setMutationError(`Failed to update checklist: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
+  async function handleAddChecklist(title: string) {
+    if (submittingAction) return;
+    setSubmittingAction("chk_add");
+    setMutationError(null);
+    setMutationSuccess(null);
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/checklist`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        item?: { id: string; title: string; completed: boolean; completedBy?: string; completedAt?: string };
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.item) {
+        setMutationError(`Failed to add checklist item: ${data.error || res.statusText}`);
+        return;
+      }
+      const saved = data.item;
+      const newItem: DemoChecklistItem = {
+        id: saved.id,
+        title: saved.title,
+        completed: saved.completed,
+        completedBy: saved.completedBy,
+        completedAt: saved.completedAt,
+      };
+      setReview((prev) => ({
+        ...prev,
+        checklist: [...prev.checklist, newItem],
+      }));
+      setMutationSuccess("Checklist item added.");
+    } catch (err) {
+      setMutationError(`Failed to add checklist item: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
+  async function handleApprovalConfirm(data: { reason: string; isBreakGlass?: boolean }) {
+    if (!approvalModalType || submittingAction) return;
+
+    const isApprove = approvalModalType === "approve";
+    const status = isApprove ? "approved" : "changes_requested";
+    const reason = data.reason.trim() || (isApprove ? "Approved" : "Changes requested");
+    const isBreakGlass = data.isBreakGlass ?? false;
+
+    setSubmittingAction(approvalModalType);
+    setMutationError(null);
+    setMutationSuccess(null);
+
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/approvals`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          revisionId: review.currentRevisionId,
+          evidenceDigest: review.evidenceDigest,
+          status,
+          reason,
+          isBreakGlass,
+        }),
+      });
+
+      const body = (await res.json()) as { ok: boolean; approval?: DemoApproval; error?: string };
+
+      if (!res.ok || !body.ok || !body.approval) {
+        const errorMsg = body.error || `Server returned status ${res.status}`;
+        setMutationError(`Failed to persist sign-off: ${errorMsg}`);
+        return;
+      }
+
+      const authoritativeApproval = body.approval;
+      const nextDecision: ReviewDecision = isApprove ? "approved" : "changes_requested";
+
+      setReview((prev) => {
+        const existing = prev.approvals.some((a) => a.id === authoritativeApproval.id);
+        const nextApprovals = existing ? prev.approvals : [authoritativeApproval, ...prev.approvals];
+        return {
+          ...prev,
+          decision: nextDecision,
+          approvals: nextApprovals,
+          updatedAt: authoritativeApproval.createdAt ?? new Date().toISOString(),
+        };
+      });
+
+      setMutationSuccess(
+        isApprove
+          ? "Review approval recorded against the current evidence digest."
+          : "Changes requested on hardware review.",
+      );
+      setApprovalModalType(null);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Network error";
+      setMutationError(`Failed to persist sign-off: ${errorMsg}`);
+    } finally {
+      setSubmittingAction(null);
+    }
   }
 
   return (
@@ -147,76 +430,27 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
         onRequestChanges={() => setApprovalModalType("request_changes")}
       />
 
-      <div className="review-workspace-nav review-tabs-navigation" aria-label="Review workspace" role="tablist">
-        <button
-          id="tab-overview"
-          role="tab"
-          aria-selected={activeTab === "overview"}
-          aria-controls="panel-overview"
-          type="button"
-          className={`review-tab-link ${activeTab === "overview" ? "active" : ""}`}
-          onClick={() => setActiveTab("overview")}
-        >
-          Overview
-        </button>
-        <button
-          id="tab-changes"
-          role="tab"
-          aria-selected={activeTab === "changes"}
-          aria-controls="panel-changes"
-          type="button"
-          className={`review-tab-link ${activeTab === "changes" ? "active" : ""}`}
-          onClick={() => setActiveTab("changes")}
-        >
-          Changes ({review.changedFiles.length})
-        </button>
-        <button
-          id="tab-findings"
-          role="tab"
-          aria-selected={activeTab === "findings"}
-          aria-controls="panel-findings"
-          type="button"
-          className={`review-tab-link ${activeTab === "findings" ? "active" : ""}`}
-          onClick={() => setActiveTab("findings")}
-        >
-          Findings ({review.findings.length})
-          {blockingCount > 0 ? <span className="tab-pill danger">{blockingCount}</span> : null}
-        </button>
-        <button
-          id="tab-discussion"
-          role="tab"
-          aria-selected={activeTab === "discussion"}
-          aria-controls="panel-discussion"
-          type="button"
-          className={`review-tab-link ${activeTab === "discussion" ? "active" : ""}`}
-          onClick={() => setActiveTab("discussion")}
-        >
-          Discussion ({review.comments.length})
-        </button>
-        <button
-          id="tab-checklist"
-          role="tab"
-          aria-selected={activeTab === "checklist"}
-          aria-controls="panel-checklist"
-          type="button"
-          className={`review-tab-link ${activeTab === "checklist" ? "active" : ""}`}
-          onClick={() => setActiveTab("checklist")}
-        >
-          Checklist & Approvals
-          {incompleteChecklistCount > 0 ? <span className="tab-pill warning">{incompleteChecklistCount}</span> : null}
-        </button>
-        <button
-          id="tab-evidence"
-          role="tab"
-          aria-selected={activeTab === "evidence"}
-          aria-controls="panel-evidence"
-          type="button"
-          className={`review-tab-link ${activeTab === "evidence" ? "active" : ""}`}
-          onClick={() => setActiveTab("evidence")}
-        >
-          Evidence
-        </button>
-      </div>
+      {mutationError ? (
+        <div className="alert-banner error" role="alert" style={{ margin: "var(--space-3) 0" }}>
+          {mutationError}
+        </div>
+      ) : null}
+
+      {mutationSuccess ? (
+        <output className="alert-banner success" style={{ margin: "var(--space-3) 0" }}>
+          ✓ {mutationSuccess}
+        </output>
+      ) : null}
+
+      <ReviewNavigationTabs
+        activeTab={activeTab}
+        changedFilesCount={review.changedFiles?.length}
+        findingsCount={review.findings.length}
+        blockingCount={blockingCount}
+        commentsCount={review.comments.length}
+        incompleteChecklistCount={incompleteChecklistCount}
+        onSelectTab={setActiveTab}
+      />
 
       <main id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="review-tab-body">
         {activeTab === "overview" ? <OverviewTab review={review} /> : null}
@@ -247,8 +481,15 @@ export function ReviewView({ initialReview }: { initialReview: DemoReview }) {
         <ApprovalModal
           type={approvalModalType}
           evidenceDigest={review.evidenceDigest}
+          isSubmitting={submittingAction !== null}
+          serverError={mutationError}
           onConfirm={handleApprovalConfirm}
-          onClose={() => setApprovalModalType(null)}
+          onClose={() => {
+            if (!submittingAction) {
+              setApprovalModalType(null);
+              setMutationError(null);
+            }
+          }}
         />
       ) : null}
     </div>

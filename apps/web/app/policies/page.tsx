@@ -10,19 +10,17 @@ export const metadata = {
 export default function PoliciesPage() {
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame operational-page" id="main-content">
+      <main className="page-frame operational-page policies-page-frame" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Policies" }]} />
         <header className="page-intro">
-          <h1>Organization Policies</h1>
-          <p>Inheritance: Organization → Team → Repository → Review exception. No hidden precedence.</p>
+          <h1>Organization Governance & Release Policies</h1>
+          <p>
+            Cryptographic release gates and verification rules. Inheritance: Organization → Team → Repository → Review
+            exception.
+          </p>
         </header>
 
-        <div className="panel surface-raised">
-          <p className="cell-note">
-            Policy updates run a dry-run impact preview before enforcement. Expired waivers block production releases.
-          </p>
-          <PoliciesClient />
-        </div>
+        <PoliciesClient />
       </main>
     </AppShell>
   );

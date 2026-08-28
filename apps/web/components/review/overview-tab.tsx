@@ -1,7 +1,32 @@
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
 
-export function OverviewTab({ review }: { review: DemoReview }) {
+function getReadinessTone(decision: string, isReadyForFab: boolean): "danger" | "ready" | "blocked" {
+  if (decision === "changes_requested") return "danger";
+  return isReadyForFab ? "ready" : "blocked";
+}
+
+function getReadinessTitle(decision: string, isReadyForFab: boolean): string {
+  if (decision === "changes_requested") return "Changes Requested — Fabrication Blocked";
+  return isReadyForFab ? "Ready for Fabrication" : "Fabrication Gate Blocked";
+}
+
+function getReadinessDescription(
+  decision: string,
+  isReadyForFab: boolean,
+  blockingCount: number,
+  pendingChecklistCount: number,
+): string {
+  if (decision === "changes_requested") {
+    return "A sign-off authority has requested changes. Hardware revision must be updated and approved.";
+  }
+  if (isReadyForFab) {
+    return "All checklist items complete, no blocking findings, and evidence digest approved.";
+  }
+  return `${blockingCount} blocking finding(s), ${pendingChecklistCount} checklist item(s) pending.`;
+}
+
+export function OverviewTab({ review }: { readonly review: DemoReview }) {
   const blockingFindings = review.findings.filter(
     (f) => (f.severity === "error" || f.severity === "critical") && f.disposition === "open",
   );
@@ -14,18 +39,46 @@ export function OverviewTab({ review }: { review: DemoReview }) {
   );
 
   const isReadyForFab =
-    blockingFindings.length === 0 && completedChecklist.length === review.checklist.length && validApprovals.length > 0;
+    review.decision === "approved" &&
+    blockingFindings.length === 0 &&
+    completedChecklist.length === review.checklist.length &&
+    validApprovals.length > 0;
+
+  const readinessTone = getReadinessTone(review.decision, isReadyForFab);
+  const readinessTitle = getReadinessTitle(review.decision, isReadyForFab);
+  const pendingChecklistCount = review.checklist.length - completedChecklist.length;
+  const readinessDescription = getReadinessDescription(
+    review.decision,
+    isReadyForFab,
+    blockingFindings.length,
+    pendingChecklistCount,
+  );
+
+  let changedFilesContent: React.ReactNode;
+  if (review.changedFiles === undefined) {
+    changedFilesContent = (
+      <p className="no-items-message">Hardware surface diff details are not available for this persisted review.</p>
+    );
+  } else if (review.changedFiles.length === 0) {
+    changedFilesContent = (
+      <p className="no-items-message">No changed hardware surface files detected for this revision.</p>
+    );
+  } else {
+    changedFilesContent = review.changedFiles.map((file) => (
+      <div key={file.path} className="changed-file-row">
+        <span className={`file-status-badge ${file.status}`}>{file.status}</span>
+        <code className="file-path">{file.path}</code>
+        <span className="changes-count">+{file.changesCount} lines</span>
+      </div>
+    ));
+  }
 
   return (
     <div className="overview-tab-content">
-      <section className={`decision-band readiness-band ${isReadyForFab ? "ready" : "blocked"}`}>
+      <section className={`decision-band readiness-band ${readinessTone}`}>
         <div className="readiness-lead">
-          <h3>{isReadyForFab ? "Ready for Fabrication" : "Fabrication Gate Blocked"}</h3>
-          <p>
-            {isReadyForFab
-              ? "All checklist items complete, no blocking findings, and evidence digest approved."
-              : `${blockingFindings.length} blocking finding(s), ${review.checklist.length - completedChecklist.length} checklist item(s) pending.`}
-          </p>
+          <h3>{readinessTitle}</h3>
+          <p>{readinessDescription}</p>
         </div>
         <div className="metric-strip">
           <span className="metric-pill">
@@ -47,15 +100,7 @@ export function OverviewTab({ review }: { review: DemoReview }) {
       </section>
 
       <Panel title="Changed Hardware Surfaces" tone="default">
-        <div className="changed-files-list">
-          {review.changedFiles.map((file) => (
-            <div key={file.path} className="changed-file-row">
-              <span className={`file-status-badge ${file.status}`}>{file.status}</span>
-              <code className="file-path">{file.path}</code>
-              <span className="changes-count">+{file.changesCount} lines</span>
-            </div>
-          ))}
-        </div>
+        <div className="changed-files-list">{changedFilesContent}</div>
       </Panel>
 
       <Panel title="Review Details & Metadata" tone="inset">

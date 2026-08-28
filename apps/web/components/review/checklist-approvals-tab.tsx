@@ -5,8 +5,8 @@ import type { DemoApproval, DemoChecklistItem } from "../../lib/demo-data.js";
 import { Panel, StatusBadge } from "../ui.js";
 
 export function ChecklistApprovalsTab({
-  checklist: initialChecklist,
-  approvals: initialApprovals,
+  checklist,
+  approvals,
   evidenceDigest,
   onToggleChecklist,
   onAddChecklist,
@@ -17,42 +17,18 @@ export function ChecklistApprovalsTab({
   onToggleChecklist?: (id: string, completed: boolean) => void;
   onAddChecklist?: (title: string) => void;
 }) {
-  const [checklist, setChecklist] = useState(initialChecklist);
-  const [approvals] = useState(initialApprovals);
   const [newItemTitle, setNewItemTitle] = useState("");
 
   function handleToggle(id: string) {
-    setChecklist((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nextCompleted = !item.completed;
-          const updated: DemoChecklistItem = {
-            id: item.id,
-            title: item.title,
-            completed: nextCompleted,
-            ...(nextCompleted
-              ? { completedBy: "current.user@company.com", completedAt: new Date().toISOString() }
-              : {}),
-          };
-          onToggleChecklist?.(id, nextCompleted);
-          return updated;
-        }
-        return item;
-      }),
-    );
+    const item = checklist.find((c) => c.id === id);
+    if (!item) return;
+    const nextCompleted = !item.completed;
+    onToggleChecklist?.(id, nextCompleted);
   }
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!newItemTitle.trim()) return;
-
-    const newItem: DemoChecklistItem = {
-      id: `chk_${Date.now()}`,
-      title: newItemTitle.trim(),
-      completed: false,
-    };
-
-    setChecklist((prev) => [...prev, newItem]);
     onAddChecklist?.(newItemTitle.trim());
     setNewItemTitle("");
   }
