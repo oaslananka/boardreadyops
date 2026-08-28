@@ -79,7 +79,9 @@ export interface RepositoryApiContext {
 }
 
 function safeInstallationId(value: unknown): number | undefined {
-  const parsed = typeof value === "string" ? Number(value) : typeof value === "number" ? value : Number.NaN;
+  let parsed = Number.NaN;
+  if (typeof value === "number") parsed = value;
+  else if (typeof value === "string") parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
