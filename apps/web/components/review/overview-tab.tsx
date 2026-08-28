@@ -54,6 +54,25 @@ export function OverviewTab({ review }: { readonly review: DemoReview }) {
     pendingChecklistCount,
   );
 
+  let changedFilesContent: React.ReactNode;
+  if (review.changedFiles === undefined) {
+    changedFilesContent = (
+      <p className="no-items-message">Hardware surface diff details are not available for this persisted review.</p>
+    );
+  } else if (review.changedFiles.length === 0) {
+    changedFilesContent = (
+      <p className="no-items-message">No changed hardware surface files detected for this revision.</p>
+    );
+  } else {
+    changedFilesContent = review.changedFiles.map((file) => (
+      <div key={file.path} className="changed-file-row">
+        <span className={`file-status-badge ${file.status}`}>{file.status}</span>
+        <code className="file-path">{file.path}</code>
+        <span className="changes-count">+{file.changesCount} lines</span>
+      </div>
+    ));
+  }
+
   return (
     <div className="overview-tab-content">
       <section className={`decision-band readiness-band ${readinessTone}`}>
@@ -81,23 +100,7 @@ export function OverviewTab({ review }: { readonly review: DemoReview }) {
       </section>
 
       <Panel title="Changed Hardware Surfaces" tone="default">
-        <div className="changed-files-list">
-          {review.changedFiles === undefined ? (
-            <p className="no-items-message">
-              Hardware surface diff details are not available for this persisted review.
-            </p>
-          ) : review.changedFiles.length === 0 ? (
-            <p className="no-items-message">No changed hardware surface files detected for this revision.</p>
-          ) : (
-            review.changedFiles.map((file) => (
-              <div key={file.path} className="changed-file-row">
-                <span className={`file-status-badge ${file.status}`}>{file.status}</span>
-                <code className="file-path">{file.path}</code>
-                <span className="changes-count">+{file.changesCount} lines</span>
-              </div>
-            ))
-          )}
-        </div>
+        <div className="changed-files-list">{changedFilesContent}</div>
       </Panel>
 
       <Panel title="Review Details & Metadata" tone="inset">

@@ -288,31 +288,33 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
           <fieldset className="form-section-card panel surface-default">
             <legend className="section-title">3. Compliance & Evidence Pack</legend>
             <div className="checkbox-cards-group">
-              <label className={`checkbox-card panel surface-sunken ${draft.requireEvidencePack ? "selected" : ""}`}>
+              <div className={`checkbox-card panel surface-sunken ${draft.requireEvidencePack ? "selected" : ""}`}>
                 <input
+                  id="chk-require-evidence-pack"
                   type="checkbox"
                   checked={draft.requireEvidencePack}
                   onChange={(e) => onChange({ ...draft, requireEvidencePack: e.target.checked })}
                 />
-                <div className="checkbox-card-content">
+                <label htmlFor="chk-require-evidence-pack" className="checkbox-card-content">
                   <strong>Require Verified Evidence Pack</strong>
                   <p>
                     Mandates verified evidence digests bound to KiCad DRC reports, BOM snapshots, and release manifests.
                   </p>
-                </div>
-              </label>
+                </label>
+              </div>
 
-              <label className={`checkbox-card panel surface-sunken ${draft.requireExternalReview ? "selected" : ""}`}>
+              <div className={`checkbox-card panel surface-sunken ${draft.requireExternalReview ? "selected" : ""}`}>
                 <input
+                  id="chk-require-external-review"
                   type="checkbox"
                   checked={draft.requireExternalReview}
                   onChange={(e) => onChange({ ...draft, requireExternalReview: e.target.checked })}
                 />
-                <div className="checkbox-card-content">
+                <label htmlFor="chk-require-external-review" className="checkbox-card-content">
                   <strong>Require External / Third-Party Review</strong>
                   <p>Mandates external partner, lab, or customer sign-off before manufacturing gate is unlocked.</p>
-                </div>
-              </label>
+                </label>
+              </div>
             </div>
           </fieldset>
         </div>
