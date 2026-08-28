@@ -108,7 +108,9 @@ export class BillingStore {
       inserted: true,
       event: {
         id: String(row.id),
+        provider: "stripe",
         stripeEventId: String((row as unknown as Record<string, unknown>).stripe_event_id),
+        deliveryId: null,
         tenantId: (row as unknown as Record<string, unknown>).tenant_id as string | null,
         type: String(row.type),
         payload: row.payload,
@@ -120,6 +122,96 @@ export class BillingStore {
 
   async markEventProcessed(stripeEventId: string): Promise<void> {
     await this.db.query(`UPDATE billing_events SET processed_at=NOW() WHERE stripe_event_id=$1`, [stripeEventId]);
+  }
+
+  async recordMarketplaceEvent(input: {
+    deliveryId: string;
+    action: string;
+    tenantId?: string | null;
+    payload: unknown;
+  }): Promise<{ inserted: boolean; event: BillingEvent | null }> {
+    const q = `
+      INSERT INTO billing_events (id, provider, delivery_id, tenant_id, type, payload, created_at)
+      VALUES ($1, 'github_marketplace', $2, $3, $4, $5, NOW())
+      ON CONFLICT (delivery_id) DO NOTHING
+      RETURNING *
+    `;
+    const r = (await this.db.query(q, [
+      randomUUID(),
+      input.deliveryId,
+      input.tenantId ?? null,
+      `marketplace_purchase.${input.action}`,
+      JSON.stringify(input.payload),
+    ])) as { rows?: Array<Record<string, unknown>> };
+    if (!r.rows || r.rows.length === 0) return { inserted: false, event: null };
+    const row = r.rows[0] as unknown as Record<string, unknown>;
+    return {
+      inserted: true,
+      event: {
+        id: String(row.id),
+        provider: "github_marketplace",
+        stripeEventId: null,
+        deliveryId: String(row.delivery_id),
+        tenantId: (row.tenant_id as string | null) ?? null,
+        type: String(row.type),
+        payload: row.payload,
+        processedAt: (row.processed_at as string | null) ?? null,
+        createdAt: String(row.created_at),
+      },
+    };
+  }
+
+  async markMarketplaceEventProcessed(deliveryId: string): Promise<void> {
+    await this.db.query(`UPDATE billing_events SET processed_at=NOW() WHERE delivery_id=$1`, [deliveryId]);
+  }
+
+  async applyMarketplacePurchase(input: {
+    tenantId: string;
+    tier: string;
+    status?: string | undefined;
+    effectiveDate?: string | null | undefined;
+  }): Promise<BillingCustomer> {
+    const id = randomUUID();
+    const status = input.status ?? "active";
+    const q = `
+      INSERT INTO billing_customers (id, tenant_id, tier, status, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, NOW(), NOW())
+      ON CONFLICT (tenant_id) DO UPDATE SET
+        tier = EXCLUDED.tier,
+        status = EXCLUDED.status,
+        updated_at = NOW()
+      RETURNING *
+    `;
+    const r = (await this.db.query(q, [id, input.tenantId, input.tier, status])) as {
+      rows?: StoredBillingCustomerRow[];
+    };
+    const row = r.rows?.[0];
+    if (!row) throw new Error("applyMarketplacePurchase customer upsert failed");
+
+    await this.db.query(`UPDATE installations SET plan_tier = $1 WHERE account_login = $2`, [
+      input.tier,
+      input.tenantId,
+    ]);
+
+    return mapCustomer(row);
+  }
+
+  async applyMarketplaceCancellation(input: {
+    tenantId: string;
+    effectiveDate?: string | null | undefined;
+  }): Promise<BillingCustomer | null> {
+    const q = `
+      UPDATE billing_customers
+      SET tier = 'free', status = 'canceled', updated_at = NOW()
+      WHERE tenant_id = $1
+      RETURNING *
+    `;
+    const r = (await this.db.query(q, [input.tenantId])) as {
+      rows?: StoredBillingCustomerRow[];
+    };
+    await this.db.query(`UPDATE installations SET plan_tier = 'free' WHERE account_login = $1`, [input.tenantId]);
+    const row = r.rows?.[0];
+    return row ? mapCustomer(row) : null;
   }
 
   async recordActivity(input: {
