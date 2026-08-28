@@ -44,7 +44,7 @@ export interface DemoChecklistItem {
 export interface DemoApproval {
   id: string;
   approverId: string;
-  status: "approved" | "changes_requested" | "invalidated";
+  status: "approved" | "changes_requested" | "invalidated" | "dismissed";
   reason?: string | undefined;
   isBreakGlass?: boolean | undefined;
   evidenceDigest: string;
@@ -53,12 +53,14 @@ export interface DemoApproval {
   invalidationReason?: string | undefined;
 }
 
-interface DemoEvidenceItem {
+export interface DemoEvidenceItem {
+  id?: string | undefined;
   name: string;
   type: "bom" | "drc" | "netlist" | "schematic" | "pcb" | "manifest";
   path: string;
   sha256: string;
   sizeBytes: number;
+  verified?: boolean | undefined;
 }
 
 export interface DemoReview {
@@ -83,11 +85,17 @@ export interface DemoReview {
   checklist: DemoChecklistItem[];
   approvals: DemoApproval[];
   evidenceItems: DemoEvidenceItem[];
-  changedFiles: Array<{ path: string; status: "modified" | "added" | "deleted"; changesCount: number }>;
-  bomChanges: DemoBomChange[];
+  changedFiles?: DemoChangedFile[] | undefined;
+  bomChanges?: DemoBomChange[] | undefined;
   /** Populated server-side (see `getDemoReview`); absent on the static fixtures below. */
-  headSnapshots?: SnapshotArtifact[];
+  headSnapshots?: SnapshotArtifact[] | undefined;
 }
+
+type DemoChangedFile = {
+  path: string;
+  status: "modified" | "added" | "deleted";
+  changesCount: number;
+};
 
 interface DemoBomChange {
   reference: string;

@@ -5,6 +5,7 @@ import type { UploadMode } from "@boardreadyops/contracts";
 import { mapFindingsForCloud } from "../../core/cloud-findings.js";
 import { loadConfig } from "../../core/config.js";
 import { runPipeline } from "../../core/pipeline.js";
+import { resolveGitExecutable } from "../../util/git-resolver.js";
 import type { CommonCliOptions } from "./run.js";
 
 export interface ReviewPublishOptions extends CommonCliOptions {
@@ -19,13 +20,10 @@ export interface ReviewPublishOptions extends CommonCliOptions {
   pr?: number;
 }
 
-// NOSONAR(typescript:S4036): resolving "git" via PATH is the standard, portable way every
-// git-wrapping CLI (husky, lint-staged, semantic-release, this repo's own src/util/process.ts
-// call sites) invokes it; pinning an absolute path would break the many valid install
-// locations (nvm, scoop, Git for Windows, system packages) this tool has to support.
 function getGitCommitSha(ref = "HEAD"): string {
   try {
-    return execFileSync("git", ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); // NOSONAR
+    const gitExec = resolveGitExecutable();
+    return execFileSync(gitExec, ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return "0".repeat(40);
   }
@@ -33,8 +31,8 @@ function getGitCommitSha(ref = "HEAD"): string {
 
 function getGitOriginRepo(): string | undefined {
   try {
-    const url = execFileSync("git", ["remote", "get-url", "origin"], {
-      // NOSONAR
+    const gitExec = resolveGitExecutable();
+    const url = execFileSync(gitExec, ["remote", "get-url", "origin"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();

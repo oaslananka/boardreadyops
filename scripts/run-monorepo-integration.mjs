@@ -35,6 +35,7 @@ export const POSTGRES_INTEGRATION_TESTS = [
   "tests/integration/runner-result-postgres.test.ts",
   "tests/integration/runner-routing-policy-postgres.test.ts",
   "tests/integration/runner-terminal-result-authorizer-postgres.test.ts",
+  "tests/integration/review-durability-postgres.test.ts",
   "tests/integration/transactional-release-run-outbox-postgres.test.ts",
   "tests/integration/versioned-release-run-transitions-postgres.test.ts",
 ];

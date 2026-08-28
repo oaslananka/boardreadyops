@@ -1,8 +1,7 @@
 import { ReviewApprovalStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../../../lib/cloud-runtime-config.js";
+import { authenticateApiRequest, resolveReviewApiContext } from "../../../../../../lib/api-auth.js";
 
 export const runtime = "nodejs";
 
@@ -14,6 +13,49 @@ const recordApprovalSchema = z.object({
   isBreakGlass: z.boolean().optional(),
 });
 
+type RecordApprovalInput = z.infer<typeof recordApprovalSchema>;
+
+async function parseApprovalPayload(
+  request: Request,
+): Promise<{ ok: true; data: RecordApprovalInput } | { ok: false; error: string; status: number }> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return { ok: false, error: "Invalid JSON body", status: 400 };
+  }
+
+  const parsed = recordApprovalSchema.safeParse(body);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid approval payload", status: 400 };
+  }
+
+  return { ok: true, data: parsed.data };
+}
+
+async function verifyRevisionDigest(
+  executor: PgQueryExecutor,
+  revisionId: string,
+  reviewId: string,
+  expectedDigest: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const revisionResult = await executor.query(
+    `SELECT id, evidence_digest FROM review_revisions WHERE id = $1 AND review_id = $2 LIMIT 1`,
+    [revisionId, reviewId],
+  );
+  const revisionRows = (revisionResult as { rows?: { id: string; evidence_digest: string }[] }).rows ?? [];
+  const revision = revisionRows[0];
+  if (!revision) {
+    return { ok: false, error: "Review revision not found", status: 404 };
+  }
+
+  if (revision.evidence_digest !== expectedDigest) {
+    return { ok: false, error: "Evidence digest does not match the active review revision", status: 409 };
+  }
+
+  return { ok: true };
+}
+
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }): Promise<Response> {
   const auth = await authenticateApiRequest(request, "reviews:read");
   if (!auth.ok) {
@@ -22,15 +64,13 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
   const { id: reviewId } = await props.params;
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
+  const ctx = await resolveReviewApiContext(reviewId, auth);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new ReviewApprovalStore(executor);
-    const approvals = await store.listApprovalsForReview(reviewId);
+    const approvals = await store.listApprovalsForReview(reviewId, repositoryId);
     return Response.json({ ok: true, approvals });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load approvals";
@@ -48,41 +88,52 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   const { id: reviewId } = await props.params;
 
-  let body: unknown;
+  const ctx = await resolveReviewApiContext(reviewId, auth);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, currentRevisionId, executor } = ctx;
+
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
-  }
+    const payload = await parseApprovalPayload(request);
+    if (!payload.ok) {
+      return Response.json({ ok: false, error: payload.error }, { status: payload.status });
+    }
 
-  const parsed = recordApprovalSchema.safeParse(body);
-  if (!parsed.success) {
-    return Response.json({ ok: false, error: "Invalid approval payload" }, { status: 400 });
-  }
+    if (currentRevisionId && payload.data.revisionId !== currentRevisionId) {
+      return Response.json(
+        { ok: false, error: "Submitted revision is not the current active review revision" },
+        { status: 409 },
+      );
+    }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-  try {
-    const store = new ReviewApprovalStore(executor);
-    const approval = await store.recordApproval({
-      repositoryId: auth.repositoryId ?? "default-repo",
+    const verification = await verifyRevisionDigest(
+      executor,
+      payload.data.revisionId,
       reviewId,
-      revisionId: parsed.data.revisionId,
-      evidenceDigest: parsed.data.evidenceDigest,
+      payload.data.evidenceDigest,
+    );
+    if (!verification.ok) {
+      return Response.json({ ok: false, error: verification.error }, { status: verification.status });
+    }
+
+    const store = new ReviewApprovalStore(executor);
+    const approval = await store.recordApprovalAndTransitionDecision({
+      repositoryId,
+      reviewId,
+      revisionId: payload.data.revisionId,
+      evidenceDigest: payload.data.evidenceDigest,
       approverId: auth.actorId,
-      status: parsed.data.status,
-      ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
-      ...(parsed.data.isBreakGlass !== undefined ? { isBreakGlass: parsed.data.isBreakGlass } : {}),
+      status: payload.data.status,
+      ...(payload.data.reason ? { reason: payload.data.reason } : {}),
+      ...(payload.data.isBreakGlass !== undefined ? { isBreakGlass: payload.data.isBreakGlass } : {}),
     });
 
     return Response.json({ ok: true, approval }, { status: 201 });
   } catch (error) {
+    const isConflict =
+      (error && typeof error === "object" && "isConflict" in error && Boolean(error.isConflict)) ||
+      (error instanceof Error && error.message.includes("Conflicting approval"));
     const message = error instanceof Error ? error.message : "Failed to record approval";
-    return Response.json({ ok: false, error: message }, { status: 500 });
+    return Response.json({ ok: false, error: message }, { status: isConflict ? 409 : 500 });
   } finally {
     await executor.close();
   }

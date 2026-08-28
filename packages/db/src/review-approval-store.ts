@@ -58,34 +58,90 @@ function extractRows<T>(result: unknown): T[] {
   return [];
 }
 
+export class ApprovalConflictError extends Error {
+  readonly isConflict = true;
+  constructor(message = "Conflicting approval payload for active decision") {
+    super(message);
+    this.name = "ApprovalConflictError";
+  }
+}
+
 export class ReviewApprovalStore {
   constructor(private readonly executor: SqlQueryExecutor) {}
 
   async recordApproval(input: RecordApprovalInput): Promise<ReviewApprovalRecord> {
+    return this.recordApprovalAndTransitionDecision(input);
+  }
+
+  async recordApprovalAndTransitionDecision(input: RecordApprovalInput): Promise<ReviewApprovalRecord> {
     const id = `rapp_${randomUUID()}`;
     const reason = input.reason ?? null;
     const isBreakGlass = input.isBreakGlass ?? false;
 
     const raw = await this.executor.query(
-      `INSERT INTO review_approvals (
-        id, repository_id, review_id, revision_id, evidence_digest,
-        approver_id, status, reason, is_break_glass, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-      RETURNING
-        id,
-        repository_id AS "repositoryId",
-        review_id AS "reviewId",
-        revision_id AS "revisionId",
-        evidence_digest AS "evidenceDigest",
-        approver_id AS "approverId",
-        status,
-        reason,
-        is_break_glass AS "isBreakGlass",
-        invalidated_at AS "invalidatedAt",
-        invalidated_by AS "invalidatedBy",
-        invalidation_reason AS "invalidationReason",
-        created_at AS "createdAt",
-        updated_at AS "updatedAt"`,
+      `WITH claim_approval AS (
+        INSERT INTO review_approvals (
+          id, repository_id, review_id, revision_id, evidence_digest,
+          approver_id, status, reason, is_break_glass, created_at, updated_at
+        )
+        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+        WHERE EXISTS (SELECT 1 FROM reviews WHERE id = $3 AND repository_id = $2)
+        ON CONFLICT (review_id, revision_id, approver_id, status)
+          WHERE status IN ('approved', 'changes_requested') AND invalidated_at IS NULL
+        DO UPDATE SET updated_at = review_approvals.updated_at
+        WHERE (
+          review_approvals.reason IS NOT DISTINCT FROM EXCLUDED.reason
+          AND review_approvals.is_break_glass IS NOT DISTINCT FROM EXCLUDED.is_break_glass
+          AND review_approvals.evidence_digest = EXCLUDED.evidence_digest
+        )
+        RETURNING
+          id,
+          repository_id AS "repositoryId",
+          review_id AS "reviewId",
+          revision_id AS "revisionId",
+          evidence_digest AS "evidenceDigest",
+          approver_id AS "approverId",
+          status,
+          reason,
+          is_break_glass AS "isBreakGlass",
+          invalidated_at AS "invalidatedAt",
+          invalidated_by AS "invalidatedBy",
+          invalidation_reason AS "invalidationReason",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+      ),
+      superseded_opposing AS (
+        UPDATE review_approvals
+        SET status = 'invalidated',
+            invalidated_at = NOW(),
+            invalidated_by = $6,
+            invalidation_reason = CASE
+              WHEN $7 = 'approved' THEN 'Superseded by subsequent approval'
+              ELSE 'Superseded by subsequent changes request'
+            END,
+            updated_at = NOW()
+        WHERE review_id = $3
+          AND revision_id = $4
+          AND approver_id = $6
+          AND status IN ('approved', 'changes_requested')
+          AND status <> $7
+          AND invalidated_at IS NULL
+          AND EXISTS (SELECT 1 FROM claim_approval)
+        RETURNING id
+      ),
+      updated_review AS (
+        UPDATE reviews
+        SET decision = CASE
+              WHEN $7 = 'approved' THEN 'approved'::text
+              WHEN $7 = 'changes_requested' THEN 'changes_requested'::text
+              ELSE decision
+            END,
+            updated_at = NOW()
+        WHERE id = $3 AND repository_id = $2
+          AND EXISTS (SELECT 1 FROM claim_approval)
+        RETURNING id
+      )
+      SELECT * FROM claim_approval`,
       [
         id,
         input.repositoryId,
@@ -101,10 +157,24 @@ export class ReviewApprovalStore {
 
     const rows = extractRows<ReviewApprovalRecord>(raw);
     const record = rows[0];
-    if (!record) {
-      throw new Error("Failed to record approval");
+
+    if (record) {
+      return record;
     }
-    return record;
+
+    // claim_approval was not inserted or updated. Determine if it was a conflict or missing review.
+    const existingCheck = await this.executor.query(
+      `SELECT id FROM review_approvals
+       WHERE review_id = $1 AND revision_id = $2 AND approver_id = $3 AND status = $4 AND invalidated_at IS NULL
+       LIMIT 1`,
+      [input.reviewId, input.revisionId, input.approverId, input.status],
+    );
+    const existingRows = extractRows<{ id: string }>(existingCheck);
+    if (existingRows.length > 0) {
+      throw new ApprovalConflictError("Conflicting approval payload for active decision");
+    }
+
+    throw new Error("Failed to record approval: review not found for repository or update failed");
   }
 
   async invalidateApprovalsOnDigestChange(
@@ -132,9 +202,9 @@ export class ReviewApprovalStore {
     return rows.length;
   }
 
-  async listApprovalsForReview(reviewId: string): Promise<ReviewApprovalRecord[]> {
-    const raw = await this.executor.query(
-      `SELECT
+  async listApprovalsForReview(reviewId: string, repositoryId?: string): Promise<ReviewApprovalRecord[]> {
+    const params: unknown[] = [reviewId];
+    let query = `SELECT
         id,
         repository_id AS "repositoryId",
         review_id AS "reviewId",
@@ -150,10 +220,13 @@ export class ReviewApprovalStore {
         created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM review_approvals
-      WHERE review_id = $1
-      ORDER BY created_at DESC`,
-      [reviewId],
-    );
+      WHERE review_id = $1`;
+    if (repositoryId) {
+      params.push(repositoryId);
+      query += ` AND repository_id = $2`;
+    }
+    query += ` ORDER BY created_at DESC`;
+    const raw = await this.executor.query(query, params);
     return extractRows<ReviewApprovalRecord>(raw);
   }
 
@@ -187,17 +260,22 @@ export class ReviewApprovalStore {
     id: string,
     completed: boolean,
     completedBy?: string | null | undefined,
+    scope?: { reviewId: string; repositoryId: string },
   ): Promise<ReviewChecklistItemRecord | undefined> {
     const completedAt = completed ? new Date().toISOString() : null;
     const actor = completed ? (completedBy ?? null) : null;
-
-    const raw = await this.executor.query(
-      `UPDATE review_checklist_items
+    const params: unknown[] = [id, completed, actor, completedAt];
+    let query = `UPDATE review_checklist_items
       SET
         completed = $2,
         completed_by = $3,
         completed_at = $4
-      WHERE id = $1
+      WHERE id = $1`;
+    if (scope) {
+      params.push(scope.reviewId, scope.repositoryId);
+      query += ` AND review_id = $5 AND repository_id = $6`;
+    }
+    query += `
       RETURNING
         id,
         repository_id AS "repositoryId",
@@ -206,10 +284,9 @@ export class ReviewApprovalStore {
         completed,
         completed_by AS "completedBy",
         completed_at AS "completedAt",
-        created_at AS "createdAt"`,
-      [id, completed, actor, completedAt],
-    );
+        created_at AS "createdAt"`;
 
+    const raw = await this.executor.query(query, params);
     const rows = extractRows<ReviewChecklistItemRecord>(raw);
     return rows[0];
   }

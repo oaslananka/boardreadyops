@@ -85,6 +85,13 @@ function safeInstallationId(value: unknown): number | undefined {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function parseSafeString(value: unknown): string | null {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+  return null;
+}
+
 export async function resolveRepositoryApiContext(
   auth: AuthenticatedApiContext,
   request: Request,
@@ -147,6 +154,111 @@ export async function resolveRepositoryApiContext(
     }
 
     return { repositoryId, executor };
+  } catch (error) {
+    await executor.close();
+    throw error;
+  }
+}
+
+export interface ReviewApiContext {
+  reviewId: string;
+  repositoryId: string;
+  headRunId: string;
+  currentRevisionId: string | null;
+  executor: PgQueryExecutor;
+}
+
+export async function resolveReviewApiContext(
+  reviewId: string,
+  auth: AuthenticatedApiContext,
+): Promise<ReviewApiContext | Response> {
+  const config = resolveCloudPersistenceConfiguration();
+  if (config.mode !== "postgres") {
+    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  }
+
+  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  try {
+    const result = await executor.query(
+      `select reviews.id as review_id,
+              reviews.repository_id,
+              reviews.head_run_id,
+              reviews.current_revision_id,
+              installations.github_installation_id
+         from reviews
+         join repositories on repositories.id = reviews.repository_id
+         join installations on installations.id = repositories.installation_id
+        where reviews.id = $1
+          and repositories.disabled_at is null
+          and installations.suspended_at is null
+          and not exists (
+            select 1
+              from github_marketplace_subscriptions
+             where github_marketplace_subscriptions.status = 'canceled'
+               and (
+                 github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
+                 or (
+                   github_marketplace_subscriptions.github_installation_id is null
+                   and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
+                 )
+               )
+          )
+        limit 1`,
+      [reviewId],
+    );
+
+    const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
+    const first = rows[0];
+    if (!first) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Review not found" }, { status: 404 });
+    }
+
+    const repositoryId = parseSafeString(first.repository_id);
+    if (!repositoryId) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Invalid repository configuration" }, { status: 500 });
+    }
+
+    const headRunId = parseSafeString(first.head_run_id);
+    if (!headRunId) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Invalid review head run configuration" }, { status: 500 });
+    }
+
+    let currentRevisionId: string | null = null;
+    if (first.current_revision_id !== null && first.current_revision_id !== undefined) {
+      currentRevisionId = parseSafeString(first.current_revision_id);
+      if (!currentRevisionId) {
+        await executor.close();
+        return Response.json({ ok: false, error: "Invalid revision configuration" }, { status: 500 });
+      }
+    }
+
+    const githubInstallationId = safeInstallationId(first.github_installation_id);
+
+    if (githubInstallationId === undefined) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    if (auth.authType === "bearer_token" && auth.repositoryId && auth.repositoryId !== repositoryId) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    if (auth.authType === "session" && !auth.installationIds?.includes(githubInstallationId)) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    return {
+      reviewId,
+      repositoryId,
+      headRunId,
+      currentRevisionId,
+      executor,
+    };
   } catch (error) {
     await executor.close();
     throw error;
