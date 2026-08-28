@@ -47,6 +47,7 @@ export type ControlPlaneJobMetrics = {
 };
 
 export type ControlPlaneJobStore = {
+  isMarketplaceAccountCanceled(input: { installationExternalId?: number; accountLogin?: string }): Promise<boolean>;
   acceptGitHubWebhook(input: AcceptGitHubWebhookInput): Promise<AcceptGitHubWebhookResult>;
   claimJobs(input: { workerId: string; limit?: number }): Promise<ClaimedControlPlaneJob[]>;
   completeJob(input: { jobId: string; workerId: string }): Promise<"completed" | "stale">;
@@ -126,6 +127,26 @@ export function createSqlControlPlaneJobStore(
   const retryBaseSeconds = positiveInteger(options.retryBaseSeconds, 15, "retryBaseSeconds");
 
   return {
+    async isMarketplaceAccountCanceled(input) {
+      if (input.installationExternalId === undefined && !input.accountLogin) return false;
+      const result = await executor.query(
+        `select exists (
+           select 1
+             from github_marketplace_subscriptions
+            where status = 'canceled'
+              and (
+                ($1::bigint is not null and github_installation_id = $1::bigint)
+                or (
+                  ($1::bigint is null or github_installation_id is null)
+                  and $2::text is not null
+                  and lower(account_login) = lower($2::text)
+                )
+              )
+         ) as canceled`,
+        [input.installationExternalId ?? null, input.accountLogin ?? null],
+      );
+      return rows(result)[0]?.canceled === true;
+    },
     async acceptGitHubWebhook(input) {
       if (!validAcceptance(input)) throw new Error("invalid durable GitHub webhook intake");
       const receivedAt = input.receivedAt ?? now();
@@ -290,6 +311,9 @@ export function createMemoryControlPlaneJobStore(options: ControlPlaneJobStoreOp
   let duplicateDeliveries = 0;
 
   return {
+    async isMarketplaceAccountCanceled() {
+      return false;
+    },
     async acceptGitHubWebhook(input) {
       if (!validAcceptance(input)) throw new Error("invalid durable GitHub webhook intake");
       const key = `github:${input.deliveryId}`;

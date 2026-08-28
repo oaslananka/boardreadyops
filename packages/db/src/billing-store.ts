@@ -133,7 +133,7 @@ export class BillingStore {
     const q = `
       INSERT INTO billing_events (id, provider, delivery_id, tenant_id, type, payload, created_at)
       VALUES ($1, 'github_marketplace', $2, $3, $4, $5, NOW())
-      ON CONFLICT (delivery_id) DO NOTHING
+      ON CONFLICT (delivery_id) WHERE delivery_id IS NOT NULL DO NOTHING
       RETURNING *
     `;
     const r = (await this.db.query(q, [
@@ -212,6 +212,198 @@ export class BillingStore {
     await this.db.query(`UPDATE installations SET plan_tier = 'free' WHERE account_login = $1`, [input.tenantId]);
     const row = r.rows?.[0];
     return row ? mapCustomer(row) : null;
+  }
+
+  async processMarketplaceEvent(input: {
+    deliveryId: string;
+    action: string;
+    githubAccountId: number;
+    accountLogin: string;
+    accountType?: string | null;
+    githubInstallationId?: number | null;
+    planId?: number | null;
+    planName?: string | null;
+    planTier: "free";
+    effectiveDate: string;
+    payload: unknown;
+  }): Promise<{
+    outcome: "applied" | "duplicate" | "recorded" | "stale";
+    stateChanged: boolean;
+    erasureQueued: boolean;
+  }> {
+    const stateful = input.action === "purchased" || input.action === "cancelled";
+    const canceled = input.action === "cancelled";
+    const status = canceled ? "canceled" : "active";
+    const erasureScope = input.accountType?.toLowerCase() === "user" ? "user" : "organization";
+    const q = `
+      WITH inserted_event AS (
+        INSERT INTO billing_events (id, provider, delivery_id, tenant_id, type, payload, created_at)
+        VALUES ($1, 'github_marketplace', $2, $3, $4, $5::jsonb, NOW())
+        ON CONFLICT (delivery_id) WHERE delivery_id IS NOT NULL DO NOTHING
+        RETURNING id
+      ),
+      upserted_state AS (
+        INSERT INTO github_marketplace_subscriptions (
+          github_account_id, account_login, account_type, github_installation_id,
+          plan_id, plan_name, plan_tier, status, effective_at, last_delivery_id,
+          created_at, updated_at
+        )
+        SELECT $6, $3, $7, $8, $9, $10, $11, $12, $13::timestamptz, $2, NOW(), NOW()
+        FROM inserted_event
+        WHERE $14::boolean
+        ON CONFLICT (github_account_id) DO UPDATE SET
+          account_login = EXCLUDED.account_login,
+          account_type = EXCLUDED.account_type,
+          github_installation_id = COALESCE(EXCLUDED.github_installation_id, github_marketplace_subscriptions.github_installation_id),
+          plan_id = EXCLUDED.plan_id,
+          plan_name = EXCLUDED.plan_name,
+          plan_tier = EXCLUDED.plan_tier,
+          status = EXCLUDED.status,
+          effective_at = EXCLUDED.effective_at,
+          last_delivery_id = EXCLUDED.last_delivery_id,
+          updated_at = NOW()
+        WHERE EXCLUDED.effective_at > github_marketplace_subscriptions.effective_at
+           OR (
+             EXCLUDED.effective_at = github_marketplace_subscriptions.effective_at
+             AND (
+               EXCLUDED.status = github_marketplace_subscriptions.status
+               OR EXCLUDED.status = 'canceled'
+             )
+           )
+        RETURNING github_account_id, account_login, github_installation_id
+      ),
+      resolved_erasure_tenant AS (
+        SELECT COALESCE(
+          (
+            SELECT installations.account_login
+              FROM installations
+             WHERE upserted_state.github_installation_id IS NOT NULL
+               AND installations.github_installation_id = upserted_state.github_installation_id
+             LIMIT 1
+          ),
+          upserted_state.account_login
+        ) AS tenant_id
+        FROM upserted_state
+      ),
+      queued_erasure AS (
+        INSERT INTO erasure_requests (
+          id, tenant_id, requested_by, scope, scope_id, status, dry_run, created_at, due_at
+        )
+        SELECT
+          gen_random_uuid()::text,
+          (SELECT tenant_id FROM resolved_erasure_tenant),
+          'github_marketplace',
+          $16::text,
+          CASE
+            WHEN $16::text = 'user' THEN (SELECT tenant_id FROM resolved_erasure_tenant)
+            ELSE NULL
+          END,
+          CASE
+            WHEN EXISTS (
+              SELECT 1 FROM legal_holds
+              WHERE tenant_id = (SELECT tenant_id FROM resolved_erasure_tenant)
+                AND active = TRUE
+                AND (
+                  scope = 'organization'
+                  OR (
+                    scope = $16::text
+                    AND (
+                      scope_id = CASE
+                        WHEN $16::text = 'user' THEN (SELECT tenant_id FROM resolved_erasure_tenant)
+                        ELSE NULL
+                      END
+                      OR scope_id IS NULL
+                    )
+                  )
+                )
+            ) THEN 'blocked_by_hold'
+            ELSE 'pending'
+          END,
+          FALSE,
+          NOW(),
+          $13::timestamptz + INTERVAL '30 days'
+        FROM upserted_state
+        WHERE $15::boolean
+          AND NOT EXISTS (
+            SELECT 1 FROM erasure_requests
+            WHERE tenant_id = (SELECT tenant_id FROM resolved_erasure_tenant)
+              AND requested_by = 'github_marketplace'
+              AND scope = $16::text
+              AND status IN ('pending', 'running', 'blocked_by_hold')
+          )
+        ON CONFLICT (tenant_id, scope)
+          WHERE requested_by = 'github_marketplace'
+            AND scope IN ('organization', 'user')
+            AND status IN ('pending', 'running', 'blocked_by_hold')
+        DO NOTHING
+        RETURNING id
+      ),
+      revoked_tokens AS (
+        UPDATE api_tokens
+        SET revoked_at = NOW()
+        WHERE revoked_at IS NULL
+          AND $15::boolean
+          AND EXISTS (SELECT 1 FROM upserted_state)
+          AND repository_id IN (
+            SELECT repositories.id
+              FROM repositories
+              JOIN installations ON installations.id = repositories.installation_id
+             WHERE installations.github_installation_id = (SELECT github_installation_id FROM upserted_state)
+                OR (
+                  (SELECT github_installation_id FROM upserted_state) IS NULL
+                  AND lower(installations.account_login) = lower((SELECT account_login FROM upserted_state))
+                )
+          )
+        RETURNING id
+      ),
+      marked_event AS (
+        UPDATE billing_events
+        SET processed_at = NOW()
+        WHERE delivery_id = $2
+          AND EXISTS (SELECT 1 FROM inserted_event)
+        RETURNING id
+      )
+      SELECT
+        EXISTS (SELECT 1 FROM inserted_event) AS inserted,
+        EXISTS (SELECT 1 FROM upserted_state) AS state_changed,
+        ($14::boolean
+          AND EXISTS (SELECT 1 FROM inserted_event)
+          AND NOT EXISTS (SELECT 1 FROM upserted_state)) AS stale,
+        EXISTS (SELECT 1 FROM queued_erasure) AS erasure_queued
+    `;
+    const r = (await this.db.query(q, [
+      randomUUID(),
+      input.deliveryId,
+      input.accountLogin,
+      `marketplace_purchase.${input.action}`,
+      JSON.stringify(input.payload),
+      input.githubAccountId,
+      input.accountType ?? null,
+      input.githubInstallationId ?? null,
+      input.planId ?? null,
+      input.planName ?? null,
+      input.planTier,
+      status,
+      input.effectiveDate,
+      stateful,
+      canceled,
+      erasureScope,
+    ])) as {
+      rows?: Array<{
+        inserted: boolean;
+        state_changed: boolean;
+        stale: boolean;
+        erasure_queued: boolean;
+      }>;
+    };
+    const row = r.rows?.[0];
+    if (!row) throw new Error("Marketplace event processing returned no result");
+    if (!row.inserted) return { outcome: "duplicate", stateChanged: false, erasureQueued: false };
+    if (row.stale) return { outcome: "stale", stateChanged: false, erasureQueued: false };
+    if (stateful) {
+      return { outcome: "applied", stateChanged: row.state_changed, erasureQueued: row.erasure_queued };
+    }
+    return { outcome: "recorded", stateChanged: false, erasureQueued: false };
   }
 
   async recordActivity(input: {

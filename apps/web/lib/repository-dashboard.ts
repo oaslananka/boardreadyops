@@ -58,6 +58,19 @@ const repositorySummaryQuery = `
       join installations on installations.id = repositories.installation_id
      where installations.github_installation_id = any($1::bigint[])
        and repositories.disabled_at is null
+       and installations.suspended_at is null
+       and not exists (
+         select 1
+           from github_marketplace_subscriptions
+          where github_marketplace_subscriptions.status = 'canceled'
+            and (
+              github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
+              or (
+                github_marketplace_subscriptions.github_installation_id is null
+                and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
+              )
+            )
+       )
   ),
   latest as (
     select distinct on (release_runs.repository_id)

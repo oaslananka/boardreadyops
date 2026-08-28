@@ -40,6 +40,30 @@ describe("control-plane job store", () => {
     });
   });
 
+  it("checks Marketplace cancellation state by installation and account without exposing payload data", async () => {
+    const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
+    const executor: SqlQueryExecutor = {
+      async query(sql, params = []) {
+        calls.push({ sql, params });
+        return { rows: [{ canceled: true }] };
+      },
+    };
+    const store = createSqlControlPlaneJobStore(executor);
+
+    await expect(
+      store.isMarketplaceAccountCanceled({ installationExternalId: 123, accountLogin: "octo" }),
+    ).resolves.toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("github_marketplace_subscriptions");
+    expect(calls[0]?.sql).toContain("status = 'canceled'");
+    expect(calls[0]?.params).toEqual([123, "octo"]);
+
+    const memory = createMemoryControlPlaneJobStore();
+    await expect(
+      memory.isMarketplaceAccountCanceled({ installationExternalId: 123, accountLogin: "octo" }),
+    ).resolves.toBe(false);
+  });
+
   it("passes only normalized actions and routing metadata into the atomic SQL intake", async () => {
     const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
     const executor: SqlQueryExecutor = {

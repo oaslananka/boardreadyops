@@ -1,8 +1,6 @@
 import { ApiTokenStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 
 export const runtime = "nodejs";
 
@@ -20,7 +18,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
-  const ctx = resolveRepositoryApiContext(auth, request);
+  const ctx = await resolveRepositoryApiContext(auth, request);
   if (ctx instanceof Response) return ctx;
   const { repositoryId, executor } = ctx;
 
@@ -51,17 +49,10 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Invalid token payload", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const { repositoryId, name, scopes, durationDays } = parsed.data;
-  if (auth.repositoryId && auth.repositoryId !== repositoryId) {
-    return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
-  }
-
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { repositoryId: requestedRepositoryId, name, scopes, durationDays } = parsed.data;
+  const ctx = await resolveRepositoryApiContext(auth, request, requestedRepositoryId);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
   try {
     const store = new ApiTokenStore(executor);
     const result = await store.createToken({
@@ -90,7 +81,7 @@ export async function DELETE(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
-  const ctx = resolveRepositoryApiContext(auth, request);
+  const ctx = await resolveRepositoryApiContext(auth, request);
   if (ctx instanceof Response) return ctx;
   const { repositoryId, executor } = ctx;
 

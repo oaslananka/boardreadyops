@@ -37,7 +37,7 @@ By installing the BoardReadyOps GitHub App, running BoardReadyOps in GitHub Acti
 
 - **Community Free Plan**: The Community plan on GitHub Marketplace provides automated pull request checks and single-board supply watch free of charge for individuals and teams.
 - **Plan Modifications**: We reserve the right to modify, adjust limits on, or discontinue features of plans with reasonable advance notice.
-- **Marketplace Billing**: Marketplace purchases and cancellations are managed directly through GitHub Marketplace and are subject to GitHub's payment and marketplace terms.
+- **Marketplace Billing**: The currently published hosted Marketplace offering is Community (Free). BoardReadyOps does not require an external paid subscription for this Free Marketplace listing. Marketplace activation and cancellation are managed through GitHub and are also subject to GitHub's marketplace terms.
 
 ---
 

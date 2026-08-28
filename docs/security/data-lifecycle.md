@@ -41,6 +41,7 @@ option. Workspaces should not be included in general-purpose backups.
 | Data class | Stored content and scope | Current lifecycle |
 | --- | --- | --- |
 | GitHub webhook intake | Delivery and event metadata, installation/repository identifiers, a payload SHA-256 digest, bounded normalized lifecycle actions, state, timestamps, and bounded errors. BoardReadyOps does not persist the raw GitHub webhook body. | Successful processing marks the row processed and normalized actions are replaced with an empty array. `BOARDREADYOPS_WEBHOOK_RETENTION_DAYS` defaults terminal metadata retention to 30 days. Bounded cleanup removes only processed, failed, or dead-letter rows after their persisted deadline; accepted and processing rows are not purged. |
+| GitHub Marketplace lifecycle | Delivery ID, stable GitHub account ID, account login/type, optional installation ID, bounded plan metadata, current active/canceled state, and event effective date. The raw Marketplace webhook body is not persisted. | Signed deliveries are recorded idempotently. Current state advances only for non-stale effective dates. Cancellation atomically revokes repository API tokens, removes the account from hosted repository/session views and future control-plane lifecycle enqueue, and queues an account-scoped erasure request (`organization` or `user`, matching the Marketplace account type) with `due_at` 30 days after the cancellation effective date; matching active legal holds mark the request blocked. Erasure execution is currently an operator workflow, not an automatic purge. |
 | Installation and repository records | GitHub installation/account identifiers and repository identity, visibility, default branch, enablement, suspension, and routing state. Installation or repository scoped. | Retained until an explicit installation/repository lifecycle operation removes the parent record. No customer-facing uninstall export, erasure, or legal-hold workflow is implemented. |
 | Logical runs, attempts, transitions, outbox, and reconciliation | Commit/ref/PR metadata, run and attempt state, transition history, bounded side-effect payloads, external results, replay records, reconciliation state, and bounded errors. Repository/run scoped. | `BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS` defaults completed outbox-effect and completed reconciliation-item retention to 90 days. Bounded cleanup preserves active, dead-letter, and reconciliation-required records. Logical runs, attempts, transitions, and replay operations have no automatic age-based purge. |
 | Findings and accepted result payloads | Rule IDs, severities, messages, repository-relative paths, metrics, report links, result digests, and the raw normalized runner result payload accepted by the result contract. Run scoped. | No automatic age-based purge is implemented. The result payload remains available for dashboard, replay, and publication consistency until its parent run is removed by a future retention or erasure workflow. |
@@ -120,9 +121,9 @@ The current release does not provide all lifecycle controls requested by issue
 - per-organization or per-repository retention settings are not implemented;
 - general age-based expiry for runs, findings, accepted result payloads, audit
   events, replay/transition history, or managed artifacts is not implemented;
-- an organization, repository, or user erasure workflow is not implemented;
-- an uninstall export and post-uninstall deletion workflow is not implemented;
-- a legal-hold workflow is not implemented;
+- organization, repository, and user erasure **request intake** exists, including a 30-day Marketplace-cancellation deadline, but complete erasure execution across relational data and managed objects is not automated;
+- an uninstall export and complete post-uninstall deletion workflow is not implemented;
+- legal-hold checks exist for erasure requests, but a complete customer/operator legal-hold lifecycle is not implemented;
 - physical deletion for object-storage drivers is not implemented; and
 - backup and platform-log expiry remain operator responsibilities.
 
