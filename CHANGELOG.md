@@ -4,6 +4,39 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.35.0](https://github.com/oaslananka/boardreadyops/compare/v1.34.0...v1.35.0) (2026-08-27)
+
+
+### Features
+
+* **core:** look up component lifecycle through Nexar under customer credentials ([#495](https://github.com/oaslananka/boardreadyops/issues/495)) ([727a468](https://github.com/oaslananka/boardreadyops/commit/727a4682e6c789b0a7b462d6808c9acfb6fc1100))
+* **core:** resolve component intelligence per installation ([#492](https://github.com/oaslananka/boardreadyops/issues/492)) ([a2fa189](https://github.com/oaslananka/boardreadyops/commit/a2fa1899d16ac21e96e53611030434cd71c7026c))
+* **core:** run the supply watch pass on a schedule, gated by the plan ([#490](https://github.com/oaslananka/boardreadyops/issues/490)) ([30edd36](https://github.com/oaslananka/boardreadyops/commit/30edd368624961f03b9c8efb338f70745d50e3e8))
+* **core:** store per-installation provider credentials, encrypted at rest ([#493](https://github.com/oaslananka/boardreadyops/issues/493)) ([debc6ae](https://github.com/oaslananka/boardreadyops/commit/debc6ae90a2f27c79ec9bae094edeb0d59a6b643))
+* **governance:** persist and enforce organization review policies ([#520](https://github.com/oaslananka/boardreadyops/issues/520)) ([0fbbb5c](https://github.com/oaslananka/boardreadyops/commit/0fbbb5c00bf62bd0660569041bb3eb379ecd6da1))
+* **report:** answer the question the run page was opened to answer ([#499](https://github.com/oaslananka/boardreadyops/issues/499)) ([c54bed6](https://github.com/oaslananka/boardreadyops/commit/c54bed6b1c9861e7ac312663d2b687d2c3d3160d))
+* **report:** give customers a dashboard of the repositories being watched ([#498](https://github.com/oaslananka/boardreadyops/issues/498)) ([9dcbee5](https://github.com/oaslananka/boardreadyops/commit/9dcbee530c8a8f824af349b7b2efe0ff1e749dd6))
+* **report:** give the ledger a daylight palette ([#508](https://github.com/oaslananka/boardreadyops/issues/508)) ([d239fee](https://github.com/oaslananka/boardreadyops/commit/d239fee046d1c448f7f8c9f82083e2366cf73d0b))
+* **report:** let customers supply their own component provider credentials ([#496](https://github.com/oaslananka/boardreadyops/issues/496)) ([7c583a6](https://github.com/oaslananka/boardreadyops/commit/7c583a620846c386b6c10dbcd12722a1d7e4da8a))
+* **report:** say it in plain words, and put the spacing back on the scale ([#500](https://github.com/oaslananka/boardreadyops/issues/500)) ([fb324a6](https://github.com/oaslananka/boardreadyops/commit/fb324a6c26675c807b28ab81d3d6b91ad1d75406))
+* **review:** add the missing finding-assignment UI control ([#521](https://github.com/oaslananka/boardreadyops/issues/521)) ([f2fa98c](https://github.com/oaslananka/boardreadyops/commit/f2fa98ca97ea884d7ca0ff31a226aa649a58b6fb))
+* **review:** Hardware Review & Evidence OS ([#518](https://github.com/oaslananka/boardreadyops/issues/518)) ([411fbf4](https://github.com/oaslananka/boardreadyops/commit/411fbf4aae71ef0636a72f8e6533fac5dd14a22b))
+* **web:** Foundry Editorial product redesign ([#523](https://github.com/oaslananka/boardreadyops/issues/523)) ([f35addc](https://github.com/oaslananka/boardreadyops/commit/f35addcd19faef1118774552ac2b9be2b0074748))
+
+
+### Bug Fixes
+
+* **billing:** close timing-unsafe Stripe signature check merged in [#518](https://github.com/oaslananka/boardreadyops/issues/518) ([#519](https://github.com/oaslananka/boardreadyops/issues/519)) ([fdffd5a](https://github.com/oaslananka/boardreadyops/commit/fdffd5aa26c889c50cceb2eaa0572de695918041))
+* **ci:** admit a quarantined release instead of failing the whole task ([#510](https://github.com/oaslananka/boardreadyops/issues/510)) ([e7d0647](https://github.com/oaslananka/boardreadyops/commit/e7d0647097b2860c74caf8eb363355a73df89c94))
+* **core:** stop rescheduling a reconciliation item past its attempt budget ([#506](https://github.com/oaslananka/boardreadyops/issues/506)) ([e68e851](https://github.com/oaslananka/boardreadyops/commit/e68e851f29c21b149d16dbe9369b5c0746bad28d))
+* **db:** fix a review-creation bug that made new reviews impossible ([#522](https://github.com/oaslananka/boardreadyops/issues/522)) ([19cdc00](https://github.com/oaslananka/boardreadyops/commit/19cdc001015d6e0ef333ec533f01d2f22c6f217e))
+* **report:** finish the copy pass the first one left half done ([#504](https://github.com/oaslananka/boardreadyops/issues/504)) ([356d9d6](https://github.com/oaslananka/boardreadyops/commit/356d9d6b88b6df9ffab4006413cc67988ce08a20))
+* **report:** give a signed-in reader a way into their dashboard ([#503](https://github.com/oaslananka/boardreadyops/issues/503)) ([96776cd](https://github.com/oaslananka/boardreadyops/commit/96776cd83e7d1a553a71a94f93476c8e1cd36858))
+* **report:** rewrite the copy on the screens nobody curls ([#507](https://github.com/oaslananka/boardreadyops/issues/507)) ([c1f477b](https://github.com/oaslananka/boardreadyops/commit/c1f477b76f87da62ee206be41a328b8b94407a43))
+* **report:** rewrite the footer that sits under every page ([#505](https://github.com/oaslananka/boardreadyops/issues/505)) ([ae3eacc](https://github.com/oaslananka/boardreadyops/commit/ae3eacc0936959908e00adaf962523dba203e1fa))
+* **report:** show signed-in state on the landing page ([#497](https://github.com/oaslananka/boardreadyops/issues/497)) ([25cdd28](https://github.com/oaslananka/boardreadyops/commit/25cdd28e85882dc89a975c08bf43c546998b9d4a))
+* standalone Docker image was silently missing pg ([#517](https://github.com/oaslananka/boardreadyops/issues/517)) ([278a570](https://github.com/oaslananka/boardreadyops/commit/278a570c7e89a454ac942f24acfc90e1c6c5db0b))
+
 ## [1.34.0](https://github.com/oaslananka/boardreadyops/compare/v1.33.0...v1.34.0) (2026-08-25)
 
 
