@@ -115,6 +115,42 @@ describe("GitHub webhook route lifecycle persistence", () => {
     });
   });
 
+  it("acknowledges but does not enqueue lifecycle work for a canceled Marketplace account", async () => {
+    process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
+    process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
+    let accepted = false;
+    setControlPlaneJobStoreForTests({
+      isMarketplaceAccountCanceled: async () => true,
+      acceptGitHubWebhook: async () => {
+        accepted = true;
+        throw new Error("must not enqueue canceled Marketplace account");
+      },
+      claimJobs: async () => [],
+      completeJob: async () => "stale",
+      failJob: async () => "stale",
+      purgeExpired: async () => 0,
+      collectMetrics: async () => ({
+        availableJobs: 0,
+        leasedJobs: 0,
+        deadLetterJobs: 0,
+        duplicateDeliveries: 0,
+        oldestUnprocessedAgeSeconds: 0,
+      }),
+    });
+
+    const response = await POST(signedGitHubRequest("installation", installationPayload()));
+
+    expect(response.status).toBe(202);
+    expect(accepted).toBe(false);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      status: "accepted",
+      ignored: true,
+      reason: "marketplace_canceled",
+      delivery: "delivery-123",
+    });
+  });
+
   it("accepts a repeated delivery idempotently without creating another job", async () => {
     process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
     delete process.env.DATABASE_URL;
@@ -157,6 +193,7 @@ describe("GitHub webhook route lifecycle persistence", () => {
     process.env.GITHUB_WEBHOOK_SECRET = "test-secret";
     process.env.BOARDREADYOPS_PERSISTENCE_MODE = "memory";
     setControlPlaneJobStoreForTests({
+      isMarketplaceAccountCanceled: async () => false,
       acceptGitHubWebhook: async () => {
         throw new Error("database unavailable");
       },

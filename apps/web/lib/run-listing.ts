@@ -83,6 +83,19 @@ const runListingQuery = `
     join installations on installations.id = repositories.installation_id
    where installations.github_installation_id = any($1::bigint[])
      and repositories.disabled_at is null
+     and installations.suspended_at is null
+     and not exists (
+       select 1
+         from github_marketplace_subscriptions
+        where github_marketplace_subscriptions.status = 'canceled'
+          and (
+            github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
+            or (
+              github_marketplace_subscriptions.github_installation_id is null
+              and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
+            )
+          )
+     )
      and ($2::timestamptz is null or (release_runs.started_at, release_runs.id) < ($2::timestamptz, $3::text))
    order by release_runs.started_at desc, release_runs.id desc
    limit $4`;

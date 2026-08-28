@@ -83,6 +83,12 @@ describe("viewerAuthorization", () => {
 
     expect(viewer.session).toBeDefined();
     expect(await viewer.authorizeInstallation("inst-1001")).toBe(true);
+    const sql = String(mockQuery.mock.calls[0]?.[0]);
+    expect(sql).toContain("github_marketplace_subscriptions");
+    expect(sql).toContain("status = 'canceled'");
+    expect(sql).toContain(
+      "github_marketplace_subscriptions.github_installation_id = installations.github_installation_id",
+    );
     expect(mockClose).toHaveBeenCalled();
   });
 

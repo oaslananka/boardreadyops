@@ -32,7 +32,7 @@ describe("BillingStore marketplace events", () => {
 
     const [sql, params] = query.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain("INSERT INTO billing_events");
-    expect(sql).toContain("ON CONFLICT (delivery_id) DO NOTHING");
+    expect(sql).toContain("ON CONFLICT (delivery_id) WHERE delivery_id IS NOT NULL DO NOTHING");
     expect(params[1]).toBe("del_abc");
     expect(params[2]).toBe("octo-org");
   });

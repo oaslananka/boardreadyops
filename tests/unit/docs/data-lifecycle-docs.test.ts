@@ -39,8 +39,11 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("`--keep-workspace` is ignored");
     expect(lifecycle).toContain("Private repository run dashboards fail closed");
     expect(lifecycle).toContain("repository authorization");
-    expect(lifecycle).toContain("organization, repository, or user erasure workflow is not implemented");
-    expect(lifecycle).toContain("legal-hold workflow is not implemented");
+    expect(lifecycle).toContain("organization, repository, and user erasure **request intake** exists");
+    expect(lifecycle).toContain(
+      "complete erasure execution across relational data and managed objects is not automated",
+    );
+    expect(lifecycle).toContain("complete customer/operator legal-hold lifecycle is not implemented");
     expect(lifecycle).toContain("backup and platform-log expiry remain operator responsibilities");
   });
 

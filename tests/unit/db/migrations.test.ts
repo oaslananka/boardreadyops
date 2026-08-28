@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(55);
+    expect(cloudDatabaseSchemaVersion).toBe(56);
     expect(cloudDatabaseModels).toContain("ApiToken");
     expect(cloudDatabaseModels).toContain("FindingDecision");
     expect(cloudDatabaseModels).toContain("FindingAssignment");
@@ -96,7 +96,27 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0053_storage_lifecycle.sql",
       "0054_governance.sql",
       "0055_marketplace_billing_events.sql",
+      "0056_marketplace_subscription_state.sql",
     ]);
+  });
+
+  it("deduplicates active Marketplace account erasures in schema v56", async () => {
+    const sql = (await readFile(join(migrationsDir, "0056_marketplace_subscription_state.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("uq_erasure_requests_active_marketplace_account");
+    expect(sql).toContain("unique index if not exists");
+    expect(sql).toContain("on erasure_requests(tenant_id, scope)");
+    expect(sql).toContain("requested_by = 'github_marketplace'");
+    expect(sql).toContain("scope in ('organization', 'user')");
+    expect(sql).toContain("status in ('pending', 'running', 'blocked_by_hold')");
+  });
+
+  it("indexes canceled Marketplace subscriptions by stable installation id in schema v56", async () => {
+    const sql = (await readFile(join(migrationsDir, "0056_marketplace_subscription_state.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("idx_github_marketplace_subscriptions_canceled_installation");
+    expect(sql).toContain("on github_marketplace_subscriptions(github_installation_id)");
+    expect(sql).toContain("where status = 'canceled' and github_installation_id is not null");
   });
 
   it("persists provider-neutral artifact metadata in schema v39", async () => {

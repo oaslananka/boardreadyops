@@ -26,8 +26,8 @@ type VerifiedWebhookRequest = {
 
 type WebhookStore = ReturnType<typeof getControlPlaneJobStore>;
 
-function firstInstallationId(actions: readonly GitHubAppLifecycleAction[]): number | undefined {
-  return actions[0]?.installation.id;
+function firstInstallation(actions: readonly GitHubAppLifecycleAction[]) {
+  return actions[0]?.installation;
 }
 
 function firstRepository(actions: readonly GitHubAppLifecycleAction[]) {
@@ -117,9 +117,10 @@ async function acceptLifecycle(
   lifecycle: GitHubAppLifecycleResult,
   request: VerifiedWebhookRequest,
   startedAt: number,
-): Promise<AcceptGitHubWebhookResult | Response> {
+): Promise<AcceptGitHubWebhookResult | "marketplace_canceled" | Response> {
   const repository = firstRepository(lifecycle.actions);
-  const installationExternalId = firstInstallationId(lifecycle.actions);
+  const installation = firstInstallation(lifecycle.actions);
+  const installationExternalId = installation?.id;
   const rateLimit = checkWebhookRateLimit(
     installationExternalId === undefined ? "installation:unknown" : `installation:${installationExternalId}`,
     request.delivery,
@@ -132,6 +133,12 @@ async function acceptLifecycle(
   }
 
   try {
+    const marketplaceCanceled = await store.isMarketplaceAccountCanceled({
+      ...(installationExternalId === undefined ? {} : { installationExternalId }),
+      ...(installation?.accountLogin ? { accountLogin: installation.accountLogin } : {}),
+    });
+    if (marketplaceCanceled) return "marketplace_canceled";
+
     return await store.acceptGitHubWebhook({
       deliveryId: request.delivery,
       eventType: request.event,
@@ -149,6 +156,20 @@ async function acceptLifecycle(
     });
     return Response.json({ ok: false, error: "webhook could not be durably accepted" }, { status: 503 });
   }
+}
+
+function marketplaceCanceledResponse(request: VerifiedWebhookRequest): Response {
+  return Response.json(
+    {
+      ok: true,
+      status: "accepted",
+      ignored: true,
+      reason: "marketplace_canceled",
+      event: request.event,
+      delivery: request.delivery,
+    },
+    { status: 202 },
+  );
 }
 
 function acceptedResponse(
@@ -209,6 +230,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const intake = await acceptLifecycle(store, lifecycle, verified, startedAt);
   if (intake instanceof Response) return intake;
+  if (intake === "marketplace_canceled") return marketplaceCanceledResponse(verified);
 
   emitWebhookIntakeTelemetry({ outcome: intake.outcome, latencyMs: performance.now() - startedAt });
   return acceptedResponse(verified, lifecycle, intake);

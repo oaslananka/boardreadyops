@@ -1,10 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { findingSchema, releaseRunArtifactSchema, triggerKindSchema } from "@boardreadyops/contracts";
 import { ReviewStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
+import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
 import { decodeRunListingCursor, loadViewerRuns, normalizedRunListingLimit } from "../../../../lib/run-listing.js";
 import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
@@ -72,24 +70,17 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const payload = parsed.data;
-  if (auth.repositoryId && auth.repositoryId !== payload.repositoryId) {
-    return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
-  }
+  const ctx = await resolveRepositoryApiContext(auth, request, payload.repositoryId);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
 
   const idempotencyKey = request.headers.get("idempotency-key")?.trim() ?? undefined;
-
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     // 1. Check idempotency
     if (idempotencyKey) {
       const existing = await executor.query(
         `select * from release_runs where repository_id = $1 and idempotency_key = $2 limit 1`,
-        [payload.repositoryId, idempotencyKey],
+        [repositoryId, idempotencyKey],
       );
       const rows = ((existing as { rows?: { id: string; status: string }[] }).rows ?? []) as {
         id: string;
@@ -119,7 +110,7 @@ export async function POST(request: Request): Promise<Response> {
       ) values ($1, $2, $3, $4, $5, $6, $7, 'completed', $8, $9, $9)`,
       [
         runId,
-        payload.repositoryId,
+        repositoryId,
         idempotencyKey ?? null,
         payload.commitSha,
         payload.ref,
@@ -159,7 +150,7 @@ export async function POST(request: Request): Promise<Response> {
       const evidenceDigest = payload.evidenceDigest ?? "0".repeat(64);
       const title = payload.title ?? `Review for PR #${payload.pullRequestNumber ?? payload.commitSha.slice(0, 7)}`;
       const reviewResult = await reviewStore.upsertReviewForRun({
-        repositoryId: payload.repositoryId,
+        repositoryId,
         ...(payload.pullRequestNumber !== undefined ? { pullRequestNumber: payload.pullRequestNumber } : {}),
         title,
         headRunId: runId,
