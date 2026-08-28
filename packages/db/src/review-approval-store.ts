@@ -260,17 +260,22 @@ export class ReviewApprovalStore {
     id: string,
     completed: boolean,
     completedBy?: string | null | undefined,
+    scope?: { reviewId: string; repositoryId: string },
   ): Promise<ReviewChecklistItemRecord | undefined> {
     const completedAt = completed ? new Date().toISOString() : null;
     const actor = completed ? (completedBy ?? null) : null;
-
-    const raw = await this.executor.query(
-      `UPDATE review_checklist_items
+    const params: unknown[] = [id, completed, actor, completedAt];
+    let query = `UPDATE review_checklist_items
       SET
         completed = $2,
         completed_by = $3,
         completed_at = $4
-      WHERE id = $1
+      WHERE id = $1`;
+    if (scope) {
+      params.push(scope.reviewId, scope.repositoryId);
+      query += ` AND review_id = $5 AND repository_id = $6`;
+    }
+    query += `
       RETURNING
         id,
         repository_id AS "repositoryId",
@@ -279,10 +284,9 @@ export class ReviewApprovalStore {
         completed,
         completed_by AS "completedBy",
         completed_at AS "completedAt",
-        created_at AS "createdAt"`,
-      [id, completed, actor, completedAt],
-    );
+        created_at AS "createdAt"`;
 
+    const raw = await this.executor.query(query, params);
     const rows = extractRows<ReviewChecklistItemRecord>(raw);
     return rows[0];
   }

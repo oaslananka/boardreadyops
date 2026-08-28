@@ -1,4 +1,5 @@
 import { ReviewApprovalStore } from "@boardreadyops/db";
+import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest, resolveReviewApiContext } from "../../../../../../lib/api-auth.js";
 
@@ -11,6 +12,49 @@ const recordApprovalSchema = z.object({
   reason: z.string().optional(),
   isBreakGlass: z.boolean().optional(),
 });
+
+type RecordApprovalInput = z.infer<typeof recordApprovalSchema>;
+
+async function parseApprovalPayload(
+  request: Request,
+): Promise<{ ok: true; data: RecordApprovalInput } | { ok: false; error: string; status: number }> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return { ok: false, error: "Invalid JSON body", status: 400 };
+  }
+
+  const parsed = recordApprovalSchema.safeParse(body);
+  if (!parsed.success) {
+    return { ok: false, error: "Invalid approval payload", status: 400 };
+  }
+
+  return { ok: true, data: parsed.data };
+}
+
+async function verifyRevisionDigest(
+  executor: PgQueryExecutor,
+  revisionId: string,
+  reviewId: string,
+  expectedDigest: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const revisionResult = await executor.query(
+    `SELECT id, evidence_digest FROM review_revisions WHERE id = $1 AND review_id = $2 LIMIT 1`,
+    [revisionId, reviewId],
+  );
+  const revisionRows = (revisionResult as { rows?: { id: string; evidence_digest: string }[] }).rows ?? [];
+  const revision = revisionRows[0];
+  if (!revision) {
+    return { ok: false, error: "Review revision not found", status: 404 };
+  }
+
+  if (revision.evidence_digest !== expectedDigest) {
+    return { ok: false, error: "Evidence digest does not match the active review revision", status: 409 };
+  }
+
+  return { ok: true };
+}
 
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }): Promise<Response> {
   const auth = await authenticateApiRequest(request, "reviews:read");
@@ -48,62 +92,39 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   if (ctx instanceof Response) return ctx;
   const { repositoryId, currentRevisionId, executor } = ctx;
 
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    await executor.close();
-    return Response.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const parsed = recordApprovalSchema.safeParse(body);
-  if (!parsed.success) {
-    await executor.close();
-    return Response.json(
-      { ok: false, error: "Invalid approval payload", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  // 1. Verify revision is current active revision
-  if (currentRevisionId && parsed.data.revisionId !== currentRevisionId) {
-    await executor.close();
-    return Response.json(
-      { ok: false, error: "Submitted revision is not the current active review revision" },
-      { status: 409 },
-    );
-  }
-
-  try {
-    // 2. Authoritatively verify revision exists and evidenceDigest matches
-    const revisionResult = await executor.query(
-      `SELECT id, evidence_digest FROM review_revisions WHERE id = $1 AND review_id = $2 LIMIT 1`,
-      [parsed.data.revisionId, reviewId],
-    );
-    const revisionRows = (revisionResult as { rows?: { id: string; evidence_digest: string }[] }).rows ?? [];
-    const revision = revisionRows[0];
-    if (!revision) {
-      return Response.json({ ok: false, error: "Review revision not found" }, { status: 404 });
+    const payload = await parseApprovalPayload(request);
+    if (!payload.ok) {
+      return Response.json({ ok: false, error: payload.error }, { status: payload.status });
     }
 
-    if (revision.evidence_digest !== parsed.data.evidenceDigest) {
+    if (currentRevisionId && payload.data.revisionId !== currentRevisionId) {
       return Response.json(
-        { ok: false, error: "Evidence digest does not match the active review revision" },
+        { ok: false, error: "Submitted revision is not the current active review revision" },
         { status: 409 },
       );
     }
 
-    // 3. Atomically persist approval and synchronize review decision in a single CTE
+    const verification = await verifyRevisionDigest(
+      executor,
+      payload.data.revisionId,
+      reviewId,
+      payload.data.evidenceDigest,
+    );
+    if (!verification.ok) {
+      return Response.json({ ok: false, error: verification.error }, { status: verification.status });
+    }
+
     const store = new ReviewApprovalStore(executor);
     const approval = await store.recordApprovalAndTransitionDecision({
       repositoryId,
       reviewId,
-      revisionId: parsed.data.revisionId,
-      evidenceDigest: parsed.data.evidenceDigest,
+      revisionId: payload.data.revisionId,
+      evidenceDigest: payload.data.evidenceDigest,
       approverId: auth.actorId,
-      status: parsed.data.status,
-      ...(parsed.data.reason ? { reason: parsed.data.reason } : {}),
-      ...(parsed.data.isBreakGlass !== undefined ? { isBreakGlass: parsed.data.isBreakGlass } : {}),
+      status: payload.data.status,
+      ...(payload.data.reason ? { reason: payload.data.reason } : {}),
+      ...(payload.data.isBreakGlass !== undefined ? { isBreakGlass: payload.data.isBreakGlass } : {}),
     });
 
     return Response.json({ ok: true, approval }, { status: 201 });

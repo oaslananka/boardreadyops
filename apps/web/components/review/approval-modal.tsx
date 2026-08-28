@@ -3,12 +3,17 @@
 import { useState } from "react";
 
 export interface ApprovalModalProps {
-  type: "approve" | "request_changes";
-  evidenceDigest: string;
-  isSubmitting?: boolean;
-  serverError?: string | null;
-  onConfirm: (data: { reason: string; isBreakGlass?: boolean }) => void;
-  onClose: () => void;
+  readonly type: "approve" | "request_changes";
+  readonly evidenceDigest: string;
+  readonly isSubmitting?: boolean;
+  readonly serverError?: string | null;
+  readonly onConfirm: (data: { reason: string; isBreakGlass?: boolean }) => void;
+  readonly onClose: () => void;
+}
+
+function getSubmitButtonLabel(isSubmitting: boolean, isApprove: boolean): string {
+  if (isSubmitting) return "Recording...";
+  return isApprove ? "Confirm Sign-Off" : "Submit Change Request";
 }
 
 export function ApprovalModal({
@@ -36,11 +41,19 @@ export function ApprovalModal({
     });
   }
 
+  const submitLabel = getSubmitButtonLabel(isSubmitting, isApprove);
+  const title = isApprove ? "Record Engineering Sign-Off" : "Request Hardware Changes";
+  const reasonLabel = isApprove ? "Sign-Off Notes (Optional)" : "Required Changes & Action Items *";
+  const reasonPlaceholder = isApprove
+    ? "e.g. Reviewed high-voltage clearance, thermal vias, and CAN isolation barrier. Approved for prototype run."
+    : "e.g. Clearance between ISO_CAN_VCC and GND must be increased to >= 0.50mm.";
+  const displayError = error ?? serverError;
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="approval-modal-title">
       <div className="modal-panel panel surface-raised">
         <header className="modal-header">
-          <h2 id="approval-modal-title">{isApprove ? "Record Engineering Sign-Off" : "Request Hardware Changes"}</h2>
+          <h2 id="approval-modal-title">{title}</h2>
           <button
             type="button"
             className="modal-close-button"
@@ -59,9 +72,7 @@ export function ApprovalModal({
           </div>
 
           <div className="form-group">
-            <label htmlFor="approval-reason">
-              {isApprove ? "Sign-Off Notes (Optional)" : "Required Changes & Action Items *"}
-            </label>
+            <label htmlFor="approval-reason">{reasonLabel}</label>
             <textarea
               id="approval-reason"
               rows={3}
@@ -71,11 +82,7 @@ export function ApprovalModal({
                 setReason(e.currentTarget.value);
                 setError(null);
               }}
-              placeholder={
-                isApprove
-                  ? "e.g. Reviewed high-voltage clearance, thermal vias, and CAN isolation barrier. Approved for prototype run."
-                  : "e.g. Clearance between ISO_CAN_VCC and GND must be increased to >= 0.50mm."
-              }
+              placeholder={reasonPlaceholder}
               className="form-textarea"
               required={!isApprove}
             />
@@ -95,7 +102,7 @@ export function ApprovalModal({
             </div>
           ) : null}
 
-          {error || serverError ? <div className="form-error-alert">{error || serverError}</div> : null}
+          {displayError ? <div className="form-error-alert">{displayError}</div> : null}
 
           <footer className="modal-footer">
             <button type="button" className="button button-secondary" onClick={onClose} disabled={isSubmitting}>
@@ -106,7 +113,7 @@ export function ApprovalModal({
               className={`button ${isApprove ? "button-primary" : "button-danger"}`}
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Recording..." : isApprove ? "Confirm Sign-Off" : "Submit Change Request"}
+              {submitLabel}
             </button>
           </footer>
         </form>

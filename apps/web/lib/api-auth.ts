@@ -85,6 +85,13 @@ function safeInstallationId(value: unknown): number | undefined {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function parseSafeString(value: unknown): string | null {
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+  return null;
+}
+
 export async function resolveRepositoryApiContext(
   auth: AuthenticatedApiContext,
   request: Request,
@@ -156,6 +163,7 @@ export async function resolveRepositoryApiContext(
 export interface ReviewApiContext {
   reviewId: string;
   repositoryId: string;
+  headRunId: string;
   currentRevisionId: string | null;
   executor: PgQueryExecutor;
 }
@@ -174,6 +182,7 @@ export async function resolveReviewApiContext(
     const result = await executor.query(
       `select reviews.id as review_id,
               reviews.repository_id,
+              reviews.head_run_id,
               reviews.current_revision_id,
               installations.github_installation_id
          from reviews
@@ -205,8 +214,27 @@ export async function resolveReviewApiContext(
       return Response.json({ ok: false, error: "Review not found" }, { status: 404 });
     }
 
-    const repositoryId = String(first.repository_id);
-    const currentRevisionId = first.current_revision_id ? String(first.current_revision_id) : null;
+    const repositoryId = parseSafeString(first.repository_id);
+    if (!repositoryId) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Invalid repository configuration" }, { status: 500 });
+    }
+
+    const headRunId = parseSafeString(first.head_run_id);
+    if (!headRunId) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Invalid review head run configuration" }, { status: 500 });
+    }
+
+    let currentRevisionId: string | null = null;
+    if (first.current_revision_id !== null && first.current_revision_id !== undefined) {
+      currentRevisionId = parseSafeString(first.current_revision_id);
+      if (!currentRevisionId) {
+        await executor.close();
+        return Response.json({ ok: false, error: "Invalid revision configuration" }, { status: 500 });
+      }
+    }
+
     const githubInstallationId = safeInstallationId(first.github_installation_id);
 
     if (githubInstallationId === undefined) {
@@ -227,6 +255,7 @@ export async function resolveReviewApiContext(
     return {
       reviewId,
       repositoryId,
+      headRunId,
       currentRevisionId,
       executor,
     };

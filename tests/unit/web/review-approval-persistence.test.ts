@@ -5,6 +5,10 @@ import {
   GET as getApprovals,
   POST as postApproval,
 } from "../../../apps/web/app/api/v1/reviews/[id]/approvals/route.js";
+import { POST as postAssignment } from "../../../apps/web/app/api/v1/reviews/[id]/assignments/route.js";
+import { PATCH as patchChecklist } from "../../../apps/web/app/api/v1/reviews/[id]/checklist/route.js";
+import { PATCH as patchComment } from "../../../apps/web/app/api/v1/reviews/[id]/comments/route.js";
+import { POST as postDecision } from "../../../apps/web/app/api/v1/reviews/[id]/decisions/route.js";
 import { ChecklistApprovalsTab } from "../../../apps/web/components/review/checklist-approvals-tab.js";
 import { ReviewHeader } from "../../../apps/web/components/review/review-header.js";
 import * as apiAuth from "../../../apps/web/lib/api-auth.js";
@@ -469,5 +473,227 @@ describe("Review Approval Persistence & State Lifecycle (Authoritative Architect
     expect(markup).toContain("chief.engineer@company.com");
     expect(markup).toContain("⚡ Break-Glass");
     expect(markup).toContain("High-voltage creepage meets IEC 60664.");
+  });
+
+  it("PATCH checklist route passes review and repository scope and fails closed (404) if item not in review", async () => {
+    const mockExecutor = createMockExecutor();
+    // Simulate no rows returned on scoped update
+    mockExecutor.query.mockImplementation(async (sql: string) => {
+      const norm = sql.toLowerCase().replace(/\s+/g, " ");
+      if (norm.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              review_id: reviewId,
+              repository_id: repositoryId,
+              head_run_id: "run-1",
+              current_revision_id: revisionId,
+              github_installation_id: 1001,
+            },
+          ],
+        };
+      }
+      if (norm.includes("update review_checklist_items")) {
+        return { rows: [] }; // Item not found in review scope
+      }
+      return { rows: [] };
+    });
+
+    vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+      ok: true,
+      actorId: "test-actor",
+      scopes: ["reviews:write"],
+      authType: "session",
+      installationIds: [1001],
+    });
+
+    vi.spyOn(apiAuth, "resolveReviewApiContext").mockResolvedValue({
+      reviewId,
+      repositoryId,
+      headRunId: "run-1",
+      currentRevisionId: revisionId,
+      executor: mockExecutor as unknown as PgQueryExecutor,
+    });
+
+    const params = Promise.resolve({ id: reviewId });
+    const req = new Request(`http://localhost:3000/api/v1/reviews/${reviewId}/checklist`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "rchk_unknown", completed: true }),
+    });
+
+    const res = await patchChecklist(req, { params });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Checklist item not found");
+  });
+
+  it("PATCH comments route passes review and repository scope and fails closed (404) if comment not in review", async () => {
+    const mockExecutor = createMockExecutor();
+    mockExecutor.query.mockImplementation(async (sql: string) => {
+      const norm = sql.toLowerCase().replace(/\s+/g, " ");
+      if (norm.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              review_id: reviewId,
+              repository_id: repositoryId,
+              head_run_id: "run-1",
+              current_revision_id: revisionId,
+              github_installation_id: 1001,
+            },
+          ],
+        };
+      }
+      if (norm.includes("update review_comments")) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    });
+
+    vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+      ok: true,
+      actorId: "test-actor",
+      scopes: ["reviews:write"],
+      authType: "session",
+      installationIds: [1001],
+    });
+
+    vi.spyOn(apiAuth, "resolveReviewApiContext").mockResolvedValue({
+      reviewId,
+      repositoryId,
+      headRunId: "run-1",
+      currentRevisionId: revisionId,
+      executor: mockExecutor as unknown as PgQueryExecutor,
+    });
+
+    const params = Promise.resolve({ id: reviewId });
+    const req = new Request(`http://localhost:3000/api/v1/reviews/${reviewId}/comments`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ commentId: "rcmt_unknown", status: "resolved" }),
+    });
+
+    const res = await patchComment(req, { params });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Comment not found");
+  });
+
+  it("POST decisions route verifies finding belongs to review head run and returns 404 for unknown finding", async () => {
+    const mockExecutor = createMockExecutor();
+    mockExecutor.query.mockImplementation(async (sql: string) => {
+      const norm = sql.toLowerCase().replace(/\s+/g, " ");
+      if (norm.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              review_id: reviewId,
+              repository_id: repositoryId,
+              head_run_id: "run-1",
+              current_revision_id: revisionId,
+              github_installation_id: 1001,
+            },
+          ],
+        };
+      }
+      if (norm.includes("from findings where run_id = $1")) {
+        return { rows: [] }; // Finding not in review run
+      }
+      return { rows: [] };
+    });
+
+    vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+      ok: true,
+      actorId: "test-actor",
+      scopes: ["reviews:write"],
+      authType: "session",
+      installationIds: [1001],
+    });
+
+    vi.spyOn(apiAuth, "resolveReviewApiContext").mockResolvedValue({
+      reviewId,
+      repositoryId,
+      headRunId: "run-1",
+      currentRevisionId: revisionId,
+      executor: mockExecutor as unknown as PgQueryExecutor,
+    });
+
+    const params = Promise.resolve({ id: reviewId });
+    const req = new Request(`http://localhost:3000/api/v1/reviews/${reviewId}/decisions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        findingFingerprint: "fp_unknown_unrelated",
+        disposition: "fixed",
+        reason: "Fixed trace clearance in board layout",
+        owner: "engineer@company.com",
+        evidenceDigest,
+      }),
+    });
+
+    const res = await postDecision(req, { params });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Finding not found in review run");
+  });
+
+  it("POST assignments route verifies finding belongs to review head run and returns 404 for unknown finding", async () => {
+    const mockExecutor = createMockExecutor();
+    mockExecutor.query.mockImplementation(async (sql: string) => {
+      const norm = sql.toLowerCase().replace(/\s+/g, " ");
+      if (norm.includes("from reviews")) {
+        return {
+          rows: [
+            {
+              review_id: reviewId,
+              repository_id: repositoryId,
+              head_run_id: "run-1",
+              current_revision_id: revisionId,
+              github_installation_id: 1001,
+            },
+          ],
+        };
+      }
+      if (norm.includes("from findings where run_id = $1")) {
+        return { rows: [] };
+      }
+      return { rows: [] };
+    });
+
+    vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+      ok: true,
+      actorId: "test-actor",
+      scopes: ["reviews:write"],
+      authType: "session",
+      installationIds: [1001],
+    });
+
+    vi.spyOn(apiAuth, "resolveReviewApiContext").mockResolvedValue({
+      reviewId,
+      repositoryId,
+      headRunId: "run-1",
+      currentRevisionId: revisionId,
+      executor: mockExecutor as unknown as PgQueryExecutor,
+    });
+
+    const params = Promise.resolve({ id: reviewId });
+    const req = new Request(`http://localhost:3000/api/v1/reviews/${reviewId}/assignments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        findingFingerprint: "fp_unknown_unrelated",
+        assignee: "alice@company.com",
+      }),
+    });
+
+    const res = await postAssignment(req, { params });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Finding not found in review run");
   });
 });

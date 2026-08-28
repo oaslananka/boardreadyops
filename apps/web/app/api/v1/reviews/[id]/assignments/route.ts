@@ -60,8 +60,17 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     return reviewContext;
   }
 
-  const { repositoryId, executor } = reviewContext;
+  const { repositoryId, headRunId, executor } = reviewContext;
   try {
+    const findingCheck = await executor.query(
+      `SELECT 1 FROM findings WHERE run_id = $1 AND (fingerprint = $2 OR id = $2) LIMIT 1`,
+      [headRunId, parsed.data.findingFingerprint],
+    );
+    const findingRows = (findingCheck as { rows?: unknown[] }).rows ?? [];
+    if (findingRows.length === 0) {
+      return Response.json({ ok: false, error: "Finding not found in review run" }, { status: 404 });
+    }
+
     const store = new ReviewCollaborationStore(executor);
     const assignment = await store.assignFinding({
       repositoryId,

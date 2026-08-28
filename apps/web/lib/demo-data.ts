@@ -91,13 +91,13 @@ export interface DemoReview {
   headSnapshots?: SnapshotArtifact[] | undefined;
 }
 
-export type DemoChangedFile = {
+type DemoChangedFile = {
   path: string;
   status: "modified" | "added" | "deleted";
   changesCount: number;
 };
 
-export interface DemoBomChange {
+interface DemoBomChange {
   reference: string;
   changeType: "added" | "removed" | "modified";
   baseMpn?: string | undefined;

@@ -107,10 +107,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     return reviewContext;
   }
 
-  const { executor } = reviewContext;
+  const { repositoryId, executor } = reviewContext;
   try {
     const store = new ReviewApprovalStore(executor);
-    const updated = await store.updateChecklistItem(parsed.data.id, parsed.data.completed, auth.actorId);
+    const updated = await store.updateChecklistItem(parsed.data.id, parsed.data.completed, auth.actorId, {
+      reviewId,
+      repositoryId,
+    });
     if (!updated) {
       return Response.json({ ok: false, error: "Checklist item not found" }, { status: 404 });
     }

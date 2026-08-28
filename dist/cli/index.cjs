@@ -55216,10 +55216,10 @@ function resolveGitExecutable(options = {}) {
   const candidates = [];
   if (platform === "win32") {
     candidates.push(
-      "C:\\Program Files\\Git\\cmd\\git.exe",
-      "C:\\Program Files\\Git\\bin\\git.exe",
-      "C:\\Program Files (x86)\\Git\\cmd\\git.exe",
-      "C:\\Program Files (x86)\\Git\\bin\\git.exe"
+      String.raw`C:\Program Files\Git\cmd\git.exe`,
+      String.raw`C:\Program Files\Git\bin\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\cmd\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\bin\git.exe`
     );
   } else if (platform === "darwin") {
     candidates.push("/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git");

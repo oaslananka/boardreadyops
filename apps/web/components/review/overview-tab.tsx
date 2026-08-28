@@ -1,7 +1,32 @@
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
 
-export function OverviewTab({ review }: { review: DemoReview }) {
+function getReadinessTone(decision: string, isReadyForFab: boolean): "danger" | "ready" | "blocked" {
+  if (decision === "changes_requested") return "danger";
+  return isReadyForFab ? "ready" : "blocked";
+}
+
+function getReadinessTitle(decision: string, isReadyForFab: boolean): string {
+  if (decision === "changes_requested") return "Changes Requested — Fabrication Blocked";
+  return isReadyForFab ? "Ready for Fabrication" : "Fabrication Gate Blocked";
+}
+
+function getReadinessDescription(
+  decision: string,
+  isReadyForFab: boolean,
+  blockingCount: number,
+  pendingChecklistCount: number,
+): string {
+  if (decision === "changes_requested") {
+    return "A sign-off authority has requested changes. Hardware revision must be updated and approved.";
+  }
+  if (isReadyForFab) {
+    return "All checklist items complete, no blocking findings, and evidence digest approved.";
+  }
+  return `${blockingCount} blocking finding(s), ${pendingChecklistCount} checklist item(s) pending.`;
+}
+
+export function OverviewTab({ review }: { readonly review: DemoReview }) {
   const blockingFindings = review.findings.filter(
     (f) => (f.severity === "error" || f.severity === "critical") && f.disposition === "open",
   );
@@ -19,28 +44,22 @@ export function OverviewTab({ review }: { review: DemoReview }) {
     completedChecklist.length === review.checklist.length &&
     validApprovals.length > 0;
 
+  const readinessTone = getReadinessTone(review.decision, isReadyForFab);
+  const readinessTitle = getReadinessTitle(review.decision, isReadyForFab);
+  const pendingChecklistCount = review.checklist.length - completedChecklist.length;
+  const readinessDescription = getReadinessDescription(
+    review.decision,
+    isReadyForFab,
+    blockingFindings.length,
+    pendingChecklistCount,
+  );
+
   return (
     <div className="overview-tab-content">
-      <section
-        className={`decision-band readiness-band ${
-          review.decision === "changes_requested" ? "danger" : isReadyForFab ? "ready" : "blocked"
-        }`}
-      >
+      <section className={`decision-band readiness-band ${readinessTone}`}>
         <div className="readiness-lead">
-          <h3>
-            {review.decision === "changes_requested"
-              ? "Changes Requested — Fabrication Blocked"
-              : isReadyForFab
-                ? "Ready for Fabrication"
-                : "Fabrication Gate Blocked"}
-          </h3>
-          <p>
-            {review.decision === "changes_requested"
-              ? "A sign-off authority has requested changes. Hardware revision must be updated and approved."
-              : isReadyForFab
-                ? "All checklist items complete, no blocking findings, and evidence digest approved."
-                : `${blockingFindings.length} blocking finding(s), ${review.checklist.length - completedChecklist.length} checklist item(s) pending.`}
-          </p>
+          <h3>{readinessTitle}</h3>
+          <p>{readinessDescription}</p>
         </div>
         <div className="metric-strip">
           <span className="metric-pill">

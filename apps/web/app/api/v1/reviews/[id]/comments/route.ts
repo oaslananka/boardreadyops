@@ -116,10 +116,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     return reviewContext;
   }
 
-  const { executor } = reviewContext;
+  const { repositoryId, executor } = reviewContext;
   try {
     const store = new ReviewCommentStore(executor);
-    const updated = await store.updateCommentStatus(parsed.data.commentId, parsed.data.status);
+    const updated = await store.updateCommentStatus(parsed.data.commentId, parsed.data.status, {
+      reviewId,
+      repositoryId,
+    });
     if (!updated) {
       return Response.json({ ok: false, error: "Comment not found" }, { status: 404 });
     }

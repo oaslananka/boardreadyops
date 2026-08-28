@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as cloudConfig from "../../../apps/web/lib/cloud-runtime-config.js";
 import { loadServerReview } from "../../../apps/web/lib/server-review-loader.js";
 import type { UserSession } from "../../../apps/web/lib/user-session.js";
@@ -21,6 +21,11 @@ vi.mock("../../../packages/db/src/pg-executor.js", () => ({
 }));
 
 describe("Server-Side Authoritative Review Loader (Security & Durability)", () => {
+  beforeEach(() => {
+    mockLoaderQuery.mockReset();
+    mockLoaderClose.mockReset();
+  });
+
   const reviewId = "rev_db_real_42";
   const now = new Date().toISOString();
   const authorizedSession: UserSession = {
@@ -294,12 +299,12 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
         };
       }
 
-      if (norm.includes("from review_revisions where id = $1 and review_id = $2")) {
+      if (norm.includes("from review_revisions")) {
         // Returns the exact requested revision id
         return {
           rows: [
             {
-              id: params[0],
+              id: (params[0] as string) ?? "rev_specific_v1",
               sequence: 1,
               base_run_id: null,
               head_run_id: "run-hw-v1",
@@ -457,7 +462,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
         };
       }
 
-      if (norm.includes("from runner_artifacts")) {
+      if (norm.includes("from artifacts")) {
         return {
           rows: [
             {
@@ -465,7 +470,7 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
               kind: "gerber",
               name: "gerbers.zip",
               role: "gerber",
-              declared_bytes: 409600,
+              bytes: 409600,
               sha256: "c".repeat(64),
             },
           ],
