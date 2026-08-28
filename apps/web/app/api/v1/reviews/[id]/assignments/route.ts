@@ -1,8 +1,6 @@
 import { ReviewCollaborationStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../../../lib/cloud-runtime-config.js";
+import { authenticateApiRequest, resolveReviewApiContext } from "../../../../../../lib/api-auth.js";
 
 export const runtime = "nodejs";
 
@@ -19,12 +17,12 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
   const { id: reviewId } = await props.params;
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { executor } = reviewContext;
   try {
     const store = new ReviewCollaborationStore(executor);
     const assignments = await store.listAssignmentsForReview(reviewId);
@@ -57,16 +55,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     return Response.json({ ok: false, error: "Invalid assignment payload" }, { status: 400 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { repositoryId, executor } = reviewContext;
   try {
     const store = new ReviewCollaborationStore(executor);
     const assignment = await store.assignFinding({
-      repositoryId: auth.repositoryId ?? "default-repo",
+      repositoryId,
       reviewId,
       findingFingerprint: parsed.data.findingFingerprint,
       assignee: parsed.data.assignee,
@@ -102,12 +100,12 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
     return Response.json({ ok: false, error: "Invalid unassign payload" }, { status: 400 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { executor } = reviewContext;
   try {
     const store = new ReviewCollaborationStore(executor);
     const unassigned = await store.unassignFinding(reviewId, parsed.data.findingFingerprint, parsed.data.assignee);

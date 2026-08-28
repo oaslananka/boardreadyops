@@ -1,8 +1,6 @@
 import { ReviewApprovalStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../../../lib/cloud-runtime-config.js";
+import { authenticateApiRequest, resolveReviewApiContext } from "../../../../../../lib/api-auth.js";
 
 export const runtime = "nodejs";
 
@@ -22,15 +20,13 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
   const { id: reviewId } = await props.params;
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
+  const ctx = await resolveReviewApiContext(reviewId, auth);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new ReviewApprovalStore(executor);
-    const approvals = await store.listApprovalsForReview(reviewId);
+    const approvals = await store.listApprovalsForReview(reviewId, repositoryId);
     return Response.json({ ok: true, approvals });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to load approvals";
@@ -48,28 +44,59 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   const { id: reviewId } = await props.params;
 
+  const ctx = await resolveReviewApiContext(reviewId, auth);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, currentRevisionId, executor } = ctx;
+
   let body: unknown;
   try {
     body = await request.json();
   } catch {
+    await executor.close();
     return Response.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
   const parsed = recordApprovalSchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json({ ok: false, error: "Invalid approval payload" }, { status: 400 });
+    await executor.close();
+    return Response.json(
+      { ok: false, error: "Invalid approval payload", issues: parsed.error.issues },
+      { status: 400 },
+    );
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  // 1. Verify revision is current active revision
+  if (currentRevisionId && parsed.data.revisionId !== currentRevisionId) {
+    await executor.close();
+    return Response.json(
+      { ok: false, error: "Submitted revision is not the current active review revision" },
+      { status: 409 },
+    );
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
+    // 2. Authoritatively verify revision exists and evidenceDigest matches
+    const revisionResult = await executor.query(
+      `SELECT id, evidence_digest FROM review_revisions WHERE id = $1 AND review_id = $2 LIMIT 1`,
+      [parsed.data.revisionId, reviewId],
+    );
+    const revisionRows = (revisionResult as { rows?: { id: string; evidence_digest: string }[] }).rows ?? [];
+    const revision = revisionRows[0];
+    if (!revision) {
+      return Response.json({ ok: false, error: "Review revision not found" }, { status: 404 });
+    }
+
+    if (revision.evidence_digest !== parsed.data.evidenceDigest) {
+      return Response.json(
+        { ok: false, error: "Evidence digest does not match the active review revision" },
+        { status: 409 },
+      );
+    }
+
+    // 3. Atomically persist approval and synchronize review decision in a single CTE
     const store = new ReviewApprovalStore(executor);
-    const approval = await store.recordApproval({
-      repositoryId: auth.repositoryId ?? "default-repo",
+    const approval = await store.recordApprovalAndTransitionDecision({
+      repositoryId,
       reviewId,
       revisionId: parsed.data.revisionId,
       evidenceDigest: parsed.data.evidenceDigest,
@@ -81,8 +108,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     return Response.json({ ok: true, approval }, { status: 201 });
   } catch (error) {
+    const isConflict =
+      (error && typeof error === "object" && "isConflict" in error && Boolean(error.isConflict)) ||
+      (error instanceof Error && error.message.includes("Conflicting approval"));
     const message = error instanceof Error ? error.message : "Failed to record approval";
-    return Response.json({ ok: false, error: message }, { status: 500 });
+    return Response.json({ ok: false, error: message }, { status: isConflict ? 409 : 500 });
   } finally {
     await executor.close();
   }

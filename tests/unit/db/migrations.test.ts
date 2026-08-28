@@ -97,6 +97,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0054_governance.sql",
       "0055_marketplace_billing_events.sql",
       "0056_marketplace_subscription_state.sql",
+      "0057_review_approval_uniqueness.sql",
     ]);
   });
 
@@ -109,6 +110,15 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("requested_by = 'github_marketplace'");
     expect(sql).toContain("scope in ('organization', 'user')");
     expect(sql).toContain("status in ('pending', 'running', 'blocked_by_hold')");
+  });
+
+  it("enforces review approval uniqueness for active decisions in schema v57", async () => {
+    const sql = (await readFile(join(migrationsDir, "0057_review_approval_uniqueness.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("uq_review_approval_active_decision");
+    expect(sql).toContain("unique index if not exists");
+    expect(sql).toContain("on review_approvals (review_id, revision_id, approver_id, status)");
+    expect(sql).toContain("status in ('approved', 'changes_requested')");
   });
 
   it("indexes canceled Marketplace subscriptions by stable installation id in schema v56", async () => {

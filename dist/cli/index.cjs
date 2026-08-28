@@ -16535,7 +16535,7 @@ var require_pattern2 = __commonJS({
       const absolute = [];
       const relative = [];
       for (const pattern of patterns) {
-        if (isAbsolute(pattern)) {
+        if (isAbsolute2(pattern)) {
           absolute.push(pattern);
         } else {
           relative.push(pattern);
@@ -16544,10 +16544,10 @@ var require_pattern2 = __commonJS({
       return [absolute, relative];
     }
     exports2.partitionAbsoluteAndRelative = partitionAbsoluteAndRelative;
-    function isAbsolute(pattern) {
+    function isAbsolute2(pattern) {
       return path66.isAbsolute(pattern);
     }
-    exports2.isAbsolute = isAbsolute;
+    exports2.isAbsolute = isAbsolute2;
   }
 });
 
@@ -16962,11 +16962,11 @@ var require_out = __commonJS({
       async.read(path66, getSettings(optionsOrSettingsOrCallback), callback);
     }
     exports2.stat = stat3;
-    function statSync(path66, optionsOrSettings) {
+    function statSync2(path66, optionsOrSettings) {
       const settings = getSettings(optionsOrSettings);
       return sync.read(path66, settings);
     }
-    exports2.statSync = statSync;
+    exports2.statSync = statSync2;
     function getSettings(settingsOrOptions = {}) {
       if (settingsOrOptions instanceof settings_1.default) {
         return settingsOrOptions;
@@ -35998,7 +35998,7 @@ __export(index_exports, {
   runCli: () => runCli
 });
 module.exports = __toCommonJS(index_exports);
-var import_node_path66 = __toESM(require("node:path"), 1);
+var import_node_path67 = __toESM(require("node:path"), 1);
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -55188,18 +55188,67 @@ function mapFindingsForCloud(findings) {
   return findings.map(mapFindingForCloud);
 }
 
+// src/util/git-resolver.ts
+var import_node_fs5 = require("node:fs");
+var import_node_path59 = require("node:path");
+function defaultIsRegularFile(filePath) {
+  try {
+    return (0, import_node_fs5.statSync)(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+function resolveGitExecutable(options = {}) {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
+  const checkFile = options.isRegularFile ?? defaultIsRegularFile;
+  const override = env.BOARDREADYOPS_GIT_PATH;
+  if (override !== void 0 && override.trim() !== "") {
+    const trimmed = override.trim();
+    if (!(0, import_node_path59.isAbsolute)(trimmed)) {
+      throw new Error(`BOARDREADYOPS_GIT_PATH must be an absolute path, got: "${trimmed}"`);
+    }
+    if (!checkFile(trimmed)) {
+      throw new Error(`BOARDREADYOPS_GIT_PATH does not point to an existing regular file: "${trimmed}"`);
+    }
+    return trimmed;
+  }
+  const candidates = [];
+  if (platform === "win32") {
+    candidates.push(
+      "C:\\Program Files\\Git\\cmd\\git.exe",
+      "C:\\Program Files\\Git\\bin\\git.exe",
+      "C:\\Program Files (x86)\\Git\\cmd\\git.exe",
+      "C:\\Program Files (x86)\\Git\\bin\\git.exe"
+    );
+  } else if (platform === "darwin") {
+    candidates.push("/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git");
+  } else {
+    candidates.push("/usr/bin/git", "/usr/local/bin/git");
+  }
+  for (const candidate of candidates) {
+    if (checkFile(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error(
+    "Safe git executable not found in standard system locations. Set the BOARDREADYOPS_GIT_PATH environment variable to the absolute path of your git binary."
+  );
+}
+
 // src/cli/commands/review.ts
 function getGitCommitSha(ref = "HEAD") {
   try {
-    return (0, import_node_child_process4.execFileSync)("git", ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const gitExec = resolveGitExecutable();
+    return (0, import_node_child_process4.execFileSync)(gitExec, ["rev-parse", ref], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return "0".repeat(40);
   }
 }
 function getGitOriginRepo() {
   try {
-    const url2 = (0, import_node_child_process4.execFileSync)("git", ["remote", "get-url", "origin"], {
-      // NOSONAR
+    const gitExec = resolveGitExecutable();
+    const url2 = (0, import_node_child_process4.execFileSync)(gitExec, ["remote", "get-url", "origin"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
@@ -55407,14 +55456,14 @@ async function reviewVerifyCommand(target, options, streams) {
 }
 
 // src/cli/commands/runner.ts
-var import_node_path64 = __toESM(require("node:path"), 1);
+var import_node_path65 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
 var import_node_child_process5 = require("node:child_process");
 var import_node_crypto14 = require("node:crypto");
 var import_promises22 = require("node:fs/promises");
 var import_node_os4 = __toESM(require("node:os"), 1);
-var import_node_path59 = __toESM(require("node:path"), 1);
+var import_node_path60 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-registration-enrollment-store.ts
 var import_node_crypto13 = require("node:crypto");
@@ -55614,8 +55663,8 @@ var defaultDependencies = {
 };
 async function issueRunnerEnrollment(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path59.default.resolve(options.databaseUrlFile);
-  const tokenOutputFile = import_node_path59.default.resolve(options.tokenOutputFile);
+  const databaseUrlFile = import_node_path60.default.resolve(options.databaseUrlFile);
+  const tokenOutputFile = import_node_path60.default.resolve(options.tokenOutputFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
   await prepareTokenOutput(tokenOutputFile);
   const databaseUrl = (await (0, import_promises22.readFile)(databaseUrlFile, "utf8")).trim();
@@ -55660,7 +55709,7 @@ async function issueRunnerEnrollment(options, overrides = {}) {
 }
 async function revokeRunnerRegistration(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path59.default.resolve(options.databaseUrlFile);
+  const databaseUrlFile = import_node_path60.default.resolve(options.databaseUrlFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
   const databaseUrl = (await (0, import_promises22.readFile)(databaseUrlFile, "utf8")).trim();
   validateDatabaseUrl(databaseUrl);
@@ -55681,8 +55730,8 @@ async function revokeRunnerRegistration(options, overrides = {}) {
 async function executePsqlQuery(databaseUrl, sql, params) {
   const invocation = psqlInvocation(sql, params);
   const connection = parseDatabaseConnection(databaseUrl);
-  const secretDirectory = await (0, import_promises22.mkdtemp)(import_node_path59.default.join(import_node_os4.default.tmpdir(), "boardreadyops-psql-"));
-  const passwordFile = import_node_path59.default.join(secretDirectory, "pgpass");
+  const secretDirectory = await (0, import_promises22.mkdtemp)(import_node_path60.default.join(import_node_os4.default.tmpdir(), "boardreadyops-psql-"));
+  const passwordFile = import_node_path60.default.join(secretDirectory, "pgpass");
   try {
     if (process.platform !== "win32") await (0, import_promises22.chmod)(secretDirectory, 448);
     await (0, import_promises22.writeFile)(
@@ -55926,7 +55975,7 @@ async function prepareTokenOutput(filePath) {
   if (await (0, import_promises22.stat)(filePath).catch(() => void 0)) {
     throw new Error(`refusing to overwrite an existing enrollment token file: ${filePath}`);
   }
-  const directory = import_node_path59.default.dirname(filePath);
+  const directory = import_node_path60.default.dirname(filePath);
   const existing = await (0, import_promises22.stat)(directory).catch(() => void 0);
   if (existing && !existing.isDirectory()) {
     throw new Error(`enrollment token output parent is not a directory: ${directory}`);
@@ -55958,7 +56007,7 @@ init_version();
 var import_node_crypto16 = require("node:crypto");
 var import_promises24 = require("node:fs/promises");
 var import_node_os5 = __toESM(require("node:os"), 1);
-var import_node_path60 = __toESM(require("node:path"), 1);
+var import_node_path61 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
@@ -56214,11 +56263,11 @@ var privateKeyName = "runner-private-key.pem";
 var publicKeyName = "runner-public-key.pem";
 var identityFileName = "runner.json";
 function defaultRunnerIdentityDirectory() {
-  return import_node_path60.default.join(import_node_os5.default.homedir(), ".config", "boardreadyops", "runner");
+  return import_node_path61.default.join(import_node_os5.default.homedir(), ".config", "boardreadyops", "runner");
 }
 async function activateRunnerIdentity(options) {
   const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
-  const enrollmentTokenFile = import_node_path60.default.resolve(options.enrollmentTokenFile);
+  const enrollmentTokenFile = import_node_path61.default.resolve(options.enrollmentTokenFile);
   await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
   const enrollmentToken = (await (0, import_promises24.readFile)(enrollmentTokenFile, "utf8")).trim();
   if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
@@ -56226,11 +56275,11 @@ async function activateRunnerIdentity(options) {
   }
   const capabilities = normalizeCapabilities(options.capabilities ?? []);
   const labels = normalizeCapabilities(options.labels ?? []);
-  const identityDirectory = import_node_path60.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
+  const identityDirectory = import_node_path61.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
   await prepareIdentityDirectory(identityDirectory);
-  const identityFile = import_node_path60.default.join(identityDirectory, identityFileName);
-  const privateKeyFile = import_node_path60.default.join(identityDirectory, privateKeyName);
-  const publicKeyFile = import_node_path60.default.join(identityDirectory, publicKeyName);
+  const identityFile = import_node_path61.default.join(identityDirectory, identityFileName);
+  const privateKeyFile = import_node_path61.default.join(identityDirectory, privateKeyName);
+  const publicKeyFile = import_node_path61.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
   const generated = (0, import_node_crypto16.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -56276,8 +56325,8 @@ async function activateRunnerIdentity(options) {
   };
 }
 async function loadRunnerIdentity(identityFileInput) {
-  const identityFile = import_node_path60.default.resolve(identityFileInput);
-  await assertPrivateDirectory(import_node_path60.default.dirname(identityFile), "runner identity directory");
+  const identityFile = import_node_path61.default.resolve(identityFileInput);
+  await assertPrivateDirectory(import_node_path61.default.dirname(identityFile), "runner identity directory");
   await assertPrivateFile2(identityFile, "runner identity file");
   let value;
   try {
@@ -56286,7 +56335,7 @@ async function loadRunnerIdentity(identityFileInput) {
     throw new Error("runner identity file is not valid JSON");
   }
   const identity = parseIdentity(value);
-  const directory = import_node_path60.default.dirname(identityFile);
+  const directory = import_node_path61.default.dirname(identityFile);
   const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
   const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
   await assertPrivateFile2(privateKeyPath, "runner private key file");
@@ -56344,14 +56393,14 @@ function normalizeCapabilities(values) {
   return normalized;
 }
 function relativeFile(value, name) {
-  if (typeof value !== "string" || value.length < 1 || import_node_path60.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
+  if (typeof value !== "string" || value.length < 1 || import_node_path61.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
     throw new Error(`runner identity ${name} must be a relative file within the identity directory`);
   }
   return value;
 }
 function resolveIdentityChild(directory, relative, name) {
-  const resolved = import_node_path60.default.resolve(directory, relative);
-  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path60.default.sep}`)) {
+  const resolved = import_node_path61.default.resolve(directory, relative);
+  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path61.default.sep}`)) {
     throw new Error(`runner identity ${name} escapes the identity directory`);
   }
   return resolved;
@@ -56397,22 +56446,22 @@ async function writeExclusive(filePath, content, mode) {
 // src/runner/worker.ts
 var import_promises26 = require("node:fs/promises");
 var import_node_os6 = __toESM(require("node:os"), 1);
-var import_node_path62 = __toESM(require("node:path"), 1);
+var import_node_path63 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/source.ts
 var import_node_child_process6 = require("node:child_process");
 var import_promises25 = require("node:fs/promises");
-var import_node_path61 = __toESM(require("node:path"), 1);
+var import_node_path62 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
-  const workspaceRoot = import_node_path61.default.resolve(options.workspaceRoot);
+  const workspaceRoot = import_node_path62.default.resolve(options.workspaceRoot);
   await (0, import_promises25.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
   if (process.platform !== "win32") await (0, import_promises25.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises25.mkdtemp)(import_node_path61.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  const workspace = await (0, import_promises25.mkdtemp)(import_node_path62.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   if (process.platform !== "win32") await (0, import_promises25.chmod)(workspace, 448);
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
@@ -56488,9 +56537,9 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
-  const root = import_node_path61.default.resolve(repositoryMirrorRoot);
-  const candidate = import_node_path61.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
-  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path61.default.sep}`)) {
+  const root = import_node_path62.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path62.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path62.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
   return candidate;
@@ -56530,7 +56579,7 @@ var defaultDependencies2 = {
   log: () => void 0
 };
 function defaultRunnerWorkspaceRoot() {
-  return import_node_path62.default.join(import_node_os6.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
+  return import_node_path63.default.join(import_node_os6.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
 async function runRunnerWorkerOnce(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
@@ -56539,7 +56588,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
   const workspaceRoot = runnerActiveWorkspaceRoot(
-    import_node_path62.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path63.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   const claim = await client.claim({
@@ -56683,7 +56732,7 @@ async function serveRunnerWorker(options, overrides = {}) {
   const identity = await dependencies.loadIdentity(options.identityFile);
   if (options.signal?.aborted) return;
   const recovered = await dependencies.recoverCrashWorkspaces(
-    import_node_path62.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path63.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   if (recovered > 0) {
@@ -56865,11 +56914,11 @@ async function bestEffortRelinquish(client, job, reason, message) {
   }).catch(() => void 0);
 }
 function runnerActiveWorkspaceRoot(workspaceRoot, runnerId) {
-  return import_node_path62.default.join(import_node_path62.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
+  return import_node_path63.default.join(import_node_path63.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
 }
 async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
-  const root = import_node_path62.default.resolve(workspaceRoot);
-  const namespace = import_node_path62.default.join(root, ".boardreadyops-active");
+  const root = import_node_path63.default.resolve(workspaceRoot);
+  const namespace = import_node_path63.default.join(root, ".boardreadyops-active");
   const namespaceInfo = await (0, import_promises26.lstat)(namespace).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
@@ -56936,31 +56985,31 @@ var RunnerShutdownError = class extends Error {
 // src/cli/runner-pipeline.ts
 var import_node_crypto17 = require("node:crypto");
 var import_promises27 = require("node:fs/promises");
-var import_node_path63 = __toESM(require("node:path"), 1);
+var import_node_path64 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
 async function executeRunnerPipeline(workspace, job, options) {
   options.signal?.throwIfAborted();
-  const relativeOutputDirectory = import_node_path63.default.join(".boardreadyops-runner", job.executionAttemptId);
-  const outputDirectory2 = import_node_path63.default.join(workspace, relativeOutputDirectory);
+  const relativeOutputDirectory = import_node_path64.default.join(".boardreadyops-runner", job.executionAttemptId);
+  const outputDirectory2 = import_node_path64.default.join(workspace, relativeOutputDirectory);
   await (0, import_promises27.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
   const targets = [
     {
       kind: "report/json",
       name: "boardreadyops-result.json",
       role: "primary",
-      relative: import_node_path63.default.join(relativeOutputDirectory, "result.json")
+      relative: import_node_path64.default.join(relativeOutputDirectory, "result.json")
     },
     {
       kind: "report/sarif",
       name: "boardreadyops-result.sarif",
       role: "sarif",
-      relative: import_node_path63.default.join(relativeOutputDirectory, "result.sarif")
+      relative: import_node_path64.default.join(relativeOutputDirectory, "result.sarif")
     },
     {
       kind: "report/markdown",
       name: "boardreadyops-result.md",
       role: "summary",
-      relative: import_node_path63.default.join(relativeOutputDirectory, "result.md")
+      relative: import_node_path64.default.join(relativeOutputDirectory, "result.md")
     }
   ];
   const output = new import_node_stream.Writable({ write: (_chunk, _encoding, callback) => callback() });
@@ -56984,7 +57033,7 @@ async function executeRunnerPipeline(workspace, job, options) {
     options.signal ? { signal: options.signal } : {}
   );
   options.signal?.throwIfAborted();
-  const report = await readRunReport(import_node_path63.default.join(workspace, targets[0].relative));
+  const report = await readRunReport(import_node_path64.default.join(workspace, targets[0].relative));
   const runnerReport = report ? {
     summary: {
       total: report.summary.total,
@@ -57018,7 +57067,7 @@ async function executeRunnerPipeline(workspace, job, options) {
   } : void 0;
   const artifacts = [];
   for (const target of targets) {
-    const filePath = import_node_path63.default.join(workspace, target.relative);
+    const filePath = import_node_path64.default.join(workspace, target.relative);
     const artifact = await runnerArtifact(filePath, target.kind, target.name, target.role).catch(() => void 0);
     if (artifact) artifacts.push(artifact);
   }
@@ -57054,12 +57103,12 @@ async function readRunReport(filePath) {
 async function runnerIssueEnrollmentCommand(options, streams) {
   try {
     const issued = await issueRunnerEnrollment({
-      databaseUrlFile: import_node_path64.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path65.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       name: options.name,
       scope: options.scope,
       allowedRepositories: options.repository ?? [],
-      tokenOutputFile: import_node_path64.default.resolve(options.tokenOutput),
+      tokenOutputFile: import_node_path65.default.resolve(options.tokenOutput),
       ...options.ttlSeconds === void 0 ? {} : { ttlSeconds: options.ttlSeconds }
     });
     writeRunnerOutput(
@@ -57083,7 +57132,7 @@ async function runnerIssueEnrollmentCommand(options, streams) {
 async function runnerRevokeRegistrationCommand(options, streams) {
   try {
     const revoked = await revokeRunnerRegistration({
-      databaseUrlFile: import_node_path64.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path65.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       registrationId: options.registrationId,
       actorId: options.actorId,
@@ -57106,8 +57155,8 @@ async function runnerActivateCommand(options, streams) {
   try {
     const activated = await activateRunnerIdentity({
       controlPlaneUrl: options.url,
-      enrollmentTokenFile: import_node_path64.default.resolve(options.enrollmentTokenFile),
-      identityDirectory: import_node_path64.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
+      enrollmentTokenFile: import_node_path65.default.resolve(options.enrollmentTokenFile),
+      identityDirectory: import_node_path65.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
       capabilities: options.capability ?? [],
       labels: options.label ?? []
     });
@@ -57187,7 +57236,7 @@ function workerOptions(options) {
     identityFile: identityPath(options),
     runnerVersion: boardReadyVersion,
     workspaceRoot: workspacePath(options),
-    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path64.default.resolve(options.repositoryMirrorRoot) },
+    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path65.default.resolve(options.repositoryMirrorRoot) },
     ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },
     ...options.pollSeconds === void 0 ? {} : { pollSeconds: options.pollSeconds },
     requireKicad: options.requireKicad ?? true,
@@ -57196,10 +57245,10 @@ function workerOptions(options) {
   };
 }
 function identityPath(options) {
-  return import_node_path64.default.resolve(options.identity ?? import_node_path64.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
+  return import_node_path65.default.resolve(options.identity ?? import_node_path65.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
 }
 function workspacePath(options) {
-  return import_node_path64.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  return import_node_path65.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
 }
 function createRunnerLogger(stream, format) {
   return (event, fields = {}) => {
@@ -57227,7 +57276,7 @@ function safeMessage(error51) {
 }
 
 // src/cli/commands/sbom.ts
-var import_node_path65 = __toESM(require("node:path"), 1);
+var import_node_path66 = __toESM(require("node:path"), 1);
 init_t();
 
 // src/report/hbom.ts
@@ -57352,7 +57401,7 @@ async function sbomCommand(pathInput, options, streams) {
     return 2;
   }
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path65.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path66.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     for (const error51 of loaded.errors) {
@@ -57386,7 +57435,7 @@ async function writeHbom(root, output, content, stdout) {
     stdout.write(content);
     return;
   }
-  await writeTextFile(import_node_path65.default.resolve(root, normalizePathInput(output)), content);
+  await writeTextFile(import_node_path66.default.resolve(root, normalizePathInput(output)), content);
 }
 
 // schemas/agent-plan.schema.json
@@ -59147,7 +59196,7 @@ function isCommanderDisplay(error51) {
   return error51 instanceof Error && "code" in error51 && (error51.code === "commander.helpDisplayed" || error51.code === "commander.version");
 }
 var cliEntry = process.argv.at(1);
-var cliEntryName = cliEntry ? import_node_path66.default.basename(cliEntry) : "";
+var cliEntryName = cliEntry ? import_node_path67.default.basename(cliEntry) : "";
 if (cliEntry && !process.env.VITEST && (cliEntryName === "boardreadyops" || cliEntryName === "index.ts" || cliEntryName === "index.js" || cliEntryName === "index.cjs")) {
   void runCli(process.argv.slice(2)).then((code) => {
     process.exitCode = code;

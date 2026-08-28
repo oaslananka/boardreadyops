@@ -14,17 +14,32 @@ export function OverviewTab({ review }: { review: DemoReview }) {
   );
 
   const isReadyForFab =
-    blockingFindings.length === 0 && completedChecklist.length === review.checklist.length && validApprovals.length > 0;
+    review.decision === "approved" &&
+    blockingFindings.length === 0 &&
+    completedChecklist.length === review.checklist.length &&
+    validApprovals.length > 0;
 
   return (
     <div className="overview-tab-content">
-      <section className={`decision-band readiness-band ${isReadyForFab ? "ready" : "blocked"}`}>
+      <section
+        className={`decision-band readiness-band ${
+          review.decision === "changes_requested" ? "danger" : isReadyForFab ? "ready" : "blocked"
+        }`}
+      >
         <div className="readiness-lead">
-          <h3>{isReadyForFab ? "Ready for Fabrication" : "Fabrication Gate Blocked"}</h3>
+          <h3>
+            {review.decision === "changes_requested"
+              ? "Changes Requested — Fabrication Blocked"
+              : isReadyForFab
+                ? "Ready for Fabrication"
+                : "Fabrication Gate Blocked"}
+          </h3>
           <p>
-            {isReadyForFab
-              ? "All checklist items complete, no blocking findings, and evidence digest approved."
-              : `${blockingFindings.length} blocking finding(s), ${review.checklist.length - completedChecklist.length} checklist item(s) pending.`}
+            {review.decision === "changes_requested"
+              ? "A sign-off authority has requested changes. Hardware revision must be updated and approved."
+              : isReadyForFab
+                ? "All checklist items complete, no blocking findings, and evidence digest approved."
+                : `${blockingFindings.length} blocking finding(s), ${review.checklist.length - completedChecklist.length} checklist item(s) pending.`}
           </p>
         </div>
         <div className="metric-strip">
@@ -48,13 +63,21 @@ export function OverviewTab({ review }: { review: DemoReview }) {
 
       <Panel title="Changed Hardware Surfaces" tone="default">
         <div className="changed-files-list">
-          {review.changedFiles.map((file) => (
-            <div key={file.path} className="changed-file-row">
-              <span className={`file-status-badge ${file.status}`}>{file.status}</span>
-              <code className="file-path">{file.path}</code>
-              <span className="changes-count">+{file.changesCount} lines</span>
-            </div>
-          ))}
+          {review.changedFiles === undefined ? (
+            <p className="no-items-message">
+              Hardware surface diff details are not available for this persisted review.
+            </p>
+          ) : review.changedFiles.length === 0 ? (
+            <p className="no-items-message">No changed hardware surface files detected for this revision.</p>
+          ) : (
+            review.changedFiles.map((file) => (
+              <div key={file.path} className="changed-file-row">
+                <span className={`file-status-badge ${file.status}`}>{file.status}</span>
+                <code className="file-path">{file.path}</code>
+                <span className="changes-count">+{file.changesCount} lines</span>
+              </div>
+            ))
+          )}
         </div>
       </Panel>
 

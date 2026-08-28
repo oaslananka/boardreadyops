@@ -7,7 +7,7 @@ import {
 } from "../../../packages/db/src/review-approval-store.js";
 
 describe("ReviewApprovalStore", () => {
-  it("records approvals and invalidates on digest change", async () => {
+  it("records approvals atomically with CTE and invalidates on digest change", async () => {
     const mockApproval: ReviewApprovalRecord = {
       id: "rapp_1",
       repositoryId: "repo-1",
@@ -29,12 +29,13 @@ describe("ReviewApprovalStore", () => {
       query: vi
         .fn()
         .mockResolvedValueOnce([mockApproval])
-        .mockResolvedValueOnce([{ id: "rapp_1" }]),
+        .mockResolvedValueOnce([{ id: "rapp_1" }])
+        .mockResolvedValueOnce([mockApproval]),
     };
 
     const store = new ReviewApprovalStore(mockExecutor);
 
-    const recorded = await store.recordApproval({
+    const recorded = await store.recordApprovalAndTransitionDecision({
       repositoryId: "repo-1",
       reviewId: "rev-1",
       revisionId: "rev-rev-1",
@@ -46,12 +47,23 @@ describe("ReviewApprovalStore", () => {
 
     expect(recorded.id).toBe("rapp_1");
     expect(recorded.status).toBe("approved");
+    expect(mockExecutor.query).toHaveBeenCalledWith(
+      expect.stringContaining("claim_approval AS ("),
+      expect.arrayContaining(["repo-1", "rev-1", "rev-rev-1", "a".repeat(64), "alice", "approved"]),
+    );
 
     const count = await store.invalidateApprovalsOnDigestChange("rev-1", "b".repeat(64));
     expect(count).toBe(1);
     expect(mockExecutor.query).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE review_approvals"),
       expect.arrayContaining(["rev-1", "b".repeat(64)]),
+    );
+
+    const approvals = await store.listApprovalsForReview("rev-1", "repo-1");
+    expect(approvals).toHaveLength(1);
+    expect(mockExecutor.query).toHaveBeenCalledWith(
+      expect.stringContaining("AND repository_id = $2"),
+      expect.arrayContaining(["rev-1", "repo-1"]),
     );
   });
 
@@ -86,5 +98,48 @@ describe("ReviewApprovalStore", () => {
     const updated = await store.updateChecklistItem("rchk_1", true, "alice");
     expect(updated?.completed).toBe(true);
     expect(updated?.completedBy).toBe("alice");
+  });
+
+  it("throws ApprovalConflictError when claim_approval yields zero rows and existing active decision exists", async () => {
+    const mockExecutor: SqlQueryExecutor = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce([]) // claim_approval returns 0 rows due to conflict
+        .mockResolvedValueOnce([{ id: "rapp_existing" }]), // existing active decision check returns row
+    };
+
+    const store = new ReviewApprovalStore(mockExecutor);
+    await expect(
+      store.recordApprovalAndTransitionDecision({
+        repositoryId: "repo-1",
+        reviewId: "rev-1",
+        revisionId: "rev-rev-1",
+        evidenceDigest: "a".repeat(64),
+        approverId: "alice",
+        status: "approved",
+        reason: "Conflicting reason",
+      }),
+    ).rejects.toThrow("Conflicting approval payload for active decision");
+  });
+
+  it("throws Error when claim_approval yields zero rows and no active review exists", async () => {
+    const mockExecutor: SqlQueryExecutor = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce([]) // claim_approval returns 0 rows
+        .mockResolvedValueOnce([]), // existing check returns 0 rows (missing review)
+    };
+
+    const store = new ReviewApprovalStore(mockExecutor);
+    await expect(
+      store.recordApprovalAndTransitionDecision({
+        repositoryId: "repo-1",
+        reviewId: "rev-1",
+        revisionId: "rev-rev-1",
+        evidenceDigest: "a".repeat(64),
+        approverId: "alice",
+        status: "approved",
+      }),
+    ).rejects.toThrow("Failed to record approval: review not found for repository");
   });
 });

@@ -3,10 +3,9 @@ import { Panel } from "../ui.js";
 import { ReviewCanvas } from "./review-canvas.js";
 
 export function ChangesTab({ review }: { review: DemoReview }) {
-  const pcbs = review.changedFiles.filter((f) => f.path.endsWith(".kicad_pcb"));
-  const hasSchematicOrPcbChanges = review.changedFiles.some(
-    (f) => f.path.endsWith(".kicad_sch") || f.path.endsWith(".kicad_pcb"),
-  );
+  const pcbs = review.changedFiles?.filter((f) => f.path.endsWith(".kicad_pcb")) ?? [];
+  const hasSchematicOrPcbChanges =
+    review.changedFiles?.some((f) => f.path.endsWith(".kicad_sch") || f.path.endsWith(".kicad_pcb")) ?? false;
 
   return (
     <div className="changes-tab-content">
@@ -15,7 +14,9 @@ export function ChangesTab({ review }: { review: DemoReview }) {
         description="Rendered from this revision's actual findings and changed sheets/layers. Pan, zoom, and open a finding marker for detail."
         tone="raised"
       >
-        {!hasSchematicOrPcbChanges || !review.headSnapshots || review.headSnapshots.length === 0 ? (
+        {review.changedFiles === undefined ? (
+          <p className="empty-notice">Canvas diff preview is not available for this persisted review.</p>
+        ) : !hasSchematicOrPcbChanges || !review.headSnapshots || review.headSnapshots.length === 0 ? (
           <p className="empty-notice">No schematic or PCB files modified in this revision.</p>
         ) : (
           <ReviewCanvas headSnapshots={review.headSnapshots} />
@@ -27,8 +28,10 @@ export function ChangesTab({ review }: { review: DemoReview }) {
         description="Copper traces, via placements, and keepout boundary modifications."
         tone="default"
       >
-        {pcbs.length === 0 ? (
-          <p className="empty-notice">No PCB files modified.</p>
+        {review.changedFiles === undefined ? (
+          <p className="empty-notice">PCB surface change details are not available for this persisted review.</p>
+        ) : pcbs.length === 0 ? (
+          <p className="empty-notice">No PCB files modified in this revision.</p>
         ) : (
           <div className="pcb-diff-grid">
             {pcbs.map((pcb) => (
@@ -45,7 +48,9 @@ export function ChangesTab({ review }: { review: DemoReview }) {
       </Panel>
 
       <Panel title="Bill of Materials (BOM) Delta" tone="default">
-        {review.bomChanges.length === 0 ? (
+        {review.bomChanges === undefined ? (
+          <p className="empty-notice">BOM component delta details are not available for this persisted review.</p>
+        ) : review.bomChanges.length === 0 ? (
           <p className="empty-notice">No BOM changes recorded for this revision.</p>
         ) : (
           <div className="bom-delta-table-wrap">

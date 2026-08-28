@@ -17,7 +17,10 @@ const REVIEW_PATH = "/reviews/rev_gateway_42";
 async function openReviewAndWaitForHydration(page: Page) {
   await page.goto(REVIEW_PATH);
   // The tab bar is a client component; clicking before hydration completes is a no-op.
-  await page.getByRole("button", { name: /Approve review/i }).waitFor({ state: "visible" });
+  await page
+    .getByRole("button", { name: /Approve/i })
+    .first()
+    .waitFor({ state: "visible" });
   await page.waitForTimeout(1500);
 }
 
@@ -128,7 +131,7 @@ test.describe("Review lifecycle", () => {
 
   test("11. Billing settings page renders plan management", async ({ page }) => {
     await page.goto("/settings/billing");
-    await expect(page.getByRole("heading", { name: /Billing/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Marketplace plan|Billing/i })).toBeVisible();
   });
 
   test("12. Data settings page renders export/erasure controls", async ({ page }) => {

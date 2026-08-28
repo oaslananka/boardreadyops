@@ -1,9 +1,7 @@
 import { findingDispositions } from "@boardreadyops/contracts";
 import { FindingDecisionStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../../../lib/cloud-runtime-config.js";
+import { authenticateApiRequest, resolveReviewApiContext } from "../../../../../../lib/api-auth.js";
 
 export const runtime = "nodejs";
 
@@ -29,12 +27,12 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
   const { id: reviewId } = await props.params;
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { executor } = reviewContext;
   try {
     const store = new FindingDecisionStore(executor);
     const decisions = await store.listDecisionsForReview(reviewId);
@@ -70,16 +68,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     );
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { repositoryId, executor } = reviewContext;
   try {
     const store = new FindingDecisionStore(executor);
     const decision = await store.recordDecision({
-      repositoryId: auth.repositoryId ?? "default-repo",
+      repositoryId,
       reviewId,
       findingFingerprint: parsed.data.findingFingerprint,
       disposition: parsed.data.disposition,

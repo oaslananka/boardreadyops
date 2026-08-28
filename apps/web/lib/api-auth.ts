@@ -152,3 +152,86 @@ export async function resolveRepositoryApiContext(
     throw error;
   }
 }
+
+export interface ReviewApiContext {
+  reviewId: string;
+  repositoryId: string;
+  currentRevisionId: string | null;
+  executor: PgQueryExecutor;
+}
+
+export async function resolveReviewApiContext(
+  reviewId: string,
+  auth: AuthenticatedApiContext,
+): Promise<ReviewApiContext | Response> {
+  const config = resolveCloudPersistenceConfiguration();
+  if (config.mode !== "postgres") {
+    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  }
+
+  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  try {
+    const result = await executor.query(
+      `select reviews.id as review_id,
+              reviews.repository_id,
+              reviews.current_revision_id,
+              installations.github_installation_id
+         from reviews
+         join repositories on repositories.id = reviews.repository_id
+         join installations on installations.id = repositories.installation_id
+        where reviews.id = $1
+          and repositories.disabled_at is null
+          and installations.suspended_at is null
+          and not exists (
+            select 1
+              from github_marketplace_subscriptions
+             where github_marketplace_subscriptions.status = 'canceled'
+               and (
+                 github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
+                 or (
+                   github_marketplace_subscriptions.github_installation_id is null
+                   and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
+                 )
+               )
+          )
+        limit 1`,
+      [reviewId],
+    );
+
+    const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
+    const first = rows[0];
+    if (!first) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Review not found" }, { status: 404 });
+    }
+
+    const repositoryId = String(first.repository_id);
+    const currentRevisionId = first.current_revision_id ? String(first.current_revision_id) : null;
+    const githubInstallationId = safeInstallationId(first.github_installation_id);
+
+    if (githubInstallationId === undefined) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    if (auth.authType === "bearer_token" && auth.repositoryId && auth.repositoryId !== repositoryId) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    if (auth.authType === "session" && !auth.installationIds?.includes(githubInstallationId)) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    return {
+      reviewId,
+      repositoryId,
+      currentRevisionId,
+      executor,
+    };
+  } catch (error) {
+    await executor.close();
+    throw error;
+  }
+}

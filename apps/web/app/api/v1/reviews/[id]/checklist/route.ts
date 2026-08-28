@@ -1,8 +1,6 @@
 import { ReviewApprovalStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { authenticateApiRequest } from "../../../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../../../lib/cloud-runtime-config.js";
+import { authenticateApiRequest, resolveReviewApiContext } from "../../../../../../lib/api-auth.js";
 
 export const runtime = "nodejs";
 
@@ -23,12 +21,12 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
   const { id: reviewId } = await props.params;
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { executor } = reviewContext;
   try {
     const store = new ReviewApprovalStore(executor);
     const items = await store.listChecklistItems(reviewId);
@@ -61,16 +59,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     return Response.json({ ok: false, error: "Invalid checklist item payload" }, { status: 400 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { repositoryId, executor } = reviewContext;
   try {
     const store = new ReviewApprovalStore(executor);
     const item = await store.addChecklistItem({
-      repositoryId: auth.repositoryId ?? "default-repo",
+      repositoryId,
       reviewId,
       title: parsed.data.title,
     });
@@ -84,11 +82,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   }
 }
 
-export async function PATCH(request: Request, _props: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }): Promise<Response> {
   const auth = await authenticateApiRequest(request, "reviews:write");
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
+
+  const { id: reviewId } = await props.params;
 
   let body: unknown;
   try {
@@ -102,12 +102,12 @@ export async function PATCH(request: Request, _props: { params: Promise<{ id: st
     return Response.json({ ok: false, error: "Invalid update checklist item payload" }, { status: 400 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
+  const reviewContext = await resolveReviewApiContext(reviewId, auth);
+  if (reviewContext instanceof Response) {
+    return reviewContext;
   }
 
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const { executor } = reviewContext;
   try {
     const store = new ReviewApprovalStore(executor);
     const updated = await store.updateChecklistItem(parsed.data.id, parsed.data.completed, auth.actorId);

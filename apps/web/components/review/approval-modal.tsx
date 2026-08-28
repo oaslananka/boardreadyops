@@ -5,11 +5,20 @@ import { useState } from "react";
 export interface ApprovalModalProps {
   type: "approve" | "request_changes";
   evidenceDigest: string;
+  isSubmitting?: boolean;
+  serverError?: string | null;
   onConfirm: (data: { reason: string; isBreakGlass?: boolean }) => void;
   onClose: () => void;
 }
 
-export function ApprovalModal({ type, evidenceDigest, onConfirm, onClose }: ApprovalModalProps) {
+export function ApprovalModal({
+  type,
+  evidenceDigest,
+  isSubmitting = false,
+  serverError = null,
+  onConfirm,
+  onClose,
+}: ApprovalModalProps) {
   const isApprove = type === "approve";
   const [reason, setReason] = useState("");
   const [isBreakGlass, setIsBreakGlass] = useState(false);
@@ -32,7 +41,13 @@ export function ApprovalModal({ type, evidenceDigest, onConfirm, onClose }: Appr
       <div className="modal-panel panel surface-raised">
         <header className="modal-header">
           <h2 id="approval-modal-title">{isApprove ? "Record Engineering Sign-Off" : "Request Hardware Changes"}</h2>
-          <button type="button" className="modal-close-button" onClick={onClose} aria-label="Close modal">
+          <button
+            type="button"
+            className="modal-close-button"
+            onClick={onClose}
+            aria-label="Close modal"
+            disabled={isSubmitting}
+          >
             ✕
           </button>
         </header>
@@ -51,6 +66,7 @@ export function ApprovalModal({ type, evidenceDigest, onConfirm, onClose }: Appr
               id="approval-reason"
               rows={3}
               value={reason}
+              disabled={isSubmitting}
               onChange={(e) => {
                 setReason(e.currentTarget.value);
                 setError(null);
@@ -71,6 +87,7 @@ export function ApprovalModal({ type, evidenceDigest, onConfirm, onClose }: Appr
                 <input
                   type="checkbox"
                   checked={isBreakGlass}
+                  disabled={isSubmitting}
                   onChange={(e) => setIsBreakGlass(e.currentTarget.checked)}
                 />
                 <span>⚡ Break-Glass Override (Emergency sign-off with audit logging)</span>
@@ -78,14 +95,18 @@ export function ApprovalModal({ type, evidenceDigest, onConfirm, onClose }: Appr
             </div>
           ) : null}
 
-          {error ? <div className="form-error-alert">{error}</div> : null}
+          {error || serverError ? <div className="form-error-alert">{error || serverError}</div> : null}
 
           <footer className="modal-footer">
-            <button type="button" className="button button-secondary" onClick={onClose}>
+            <button type="button" className="button button-secondary" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </button>
-            <button type="submit" className={`button ${isApprove ? "button-primary" : "button-danger"}`}>
-              {isApprove ? "Confirm Sign-Off" : "Submit Change Request"}
+            <button
+              type="submit"
+              className={`button ${isApprove ? "button-primary" : "button-danger"}`}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Recording..." : isApprove ? "Confirm Sign-Off" : "Submit Change Request"}
             </button>
           </footer>
         </form>

@@ -4024,6 +4024,419 @@ code {
   font-weight: 700;
 }
 
+/* ==========================================================================
+   Organization Governance & Policies Styles
+   ========================================================================== */
+
+.policies-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.policy-inheritance-diagram {
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--bro-radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--bro-border);
+}
+
+.inheritance-lead h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--foundry-ink);
+}
+
+.inheritance-lead p {
+  margin: 0 0 var(--space-4);
+  font-size: 0.88rem;
+  color: var(--foundry-ink-muted);
+  line-height: 1.5;
+}
+
+.inheritance-layers-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+@media (max-width: 1024px) {
+  .inheritance-layers-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .inheritance-arrow {
+    transform: rotate(90deg);
+    text-align: center;
+  }
+}
+
+.inheritance-layer-card {
+  padding: 0.85rem 1rem;
+  border-radius: var(--bro-radius-sm);
+  background: var(--foundry-surface);
+  border: 1px solid var(--bro-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inheritance-layer-card .layer-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foundry-copper);
+}
+
+.inheritance-layer-card h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--foundry-ink);
+}
+
+.inheritance-layer-card p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--foundry-ink-muted);
+  line-height: 1.4;
+}
+
+.inheritance-arrow {
+  color: var(--foundry-line-strong);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.policies-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: 1rem 1.25rem;
+}
+
+.policies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .policies-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.policy-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 1.25rem;
+  border-radius: var(--bro-radius-md);
+  border: 1px solid var(--bro-border);
+  background: var(--foundry-surface);
+  transition: border-color var(--bro-motion-fast) var(--bro-ease);
+}
+
+.policy-card:hover {
+  border-color: var(--foundry-line-strong);
+}
+
+.policy-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.policy-card-scope-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.policy-scope-chip {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.policy-scope-chip.organization {
+  background: var(--warning-surface);
+  color: var(--foundry-brass);
+  border: 1px solid var(--warning-border);
+}
+
+.policy-scope-chip.team {
+  background: var(--info-surface);
+  color: var(--info);
+  border: 1px solid var(--info-border);
+}
+
+.policy-scope-chip.repository {
+  background: var(--foundry-copper-soft);
+  color: var(--foundry-copper-strong);
+  border: 1px solid var(--foundry-copper);
+}
+
+.policy-scope-id {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  padding: 1px 6px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.policy-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--foundry-ink);
+}
+
+.policy-description {
+  margin: 0 0 var(--space-3);
+  font-size: 0.86rem;
+  color: var(--foundry-ink-muted);
+  line-height: 1.5;
+}
+
+.policy-gates-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.gate-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.82rem;
+}
+
+.gate-label {
+  color: var(--foundry-ink-muted);
+  font-weight: 500;
+}
+
+.compliance-pill {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.compliance-pill.evidence {
+  background: var(--success-surface);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.compliance-pill.external {
+  background: var(--info-surface);
+  color: var(--info);
+  border: 1px solid var(--info-border);
+}
+
+.advisory-pill {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  background: var(--surface-sunken);
+  color: var(--foundry-ink-muted);
+  border: 1px solid var(--border);
+}
+
+.policy-spec-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: var(--space-2);
+}
+
+.spec-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--foundry-ink-subtle);
+}
+
+summary.spec-label {
+  cursor: pointer;
+}
+
+.spec-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.policy-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+
+.policy-tag.role {
+  color: var(--foundry-brass);
+}
+
+.policy-tag.check {
+  color: var(--success);
+}
+
+.policy-checklist-preview {
+  list-style: none;
+  margin: var(--space-2) 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.policy-checklist-preview li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--foundry-ink);
+}
+
+.policy-checklist-preview .check-icon {
+  color: var(--success);
+  font-weight: 700;
+}
+
+/* Policy Builder Form */
+.policy-builder-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.policy-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.form-section-card {
+  padding: 1.25rem;
+  border-radius: var(--bro-radius-md);
+  border: 1px solid var(--bro-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--foundry-ink);
+  padding: 0 var(--space-2);
+}
+
+.field-help {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--foundry-ink-subtle);
+  margin-top: 0.25rem;
+}
+
+.form-tag-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.checkbox-cards-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.checkbox-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0.85rem 1rem;
+  border-radius: var(--bro-radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  cursor: pointer;
+  transition: all var(--bro-motion-fast) var(--bro-ease);
+}
+
+.checkbox-card input[type="checkbox"] {
+  margin-top: 0.25rem;
+}
+
+.checkbox-card.selected {
+  border-color: var(--foundry-copper);
+  background: var(--foundry-copper-soft);
+}
+
+.checkbox-card-content strong {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--foundry-ink);
+  margin-bottom: 0.2rem;
+}
+
+.checkbox-card-content p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--foundry-ink-muted);
+  line-height: 1.4;
+}
+
+.policy-builder-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.alert-banner {
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--bro-radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.alert-banner.success {
+  background: var(--success-surface);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+}
+
+.alert-banner.error {
+  background: var(--danger-surface);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+
 @media (forced-colors: active) {
   :focus-visible {
     outline: 2px solid CanvasText;
