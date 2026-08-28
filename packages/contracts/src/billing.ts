@@ -41,12 +41,39 @@ export const billingEventSchema = z.object({
   id: z.string().min(1),
   tenantId: z.string().min(1).nullable(),
   type: z.string().min(1),
-  stripeEventId: z.string().min(1),
+  provider: z.string().min(1).default("stripe"),
+  stripeEventId: z.string().min(1).nullable().optional(),
+  deliveryId: z.string().min(1).nullable().optional(),
   payload: z.unknown(),
   processedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
 });
 export type BillingEvent = z.infer<typeof billingEventSchema>;
+
+export const marketplaceActions = [
+  "purchased",
+  "cancelled",
+  "pending_change",
+  "pending_change_cancelled",
+  "changed",
+] as const;
+export type MarketplaceAction = (typeof marketplaceActions)[number];
+
+export const marketplacePurchaseMetadataSchema = z.object({
+  deliveryId: z.string().min(1),
+  action: z.string().min(1),
+  accountLogin: z.string().min(1),
+  accountId: z.number().int().optional(),
+  accountType: z.string().optional(),
+  planId: z.number().int().optional(),
+  planName: z.string().optional(),
+  priceModel: z.string().optional(),
+  billingCycle: z.string().optional(),
+  effectiveDate: z.string().optional(),
+  onFreeTrial: z.boolean().optional(),
+  freeTrialEndsOn: z.string().nullable().optional(),
+});
+export type MarketplacePurchaseMetadata = z.infer<typeof marketplacePurchaseMetadataSchema>;
 
 export const billingActivitySchema = z.object({
   id: z.string().uuid(),

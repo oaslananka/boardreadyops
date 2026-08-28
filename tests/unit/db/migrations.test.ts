@@ -7,7 +7,7 @@ const migrationsDir = join(process.cwd(), "packages/db/migrations");
 
 describe("BoardReadyOps Cloud migrations", () => {
   it("publishes the cloud schema version and models", () => {
-    expect(cloudDatabaseSchemaVersion).toBe(54);
+    expect(cloudDatabaseSchemaVersion).toBe(55);
     expect(cloudDatabaseModels).toContain("ApiToken");
     expect(cloudDatabaseModels).toContain("FindingDecision");
     expect(cloudDatabaseModels).toContain("FindingAssignment");
@@ -95,6 +95,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0052_billing.sql",
       "0053_storage_lifecycle.sql",
       "0054_governance.sql",
+      "0055_marketplace_billing_events.sql",
     ]);
   });
 
