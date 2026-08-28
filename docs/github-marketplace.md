@@ -39,6 +39,8 @@ BoardReadyOps is listed on GitHub Marketplace as a **Continuous Integration** an
   - Interactive report artifact generation.
   - Standard 30-day retention on run summaries.
 
+The hosted Marketplace offering is intentionally free-only. Authenticated calls to the legacy external Stripe checkout and customer-portal endpoints return HTTP 410 with code `marketplace_free_only` while Community is the published Marketplace plan; no external paid subscription path is exposed for this listing. The underlying provider-neutral billing contracts and Stripe webhook primitives remain in the codebase for historical data handling and a future paid Marketplace migration.
+
 ---
 
 ## 4. GitHub App Permissions Overview
