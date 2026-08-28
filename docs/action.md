@@ -19,7 +19,7 @@ jobs:
 ```
 
 This example pins the reviewed release commit shown above. The public
-`v1.34.0` tag is the current published release, and its `action.yml` input
+`v1.35.0` tag is the current published release, and its `action.yml` input
 contract was verified against current main before this reference was updated.
 Use the immutable SHA when reproducibility matters; the floating `v1` alias
 moves with stable releases.
