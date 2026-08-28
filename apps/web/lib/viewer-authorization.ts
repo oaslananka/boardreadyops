@@ -82,9 +82,25 @@ async function githubInstallationIdFor(
   const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
   const executor = createPgQueryExecutor({ connectionString, max: 1 });
   try {
-    const result = await executor.query("select github_installation_id from installations where id = $1", [
-      installationId,
-    ]);
+    const result = await executor.query(
+      `select installations.github_installation_id
+         from installations
+        where installations.id = $1
+          and installations.suspended_at is null
+          and not exists (
+            select 1
+              from github_marketplace_subscriptions
+             where github_marketplace_subscriptions.status = 'canceled'
+               and (
+                 github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
+                 or (
+                   github_marketplace_subscriptions.github_installation_id is null
+                   and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
+                 )
+               )
+          )`,
+      [installationId],
+    );
     const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
     const value = rows[0]?.github_installation_id;
     // node-postgres decodes bigint as a string to avoid precision loss.

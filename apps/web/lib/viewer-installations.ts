@@ -62,6 +62,18 @@ export async function viewerInstallations(
           -- A suspended installation cannot run anything, so offering to configure it would
           -- promise work that will not happen.
           and installations.suspended_at is null
+          and not exists (
+            select 1
+              from github_marketplace_subscriptions
+             where github_marketplace_subscriptions.status = 'canceled'
+               and (
+                 github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
+                 or (
+                   github_marketplace_subscriptions.github_installation_id is null
+                   and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
+                 )
+               )
+          )
         order by installations.account_login, installations.id`,
       [session.installationIds, provider],
     );

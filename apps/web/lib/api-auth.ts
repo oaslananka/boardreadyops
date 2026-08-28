@@ -9,6 +9,7 @@ export interface AuthenticatedApiContext {
   actorId: string;
   scopes: ApiTokenScope[];
   authType: "bearer_token" | "session";
+  installationIds?: number[];
 }
 
 export interface ApiAuthError {
@@ -23,7 +24,6 @@ export async function authenticateApiRequest(
 ): Promise<AuthenticatedApiContext | ApiAuthError> {
   const authHeader = request.headers.get("authorization");
 
-  // 1. Check Bearer Token
   if (authHeader?.startsWith("Bearer ")) {
     const rawToken = authHeader.slice("Bearer ".length).trim();
     try {
@@ -59,7 +59,6 @@ export async function authenticateApiRequest(
     }
   }
 
-  // 2. Check User Session
   const viewer = await viewerAuthorization();
   if (viewer.session) {
     return {
@@ -67,6 +66,7 @@ export async function authenticateApiRequest(
       actorId: viewer.session.login,
       scopes: ["runs:write", "reviews:read", "reviews:write", "admin"],
       authType: "session",
+      installationIds: [...viewer.session.installationIds],
     };
   }
 
@@ -78,20 +78,27 @@ export interface RepositoryApiContext {
   executor: PgQueryExecutor;
 }
 
-/**
- * Resolves a repository-scoped route's repositoryId (from the token or the ?repositoryId
- * query param) and opens a Postgres executor. Takes an already-resolved `auth` rather than
- * calling authenticateApiRequest itself, so routes keep their own direct call to it - that
- * direct import is what tests intercept with vi.spyOn(apiAuth, "authenticateApiRequest");
- * an internal same-module call here would bypass that mock. Callers own the returned
- * executor and must close it.
- */
-export function resolveRepositoryApiContext(
+function safeInstallationId(value: unknown): number | undefined {
+  const parsed = typeof value === "string" ? Number(value) : typeof value === "number" ? value : Number.NaN;
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export async function resolveRepositoryApiContext(
   auth: AuthenticatedApiContext,
   request: Request,
-): RepositoryApiContext | Response {
+  explicitRepositoryId?: string,
+): Promise<RepositoryApiContext | Response> {
   const url = new URL(request.url);
-  const repositoryId = auth.repositoryId ?? url.searchParams.get("repositoryId");
+  const queryRepositoryId = url.searchParams.get("repositoryId") ?? undefined;
+
+  if (auth.repositoryId && explicitRepositoryId && auth.repositoryId !== explicitRepositoryId) {
+    return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+  }
+  if (auth.repositoryId && queryRepositoryId && auth.repositoryId !== queryRepositoryId) {
+    return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+  }
+
+  const repositoryId = explicitRepositoryId ?? auth.repositoryId ?? queryRepositoryId;
   if (!repositoryId) {
     return Response.json({ ok: false, error: "repositoryId is required" }, { status: 400 });
   }
@@ -102,5 +109,44 @@ export function resolveRepositoryApiContext(
   }
 
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-  return { repositoryId, executor };
+  try {
+    const result = await executor.query(
+      `select installations.github_installation_id
+         from repositories
+         join installations on installations.id = repositories.installation_id
+        where repositories.id = $1
+          and repositories.disabled_at is null
+          and installations.suspended_at is null
+          and not exists (
+            select 1
+              from github_marketplace_subscriptions
+             where github_marketplace_subscriptions.status = 'canceled'
+               and (
+                 github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
+                 or (
+                   github_marketplace_subscriptions.github_installation_id is null
+                   and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
+                 )
+               )
+          )
+        limit 1`,
+      [repositoryId],
+    );
+    const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
+    const githubInstallationId = safeInstallationId(rows[0]?.github_installation_id);
+    if (githubInstallationId === undefined) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    if (auth.authType === "session" && !auth.installationIds?.includes(githubInstallationId)) {
+      await executor.close();
+      return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
+    }
+
+    return { repositoryId, executor };
+  } catch (error) {
+    await executor.close();
+    throw error;
+  }
 }

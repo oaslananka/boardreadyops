@@ -43,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
-  const ctx = resolveRepositoryApiContext(auth, request);
+  const ctx = await resolveRepositoryApiContext(auth, request);
   if (ctx instanceof Response) return ctx;
   const { repositoryId, executor } = ctx;
 

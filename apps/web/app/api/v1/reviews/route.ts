@@ -1,9 +1,7 @@
 import type { ReviewDecision, ReviewStatus } from "@boardreadyops/contracts";
 import { ReviewStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
-import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 
 export const runtime = "nodejs";
 
@@ -23,7 +21,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!auth.ok) {
     return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   }
-  const ctx = resolveRepositoryApiContext(auth, request);
+  const ctx = await resolveRepositoryApiContext(auth, request);
   if (ctx instanceof Response) return ctx;
   const { repositoryId, executor } = ctx;
 
@@ -74,21 +72,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const payload = parsed.data;
-  // If bearer token is tied to a specific repo, ensure match
-  if (auth.repositoryId && auth.repositoryId !== payload.repositoryId) {
-    return Response.json({ ok: false, error: "Forbidden repository scope" }, { status: 403 });
-  }
-
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
-    return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
-  }
-
-  const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+  const ctx = await resolveRepositoryApiContext(auth, request, payload.repositoryId);
+  if (ctx instanceof Response) return ctx;
+  const { repositoryId, executor } = ctx;
   try {
     const store = new ReviewStore(executor);
     const result = await store.upsertReviewForRun({
-      repositoryId: payload.repositoryId,
+      repositoryId,
       ...(payload.pullRequestNumber !== undefined ? { pullRequestNumber: payload.pullRequestNumber } : {}),
       title: payload.title,
       headRunId: payload.headRunId,

@@ -22,7 +22,7 @@ When using the hosted BoardReadyOps Cloud service, we process the following cate
 ### A. GitHub Account and Installation Metadata
 - GitHub installation identifier, account login, account type (User or Organization).
 - Repository metadata: repository ID, repository name, full name, owner, visibility (public/private), and default branch.
-- OAuth user identifiers when authenticating to the dashboard.
+- OAuth user identifiers when authenticating to the dashboard. The transient GitHub user OAuth access token used during sign-in is not persisted by BoardReadyOps after the viewer and installation list are resolved.
 
 ### B. Release Run and Finding Metadata
 - Commit SHA, git ref, pull request number, workflow trigger kind.
@@ -37,9 +37,10 @@ When using the hosted BoardReadyOps Cloud service, we process the following cate
 - GitHub webhook delivery IDs (`X-GitHub-Delivery`), event types (`installation`, `pull_request`, `marketplace_purchase`, `ping`), payload SHA-256 digests, and delivery timestamps.
 - Raw GitHub webhook payloads are validated in memory and are **not** inserted into long-term database storage.
 
-### E. Marketplace and Billing Metadata
-- GitHub Marketplace purchase events: account login, plan identifier, plan name, billing cycle, effective date, and free trial status.
-- We do **not** collect or store credit card numbers or payment credentials; billing transactions on GitHub Marketplace are handled exclusively by GitHub.
+### E. Marketplace Metadata
+- GitHub Marketplace lifecycle events: stable GitHub account identifier, account login/type, optional GitHub App installation identifier, plan identifier/name, lifecycle action, effective date, and bounded plan metadata.
+- Marketplace subscription state is stored separately from other billing-provider state. The currently published Marketplace tier is Community (Free); Marketplace payload values are not used to grant unpublished paid entitlements.
+- We do **not** collect or store credit card numbers or payment credentials. The Community Marketplace plan does not require BoardReadyOps to process payment details.
 
 ### F. Append-Only Audit Logs
 - Actor identity (e.g., GitHub login or runner identity), tenant ID, action performed, timestamp, and privacy-bounded metadata.
@@ -67,6 +68,7 @@ In accordance with our implemented data lifecycle controls:
 | **Release Runs & Findings** | Run records, findings, readiness score | Retained until associated repository or installation is removed or modified by lifecycle operations. |
 | **Managed Report Artifacts** | Report files and digests | When replaced by newer accepted results, old artifact metadata is removed transactionally and local storage objects are deleted asynchronously. |
 | **Audit Logs** | Security and administrative audit entries | Retained append-only for operational proof and compliance tracking. |
+| **Marketplace Lifecycle State** | Account identifier, current active/canceled state, effective date, delivery identifier, bounded plan metadata | Retained for lifecycle enforcement and auditability. Cancellation queues an account-scoped erasure request due no later than 30 days after the cancellation effective date, subject to lawful retention/legal hold. |
 
 ---
 
@@ -94,9 +96,11 @@ We apply defense-in-depth controls including:
 
 ## 7. Current Limitations & Data Erasure
 
-As documented in our repository architecture:
-- Organization-wide automated self-service data erasure and bulk data export APIs are currently limited to repository uninstall lifecycle events and administrative operator workflows.
-- Database backups and infrastructure-level logs are managed on independent retention schedules.
+BoardReadyOps exposes tenant-scoped export and erasure-request intake, and a GitHub Marketplace cancellation creates an account-scoped erasure request (organization or user, matching the Marketplace account type) with a persisted deadline 30 days after the cancellation effective date. The request is blocked rather than silently deleted when an active legal hold applies. A non-stale cancellation also revokes BoardReadyOps repository API tokens for the account and immediately removes canceled Marketplace repositories from hosted dashboard/API/job-dispatch access paths.
+
+The current release does **not** automatically execute a complete customer erasure across every database record, managed artifact, backup, and infrastructure log. Application-level erasure execution is an operator process today. General age-based purge of release runs, findings, audit evidence, and all managed artifacts is also incomplete. Database backups and infrastructure-level logs follow separate operator retention schedules.
+
+We do not represent a queued erasure request as completed deletion. Operators are responsible for completing or lawfully blocking due erasure requests within the documented deadline and recording what remains in backups or external systems.
 
 ---
 
