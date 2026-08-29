@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CURATED_DOC_LINKS,
@@ -26,7 +27,7 @@ describe("public discovery manifest", () => {
   it("keeps curated links on canonical public origins", () => {
     for (const item of CURATED_DOC_LINKS) {
       const url = new URL(item.url);
-      expect([PUBLIC_SITE_ORIGIN, DOCS_ORIGIN]).toContain(url.origin);
+      expect(url.origin).toBe(DOCS_ORIGIN);
       expect(url.username).toBe("");
       expect(url.password).toBe("");
     }
@@ -34,6 +35,11 @@ describe("public discovery manifest", () => {
 });
 
 describe("public discovery content", () => {
+  it("keeps docs Markdown URL generation limited to the curated docs manifest", () => {
+    const source = readFileSync("apps/web/lib/public-discovery-content.ts", "utf8");
+    expect(source).not.toContain("parsed.origin !== DOCS_ORIGIN");
+  });
+
   it("builds llmstxt.org-compatible discovery markdown", () => {
     const text = buildLlmsTxt();
     expect(text.startsWith("# BoardReadyOps\n\n> ")).toBe(true);

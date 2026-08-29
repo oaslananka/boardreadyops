@@ -11,7 +11,6 @@ const productDescription =
 
 function docsMarkdownUrl(url: string): string {
   const parsed = new URL(url);
-  if (parsed.origin !== DOCS_ORIGIN) return url;
   if (parsed.pathname === "/") return `${DOCS_ORIGIN}/index.md`;
   return `${DOCS_ORIGIN}${parsed.pathname.replace(/\/$/, "")}.md`;
 }
