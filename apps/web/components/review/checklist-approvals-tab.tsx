@@ -90,7 +90,7 @@ export function ChecklistApprovalsTab({
 
       <Panel
         title="Formal Approvals & Sign-Off Ledger"
-        description="Append-only cryptographic record of engineering sign-offs bound to head evidence digests."
+        description="Engineering sign-offs recorded against revision evidence digests."
         tone="default"
       >
         <div className="signoff-ledger approvals-table-wrap">

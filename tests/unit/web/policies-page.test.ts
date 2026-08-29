@@ -138,6 +138,8 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
     expect(markup).toContain("Organization Governance &amp; Release Policies");
     expect(markup).toContain("policies-page-frame");
     expect(markup).toContain("Policies");
+    expect(markup).toContain("Release gates and verification rules bound to SHA-256 evidence digests.");
+    expect(markup).not.toContain("Cryptographic release gates");
   });
 
   it("renders PoliciesClient with hierarchy diagram, metrics toolbar, and action CTA", () => {

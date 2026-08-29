@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ChangesTab } from "../../../apps/web/components/review/changes-tab.js";
+import { ChecklistApprovalsTab } from "../../../apps/web/components/review/checklist-approvals-tab.js";
 import { EvidenceTab } from "../../../apps/web/components/review/evidence-tab.js";
 import { OverviewTab } from "../../../apps/web/components/review/overview-tab.js";
 import { ReviewHeader } from "../../../apps/web/components/review/review-header.js";
@@ -58,5 +59,21 @@ describe("Review Detail Tabs", () => {
     expect(evidence).toBeDefined();
     expect(evidence).toContain("provenance-chain");
     expect(evidence).toContain("Head Evidence Digest");
+    expect(evidence).toContain(
+      "SHA-256 artifact digests and revision-bound evidence records for this hardware revision.",
+    );
+    expect(evidence).not.toContain("Immutable cryptographic records");
+  });
+
+  it("describes approval records without claiming cryptographic signatures or append-only storage", () => {
+    const approvals = renderToStaticMarkup(
+      createElement(ChecklistApprovalsTab, {
+        checklist: review.checklist,
+        approvals: review.approvals,
+        evidenceDigest: review.evidenceDigest,
+      }),
+    );
+    expect(approvals).toContain("Engineering sign-offs recorded against revision evidence digests.");
+    expect(approvals).not.toContain("Append-only cryptographic record");
   });
 });
