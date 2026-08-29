@@ -17,7 +17,7 @@ const DOCS_PATTERNS = [
 ];
 
 const DOCS_GENERATION_PATTERNS = [
-  /^scripts\/(docs-build|generate-api-docs|generate-release-history|generate-rule-docs|update-action-inputs-docs)\.mjs$/,
+  /^scripts\/(docs-agent-edge-worker|docs-build|generate-api-docs|generate-release-history|generate-rule-docs|update-action-inputs-docs)\.mjs$/,
   /^scripts\/check-docs-a11y\.mjs$/,
   /^docs\/requirements(?:\.lock)?\.txt$/,
   /^packages\/plugin-sdk\//,
@@ -63,7 +63,7 @@ const PARSER_MODEL_PATTERNS = [/^src\/kicad\//, /^tests\/unit\/kicad\//];
 const SECURITY_PATTERNS = [
   /^SECURITY\.md$/,
   /^\.github\/workflows\/(security|trivy|provenance|publish-npm)\.ya?ml$/,
-  /^scripts\/(build-notice|check-licenses|check-reuse|check-scorecard-baseline|generate-sbom)\.mjs$/,
+  /^scripts\/(build-notice|check-licenses|check-reuse|check-scorecard-baseline|docs-agent-edge-worker|generate-sbom)\.mjs$/,
   /^package\.json$/,
   /^pnpm-lock\.yaml$/,
   /^NOTICE$/,
