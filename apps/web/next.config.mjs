@@ -23,17 +23,20 @@ const nextConfig = {
   async headers() {
     const noindex = { key: "X-Robots-Tag", value: "noindex, nofollow" };
     return [
-      "/setup",
-      "/dashboard",
-      "/work",
-      "/evidence",
-      "/insights",
-      "/policies",
-      "/repositories/:path*",
-      "/reviews/:path*",
-      "/runs/:path*",
-      "/settings/:path*",
-    ].map((source) => ({ source, headers: [noindex] }));
+      { source: "/", headers: [{ key: "Link", value: '</llms.txt>; rel="describedby"' }] },
+      ...[
+        "/setup",
+        "/dashboard",
+        "/work",
+        "/evidence",
+        "/insights",
+        "/policies",
+        "/repositories/:path*",
+        "/reviews/:path*",
+        "/runs/:path*",
+        "/settings/:path*",
+      ].map((source) => ({ source, headers: [noindex] })),
+    ];
   },
   transpilePackages: [
     "@boardreadyops/cloud-core",
