@@ -112,7 +112,7 @@ async function walk(absoluteDir, relativeDir, collected) {
   try {
     entries = await readdir(absoluteDir, { withFileTypes: true });
   } catch (error) {
-    if (error && error.code === "ENOENT") return;
+    if (error?.code === "ENOENT") return;
     throw error;
   }
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
@@ -150,8 +150,13 @@ function deduplicate(values) {
 }
 
 function extractTitle(content, relativePath) {
-  const match = /^#\s+(.+)$/m.exec(content);
-  if (match?.[1]) return match[1].trim();
+  for (const line of content.split("\n")) {
+    if (!line.startsWith("#")) continue;
+    const remainder = line.slice(1);
+    if (remainder.trimStart() === remainder) continue;
+    const title = remainder.trim();
+    if (title) return title;
+  }
   const fileName = path.posix.basename(relativePath, ".md");
   return fileName === "index" || fileName === "README" ? "BoardReadyOps" : fileName.replaceAll("-", " ");
 }
@@ -179,11 +184,12 @@ function buildLlmsTxt(siteUrl, documents, preferredDocuments) {
 
 function extractSummary(content) {
   if (!content) return null;
-  const paragraphs = content
-    .split(/\n\s*\n/)
-    .map((part) => part.trim())
-    .filter((part) => part && !part.startsWith("#") && !part.startsWith("---"));
-  return paragraphs[0] ?? null;
+  return (
+    content
+      .split(/\n\s*\n/)
+      .map((part) => part.trim())
+      .find((part) => part && !part.startsWith("#") && !part.startsWith("---")) ?? null
+  );
 }
 
 function buildLlmsFullTxt(siteUrl, documents) {
