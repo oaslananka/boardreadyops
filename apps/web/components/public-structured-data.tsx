@@ -1,6 +1,7 @@
-import { PRODUCT_DESCRIPTION, PUBLIC_CONTENT_LAST_UPDATED, PUBLIC_SITE_ORIGIN } from "../lib/public-discovery.js";
+import { PUBLIC_CONTENT_LAST_UPDATED, PUBLIC_SITE_ORIGIN } from "../lib/public-discovery.js";
 
 const homepageUrl = `${PUBLIC_SITE_ORIGIN}/`;
+const productDescription = "Checks whether a KiCad board is ready to fabricate, on every pull request.";
 
 export const PUBLIC_STRUCTURED_DATA = {
   "@context": "https://schema.org",
@@ -10,7 +11,7 @@ export const PUBLIC_STRUCTURED_DATA = {
       "@id": `${PUBLIC_SITE_ORIGIN}/#website`,
       name: "BoardReadyOps",
       url: homepageUrl,
-      description: PRODUCT_DESCRIPTION,
+      description: productDescription,
     },
     {
       "@type": "SoftwareApplication",
@@ -19,13 +20,13 @@ export const PUBLIC_STRUCTURED_DATA = {
       applicationCategory: "DeveloperApplication",
       operatingSystem: "Web",
       url: homepageUrl,
-      description: PRODUCT_DESCRIPTION,
+      description: productDescription,
     },
     {
       "@type": "WebPage",
       "@id": `${PUBLIC_SITE_ORIGIN}/#webpage`,
       headline: "Catch board mistakes before the fab does.",
-      description: PRODUCT_DESCRIPTION,
+      description: productDescription,
       url: homepageUrl,
       dateModified: PUBLIC_CONTENT_LAST_UPDATED,
       isPartOf: { "@id": `${PUBLIC_SITE_ORIGIN}/#website` },
@@ -48,7 +49,7 @@ export const PUBLIC_STRUCTURED_DATA = {
 } as const;
 
 export function PublicStructuredData() {
-  const serialized = JSON.stringify(PUBLIC_STRUCTURED_DATA).replaceAll("<", "\\u003c");
+  const serialized = JSON.stringify(PUBLIC_STRUCTURED_DATA).replaceAll("<", String.raw`\u003c`);
   return (
     <script
       type="application/ld+json"

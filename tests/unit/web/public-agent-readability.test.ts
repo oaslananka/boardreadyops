@@ -61,6 +61,18 @@ describe("public agent readability contract", () => {
     expect(link).toContain('</llms.txt>; rel="describedby"');
   });
 
+  it("keeps public-discovery verification explicit for static analyzers", () => {
+    const verifier = readFileSync("scripts/verify-public-agent-readability.mjs", "utf8");
+    const structuredData = readFileSync("apps/web/components/public-structured-data.tsx", "utf8");
+
+    expect(verifier).not.toContain("String(lastError)");
+    expect(verifier).not.toContain("lastError ? `:");
+    expect(verifier).toContain('.startsWith("3.1.")');
+    expect(verifier).toContain(".sort((left, right) => left.localeCompare(right))");
+    expect(verifier).not.toContain("main().catch(");
+    expect(structuredData).toContain("String.raw`\\u003c`");
+  });
+
   it("wires the post-build verifier into the cloud build contract", () => {
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> };
     expect(pkg.scripts["verify:public-agent-readability"]).toBe("node scripts/verify-public-agent-readability.mjs");

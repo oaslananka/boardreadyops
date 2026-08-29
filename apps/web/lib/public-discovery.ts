@@ -1,9 +1,6 @@
 export const PUBLIC_SITE_ORIGIN = "https://boardreadyops.com" as const;
 export const DOCS_ORIGIN = "https://docs.boardreadyops.com" as const;
 export const PUBLIC_CONTENT_LAST_UPDATED = "2026-08-29" as const;
-export const PRODUCT_DESCRIPTION =
-  "Checks whether a KiCad board is ready to fabricate, on every pull request." as const;
-
 export const PUBLIC_HTML_PAGES = [{ path: "/", markdownPath: "/index.md" }] as const;
 export const PUBLIC_API_PATHS = ["/api/health/live", "/api/health/ready"] as const;
 

@@ -24,6 +24,12 @@ function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function errorMessage(error) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "unknown error";
+}
+
 async function reservePort() {
   const server = net.createServer();
   await new Promise((resolve, reject) => {
@@ -39,18 +45,19 @@ async function reservePort() {
 
 async function waitForServer(baseUrl, child) {
   const deadline = Date.now() + 20_000;
-  let lastError;
+  let lastErrorMessage = "";
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`standalone web server exited early with code ${child.exitCode}`);
     try {
       const response = await fetch(`${baseUrl}/`);
       if (response.ok) return;
     } catch (error) {
-      lastError = error;
+      lastErrorMessage = errorMessage(error);
     }
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
-  throw new Error(`timed out waiting for standalone web server${lastError ? `: ${String(lastError)}` : ""}`);
+  const detail = lastErrorMessage ? `: ${lastErrorMessage}` : "";
+  throw new Error(`timed out waiting for standalone web server${detail}`);
 }
 
 function parseHtml(html) {
@@ -104,16 +111,16 @@ export async function verifyPublicAgentReadability(baseUrl) {
   invariant((await markdown.text()).includes("## Sitemap"), "negotiated Markdown missing Sitemap section");
 
   const discovery = [
-    ["/robots.txt", "text/plain"],
-    ["/sitemap.xml", "application/xml"],
-    ["/sitemap.md", "text/markdown"],
-    ["/llms.txt", "text/plain"],
-    ["/llms-full.txt", "text/plain"],
-    ["/AGENTS.md", "text/markdown"],
-    ["/index.md", "text/markdown"],
-    ["/openapi.json", "application/json"],
+    { pathname: "/robots.txt", contentType: "text/plain" },
+    { pathname: "/sitemap.xml", contentType: "application/xml" },
+    { pathname: "/sitemap.md", contentType: "text/markdown" },
+    { pathname: "/llms.txt", contentType: "text/plain" },
+    { pathname: "/llms-full.txt", contentType: "text/plain" },
+    { pathname: "/AGENTS.md", contentType: "text/markdown" },
+    { pathname: "/index.md", contentType: "text/markdown" },
+    { pathname: "/openapi.json", contentType: "application/json" },
   ];
-  for (const [pathname, contentType] of discovery) {
+  for (const { pathname, contentType } of discovery) {
     const response = await fetch(`${baseUrl}${pathname}`);
     invariant(response.status === 200, `${pathname} returned ${response.status}`);
     invariant(
@@ -124,9 +131,10 @@ export async function verifyPublicAgentReadability(baseUrl) {
 
   const openApiResponse = await fetch(`${baseUrl}/openapi.json`);
   const openApi = await openApiResponse.json();
-  invariant(/^3\.1\./.test(openApi.openapi), "OpenAPI version is not 3.1.x");
+  invariant(typeof openApi.openapi === "string" && openApi.openapi.startsWith("3.1."), "OpenAPI version is not 3.1.x");
   invariant(
-    JSON.stringify(Object.keys(openApi.paths).sort()) === JSON.stringify(["/api/health/live", "/api/health/ready"]),
+    JSON.stringify(Object.keys(openApi.paths).sort((left, right) => left.localeCompare(right))) ===
+      JSON.stringify(["/api/health/live", "/api/health/ready"]),
     "OpenAPI path allowlist changed",
   );
 
@@ -173,8 +181,10 @@ async function main() {
 
 const entrypoint = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : undefined;
 if (entrypoint === import.meta.url) {
-  main().catch((error) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(`${errorMessage(error)}\n`);
     process.exitCode = 1;
-  });
+  }
 }
