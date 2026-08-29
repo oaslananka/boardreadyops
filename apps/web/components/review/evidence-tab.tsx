@@ -7,7 +7,7 @@ export function EvidenceTab({ review }: { review: DemoReview }) {
     <div className="provenance-chain evidence-tab-content">
       <Panel
         title="Evidence Pack Manifest"
-        description="Immutable cryptographic records and artifact digests for this hardware revision."
+        description="SHA-256 artifact digests and revision-bound evidence records for this hardware revision."
         tone="raised"
       >
         <div className="evidence-digest-summary-box panel surface-inset">

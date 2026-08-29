@@ -15,8 +15,8 @@ export default function PoliciesPage() {
         <header className="page-intro">
           <h1>Organization Governance & Release Policies</h1>
           <p>
-            Cryptographic release gates and verification rules. Inheritance: Organization → Team → Repository → Review
-            exception.
+            Release gates and verification rules bound to SHA-256 evidence digests. Inheritance: Organization → Team →
+            Repository → Review exception.
           </p>
         </header>
 
