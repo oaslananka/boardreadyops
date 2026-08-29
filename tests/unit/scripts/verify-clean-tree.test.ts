@@ -19,7 +19,7 @@ describe("verify-clean-tree", () => {
     expect(gitConfigNullDevice("linux")).toBe("/dev/null");
   });
 
-  it("accepts ignored dependencies, public owner guards, mirror terminology, and generated NOTICE text", async () => {
+  it("accepts ignored dependencies, mirror terminology, and generated NOTICE text", async () => {
     const root = await createRepository();
     await mkdir(path.join(root, "node_modules", "example"), { recursive: true });
     await writeFile(path.join(root, "node_modules", "example", "index.js"), "export {};\n");
@@ -123,7 +123,7 @@ async function createRepository(environment = isolatedGitEnvironment()) {
   await writeFileRecursive(path.join(root, "dist", "cli", "index.cjs"), "module.exports = {};\n");
   await writeFileRecursive(
     path.join(root, ".github", "workflows", "ci.yml"),
-    "jobs:\n  test:\n    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'\n    runs-on: ubuntu-24.04\n",
+    "jobs:\n  test:\n    runs-on: ubuntu-24.04\n",
   );
   runGit(root, ["add", "."], environment);
   runGit(root, ["commit", "--quiet", "-m", "test fixture"], environment);

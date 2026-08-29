@@ -35,7 +35,6 @@ env:
 
 jobs:
   build:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -98,7 +97,7 @@ jobs:
           path: site
 
   deploy:
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     needs: build
     timeout-minutes: 10
