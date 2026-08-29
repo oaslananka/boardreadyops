@@ -7,6 +7,34 @@ const nextConfig = {
   outputFileTracingRoot: repositoryRoot,
   poweredByHeader: false,
   reactStrictMode: true,
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/",
+          has: [{ type: "header", key: "accept", value: "(.*)text/markdown(.*)" }],
+          destination: "/index.md",
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
+  async headers() {
+    const noindex = { key: "X-Robots-Tag", value: "noindex, nofollow" };
+    return [
+      "/setup",
+      "/dashboard",
+      "/work",
+      "/evidence",
+      "/insights",
+      "/policies",
+      "/repositories/:path*",
+      "/reviews/:path*",
+      "/runs/:path*",
+      "/settings/:path*",
+    ].map((source) => ({ source, headers: [noindex] }));
+  },
   transpilePackages: [
     "@boardreadyops/cloud-core",
     "@boardreadyops/contracts",

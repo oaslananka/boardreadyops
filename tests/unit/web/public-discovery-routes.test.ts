@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GET as getAgents } from "../../../apps/web/app/AGENTS.md/route.js";
+import { GET as getHomeMarkdown } from "../../../apps/web/app/index.md/route.js";
 import { GET as getLlms } from "../../../apps/web/app/llms.txt/route.js";
 import { GET as getLlmsFull } from "../../../apps/web/app/llms-full.txt/route.js";
 import { GET as getOpenApi } from "../../../apps/web/app/openapi.json/route.js";
@@ -8,6 +9,15 @@ import sitemap from "../../../apps/web/app/sitemap.js";
 import { GET as getSitemapMarkdown } from "../../../apps/web/app/sitemap.md/route.js";
 
 describe("public discovery routes", () => {
+  it("serves the homepage Markdown representation with canonical negotiation headers", async () => {
+    const response = getHomeMarkdown();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/markdown");
+    expect(response.headers.get("link")).toBe('<https://boardreadyops.com/>; rel="canonical"');
+    expect(response.headers.get("vary")).toContain("Accept");
+    expect(await response.text()).toContain("## Sitemap");
+  });
+
   it("serves llms.txt as cacheable plain text", async () => {
     const response = getLlms();
     expect(response.status).toBe(200);
