@@ -73,14 +73,14 @@ pull_request_rules:
 
   - name: label security workflow changes
     conditions:
-      - files ~= "^\\.github/workflows/security"
+      - files ~= ^\.github/workflows/security
     actions:
       label:
         add: ["security", "manual-review"]
 
   - name: label documentation changes
     conditions:
-      - files ~= "^docs/"
+      - files ~= ^docs/
     actions:
       label:
         add: ["documentation"]
