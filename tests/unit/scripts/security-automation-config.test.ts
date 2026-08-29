@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
@@ -481,5 +481,25 @@ describe("dependency and security automation configuration", () => {
     expect(sonar).toContain("Automatic Analysis");
     expect(sonar).toContain("Do not add a CI scanner while Automatic Analysis is enabled");
     expect(workflows.join("\n")).not.toContain("SonarSource/sonarqube-scan-action");
+  });
+
+  it("does not keep fixed repository owner guards in CI configuration or examples", async () => {
+    const workflowDirectory = join(repositoryRoot, ".github/workflows");
+    const workflowNames = (await readdir(workflowDirectory)).filter(
+      (name) => name.endsWith(".yml") || name.endsWith(".yaml"),
+    );
+    const candidatePaths = [
+      ...workflowNames.map((name) => `.github/workflows/${name}`),
+      "docs/superpowers/plans/2026-08-04-windows-standalone-portable-copy.md",
+      "tests/unit/scripts/verify-clean-tree.test.ts",
+    ];
+    const guardedFiles: string[] = [];
+
+    for (const path of candidatePaths) {
+      const content = await repositoryFile(path);
+      if (content.includes("github.repository_owner ==")) guardedFiles.push(path);
+    }
+
+    expect(guardedFiles).toEqual([]);
   });
 });

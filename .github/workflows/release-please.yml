@@ -16,7 +16,6 @@ env:
 
 jobs:
   release-please:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

@@ -35,7 +35,6 @@ env:
 
 jobs:
   smoke:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: container-build / smoke (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -110,7 +109,7 @@ jobs:
 
   publish:
     name: container-build / publish
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish))
+    if: (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish))
     needs: smoke
     runs-on: ubuntu-24.04
     timeout-minutes: 60

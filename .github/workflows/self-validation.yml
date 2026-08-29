@@ -15,7 +15,6 @@ env:
 
 jobs:
   self-validation:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: self-validation / boardreadyops-on-boardreadyops
     runs-on: ubuntu-24.04
     timeout-minutes: 45
