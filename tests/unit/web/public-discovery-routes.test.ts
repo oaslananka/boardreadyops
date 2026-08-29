@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GET as getAgents } from "../../../apps/web/app/AGENTS.md/route.js";
 import { GET as getLlms } from "../../../apps/web/app/llms.txt/route.js";
 import { GET as getLlmsFull } from "../../../apps/web/app/llms-full.txt/route.js";
+import { GET as getOpenApi } from "../../../apps/web/app/openapi.json/route.js";
 import robots from "../../../apps/web/app/robots.js";
 import sitemap from "../../../apps/web/app/sitemap.js";
 import { GET as getSitemapMarkdown } from "../../../apps/web/app/sitemap.md/route.js";
@@ -30,6 +31,14 @@ describe("public discovery routes", () => {
     expect(await sitemapResponse.text()).toContain("# BoardReadyOps Sitemap");
     expect(agentsResponse.headers.get("cache-control")).toContain("public");
     expect(await agentsResponse.text()).toContain("## Installation");
+  });
+
+  it("serves the public OpenAPI document as JSON", async () => {
+    const response = getOpenApi();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    const body = (await response.json()) as { paths: Record<string, unknown> };
+    expect(Object.keys(body.paths).sort()).toEqual(["/api/health/live", "/api/health/ready"]);
   });
 
   it("declares crawlable discovery resources and the XML sitemap", () => {

@@ -173,3 +173,114 @@ The public OpenAPI document at [openapi.json](${PUBLIC_SITE_ORIGIN}/openapi.json
 See the [Markdown sitemap](${PUBLIC_SITE_ORIGIN}/sitemap.md) for public product and documentation entry points.
 `;
 }
+
+export function buildPublicOpenApiDocument() {
+  return {
+    openapi: "3.1.0",
+    info: {
+      title: "BoardReadyOps Public API",
+      version: "1.0.0",
+      description:
+        "Public service liveness and readiness endpoints for BoardReadyOps. Authenticated and operational APIs are intentionally excluded.",
+    },
+    servers: [{ url: PUBLIC_SITE_ORIGIN }],
+    paths: {
+      "/api/health/live": {
+        get: {
+          operationId: "getLiveness",
+          summary: "Check service liveness",
+          responses: {
+            "200": {
+              description: "The web service process is live.",
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["ok", "service", "check"],
+                    properties: {
+                      ok: { const: true },
+                      service: { const: "boardreadyops-cloud" },
+                      check: { const: "liveness" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "/api/health/ready": {
+        get: {
+          operationId: "getReadiness",
+          summary: "Check service readiness",
+          responses: {
+            "200": {
+              description: "Required configuration and database connectivity are ready.",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ReadinessSuccess" },
+                },
+              },
+            },
+            "503": {
+              description: "The service is live but not ready.",
+              content: {
+                "application/json": {
+                  schema: { $ref: "#/components/schemas/ReadinessFailure" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    components: {
+      schemas: {
+        ReadinessSuccess: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ok", "service", "check", "checks", "effectiveConfiguration"],
+          properties: {
+            ok: { const: true },
+            service: { const: "boardreadyops-cloud" },
+            check: { const: "readiness" },
+            checks: {
+              type: "object",
+              additionalProperties: false,
+              required: ["configuration", "database"],
+              properties: {
+                configuration: { const: "pass" },
+                database: { const: "pass" },
+              },
+            },
+            effectiveConfiguration: {
+              type: "object",
+              additionalProperties: false,
+              required: ["artifactCapabilityTtlSeconds"],
+              properties: {
+                artifactCapabilityTtlSeconds: { type: "integer", minimum: 1 },
+                selfHostedRunnerMinimumVersion: { type: "string", minLength: 1 },
+              },
+            },
+          },
+        },
+        ReadinessFailure: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ok", "service", "check", "reason"],
+          properties: {
+            ok: { const: false },
+            service: { const: "boardreadyops-cloud" },
+            check: { const: "readiness" },
+            reason: {
+              type: "string",
+              enum: ["missing-configuration", "database-unavailable", "database-timeout"],
+            },
+            missing: { type: "array", items: { type: "string" }, uniqueItems: true },
+          },
+        },
+      },
+    },
+  } as const;
+}

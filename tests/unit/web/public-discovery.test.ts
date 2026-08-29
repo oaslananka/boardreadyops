@@ -11,6 +11,7 @@ import {
   buildLlmsFullTxt,
   buildLlmsTxt,
   buildPublicAgentsMarkdown,
+  buildPublicOpenApiDocument,
   buildSitemapMarkdown,
 } from "../../../apps/web/lib/public-discovery-content.js";
 
@@ -62,6 +63,17 @@ describe("public discovery content", () => {
     const text = buildLlmsFullTxt();
     expect(text.length).toBeGreaterThan(1_000);
     expect(text.length).toBeLessThan(20_000);
+  });
+
+  it("publishes an OpenAPI contract for only the approved health endpoints", () => {
+    const spec = buildPublicOpenApiDocument();
+    expect(spec.openapi).toMatch(/^3\.1\./);
+    expect(spec.info.title).toBe("BoardReadyOps Public API");
+    expect(Object.keys(spec.paths).sort()).toEqual(["/api/health/live", "/api/health/ready"]);
+    const serialized = JSON.stringify(spec);
+    expect(serialized).not.toContain("/api/v1/");
+    expect(serialized).not.toContain("DATABASE_URL");
+    expect(serialized).not.toContain("securitySchemes");
   });
 
   it("builds a semantic markdown sitemap", () => {
