@@ -30,6 +30,7 @@ const nextConfig = {
             key: "Link",
             value: '<https://boardreadyops.com/>; rel="canonical", </llms.txt>; rel="describedby"',
           },
+          { key: "Vary", value: "Accept" },
         ],
       },
       ...[

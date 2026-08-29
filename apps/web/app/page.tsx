@@ -138,6 +138,33 @@ const releaseFaq = [
   },
 ] as const;
 
+const releaseEvidenceChecklist = [
+  {
+    title: "Source revision",
+    body: "Record the immutable Git commit that the decision describes. A branch name can move after review starts; the release evidence must not.",
+  },
+  {
+    title: "Design checks",
+    body: "Keep DRC and ERC results associated with the evaluated project so schematic and layout findings can be traced to the same revision as the handoff.",
+  },
+  {
+    title: "Manufacturing outputs",
+    body: "Verify that expected Gerbers, drill data, BOM, CPL or position files, drawings, and configured vendor deliverables are present and current rather than leftovers from an older build.",
+  },
+  {
+    title: "Evidence identity",
+    body: "Use manifests, hashes, or equivalent identifiers for important artifacts. A reviewer should be able to tell which exact output was checked without trusting a filename alone.",
+  },
+  {
+    title: "Policy and exceptions",
+    body: "Preserve the release policy, blocking threshold, suppressions, and waivers that shaped the verdict. Exceptions should remain visible engineering decisions with scope and rationale.",
+  },
+  {
+    title: "Workflow record",
+    body: "Keep the GitHub workflow and Check Run that produced the result. Together they show when the evaluation ran, which revision it evaluated, and where a reviewer can inspect the authoritative execution evidence.",
+  },
+] as const;
+
 const capabilities = [
   {
     eyebrow: "Design",
@@ -430,6 +457,22 @@ export default function HomePage() {
                 </article>
               ))}
             </div>
+            <section className="landing-evidence-checklist" aria-labelledby="evidence-checklist-heading">
+              <h3 id="evidence-checklist-heading">A reviewable release-evidence checklist</h3>
+              <p>
+                A green verdict should be explainable without access to the original engineer's workstation. These are
+                the evidence categories a reviewer should expect to trace.
+              </p>
+              <ol>
+                {releaseEvidenceChecklist.map((entry) => (
+                  <li key={entry.title}>
+                    <strong>{entry.title}</strong>
+                    <span>{entry.body}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
             <div className="landing-faq-heading">
               <h3>Release-readiness questions</h3>
               <p>Practical boundaries that keep the verdict understandable instead of turning it into a black box.</p>

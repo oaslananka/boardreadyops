@@ -1086,3 +1086,66 @@
     grid-template-columns: 1fr;
   }
 }
+
+.landing-evidence-checklist {
+  margin-top: 3.5rem;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  border: 1px solid var(--bro-border);
+  background: var(--bro-bg-elevated);
+}
+
+.landing-evidence-checklist > h3 {
+  margin: 0;
+  color: var(--bro-text);
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+}
+
+.landing-evidence-checklist > p {
+  max-width: 48rem;
+  margin: 0.65rem 0 0;
+  color: var(--bro-text-muted);
+  line-height: 1.7;
+}
+
+.landing-evidence-checklist ol {
+  display: grid;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  gap: 1rem 2rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  list-style: none;
+  counter-reset: release-evidence;
+}
+
+.landing-evidence-checklist li {
+  display: grid;
+  position: relative;
+  padding-left: 2.5rem;
+  gap: 0.35rem;
+  counter-increment: release-evidence;
+}
+
+.landing-evidence-checklist li::before {
+  position: absolute;
+  top: 0.05rem;
+  left: 0;
+  color: var(--bro-accent);
+  font-family: var(--font-mono);
+  font-weight: 800;
+  content: counter(release-evidence, decimal-leading-zero);
+}
+
+.landing-evidence-checklist strong {
+  color: var(--bro-text);
+}
+
+.landing-evidence-checklist span {
+  color: var(--bro-text-muted);
+  line-height: 1.7;
+}
+
+@media (max-width: 46rem) {
+  .landing-evidence-checklist ol {
+    grid-template-columns: 1fr;
+  }
+}

@@ -67,6 +67,7 @@ export async function verifyPublicAgentReadability(baseUrl) {
     home.headers.get("link")?.includes('</llms.txt>; rel="describedby"'),
     "homepage missing llms describedby Link header",
   );
+  invariant(home.headers.get("vary")?.toLowerCase().includes("accept"), "homepage missing Vary: Accept");
   const html = await home.text();
   const document = parseHtml(html);
   invariant(document.documentElement.lang === "en", "homepage html lang is not en");

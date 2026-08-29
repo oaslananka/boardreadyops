@@ -18,6 +18,7 @@ describe("public discovery Next.js routing", () => {
     const link = home?.headers.find((header) => header.key === "Link")?.value;
     expect(link).toContain('<https://boardreadyops.com/>; rel="canonical"');
     expect(link).toContain('</llms.txt>; rel="describedby"');
+    expect(home?.headers).toContainEqual({ key: "Vary", value: "Accept" });
     const setup = headers.find((entry) => entry.source === "/setup");
     expect(setup?.headers).not.toContainEqual(expect.objectContaining({ key: "Link" }));
   });
