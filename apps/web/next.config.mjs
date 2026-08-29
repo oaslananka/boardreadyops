@@ -23,7 +23,15 @@ const nextConfig = {
   async headers() {
     const noindex = { key: "X-Robots-Tag", value: "noindex, nofollow" };
     return [
-      { source: "/", headers: [{ key: "Link", value: '</llms.txt>; rel="describedby"' }] },
+      {
+        source: "/",
+        headers: [
+          {
+            key: "Link",
+            value: '<https://boardreadyops.com/>; rel="canonical", </llms.txt>; rel="describedby"',
+          },
+        ],
+      },
       ...[
         "/setup",
         "/dashboard",
