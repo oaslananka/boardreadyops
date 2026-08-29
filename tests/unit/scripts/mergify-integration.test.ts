@@ -64,6 +64,12 @@ describe("Mergify integration contract", () => {
     expect(mergify).not.toContain("#comments");
   });
 
+  it("uses unquoted path regex values for file-label rules", () => {
+    expect(mergify).toContain("files ~= ^\\.github/workflows/security");
+    expect(mergify).toContain("files ~= ^docs/");
+    expect(mergify).not.toContain('files ~= "^');
+  });
+
   it("keeps queue scopes in Mergify without replacing the repository CI risk profile", () => {
     expect(mergify).toContain("merge_queue_scope: merge-queue");
     expect(ci).not.toContain("ci / detect-scopes");
