@@ -100,8 +100,10 @@ describe("HomePage", () => {
     expect(text).not.toMatch(/trusted by|customers|teams worldwide|10,000|fortune 500/iu);
   });
 
-  it("links documentation from the premium landing navigation", () => {
-    expect(collectLinks(HomePage())).toContain("https://docs.boardreadyops.com");
+  it("links documentation and security assurance from the premium landing navigation", () => {
+    const links = collectLinks(HomePage());
+    expect(links).toContain("https://docs.boardreadyops.com");
+    expect(links).toContain("https://docs.boardreadyops.com/security/assurance-case/");
   });
 
   it("uses Foundry tokens in landing styles and defines landing-product-proof", async () => {
