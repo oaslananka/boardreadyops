@@ -50,6 +50,7 @@ queue_rules:
       - check-success = ci / test-unit
       - check-success = ci / build
       - check-success = ci / verify-dist
+      - check-success = ci / coverage-gate
       - check-success = security / gate
     merge_conditions:
       - label = queue-me
@@ -60,6 +61,7 @@ queue_rules:
       - check-success = ci / test-unit
       - check-success = ci / build
       - check-success = ci / verify-dist
+      - check-success = ci / coverage-gate
       - check-success = security / gate
 
 pull_request_rules:

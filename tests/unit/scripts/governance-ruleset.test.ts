@@ -19,6 +19,7 @@ type PullRequestRule = {
     dismiss_stale_reviews_on_push: boolean;
     require_code_owner_review: boolean;
     require_last_push_approval: boolean;
+    require_extra_approval_for_unattributed_changes: boolean;
     required_approving_review_count: number;
     required_review_thread_resolution: boolean;
   };
@@ -45,6 +46,7 @@ describe("main branch governance ruleset", () => {
       dismiss_stale_reviews_on_push: true,
       require_code_owner_review: false,
       require_last_push_approval: false,
+      require_extra_approval_for_unattributed_changes: true,
       required_approving_review_count: 0,
       required_review_thread_resolution: true,
     });
@@ -66,6 +68,7 @@ describe("main branch governance ruleset", () => {
       "ci / test-unit",
       "ci / build",
       "ci / verify-dist",
+      "ci / coverage-gate",
       "security / gate",
     ]);
   });

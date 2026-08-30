@@ -3,16 +3,17 @@ import { describe, expect, it } from "vitest";
 
 const mergify = readFileSync(".mergify.yml", "utf8");
 const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+const mainRuleset = JSON.parse(readFileSync(".github/rulesets/main.json", "utf8")) as {
+  rules: Array<{
+    type: string;
+    parameters?: { required_status_checks?: Array<{ context: string }> };
+  }>;
+};
 
-const stableRequiredChecks = [
-  "ci / risk-profile",
-  "ci / lint",
-  "ci / typecheck",
-  "ci / test-unit",
-  "ci / build",
-  "ci / verify-dist",
-  "security / gate",
-];
+const stableRequiredChecks =
+  mainRuleset.rules
+    .find((rule) => rule.type === "required_status_checks")
+    ?.parameters?.required_status_checks?.map(({ context }) => context) ?? [];
 
 function readQueueConditionList(name: "queue_conditions" | "merge_conditions"): string[] {
   const lines = mergify.split(/\r?\n/u);
