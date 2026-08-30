@@ -80,7 +80,7 @@ jobs:
   dependency-review:
     needs: policy
     name: security / dependency-review
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name == 'pull_request' && needs.policy.outputs.dependency_changed == 'true'
+    if: github.event_name == 'pull_request' && needs.policy.outputs.dependency_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -99,7 +99,7 @@ jobs:
   osv-pull-request:
     needs: policy
     name: security / osv dependency diff
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name == 'pull_request' && needs.policy.outputs.dependency_changed == 'true'
+    if: github.event_name == 'pull_request' && needs.policy.outputs.dependency_changed == 'true'
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
     with:
       scan-args: |-
@@ -115,7 +115,7 @@ jobs:
   osv-full:
     needs: policy
     name: security / osv full scan
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
     with:
       scan-args: |-
@@ -130,7 +130,7 @@ jobs:
   compliance:
     needs: policy
     name: security / repository compliance
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.needs_security == 'true'
+    if: needs.policy.outputs.needs_security == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -150,7 +150,7 @@ jobs:
 
   codeql:
     needs: policy
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.code_changed == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: needs.policy.outputs.code_changed == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     name: security / codeql
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -177,7 +177,7 @@ jobs:
 
   semgrep:
     needs: policy
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.code_changed == 'true'
+    if: needs.policy.outputs.code_changed == 'true'
     name: security / semgrep
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -216,7 +216,6 @@ jobs:
 
   gitleaks:
     needs: policy
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: security / gitleaks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -246,7 +245,7 @@ jobs:
 
   sbom:
     needs: policy
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.policy.outputs.needs_sbom == 'true'
+    if: needs.policy.outputs.needs_sbom == 'true'
     name: security / sbom
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -270,7 +269,7 @@ jobs:
 
   scorecard:
     name: security / scorecard advisory
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
