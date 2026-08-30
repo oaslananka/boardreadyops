@@ -490,6 +490,7 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       retentionMaintenance.purgeCompletedControlPlaneReconciliationItems({
         retentionDays: retention.controlPlaneHistoryDays,
       }),
+    previewExpiredArtifactRetention: () => retentionMaintenance.previewExpiredArtifactRetention(),
   });
   for (const failure of result.failures) {
     log("warn", "worker.retention_cleanup_failed", failure);
@@ -504,7 +505,8 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
     result.terminalRunnerRegistrationEnrollmentsPurged > 0 ||
     result.terminalRepositorySetupProbesPurged > 0 ||
     result.completedControlPlaneOutboxPurged > 0 ||
-    result.completedControlPlaneReconciliationItemsPurged > 0
+    result.completedControlPlaneReconciliationItemsPurged > 0 ||
+    result.artifactExpiryCandidatesPreviewed > 0
   ) {
     log("info", "worker.retention_cleanup", {
       webhookInboxPurged: result.webhookInboxPurged,
@@ -517,6 +519,7 @@ async function purgeExpiredRetentionData(currentTime: number): Promise<void> {
       terminalRepositorySetupProbesPurged: result.terminalRepositorySetupProbesPurged,
       completedControlPlaneOutboxPurged: result.completedControlPlaneOutboxPurged,
       completedControlPlaneReconciliationItemsPurged: result.completedControlPlaneReconciliationItemsPurged,
+      artifactExpiryCandidatesPreviewed: result.artifactExpiryCandidatesPreviewed,
     });
   }
   if (result.completed) lastSuccessfulRetentionCleanupAt = new Date().toISOString();

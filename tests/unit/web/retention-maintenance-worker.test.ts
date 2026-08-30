@@ -13,6 +13,7 @@ function dependencies(overrides: Partial<Parameters<typeof runRetentionMaintenan
     purgeTerminalRepositorySetupProbes: vi.fn().mockResolvedValue(3),
     purgeCompletedControlPlaneOutbox: vi.fn().mockResolvedValue(8),
     purgeCompletedControlPlaneReconciliationItems: vi.fn().mockResolvedValue(9),
+    previewExpiredArtifactRetention: vi.fn().mockResolvedValue(11),
     ...overrides,
   };
 }
@@ -30,6 +31,7 @@ describe("retention maintenance worker", () => {
       terminalRepositorySetupProbesPurged: 3,
       completedControlPlaneOutboxPurged: 8,
       completedControlPlaneReconciliationItemsPurged: 9,
+      artifactExpiryCandidatesPreviewed: 11,
       failures: [],
       completed: true,
     });
@@ -49,6 +51,7 @@ describe("retention maintenance worker", () => {
       terminalRepositorySetupProbesPurged: 3,
       completedControlPlaneOutboxPurged: 8,
       completedControlPlaneReconciliationItemsPurged: 9,
+      artifactExpiryCandidatesPreviewed: 11,
       failures: [{ scope: "webhook_inbox", errorClass: "TypeError" }],
       completed: false,
     });
@@ -61,6 +64,7 @@ describe("retention maintenance worker", () => {
     expect(input.purgeTerminalRepositorySetupProbes).toHaveBeenCalledOnce();
     expect(input.purgeCompletedControlPlaneOutbox).toHaveBeenCalledOnce();
     expect(input.purgeCompletedControlPlaneReconciliationItems).toHaveBeenCalledOnce();
+    expect(input.previewExpiredArtifactRetention).toHaveBeenCalledOnce();
   });
 
   it("reports content-free error classes for multiple failures", async () => {
