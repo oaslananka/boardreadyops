@@ -4,6 +4,19 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.37.0](https://github.com/oaslananka/boardreadyops/compare/v1.36.0...v1.37.0) (2026-08-30)
+
+
+### Features
+
+* **storage:** preview artifact expiry candidates ([#542](https://github.com/oaslananka/boardreadyops/issues/542)) ([a6a32e7](https://github.com/oaslananka/boardreadyops/commit/a6a32e7161304cdec5b08c7921e822efa1c15a6d))
+
+
+### Bug Fixes
+
+* **governance:** sync merge gates with live ruleset ([#541](https://github.com/oaslananka/boardreadyops/issues/541)) ([b2b4c9f](https://github.com/oaslananka/boardreadyops/commit/b2b4c9fac00a01ac3926cdf43c00a6f5a4a99597))
+* **web:** expose trust destination in landing nav ([#540](https://github.com/oaslananka/boardreadyops/issues/540)) ([0371cb3](https://github.com/oaslananka/boardreadyops/commit/0371cb3ae06e5f869477c1246ce4cb95164f8c2e))
+
 ## [1.36.0](https://github.com/oaslananka/boardreadyops/compare/v1.35.0...v1.36.0) (2026-08-30)
 
 
