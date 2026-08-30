@@ -10,6 +10,7 @@ export type RetentionMaintenanceStore = {
   purgeTerminalRepositorySetupProbes(input: { retentionDays: number; limit?: number }): Promise<number>;
   purgeCompletedControlPlaneOutbox(input: { retentionDays: number; limit?: number }): Promise<number>;
   purgeCompletedControlPlaneReconciliationItems(input: { retentionDays: number; limit?: number }): Promise<number>;
+  previewExpiredArtifactRetention(input?: { limit?: number }): Promise<number>;
 };
 
 export type RetentionMaintenanceStoreOptions = {
@@ -272,6 +273,51 @@ export function createSqlRetentionMaintenanceStore(
            $2::integer
          )::int as affected`,
         [cutoff, limit],
+      );
+      return nonNegativeInteger(rows(result)[0]?.affected);
+    },
+
+    async previewExpiredArtifactRetention(input = {}) {
+      const at = now().toISOString();
+      const limit = boundedLimit(input.limit, defaultBatchSize);
+      const result = await executor.query(
+        `with candidates as (
+           select artifacts.id
+           from artifacts
+           join release_runs on release_runs.id = artifacts.run_id
+           join repositories on repositories.id = release_runs.repository_id
+           join installations on installations.id = repositories.installation_id
+           left join retention_policies on retention_policies.tenant_id = installations.account_login
+           where (
+             artifacts.retention_until <= $1::timestamptz
+             or (
+               artifacts.retention_until is null
+               and case
+                   when retention_policies.retention_days is not null then retention_policies.retention_days
+                   when installations.plan_tier = 'free' then 30
+                   when installations.plan_tier = 'team' then 365
+                   else null
+                 end is not null
+               and artifacts.uploaded_at <= $1::timestamptz - make_interval(
+                 days => case
+                   when retention_policies.retention_days is not null then retention_policies.retention_days
+                   when installations.plan_tier = 'free' then 30
+                   when installations.plan_tier = 'team' then 365
+                   else null
+                 end
+               )
+             )
+           )
+             and not exists (
+               select 1
+               from legal_holds
+               where legal_holds.tenant_id = installations.account_login
+                 and legal_holds.active = true
+             )
+           limit $2::integer
+         )
+         select count(*)::int as affected from candidates`,
+        [at, limit],
       );
       return nonNegativeInteger(rows(result)[0]?.affected);
     },
