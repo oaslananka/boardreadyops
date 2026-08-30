@@ -49,10 +49,12 @@ When users install BoardReadyOps from GitHub Marketplace, the GitHub App request
 
 | Permission | Access | Justification |
 | --- | --- | --- |
-| **Checks** | Read & write | Create and update Check Runs with pass/fail release readiness results on pull requests and commits. |
-| **Pull Requests** | Read | Identify target branch, PR numbers, and compare base/head revisions. |
-| **Contents** | Read | Inspect KiCad project files (`.kicad_pro`, `.kicad_sch`, `.kicad_pcb`), BOMs, and jobsets during review runs. |
-| **Metadata** | Read-only | Core GitHub App requirement to resolve repository name, owner, and default branch. |
+| **Checks** | Read & write | Create, start, and complete BoardReadyOps Check Runs for pull request readiness results. |
+| **Pull Requests** | Read | Receive supported pull request events and bind runs to the repository and pull request context. |
+| **Actions** | Read & write | Read target-workflow readiness and dispatch `.github/workflows/readiness-runner.yml` in the same repository. |
+| **Metadata** | Read-only | GitHub-required repository and installation context. |
+
+The production GitHub App does not read repository contents through the GitHub REST API. Source checkout stays inside the target-repository GitHub Actions workflow, which uses its job-scoped `GITHUB_TOKEN` with `contents: read` to check out the exact assigned SHA. This is the ADR-0010 least-privilege boundary; App-level `Contents` access remains disabled for the shipped target-repository execution mode.
 
 ---
 
