@@ -17,7 +17,7 @@ const DOCS_PATTERNS = [
 ];
 
 const DOCS_GENERATION_PATTERNS = [
-  /^scripts\/(docs-build|generate-api-docs|generate-release-history|generate-rule-docs|update-action-inputs-docs)\.mjs$/,
+  /^scripts\/(docs-build|docs-discovery|generate-api-docs|generate-release-history|generate-rule-docs|update-action-inputs-docs)\.mjs$/,
   /^scripts\/check-docs-a11y\.mjs$/,
   /^docs\/requirements(?:\.lock)?\.txt$/,
   /^packages\/plugin-sdk\//,
