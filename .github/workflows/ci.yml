@@ -456,7 +456,7 @@ jobs:
       - run: pnpm run docs
         env:
           NO_MKDOCS_2_WARNING: "1"
-      - run: python -m mkdocs build --strict --site-dir site
+      - run: node scripts/docs-build.mjs --site-dir site
         env:
           NO_MKDOCS_2_WARNING: "1"
 

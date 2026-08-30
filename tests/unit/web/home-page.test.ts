@@ -1,6 +1,7 @@
 import { isValidElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
-import HomePage from "../../../apps/web/app/page.js";
+import HomePage, { metadata as homeMetadata } from "../../../apps/web/app/page.js";
+import { PUBLIC_STRUCTURED_DATA } from "../../../apps/web/components/public-structured-data.js";
 
 function collectText(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
@@ -29,6 +30,36 @@ function collectLinks(node: ReactNode, hrefs: string[] = []): string[] {
 }
 
 describe("HomePage", () => {
+  it("publishes homepage-only canonical and Markdown alternate metadata", () => {
+    expect(homeMetadata.alternates?.canonical).toBe("/");
+    expect(homeMetadata.alternates?.types?.["text/markdown"]).toBe("/index.md");
+  });
+
+  it("links visible terminology and the public OpenAPI contract", () => {
+    const text = collectText(HomePage());
+    const links = collectLinks(HomePage());
+    for (const term of ["DRC", "ERC", "BOM", "manufacturing package", "release evidence", "Check Run"]) {
+      expect(text).toContain(term);
+    }
+    expect(text).toContain("Glossary");
+    expect(links).toContain("#glossary");
+    expect(links).toContain("/openapi.json");
+  });
+
+  it("publishes conservative structured data for the visible product", () => {
+    const graph = PUBLIC_STRUCTURED_DATA["@graph"] as Array<Record<string, unknown>>;
+    expect(graph.map((item) => item["@type"])).toEqual(["WebSite", "SoftwareApplication", "WebPage", "BreadcrumbList"]);
+    const webPage = graph.find((item) => item["@type"] === "WebPage");
+    expect(webPage).toMatchObject({
+      headline: "Catch board mistakes before the fab does.",
+      description: expect.any(String),
+      url: "https://boardreadyops.com/",
+      dateModified: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      breadcrumb: { "@id": "https://boardreadyops.com/#breadcrumbs" },
+    });
+    const serialized = JSON.stringify(PUBLIC_STRUCTURED_DATA);
+    expect(serialized).not.toMatch(/aggregateRating|review|offers|price/);
+  });
   it("shows the primary headline", () => {
     const text = collectText(HomePage());
     expect(text).toContain("Catch board mistakes before the fab does.");
