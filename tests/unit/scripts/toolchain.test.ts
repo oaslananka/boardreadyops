@@ -10,6 +10,7 @@ import {
   evaluateToolchain,
   normalizeRepositoryModes,
   resolveToolchainPaths,
+  selectPythonInterpreter,
   type ToolchainManifest,
   type ToolchainProbe,
 } from "../../../scripts/toolchain.mjs";
@@ -270,13 +271,40 @@ exit 0
     }
   });
 
-  it("uses cmd.exe for Corepack shim execution on Windows", () => {
+  it("executes Corepack through the running Node binary on Windows without cmd.exe", () => {
     expect(buildCorepackInstallCommand("win32", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
-      command: "C:\\Windows\\System32\\cmd.exe",
-      args: ["/d", "/s", "/c", "corepack install"],
-      windowsVerbatimArguments: true,
+      command: process.execPath,
+      args: [path.join(path.dirname(process.execPath), "node_modules", "corepack", "dist", "corepack.js"), "install"],
     });
     expect(buildCorepackInstallCommand("linux", {})).toEqual({ command: "corepack", args: ["install"] });
+  });
+
+  it("does not route arbitrary Windows command shims through cmd.exe", async () => {
+    const temporaryRoot = await mkdtemp(path.join(root, ".toolchain-windows-shim-test-"));
+    const fakeCmd = path.join(temporaryRoot, "cmd.exe");
+    const marker = path.join(temporaryRoot, "cmd-invoked");
+    const pythonShim = path.join(temporaryRoot, "unsafe&launcher", "python.cmd");
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    if (!platformDescriptor) throw new Error("process.platform descriptor unavailable");
+
+    await mkdir(path.dirname(pythonShim), { recursive: true });
+    await writeFile(fakeCmd, `#!/usr/bin/env sh\ntouch "${marker}"\nexit 93\n`);
+    await chmod(fakeCmd, 0o755);
+
+    try {
+      Object.defineProperty(process, "platform", { ...platformDescriptor, value: "win32" });
+      await expect(
+        selectPythonInterpreter(
+          await manifest(),
+          { ...process.env, BOARDREADYOPS_PYTHON: pythonShim, ComSpec: fakeCmd },
+          root,
+        ),
+      ).rejects.toThrow("No usable Python interpreter");
+      await expect(stat(marker)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      Object.defineProperty(process, "platform", platformDescriptor);
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
   });
 
   it.skipIf(process.platform === "win32")(
