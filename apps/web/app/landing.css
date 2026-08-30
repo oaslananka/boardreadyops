@@ -958,3 +958,194 @@
     animation: none;
   }
 }
+
+/* ==========================================================================
+   Release guide & glossary
+   ========================================================================== */
+
+.landing-release-guide,
+.landing-glossary {
+  padding: clamp(4.5rem, 8vw, 7rem) 1.5rem;
+  border-top: 1px solid var(--bro-border);
+}
+
+.landing-release-guide {
+  background: var(--bro-bg);
+}
+
+.landing-glossary {
+  background: var(--bro-bg-elevated);
+}
+
+.landing-guide-grid,
+.landing-glossary-grid {
+  display: grid;
+  margin-top: 2.5rem;
+  gap: 1px;
+  border: 1px solid var(--bro-border);
+  background: var(--bro-border);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.landing-guide-grid article,
+.landing-glossary-grid > div {
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  background: var(--bro-bg-elevated);
+}
+
+.landing-glossary-grid > div {
+  background: var(--bro-bg);
+}
+
+.landing-guide-grid h3,
+.landing-glossary-grid dt {
+  margin: 0 0 0.75rem;
+  color: var(--bro-text);
+}
+
+.landing-glossary-grid dt {
+  color: var(--bro-accent);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.landing-guide-grid p,
+.landing-glossary-grid dd {
+  margin: 0;
+  color: var(--bro-text-muted);
+  line-height: 1.75;
+}
+
+.landing-technical-links {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+  gap: 0.75rem 1.5rem;
+}
+
+.landing-technical-links a {
+  color: var(--bro-accent);
+  font-weight: 700;
+  text-underline-offset: 0.22em;
+}
+
+@media (max-width: 46rem) {
+  .landing-guide-grid,
+  .landing-glossary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.landing-faq-heading {
+  max-width: 52rem;
+  margin-top: 3.5rem;
+}
+
+.landing-faq-heading h3 {
+  margin: 0;
+  color: var(--bro-text);
+  font-size: clamp(1.35rem, 2.5vw, 1.8rem);
+}
+
+.landing-faq-heading p {
+  margin: 0.6rem 0 0;
+  color: var(--bro-text-muted);
+  line-height: 1.7;
+}
+
+.landing-faq-grid {
+  display: grid;
+  margin-top: 1.5rem;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.landing-faq-grid article {
+  padding: clamp(1.4rem, 3vw, 2rem);
+  border: 1px solid var(--bro-border);
+  background: var(--bro-bg-elevated);
+}
+
+.landing-faq-grid h3 {
+  margin: 0;
+  color: var(--bro-text);
+  font-size: 1.05rem;
+}
+
+.landing-faq-grid p {
+  margin: 0.75rem 0 0;
+  color: var(--bro-text-muted);
+  line-height: 1.75;
+}
+
+@media (max-width: 46rem) {
+  .landing-faq-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.landing-evidence-checklist {
+  margin-top: 3.5rem;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  border: 1px solid var(--bro-border);
+  background: var(--bro-bg-elevated);
+}
+
+.landing-evidence-checklist > h3 {
+  margin: 0;
+  color: var(--bro-text);
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+}
+
+.landing-evidence-checklist > p {
+  max-width: 48rem;
+  margin: 0.65rem 0 0;
+  color: var(--bro-text-muted);
+  line-height: 1.7;
+}
+
+.landing-evidence-checklist ol {
+  display: grid;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  gap: 1rem 2rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  list-style: none;
+  counter-reset: release-evidence;
+}
+
+.landing-evidence-checklist li {
+  display: grid;
+  position: relative;
+  padding-left: 2.5rem;
+  gap: 0.35rem;
+  counter-increment: release-evidence;
+}
+
+.landing-evidence-checklist li::before {
+  position: absolute;
+  top: 0.05rem;
+  left: 0;
+  color: var(--bro-accent);
+  font-family: var(--font-mono);
+  font-weight: 800;
+  content: counter(release-evidence, decimal-leading-zero);
+}
+
+.landing-evidence-checklist strong {
+  color: var(--bro-text);
+}
+
+.landing-evidence-checklist span {
+  color: var(--bro-text-muted);
+  line-height: 1.7;
+}
+
+@media (max-width: 46rem) {
+  .landing-evidence-checklist ol {
+    grid-template-columns: 1fr;
+  }
+}
