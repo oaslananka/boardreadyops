@@ -215,6 +215,7 @@ export default function HomePage() {
           <a href="#product">Product</a>
           <a href="#how-it-works">How it works</a>
           <a href="#glossary">Glossary</a>
+          <a href="https://docs.boardreadyops.com/security/assurance-case/">Trust</a>
           <a href="https://docs.boardreadyops.com">Docs</a>
           {/* Suspended so reading the session never delays the landing navigation. */}
           <Suspense fallback={null}>
