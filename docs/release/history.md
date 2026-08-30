@@ -8,6 +8,27 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.36.0](https://github.com/oaslananka/boardreadyops/compare/v1.35.0...v1.36.0) (2026-08-30)
+
+
+### Features
+
+* **docs:** add agent discovery surfaces ([#536](https://github.com/oaslananka/boardreadyops/issues/536)) ([4ca4b65](https://github.com/oaslananka/boardreadyops/commit/4ca4b65b65517f3a0fd10bb7dc02f42a576b3862))
+* **docs:** add agent-aware edge negotiation ([#539](https://github.com/oaslananka/boardreadyops/issues/539)) ([45f5132](https://github.com/oaslananka/boardreadyops/commit/45f5132f28f7b423565caa8a522430d62c3a18df))
+* **marketplace:** prepare GitHub Marketplace listing, webhook intake, and legal documentation ([#524](https://github.com/oaslananka/boardreadyops/issues/524)) ([d3b63cd](https://github.com/oaslananka/boardreadyops/commit/d3b63cd04718cd723856f5e56a0da4ceeaa7ece1))
+* **web:** add public agent discovery and SEO metadata ([#535](https://github.com/oaslananka/boardreadyops/issues/535)) ([d8aa8d0](https://github.com/oaslananka/boardreadyops/commit/d8aa8d092e048f0687d8db4fb2a0098710eb5079))
+
+
+### Bug Fixes
+
+* **ci:** avoid Windows toolchain shell injection ([#532](https://github.com/oaslananka/boardreadyops/issues/532)) ([da4df1f](https://github.com/oaslananka/boardreadyops/commit/da4df1f25a7ff699a3261421202cc6dd481329c1))
+* **ci:** honor full production soak duration ([#533](https://github.com/oaslananka/boardreadyops/issues/533)) ([40b6220](https://github.com/oaslananka/boardreadyops/commit/40b62202356c7191c758682795b210c8eff74048))
+* **ci:** repair Mergify file label rules ([#531](https://github.com/oaslananka/boardreadyops/issues/531)) ([bd88079](https://github.com/oaslananka/boardreadyops/commit/bd8807963fffa3c5383d31bedfbbd455a14acc7b))
+* **cloud:** enforce Marketplace cancellation lifecycle ([46d2bca](https://github.com/oaslananka/boardreadyops/commit/46d2bcadc8698c9fe705f4253a3e0a79ce6812fd))
+* **docs:** align Marketplace permission model ([#530](https://github.com/oaslananka/boardreadyops/issues/530)) ([16d94de](https://github.com/oaslananka/boardreadyops/commit/16d94dee13d5fe48a716bfcc6efa90d5531e7ef7))
+* **review:** persist governance state and harden approval decisions ([#527](https://github.com/oaslananka/boardreadyops/issues/527)) ([2911a14](https://github.com/oaslananka/boardreadyops/commit/2911a1436781017972eaf8c425c7b85a9c74ebd9))
+* **web:** align governance copy with evidence model ([#528](https://github.com/oaslananka/boardreadyops/issues/528)) ([0b77922](https://github.com/oaslananka/boardreadyops/commit/0b77922edf3e31be9368024e8ac1c8224f813718))
+
 ## [1.35.0](https://github.com/oaslananka/boardreadyops/compare/v1.34.0...v1.35.0) (2026-08-27)
 
 
