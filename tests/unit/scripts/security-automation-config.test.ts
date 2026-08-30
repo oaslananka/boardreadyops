@@ -102,7 +102,9 @@ describe("dependency and security automation configuration", () => {
     const binaryPublisher = await repositoryFile("scripts/publish-binary-release-assets.mjs");
     const ci = await repositoryFile(".github/workflows/ci.yml");
     const benchmark = await repositoryFile(".github/workflows/benchmark.yml");
+    const container = await repositoryFile(".github/workflows/container-build.yml");
     const mutation = await repositoryFile(".github/workflows/mutation-nightly.yml");
+    const publishNpm = await repositoryFile(".github/workflows/publish-npm.yml");
     const security = await repositoryFile(".github/workflows/security.yml");
     const selfValidation = await repositoryFile(".github/workflows/self-validation.yml");
 
@@ -119,7 +121,11 @@ describe("dependency and security automation configuration", () => {
     );
     expect(ci.match(/retention-days: 7/gu) ?? []).toHaveLength(3);
     expect(benchmark).toContain("retention-days: 7");
+    expect(container).toMatch(
+      /name: boardreadyops-full-cyclonedx\n\s+path: boardreadyops-full\.cyclonedx\.json\n\s+retention-days: 30/u,
+    );
     expect(mutation).toContain("retention-days: 7");
+    expect(publishNpm).toMatch(/name: sbom\n\s+path: sbom\.cyclonedx\.json\n\s+retention-days: 7/u);
     expect(security.match(/retention-days: 7/gu) ?? []).toHaveLength(2);
     expect(selfValidation).toContain("retention-days: 7");
     expect(selfValidation).not.toContain("retention-days: 30");

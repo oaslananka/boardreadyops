@@ -224,3 +224,4 @@ jobs:
         with:
           name: boardreadyops-full-cyclonedx
           path: boardreadyops-full.cyclonedx.json
+          retention-days: 30

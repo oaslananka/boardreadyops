@@ -212,6 +212,7 @@ jobs:
         with:
           name: sbom
           path: sbom.cyclonedx.json
+          retention-days: 7
       - name: Refuse npm token-auth fallback
         if: env.SHOULD_PUBLISH == 'true'
         run: |
