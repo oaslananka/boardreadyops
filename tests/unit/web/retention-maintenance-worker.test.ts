@@ -74,6 +74,7 @@ describe("retention maintenance worker", () => {
         expireRepositorySetupProbes: vi.fn().mockRejectedValue(new RangeError("repository private-name")),
         purgeTerminalArtifactUploadCapabilities: vi.fn().mockRejectedValue(new Error("token=private-capability")),
         purgeCompletedControlPlaneOutbox: vi.fn().mockRejectedValue(new SyntaxError("private payload")),
+        previewExpiredArtifactRetention: vi.fn().mockRejectedValue(new Error("private artifact locator")),
       }),
     );
 
@@ -82,11 +83,13 @@ describe("retention maintenance worker", () => {
       repositorySetupProbesExpired: 0,
       terminalArtifactUploadCapabilitiesPurged: 0,
       completedControlPlaneOutboxPurged: 0,
+      artifactExpiryCandidatesPreviewed: 0,
       failures: [
         { scope: "runner_request_nonces", errorClass: "UnknownError" },
         { scope: "repository_setup_probes", errorClass: "RangeError" },
         { scope: "terminal_artifact_upload_capabilities", errorClass: "Error" },
         { scope: "completed_control_plane_outbox", errorClass: "SyntaxError" },
+        { scope: "artifact_retention_preview", errorClass: "Error" },
       ],
       completed: false,
     });
@@ -94,5 +97,6 @@ describe("retention maintenance worker", () => {
     expect(JSON.stringify(result)).not.toContain("private-name");
     expect(JSON.stringify(result)).not.toContain("private-capability");
     expect(JSON.stringify(result)).not.toContain("private payload");
+    expect(JSON.stringify(result)).not.toContain("private artifact locator");
   });
 });
