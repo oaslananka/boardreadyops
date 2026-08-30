@@ -735,13 +735,14 @@ async function readOptional(file) {
   }
 }
 
-export function buildCorepackInstallCommand(platform = process.platform, env = process.env) {
+function corepackNodeInvocation(args, nodeExecutable = process.execPath) {
+  const corepackScript = path.join(path.dirname(nodeExecutable), "node_modules", "corepack", "dist", "corepack.js");
+  return { command: nodeExecutable, args: [corepackScript, ...args] };
+}
+
+export function buildCorepackInstallCommand(platform = process.platform, _env = process.env) {
   if (platform === "win32") {
-    return {
-      command: env.ComSpec || env.COMSPEC || "cmd.exe",
-      args: ["/d", "/s", "/c", "corepack install"],
-      windowsVerbatimArguments: true,
-    };
+    return corepackNodeInvocation(["install"]);
   }
   return { command: "corepack", args: ["install"] };
 }
@@ -770,53 +771,27 @@ export async function installCorepackWithRetry({
   throw new Error(`Corepack install failed after ${attempts} attempts: ${diagnosticReason(lastError)}`);
 }
 
-function quoteWindowsArg(arg) {
-  if (!arg) return '""';
-  if (/[\s"&|<>^%]/.test(arg)) {
-    return `"${arg.replaceAll('"', '""')}"`;
-  }
-  return arg;
-}
-
-/**
- * `%ComSpec%` is attacker-influenceable environment data; only trust it as the shell
- * executable when it actually names cmd.exe, otherwise fall back to the well-known default
- * so an unexpected value can never redirect this spawn to an arbitrary absolute path.
- */
-function trustedComspec(value) {
-  if (value && path.basename(value).toLowerCase() === "cmd.exe") {
-    return value;
-  }
-  return "cmd.exe";
-}
-
-function resolveExecutableInvocation(command, args, env = process.env) {
+function resolveExecutableInvocation(command, args) {
   if (process.platform === "win32") {
     const lower = String(command).toLowerCase();
     const base = path.basename(lower);
-    if (
-      lower === "corepack" ||
-      lower === "pnpm" ||
-      base === "corepack.cmd" ||
-      base === "pnpm.cmd" ||
-      base === "corepack.bat" ||
-      base === "pnpm.bat" ||
-      base.endsWith(".cmd") ||
-      base.endsWith(".bat")
-    ) {
-      const comspec = trustedComspec(env.ComSpec || env.COMSPEC);
-      const fullCmd = [command, ...args.map(quoteWindowsArg)].join(" ");
-      return { command: comspec, args: ["/d", "/s", "/c", fullCmd], windowsVerbatimArguments: true };
+    if (lower === "corepack" || base === "corepack.cmd" || base === "corepack.bat") {
+      return corepackNodeInvocation(args);
+    }
+    if (lower === "pnpm" || base === "pnpm.cmd" || base === "pnpm.bat") {
+      return corepackNodeInvocation(["pnpm", ...args]);
+    }
+    if (base.endsWith(".cmd") || base.endsWith(".bat")) {
+      throw new Error(`Refusing to execute Windows command shim through a shell: ${base}`);
     }
   }
   return { command, args };
 }
 
 async function run(command, args, options) {
-  const invocation = resolveExecutableInvocation(command, args, options?.env);
+  const invocation = resolveExecutableInvocation(command, args);
   const child = spawn(invocation.command, invocation.args, {
     ...options,
-    windowsVerbatimArguments: invocation.windowsVerbatimArguments,
     stdio: "inherit",
   });
   const code = await new Promise((resolve, reject) => {
@@ -827,11 +802,10 @@ async function run(command, args, options) {
 }
 
 async function capture(command, args, options) {
-  const invocation = resolveExecutableInvocation(command, args, options?.env);
+  const invocation = resolveExecutableInvocation(command, args);
   return new Promise((resolve, reject) => {
     const child = spawn(invocation.command, invocation.args, {
       ...options,
-      windowsVerbatimArguments: invocation.windowsVerbatimArguments,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";

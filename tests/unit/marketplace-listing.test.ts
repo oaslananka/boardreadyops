@@ -11,6 +11,15 @@ describe("Marketplace listing validation", () => {
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
+  it("keeps Marketplace App permissions aligned with target-repository execution", async () => {
+    const guide = await fs.readFile(path.resolve("docs/github-marketplace.md"), "utf8");
+
+    expect(guide).toContain("| **Actions** | Read & write |");
+    expect(guide).not.toContain("| **Contents** | Read |");
+    expect(guide).toContain("does not read repository contents through the GitHub REST API");
+    expect(guide).toContain("target-repository GitHub Actions workflow");
+  });
+
   it("rejects Marketplace badge links hidden inside another URL", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-marketplace-"));
     await fs.writeFile(
