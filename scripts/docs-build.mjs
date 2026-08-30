@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { generateDocsDiscovery } from "./docs-discovery.mjs";
 import { runWithMkDocsWarningSuppressed } from "./lib/run-command.mjs";
 
 const markdownFiles = [];
@@ -12,7 +13,10 @@ for (const file of markdownFiles) {
   }
 }
 
-const siteDir = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-mkdocs-"));
+const requestedSiteDir = parseSiteDir(process.argv.slice(2));
+const temporarySiteDir = requestedSiteDir ? null : await mkdtemp(path.join(os.tmpdir(), "boardreadyops-mkdocs-"));
+const siteDir = requestedSiteDir ? path.resolve(requestedSiteDir) : temporarySiteDir;
+
 try {
   await runWithMkDocsWarningSuppressed("python", [
     "-m",
@@ -23,8 +27,17 @@ try {
     "--site-dir",
     siteDir,
   ]);
+  await generateDocsDiscovery({ repositoryRoot: process.cwd(), siteDir });
 } finally {
-  await rm(siteDir, { recursive: true, force: true });
+  if (temporarySiteDir) await rm(temporarySiteDir, { recursive: true, force: true });
+}
+
+function parseSiteDir(args) {
+  if (args.length === 0) return null;
+  if (args.length !== 2 || args[0] !== "--site-dir" || !args[1]) {
+    throw new Error("usage: node scripts/docs-build.mjs [--site-dir <path>]");
+  }
+  return args[1];
 }
 
 async function collect(dir) {
