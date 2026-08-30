@@ -7,8 +7,8 @@ import { metadata as layoutMetadata } from "../../../apps/web/app/layout.js";
 import HomePage, { metadata as homeMetadata } from "../../../apps/web/app/page.js";
 import { PUBLIC_STRUCTURED_DATA } from "../../../apps/web/components/public-structured-data.js";
 import { buildHomeMarkdown } from "../../../apps/web/lib/public-discovery-content.js";
-import nextConfig from "../../../apps/web/next.config.mjs";
-import { visibleTextRatio } from "../../../scripts/verify-public-agent-readability.mjs";
+import { HOMEPAGE_LINK_HEADER } from "../../../apps/web/proxy.js";
+import { hasHeaderToken, visibleTextRatio } from "../../../scripts/verify-public-agent-readability.mjs";
 
 describe("public agent readability contract", () => {
   it("keeps search metadata and language semantics explicit", () => {
@@ -54,11 +54,15 @@ describe("public agent readability contract", () => {
     expect(response.headers.get("vary")).toContain("Accept");
   });
 
-  it("advertises llms discovery on the homepage response only", async () => {
-    const headers = await nextConfig.headers();
-    const link = headers.find((entry) => entry.source === "/")?.headers.find((header) => header.key === "Link")?.value;
-    expect(link).toContain('<https://boardreadyops.com/>; rel="canonical"');
-    expect(link).toContain('</llms.txt>; rel="describedby"');
+  it("advertises canonical and llms discovery through the homepage proxy contract", () => {
+    expect(HOMEPAGE_LINK_HEADER).toContain('<https://boardreadyops.com/>; rel="canonical"');
+    expect(HOMEPAGE_LINK_HEADER).toContain('</llms.txt>; rel="describedby"');
+  });
+
+  it("checks Vary as a token list instead of matching Accept-Encoding", () => {
+    expect(hasHeaderToken("Accept-Encoding", "Accept")).toBe(false);
+    expect(hasHeaderToken("rsc, Accept-Encoding, Accept", "Accept")).toBe(true);
+    expect(hasHeaderToken(null, "Accept")).toBe(false);
   });
 
   it("keeps public-discovery verification explicit for static analyzers", () => {

@@ -20,6 +20,14 @@ export function visibleTextRatio(html) {
   return Buffer.byteLength(visibleText, "utf8") / Buffer.byteLength(html, "utf8");
 }
 
+export function hasHeaderToken(value, token) {
+  if (!value) return false;
+  return value
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .includes(token.toLowerCase());
+}
+
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -74,7 +82,10 @@ export async function verifyPublicAgentReadability(baseUrl) {
     home.headers.get("link")?.includes('</llms.txt>; rel="describedby"'),
     "homepage missing llms describedby Link header",
   );
-  invariant(home.headers.get("vary")?.toLowerCase().includes("accept"), "homepage missing Vary: Accept");
+  invariant(
+    hasHeaderToken(home.headers.get("vary"), "Accept") || hasHeaderToken(home.headers.get("cache-control"), "no-store"),
+    "homepage representation caching is unsafe: expected Vary: Accept or Cache-Control: no-store",
+  );
   const html = await home.text();
   const document = parseHtml(html);
   invariant(document.documentElement.lang === "en", "homepage html lang is not en");
@@ -103,12 +114,43 @@ export async function verifyPublicAgentReadability(baseUrl) {
     markdown.headers.get("content-type")?.includes("text/markdown"),
     "negotiated representation is not Markdown",
   );
-  invariant(markdown.headers.get("vary")?.toLowerCase().includes("accept"), "negotiated Markdown missing Vary: Accept");
+  invariant(hasHeaderToken(markdown.headers.get("vary"), "Accept"), "negotiated Markdown missing Vary: Accept");
   invariant(
     markdown.headers.get("link")?.includes('rel="canonical"'),
     "negotiated Markdown missing canonical Link header",
   );
   invariant((await markdown.text()).includes("## Sitemap"), "negotiated Markdown missing Sitemap section");
+
+  const rejectedMarkdown = await fetch(`${baseUrl}/`, {
+    headers: { Accept: "text/html, text/markdown;q=0" },
+  });
+  invariant(
+    rejectedMarkdown.headers.get("content-type")?.includes("text/html"),
+    "q=0 Markdown preference incorrectly rewrote the homepage",
+  );
+  invariant(
+    hasHeaderToken(rejectedMarkdown.headers.get("vary"), "Accept") ||
+      hasHeaderToken(rejectedMarkdown.headers.get("cache-control"), "no-store"),
+    "q=0 HTML representation is cacheable without Vary: Accept",
+  );
+
+  const robots = await fetch(`${baseUrl}/robots.txt`);
+  const robotsText = await robots.text();
+  for (const privatePrefix of [
+    "/api/",
+    "/setup",
+    "/dashboard",
+    "/work",
+    "/evidence",
+    "/insights",
+    "/policies",
+    "/repositories/",
+    "/reviews/",
+    "/runs/",
+    "/settings/",
+  ]) {
+    invariant(robotsText.includes(`Disallow: ${privatePrefix}`), `robots.txt does not disallow ${privatePrefix}`);
+  }
 
   const discovery = [
     { pathname: "/robots.txt", contentType: "text/plain" },

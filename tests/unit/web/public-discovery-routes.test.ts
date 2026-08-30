@@ -53,7 +53,11 @@ describe("public discovery routes", () => {
 
   it("declares crawlable discovery resources and the XML sitemap", () => {
     const result = robots();
-    expect(result.rules).toEqual({ userAgent: "*", allow: "/" });
+    expect(result.rules).toMatchObject({
+      userAgent: "*",
+      allow: "/",
+      disallow: expect.arrayContaining(["/api/", "/setup", "/reviews/", "/runs/", "/settings/"]),
+    });
     expect(result.sitemap).toContain("https://boardreadyops.com/sitemap.xml");
   });
 

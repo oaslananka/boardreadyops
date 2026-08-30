@@ -7,32 +7,9 @@ const nextConfig = {
   outputFileTracingRoot: repositoryRoot,
   poweredByHeader: false,
   reactStrictMode: true,
-  async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: "/",
-          has: [{ type: "header", key: "accept", value: "(.*)text/markdown(.*)" }],
-          destination: "/index.md",
-        },
-      ],
-      afterFiles: [],
-      fallback: [],
-    };
-  },
   async headers() {
     const noindex = { key: "X-Robots-Tag", value: "noindex, nofollow" };
     return [
-      {
-        source: "/",
-        headers: [
-          {
-            key: "Link",
-            value: '<https://boardreadyops.com/>; rel="canonical", </llms.txt>; rel="describedby"',
-          },
-          { key: "Vary", value: "Accept" },
-        ],
-      },
       ...[
         "/setup",
         "/dashboard",
