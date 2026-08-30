@@ -119,6 +119,30 @@ describe("retention maintenance store", () => {
     );
   });
 
+  it("previews age-expired artifacts without mutating data and blocks tenants under legal hold", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ affected: "7" }] });
+    const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now, defaultBatchSize: 80 });
+
+    await expect(store.previewExpiredArtifactRetention({ limit: 120 })).resolves.toBe(7);
+    const [sql, params] = query.mock.calls[0] ?? [];
+    expect(sql).toContain("from artifacts");
+    expect(sql).toContain("join release_runs");
+    expect(sql).toContain("join repositories");
+    expect(sql).toContain("join installations");
+    expect(sql).toContain("left join retention_policies");
+    expect(sql).toContain("artifacts.retention_until <= $1::timestamptz");
+    expect(sql).toContain("artifacts.retention_until is null");
+    expect(sql).toContain("from legal_holds");
+    expect(sql).toContain("legal_holds.active = true");
+    expect(sql).toContain("when installations.plan_tier = 'free' then 30");
+    expect(sql).toContain("when installations.plan_tier = 'team' then 365");
+    expect(sql).toContain("when retention_policies.retention_days is not null then retention_policies.retention_days");
+    expect(sql).toContain("retention_policies.retention_days");
+    expect(sql).not.toContain("order by artifacts.uploaded_at");
+    expect(sql).not.toMatch(/\bdelete\b|\binsert\b|\bupdate\b/iu);
+    expect(params).toEqual([now.toISOString(), 120]);
+  });
+
   it("rejects invalid terminal retention periods before querying", async () => {
     const query = vi.fn();
     const store = createSqlRetentionMaintenanceStore({ query }, { now: () => now });
