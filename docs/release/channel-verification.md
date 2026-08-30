@@ -5,8 +5,8 @@ BoardReadyOps consumption channels. The current contract is version-derived and
 kept synchronized by `release:readme`; timestamped verification snapshots are
 immutable evidence and are not rewritten by release bumps.
 
-> **Current status:** The latest public release is `boardreadyops@1.35.0` on npm
-> and the `v1.35.0` GitHub Release. The exact release tag and floating `v1` tag
+> **Current status:** The latest public release is `boardreadyops@1.36.0` on npm
+> and the `v1.36.0` GitHub Release. The exact release tag and floating `v1` tag
 > point to the same reviewed release commit. Stable GHCR aliases are expected to
 > resolve to the same multi-architecture image index.
 
@@ -14,12 +14,12 @@ immutable evidence and are not rewritten by release bumps.
 
 | Surface | Current contract |
 | --- | --- |
-| Public release | `v1.35.0` |
-| npm package | `boardreadyops@1.35.0` (`latest`) |
+| Public release | `v1.36.0` |
+| npm package | `boardreadyops@1.36.0` (`latest`) |
 | Binary assets | Linux x64/arm64, macOS x64/arm64, Windows x64, `SHA256SUMS`, and `sbom.cyclonedx.json` |
 | Root Action | Pin a reviewed release commit SHA for reproducibility; `v1` is a moving convenience alias |
 | Container Action | Pin the same reviewed release commit SHA; its image aliases are release-managed |
-| Container aliases | `v1.35.0`, `v1`, and `latest` |
+| Container aliases | `v1.36.0`, `v1`, and `latest` |
 | Homebrew formula | Repository formula must use the exact release version and `SHA256SUMS` values; external tap publication is a separate maintainer concern |
 
 Run the deterministic repository freshness check on every change:
