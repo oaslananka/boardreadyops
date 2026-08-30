@@ -20,6 +20,7 @@ on:
       - scripts/generate-rule-docs.mjs
       - scripts/update-action-inputs-docs.mjs
       - scripts/docs-build.mjs
+      - scripts/docs-discovery.mjs
       - typedoc.json
 
 concurrency:
@@ -35,7 +36,6 @@ env:
 
 jobs:
   build:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -87,7 +87,7 @@ jobs:
           NO_MKDOCS_2_WARNING: "1"
 
       - name: Build MkDocs site
-        run: python -m mkdocs build --strict --site-dir site
+        run: node scripts/docs-build.mjs --site-dir site
         env:
           NO_MKDOCS_2_WARNING: "1"
 
@@ -98,7 +98,7 @@ jobs:
           path: site
 
   deploy:
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     needs: build
     timeout-minutes: 10

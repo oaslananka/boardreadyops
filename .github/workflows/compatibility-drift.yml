@@ -15,7 +15,6 @@ permissions:
 
 jobs:
   check-drift:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: compatibility-drift / check
     runs-on: ubuntu-24.04
     timeout-minutes: 15

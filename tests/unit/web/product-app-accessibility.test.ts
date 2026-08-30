@@ -2,6 +2,7 @@ import { Window } from "happy-dom";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import HomePage from "../../../apps/web/app/page.js";
 import SettingsLayout from "../../../apps/web/app/settings/layout.js";
 import { ReviewView } from "../../../apps/web/components/review/review-view.js";
 import { DEMO_REVIEWS } from "../../../apps/web/lib/demo-data.js";
@@ -48,6 +49,12 @@ async function axeViolations(markup: string, path: string): Promise<string[]> {
 }
 
 describe("Product App Accessibility", () => {
+  it("has no WCAG A/AA violations on the public homepage", async () => {
+    const html = renderToStaticMarkup(createElement(HomePage));
+    const violations = await axeViolations(html, "/");
+    expect(violations).toEqual([]);
+  });
+
   it("has no WCAG A/AA violations in the review workspace", async () => {
     const review = DEMO_REVIEWS[0];
     if (!review) throw new Error("review fixture not found");

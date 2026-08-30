@@ -22,7 +22,6 @@ env:
 
 jobs:
   risk-profile:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: ci / risk-profile
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -81,7 +80,6 @@ jobs:
 
   lint:
     needs: risk-profile
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: ci / lint
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -114,7 +112,7 @@ jobs:
 
   typecheck:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_typecheck == 'true'
+    if: needs.risk-profile.outputs.needs_typecheck == 'true'
     name: ci / typecheck
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -133,7 +131,7 @@ jobs:
 
   test-unit:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_unit == 'true'
+    if: needs.risk-profile.outputs.needs_unit == 'true'
     name: ci / test-unit
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -180,7 +178,7 @@ jobs:
 
   test-unit-matrix:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_unit_matrix == 'true'
+    if: needs.risk-profile.outputs.needs_unit_matrix == 'true'
     name: ci / test-unit-matrix (${{ matrix.os }}, Node ${{ matrix.node-version }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -237,7 +235,7 @@ jobs:
 
   test-int:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_integration == 'true'
+    if: needs.risk-profile.outputs.needs_integration == 'true'
     name: ci / test-int (KiCad ${{ matrix.kicad-version }}, Node ${{ matrix.node-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -328,7 +326,7 @@ jobs:
 
   cross-platform-paths:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_cross_platform == 'true'
+    if: needs.risk-profile.outputs.needs_cross_platform == 'true'
     name: ci / cross-platform-paths (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
@@ -382,7 +380,7 @@ jobs:
 
   test-action:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_action_smoke == 'true'
+    if: needs.risk-profile.outputs.needs_action_smoke == 'true'
     name: ci / test-action
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -429,7 +427,7 @@ jobs:
 
   docs-build:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_docs == 'true'
+    if: needs.risk-profile.outputs.needs_docs == 'true'
     name: ci / docs-build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -458,13 +456,13 @@ jobs:
       - run: pnpm run docs
         env:
           NO_MKDOCS_2_WARNING: "1"
-      - run: python -m mkdocs build --strict --site-dir site
+      - run: node scripts/docs-build.mjs --site-dir site
         env:
           NO_MKDOCS_2_WARNING: "1"
 
   accessibility:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_accessibility == 'true'
+    if: needs.risk-profile.outputs.needs_accessibility == 'true'
     name: ci / accessibility
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -496,7 +494,7 @@ jobs:
 
   build:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_build == 'true'
+    if: needs.risk-profile.outputs.needs_build == 'true'
     name: ci / build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -523,7 +521,6 @@ jobs:
   web-standalone-windows:
     needs: risk-profile
     if: >-
-      (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') &&
       (needs.risk-profile.outputs.needs_build == 'true' || needs.risk-profile.outputs.needs_integration == 'true')
     name: ci / web-standalone-windows
     runs-on: windows-2025-vs2026
@@ -547,7 +544,7 @@ jobs:
     needs:
       - risk-profile
       - build
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_dist == 'true'
+    if: needs.risk-profile.outputs.needs_dist == 'true'
     name: ci / verify-dist
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -566,7 +563,7 @@ jobs:
 
   coverage-gate:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_coverage == 'true'
+    if: needs.risk-profile.outputs.needs_coverage == 'true'
     name: ci / coverage-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -645,7 +642,7 @@ jobs:
     name: ci / mutation
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_mutation == 'true' && github.event_name == 'workflow_dispatch'
+    if: needs.risk-profile.outputs.needs_mutation == 'true' && github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -672,7 +669,7 @@ jobs:
 
   security:
     needs: risk-profile
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_security == 'true'
+    if: needs.risk-profile.outputs.needs_security == 'true'
     name: ci / security
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -696,7 +693,7 @@ jobs:
     name: ci / sbom
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    if: (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.risk-profile.outputs.needs_sbom == 'true' && github.ref == 'refs/heads/main'
+    if: needs.risk-profile.outputs.needs_sbom == 'true' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
