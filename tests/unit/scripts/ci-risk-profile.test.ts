@@ -18,6 +18,14 @@ describe("ci-risk-profile", () => {
     expect(profile.needs_security).toBe(false);
   });
 
+  it("runs docs and security gates for the public docs edge worker", () => {
+    const profile = classifyChangedFiles(["scripts/docs-agent-edge-worker.mjs"], { eventName: "pull_request" });
+
+    expect(profile.needs_docs).toBe(true);
+    expect(profile.needs_accessibility).toBe(true);
+    expect(profile.needs_security).toBe(true);
+  });
+
   it("runs docs gates for documentation discovery generator changes", () => {
     const profile = classifyChangedFiles(["scripts/docs-discovery.mjs"], { eventName: "pull_request" });
 
