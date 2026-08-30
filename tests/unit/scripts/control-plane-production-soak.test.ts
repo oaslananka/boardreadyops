@@ -174,6 +174,8 @@ describe("production soak monitor orchestration", () => {
     expect(report.terminatedEarly).toBe(false);
     expect(report.availability).toEqual({ successCount: 5, samplesTaken: 5, availabilityPercent: 100 });
     expect(report.ready.count).toBe(5);
+    expect(report.elapsedMinutes).toBeGreaterThanOrEqual(options.durationMinutes);
+    expect(evaluateProductionSoakReport(report, options.thresholds)).toEqual([]);
   });
 
   it("terminates early once consecutive failures exceed the configured maximum", async () => {
