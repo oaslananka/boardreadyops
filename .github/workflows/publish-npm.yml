@@ -31,7 +31,6 @@ env:
 
 jobs:
   publish-npm:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -374,7 +373,7 @@ jobs:
           fi
 
   floating-release-tags:
-    if: ${{ (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') && needs.publish-npm.outputs.should_publish == 'true' && needs.publish-npm.outputs.release_is_prerelease == 'false' && needs.publish-npm.outputs.release_allows_floating_tags == 'true' }}
+    if: ${{ needs.publish-npm.outputs.should_publish == 'true' && needs.publish-npm.outputs.release_is_prerelease == 'false' && needs.publish-npm.outputs.release_allows_floating_tags == 'true' }}
     needs: publish-npm
     runs-on: ubuntu-24.04
     timeout-minutes: 10

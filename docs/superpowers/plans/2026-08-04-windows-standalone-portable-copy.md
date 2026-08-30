@@ -105,7 +105,6 @@ Insert a job after the existing Linux `build` job. It checks out without persist
   web-standalone-windows:
     needs: risk-profile
     if: >-
-      (github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops') &&
       (needs.risk-profile.outputs.needs_build == 'true' || needs.risk-profile.outputs.needs_integration == 'true')
     name: ci / web-standalone-windows
     runs-on: windows-2025-vs2026

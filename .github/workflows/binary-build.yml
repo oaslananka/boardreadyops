@@ -24,7 +24,6 @@ env:
 
 jobs:
   smoke:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: binary / smoke (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
@@ -68,7 +67,6 @@ jobs:
           retention-days: 1
 
   release-assets:
-    if: github.repository_owner == 'oaslananka' || github.repository_owner == 'oaslananka-ops'
     name: binary / release-assets
     runs-on: ubuntu-24.04
     timeout-minutes: 45
