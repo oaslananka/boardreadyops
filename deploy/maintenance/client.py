@@ -4,17 +4,17 @@ import socket
 import sys
 
 SOCKET_PATH = "/run/boardreadyops-maintenance/control.sock"
-OPERATIONS = frozenset({"runtime-status", "backup-restore-verify"})
+OPERATIONS = frozenset({"runtime-status", "backup-restore-verify", "topology-preflight"})
 RESPONSE_LIMIT = 64 * 1024
 
 
 def main() -> int:
     if len(sys.argv) != 2 or sys.argv[1] not in OPERATIONS:
-        print("usage: boardreadyops-maintenance {runtime-status|backup-restore-verify}", file=sys.stderr)
+        print("usage: boardreadyops-maintenance {runtime-status|backup-restore-verify|topology-preflight}", file=sys.stderr)
         return 2
 
     operation = sys.argv[1]
-    timeout = 30 if operation == "runtime-status" else 15 * 60
+    timeout = 30 if operation in {"runtime-status", "topology-preflight"} else 15 * 60
     payload = (json.dumps({"version": 1, "operation": operation}, separators=(",", ":")) + "\n").encode("utf-8")
 
     connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

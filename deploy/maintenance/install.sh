@@ -36,7 +36,7 @@ PY
 [[ -f "$BOARDREADYOPS_DEPLOYMENT_DIR/repo/deploy/docker-compose.yml" ]] || fail "deployment compose file is unavailable"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for asset in server.py client.py runtime-status.sh backup-restore-verify.sh boardreadyops-maintenance.service; do
+for asset in server.py client.py runtime-status.sh backup-restore-verify.sh topology-preflight.sh boardreadyops-maintenance.service; do
   [[ -f "$SCRIPT_DIR/$asset" ]] || fail "missing maintenance asset: $asset"
 done
 
@@ -50,6 +50,7 @@ install -d -o root -g root -m 0755 "$INSTALL_DIR" "$CONFIG_DIR" "$DROPIN_DIR"
 install -o root -g root -m 0755 "$SCRIPT_DIR/server.py" "$INSTALL_DIR/server.py"
 install -o root -g root -m 0755 "$SCRIPT_DIR/runtime-status.sh" "$INSTALL_DIR/runtime-status.sh"
 install -o root -g root -m 0755 "$SCRIPT_DIR/backup-restore-verify.sh" "$INSTALL_DIR/backup-restore-verify.sh"
+install -o root -g root -m 0755 "$SCRIPT_DIR/topology-preflight.sh" "$INSTALL_DIR/topology-preflight.sh"
 install -o root -g root -m 0755 "$SCRIPT_DIR/client.py" "$CLIENT_PATH"
 install -o root -g root -m 0644 "$SCRIPT_DIR/boardreadyops-maintenance.service" "$SERVICE_PATH"
 

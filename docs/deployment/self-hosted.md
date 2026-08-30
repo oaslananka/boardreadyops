@@ -40,7 +40,7 @@ Docker Engine and Docker Compose are the host runtime requirements. Host Node.js
 
 ## Production maintenance service
 
-A BoardReadyOps-operated host may install the repository-owned maintenance service when an unprivileged `exec-agent` needs two production-safe maintenance operations without receiving root shell or Docker access. The service runs as root, listens only on `/run/boardreadyops-maintenance/control.sock`, verifies the exact `exec-agent` peer UID, and accepts only the versioned `runtime-status` and `backup-restore-verify` requests. The installer does not add `exec-agent` to the Docker group, does not create a privileged shell path, and stores only the operator-selected deployment directory in its root-only configuration.
+A BoardReadyOps-operated host may install the repository-owned maintenance service when an unprivileged `exec-agent` needs three production-safe maintenance operations without receiving root shell or Docker access. The service runs as root, listens only on `/run/boardreadyops-maintenance/control.sock`, verifies the exact `exec-agent` peer UID, and accepts only the versioned `runtime-status`, `backup-restore-verify`, and `topology-preflight` requests. The installer does not add `exec-agent` to the Docker group, does not create a privileged shell path, and stores only the operator-selected deployment directory in its root-only configuration.
 
 Install it once from the exact reviewed BoardReadyOps release on the deployment host:
 
@@ -50,14 +50,15 @@ sudo bash deploy/maintenance/install.sh --deployment-dir /absolute/path
 
 For a normal layout, replace `/absolute/path` with the directory that contains the production `repo/` checkout and deployment state. The installer validates that the path is absolute, normalized, real, and contains `repo/deploy/docker-compose.yml`; it then binds only that deployment tree read-only into the hardened service namespace. Runtime secrets remain outside the maintenance protocol.
 
-After installation the unprivileged maintenance client has only these two commands:
+After installation the unprivileged maintenance client has only these three commands:
 
 ```bash
 boardreadyops-maintenance runtime-status
 boardreadyops-maintenance backup-restore-verify
+boardreadyops-maintenance topology-preflight
 ```
 
-`runtime-status` returns aggregate service state, restart counts, and the checkout/image revision binding for the fixed `boardreadyops-cloud` Compose project. `backup-restore-verify` reads production PostgreSQL with native `pg_dump`, restores into disposable containers on an internal Docker network, compares migrations/tables/representative aggregate row counts, starts isolated web and worker containers with runner execution disabled, requires both readiness endpoints, verifies cleanup, and only then emits aggregate evidence. The maintenance response never includes database URLs, passwords, GitHub credentials, tenant identifiers, findings, webhook payloads, artifact paths, or OIDC claims.
+`runtime-status` returns aggregate service state, restart counts, and the checkout/image revision binding for the fixed `boardreadyops-cloud` Compose project. `topology-preflight` reads only container name, Compose ownership, state, and health metadata for the fixed production services and fails closed on ownership drift. `backup-restore-verify` reads production PostgreSQL with native `pg_dump`, restores into disposable containers on an internal Docker network, compares migrations/tables/representative aggregate row counts, starts isolated web and worker containers with runner execution disabled, requires both readiness endpoints, verifies cleanup, and only then emits aggregate evidence. The maintenance response never includes database URLs, passwords, GitHub credentials, tenant identifiers, findings, webhook payloads, artifact paths, or OIDC claims.
 
 ## VPS migration and portable cutover
 
@@ -170,6 +171,22 @@ Inspect the native Docker health state with:
 ```bash
 docker inspect --format '{{json .State.Health}}' bro-web
 ```
+
+### Production topology preflight
+
+Before every production rollout, run `boardreadyops-maintenance topology-preflight`. This operation is read-only and must pass before a production rollout with `ready=true`. If it reports an unmanaged or mislabelled container, stop: do not run the deployment or attempt rollback until container ownership is reconciled. The preflight never repairs containers automatically.
+
+### BoardReadyOps-operated production CD
+
+The BoardReadyOps-operated host may use the repository-owned **pull-based production deployer** after commissioning. It has **no inbound deployment listener** and does not turn the production host into a **production-host GitHub Actions runner**. The host polls outward and accepts only the current `main` candidate whose commit is GitHub-verified and whose newest exact-SHA `push` runs for both `ci.yml` and `security.yml` are completed successfully.
+
+Every candidate must be a fast-forward descendant of the currently deployed revision. Before checkout or any Docker mutation, the deployer requires a clean production checkout, `topology-preflight`, `backup-restore-verify`, and a second current-runtime identity check. A failed or unavailable gate stops the run without changing production.
+
+Commissioning is deliberately supervised. Install the maintenance prerequisite first, then normalize the production checkout to the **currently running image SHA** without changing containers. Verify runtime status, topology, and backup/restore evidence. Install the deployer; the **timer is installed but remains disabled**. The root oneshot keeps orchestration and maintenance privileges, while Git and the Doppler/Compose deployment wrapper run as the existing deployment-repository owner with that account's supplementary groups; the installer records this identity without changing checkout ownership or adding users to the Docker group. Run one admission-only or supervised invocation, observe one **supervised rollout**, and require the checkout, web image, worker readiness, and public HTTPS health surface to bind to the admitted exact SHA before enabling the timer.
+
+The rollout applies forward-compatible migrations once, proves a localhost canary, then recreates only web and worker. Automatic rollback restores the previous compatible application revision but **does not reverse database migrations**. If rollback cannot restore healthy live services, the deployer writes `/var/lib/boardreadyops-deployer/manual-intervention-required`; later timer runs fail closed until an operator repairs the deployment and deliberately clears that latch.
+
+For **break-glass** incident work, disable the deployer timer before manual changes. The existing manual deployment path remains available for an operator-controlled recovery. Re-enable automation only after the production checkout/image binding, topology preflight, backup verification, and public/runtime health checks are clean again.
 
 ## Repeatable self-hosted deploy from main
 

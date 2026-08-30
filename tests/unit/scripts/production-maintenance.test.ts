@@ -9,6 +9,7 @@ const installerPath = `${root}/install.sh`;
 const servicePath = `${root}/boardreadyops-maintenance.service`;
 const runtimeStatusPath = `${root}/runtime-status.sh`;
 const backupVerifyPath = `${root}/backup-restore-verify.sh`;
+const topologyPreflightPath = `${root}/topology-preflight.sh`;
 const pythonLauncher = process.env.BOARDREADYOPS_PYTHON ?? (process.platform === "win32" ? "python" : "python3");
 const pythonSubprocessTimeoutMs = 20_000;
 const pythonContractTestTimeoutMs = 30_000;
@@ -35,7 +36,7 @@ describe("production maintenance Python test harness", () => {
 
 describe("BoardReadyOps production maintenance boundary", () => {
   it(
-    "accepts only the two versioned maintenance operations and maps them to fixed helper argv",
+    "accepts only the three versioned maintenance operations and maps them to fixed helper argv",
     () => {
       const result = runPython(String.raw`
 import builtins, importlib.util, json, sys
@@ -54,12 +55,19 @@ finally:
     builtins.__import__ = real_import
 assert module.parse_request(b'{"version":1,"operation":"runtime-status"}\n') == "runtime-status"
 assert module.parse_request(b'{"version":1,"operation":"backup-restore-verify"}\n') == "backup-restore-verify"
+assert module.parse_request(b'{"version":1,"operation":"topology-preflight"}\n') == "topology-preflight"
 assert module.SOCKET_MODE == 0o660
+assert module.peer_is_authorized(0, 1234) is True
+assert module.peer_is_authorized(1234, 1234) is True
+assert module.peer_is_authorized(4321, 1234) is False
 assert module.command_for_operation("runtime-status", "/srv/boardreadyops") == [
     "/opt/boardreadyops-maintenance/runtime-status.sh", "--deployment-dir", "/srv/boardreadyops"
 ]
 assert module.command_for_operation("backup-restore-verify", "/srv/boardreadyops") == [
     "/opt/boardreadyops-maintenance/backup-restore-verify.sh", "--deployment-dir", "/srv/boardreadyops"
+]
+assert module.command_for_operation("topology-preflight", "/srv/boardreadyops") == [
+    "/opt/boardreadyops-maintenance/topology-preflight.sh", "--deployment-dir", "/srv/boardreadyops"
 ]
 for payload in [
     b'{"version":1,"operation":"shell","command":"id"}\n',
@@ -97,6 +105,8 @@ for payload in [
 
     expect(client).toContain('"runtime-status"');
     expect(client).toContain('"backup-restore-verify"');
+    expect(client).toContain('"topology-preflight"');
+    expect(client).toContain('operation in {"runtime-status", "topology-preflight"}');
     expect(client).not.toMatch(/command|deployment-dir|environment|env_file/u);
   });
 
@@ -108,6 +118,8 @@ for payload in [
     expect(installer).toContain("EUID");
     expect(installer).toContain("exec-agent");
     expect(installer).toContain("BOARDREADYOPS_DEPLOYMENT_DIR");
+    expect(installer).toContain("topology-preflight.sh");
+    expect(installer).toContain('install -o root -g root -m 0755 "$SCRIPT_DIR/topology-preflight.sh"');
     expect(installer).toContain("BindReadOnlyPaths=");
     expect(installer).toContain("systemctl enable --now boardreadyops-maintenance.service");
     expect(installer).not.toMatch(/sudoers|NOPASSWD|usermod.*docker|groupadd.*docker/u);
@@ -121,6 +133,20 @@ for payload in [
     expect(service).toContain("RestrictAddressFamilies=AF_UNIX");
     expect(service).toContain("RuntimeDirectory=boardreadyops-maintenance");
     expect(service).not.toMatch(/sudo|docker\.sock.*rw|0\.0\.0\.0|ListenStream/u);
+  });
+
+  it("detects production Compose ownership drift without mutating Docker or reading secrets", () => {
+    const script = read(topologyPreflightPath);
+
+    expect(script).toContain('readonly project="boardreadyops-cloud"');
+    expect(script).toContain("com.docker.compose.project");
+    expect(script).toContain("com.docker.compose.service");
+    expect(script).toContain("boardreadyops-cloud-worker-1");
+    expect(script).toContain("boardreadyops-cloud-caddy-1");
+    expect(script).toContain("boardreadyops_production_topology_preflight");
+    expect(script).toContain("docker ps -a");
+    expect(script).not.toMatch(/docker\s+(rm|stop|start|restart|rename|update|run|compose\s+up)\b/u);
+    expect(script).not.toMatch(/\.Config\.Env|runtime\.env|POSTGRES_PASSWORD|DATABASE_URL|GITHUB_APP|PRIVATE_KEY/u);
   });
 
   it("keeps runtime status aggregate-only and binds the running web image revision to the checkout SHA", () => {

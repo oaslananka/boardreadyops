@@ -14,7 +14,7 @@ SOCKET_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP
 INSTALL_ROOT = "/opt/boardreadyops-maintenance"
 REQUEST_LIMIT = 1024
 RESPONSE_LIMIT = 64 * 1024
-OPERATIONS = frozenset({"runtime-status", "backup-restore-verify"})
+OPERATIONS = frozenset({"runtime-status", "backup-restore-verify", "topology-preflight"})
 SAFE_ENV = {
     "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "LANG": "C.UTF-8",
@@ -54,6 +54,8 @@ def command_for_operation(operation: str, deployment_dir: str) -> list[str]:
         helper = f"{INSTALL_ROOT}/runtime-status.sh"
     elif operation == "backup-restore-verify":
         helper = f"{INSTALL_ROOT}/backup-restore-verify.sh"
+    elif operation == "topology-preflight":
+        helper = f"{INSTALL_ROOT}/topology-preflight.sh"
     else:
         raise ValueError("unsupported operation")
     return [helper, "--deployment-dir", deployment_dir]
@@ -67,7 +69,7 @@ def response_bytes(value: dict) -> bytes:
 
 
 def run_operation(operation: str, deployment_dir: str) -> dict:
-    timeout = 30 if operation == "runtime-status" else 15 * 60
+    timeout = 30 if operation in {"runtime-status", "topology-preflight"} else 15 * 60
     try:
         result = subprocess.run(
             command_for_operation(operation, deployment_dir),
@@ -109,6 +111,10 @@ def peer_uid(connection: socket.socket) -> int:
     raw = connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
     _pid, uid, _gid = struct.unpack("3i", raw)
     return uid
+
+
+def peer_is_authorized(uid: int, allowed_uid: int) -> bool:
+    return uid in {0, allowed_uid}
 
 
 def read_request(connection: socket.socket) -> bytes:
@@ -162,7 +168,7 @@ def main() -> int:
         while True:
             connection, _ = listener.accept()
             with connection:
-                if peer_uid(connection) != allowed_uid:
+                if not peer_is_authorized(peer_uid(connection), allowed_uid):
                     connection.sendall(response_bytes({"ok": False, "error": "unauthorized_peer"}))
                     continue
                 try:

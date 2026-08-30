@@ -288,6 +288,16 @@ ${operations}`;
     expect(reconciliation).toContain("synthetic-target-repository-canaries.md");
   });
 
+  it("requires read-only topology preflight before production rollout", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+
+    expect(deployment).toContain("topology-preflight");
+    expect(deployment).toContain("unmanaged or mislabelled container");
+    expect(deployment).toContain("must pass before a production rollout");
+    expect(deployment).toContain("read-only");
+    expect(deployment).toContain("never repairs containers automatically");
+  });
+
   it("documents exact-base impact without broadening the GitHub App permission boundary", async () => {
     const deployment = await readFile(join(process.cwd(), "docs/deployment/github-actions-execution.md"), "utf8");
     const review = await readFile(join(process.cwd(), "docs/review-app.md"), "utf8");
@@ -300,5 +310,30 @@ ${operations}`;
     expect(review).toContain("exact base SHA");
     expect(review).toContain("does not substitute a newer, older, or merely same-branch run");
     expect(review).toContain("current-run decision remains valid");
+  });
+});
+
+describe("production CD commissioning documentation", () => {
+  it("documents pull-based exact-SHA admission, supervised commissioning, rollback, and break-glass", () => {
+    const deployment = fs.readFileSync("docs/deployment/self-hosted.md", "utf8");
+
+    for (const expected of [
+      "pull-based production deployer",
+      "no inbound deployment listener",
+      "production-host GitHub Actions runner",
+      "exact-SHA",
+      "`ci.yml`",
+      "`security.yml`",
+      "topology-preflight",
+      "backup-restore-verify",
+      "timer is installed but remains disabled",
+      "currently running image SHA",
+      "supervised rollout",
+      "manual-intervention-required",
+      "does not reverse database migrations",
+      "break-glass",
+    ]) {
+      expect(deployment).toContain(expected);
+    }
   });
 });

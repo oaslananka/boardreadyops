@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll BoardReadyOps main for an admitted production release
+
+[Timer]
+OnBootSec=3m
+OnUnitActiveSec=5m
+RandomizedDelaySec=30s
+Persistent=false
+Unit=boardreadyops-deployer.service
+
+[Install]
+WantedBy=timers.target

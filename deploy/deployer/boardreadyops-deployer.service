@@ -1,0 +1,29 @@
+[Unit]
+Description=BoardReadyOps pull-based production deployer
+Wants=network-online.target
+After=network-online.target docker.service boardreadyops-maintenance.service
+Requires=docker.service boardreadyops-maintenance.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /opt/boardreadyops-deployer/production-deployer.py
+EnvironmentFile=/etc/boardreadyops-deployer/deployer.env
+RuntimeDirectory=boardreadyops-deployer
+RuntimeDirectoryMode=0700
+StateDirectory=boardreadyops-deployer
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SETUID CAP_SETGID
