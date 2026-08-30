@@ -151,8 +151,9 @@ export async function runProductionSoakMonitor(options, dependencies = {}) {
       }
     }
     const elapsedMs = runtime.now() - startedAt;
-    if (elapsedMs >= durationMs - intervalMs) break;
-    await runtime.sleep(intervalMs);
+    if (elapsedMs >= durationMs) break;
+    await runtime.sleep(Math.min(intervalMs, durationMs - elapsedMs));
+    if (runtime.now() - startedAt >= durationMs) break;
   }
 
   const elapsedMs = runtime.now() - startedAt;
