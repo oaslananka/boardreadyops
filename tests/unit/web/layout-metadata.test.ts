@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { metadata } from "../../../apps/web/app/layout.js";
 
 describe("root layout metadata", () => {
+  it("does not apply a homepage canonical to child application routes", () => {
+    expect(metadata.alternates?.canonical).toBeUndefined();
+  });
+
   it("sets metadataBase for absolute asset URLs", () => {
     expect(metadata.metadataBase?.toString()).toBe("https://boardreadyops.com/");
   });
