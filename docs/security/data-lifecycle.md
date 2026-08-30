@@ -51,6 +51,19 @@ option. Workspaces should not be included in general-purpose backups.
 | Runner leases, enrollment, upload capabilities, and request nonces | Lease/capability state, public identifiers, timestamps, declared artifact metadata, and SHA-256 digests of bearer values. | Plaintext capability, lease, enrollment, and nonce secrets are not persisted. Expired runner request nonce digests are removed periodically in bounded batches after their persisted deadline. Pending artifact upload capabilities are marked expired and unconsumed enrollment tokens are revoked after their persisted deadline in bounded batches. `BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS` defaults terminal artifact capability, consumed or revoked enrollment, and terminal setup-probe metadata retention to 30 days; bounded cleanup then deletes those one-time rows without deleting their durable run, finding, artifact, setup revision, or audit evidence. |
 | Artifact deletion jobs | Tenant/run identifiers, storage driver/path, reason, digest, byte count, attempts, lease state, terminal outcome, and bounded errors. | Durable jobs retry transient failures, recover expired leases, and end as completed or dead-letter. Completed rows are retained as operational proof; no automatic age-based purge is implemented. |
 
+## Default retention contract
+
+| Data class | Default | Enforcement today |
+| --- | --- | --- |
+| Webhook terminal metadata | 30 days | Enforced for newly accepted terminal webhook metadata through persisted deadlines and bounded cleanup. |
+| Terminal one-time records | 30 days | Enforced for terminal artifact capabilities, consumed/revoked enrollments, and terminal setup probes. |
+| Completed delivery and reconciliation history | 90 days | Enforced for completed outbox and reconciliation history while preserving active and investigation-required work. |
+| Managed artifacts | Free: 30 days; Team: 365 days; Business/Enterprise: explicit finite policy | Read-only expiry preview only. Physical age-based deletion is not activated. |
+| Logical runs, findings, and accepted results | No automatic age-based expiry | Retained until a future tenant retention or erasure workflow removes the parent data safely. |
+| Audit events | No automatic age-based expiry | Append-only evidence; future lifecycle work must define legal-hold and deletion-proof semantics first. |
+
+These are separate data-class contracts, not one tenant-wide destructive TTL. A `null`/unspecified automatic expiry for durable run, finding, result, or audit data means BoardReadyOps does not currently age-delete that class. It must not be interpreted as permission for operators to delete rows directly.
+
 ## Implemented controls
 
 ### Webhook minimization and retention

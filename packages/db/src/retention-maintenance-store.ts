@@ -1,3 +1,4 @@
+import { DATA_RETENTION_DEFAULTS } from "@boardreadyops/cloud-core/data-retention-defaults";
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 
 export type RetentionMaintenanceStore = {
@@ -294,15 +295,15 @@ export function createSqlRetentionMaintenanceStore(
                artifacts.retention_until is null
                and case
                    when retention_policies.retention_days is not null then retention_policies.retention_days
-                   when installations.plan_tier = 'free' then 30
-                   when installations.plan_tier = 'team' then 365
+                   when installations.plan_tier = 'free' then $2::integer
+                   when installations.plan_tier = 'team' then $3::integer
                    else null
                  end is not null
                and artifacts.uploaded_at <= $1::timestamptz - make_interval(
                  days => case
                    when retention_policies.retention_days is not null then retention_policies.retention_days
-                   when installations.plan_tier = 'free' then 30
-                   when installations.plan_tier = 'team' then 365
+                   when installations.plan_tier = 'free' then $2::integer
+                   when installations.plan_tier = 'team' then $3::integer
                    else null
                  end
                )
@@ -314,10 +315,15 @@ export function createSqlRetentionMaintenanceStore(
                where legal_holds.tenant_id = installations.account_login
                  and legal_holds.active = true
              )
-           limit $2::integer
+           limit $4::integer
          )
          select count(*)::int as affected from candidates`,
-        [at, limit],
+        [
+          at,
+          DATA_RETENTION_DEFAULTS.managedArtifactDaysByPlan.free,
+          DATA_RETENTION_DEFAULTS.managedArtifactDaysByPlan.team,
+          limit,
+        ],
       );
       return nonNegativeInteger(rows(result)[0]?.affected);
     },

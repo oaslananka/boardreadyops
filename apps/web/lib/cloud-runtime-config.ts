@@ -1,3 +1,5 @@
+import { DATA_RETENTION_DEFAULTS } from "@boardreadyops/cloud-core/data-retention-defaults";
+
 type CloudPersistenceMode = "postgres" | "memory";
 
 export type CloudRuntimeConfigurationErrorCode =
@@ -98,19 +100,19 @@ export function resolveControlPlaneRetentionConfiguration(
       raw: environment.BOARDREADYOPS_WEBHOOK_RETENTION_DAYS,
       environmentName: "BOARDREADYOPS_WEBHOOK_RETENTION_DAYS",
       errorCode: "invalid-webhook-retention-days",
-      defaultDays: 30,
+      defaultDays: DATA_RETENTION_DEFAULTS.webhookInboxDays,
     }),
     ephemeralRecordsDays: resolveRetentionDays({
       raw: environment.BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS,
       environmentName: "BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS",
       errorCode: "invalid-ephemeral-record-retention-days",
-      defaultDays: 30,
+      defaultDays: DATA_RETENTION_DEFAULTS.terminalEphemeralRecordDays,
     }),
     controlPlaneHistoryDays: resolveRetentionDays({
       raw: environment.BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS,
       environmentName: "BOARDREADYOPS_CONTROL_PLANE_HISTORY_RETENTION_DAYS",
       errorCode: "invalid-control-plane-history-retention-days",
-      defaultDays: 90,
+      defaultDays: DATA_RETENTION_DEFAULTS.completedControlPlaneHistoryDays,
     }),
   };
 }

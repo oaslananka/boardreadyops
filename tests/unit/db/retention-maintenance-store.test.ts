@@ -134,13 +134,13 @@ describe("retention maintenance store", () => {
     expect(sql).toContain("artifacts.retention_until is null");
     expect(sql).toContain("from legal_holds");
     expect(sql).toContain("legal_holds.active = true");
-    expect(sql).toContain("when installations.plan_tier = 'free' then 30");
-    expect(sql).toContain("when installations.plan_tier = 'team' then 365");
+    expect(sql).toContain("when installations.plan_tier = 'free' then $2::integer");
+    expect(sql).toContain("when installations.plan_tier = 'team' then $3::integer");
     expect(sql).toContain("when retention_policies.retention_days is not null then retention_policies.retention_days");
     expect(sql).toContain("retention_policies.retention_days");
     expect(sql).not.toContain("order by artifacts.uploaded_at");
     expect(sql).not.toMatch(/\bdelete\b|\binsert\b|\bupdate\b/iu);
-    expect(params).toEqual([now.toISOString(), 120]);
+    expect(params).toEqual([now.toISOString(), 30, 365, 120]);
   });
 
   it("rejects invalid terminal retention periods before querying", async () => {

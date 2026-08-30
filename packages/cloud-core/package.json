@@ -14,6 +14,11 @@
       "import": "./src/lifecycle.ts",
       "default": "./src/lifecycle.ts"
     },
+    "./data-retention-defaults": {
+      "types": "./src/data-retention-defaults.ts",
+      "import": "./src/data-retention-defaults.ts",
+      "default": "./src/data-retention-defaults.ts"
+    },
     "./lifecycle-executor": {
       "types": "./src/lifecycle-executor.ts",
       "import": "./src/lifecycle-executor.ts",

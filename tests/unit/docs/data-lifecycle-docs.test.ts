@@ -14,6 +14,13 @@ describe("data lifecycle documentation", () => {
     expect(lifecycle).toContain("BoardReadyOps does not persist the raw GitHub webhook body");
     expect(lifecycle).toContain("BOARDREADYOPS_WEBHOOK_RETENTION_DAYS");
     expect(lifecycle).toContain("BOARDREADYOPS_EPHEMERAL_RECORD_RETENTION_DAYS");
+    expect(lifecycle).toContain("## Default retention contract");
+    expect(lifecycle).toContain("Webhook terminal metadata | 30 days");
+    expect(lifecycle).toContain("Terminal one-time records | 30 days");
+    expect(lifecycle).toContain("Completed delivery and reconciliation history | 90 days");
+    expect(lifecycle).toContain("Managed artifacts | Free: 30 days; Team: 365 days");
+    expect(lifecycle).toContain("Logical runs, findings, and accepted results | No automatic age-based expiry");
+    expect(lifecycle).toContain("Audit events | No automatic age-based expiry");
     expect(lifecycle).toContain("30 days");
     expect(lifecycle).toContain("normalized actions are replaced with an empty array");
     expect(lifecycle).toContain("raw normalized runner result payload");
