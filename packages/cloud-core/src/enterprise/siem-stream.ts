@@ -12,6 +12,12 @@ interface SiemStream {
   exportForTenant(tenantId: string, since: string): Promise<SiemEvent[]>;
 }
 
+/**
+ * In-memory SIEM event stream.
+ *
+ * @public @experimental - Experimental in-memory event buffer.
+ * Production webhook delivery with HMAC signatures and retry policies is `planned`.
+ */
 export class InMemorySiemStream implements SiemStream {
   private readonly events: SiemEvent[] = [];
   private readonly webhookUrl: string | null;
