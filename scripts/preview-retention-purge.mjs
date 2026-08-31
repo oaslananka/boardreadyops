@@ -10,7 +10,6 @@
  * It does NOT modify or delete any database rows or blob storage objects.
  */
 
-import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import pg from "pg";
 
@@ -18,8 +17,6 @@ const { Pool } = pg;
 
 const { values } = parseArgs({
   options: {
-    "database-url": { type: "string" },
-    "database-url-file": { type: "string" },
     limit: { type: "string", default: "1000" },
     format: { type: "string", default: "text" },
     help: { type: "boolean", short: "h" },
@@ -36,9 +33,12 @@ if (values.help) {
   writeLine(`
 Usage: node scripts/preview-retention-purge.mjs [options]
 
+Reads the database connection from the DATABASE_URL environment variable
+(same convention as apps/web/worker.ts) -- there is deliberately no CLI flag
+for it, so this script can't be pointed at an arbitrary database by whatever
+invokes it.
+
 Options:
-  --database-url <url>        PostgreSQL connection string
-  --database-url-file <path>  File containing PostgreSQL connection string
   --limit <number>            Maximum candidates to preview (default: 1000)
   --format <text|json>        Output format (default: text)
   -h, --help                  Show help
@@ -46,16 +46,7 @@ Options:
   process.exit(0);
 }
 
-async function resolveDatabaseUrl() {
-  if (values["database-url"]) return values["database-url"];
-  if (values["database-url-file"]) {
-    return (await readFile(values["database-url-file"], "utf8")).trim();
-  }
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  return null;
-}
-
-const dbUrl = await resolveDatabaseUrl();
+const dbUrl = process.env.DATABASE_URL?.trim() || null;
 if (!dbUrl) {
   if (values.format === "json") {
     writeLine(JSON.stringify({ status: "skipped", reason: "DATABASE_URL not configured" }, null, 2));
