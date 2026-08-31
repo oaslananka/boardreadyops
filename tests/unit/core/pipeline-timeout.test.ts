@@ -84,6 +84,53 @@ rules:
     clearRulesForTests();
   });
 
+  it("does not apply a timeout race when the rule config object has no numeric timeout", async () => {
+    clearRulesForTests();
+    const untimedRule: Rule = {
+      meta: {
+        id: "custom.untimed-rule",
+        title: "Untimed Rule",
+        description: "A rule configured as an object but without a timeout field",
+        rationale: "Testing that an object rule config without `timeout` doesn't spuriously race",
+        defaultSeverity: "low",
+        appliesTo: ["pcb"],
+        configKeys: [],
+        kicadVersions: ["9", "10"],
+        tags: ["test"],
+      },
+      run: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return [];
+      },
+    };
+
+    registerRule(untimedRule);
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "brop-no-timeout-test-"));
+    const configPath = path.join(tempDir, "boardreadyops.yml");
+    await fs.writeFile(
+      configPath,
+      `version: 1
+rules:
+  custom.untimed-rule:
+    enabled: true
+`,
+      "utf8",
+    );
+
+    try {
+      const result = await runPipeline({
+        path: fixtureDir,
+        config: configPath,
+        rules: ["custom.untimed-rule"],
+      });
+      expect(result.summary.failed).toBe(false);
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+      clearRulesForTests();
+    }
+  });
+
   it("aborts execution promptly when AbortSignal is triggered", async () => {
     const controller = new AbortController();
     controller.abort();

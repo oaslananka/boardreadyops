@@ -417,6 +417,65 @@ describe("plugin loader", () => {
     expect(result.errors).toEqual([expect.stringContaining("requests unapproved permission: process")]);
   });
 
+  it("normalizes a plugin rule that returns non-array output into a config.invalid finding", async () => {
+    const root = await makeProjectRoot();
+    const pluginFile = path.join(root, "non-array-plugin.js");
+    await fs.writeFile(
+      pluginFile,
+      `export default {
+  name: "non-array-plugin",
+  version: "1.0.0",
+  rules: [
+    {
+      meta: {
+        id: "plugin.non-array",
+        title: "Non-array",
+        description: "Returns something that isn't an array",
+        rationale: "Testing non-array output normalization",
+        defaultSeverity: "info",
+        appliesTo: ["project"],
+        configKeys: [],
+        kicadVersions: ["9", "10", "future"],
+        tags: ["plugin"]
+      },
+      run() {
+        return { notAnArray: true };
+      }
+    }
+  ]
+};`,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(root, "boardreadyops.yml"),
+      `version: 1\nplugins:\n  - ${JSON.stringify(pluginFile)}\n`,
+      "utf8",
+    );
+
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.non-array"] });
+
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "config.invalid",
+        severity: "high",
+        message: expect.stringContaining("returned non-array output"),
+      }),
+    ]);
+  });
+
+  it("falls back to a directory-adjacent package.json when a path-specifier plugin file doesn't exist", async () => {
+    const root = await makeProjectRoot();
+    const missingPlugin = path.join(root, "does-not-exist.js");
+
+    const result = await loadPlugins(root, {
+      plugins: [missingPlugin],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining(missingPlugin)]);
+  });
+
   it("runs the shipped example plugin end-to-end through the SDK package", async () => {
     const root = await makeProjectRoot();
     const examplePlugin = path.resolve("examples/plugin-custom-rule/index.js");
@@ -515,6 +574,98 @@ export default {
         message: expect.stringContaining("Simulated plugin runtime panic"),
       }),
     ]);
+  });
+
+  it("safely contains a plugin rule that throws a non-Error value", async () => {
+    const root = await makeProjectRoot();
+    const crashingPlugin = path.join(root, "string-throw-plugin.js");
+    await fs.writeFile(
+      crashingPlugin,
+      `export default {
+  name: "string-throw-plugin",
+  version: "1.0.0",
+  rules: [
+    {
+      meta: {
+        id: "plugin.string-thrower",
+        title: "String thrower",
+        description: "Throws a plain string instead of an Error",
+        rationale: "Testing non-Error throw normalization",
+        defaultSeverity: "info",
+        appliesTo: ["project"],
+        configKeys: [],
+        kicadVersions: ["9", "10", "future"],
+        tags: ["plugin"]
+      },
+      run() {
+        throw "boom";
+      }
+    }
+  ]
+};`,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(root, "boardreadyops.yml"),
+      `version: 1\nplugins:\n  - ${JSON.stringify(crashingPlugin)}\n`,
+      "utf8",
+    );
+
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.string-thrower"] });
+
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "config.invalid",
+        severity: "high",
+        message: expect.stringContaining("unknown error"),
+      }),
+    ]);
+  });
+
+  it("falls back to the specifier for the denial message when a static manifest has permissions but no name", async () => {
+    const root = await makeProjectRoot();
+    const pkgDir = path.join(root, "node_modules", "boardreadyops-plugin-unnamed");
+    await fs.mkdir(pkgDir, { recursive: true });
+    await fs.writeFile(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        type: "module",
+        main: "index.js",
+        boardreadyops: { permissions: ["network"] },
+      }),
+      "utf8",
+    );
+    await fs.writeFile(path.join(pkgDir, "index.js"), 'throw new Error("must not run");\n', "utf8");
+
+    const result = await loadPlugins(root, {
+      plugins: ["boardreadyops-plugin-unnamed"],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining("boardreadyops-plugin-unnamed")]);
+  });
+
+  it("accepts a plugin that declares extension points other than rules", async () => {
+    const root = await makeProjectRoot();
+    const noRulesPlugin = path.join(root, "no-rules-plugin.js");
+    await fs.writeFile(
+      noRulesPlugin,
+      `export default {
+  name: "no-rules-plugin",
+  version: "1.0.0"
+};`,
+      "utf8",
+    );
+
+    const result = await loadPlugins(root, {
+      plugins: [noRulesPlugin],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.plugins).toEqual([expect.objectContaining({ name: "no-rules-plugin", ruleIds: [] })]);
   });
 });
 
