@@ -365,7 +365,7 @@
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--bro-border-accent);
-  border-radius: 999px;
+  border-radius: var(--bro-radius-sm);
   background: color-mix(in srgb, var(--bro-accent) 10%, transparent);
   color: var(--bro-accent-strong);
   font-family: var(--font-mono);
