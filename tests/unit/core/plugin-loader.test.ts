@@ -417,6 +417,60 @@ describe("plugin loader", () => {
     expect(result.errors).toEqual([expect.stringContaining("requests unapproved permission: process")]);
   });
 
+  it("runs the shipped example plugin end-to-end through the SDK package", async () => {
+    const root = await makeProjectRoot();
+    const examplePlugin = path.resolve("examples/plugin-custom-rule/index.js");
+    await fs.writeFile(
+      path.join(root, "boardreadyops.yml"),
+      `version: 1\nplugins:\n  - ${JSON.stringify(examplePlugin)}\n`,
+      "utf8",
+    );
+
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.hello-world"] });
+
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "plugin.hello-world",
+        severity: "info",
+        message: "Hello from a BoardReadyOps plugin.",
+      }),
+    ]);
+  });
+
+  it("documents the known trust-boundary limit: permissions declared only on the exported object still run top-level code before the permission decision (ADR 0009)", async () => {
+    const root = await makeProjectRoot();
+    const markerFile = path.join(root, "import-ran.marker");
+    const pluginFile = path.join(root, "undeclared-permissions-plugin.js");
+    await fs.writeFile(
+      pluginFile,
+      `import fs from "node:fs";
+fs.writeFileSync(${JSON.stringify(markerFile)}, "ran");
+export default {
+  name: "undeclared-permissions-plugin",
+  version: "1.0.0",
+  permissions: ["process"],
+  rules: [],
+};
+`,
+      "utf8",
+    );
+
+    const result = await loadPlugins(root, {
+      plugins: [pluginFile],
+      pluginPermissions: { allow: {} },
+    });
+
+    // Denied, because nothing allows "process" — but only after the module already ran.
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining("process")]);
+    // There is no static package.json manifest to pre-check for a bare path-specifier
+    // plugin, and the loader must import the module to read its exported `permissions`
+    // in the first place. The marker file proves the top-level code already executed
+    // before the denial was known. This is the accepted, documented trust boundary
+    // (ADR 0009): standard-mode plugins are trusted workspace code, not sandboxed.
+    await expect(fs.stat(markerFile)).resolves.toBeDefined();
+  });
+
   it("safely contains plugin rules that throw during execution", async () => {
     const root = await makeProjectRoot();
     const crashingPlugin = path.join(root, "crashing-plugin.js");
