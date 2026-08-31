@@ -49127,6 +49127,18 @@ function assertUniqueRuleIds(ruleIds, specifier) {
     seen.add(ruleId6);
   }
 }
+function createPluginErrorFinding(context, message) {
+  return createFinding({
+    ruleId: "config.invalid",
+    severity: "high",
+    message,
+    project: context.projects[0]?.projectFile,
+    resource: {
+      path: context.projects[0]?.projectFile ?? context.root,
+      kind: "project"
+    }
+  });
+}
 function toCoreRule(pluginRule) {
   return {
     meta: pluginRule.meta,
@@ -49134,32 +49146,15 @@ function toCoreRule(pluginRule) {
       try {
         const findings = await pluginRule.run(context);
         if (!Array.isArray(findings)) {
-          return [
-            createFinding({
-              ruleId: "config.invalid",
-              severity: "high",
-              message: `Plugin rule "${pluginRule.meta.id}" returned non-array output.`,
-              project: context.projects[0]?.projectFile,
-              resource: {
-                path: context.projects[0]?.projectFile ?? context.root,
-                kind: "project"
-              }
-            })
-          ];
+          return [createPluginErrorFinding(context, `Plugin rule "${pluginRule.meta.id}" returned non-array output.`)];
         }
         return findings.map(normalizePluginFinding);
       } catch (error51) {
         return [
-          createFinding({
-            ruleId: "config.invalid",
-            severity: "high",
-            message: `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error51)}`,
-            project: context.projects[0]?.projectFile,
-            resource: {
-              path: context.projects[0]?.projectFile ?? context.root,
-              kind: "project"
-            }
-          })
+          createPluginErrorFinding(
+            context,
+            `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error51)}`
+          )
         ];
       }
     }

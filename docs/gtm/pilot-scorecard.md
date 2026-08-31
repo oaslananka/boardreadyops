@@ -1,8 +1,8 @@
 # Design Partner Pilot Scorecard & Evaluation Criteria
 
-*Customer Name: {{Company_Name}}*
-*Evaluation Period: {{Start_Date}} to {{End_Date}} (60–90 days)*
-*Owner: {{Customer_Lead_EE}} / {{Provider_Lead}}*
+*Customer Name: [Company Name]*
+*Evaluation Period: [Start Date] to [End Date] (60–90 days)*
+*Owner: [Customer Lead EE] / [Provider Lead]*
 
 ---
 
@@ -34,7 +34,7 @@ The pilot is evaluated against three core operational dimensions:
 | :--- | :--- | :--- | :--- |
 | Example: PR #42 | `bom.missing-mpn` | Valid Blocker | Caught missing resistor network MPN before placing PCB assembly order. |
 | Example: PR #45 | `Hardware Impact` | Highly Actionable | Clear summary showing only silkscreen changed; expedited review. |
-| {{PR_Number}} | {{Rule_Id}} | {{Valid / False Alarm / Useful}} | {{Reviewer_Comments}} |
+| [PR Number] | [Rule ID] | [Valid / False Alarm / Useful] | [Reviewer Comments] |
 
 ---
 

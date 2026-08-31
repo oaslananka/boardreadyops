@@ -8,7 +8,6 @@ import {
   supplyWatchEnabled,
 } from "../../../packages/cloud-core/src/entitlements.js";
 import {
-  getStripePriceConfig,
   handledStripeEventTypes,
   resolveIntervalFromPriceId,
   resolveTierFromPriceId,

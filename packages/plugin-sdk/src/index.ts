@@ -101,7 +101,7 @@ export interface Rule {
 
 /**
  * Component adapter extension point.
- * @public @reserved - Reserved extension point for future hardware adapter implementations.
+ * @public @experimental - Reserved extension point for future hardware adapter implementations.
  */
 export interface ComponentAdapter {
   id: string;
@@ -110,7 +110,7 @@ export interface ComponentAdapter {
 
 /**
  * Report emitter extension point.
- * @public @reserved - Reserved extension point for custom report formats.
+ * @public @experimental - Reserved extension point for custom report formats.
  */
 export interface ReportEmitter {
   id: string;
@@ -119,7 +119,7 @@ export interface ReportEmitter {
 
 /**
  * Vendor profile extension point.
- * @public @reserved - Reserved extension point for custom manufacturing profiles.
+ * @public @experimental - Reserved extension point for custom manufacturing profiles.
  */
 export interface VendorProfile {
   id: string;
@@ -128,7 +128,7 @@ export interface VendorProfile {
 
 /**
  * Notification extension point.
- * @public @reserved - Reserved extension point for custom alert dispatchers.
+ * @public @experimental - Reserved extension point for custom alert dispatchers.
  */
 export interface Notifier {
   id: string;

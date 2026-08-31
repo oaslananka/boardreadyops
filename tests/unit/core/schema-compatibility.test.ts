@@ -51,13 +51,12 @@ describe("Schema Compatibility & Legacy Fixtures", () => {
       generatedAt: "2025-01-01T00:00:00.000Z",
       summary: {
         total: 0,
-        bySeverity: {
-          critical: 0,
-          high: 0,
-          medium: 0,
-          low: 0,
-          info: 0,
-        },
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        info: 0,
+        maxSeverity: "none",
         failed: false,
       },
       findings: [],
@@ -68,8 +67,10 @@ describe("Schema Compatibility & Legacy Fixtures", () => {
       projects: [
         {
           projectFile: "test.kicad_pro",
-          status: "passed",
-          findingCount: 0,
+          root: ".",
+          schematicFiles: [],
+          boardFiles: [],
+          jobsetFiles: [],
         },
       ],
     };

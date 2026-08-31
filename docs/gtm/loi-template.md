@@ -9,8 +9,8 @@
 
 ## Non-Binding Letter of Intent
 
-**Date**: {{Date}}
-**Prospective Customer**: {{Company_Name}} ("Customer")
+**Date**: [Date]
+**Prospective Customer**: [Company Name] ("Customer")
 **Provider**: BoardReadyOps Project / Maintainers ("Provider")
 
 ---
@@ -20,8 +20,8 @@ Customer wishes to evaluate Provider's software (**BoardReadyOps**) for automate
 
 ### 2. Pilot Evaluation Scope
 1. **Duration**: 60–90 calendar days from successful installation.
-2. **Repositories**: Up to {{Number_Of_Repositories}} active hardware design repositories.
-3. **Participants**: Up to {{Number_Of_Engineers}} hardware and release engineers.
+2. **Repositories**: Up to [Number of Repositories] active hardware design repositories.
+3. **Participants**: Up to [Number of Engineers] hardware and release engineers.
 4. **Success Criteria**:
    - Time to first useful finding < 15 minutes post-installation.
    - At least 1 preventable manufacturing/BOM risk caught before fab release.
@@ -30,9 +30,9 @@ Customer wishes to evaluate Provider's software (**BoardReadyOps**) for automate
 ### 3. Commercial Intent (Contingent on Success)
 Upon successful completion of the pilot evaluation meeting the mutually agreed success criteria above, Customer intends to negotiate in good faith a commercial license under the following terms:
 
-- **Target Plan Tier**: {{Team / Business / Custom Enterprise}}
-- **Target Contributor Seats**: {{Number_Of_Seats}} active hardware engineers.
-- **Estimated Annual Contract Value (ACV)**: ${{Estimated_ACV}} USD / year (non-binding estimate).
+- **Target Plan Tier**: [Team / Business / Custom Enterprise]
+- **Target Contributor Seats**: [Number of Seats] active hardware engineers.
+- **Estimated Annual Contract Value (ACV)**: $[Estimated ACV] USD / year (non-binding estimate).
 - **Deployment Mode**: GitHub Actions (Local-first / Self-hosted runner execution).
 
 ### 4. Non-Binding Nature & Confidentiality
@@ -44,12 +44,12 @@ Except for this Section 4 and any applicable mutual non-disclosure agreements, t
 
 **For Customer:**
 Signature: ___________________________
-Name: {{Signatory_Name}}
-Title: {{Signatory_Title}}
+Name: [Signatory Name]
+Title: [Signatory Title]
 Date: _______________________________
 
 **For BoardReadyOps:**
 Signature: ___________________________
-Name: {{Maintainer_Name}}
+Name: [Maintainer Name]
 Title: Lead Maintainer
 Date: _______________________________

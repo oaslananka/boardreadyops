@@ -1,8 +1,13 @@
+import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { generateDocsDiscovery } from "./docs-discovery.mjs";
 import { runWithMkDocsWarningSuppressed } from "./lib/run-command.mjs";
+import { resolveToolchainPaths } from "./toolchain.mjs";
+
+const toolchainPaths = resolveToolchainPaths(process.cwd());
+const pythonExecutable = existsSync(toolchainPaths.python) ? toolchainPaths.python : "python";
 
 const markdownFiles = [];
 await collect("docs");
@@ -18,7 +23,7 @@ const temporarySiteDir = requestedSiteDir ? null : await mkdtemp(path.join(os.tm
 const siteDir = requestedSiteDir ? path.resolve(requestedSiteDir) : temporarySiteDir;
 
 try {
-  await runWithMkDocsWarningSuppressed("python", [
+  await runWithMkDocsWarningSuppressed(pythonExecutable, [
     "-m",
     "mkdocs",
     "build",

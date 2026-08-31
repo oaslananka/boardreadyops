@@ -6,14 +6,20 @@
 
 # Interface: VendorProfile
 
-Vendor profile extension point reserved for plugin packages.
+**`Experimental`**
+
+Vendor profile extension point.
+  - Reserved extension point for custom manufacturing profiles.
 
 ## Indexable
 
 > \[`key`: `string`\]: `unknown`
+**`Experimental`**
 
 ## Properties
 
 ### id
 
 > **id**: `string`
+
+**`Experimental`**

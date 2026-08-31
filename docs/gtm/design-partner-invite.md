@@ -17,9 +17,9 @@ This template is used to invite selected professional hardware teams into the 90
 
 **Subject**: Early Access: Automated PR review & release gate for your KiCad repositories
 
-Hi {{First_Name}},
+Hi [First Name],
 
-I noticed that {{Company_Name}} is building innovative hardware using KiCad and GitHub.
+I noticed that [Company Name] is building innovative hardware using KiCad and GitHub.
 
 One of the most frustrating bottlenecks in hardware engineering is ordering a PCB spin only to discover a preventable manufacturing defect—a swapped MPN, a missing polarity marker, or stale Gerber exports.
 
@@ -36,6 +36,6 @@ Are you available for a brief 15-minute walkthrough this Thursday or Friday?
 
 Best regards,
 
-{{Your_Name}}
+[Your Name]
 Lead Maintainer, BoardReadyOps
 [https://github.com/oaslananka/boardreadyops](https://github.com/oaslananka/boardreadyops)
