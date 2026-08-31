@@ -1,6 +1,6 @@
 # ADR-0008 — Vercel as BoardReadyOps Cloud Control Plane
 
-**Status:** Proposed
+**Status:** Superseded — the project deployed a self-hosted Docker/Compose control plane instead; see [Self-hosted deployment](../../deployment/self-hosted.md)
 **Date:** 2026-06-27
 **Issue:** [#304](https://github.com/oaslananka/boardreadyops/issues/304)
 
