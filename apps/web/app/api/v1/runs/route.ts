@@ -26,6 +26,8 @@ const ingestRunRequestSchema = z.object({
   baseCommitSha: z.string().optional(),
 });
 
+type IngestRunRequest = z.infer<typeof ingestRunRequestSchema>;
+
 export async function GET(request: Request): Promise<Response> {
   const viewer = await viewerAuthorization();
   if (!viewer.session) {

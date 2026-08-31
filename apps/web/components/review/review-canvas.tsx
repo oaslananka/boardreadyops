@@ -9,9 +9,9 @@ export interface ReviewCanvasProps {
   baseSnapshots?: SnapshotArtifact[];
   findings?: DemoFinding[];
   comments?: DemoComment[];
-  selectedFindingFingerprint?: string;
-  onSelectFinding?: (fingerprint: string) => void;
-  onSelectComment?: (commentId: string) => void;
+  selectedFindingFingerprint?: string | undefined;
+  onSelectFinding?: ((fingerprint: string) => void) | undefined;
+  onSelectComment?: ((commentId: string) => void) | undefined;
   onAddCommentAtPoint?: (point: { x: number; y: number; sheetOrLayer: string }) => void;
 }
 
@@ -29,9 +29,9 @@ interface CanvasMarkersProps {
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
   comments: DemoComment[];
-  selectedFindingFingerprint?: string;
-  onSelectFinding?: (fingerprint: string) => void;
-  onSelectComment?: (commentId: string) => void;
+  selectedFindingFingerprint?: string | undefined;
+  onSelectFinding?: ((fingerprint: string) => void) | undefined;
+  onSelectComment?: ((commentId: string) => void) | undefined;
 }
 
 function CanvasMarkersLayer({
@@ -165,9 +165,9 @@ function StackedLayersView({
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
   comments: DemoComment[];
-  selectedFindingFingerprint?: string;
-  onSelectFinding?: (fingerprint: string) => void;
-  onSelectComment?: (commentId: string) => void;
+  selectedFindingFingerprint?: string | undefined;
+  onSelectFinding?: ((fingerprint: string) => void) | undefined;
+  onSelectComment?: ((commentId: string) => void) | undefined;
 }>) {
   return (
     <div className="canvas-layers-stack">
