@@ -24,7 +24,7 @@ await writeFile(
 );
 
 function extractChangelogSections(content) {
-  const normalized = content.replace(/\r\n/g, "\n").trim();
+  const normalized = content.replaceAll("\r\n", "\n").trim();
   if (!normalized.startsWith("# Changelog\n")) {
     throw new Error("CHANGELOG.md must start with '# Changelog'.");
   }
@@ -32,7 +32,9 @@ function extractChangelogSections(content) {
 }
 
 function validateChangelog(content) {
-  const sectionHeadings = [...content.matchAll(/^## \[?([^\]\n]+)\]?(?:[^\n]*)$/gm)].map((match) => match[1]);
+  const sectionHeadings = [...content.matchAll(/^## (?:\[([^\]\r\n]+)\]|(\S+))/gm)].map(
+    (match) => match[1] ?? match[2],
+  );
   if (sectionHeadings[0] !== "Unreleased") {
     throw new Error("CHANGELOG.md must keep the Unreleased section first.");
   }
@@ -44,7 +46,7 @@ function validateChangelog(content) {
 
   for (const version of versions) {
     const headingPattern = new RegExp(
-      `^## \\[?${escapeRegExp(version)}\\]?(?:[^\\n]*)\\(?(\\d{4}-\\d{2}-\\d{2})\\)?$`,
+      String.raw`^## \[?${escapeRegExp(version)}\]?(?:[^\n]*)\(?(\d{4}-\d{2}-\d{2})\)?$`,
       "m",
     );
     if (!headingPattern.test(content)) {
@@ -54,5 +56,5 @@ function validateChangelog(content) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }

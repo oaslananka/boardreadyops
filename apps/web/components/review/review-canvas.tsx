@@ -1,7 +1,7 @@
 "use client";
 
-import type { SnapshotArtifact } from "@boardreadyops/contracts";
-import { type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
+import type { CanvasAnchor, SnapshotArtifact } from "@boardreadyops/contracts";
+import { type PointerEvent, useEffect, useRef, useState } from "react";
 import type { DemoComment, DemoFinding } from "../../lib/demo-data.js";
 
 export interface ReviewCanvasProps {
@@ -9,9 +9,9 @@ export interface ReviewCanvasProps {
   baseSnapshots?: SnapshotArtifact[];
   findings?: DemoFinding[];
   comments?: DemoComment[];
-  selectedFindingFingerprint?: string;
-  onSelectFinding?: (fingerprint: string) => void;
-  onSelectComment?: (commentId: string) => void;
+  selectedFindingFingerprint?: string | undefined;
+  onSelectFinding?: ((fingerprint: string) => void) | undefined;
+  onSelectComment?: ((commentId: string) => void) | undefined;
   onAddCommentAtPoint?: (point: { x: number; y: number; sheetOrLayer: string }) => void;
 }
 
@@ -25,6 +25,190 @@ function toImageSrc(content?: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(content)}`;
 }
 
+interface CanvasMarkersProps {
+  sheetAnchors: CanvasAnchor[];
+  relevantFindings: DemoFinding[];
+  comments: DemoComment[];
+  selectedFindingFingerprint?: string | undefined;
+  onSelectFinding?: ((fingerprint: string) => void) | undefined;
+  onSelectComment?: ((commentId: string) => void) | undefined;
+}
+
+function CanvasMarkersLayer({
+  sheetAnchors,
+  relevantFindings,
+  comments,
+  selectedFindingFingerprint,
+  onSelectFinding,
+  onSelectComment,
+}: Readonly<CanvasMarkersProps>) {
+  return (
+    <div className="canvas-markers-layer">
+      {sheetAnchors.map((anchor) => {
+        if (anchor.kind === "finding" && anchor.metadata?.fingerprint) {
+          const fp = String(anchor.metadata.fingerprint);
+          const isSelected = fp === selectedFindingFingerprint;
+          const sev = String(anchor.metadata.severity ?? "warning");
+
+          return (
+            <button
+              type="button"
+              key={anchor.id}
+              className={`canvas-marker finding-marker severity-${sev} ${isSelected ? "selected" : ""}`}
+              style={{
+                left: `${anchor.x * 100}%`,
+                top: `${anchor.y * 100}%`,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectFinding?.(fp);
+              }}
+              title={`Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`}
+            >
+              <span className="marker-dot" />
+              <span className="marker-label">{anchor.targetRef}</span>
+            </button>
+          );
+        }
+
+        if (anchor.kind === "component" && anchor.targetRef) {
+          const compFinding = relevantFindings.find((f) => f.component === anchor.targetRef);
+          if (compFinding) {
+            const isSelected = compFinding.fingerprint === selectedFindingFingerprint;
+            return (
+              <button
+                type="button"
+                key={anchor.id}
+                className={`canvas-marker finding-marker severity-${compFinding.severity} ${isSelected ? "selected" : ""}`}
+                style={{
+                  left: `${anchor.x * 100}%`,
+                  top: `${anchor.y * 100}%`,
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectFinding?.(compFinding.fingerprint);
+                }}
+                title={`Finding on ${anchor.targetRef}: ${compFinding.ruleId}`}
+              >
+                <span className="marker-dot" />
+                <span className="marker-label">{anchor.targetRef}</span>
+              </button>
+            );
+          }
+        }
+
+        return null;
+      })}
+
+      {comments
+        .filter((c) => c.findingFingerprint)
+        .map((comment) => (
+          <button
+            type="button"
+            key={comment.id}
+            className="canvas-marker comment-marker"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectComment?.(comment.id);
+            }}
+            title={`Comment by ${comment.authorId}: ${comment.content}`}
+          >
+            💬
+          </button>
+        ))}
+    </div>
+  );
+}
+
+function SplitViewport({ baseSrc, headSrc }: Readonly<{ baseSrc: string; headSrc: string }>) {
+  return (
+    <div className="split-viewport-grid">
+      <div className="split-pane base-pane">
+        <span className="pane-tag">Base Revision</span>
+        {baseSrc ? (
+          // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
+          <img src={baseSrc} alt="Base Revision Snapshot" className="svg-render-img" />
+        ) : (
+          <div className="empty-pane-msg">No base snapshot</div>
+        )}
+      </div>
+
+      <div className="split-pane head-pane">
+        <span className="pane-tag">Head Revision</span>
+        {headSrc ? (
+          // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
+          <img src={headSrc} alt="Head Revision Snapshot" className="svg-render-img" />
+        ) : (
+          <div className="empty-pane-msg">No head snapshot</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StackedLayersView({
+  viewMode,
+  baseSrc,
+  headSrc,
+  opacity,
+  sheetAnchors,
+  relevantFindings,
+  comments,
+  selectedFindingFingerprint,
+  onSelectFinding,
+  onSelectComment,
+}: Readonly<{
+  viewMode: ViewMode;
+  baseSrc: string;
+  headSrc: string;
+  opacity: number;
+  sheetAnchors: CanvasAnchor[];
+  relevantFindings: DemoFinding[];
+  comments: DemoComment[];
+  selectedFindingFingerprint?: string | undefined;
+  onSelectFinding?: ((fingerprint: string) => void) | undefined;
+  onSelectComment?: ((commentId: string) => void) | undefined;
+}>) {
+  return (
+    <div className="canvas-layers-stack">
+      {(viewMode === "overlay" || viewMode === "base" || viewMode === "diff") && baseSrc ? (
+        // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
+        <img
+          src={baseSrc}
+          alt="Base Revision Snapshot Layer"
+          className="canvas-layer base-layer"
+          style={{
+            opacity: viewMode === "overlay" ? 1 - opacity : 1,
+            filter: viewMode === "diff" ? "invert(1) grayscale(1)" : "none",
+          }}
+        />
+      ) : null}
+
+      {(viewMode === "overlay" || viewMode === "head" || viewMode === "diff") && headSrc ? (
+        // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
+        <img
+          src={headSrc}
+          alt="Head Revision Snapshot Layer"
+          className="canvas-layer head-layer"
+          style={{
+            opacity: viewMode === "overlay" ? opacity : 1,
+            mixBlendMode: viewMode === "diff" ? "difference" : "normal",
+          }}
+        />
+      ) : null}
+
+      <CanvasMarkersLayer
+        sheetAnchors={sheetAnchors}
+        relevantFindings={relevantFindings}
+        comments={comments}
+        selectedFindingFingerprint={selectedFindingFingerprint}
+        onSelectFinding={onSelectFinding}
+        onSelectComment={onSelectComment}
+      />
+    </div>
+  );
+}
+
 export function ReviewCanvas({
   headSnapshots,
   baseSnapshots = [],
@@ -34,14 +218,15 @@ export function ReviewCanvas({
   onSelectFinding,
   onSelectComment,
   onAddCommentAtPoint,
-}: ReviewCanvasProps) {
+}: Readonly<ReviewCanvasProps>) {
   const [selectedSheetOrLayer, setSelectedSheetOrLayer] = useState<string>(headSnapshots[0]?.sheetOrLayer ?? "Main");
   const [viewMode, setViewMode] = useState<ViewMode>("overlay");
-  const [opacity, setOpacity] = useState<number>(0.5); // 0 = base, 1 = head
+  const [opacity, setOpacity] = useState<number>(0.5);
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [hasMoved, setHasMoved] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -52,7 +237,6 @@ export function ReviewCanvas({
     new Set([...headSnapshots.map((s) => s.sheetOrLayer), ...baseSnapshots.map((s) => s.sheetOrLayer)]),
   );
 
-  // Zoom handlers
   const handleZoomIn = () => setZoom((z) => Math.min(z * 1.25, 5));
   const handleZoomOut = () => setZoom((z) => Math.max(z / 1.25, 0.2));
   const handleReset = () => {
@@ -60,55 +244,61 @@ export function ReviewCanvas({
     setPan({ x: 0, y: 0 });
   };
 
-  const handleMouseDown = (e: MouseEvent) => {
-    if (e.button !== 0) return; // only left click
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
     setIsDragging(true);
+    setHasMoved(false);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
+    setHasMoved(true);
     setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
     setIsDragging(false);
-  };
+    if (!hasMoved && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const clickX = (e.clientX - rect.left - pan.x) / (rect.width * zoom);
+      const clickY = (e.clientY - rect.top - pan.y) / (rect.height * zoom);
 
-  const handleCanvasClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (!containerRef.current || isDragging) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const clickX = (e.clientX - rect.left - pan.x) / (rect.width * zoom);
-    const clickY = (e.clientY - rect.top - pan.y) / (rect.height * zoom);
-
-    if (clickX >= 0 && clickX <= 1 && clickY >= 0 && clickY <= 1) {
-      onAddCommentAtPoint?.({
-        x: Math.round(clickX * 1000) / 1000,
-        y: Math.round(clickY * 1000) / 1000,
-        sheetOrLayer: selectedSheetOrLayer,
-      });
+      if (clickX >= 0 && clickX <= 1 && clickY >= 0 && clickY <= 1) {
+        onAddCommentAtPoint?.({
+          x: Math.round(clickX * 1000) / 1000,
+          y: Math.round(clickY * 1000) / 1000,
+          sheetOrLayer: selectedSheetOrLayer,
+        });
+      }
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "+" || e.key === "=") {
-      handleZoomIn();
-    } else if (e.key === "-" || e.key === "_") {
-      handleZoomOut();
-    } else if (e.key === "0") {
-      handleReset();
-    } else if (e.key === "ArrowLeft") {
-      setPan((p) => ({ ...p, x: p.x + 20 }));
-    } else if (e.key === "ArrowRight") {
-      setPan((p) => ({ ...p, x: p.x - 20 }));
-    } else if (e.key === "ArrowUp") {
-      setPan((p) => ({ ...p, y: p.y + 20 }));
-    } else if (e.key === "ArrowDown") {
-      setPan((p) => ({ ...p, y: p.y - 20 }));
-    }
-  };
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "+" || e.key === "=") {
+        setZoom((z) => Math.min(z * 1.25, 5));
+      } else if (e.key === "-" || e.key === "_") {
+        setZoom((z) => Math.max(z / 1.25, 0.2));
+      } else if (e.key === "0") {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+      } else if (e.key === "ArrowLeft") {
+        setPan((p) => ({ ...p, x: p.x + 20 }));
+      } else if (e.key === "ArrowRight") {
+        setPan((p) => ({ ...p, x: p.x - 20 }));
+      } else if (e.key === "ArrowUp") {
+        setPan((p) => ({ ...p, y: p.y + 20 }));
+      } else if (e.key === "ArrowDown") {
+        setPan((p) => ({ ...p, y: p.y - 20 }));
+      }
+    };
 
-  // Extract finding anchors mapped to this sheet
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   const sheetAnchors = currentHeadSnapshot?.anchors ?? [];
   const relevantFindings = findings.filter(
     (f) => !f.sheet || f.sheet.toLowerCase() === selectedSheetOrLayer.toLowerCase(),
@@ -119,7 +309,6 @@ export function ReviewCanvas({
 
   return (
     <div className="review-canvas-container panel">
-      {/* Canvas Toolbar */}
       <section className="canvas-toolbar" aria-label="Canvas instruments">
         <div className="toolbar-left">
           <label htmlFor="sheet-select" className="toolbar-label">
@@ -215,16 +404,13 @@ export function ReviewCanvas({
         </div>
       </section>
 
-      {/* Canvas Viewport */}
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
         className={`canvas-viewport ${isDragging ? "dragging" : ""}`}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onClick={handleCanvasClick}
-        onKeyDown={handleKeyDown}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
         style={{ cursor: isDragging ? "grabbing" : "grab" }}
       >
         <div
@@ -234,138 +420,21 @@ export function ReviewCanvas({
             transformOrigin: "0 0",
           }}
         >
-          {/* Split Mode */}
           {viewMode === "split" ? (
-            <div className="split-viewport-grid">
-              <div className="split-pane base-pane">
-                <span className="pane-tag">Base Revision</span>
-                {baseSrc ? (
-                  // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-                  <img src={baseSrc} alt="Base Revision Snapshot" className="svg-render-img" />
-                ) : (
-                  <div className="empty-pane-msg">No base snapshot</div>
-                )}
-              </div>
-
-              <div className="split-pane head-pane">
-                <span className="pane-tag">Head Revision</span>
-                {headSrc ? (
-                  // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-                  <img src={headSrc} alt="Head Revision Snapshot" className="svg-render-img" />
-                ) : (
-                  <div className="empty-pane-msg">No head snapshot</div>
-                )}
-              </div>
-            </div>
+            <SplitViewport baseSrc={baseSrc} headSrc={headSrc} />
           ) : (
-            /* Overlay / Single / Diff Mode */
-            <div className="canvas-layers-stack">
-              {/* Base Layer */}
-              {(viewMode === "overlay" || viewMode === "base" || viewMode === "diff") && baseSrc ? (
-                // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-                <img
-                  src={baseSrc}
-                  alt="Base Revision Snapshot Layer"
-                  className="canvas-layer base-layer"
-                  style={{
-                    opacity: viewMode === "overlay" ? 1 - opacity : 1,
-                    filter: viewMode === "diff" ? "invert(1) grayscale(1)" : "none",
-                  }}
-                />
-              ) : null}
-
-              {/* Head Layer */}
-              {(viewMode === "overlay" || viewMode === "head" || viewMode === "diff") && headSrc ? (
-                // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-                <img
-                  src={headSrc}
-                  alt="Head Revision Snapshot Layer"
-                  className="canvas-layer head-layer"
-                  style={{
-                    opacity: viewMode === "overlay" ? opacity : 1,
-                    mixBlendMode: viewMode === "diff" ? "difference" : "normal",
-                  }}
-                />
-              ) : null}
-
-              {/* Markers Overlay */}
-              <div className="canvas-markers-layer">
-                {sheetAnchors.map((anchor) => {
-                  if (anchor.kind === "finding" && anchor.metadata?.fingerprint) {
-                    const fp = String(anchor.metadata.fingerprint);
-                    const isSelected = fp === selectedFindingFingerprint;
-                    const sev = String(anchor.metadata.severity ?? "warning");
-
-                    return (
-                      <button
-                        type="button"
-                        key={anchor.id}
-                        className={`canvas-marker finding-marker severity-${sev} ${isSelected ? "selected" : ""}`}
-                        style={{
-                          left: `${anchor.x * 100}%`,
-                          top: `${anchor.y * 100}%`,
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectFinding?.(fp);
-                        }}
-                        title={`Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`}
-                      >
-                        <span className="marker-dot" />
-                        <span className="marker-label">{anchor.targetRef}</span>
-                      </button>
-                    );
-                  }
-
-                  if (anchor.kind === "component" && anchor.targetRef) {
-                    // Check if any finding matches this component
-                    const compFinding = relevantFindings.find((f) => f.component === anchor.targetRef);
-                    if (compFinding) {
-                      const isSelected = compFinding.fingerprint === selectedFindingFingerprint;
-                      return (
-                        <button
-                          type="button"
-                          key={anchor.id}
-                          className={`canvas-marker finding-marker severity-${compFinding.severity} ${isSelected ? "selected" : ""}`}
-                          style={{
-                            left: `${anchor.x * 100}%`,
-                            top: `${anchor.y * 100}%`,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectFinding?.(compFinding.fingerprint);
-                          }}
-                          title={`Finding on ${anchor.targetRef}: ${compFinding.ruleId}`}
-                        >
-                          <span className="marker-dot" />
-                          <span className="marker-label">{anchor.targetRef}</span>
-                        </button>
-                      );
-                    }
-                  }
-
-                  return null;
-                })}
-
-                {/* Render comment anchors */}
-                {comments
-                  .filter((c) => c.findingFingerprint)
-                  .map((comment) => (
-                    <button
-                      type="button"
-                      key={comment.id}
-                      className="canvas-marker comment-marker"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectComment?.(comment.id);
-                      }}
-                      title={`Comment by ${comment.authorId}: ${comment.content}`}
-                    >
-                      💬
-                    </button>
-                  ))}
-              </div>
-            </div>
+            <StackedLayersView
+              viewMode={viewMode}
+              baseSrc={baseSrc}
+              headSrc={headSrc}
+              opacity={opacity}
+              sheetAnchors={sheetAnchors}
+              relevantFindings={relevantFindings}
+              comments={comments}
+              selectedFindingFingerprint={selectedFindingFingerprint}
+              onSelectFinding={onSelectFinding}
+              onSelectComment={onSelectComment}
+            />
           )}
         </div>
       </section>

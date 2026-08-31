@@ -33,7 +33,7 @@ export type RunnerFleetHealthStore = {
 };
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
-const versionPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
+const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 
 function rows(result: unknown): readonly Record<string, unknown>[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
@@ -44,7 +44,7 @@ function rows(result: unknown): readonly Record<string, unknown>[] {
 function integerColumn(row: Record<string, unknown>, name: string): number | undefined {
   const value = row[name];
   if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
-  if (typeof value === "string" && /^(0|[1-9][0-9]*)$/u.test(value)) {
+  if (typeof value === "string" && /^(0|[1-9]\d*)$/u.test(value)) {
     const parsed = Number(value);
     return Number.isSafeInteger(parsed) ? parsed : undefined;
   }

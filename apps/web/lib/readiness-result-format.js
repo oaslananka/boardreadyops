@@ -185,7 +185,7 @@ function sanitizeInline(value) {
 
 function code(value) {
   return `\`${String(value)
-    .replace(/`/g, "'")
+    .replaceAll("`", "'")
     .replace(/[\r\n]/g, " ")
     .trim()}\``;
 }
@@ -249,14 +249,18 @@ function appendTrustSummary(lines, input, style) {
   const trustMode = trustModeValue(input);
   if (!trustMode) return;
   if (style === "table") {
-    lines.push(`| Trust mode | ${trustMode} |`);
-    lines.push(`| Trust reasons | ${trustReasonsValue(input)} |`);
-    lines.push(`| Applied restrictions | ${appliedRestrictionsValue(input)} |`);
+    lines.push(
+      `| Trust mode | ${trustMode} |`,
+      `| Trust reasons | ${trustReasonsValue(input)} |`,
+      `| Applied restrictions | ${appliedRestrictionsValue(input)} |`,
+    );
     return;
   }
-  lines.push(`**Trust mode:** ${trustMode}`);
-  lines.push(`**Trust reasons:** ${trustReasonsValue(input)}`);
-  lines.push(`**Applied restrictions:** ${appliedRestrictionsValue(input)}`);
+  lines.push(
+    `**Trust mode:** ${trustMode}`,
+    `**Trust reasons:** ${trustReasonsValue(input)}`,
+    `**Applied restrictions:** ${appliedRestrictionsValue(input)}`,
+  );
 }
 
 function summaryTable(input) {

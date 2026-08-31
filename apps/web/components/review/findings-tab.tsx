@@ -11,7 +11,7 @@ export interface FindingsTabProps {
   onAssign?: (fingerprint: string, assignee: string) => void;
 }
 
-export function FindingsTab({ findings: initialFindings, onUpdateDisposition, onAssign }: FindingsTabProps) {
+export function FindingsTab({ findings: initialFindings, onUpdateDisposition, onAssign }: Readonly<FindingsTabProps>) {
   const [findings, setFindings] = useState(initialFindings);
   const [selectedDiffState, setSelectedDiffState] = useState<string>("all");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
@@ -226,11 +226,15 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
           </select>
 
           <div className="keyboard-shortcuts-hint">
-            <span>Shortcuts:</span>
-            <kbd>j</kbd>/<kbd>k</kbd> navigate
-            <kbd>e</kbd> accept risk
-            <kbd>f</kbd> false positive
-            <kbd>o</kbd> open
+            <span>Shortcuts: </span>
+            <kbd>j</kbd>/<kbd>k</kbd>
+            {" navigate "}
+            <kbd>e</kbd>
+            {" accept risk "}
+            <kbd>f</kbd>
+            {" false positive "}
+            <kbd>o</kbd>
+            {" open"}
           </div>
         </div>
       </div>

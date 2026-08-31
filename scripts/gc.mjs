@@ -129,6 +129,9 @@ function isAllowedDuplicate(block) {
     block.includes("createFinding({") ||
     block.includes("meta: {") ||
     block.includes("return output;") ||
+    // The `if (import.meta.url === ...) { try { await main() } ... }` CLI entrypoint guard is
+    // deliberately repeated across scripts/*.mjs; it is boilerplate, not shared logic to extract.
+    (block.includes("import.meta.url ===") && block.includes("process.argv[1]")) ||
     block.split("\n").every((line) => /^"[a-z][a-z0-9.-]+",?$/.test(line) || line === "]," || line === "]")
   );
 }

@@ -108,6 +108,30 @@ const lifecycleQuery = `query BoardReadyOpsLifecycle($queries: [SupPartMatchQuer
   }
 }`;
 
+function parseNexarMatches(
+  matches: readonly { reference?: string; parts?: NexarPart[] }[],
+  batch: readonly ComponentQuery[],
+  observedAt: Date,
+): ComponentObservation[] {
+  const observations: ComponentObservation[] = [];
+  for (const match of matches) {
+    const query = queryFor(batch, match.reference);
+    if (!query) continue;
+    const part = selectPart(match.parts ?? [], query);
+    if (!part) continue;
+    const status = nexarLifecycleStatus(specValue(part, "lifecyclestatus"));
+    if (status === "unknown") continue;
+    observations.push({
+      mpn: query.mpn,
+      ...(query.manufacturer === undefined ? {} : { manufacturer: query.manufacturer }),
+      status,
+      source: "nexar",
+      observedAt,
+    });
+  }
+  return observations;
+}
+
 export function createNexarComponentIntelligenceProvider(options: NexarProviderOptions): ComponentIntelligenceProvider {
   const request = options.fetch ?? globalThis.fetch;
   const now = options.now ?? (() => new Date());
@@ -150,6 +174,42 @@ export function createNexarComponentIntelligenceProvider(options: NexarProviderO
     return token.value;
   }
 
+  async function queryBatch(batch: readonly ComponentQuery[]): Promise<ComponentObservation[]> {
+    const bearer = await accessToken();
+    const response = await request(graphqlEndpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bearer}` },
+      body: JSON.stringify({
+        query: lifecycleQuery,
+        variables: {
+          queries: batch.map((part, index) => ({
+            mpn: part.mpn,
+            reference: String(index),
+            limit: partsPerMatch,
+          })),
+        },
+      }),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      token = undefined;
+      throw new ComponentIntelligenceCredentialError(`Nexar rejected the credential (HTTP ${response.status})`);
+    }
+    if (!response.ok) throw new Error(`Nexar lookup failed (HTTP ${response.status})`);
+
+    const payload = (await response.json()) as {
+      data?: { supMultiMatch?: { reference?: string; parts?: NexarPart[] }[] };
+      errors?: { message?: string }[];
+    };
+    if (payload.errors?.length) {
+      // GraphQL reports errors with HTTP 200, so this is the only place a schema drift or
+      // a quota refusal becomes visible.
+      throw new Error(`Nexar lookup returned errors: ${payload.errors.length}`);
+    }
+
+    return parseNexarMatches(payload.data?.supMultiMatch ?? [], batch, now());
+  }
+
   return {
     name: "nexar",
     cachePolicy: nexarCachePolicy,
@@ -159,54 +219,8 @@ export function createNexarComponentIntelligenceProvider(options: NexarProviderO
       const observations: ComponentObservation[] = [];
 
       for (const batch of chunked(parts, maximumPartsPerRequest)) {
-        const bearer = await accessToken();
-        const response = await request(graphqlEndpoint, {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${bearer}` },
-          body: JSON.stringify({
-            query: lifecycleQuery,
-            variables: {
-              queries: batch.map((part, index) => ({
-                mpn: part.mpn,
-                reference: String(index),
-                limit: partsPerMatch,
-              })),
-            },
-          }),
-        });
-
-        if (response.status === 401 || response.status === 403) {
-          token = undefined;
-          throw new ComponentIntelligenceCredentialError(`Nexar rejected the credential (HTTP ${response.status})`);
-        }
-        if (!response.ok) throw new Error(`Nexar lookup failed (HTTP ${response.status})`);
-
-        const payload = (await response.json()) as {
-          data?: { supMultiMatch?: { reference?: string; parts?: NexarPart[] }[] };
-          errors?: { message?: string }[];
-        };
-        if (payload.errors?.length) {
-          // GraphQL reports errors with HTTP 200, so this is the only place a schema drift or
-          // a quota refusal becomes visible.
-          throw new Error(`Nexar lookup returned errors: ${payload.errors.length}`);
-        }
-
-        const observedAt = now();
-        for (const match of payload.data?.supMultiMatch ?? []) {
-          const query = queryFor(batch, match.reference);
-          if (!query) continue;
-          const part = selectPart(match.parts ?? [], query);
-          if (!part) continue;
-          const status = nexarLifecycleStatus(specValue(part, "lifecyclestatus"));
-          if (status === "unknown") continue;
-          observations.push({
-            mpn: query.mpn,
-            ...(query.manufacturer === undefined ? {} : { manufacturer: query.manufacturer }),
-            status,
-            source: "nexar",
-            observedAt,
-          });
-        }
+        const batchObservations = await queryBatch(batch);
+        observations.push(...batchObservations);
       }
 
       return observations;

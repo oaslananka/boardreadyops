@@ -44,7 +44,7 @@ export interface FindingEvaluationResult {
 
 export function evaluateFindingDecision(
   finding: { fingerprint: string; severity: string },
-  decision?: FindingDecisionLike | undefined,
+  decision?: FindingDecisionLike,
   now = new Date(),
 ): FindingEvaluationResult {
   if (!decision) {
@@ -94,13 +94,13 @@ export interface ReviewReadinessBlocker {
     | "missing_required_checklist_item"
     | "missing_required_approver_role";
   message: string;
-  referenceId?: string | undefined;
+  referenceId?: string;
 }
 
 export interface ReviewReadinessPolicyGate {
   requiredChecklist: string[];
   requiredRoles: string[];
-  severityGate?: "error" | "high" | "medium" | null | undefined;
+  severityGate?: "error" | "high" | "medium" | null;
 }
 
 const SEVERITY_ORDER = ["info", "low", "medium", "high", "error"] as const;
@@ -123,32 +123,13 @@ export interface ReviewReadinessEvaluation {
   completedChecklistCount: number;
 }
 
-export function evaluateReviewReadiness(options: {
-  findings: Array<{ fingerprint: string; severity: string; ruleId: string; path: string }>;
-  decisions: Map<string, FindingDecisionLike>;
-  approvals: ReviewApprovalLike[];
-  checklist: ReviewChecklistItemLike[];
-  headEvidenceDigest: string;
-  requiredApprovalsCount?: number | undefined;
-  policy?: ReviewReadinessPolicyGate | null | undefined;
-  approverRoles?: Map<string, string[]> | undefined;
-  now?: Date | undefined;
-}): ReviewReadinessEvaluation {
-  const {
-    findings,
-    decisions,
-    approvals,
-    checklist,
-    headEvidenceDigest,
-    requiredApprovalsCount = 1,
-    policy,
-    approverRoles,
-    now = new Date(),
-  } = options;
-
+function collectFindingBlockers(
+  findings: Array<{ fingerprint: string; severity: string; ruleId: string; path: string }>,
+  decisions: Map<string, FindingDecisionLike>,
+  policy: ReviewReadinessPolicyGate | null | undefined,
+  now: Date,
+): ReviewReadinessBlocker[] {
   const blockers: ReviewReadinessBlocker[] = [];
-
-  // 1. Check findings against the policy severity gate (defaults to blocking only "error")
   for (const finding of findings) {
     const isBlockingSeverity = policy?.severityGate
       ? isAtOrAboveSeverityGate(finding.severity, policy.severityGate)
@@ -165,10 +146,14 @@ export function evaluateReviewReadiness(options: {
       }
     }
   }
+  return blockers;
+}
 
-  // 2. Check checklist
-  const totalChecklistCount = checklist.length;
-  const completedChecklistCount = checklist.filter((item) => item.completed).length;
+function collectChecklistBlockers(
+  checklist: ReviewChecklistItemLike[],
+  policy: ReviewReadinessPolicyGate | null | undefined,
+): ReviewReadinessBlocker[] {
+  const blockers: ReviewReadinessBlocker[] = [];
   for (const item of checklist) {
     if (!item.completed) {
       blockers.push({
@@ -179,7 +164,6 @@ export function evaluateReviewReadiness(options: {
     }
   }
 
-  // 2b. Check policy-required checklist items exist at all (not just completed)
   if (policy) {
     const existingTitles = new Set(checklist.map((item) => item.title.trim().toLowerCase()));
     for (const requiredTitle of policy.requiredChecklist) {
@@ -191,34 +175,16 @@ export function evaluateReviewReadiness(options: {
       }
     }
   }
+  return blockers;
+}
 
-  // 3. Check approvals
-  // Filter valid approved records targeting the current head evidence digest
-  const validApprovals = approvals.filter(
-    (app) => app.status === "approved" && app.evidenceDigest === headEvidenceDigest && !app.invalidatedAt,
-  );
-
-  const changesRequested = approvals.find(
-    (app) => app.status === "changes_requested" && app.evidenceDigest === headEvidenceDigest && !app.invalidatedAt,
-  );
-
-  if (changesRequested) {
-    blockers.push({
-      type: "changes_requested",
-      message: `Changes requested by ${changesRequested.approverId}: ${changesRequested.reason ?? "No reason provided"}`,
-      referenceId: changesRequested.id,
-    });
-  } else if (validApprovals.length < requiredApprovalsCount) {
-    blockers.push({
-      type: "missing_approval",
-      message: `Requires at least ${requiredApprovalsCount} approval(s), currently has ${validApprovals.length}`,
-    });
-  }
-
-  // 4. Check policy-required approver roles, if a role directory was supplied.
-  // Without approverRoles, role coverage cannot be verified, so it fails closed rather than
-  // silently passing a governance requirement no data source can confirm.
-  if (policy && policy.requiredRoles.length > 0 && !changesRequested) {
+function collectRoleBlockers(
+  validApprovals: ReviewApprovalLike[],
+  policy: ReviewReadinessPolicyGate | null | undefined,
+  approverRoles: Map<string, string[]> | undefined,
+): ReviewReadinessBlocker[] {
+  const blockers: ReviewReadinessBlocker[] = [];
+  if (policy && policy.requiredRoles.length > 0) {
     for (const requiredRole of policy.requiredRoles) {
       const hasApprovalFromRole = validApprovals.some((app) =>
         approverRoles?.get(app.approverId)?.includes(requiredRole),
@@ -231,8 +197,78 @@ export function evaluateReviewReadiness(options: {
       }
     }
   }
+  return blockers;
+}
 
+function collectApprovalBlockers(
+  validApprovals: ReviewApprovalLike[],
+  changesRequested: ReviewApprovalLike | undefined,
+  requiredApprovalsCount: number,
+  policy: ReviewReadinessPolicyGate | null | undefined,
+  approverRoles: Map<string, string[]> | undefined,
+): ReviewReadinessBlocker[] {
+  const blockers: ReviewReadinessBlocker[] = [];
+  if (changesRequested) {
+    blockers.push({
+      type: "changes_requested",
+      message: `Changes requested by ${changesRequested.approverId}: ${changesRequested.reason ?? "No reason provided"}`,
+      referenceId: changesRequested.id,
+    });
+    return blockers;
+  }
+
+  if (validApprovals.length < requiredApprovalsCount) {
+    blockers.push({
+      type: "missing_approval",
+      message: `Requires at least ${requiredApprovalsCount} approval(s), currently has ${validApprovals.length}`,
+    });
+  }
+
+  blockers.push(...collectRoleBlockers(validApprovals, policy, approverRoles));
+  return blockers;
+}
+
+export function evaluateReviewReadiness(options: {
+  findings: Array<{ fingerprint: string; severity: string; ruleId: string; path: string }>;
+  decisions: Map<string, FindingDecisionLike>;
+  approvals: ReviewApprovalLike[];
+  checklist: ReviewChecklistItemLike[];
+  headEvidenceDigest: string;
+  requiredApprovalsCount?: number;
+  policy?: ReviewReadinessPolicyGate | null;
+  approverRoles?: Map<string, string[]>;
+  now?: Date;
+}): ReviewReadinessEvaluation {
+  const {
+    findings,
+    decisions,
+    approvals,
+    checklist,
+    headEvidenceDigest,
+    requiredApprovalsCount = 1,
+    policy,
+    approverRoles,
+    now = new Date(),
+  } = options;
+
+  const validApprovals = approvals.filter(
+    (app) => app.status === "approved" && app.evidenceDigest === headEvidenceDigest && !app.invalidatedAt,
+  );
+
+  const changesRequested = approvals.find(
+    (app) => app.status === "changes_requested" && app.evidenceDigest === headEvidenceDigest && !app.invalidatedAt,
+  );
+
+  const blockers: ReviewReadinessBlocker[] = [
+    ...collectFindingBlockers(findings, decisions, policy, now),
+    ...collectChecklistBlockers(checklist, policy),
+    ...collectApprovalBlockers(validApprovals, changesRequested, requiredApprovalsCount, policy, approverRoles),
+  ];
+
+  const totalChecklistCount = checklist.length;
+  const completedChecklistCount = checklist.filter((item) => item.completed).length;
   const isReady = blockers.length === 0;
+
   let decision: ReviewDecision = "pending";
   if (changesRequested) {
     decision = "changes_requested";

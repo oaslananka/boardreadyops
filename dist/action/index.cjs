@@ -99681,7 +99681,7 @@ function defaultKicadCliCandidates() {
 
 // src/kicad/version.ts
 function parseKicadMajor(version4) {
-  const match = /(\d+)\./.exec(version4);
+  const match = /\b(\d+)\./.exec(version4);
   return match ? Number(match[1]) : void 0;
 }
 
@@ -105106,7 +105106,9 @@ function reportCoordinate(value) {
   if (Number.isInteger(value)) {
     return value.toString();
   }
-  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  const formatted = value.toFixed(6);
+  const trimmed = formatted.replace(/0+$/, "");
+  return trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
 }
 function reportCoordinateWithUnits(value, units) {
   return `${reportCoordinate(value)}${units}`;

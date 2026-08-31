@@ -69,3 +69,12 @@ BoardReadyOps is a local-first CLI and GitHub Action for KiCad hardware review. 
 - Add a report field: update `src/core/findings.ts`, `schemas/findings.schema.json`, report emitters, and tests.
 - Update Action inputs: edit `action.yml`, run `corepack pnpm run docs`, and update action tests.
 - Regenerate bundles: `corepack pnpm run build && corepack pnpm run verify:dist`.
+
+## SonarQube
+
+- Shared Connected Mode binding: `.sonarlint/connectedMode.json`; project key: `oaslananka_boardreadyops`.
+- SonarQube Cloud Automatic Analysis is authoritative. Do not add a CI scanner while it remains enabled.
+- For new or changed source files, use SonarQube MCP local analysis before declaring work complete; fix actionable findings and re-run analysis.
+- Use `get_project_quality_gate_status` as the remote baseline, not as proof that unpushed feature-branch changes were analyzed.
+- The Cloud project currently has only `main` analyzed; resolve PR/branch context explicitly when one appears in SonarQube.
+- `run_advanced_code_analysis` is currently unavailable for this organization. Do not depend on it unless the MCP tool actually becomes available.
