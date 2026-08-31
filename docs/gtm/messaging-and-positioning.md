@@ -1,13 +1,13 @@
 # Messaging & Product Positioning Guide
 
-*Date: August 31, 2026*  
+*Date: August 31, 2026*
 *Product Positioning: The trust layer between KiCad commits and manufacturing release.*
 
 ---
 
 ## 1. Core Positioning Statement
 
-> **BoardReadyOps is the trust layer between KiCad commits and manufacturing release.**  
+> **BoardReadyOps is the trust layer between KiCad commits and manufacturing release.**
 > It is a local-first, policy-as-code hardware review gate for teams designing PCBs in KiCad and GitHub. It explains what changed in every pull request, why it matters for fabrication, and binds every release to auditable, cryptographically verifiable evidence.
 
 ---

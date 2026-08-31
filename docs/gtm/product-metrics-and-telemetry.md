@@ -1,6 +1,6 @@
 # Product Metrics & Privacy-Safe Measurement Framework
 
-*Date: August 31, 2026*  
+*Date: August 31, 2026*
 *Product Positioning: The trust layer between KiCad commits and manufacturing release.*
 
 ---
@@ -9,7 +9,7 @@
 
 ```
                        ★ NORTH STAR METRIC ★
-   Number of trusted, verified hardware PR and release decisions 
+   Number of trusted, verified hardware PR and release decisions
            accepted, remediated, or blocked per month.
 ```
 

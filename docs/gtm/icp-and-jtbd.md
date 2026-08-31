@@ -1,6 +1,6 @@
 # Ideal Customer Profile (ICP) & Jobs To Be Done (JTBD)
 
-*Date: August 31, 2026*  
+*Date: August 31, 2026*
 *Product Positioning: The trust layer between KiCad commits and manufacturing release.*
 
 ---

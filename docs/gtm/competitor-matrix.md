@@ -1,6 +1,6 @@
 # KiCad Hardware Review & Release Gate: Competitor Analysis Matrix
 
-*Date: August 31, 2026*  
+*Date: August 31, 2026*
 *Market Scope: Hardware review automation, KiCad CI/CD tooling, PCB DFM gates, and release evidence governance.*
 
 ---

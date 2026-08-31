@@ -1,13 +1,13 @@
 # GTM Templates & Customer Discovery Artifacts
 
-*Date: August 31, 2026*  
+*Date: August 31, 2026*
 *Collection: Discovery scripts, pilot proposals, non-binding LOI, and security answers.*
 
 ---
 
 ## 1. 10-Question Customer Discovery Interview Guide
 
-**Target Persona**: Lead Hardware Engineer, Director of Hardware Engineering, PCB Designer.  
+**Target Persona**: Lead Hardware Engineer, Director of Hardware Engineering, PCB Designer.
 **Interview Objective**: Uncover real-world PCB respin causes, PR review bottlenecks, and willingness to pay for automated policy gates.
 
 ```markdown
@@ -34,8 +34,8 @@
 ```markdown
 # NON-BINDING LETTER OF INTENT (DESIGN PARTNER PILOT)
 
-**Date**: [Date]  
-**Between**: BoardReadyOps ("Provider") and [Company Name] ("Participant")  
+**Date**: [Date]
+**Between**: BoardReadyOps ("Provider") and [Company Name] ("Participant")
 
 ### 1. Purpose & Scope
 Participant intends to participate as a Design Partner in the BoardReadyOps Hardware Review & Release Gate Pilot. The purpose of this pilot is to evaluate automated KiCad PR review, BOM preflight, and release evidence generation within Participant's development workflows.
@@ -57,11 +57,11 @@ If Participant successfully validates the Pilot Acceptance Criteria defined belo
 ### 5. Non-Binding Nature
 This Letter of Intent represents a statement of mutual interest and goodwill only. Neither party is legally bound to purchase or license software until a definitive Commercial Agreement is executed.
 
-**For Participant:**  
-Name: __________________________  Title: __________________________  Date: ______________  
+**For Participant:**
+Name: __________________________  Title: __________________________  Date: ______________
 
-**For BoardReadyOps:**  
-Name: __________________________  Title: __________________________  Date: ______________  
+**For BoardReadyOps:**
+Name: __________________________  Title: __________________________  Date: ______________
 ```
 
 ---
@@ -71,15 +71,15 @@ Name: __________________________  Title: __________________________  Date: _____
 ```markdown
 ### Frequently Asked Security Questions
 
-**Q1: Does BoardReadyOps upload our PCB schematics, board layouts, or Gerber files to an external cloud?**  
+**Q1: Does BoardReadyOps upload our PCB schematics, board layouts, or Gerber files to an external cloud?**
 **A**: No. The open-source BoardReadyOps CLI and GitHub Action run entirely within your local workstation or your private GitHub Actions runner. Source files, netlists, and schematics never leave your compute boundary.
 
-**Q2: How does BoardReadyOps verify permissions for 3rd-party plugins?**  
+**Q2: How does BoardReadyOps verify permissions for 3rd-party plugins?**
 **A**: BoardReadyOps enforces a default-deny capability model. Plugin manifests are statically evaluated before execution, and plugins requesting unapproved filesystem, process, or network access are rejected before any code is loaded.
 
-**Q3: Does BoardReadyOps send tracking telemetry or phone home by default?**  
+**Q3: Does BoardReadyOps send tracking telemetry or phone home by default?**
 **A**: No. The CLI has zero default outbound network telemetry. Diagnostic logs are written locally to your terminal and `build/` directory.
 
-**Q4: How are release evidence bundles protected against tampering?**  
+**Q4: How are release evidence bundles protected against tampering?**
 **A**: Evidence manifests contain SHA-256 digests of all generated manufacturing outputs and can be cryptographically signed using Ed25519 asymmetric keys for offline verification.
 ```

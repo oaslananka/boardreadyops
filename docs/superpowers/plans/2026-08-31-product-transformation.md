@@ -4,7 +4,7 @@
 
 **Goal:** Transform BoardReadyOps into a professional, local-first policy-as-code hardware review gate ("The trust layer between KiCad commits and manufacturing release") with airtight plugin security, reproducible toolchain, deterministic hardware change impact, robust data lifecycle & billing readiness, and comprehensive GTM artifacts.
 
-**Architecture:** 
+**Architecture:**
 - Strict separation between local-first CLI/Action execution and self-hosted/cloud control plane.
 - P0 Plugin Security: Static manifest validation and permission evaluation BEFORE any plugin code execution; safe mode default-deny.
 - Exact-base deterministic hardware impact modeling (`HardwareImpactV1`).

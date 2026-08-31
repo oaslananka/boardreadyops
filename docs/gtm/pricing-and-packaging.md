@@ -1,6 +1,6 @@
 # Pricing & Packaging Strategy (August 2026)
 
-*Status: Test Hypotheses & Commercial Packaging Architecture*  
+*Status: Test Hypotheses & Commercial Packaging Architecture*
 *Product Positioning: The trust layer between KiCad commits and manufacturing release.*
 
 ---
