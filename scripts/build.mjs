@@ -17,7 +17,18 @@ const common = {
     ".json": "json",
     ".mustache": "text",
   },
-  external: ["typescript"],
+  // supports-color: `debug` (pulled in transitively via @actions/github's
+  // octokit dependencies) does `try { require("supports-color") } catch {}`
+  // -- it's optional, debug runs fine without it. Since adding
+  // @sentry/nextjs to the workspace, two versions of supports-color exist
+  // in the pnpm store (7.2.0 via chalk/istanbul, 8.1.1 via
+  // @sentry/nextjs's webpack), and esbuild's bundling of debug's ambient
+  // (non-pinned) require picked a different one on Windows vs Linux --
+  // the only place dist/action/index.cjs wasn't byte-reproducible across
+  // platforms. Leaving it external sidesteps the ambiguity entirely: the
+  // require stays unresolved at build time and debug's own catch handles
+  // it missing at runtime exactly the same as today.
+  external: ["typescript", "supports-color"],
 };
 
 await buildBundle("src/cli/index.ts", "dist/cli/index.cjs", 0o755);
