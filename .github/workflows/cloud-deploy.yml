@@ -37,19 +37,19 @@ jobs:
           chmod 600 "${key_path}"
           echo "CLOUD_DEPLOY_SSH_KEY_PATH=${key_path}" >> "$GITHUB_ENV"
 
-          ssh_host="$(doppler secrets get CLOUD_DEPLOY_SSH_HOST --plain \
-            --project boardreadyops --config deploy)"
-          echo "::add-mask::${ssh_host}"
-          echo "CLOUD_DEPLOY_SSH_HOST=${ssh_host}" >> "$GITHUB_ENV"
-
+          # These two must reach the `with:` block of the Tailscale action below, which only
+          # accepts values from the workflow's env/expression context — add-mask is the only
+          # mechanism GitHub provides for that. The stop-commands bypass this rule warns about
+          # requires an attacker's own code to run later in this same job; this workflow is
+          # workflow_dispatch-only with no untrusted checkout or execution after this step.
           ts_client_id="$(doppler secrets get TAILSCALE_OAUTH_CLIENT_ID --plain \
             --project boardreadyops --config deploy)"
-          echo "::add-mask::${ts_client_id}"
+          echo "::add-mask::${ts_client_id}" # nosemgrep: yaml.github-actions.security.audit.unsafe-add-mask-workflow-command.unsafe-add-mask-workflow-command
           echo "TAILSCALE_OAUTH_CLIENT_ID=${ts_client_id}" >> "$GITHUB_ENV"
 
           ts_client_secret="$(doppler secrets get TAILSCALE_OAUTH_CLIENT_SECRET --plain \
             --project boardreadyops --config deploy)"
-          echo "::add-mask::${ts_client_secret}"
+          echo "::add-mask::${ts_client_secret}" # nosemgrep: yaml.github-actions.security.audit.unsafe-add-mask-workflow-command.unsafe-add-mask-workflow-command
           echo "TAILSCALE_OAUTH_CLIENT_SECRET=${ts_client_secret}" >> "$GITHUB_ENV"
 
       - name: Connect Tailscale
@@ -59,17 +59,22 @@ jobs:
           oauth-secret: ${{ env.TAILSCALE_OAUTH_CLIENT_SECRET }}
           tags: tag:ci-deploy
           version: 1.94.2
-          ping: ${{ env.CLOUD_DEPLOY_SSH_HOST }}
 
       - name: Run production deploy runbook
         env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           DRY_RUN_FLAG: ${{ inputs.dry_run && '1' || '0' }}
         run: |
           set -euo pipefail
+          # Fetched fresh here instead of exported via the earlier step: this value is only
+          # ever used in this one step, so it can stay a local shell variable instead of
+          # crossing through $GITHUB_ENV, which means it never needs `::add-mask::` at all.
+          ssh_host="$(doppler secrets get CLOUD_DEPLOY_SSH_HOST --plain \
+            --project boardreadyops --config deploy)"
           ssh -i "${CLOUD_DEPLOY_SSH_KEY_PATH}" \
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
-            "ubuntu@${CLOUD_DEPLOY_SSH_HOST}" \
+            "ubuntu@${ssh_host}" \
             "set -euo pipefail; cd /opt/repos/boardreadyops-prod && git fetch origin --prune && git checkout prod-main && git merge --ff-only origin/main && BOARDREADYOPS_CLOUD_DRY_RUN=${DRY_RUN_FLAG} pnpm run cloud:deploy:self-hosted"
 
       - name: Remove temporary SSH key
