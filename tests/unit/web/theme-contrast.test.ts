@@ -6,15 +6,13 @@ import { describe, expect, it } from "vitest";
  *
  * The accessibility suite renders markup without the stylesheet, so axe has no colours to
  * measure and cannot see a theme regression at all. These read the tokens straight out of the
- * stylesheet and do the WCAG arithmetic, which is the only place the two themes are held to a
- * contrast floor rather than to how they look.
+ * stylesheet and do the WCAG arithmetic, which is the only place the (single, dark) theme is
+ * held to a contrast floor rather than to how it looks.
  */
 
 const stylesheet = await readFile("apps/web/app/styles.css", "utf8");
 
 const DARK = ":root {";
-const LIGHT_SYSTEM = ':root:not([data-theme="dark"]) {';
-const LIGHT_CHOSEN = ':root[data-theme="light"] {';
 
 function declarations(selector: string): Map<string, string> {
   const start = stylesheet.indexOf(selector);
@@ -109,8 +107,7 @@ const TEXT_PAIRS: [string, string][] = [
   ["--text-subtle", "--surface"],
   ["--accent", "--background"],
   ["--accent", "--surface"],
-  ["--accent-contrast", "--accent"],
-  ["--accent-contrast", "--accent-strong"],
+  ["--accent-contrast", "--accent-fill"],
   ["--code", "--surface"],
   ["--code", "--surface-sunken"],
   ["--success", "--success-surface"],
@@ -133,52 +130,31 @@ const NON_TEXT_PAIRS: [string, string][] = [
   ["--foundry-copper-strong", "--foundry-surface"],
 ];
 
-const THEMES = [
-  ["dark", DARK],
-  ["light, from the system preference", LIGHT_SYSTEM],
-  ["light, chosen by the reader", LIGHT_CHOSEN],
-] as const;
-
 describe("palette contrast", () => {
   const dark = declarations(DARK);
-  const themeFor = (selector: string): Map<string, string> =>
-    selector === DARK ? dark : new Map([...dark, ...declarations(selector)]);
 
-  for (const [label, selector] of THEMES) {
-    it(`keeps every text pair at WCAG AA in ${label}`, () => {
-      const theme = themeFor(selector);
-      const failures = TEXT_PAIRS.map(([foreground, background]) => {
-        const ratio = contrast(resolve(theme, dark, foreground), resolve(theme, dark, background));
-        return ratio < 4.5 ? `${foreground} on ${background} is ${ratio.toFixed(2)}:1` : undefined;
-      }).filter((failure) => failure !== undefined);
+  it("keeps every text pair at WCAG AA", () => {
+    const failures = TEXT_PAIRS.map(([foreground, background]) => {
+      const ratio = contrast(resolve(dark, dark, foreground), resolve(dark, dark, background));
+      return ratio < 4.5 ? `${foreground} on ${background} is ${ratio.toFixed(2)}:1` : undefined;
+    }).filter((failure) => failure !== undefined);
 
-      expect(failures).toEqual([]);
-    });
-
-    it(`keeps the focus ring visible against both grounds in ${label}`, () => {
-      const theme = themeFor(selector);
-      for (const ground of ["--background", "--surface"]) {
-        expect(contrast(resolve(theme, dark, "--focus"), resolve(theme, dark, ground))).toBeGreaterThanOrEqual(3);
-      }
-    });
-
-    it(`keeps material boundaries visible in ${label}`, () => {
-      const theme = themeFor(selector);
-      for (const [foreground, background] of NON_TEXT_PAIRS) {
-        expect(contrast(resolve(theme, dark, foreground), resolve(theme, dark, background))).toBeGreaterThanOrEqual(3);
-      }
-    });
-  }
-
-  it("keeps the two light blocks identical", () => {
-    // CSS cannot share one declaration block between a media query and a plain selector, so the
-    // palette is written twice. If they ever drift, a reader who picked light gets a different
-    // page from one whose system asked for it.
-    expect([...declarations(LIGHT_CHOSEN)]).toEqual([...declarations(LIGHT_SYSTEM)]);
+    expect(failures).toEqual([]);
   });
 
-  it("declares a colour scheme for both themes so form controls follow", () => {
+  it("keeps the focus ring visible against both grounds", () => {
+    for (const ground of ["--background", "--surface"]) {
+      expect(contrast(resolve(dark, dark, "--focus"), resolve(dark, dark, ground))).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("keeps material boundaries visible", () => {
+    for (const [foreground, background] of NON_TEXT_PAIRS) {
+      expect(contrast(resolve(dark, dark, foreground), resolve(dark, dark, background))).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("declares a colour scheme so form controls follow", () => {
     expect(stylesheet).toContain("color-scheme: dark");
-    expect(stylesheet).toContain("color-scheme: light");
   });
 });

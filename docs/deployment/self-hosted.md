@@ -199,6 +199,22 @@ The deploy script performs these steps:
 
 The deploy no longer copies `.next` into a running container. Each release is an immutable Docker image tied to one Git revision.
 
+## Remote deploy trigger
+
+The same runbook above can be run remotely from the GitHub Actions UI instead of an operator's terminal, via the [`cloud-deploy` workflow](../../.github/workflows/cloud-deploy.yml). It is `workflow_dispatch`-only — merging to `main` never triggers it — and it runs the identical `git fetch`/`checkout`/`merge`/`pnpm run cloud:deploy:self-hosted` sequence over SSH, reached over Tailscale rather than the public internet.
+
+One-time setup before the workflow can be used:
+
+1. In Tailscale, create an OAuth client scoped to a dedicated tag (e.g. `tag:ci-deploy`) that can reach only the production host on port 22, and configure that tag's nodes as ephemeral so a run leaves no persistent tailnet device behind.
+2. In Doppler, create a new config named `deploy` under the `boardreadyops` project (separate from `main`/`runtime`, so this workflow's token can never read application runtime secrets) containing:
+   - `CLOUD_DEPLOY_SSH_PRIVATE_KEY` — the private half of a dedicated SSH keypair, authorized only for the `ubuntu` account on the production host and used only by this workflow (not an operator's personal key).
+   - `CLOUD_DEPLOY_SSH_HOST` — the host's Tailscale IP or MagicDNS name.
+   - `TAILSCALE_OAUTH_CLIENT_ID` / `TAILSCALE_OAUTH_CLIENT_SECRET` — the OAuth client from step 1.
+3. Create a Doppler service token scoped to project `boardreadyops`, config `deploy`, and store it as the single GitHub Actions repository secret `DOPPLER_TOKEN`.
+4. Create a `production` GitHub Environment (Settings → Environments) so the workflow's `environment: production` reference resolves and the run appears in the deployments audit trail.
+
+To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to rehearse the canary and health checks without touching the live containers; set it to `false` to perform a real deploy. A failed run leaves the live containers untouched — `scripts/deploy-cloud.mjs` restores the previous containers automatically on failure, exactly as it does when the runbook is run manually.
+
 ## Independent worker scaling
 
 The lifecycle and outbox batch limits are independent from the web process. Scale worker replicas only after accounting for database connections and GitHub API throughput:
