@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -39,4 +40,19 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Source map upload only runs when the operator has configured a Sentry
+// project (SENTRY_ORG + SENTRY_PROJECT); otherwise the build is untouched.
+const sentryOrg = process.env.SENTRY_ORG?.trim();
+const sentryProject = process.env.SENTRY_PROJECT?.trim();
+
+export default sentryOrg && sentryProject
+  ? withSentryConfig(nextConfig, {
+      org: sentryOrg,
+      project: sentryProject,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: !process.env.CI,
+      widenClientFileUpload: false,
+      disableLogger: true,
+      telemetry: false,
+    })
+  : nextConfig;

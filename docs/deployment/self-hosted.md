@@ -171,6 +171,38 @@ Inspect the native Docker health state with:
 docker inspect --format '{{json .State.Health}}' bro-web
 ```
 
+## Error tracking (optional)
+
+The web app (`apps/web`) and the control-plane worker (`apps/web/worker.ts`) can
+report unhandled errors to [Sentry](https://sentry.io). This is opt-in only:
+nothing is sent unless `SENTRY_DSN` is set. There is no default outbound
+telemetry.
+
+| Variable | Required for | Purpose |
+| --- | --- | --- |
+| `SENTRY_DSN` | Runtime error capture | Enables reporting in both the web app and the worker. Unset = disabled. |
+| `SENTRY_ENVIRONMENT` | Optional | Tags events (defaults to `NODE_ENV`). |
+| `SENTRY_ORG`, `SENTRY_PROJECT` | Build-time source map upload (web app only) | Both must be set for `next build` to upload source maps via `withSentryConfig`. Unset = plain build, no Sentry build step. |
+| `SENTRY_AUTH_TOKEN` | Build-time source map upload (web app only) | Only used when `SENTRY_ORG`/`SENTRY_PROJECT` are set; needs the `project:releases` scope, not just `org:ci`. |
+
+The web app uses the full `@sentry/nextjs` SDK (`apps/web/instrumentation.ts`),
+capturing errors from Server Components, Route Handlers, and middleware via
+its `onRequestError` hook. The worker uses a different, minimal path
+(`apps/web/lib/sentry-worker-client.ts`) instead of the `@sentry/node` SDK:
+that SDK statically references `node:child_process` in its bundled
+OpenTelemetry/context integrations regardless of which integrations are
+registered at runtime, and
+`scripts/verify-control-plane-worker-boundary.mjs` forbids the worker from
+gaining process-spawning capability by design — so the worker sends the
+same Sentry envelope format directly over HTTPS instead. It forwards every
+`log("error", ...)` call through the same sanitized fields already written
+to stdout (`sanitizeWorkerLogFields`) — no additional payload, no raw
+request/design data.
+
+Tracing is intentionally disabled (`tracesSampleRate: 0`); this is error
+reporting only, not APM. Enabling it is a deliberate follow-up if request
+tracing becomes worth the added event volume.
+
 ## Repeatable self-hosted deploy from main
 
 After a change is merged to `main`, update the clean production worktree without rewriting local history:

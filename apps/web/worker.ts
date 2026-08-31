@@ -44,6 +44,11 @@ import { createGitHubWorkflowReconciliationClient } from "./lib/github-workflow-
 import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-worker.js";
 import { createRunnerClient } from "./lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mode.js";
+import { sendSentryEvent } from "./lib/sentry-worker-client.js";
+
+// Opt-in only: sends nothing unless SENTRY_DSN is set. See lib/sentry-worker-client.ts.
+const sentryDsn = process.env.SENTRY_DSN?.trim();
+const sentryEnvironment = process.env.SENTRY_ENVIRONMENT?.trim() || process.env.NODE_ENV;
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!databaseUrl) throw new Error("DATABASE_URL is required for the control-plane worker");
@@ -66,15 +71,19 @@ function errorClass(error: unknown): string {
 }
 
 function log(level: "error" | "info" | "warn", event: string, fields: Record<string, unknown> = {}): void {
+  const sanitized = sanitizeWorkerLogFields(fields);
   process.stdout.write(
     `${JSON.stringify({
       timestamp: new Date().toISOString(),
       level,
       component: "control-plane-worker",
       event,
-      ...sanitizeWorkerLogFields(fields),
+      ...sanitized,
     })}\n`,
   );
+  if (level === "error" && sentryDsn) {
+    void sendSentryEvent(sentryDsn, { message: event, environment: sentryEnvironment, extra: sanitized });
+  }
 }
 
 const workerId = (process.env.BOARDREADYOPS_WORKER_ID?.trim() || `${hostname()}-${process.pid}`).slice(0, 128);
