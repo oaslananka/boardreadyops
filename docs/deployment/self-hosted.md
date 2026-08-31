@@ -201,19 +201,21 @@ The deploy no longer copies `.next` into a running container. Each release is an
 
 ## Remote deploy trigger
 
-The same runbook above can be run remotely from the GitHub Actions UI instead of an operator's terminal, via the [`cloud-deploy` workflow](../../.github/workflows/cloud-deploy.yml). It is `workflow_dispatch`-only — merging to `main` never triggers it — and it runs the identical `git fetch`/`checkout`/`merge`/`pnpm run cloud:deploy:self-hosted` sequence over SSH, reached over Tailscale rather than the public internet.
+> The current production host does not run the `scripts/deploy-cloud.mjs` runbook described above — it runs a hand-maintained `deploy.sh` wrapper around `docker compose` (project `boardreadyops-cloud`, services `web`/`worker`/`migrate`/`caddy`/`cloudflared`), with the checkout at `/home/ubuntu/boardreadyops-cloud/repo`. The [`cloud-deploy` workflow](../../.github/workflows/cloud-deploy.yml) below targets that real topology, not the section above; treat this as the current source of truth for what a production deploy actually does until the sections are reconciled.
+
+The [`cloud-deploy` workflow](../../.github/workflows/cloud-deploy.yml) lets an operator trigger a deploy from the GitHub Actions UI instead of an SSH terminal. It is `workflow_dispatch`-only — merging to `main` never triggers it. A run: fast-forwards the production `repo/` checkout to `origin/main`, then over SSH (reached over Tailscale, not the public internet) runs the host's own `./deploy.sh`, which fetches runtime configuration from Doppler itself and drives `docker compose`.
 
 One-time setup before the workflow can be used:
 
 1. In Tailscale, create an OAuth client scoped to a dedicated tag (e.g. `tag:ci-deploy`) that can reach only the production host on port 22, and configure that tag's nodes as ephemeral so a run leaves no persistent tailnet device behind.
-2. In Doppler, create a new config named `deploy` under the `boardreadyops` project (separate from `main`/`runtime`, so this workflow's token can never read application runtime secrets) containing:
+2. In Doppler, create a new config named `deploy` under the `boardreadyops` project (separate from `main`/`runtime` — the workflow's token can never read the application's runtime secrets, which `deploy.sh` fetches on the host itself from a separate, read-only `runtime`-scoped token) containing:
    - `CLOUD_DEPLOY_SSH_PRIVATE_KEY` — the private half of a dedicated SSH keypair, authorized only for the `ubuntu` account on the production host and used only by this workflow (not an operator's personal key).
    - `CLOUD_DEPLOY_SSH_HOST` — the host's Tailscale IP or MagicDNS name.
    - `TAILSCALE_OAUTH_CLIENT_ID` / `TAILSCALE_OAUTH_CLIENT_SECRET` — the OAuth client from step 1.
 3. Create a Doppler service token scoped to project `boardreadyops`, config `deploy`, and store it as the single GitHub Actions repository secret `DOPPLER_TOKEN`.
 4. Create a `production` GitHub Environment (Settings → Environments) so the workflow's `environment: production` reference resolves and the run appears in the deployments audit trail.
 
-To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to rehearse the canary and health checks without touching the live containers; set it to `false` to perform a real deploy. A failed run leaves the live containers untouched — `scripts/deploy-cloud.mjs` restores the previous containers automatically on failure, exactly as it does when the runbook is run manually.
+To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to run `./deploy.sh build migrate web worker` — this builds the image from the fast-forwarded checkout and exercises the Doppler/SSH/Tailscale path without touching the running containers. Set it to `false` to run `./deploy.sh up -d --build migrate web worker`, the real deploy. `deploy.sh` has no canary or automatic rollback of its own: a failed build fails the workflow before anything is replaced, but a failed `up` can leave the stack partially replaced — check `docker compose -p boardreadyops-cloud ps` on the host afterward if a real-deploy run fails.
 
 ## Independent worker scaling
 
