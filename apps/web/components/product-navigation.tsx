@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { BrandMarkLockup } from "./brand-mark.js";
 import { ProductIcon, type ProductIconName } from "./product-icons.js";
-import { ThemeToggle } from "./theme-toggle.js";
 
 type NavigationItem = Readonly<{
   href: string;
@@ -145,7 +144,6 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
           </a>
           {viewerNav ? <Suspense fallback={null}>{viewerNav}</Suspense> : null}
           <div className="product-rail-actions">
-            <ThemeToggle />
             <button
               className="product-compact-toggle"
               type="button"

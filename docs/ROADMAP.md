@@ -152,9 +152,9 @@ Extended manufacturing and assembly risk rules covering polarity markers, pin-1 
 
 Native GitHub App with check run lifecycle, PR comment strategy, and dashboard/evidence links. Complements the existing GitHub Action for zero-config integration.
 
-### 16. Cloud Dashboard & Vercel Control Plane ([Epic #276](https://github.com/oaslananka/boardreadyops/issues/276))
+### 16. Cloud Dashboard & Self-Hosted Control Plane ([Epic #276](https://github.com/oaslananka/boardreadyops/issues/276))
 
-Hosted web dashboard and API on Vercel with GitHub App integration, artifact storage, and execution plane for KiCad-heavy jobs.
+Hosted web dashboard and API on a self-hosted Docker/Compose control plane with GitHub App integration, artifact storage, and execution plane for KiCad-heavy jobs. ADR-0008 proposed Vercel for this role; the project deployed self-hosted instead (see [Self-hosted deployment](deployment/self-hosted.md)).
 
 > **Foundation landed:** `GET /api/v1/runs` is now a real, cursor-paginated, session-authenticated, tenant-scoped listing (`apps/web/lib/run-listing.ts`) rather than the previous hardcoded-empty stub — the first real product API surface beyond the runner protocol and dashboard pages. Bearer-token auth for the CLI (`BOARDREADYOPS_TOKEN`) still needs its own token-issuance design before it can be added. Object storage beyond the local filesystem driver is scoped out for now: it needs a redesign of the runner upload protocol (proxy-through-server today vs. presigned direct-to-storage URLs) that already-deployed runner binaries depend on, which deserves its own design pass rather than a drive-by change.
 >

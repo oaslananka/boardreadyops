@@ -97,7 +97,7 @@
 }
 
 .landing-nav-links .landing-nav-cta:hover {
-  background: var(--bro-accent);
+  background: var(--bro-accent-fill);
   color: var(--bro-accent-contrast);
   border-color: var(--bro-accent-strong);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--bro-accent) 30%, transparent);
@@ -221,7 +221,7 @@
 
 .landing-button-primary {
   border-color: var(--bro-accent-strong);
-  background: var(--bro-accent);
+  background: var(--bro-accent-fill);
   color: var(--bro-accent-contrast);
   box-shadow: 0 2px 12px color-mix(in srgb, var(--bro-accent) 30%, transparent);
 }
@@ -365,7 +365,7 @@
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--bro-border-accent);
-  border-radius: 999px;
+  border-radius: var(--bro-radius-sm);
   background: color-mix(in srgb, var(--bro-accent) 10%, transparent);
   color: var(--bro-accent-strong);
   font-family: var(--font-mono);
