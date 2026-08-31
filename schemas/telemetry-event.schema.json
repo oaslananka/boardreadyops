@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oaslananka/boardreadyops/schemas/telemetry-event.schema.json",
+  "title": "BoardReadyOps Structured Local Diagnostic & Planned Telemetry Event Schema",
+  "description": "Privacy-bounded event schema for local diagnostics and planned opt-in product analytics. No outbound network transmissions occur by default.",
+  "type": "object",
+  "required": ["version", "eventId", "timestamp", "eventName", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version."
+    },
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique ephemeral event identifier."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp when the event was recorded."
+    },
+    "eventName": {
+      "type": "string",
+      "enum": [
+        "setup.completed",
+        "doctor.run",
+        "scan.completed",
+        "hardware_impact.generated",
+        "waiver.evaluated",
+        "release.prepared"
+      ],
+      "description": "Privacy-safe event taxonomy name."
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "os": {
+          "type": "string",
+          "enum": ["win32", "linux", "darwin"]
+        },
+        "nodeVersion": {
+          "type": "string"
+        },
+        "kicadMajor": {
+          "type": "string",
+          "enum": ["9", "10", "unknown"]
+        },
+        "ci": {
+          "type": "boolean"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "ready", "at-risk", "blocked"]
+        },
+        "failingChecks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ruleCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "findingsTotal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocking": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baselineStatus": {
+          "type": "string",
+          "enum": ["available", "unavailable"]
+        },
+        "materialChange": {
+          "type": "boolean"
+        },
+        "riskDirection": {
+          "type": "string",
+          "enum": ["increased", "decreased", "unchanged", "unknown"]
+        },
+        "activeWaivers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expiredWaivers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blockedRelease": {
+          "type": "boolean"
+        },
+        "vendorProfile": {
+          "type": "string"
+        },
+        "signed": {
+          "type": "boolean"
+        },
+        "outputCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
