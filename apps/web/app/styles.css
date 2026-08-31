@@ -1,10 +1,10 @@
 /*
- * BoardReadyOps evidence ledger.
+ * BoardReadyOps Technical Premium theme.
  *
- * The subject is a record a board signs off on, not a terminal session, so the surface reads
- * as ink and paper: a near-black ground, warm parchment text, and one brass accent reserved
- * for the decision. Structure comes from hairlines and type weight rather than glow, which
- * keeps semantic colour (pass / warning / danger) from competing with a decorative accent.
+ * The subject is an engineering instrument, not an illustrated document, so the surface reads
+ * as a deep-charcoal control panel: structural borders and tonal layering instead of soft
+ * shadows or decoration, and one cobalt accent reserved for action and focus. Semantic colour
+ * (pass / warning / danger) stays reserved for status, never decoration.
  */
 :root {
   color-scheme: dark;
@@ -41,6 +41,11 @@
   --bro-accent-strong: #4d8eff;
   --bro-accent-soft: #4d8eff;
   --bro-accent-contrast: #ffffff;
+  /* #3b82f6 reads fine as text on the dark ground, but white text directly on top of it falls
+     short of WCAG AA (3.68:1). Solid-fill surfaces that carry --accent-contrast text use this
+     darker shade instead, so link/icon/focus colour stays the bright Stitch cobalt everywhere
+     else. */
+  --bro-accent-fill: #1d4ed8;
   --bro-focus: #3b82f6;
   /* Technical Premium reads elevation from border + tonal layering, not shadow. These
      stay defined (every panel/header/card references them) but are flattened to near-
@@ -70,6 +75,7 @@
   --text-subtle: var(--bro-text-subtle);
   --accent: var(--bro-accent);
   --accent-strong: var(--bro-accent-strong);
+  --accent-fill: var(--bro-accent-fill);
   --accent-contrast: var(--bro-accent-contrast);
   --focus: var(--bro-focus);
   --radius-sm: var(--bro-radius-sm);
@@ -80,20 +86,25 @@
   --code: #c2c6d6;
   --skip-text: #0b0e14;
   /*
-   * Status badge/alert fills follow the Stitch rule: ~10% opacity of the semantic hue
-   * for the surface, full-intensity hue for border and text.
+   * Status badge/alert fills follow the Stitch "low-light fill" rule: a small amount of the
+   * semantic hue mixed into --surface for the fill, full-intensity hue for border and text.
+   * Mixed at 4% rather than the ~10% Stitch describes because Crimson and Cobalt Blue only
+   * clear WCAG AA against --surface at the lower ratio; Emerald and Amber would tolerate more.
+   * Pre-mixed to a flat hex (rather than color-mix()) so the WCAG contrast check in
+   * theme-contrast.test.ts, which only understands opaque colours, can verify these pairs the
+   * same way it does everywhere else in this file.
    */
   --success: #10b981;
-  --success-surface: color-mix(in srgb, #10b981 10%, transparent);
+  --success-surface: #111e2b;
   --success-border: #10b981;
   --warning: #f59e0b;
-  --warning-surface: color-mix(in srgb, #f59e0b 10%, transparent);
+  --warning-surface: #1a1d26;
   --warning-border: #f59e0b;
   --danger: #ef4444;
-  --danger-surface: color-mix(in srgb, #ef4444 10%, transparent);
+  --danger-surface: #1a1a28;
   --danger-border: #ef4444;
   --info: #3b82f6;
-  --info-surface: color-mix(in srgb, #3b82f6 10%, transparent);
+  --info-surface: #131c2f;
   --info-border: #3b82f6;
   --background-glow: transparent;
   --header-backdrop: rgba(11, 14, 20, 0.9);
@@ -1135,7 +1146,7 @@ code {
 
 .button-primary {
   border-color: var(--accent-strong);
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-contrast);
 }
 
@@ -2382,7 +2393,7 @@ code {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  background: var(--bro-accent);
+  background: var(--bro-accent-fill);
   color: var(--bro-accent-contrast);
   transition: background var(--bro-motion-fast) var(--bro-ease);
 }
