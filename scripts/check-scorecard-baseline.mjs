@@ -80,7 +80,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, root
   await appendSummary(options, env, result.summary);
 
   if (!result.passed && !options.noFail) {
-    throw new Error(`scorecard baseline failed:\n${result.failures.map((failure) => `- ${failure}`).join("\n")}`);
+    const formattedFailures = result.failures.map((failure) => `- ${failure}`).join("\n");
+    throw new Error(`scorecard baseline failed:\n${formattedFailures}`);
   }
 }
 
@@ -102,14 +103,14 @@ function parseArgs(argv) {
   };
 
   let index = 0;
-  const nextValue = (flag) => {
+  function nextValue(flag) {
     index += 1;
     const value = argv[index];
-    if (!value) {
-      throw new Error(`${flag} requires a value`);
+    if (!value || value.startsWith("--")) {
+      throw new Error(`Missing value for ${flag}`);
     }
     return value;
-  };
+  }
 
   while (index < argv.length) {
     const flag = argv[index];
@@ -122,7 +123,7 @@ function parseArgs(argv) {
       case "--minimum": {
         options.minimum = Number.parseFloat(nextValue(flag));
         if (!Number.isFinite(options.minimum)) {
-          throw new Error("--minimum must be a number");
+          throw new TypeError("--minimum must be a number");
         }
         break;
       }
@@ -157,16 +158,18 @@ function formatScore(value) {
 
 function escapeCell(value) {
   return String(value ?? "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\|/g, "\\|")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("|", String.raw`\|`)
     .replace(/\r?\n/g, "<br>");
 }
 
 if (isDirectInvocation()) {
-  await main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
-  });
+  }
 }
 
 function isDirectInvocation() {

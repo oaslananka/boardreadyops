@@ -36,7 +36,7 @@ function getGitOriginRepo(): string | undefined {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-    const match = url.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    const match = /[:/]([^/:]+\/[^/:]+?)(?:\.git)?$/.exec(url);
     return match ? match[1] : undefined;
   } catch {
     return undefined;
@@ -163,27 +163,78 @@ export interface ReviewVerifyOptions extends CommonCliOptions {
   artifacts?: string;
 }
 
+function resolveLedgerPath(target: string | undefined, root: string, explicitLedger?: string): string {
+  if (explicitLedger) return explicitLedger;
+  if (target?.endsWith(".json")) return target;
+  const candidates = [
+    `${root}/evidence-ledger.json`,
+    `${root}/artifacts/evidence-ledger.json`,
+    `${root}/.boardreadyops/evidence-ledger.json`,
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (require("node:fs").existsSync(candidate)) return candidate;
+    } catch {
+      // ignore
+    }
+  }
+  return `${root}/evidence-ledger.json`;
+}
+
+function writeVerificationResults(
+  result: {
+    calculatedDigest: string;
+    expectedDigest: string;
+    manifestCheckPassed: boolean;
+    tamperedItems: string[];
+    missingItems: string[];
+    errors: string[];
+    verified: boolean;
+  },
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
+): number {
+  streams.stdout.write(`\n--- Verification Summary ---\n`);
+  streams.stdout.write(`  Calculated Digest: ${result.calculatedDigest}\n`);
+  streams.stdout.write(`  Expected Digest:   ${result.expectedDigest}\n`);
+  streams.stdout.write(`  Manifest Check:    ${result.manifestCheckPassed ? "PASS" : "FAIL"}\n`);
+
+  if (result.tamperedItems.length > 0) {
+    streams.stderr.write(`\n❌ Tampered Artifacts Detected:\n`);
+    for (const item of result.tamperedItems) {
+      streams.stderr.write(`  - ${item}\n`);
+    }
+  }
+
+  if (result.missingItems.length > 0) {
+    streams.stderr.write(`\n⚠️ Missing Artifacts:\n`);
+    for (const item of result.missingItems) {
+      streams.stderr.write(`  - ${item}\n`);
+    }
+  }
+
+  if (result.errors.length > 0) {
+    streams.stderr.write(`\n❌ Integrity Errors:\n`);
+    for (const err of result.errors) {
+      streams.stderr.write(`  - ${err}\n`);
+    }
+  }
+
+  if (result.verified) {
+    streams.stdout.write(`\n✔ Hardware Review Evidence Cryptographically Verified (PASS)!\n\n`);
+    return 0;
+  }
+
+  streams.stderr.write(`\n❌ Evidence Verification Failed (TAMPERED / INVALID)\n\n`);
+  return 1;
+}
+
 export async function reviewVerifyCommand(
   target: string | undefined,
   options: ReviewVerifyOptions,
   streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
 ): Promise<number> {
   const root = target ?? process.cwd();
-  const ledgerPath =
-    options.ledger ??
-    (target?.endsWith(".json")
-      ? target
-      : ([
-          `${root}/evidence-ledger.json`,
-          `${root}/artifacts/evidence-ledger.json`,
-          `${root}/.boardreadyops/evidence-ledger.json`,
-        ].find((p) => {
-          try {
-            return require("node:fs").existsSync(p);
-          } catch {
-            return false;
-          }
-        }) ?? `${root}/evidence-ledger.json`));
+  const ledgerPath = resolveLedgerPath(target, root, options.ledger);
 
   streams.stdout.write(`\n🔒 Verifying Hardware Review Evidence Ledger...\n`);
   streams.stdout.write(`  Ledger File: ${ledgerPath}\n`);
@@ -197,39 +248,7 @@ export async function reviewVerifyCommand(
       result.verified = false;
     }
 
-    streams.stdout.write(`\n--- Verification Summary ---\n`);
-    streams.stdout.write(`  Calculated Digest: ${result.calculatedDigest}\n`);
-    streams.stdout.write(`  Expected Digest:   ${result.expectedDigest}\n`);
-    streams.stdout.write(`  Manifest Check:    ${result.manifestCheckPassed ? "PASS" : "FAIL"}\n`);
-
-    if (result.tamperedItems.length > 0) {
-      streams.stderr.write(`\n❌ Tampered Artifacts Detected:\n`);
-      for (const item of result.tamperedItems) {
-        streams.stderr.write(`  - ${item}\n`);
-      }
-    }
-
-    if (result.missingItems.length > 0) {
-      streams.stderr.write(`\n⚠️ Missing Artifacts:\n`);
-      for (const item of result.missingItems) {
-        streams.stderr.write(`  - ${item}\n`);
-      }
-    }
-
-    if (result.errors.length > 0) {
-      streams.stderr.write(`\n❌ Integrity Errors:\n`);
-      for (const err of result.errors) {
-        streams.stderr.write(`  - ${err}\n`);
-      }
-    }
-
-    if (result.verified) {
-      streams.stdout.write(`\n✔ Hardware Review Evidence Cryptographically Verified (PASS)!\n\n`);
-      return 0;
-    }
-
-    streams.stderr.write(`\n❌ Evidence Verification Failed (TAMPERED / INVALID)\n\n`);
-    return 1;
+    return writeVerificationResults(result, streams);
   } catch (error) {
     streams.stderr.write(`❌ Verification error: ${error instanceof Error ? error.message : String(error)}\n`);
     return 1;

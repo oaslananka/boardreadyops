@@ -214,7 +214,7 @@ async function repositoryCheck(root: string, configInput?: string): Promise<Doct
       }),
     );
   }
-  items.push(
+  const projectItem =
     projects.length === 0
       ? item("warn", "No KiCad projects discovered.", {
           recommendation: "Add a .kicad_pro project before CI.",
@@ -228,7 +228,10 @@ async function repositoryCheck(root: string, configInput?: string): Promise<Doct
             messageKey: "doctor.repository.projectsDiscovered",
             messageParams: { count: projects.length },
           },
-        ),
+        );
+
+  items.push(
+    projectItem,
     gerbers.length === 0
       ? item("fail", "No Gerber outputs found.", {
           recommendation: "Generate Gerber outputs from KiCad before CI.",
@@ -328,12 +331,11 @@ export function supportsDoctorNodeVersion(version: string): boolean {
   return Number.isInteger(major) && supportedNodeMajors.has(major);
 }
 
-function parseDoctorFormat(format: string | undefined): "text" | "json" {
-  const candidate = format ?? "text";
-  if (candidate === "text" || candidate === "json") {
-    return candidate;
+function parseDoctorFormat(format = "text"): "text" | "json" {
+  if (format === "text" || format === "json") {
+    return format;
   }
-  throw new Error(t("doctor.error.unknownFormat", { format: candidate }));
+  throw new Error(t("doctor.error.unknownFormat", { format }));
 }
 
 function parseDoctorCheck(check: string | undefined): DoctorCheckName | undefined {
@@ -347,7 +349,7 @@ function parseDoctorCheck(check: string | undefined): DoctorCheckName | undefine
 }
 
 function isDoctorCheckName(value: string): value is DoctorCheckName {
-  return doctorChecks.some((check) => check === value);
+  return (doctorChecks as readonly string[]).includes(value);
 }
 
 function item(
@@ -425,7 +427,7 @@ function collectLocalizedRecommendations(checks: DoctorCheck[], locale: Locale):
 }
 
 function localizedDoctorParams(key: MessageKey, params: MessageParams | undefined, locale: Locale): MessageParams {
-  const values: MessageParams = { ...(params ?? {}) };
+  const values: MessageParams = { ...params };
   if (key === "doctor.repository.projectsDiscovered" && typeof values.count === "number") {
     values.projectWord =
       values.count === 1

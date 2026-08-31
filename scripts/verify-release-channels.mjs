@@ -264,7 +264,7 @@ async function collectPublicReleaseSnapshot({ version, expectedNodeEngines, root
   for (const path of ACTION_REFERENCE_FILES) {
     const content = await readFile(join(root, path), "utf8");
     for (const match of content.matchAll(
-      /oaslananka\/boardreadyops(?:\/apps\/container)?@([0-9a-f]{40})\s+#\s+v([0-9]+\.[0-9]+\.[0-9]+)/g,
+      /oaslananka\/boardreadyops(?:\/apps\/container)?@([0-9a-f]{40})\s+#\s+v(\d+\.\d+\.\d+)/g,
     )) {
       actionPins.push({ path, sha: match[1], version: match[2] });
     }
@@ -358,14 +358,16 @@ async function fetchGhcrManifest(reference, fetchImpl) {
 function parseBearerChallenge(value) {
   if (!value?.startsWith("Bearer ")) return undefined;
   const fields = {};
-  for (const match of value.slice(7).matchAll(/([a-z]+)="([^"]*)"/g)) fields[match[1]] = match[2];
+  for (const match of value.slice(7).matchAll(/\b([a-z]+)="([^"]*)"/g)) fields[match[1]] = match[2];
   return fields;
 }
 
 function parseChecksumFile(text) {
   const entries = {};
   for (const line of text.split(/\r?\n/)) {
-    const match = /^([0-9a-f]{64})\s+\*?(.+)$/.exec(line.trim());
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const match = /^([0-9a-f]{64})\s+\*?(\S.*)$/.exec(trimmed);
     if (match) entries[match[2]] = match[1];
   }
   return entries;
@@ -421,8 +423,10 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
-  });
+  }
 }

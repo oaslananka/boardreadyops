@@ -49,6 +49,19 @@ function checkRunScope(context: ControlPlaneCheckRunReconciliationContext) {
   };
 }
 
+function restoredTitleForConclusion(conclusion: string): string {
+  switch (conclusion) {
+    case "success":
+      return "BoardReadyOps result: ready to release";
+    case "neutral":
+      return "BoardReadyOps result: review required";
+    case "timed_out":
+      return "BoardReadyOps result: run timed out";
+    default:
+      return "BoardReadyOps result: release blocked";
+  }
+}
+
 function recoveryPresentation(
   conclusion: ControlPlaneCheckRunReconciliationContext["expectedConclusion"],
   resultReported: boolean,
@@ -66,16 +79,8 @@ function recoveryPresentation(
     };
   }
 
-  const title =
-    conclusion === "success"
-      ? "BoardReadyOps result: ready to release"
-      : conclusion === "neutral"
-        ? "BoardReadyOps result: review required"
-        : conclusion === "timed_out"
-          ? "BoardReadyOps result: run timed out"
-          : "BoardReadyOps result: release blocked";
   return {
-    title,
+    title: restoredTitleForConclusion(conclusion),
     summary:
       "BoardReadyOps restored this Check Run from the accepted signed terminal result. Open the BoardReadyOps run for complete evidence and details.",
   };
@@ -202,6 +207,28 @@ async function repairCheckRun(
   }
 }
 
+async function handleMissingContext(
+  item: ClaimedControlPlaneReconciliationItem,
+  dependencies: ControlPlaneCheckRunReconciliationDependencies,
+): Promise<ProcessControlPlaneCheckRunReconciliationResult> {
+  const completion = await dependencies.operations.completeReconciliationItem({
+    reconciliationId: item.reconciliationId,
+    workerId: dependencies.workerId,
+    outcomeCode: "context_stale",
+    repaired: false,
+  });
+  return {
+    reconciliationId: item.reconciliationId,
+    status: completion === "completed" ? "already_published" : "stale",
+    outcomeCode: "context_stale",
+  };
+}
+
+function getReconciliationOutcomeCode(status: string, resultReported: boolean): string {
+  if (status === "already_published") return "already_published";
+  return resultReported ? "github_check_run_reconciled" : "github_check_run_reconciled_without_result";
+}
+
 export async function processControlPlaneCheckRunReconciliation(
   item: ClaimedControlPlaneReconciliationItem,
   dependencies: ControlPlaneCheckRunReconciliationDependencies,
@@ -212,17 +239,7 @@ export async function processControlPlaneCheckRunReconciliation(
     workerId: dependencies.workerId,
   });
   if (!context) {
-    const completion = await dependencies.operations.completeReconciliationItem({
-      reconciliationId: item.reconciliationId,
-      workerId: dependencies.workerId,
-      outcomeCode: "context_stale",
-      repaired: false,
-    });
-    return {
-      reconciliationId: item.reconciliationId,
-      status: completion === "completed" ? "already_published" : "stale",
-      outcomeCode: "context_stale",
-    };
+    return handleMissingContext(item, dependencies);
   }
 
   const deadline = new Date(context.deadlineAt);
@@ -265,13 +282,6 @@ export async function processControlPlaneCheckRunReconciliation(
   return {
     reconciliationId: item.reconciliationId,
     status,
-    // Mirrors the code the database records, so the worker log and the audit event agree on
-    // whether a result existed at all.
-    outcomeCode:
-      status === "already_published"
-        ? "already_published"
-        : context.resultReported
-          ? "github_check_run_reconciled"
-          : "github_check_run_reconciled_without_result",
+    outcomeCode: getReconciliationOutcomeCode(status, context.resultReported),
   };
 }

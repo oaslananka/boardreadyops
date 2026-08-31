@@ -158,7 +158,8 @@ function evidenceDecision(result: RunResult, gaps: ReleaseEvidenceGap[]): Releas
 }
 
 function formatChecksumsTxt(artifacts: ReleaseEvidenceArtifact[]): string {
-  return `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n")}\n`;
+  const lines = artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`);
+  return `${lines.join("\n")}\n`;
 }
 
 export interface ReleaseManifestCoverage {
@@ -423,6 +424,25 @@ export async function writeReviewEvidenceLedger(options: {
   return { ledgerPath, manifestPath, evidenceDigest };
 }
 
+async function resolveFileHash(item: { path: string; name: string }, baseDir: string): Promise<string | undefined> {
+  const candidatePaths = [
+    path.resolve(baseDir, item.path),
+    path.resolve(baseDir, item.name),
+    path.resolve(baseDir, "artifacts", item.name),
+    path.resolve(baseDir, "artifacts", item.path),
+  ];
+
+  for (const candidate of candidatePaths) {
+    try {
+      const fileContent = await fs.readFile(candidate);
+      return createHash("sha256").update(fileContent).digest("hex");
+    } catch {
+      // Continue searching
+    }
+  }
+  return undefined;
+}
+
 export async function verifyReviewEvidenceOffline(
   ledgerFilePath: string,
   artifactsRootDir?: string,
@@ -434,23 +454,10 @@ export async function verifyReviewEvidenceOffline(
   const baseDir = artifactsRootDir ?? path.dirname(ledgerFilePath);
 
   for (const item of ledgerDoc.manifest) {
-    const candidatePaths = [
-      path.resolve(baseDir, item.path),
-      path.resolve(baseDir, item.name),
-      path.resolve(baseDir, "artifacts", item.name),
-      path.resolve(baseDir, "artifacts", item.path),
-    ];
-
-    for (const candidate of candidatePaths) {
-      try {
-        const fileContent = await fs.readFile(candidate);
-        const hash = createHash("sha256").update(fileContent).digest("hex");
-        fileHashes[item.path] = hash;
-        fileHashes[item.name] = hash;
-        break;
-      } catch {
-        // Continue searching
-      }
+    const hash = await resolveFileHash(item, baseDir);
+    if (hash) {
+      fileHashes[item.path] = hash;
+      fileHashes[item.name] = hash;
     }
   }
 

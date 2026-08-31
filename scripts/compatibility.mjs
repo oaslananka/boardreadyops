@@ -481,7 +481,7 @@ function nodeSupportStatus(config, version) {
 }
 
 function markdownCell(value) {
-  return String(value).replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+  return String(value).replaceAll("\\", "\\\\").replaceAll("|", String.raw`\|`).replace(/\s+/g, " ").trim();
 }
 
 function releaseName(value) {
@@ -495,7 +495,7 @@ function releaseName(value) {
 }
 
 function stableReleaseName(value) {
-  const match = String(value).match(/^v?(\d+)\.(\d+)\.(\d+)$/);
+  const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(value));
   if (!match) {
     return undefined;
   }
@@ -510,7 +510,12 @@ function stableReleaseName(value) {
 
 function cycloneDxSchemaVersion(schema) {
   const value = objectValue(schema, "CycloneDX schema");
-  const id = typeof value.$id === "string" ? value.$id : typeof value.id === "string" ? value.id : "";
+  let id = "";
+  if (typeof value.$id === "string") {
+    id = value.$id;
+  } else if (typeof value.id === "string") {
+    id = value.id;
+  }
   const idMatch = id.match(/bom-(\d+\.\d+)\.schema\.json/);
   if (idMatch) {
     return idMatch[1];

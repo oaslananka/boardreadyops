@@ -51,15 +51,16 @@ if (files.some((file) => path.basename(file) === "index.ts" && path.dirname(file
 }
 
 if (violations.length > 0) {
-  throw new Error(`structure verification failed:\n${violations.map((entry) => `- ${entry}`).join("\n")}`);
+  const formattedViolations = violations.map((entry) => `- ${entry}`).join("\n");
+  throw new Error(`structure verification failed:\n${formattedViolations}`);
 }
 
 function findImports(source) {
   const imports = [];
   const patterns = [
-    /import\s+(?:type\s+)?(?:[^'"]+?\s+from\s+)?["']([^"']+)["']/g,
-    /export\s+(?:type\s+)?[^'"]+?\s+from\s+["']([^"']+)["']/g,
-    /import\(["']([^"']+)["']\)/g,
+    /\bfrom\s+["']([^"'\r\n]+)["']/g,
+    /\bimport\s+["']([^"'\r\n]+)["']/g,
+    /\bimport\(["']([^"'\r\n]+)["']\)/g,
   ];
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) {
@@ -135,5 +136,5 @@ function findCycles(inputGraph) {
 }
 
 function relative(file) {
-  return path.relative(root, file).replace(/\\/g, "/");
+  return path.relative(root, file).replaceAll("\\", "/");
 }
