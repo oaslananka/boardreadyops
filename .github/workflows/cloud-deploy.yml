@@ -76,7 +76,10 @@ jobs:
       - name: Run production deploy runbook
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-          DRY_RUN_FLAG: ${{ inputs.dry_run && '1' || '0' }}
+          # deploy.sh has no rehearsal mode of its own, so dry_run maps to its own
+          # documented `build`-only usage (builds the image, touches no running
+          # container) instead of the real `up -d --build` (replaces web/worker/migrate).
+          DEPLOY_ARGS: ${{ inputs.dry_run && 'build migrate web worker' || 'up -d --build migrate web worker' }}
         run: |
           set -euo pipefail
           # Fetched fresh here instead of exported via an earlier step: this value is only
@@ -88,7 +91,7 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            "set -euo pipefail; cd /opt/repos/boardreadyops-prod && git fetch origin --prune && git checkout prod-main && git merge --ff-only origin/main && BOARDREADYOPS_CLOUD_DRY_RUN=${DRY_RUN_FLAG} pnpm run cloud:deploy:self-hosted"
+            "set -euo pipefail; cd /home/ubuntu/boardreadyops-cloud/repo && git fetch origin --prune && git checkout main && git merge --ff-only origin/main && cd /home/ubuntu/boardreadyops-cloud && ./deploy.sh ${DEPLOY_ARGS}"
 
       - name: Remove temporary SSH key
         if: always()
