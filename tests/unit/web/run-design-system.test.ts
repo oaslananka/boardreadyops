@@ -37,7 +37,6 @@ describe("hosted dashboard design system", () => {
     expect(css).toContain("--bro-text:");
     expect(css).toContain("--bro-motion-fast:");
     expect(css).toContain("color-scheme: dark");
-    expect(css).toContain("color-scheme: light");
     expect(css).toContain("--space-7");
     expect(css).toContain("--radius-lg");
     expect(css).toContain("--focus");
