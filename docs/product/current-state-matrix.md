@@ -148,7 +148,7 @@
 | **Release Policy Simulation** | Available | Available | Available | Available | Yes ([`src/cli/commands/policy.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/src/cli/commands/policy.ts)) |
 | **Expired Waiver Blocking** | Available | Available | Available | Available | Yes ([`src/core/readiness.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/src/core/readiness.ts)) |
 | **SIEM Event Stream** | `unsupported` | `unsupported` | `experimental` (in-memory) | `planned` (webhook) | Yes ([`packages/cloud-core/src/enterprise/siem-stream.ts`](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/packages/cloud-core/src/enterprise/siem-stream.ts)) |
-| **SAML / SCIM / SSO** | `unsupported` | `unsupported` | `planned` | `planned` | Architectural Design ([ADR 0010](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/docs/architecture/adr/0010-enterprise-governance-sso-scim.md)) |
+| **SAML / SCIM / SSO** | `unsupported` | `unsupported` | `planned` | `planned` | Architectural Design ([ADR 0015](file:///C:/Users/Admin/Desktop/PROJECTS/boardreadyops/docs/architecture/adr/0015-enterprise-governance-sso-scim.md)) |
 
 ---
 
