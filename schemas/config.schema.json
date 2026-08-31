@@ -82,6 +82,11 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "timeout": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Maximum rule execution time in milliseconds."
                     }
                   }
                 }
@@ -158,6 +163,11 @@
                     "minLength": 1
                   }
                 }
+              },
+              "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Maximum rule execution time in milliseconds."
               }
             }
           }
