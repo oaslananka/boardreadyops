@@ -82298,6 +82298,11 @@ var config_schema_default = {
                       items: {
                         type: "string"
                       }
+                    },
+                    timeout: {
+                      type: "integer",
+                      minimum: 1,
+                      description: "Maximum rule execution time in milliseconds."
                     }
                   }
                 }
@@ -82374,6 +82379,11 @@ var config_schema_default = {
                     minLength: 1
                   }
                 }
+              },
+              timeout: {
+                type: "integer",
+                minimum: 1,
+                description: "Maximum rule execution time in milliseconds."
               }
             }
           }
@@ -103870,8 +103880,23 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
         rule: rule2.meta.id,
         project: project.projectFile
       });
+      const ruleConf = projectConfig.rules?.[rule2.meta.id] ?? ctx.config.rules?.[rule2.meta.id];
+      const ruleTimeout = typeof ruleConf === "object" && ruleConf !== null && typeof ruleConf.timeout === "number" && ruleConf.timeout > 0 ? ruleConf.timeout : void 0;
       try {
-        output.push(...await rule2.run(context5));
+        let rulePromise = Promise.resolve(rule2.run(context5));
+        if (ruleTimeout !== void 0) {
+          let timeoutHandle;
+          const timeoutPromise = new Promise((_2, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new Error(`Rule "${rule2.meta.id}" timed out after ${ruleTimeout}ms.`));
+            }, ruleTimeout);
+            timeoutHandle.unref?.();
+          });
+          rulePromise = Promise.race([rulePromise, timeoutPromise]).finally(() => {
+            if (timeoutHandle !== void 0) clearTimeout(timeoutHandle);
+          });
+        }
+        output.push(...await rulePromise);
         ctx.logger.debug("pipeline.rule.finish", {
           rule: rule2.meta.id,
           project: project.projectFile,
@@ -105647,7 +105672,7 @@ var runnerMutationResponseSchema = external_exports.object({
 }).strict();
 
 // packages/contracts/src/billing.ts
-var billingTierSchema = external_exports.enum(["free", "team", "business", "enterprise"]);
+var billingTierSchema = external_exports.enum(["free", "team", "business"]);
 var billingIntervalSchema = external_exports.enum(["month", "year"]);
 var billingCustomerSchema = external_exports.object({
   id: external_exports.string().uuid(),

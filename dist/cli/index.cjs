@@ -34844,7 +34844,7 @@ var init_billing = __esm({
   "packages/contracts/src/billing.ts"() {
     "use strict";
     init_zod();
-    billingTierSchema = external_exports.enum(["free", "team", "business", "enterprise"]);
+    billingTierSchema = external_exports.enum(["free", "team", "business"]);
     billingIntervalSchema = external_exports.enum(["month", "year"]);
     billingCustomerSchema = external_exports.object({
       id: external_exports.string().uuid(),
@@ -41927,6 +41927,11 @@ var config_schema_default = {
                       items: {
                         type: "string"
                       }
+                    },
+                    timeout: {
+                      type: "integer",
+                      minimum: 1,
+                      description: "Maximum rule execution time in milliseconds."
                     }
                   }
                 }
@@ -42003,6 +42008,11 @@ var config_schema_default = {
                     minLength: 1
                   }
                 }
+              },
+              timeout: {
+                type: "integer",
+                minimum: 1,
+                description: "Maximum rule execution time in milliseconds."
               }
             }
           }
@@ -49641,8 +49651,23 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
         rule: rule2.meta.id,
         project: project.projectFile
       });
+      const ruleConf = projectConfig.rules?.[rule2.meta.id] ?? ctx.config.rules?.[rule2.meta.id];
+      const ruleTimeout = typeof ruleConf === "object" && ruleConf !== null && typeof ruleConf.timeout === "number" && ruleConf.timeout > 0 ? ruleConf.timeout : void 0;
       try {
-        output.push(...await rule2.run(context));
+        let rulePromise = Promise.resolve(rule2.run(context));
+        if (ruleTimeout !== void 0) {
+          let timeoutHandle;
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new Error(`Rule "${rule2.meta.id}" timed out after ${ruleTimeout}ms.`));
+            }, ruleTimeout);
+            timeoutHandle.unref?.();
+          });
+          rulePromise = Promise.race([rulePromise, timeoutPromise]).finally(() => {
+            if (timeoutHandle !== void 0) clearTimeout(timeoutHandle);
+          });
+        }
+        output.push(...await rulePromise);
         ctx.logger.debug("pipeline.rule.finish", {
           rule: rule2.meta.id,
           project: project.projectFile,
