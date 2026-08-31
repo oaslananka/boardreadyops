@@ -25,32 +25,45 @@ jobs:
       - name: Install Doppler CLI
         uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
 
-      - name: Load deploy secrets from Doppler
+      - name: Load SSH key from Doppler
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         run: |
           set -euo pipefail
-
           key_path="${RUNNER_TEMP}/cloud-deploy-key"
           doppler secrets get CLOUD_DEPLOY_SSH_PRIVATE_KEY --plain \
             --project boardreadyops --config deploy > "${key_path}"
           chmod 600 "${key_path}"
           echo "CLOUD_DEPLOY_SSH_KEY_PATH=${key_path}" >> "$GITHUB_ENV"
 
-          # These two must reach the `with:` block of the Tailscale action below, which only
-          # accepts values from the workflow's env/expression context — add-mask is the only
-          # mechanism GitHub provides for that. The stop-commands bypass this rule warns about
-          # requires an attacker's own code to run later in this same job; this workflow is
-          # workflow_dispatch-only with no untrusted checkout or execution after this step.
-          ts_client_id="$(doppler secrets get TAILSCALE_OAUTH_CLIENT_ID --plain \
-            --project boardreadyops --config deploy)"
-          echo "::add-mask::${ts_client_id}" # nosemgrep: yaml.github-actions.security.audit.unsafe-add-mask-workflow-command.unsafe-add-mask-workflow-command
-          echo "TAILSCALE_OAUTH_CLIENT_ID=${ts_client_id}" >> "$GITHUB_ENV"
+      - name: Load Tailscale OAuth credentials from Doppler
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        with:
+          script: |
+            const { execFileSync } = require("node:child_process");
 
-          ts_client_secret="$(doppler secrets get TAILSCALE_OAUTH_CLIENT_SECRET --plain \
-            --project boardreadyops --config deploy)"
-          echo "::add-mask::${ts_client_secret}" # nosemgrep: yaml.github-actions.security.audit.unsafe-add-mask-workflow-command.unsafe-add-mask-workflow-command
-          echo "TAILSCALE_OAUTH_CLIENT_SECRET=${ts_client_secret}" >> "$GITHUB_ENV"
+            function readDeploySecret(name) {
+              return execFileSync(
+                "doppler",
+                ["secrets", "get", name, "--plain", "--project", "boardreadyops", "--config", "deploy"],
+                { encoding: "utf8" },
+              ).trim();
+            }
+
+            const clientId = readDeploySecret("TAILSCALE_OAUTH_CLIENT_ID");
+            const clientSecret = readDeploySecret("TAILSCALE_OAUTH_CLIENT_SECRET");
+
+            // core.setSecret masks the value in log output; core.exportVariable makes it
+            // available to later steps via the env context, which is what the Tailscale
+            // action's `with:` block below needs. Doing the fetch-and-mask in one script
+            // step, rather than a shell `echo`, keeps the value out of any workflow-command
+            // text a later step could otherwise interfere with.
+            core.setSecret(clientId);
+            core.setSecret(clientSecret);
+            core.exportVariable("TAILSCALE_OAUTH_CLIENT_ID", clientId);
+            core.exportVariable("TAILSCALE_OAUTH_CLIENT_SECRET", clientSecret);
 
       - name: Connect Tailscale
         uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
@@ -66,9 +79,9 @@ jobs:
           DRY_RUN_FLAG: ${{ inputs.dry_run && '1' || '0' }}
         run: |
           set -euo pipefail
-          # Fetched fresh here instead of exported via the earlier step: this value is only
-          # ever used in this one step, so it can stay a local shell variable instead of
-          # crossing through $GITHUB_ENV, which means it never needs `::add-mask::` at all.
+          # Fetched fresh here instead of exported via an earlier step: this value is only
+          # ever used in this one step, so it can stay a local shell variable and never
+          # needs to cross through $GITHUB_ENV or be masked at all.
           ssh_host="$(doppler secrets get CLOUD_DEPLOY_SSH_HOST --plain \
             --project boardreadyops --config deploy)"
           ssh -i "${CLOUD_DEPLOY_SSH_KEY_PATH}" \
