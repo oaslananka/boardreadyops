@@ -182,7 +182,7 @@ telemetry.
 | --- | --- | --- |
 | `SENTRY_DSN` | Runtime error capture | Enables reporting in both the web app and the worker. Unset = disabled. |
 | `SENTRY_ENVIRONMENT` | Optional | Tags events (defaults to `NODE_ENV`). |
-| `SENTRY_ORG`, `SENTRY_PROJECT` | Build-time source map upload (web app only) | Both must be set for `next build` to upload source maps via `withSentryConfig`. Unset = plain build, no Sentry build step. |
+| `SENTRY_ORG`, `SENTRY_PROJECT` | Build-time source map upload (web app only) | Need `SENTRY_AUTH_TOKEN` too -- all three must be set for `next build` to upload source maps via `withSentryConfig`. Any missing = plain build, no Sentry build step. |
 | `SENTRY_AUTH_TOKEN` | Build-time source map upload (web app only) | Only used when `SENTRY_ORG`/`SENTRY_PROJECT` are set; needs the `project:releases` scope, not just `org:ci`. |
 
 The web app uses the full `@sentry/nextjs` SDK (`apps/web/instrumentation.ts`),
