@@ -103409,10 +103409,14 @@ async function readStaticPluginManifest(root, specifier) {
     const parsed = JSON.parse(content);
     const boardreadyops = parsed.boardreadyops && typeof parsed.boardreadyops === "object" ? parsed.boardreadyops : parsed;
     const permissions = Array.isArray(boardreadyops.permissions) ? boardreadyops.permissions.filter(isPluginPermission) : void 0;
-    return {
-      name: typeof parsed.name === "string" ? parsed.name : void 0,
-      permissions
-    };
+    const manifest = {};
+    if (typeof parsed.name === "string") {
+      manifest.name = parsed.name;
+    }
+    if (permissions && permissions.length > 0) {
+      manifest.permissions = permissions;
+    }
+    return manifest;
   } catch {
     return void 0;
   }

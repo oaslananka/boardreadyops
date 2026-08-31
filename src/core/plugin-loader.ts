@@ -329,7 +329,7 @@ function toCoreRule(pluginRule: NonNullable<BoardReadyOpsPlugin["rules"]>[number
 async function readStaticPluginManifest(
   root: string,
   specifier: string,
-): Promise<{ name?: string | undefined; permissions?: PluginPermission[] | undefined } | undefined> {
+): Promise<{ name?: string; permissions?: PluginPermission[] } | undefined> {
   try {
     let manifestPath: string | undefined;
     if (isPathSpecifier(specifier)) {
@@ -351,10 +351,14 @@ async function readStaticPluginManifest(
     const permissions = Array.isArray(boardreadyops.permissions)
       ? (boardreadyops.permissions.filter(isPluginPermission) as PluginPermission[])
       : undefined;
-    return {
-      name: typeof parsed.name === "string" ? parsed.name : undefined,
-      permissions,
-    };
+    const manifest: { name?: string; permissions?: PluginPermission[] } = {};
+    if (typeof parsed.name === "string") {
+      manifest.name = parsed.name;
+    }
+    if (permissions && permissions.length > 0) {
+      manifest.permissions = permissions;
+    }
+    return manifest;
   } catch {
     return undefined;
   }
