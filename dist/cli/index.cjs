@@ -49151,10 +49151,7 @@ function toCoreRule(pluginRule) {
         return findings.map(normalizePluginFinding);
       } catch (error51) {
         return [
-          createPluginErrorFinding(
-            context,
-            `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error51)}`
-          )
+          createPluginErrorFinding(context, `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error51)}`)
         ];
       }
     }
