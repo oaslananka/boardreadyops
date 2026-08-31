@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const VERSION_PATTERN = "[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?";
+const VERSION_PATTERN = String.raw`\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?`;
 
 export const PUBLIC_RELEASE_PATHS = [
   "README.md",
@@ -61,7 +61,7 @@ export function syncPublicReleaseFiles(files, version) {
   for (const path of PUBLIC_RELEASE_PATHS) {
     const content = files[path];
     if (typeof content !== "string") {
-      throw new Error(`public release surface missing: ${path}`);
+      throw new TypeError(`public release surface missing: ${path}`);
     }
     next[path] = syncPublicReleaseFile(path, content, version);
   }
@@ -81,27 +81,24 @@ export function verifyPublicReleaseFiles(files, version) {
   const pinGroups = [];
   for (const path of IMMUTABLE_ACTION_PIN_PATHS) {
     const content = files[path];
-    if (typeof content !== "string") throw new Error(`public release surface missing: ${path}`);
+    if (typeof content !== "string") throw new TypeError(`public release surface missing: ${path}`);
     const pins = [
-      ...content.matchAll(
-        /oaslananka\/boardreadyops(?:\/apps\/container)?@([0-9a-f]{40})\s+#\s+v([0-9]+\.[0-9]+\.[0-9]+)/g,
-      ),
+      ...content.matchAll(/oaslananka\/boardreadyops(?:\/apps\/container)?@([0-9a-f]{40})\s+#\s+v(\d+\.\d+\.\d+)/g),
     ];
     if (pins.length === 0) throw new Error(`immutable Action pin missing: ${path}`);
     for (const pin of pins) pinGroups.push({ path, sha: pin[1], version: pin[2] });
   }
   const uniquePins = new Set(pinGroups.map((pin) => `${pin.sha}@${pin.version}`));
   if (uniquePins.size !== 1) {
-    throw new Error(
-      `immutable Action pin drift: ${pinGroups.map((pin) => `${pin.path}=${pin.sha}#v${pin.version}`).join(", ")}`,
-    );
+    const formatted = pinGroups.map((pin) => `${pin.path}=${pin.sha}#v${pin.version}`).join(", ");
+    throw new Error(`immutable Action pin drift: ${formatted}`);
   }
 
   const bugTemplate = files[".github/ISSUE_TEMPLATE/bug_report.yml"];
   if (typeof bugTemplate !== "string") {
-    throw new Error("public release surface missing: .github/ISSUE_TEMPLATE/bug_report.yml");
+    throw new TypeError("public release surface missing: .github/ISSUE_TEMPLATE/bug_report.yml");
   }
-  if (/placeholder:\s*v?[0-9]+\.[0-9]+\.[0-9]+/.test(bugTemplate)) {
+  if (/placeholder:\s*v?\d+\.\d+\.\d+/.test(bugTemplate)) {
     throw new Error("bug-report version placeholder must be version-neutral");
   }
 }
@@ -233,8 +230,10 @@ function replaceExactlyOnce(input, pattern, replacement, label) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
-  });
+  }
 }

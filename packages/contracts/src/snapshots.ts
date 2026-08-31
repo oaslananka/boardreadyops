@@ -55,11 +55,11 @@ export type SnapshotManifest = z.infer<typeof snapshotManifestSchema>;
  */
 export function escapeXml(value: string): string {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 export type SnapshotFinding = {
@@ -222,7 +222,7 @@ function extractComponentReference(finding: SnapshotFinding): string | undefined
     const comp = d.component ?? d.reference ?? d.designator ?? d.symbol;
     if (typeof comp === "string") return comp;
   }
-  const match = finding.message.match(/\b([A-Z]{1,3}\d{1,4})\b/);
+  const match = /\b([A-Z]{1,3}\d{1,4})\b/.exec(finding.message);
   return match ? match[1] : undefined;
 }
 

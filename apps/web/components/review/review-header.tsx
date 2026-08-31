@@ -21,6 +21,12 @@ export interface ReviewHeaderProps {
   onRequestChanges?: () => void;
 }
 
+function getDecisionMeta(decision: ReviewDecision): { label: string; tone: "passed" | "failed" | "warning" } {
+  if (decision === "approved") return { label: "Approved", tone: "passed" };
+  if (decision === "changes_requested") return { label: "Changes requested", tone: "failed" };
+  return { label: "Awaiting decision", tone: "warning" };
+}
+
 export function ReviewHeader({
   reviewId: _reviewId,
   title,
@@ -35,12 +41,9 @@ export function ReviewHeader({
   evidenceState,
   onApprove,
   onRequestChanges,
-}: ReviewHeaderProps) {
+}: Readonly<ReviewHeaderProps>) {
+  const { label: decisionLabel, tone: decisionTone } = getDecisionMeta(decision);
   const isApproved = decision === "approved";
-  const isChangesRequested = decision === "changes_requested";
-
-  const decisionLabel = isApproved ? "Approved" : isChangesRequested ? "Changes requested" : "Awaiting decision";
-  const decisionTone = isApproved ? "passed" : isChangesRequested ? "failed" : "warning";
 
   return (
     <header className="review-command-header panel surface-raised">

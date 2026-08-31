@@ -2,6 +2,18 @@ import Link from "next/link";
 import type { DemoReview } from "../../lib/demo-data.js";
 import { StatusBadge } from "../ui.js";
 
+function getDecisionMeta(decision: DemoReview["decision"]): { label: string; tone: "passed" | "failed" | "warning" } {
+  if (decision === "approved") return { label: "Approved", tone: "passed" };
+  if (decision === "changes_requested") return { label: "Changes requested", tone: "failed" };
+  return { label: "Awaiting decision", tone: "warning" };
+}
+
+function getBlockerLabel(count: number): string {
+  if (count === 1) return "1 blocker";
+  if (count > 0) return `${count} blockers`;
+  return "No blockers";
+}
+
 export function ReviewListItem({
   review,
   context = "registry",
@@ -16,14 +28,8 @@ export function ReviewListItem({
     (f) => (f.severity === "error" || f.severity === "critical") && f.disposition === "open",
   ).length;
 
-  const isApproved = review.decision === "approved";
-  const isChangesRequested = review.decision === "changes_requested";
-
-  const decisionLabel = isApproved ? "Approved" : isChangesRequested ? "Changes requested" : "Awaiting decision";
-  const decisionTone = isApproved ? "passed" : isChangesRequested ? "failed" : "warning";
-
-  const blockerLabel =
-    blockingCount === 1 ? "1 blocker" : blockingCount > 0 ? `${blockingCount} blockers` : "No blockers";
+  const { label: decisionLabel, tone: decisionTone } = getDecisionMeta(review.decision);
+  const blockerLabel = getBlockerLabel(blockingCount);
 
   return (
     <Link

@@ -53,10 +53,10 @@ function shortSha(commitSha: string): string {
  * full stop. Neither belongs in a one-line answer.
  */
 function asReason(message: string): string {
-  const trimmed = message
-    .trim()
-    .replace(/\s+/gu, " ")
-    .replace(/[.\s]+$/u, "");
+  let trimmed = message.trim().replace(/\s+/gu, " ");
+  while (trimmed.endsWith(".") || trimmed.endsWith(" ")) {
+    trimmed = trimmed.slice(0, -1);
+  }
   if (trimmed.length === 0) return "";
   return trimmed.length > 120 ? `${trimmed.slice(0, 117)}…` : trimmed;
 }
@@ -65,81 +65,91 @@ function plural(count: number, singular: string, pluralForm: string): string {
   return count === 1 ? singular : pluralForm;
 }
 
+function buildPassDetail(commitSha: string, blockingCount: number, advisoryCount: number): string {
+  if (blockingCount > 0) {
+    return `Within your policy, but ${blockingCount} high-severity ${plural(blockingCount, "finding is", "findings are")} recorded.`;
+  }
+  if (advisoryCount > 0) {
+    return `Nothing is blocking. ${advisoryCount} ${plural(advisoryCount, "thing", "things")} worth a look before you order.`;
+  }
+  return `Every check passed on ${shortSha(commitSha)}.`;
+}
+
+function handleSettlingRun(run: VerdictRun): RunVerdict {
+  return {
+    tone: "info",
+    headline: "Still checking",
+    detail: `Running the checks on ${shortSha(run.commitSha)}. This page updates itself as they finish.`,
+    action: { label: "Follow the execution", href: `/runs/${run.id}/attempts` },
+  };
+}
+
+function handleMissingDecisionRun(run: VerdictRun): RunVerdict {
+  return {
+    tone: "danger",
+    headline: "Could not check this board",
+    detail:
+      run.status === "timed_out"
+        ? "The run ran out of time before it produced a result, so nothing has been checked yet."
+        : "The run ended without producing a result, so nothing has been checked yet.",
+    action: { label: "See what happened", href: `/runs/${run.id}/attempts` },
+  };
+}
+
+function handleFailedRun(
+  run: VerdictRun,
+  active: readonly VerdictFinding[],
+  blocking: readonly VerdictFinding[],
+): RunVerdict {
+  const first = asReason(blocking[0]?.message ?? active[0]?.message ?? "");
+  const others = Math.max(0, blocking.length - 1);
+  const rest = others > 0 ? ` Plus ${others} other blocking ${plural(others, "issue", "issues")}.` : "";
+  return {
+    tone: "danger",
+    headline: "Not ready to fabricate",
+    detail: first ? `${first}.${rest}` : "The policy for this repository rejected the result.",
+    action: { label: "See what is blocking", href: `/runs/${run.id}/findings${blockingFindingsQuery}` },
+  };
+}
+
+function handlePassedRun(run: VerdictRun, blocking: readonly VerdictFinding[], advisory: number): RunVerdict {
+  const detail = buildPassDetail(run.commitSha, blocking.length, advisory);
+  const outstanding = blocking.length + advisory;
+  return {
+    tone: "success",
+    headline: "Ready to fabricate",
+    detail,
+    action:
+      outstanding > 0
+        ? {
+            label: `Review ${outstanding} ${plural(outstanding, "finding", "findings")}`,
+            href: `/runs/${run.id}/findings${blockingFindingsQuery}`,
+          }
+        : { label: "See the evidence", href: `/runs/${run.id}/artifacts` },
+  };
+}
+
 export function runVerdict(run: VerdictRun): RunVerdict {
   const active = run.findings.filter((finding) => !finding.waivedAt);
   const blocking = active.filter((finding) => blockingSeverities.has(finding.severity.toLowerCase()));
   const advisory = active.length - blocking.length;
 
-  // Still moving. Saying anything about readiness now would be a guess that changes under the
-  // reader, which is worse than saying "not yet".
   if (settlingStates.has(run.status) || run.investigationState === "current") {
-    return {
-      tone: "info",
-      headline: "Still checking",
-      detail: `Running the checks on ${shortSha(run.commitSha)}. This page updates itself as they finish.`,
-      action: { label: "Follow the execution", href: `/runs/${run.id}/attempts` },
-    };
+    return handleSettlingRun(run);
   }
 
-  // A run that ended without a verdict is not a pass. Reporting it as one would be the worst
-  // thing this product can do.
   if (run.decision === undefined && (run.status === "failed" || run.status === "timed_out")) {
-    return {
-      tone: "danger",
-      headline: "Could not check this board",
-      detail:
-        run.status === "timed_out"
-          ? "The run ran out of time before it produced a result, so nothing has been checked yet."
-          : "The run ended without producing a result, so nothing has been checked yet.",
-      action: { label: "See what happened", href: `/runs/${run.id}/attempts` },
-    };
+    return handleMissingDecisionRun(run);
   }
 
-  // The recorded decision is authoritative and is read before the findings are. The policy
-  // engine already applied this repository's severity threshold and its waivers; re-deriving a
-  // verdict from raw severities here would silently override a threshold somebody chose, and
-  // would call a board unfit that its own policy passed.
   if (run.decision === "fail" || run.conclusion === "failure") {
-    const first = asReason(blocking[0]?.message ?? active[0]?.message ?? "");
-    const others = Math.max(0, blocking.length - 1);
-    const rest = others > 0 ? ` Plus ${others} other blocking ${plural(others, "issue", "issues")}.` : "";
-    return {
-      tone: "danger",
-      headline: "Not ready to fabricate",
-      // Naming the finding is the point. A count tells somebody how much reading they have
-      // ahead; the reason tells them whether they already know what it is.
-      detail: first ? `${first}.${rest}` : "The policy for this repository rejected the result.",
-      action: { label: "See what is blocking", href: `/runs/${run.id}/findings${blockingFindingsQuery}` },
-    };
+    return handleFailedRun(run, active, blocking);
   }
 
   if (run.decision === "pass" || run.conclusion === "success") {
-    // High-severity findings can coexist with a pass when the repository's threshold sits
-    // above them. Saying "nothing to see" would understate that, so they are named by weight
-    // rather than folded in with the advisory ones.
-    const detail =
-      blocking.length > 0
-        ? `Within your policy, but ${blocking.length} high-severity ${plural(blocking.length, "finding is", "findings are")} recorded.`
-        : advisory > 0
-          ? `Nothing is blocking. ${advisory} ${plural(advisory, "thing", "things")} worth a look before you order.`
-          : `Every check passed on ${shortSha(run.commitSha)}.`;
-    const outstanding = blocking.length + advisory;
-    return {
-      tone: "success",
-      headline: "Ready to fabricate",
-      detail,
-      action:
-        outstanding > 0
-          ? {
-              label: `Review ${outstanding} ${plural(outstanding, "finding", "findings")}`,
-              href: `/runs/${run.id}/findings${blockingFindingsQuery}`,
-            }
-          : { label: "See the evidence", href: `/runs/${run.id}/artifacts` },
-    };
+    return handlePassedRun(run, blocking, advisory);
   }
 
-  // Neutral, or a decision this build does not recognise. Ask for a human rather than guessing
-  // in either direction.
   return {
     tone: "warning",
     headline: "Needs a look",

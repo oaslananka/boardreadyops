@@ -1,4 +1,4 @@
 export function parseKicadMajor(version: string): number | undefined {
-  const match = /(\d+)\./.exec(version);
+  const match = /\b(\d+)\./.exec(version);
   return match ? Number(match[1]) : undefined;
 }

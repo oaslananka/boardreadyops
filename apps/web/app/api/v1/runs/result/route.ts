@@ -235,7 +235,9 @@ function parseJson(input: string): unknown {
 function byCanonicalJson<T>(left: T, right: T): number {
   const leftKey = JSON.stringify(left);
   const rightKey = JSON.stringify(right);
-  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  if (leftKey < rightKey) return -1;
+  if (leftKey > rightKey) return 1;
+  return 0;
 }
 
 function normalizedResultForDigest(result: ReleaseRunResult): Record<string, unknown> {
@@ -487,7 +489,7 @@ async function recordBoardBomSnapshots(
   const watchedBoardLimit = planLimits(planTierOf(stringCell(row, "plan_tier"))).watchedBoards;
 
   try {
-    const recorded = await createSqlBoardBomStore(executor, { now: dependencies.now }).recordSnapshots({
+    await createSqlBoardBomStore(executor, { now: dependencies.now }).recordSnapshots({
       runId: input.runId,
       repositoryId,
       commitSha,
@@ -496,7 +498,6 @@ async function recordBoardBomSnapshots(
     });
     // Evidence is recorded for every board regardless; only the ongoing watch is metered, so
     // a board past the plan limit is a silent no-op here rather than a failed result.
-    void recorded.boardsEnrolled;
     return undefined;
   } catch {
     return "Board BOM snapshot could not be recorded for this run.";

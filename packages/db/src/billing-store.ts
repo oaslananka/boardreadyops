@@ -15,6 +15,11 @@ export type StoredBillingCustomerRow = {
   updated_at: string | Date;
 };
 
+function toIsoStringOrNull(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.toISOString();
+}
+
 function mapCustomer(row: StoredBillingCustomerRow): BillingCustomer {
   return {
     id: row.id,
@@ -22,21 +27,9 @@ function mapCustomer(row: StoredBillingCustomerRow): BillingCustomer {
     stripeCustomerId: row.stripe_customer_id,
     tier: row.tier as BillingCustomer["tier"],
     status: row.status as BillingCustomer["status"],
-    trialEndsAt: row.trial_ends_at
-      ? typeof row.trial_ends_at === "string"
-        ? row.trial_ends_at
-        : row.trial_ends_at.toISOString()
-      : null,
-    graceEndsAt: row.grace_ends_at
-      ? typeof row.grace_ends_at === "string"
-        ? row.grace_ends_at
-        : row.grace_ends_at.toISOString()
-      : null,
-    currentPeriodEnd: row.current_period_end
-      ? typeof row.current_period_end === "string"
-        ? row.current_period_end
-        : row.current_period_end.toISOString()
-      : null,
+    trialEndsAt: toIsoStringOrNull(row.trial_ends_at),
+    graceEndsAt: toIsoStringOrNull(row.grace_ends_at),
+    currentPeriodEnd: toIsoStringOrNull(row.current_period_end),
     createdAt: typeof row.created_at === "string" ? row.created_at : row.created_at.toISOString(),
     updatedAt: typeof row.updated_at === "string" ? row.updated_at : row.updated_at.toISOString(),
   };

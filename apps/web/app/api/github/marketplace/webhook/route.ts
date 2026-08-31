@@ -163,6 +163,41 @@ function normalizeMarketplacePayload(value: unknown): MarketplacePayload | undef
   return normalized;
 }
 
+function formatMarketplaceOutcomeResponse(
+  payload: MarketplacePayload,
+  result: { outcome: string; erasureQueued?: boolean },
+  delivery: string,
+): Response {
+  if (result.outcome === "duplicate") {
+    return json({ ok: true, duplicate: true, delivery }, 200);
+  }
+
+  const stateful = payload.action === "purchased" || payload.action === "cancelled";
+  if (stateful) {
+    return json(
+      {
+        ok: true,
+        processed: true,
+        action: payload.action,
+        tier: "free",
+        ...(result.outcome === "stale" ? { stale: true } : {}),
+        ...(result.erasureQueued ? { erasureQueued: true } : {}),
+      },
+      200,
+    );
+  }
+
+  if (payload.action === "pending_change" || payload.action === "pending_change_cancelled") {
+    return json({ ok: true, processed: true, action: payload.action, pending: true }, 200);
+  }
+
+  if (payload.action === "changed") {
+    return json({ ok: true, processed: true, action: payload.action, tier: "free", stateChanged: false }, 200);
+  }
+
+  return json({ ok: true, ignored: true, reason: "unsupported_action", action: payload.action }, 200);
+}
+
 export async function POST(request: Request): Promise<Response> {
   const verified = await verifiedRequest(request);
   if (verified instanceof Response) return verified;
@@ -217,34 +252,7 @@ export async function POST(request: Request): Promise<Response> {
       payload: sanitizedMetadata,
     });
 
-    if (result.outcome === "duplicate") {
-      return json({ ok: true, duplicate: true, delivery }, 200);
-    }
-
-    const stateful = payload.action === "purchased" || payload.action === "cancelled";
-    if (stateful) {
-      return json(
-        {
-          ok: true,
-          processed: true,
-          action: payload.action,
-          tier: "free",
-          ...(result.outcome === "stale" ? { stale: true } : {}),
-          ...(result.erasureQueued ? { erasureQueued: true } : {}),
-        },
-        200,
-      );
-    }
-
-    if (payload.action === "pending_change" || payload.action === "pending_change_cancelled") {
-      return json({ ok: true, processed: true, action: payload.action, pending: true }, 200);
-    }
-
-    if (payload.action === "changed") {
-      return json({ ok: true, processed: true, action: payload.action, tier: "free", stateChanged: false }, 200);
-    }
-
-    return json({ ok: true, ignored: true, reason: "unsupported_action", action: payload.action }, 200);
+    return formatMarketplaceOutcomeResponse(payload, result, delivery);
   } catch (error) {
     return json(
       {

@@ -397,13 +397,14 @@ async function planReleaseRevisions(
   if (!versionAllowed && !revisionAllowed) {
     return;
   }
-  const versionPattern = String(
-    ruleObjectConfig(config.rules?.[versionRule]).pattern ?? "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$",
-  );
+  const versionCfg = ruleObjectConfig(config.rules?.[versionRule]);
+  const versionPattern =
+    typeof versionCfg.pattern === "string" ? versionCfg.pattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
   const versionRegex = compilePattern(versionPattern);
-  const tagPattern = String(
-    ruleObjectConfig(config.rules?.[revisionRule])["tag-pattern"] ?? "^v?\\d+\\.\\d+(?:\\.\\d+)?$",
-  );
+
+  const revisionCfg = ruleObjectConfig(config.rules?.[revisionRule]);
+  const tagPattern =
+    typeof revisionCfg["tag-pattern"] === "string" ? revisionCfg["tag-pattern"] : String.raw`^v?\d+\.\d+(?:\.\d+)?$`;
   const tagRegex = compilePattern(tagPattern);
   if ((versionAllowed && !versionRegex) || (revisionAllowed && !tagRegex)) {
     return;

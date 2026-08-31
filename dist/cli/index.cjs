@@ -34454,7 +34454,9 @@ function reportCoordinate(value) {
   if (Number.isInteger(value)) {
     return value.toString();
   }
-  return value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  const formatted = value.toFixed(6);
+  const trimmed = formatted.replace(/0+$/, "");
+  return trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
 }
 function reportCoordinateWithUnits(value, units) {
   return `${reportCoordinate(value)}${units}`;
@@ -35675,7 +35677,8 @@ function evidenceDecision(result, gaps) {
   return { status: result.summary.failed ? "fail" : "pass", reasons };
 }
 function formatChecksumsTxt(artifacts) {
-  return `${artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`).join("\n")}
+  const lines = artifacts.map((artifact) => `${artifact.sha256}  ${artifact.path}`);
+  return `${lines.join("\n")}
 `;
 }
 async function verifyManifestCoverage(bundleDir) {
@@ -35890,27 +35893,32 @@ async function writeReviewEvidenceLedger(options) {
   await import_promises19.default.writeFile(manifestPath, JSON.stringify(options.manifest, null, 2), "utf8");
   return { ledgerPath, manifestPath, evidenceDigest };
 }
+async function resolveFileHash(item2, baseDir) {
+  const candidatePaths = [
+    import_node_path56.default.resolve(baseDir, item2.path),
+    import_node_path56.default.resolve(baseDir, item2.name),
+    import_node_path56.default.resolve(baseDir, "artifacts", item2.name),
+    import_node_path56.default.resolve(baseDir, "artifacts", item2.path)
+  ];
+  for (const candidate of candidatePaths) {
+    try {
+      const fileContent = await import_promises19.default.readFile(candidate);
+      return (0, import_node_crypto8.createHash)("sha256").update(fileContent).digest("hex");
+    } catch {
+    }
+  }
+  return void 0;
+}
 async function verifyReviewEvidenceOffline(ledgerFilePath, artifactsRootDir) {
   const content = await import_promises19.default.readFile(ledgerFilePath, "utf8");
   const ledgerDoc = JSON.parse(content);
   const fileHashes = {};
   const baseDir = artifactsRootDir ?? import_node_path56.default.dirname(ledgerFilePath);
   for (const item2 of ledgerDoc.manifest) {
-    const candidatePaths = [
-      import_node_path56.default.resolve(baseDir, item2.path),
-      import_node_path56.default.resolve(baseDir, item2.name),
-      import_node_path56.default.resolve(baseDir, "artifacts", item2.name),
-      import_node_path56.default.resolve(baseDir, "artifacts", item2.path)
-    ];
-    for (const candidate of candidatePaths) {
-      try {
-        const fileContent = await import_promises19.default.readFile(candidate);
-        const hash2 = (0, import_node_crypto8.createHash)("sha256").update(fileContent).digest("hex");
-        fileHashes[item2.path] = hash2;
-        fileHashes[item2.name] = hash2;
-        break;
-      } catch {
-      }
+    const hash2 = await resolveFileHash(item2, baseDir);
+    if (hash2) {
+      fileHashes[item2.path] = hash2;
+      fileHashes[item2.name] = hash2;
     }
   }
   const tamperedItems = [];
@@ -45231,7 +45239,7 @@ function defaultKicadCliCandidates() {
 
 // src/kicad/version.ts
 function parseKicadMajor(version2) {
-  const match = /(\d+)\./.exec(version2);
+  const match = /\b(\d+)\./.exec(version2);
   return match ? Number(match[1]) : void 0;
 }
 
@@ -52092,19 +52100,20 @@ async function repositoryCheck(root, configInput) {
       })
     );
   }
+  const projectItem = projects.length === 0 ? item("warn", "No KiCad projects discovered.", {
+    recommendation: "Add a .kicad_pro project before CI.",
+    messageKey: "doctor.repository.noProjects",
+    recommendationKey: "doctor.recommendation.repository.projects"
+  }) : item(
+    projects.length === 1 ? "pass" : "warn",
+    `${projects.length} KiCad project${plural(projects.length)} discovered.`,
+    {
+      messageKey: "doctor.repository.projectsDiscovered",
+      messageParams: { count: projects.length }
+    }
+  );
   items.push(
-    projects.length === 0 ? item("warn", "No KiCad projects discovered.", {
-      recommendation: "Add a .kicad_pro project before CI.",
-      messageKey: "doctor.repository.noProjects",
-      recommendationKey: "doctor.recommendation.repository.projects"
-    }) : item(
-      projects.length === 1 ? "pass" : "warn",
-      `${projects.length} KiCad project${plural(projects.length)} discovered.`,
-      {
-        messageKey: "doctor.repository.projectsDiscovered",
-        messageParams: { count: projects.length }
-      }
-    ),
+    projectItem,
     gerbers.length === 0 ? item("fail", "No Gerber outputs found.", {
       recommendation: "Generate Gerber outputs from KiCad before CI.",
       messageKey: "doctor.repository.noGerbers",
@@ -52190,12 +52199,11 @@ function supportsDoctorNodeVersion(version2) {
   const major = Number(version2.replace(/^v/, "").split(".")[0]);
   return Number.isInteger(major) && supportedNodeMajors.has(major);
 }
-function parseDoctorFormat(format) {
-  const candidate = format ?? "text";
-  if (candidate === "text" || candidate === "json") {
-    return candidate;
+function parseDoctorFormat(format = "text") {
+  if (format === "text" || format === "json") {
+    return format;
   }
-  throw new Error(t("doctor.error.unknownFormat", { format: candidate }));
+  throw new Error(t("doctor.error.unknownFormat", { format }));
 }
 function parseDoctorCheck(check2) {
   if (!check2) {
@@ -52207,7 +52215,7 @@ function parseDoctorCheck(check2) {
   throw new Error(t("doctor.error.unknownCheck", { check: check2, checks: doctorChecks.join(", ") }));
 }
 function isDoctorCheckName(value) {
-  return doctorChecks.some((check2) => check2 === value);
+  return doctorChecks.includes(value);
 }
 function item(severity, message, options = {}) {
   return {
@@ -52265,7 +52273,7 @@ function collectLocalizedRecommendations(checks, locale) {
   ];
 }
 function localizedDoctorParams(key, params, locale) {
-  const values = { ...params ?? {} };
+  const values = { ...params };
   if (key === "doctor.repository.projectsDiscovered" && typeof values.count === "number") {
     values.projectWord = values.count === 1 ? t("doctor.repository.project.word", {}, locale) : t("doctor.repository.project.word.plural", {}, locale);
   }
@@ -52873,13 +52881,11 @@ async function planReleaseRevisions(root, config2, projects, allowed, plan, virt
   if (!versionAllowed && !revisionAllowed) {
     return;
   }
-  const versionPattern = String(
-    ruleObjectConfig2(config2.rules?.[versionRule]).pattern ?? "^[vr]?\\d+\\.\\d+(?:\\.\\d+)?$"
-  );
+  const versionCfg = ruleObjectConfig2(config2.rules?.[versionRule]);
+  const versionPattern = typeof versionCfg.pattern === "string" ? versionCfg.pattern : String.raw`^[vr]?\d+\.\d+(?:\.\d+)?$`;
   const versionRegex = compilePattern2(versionPattern);
-  const tagPattern = String(
-    ruleObjectConfig2(config2.rules?.[revisionRule])["tag-pattern"] ?? "^v?\\d+\\.\\d+(?:\\.\\d+)?$"
-  );
+  const revisionCfg = ruleObjectConfig2(config2.rules?.[revisionRule]);
+  const tagPattern = typeof revisionCfg["tag-pattern"] === "string" ? revisionCfg["tag-pattern"] : String.raw`^v?\d+\.\d+(?:\.\d+)?$`;
   const tagRegex = compilePattern2(tagPattern);
   if (versionAllowed && !versionRegex || revisionAllowed && !tagRegex) {
     return;
@@ -55252,7 +55258,7 @@ function getGitOriginRepo() {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     }).trim();
-    const match = url2.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    const match = /[:/]([^/:]+\/[^/:]+?)(?:\.git)?$/.exec(url2);
     return match ? match[1] : void 0;
   } catch {
     return void 0;
@@ -55375,19 +55381,75 @@ async function reviewPublishCommand(target, options, streams) {
     return 1;
   }
 }
-async function reviewVerifyCommand(target, options, streams) {
-  const root = target ?? process.cwd();
-  const ledgerPath = options.ledger ?? (target?.endsWith(".json") ? target : [
+function resolveLedgerPath(target, root, explicitLedger) {
+  if (explicitLedger) return explicitLedger;
+  if (target?.endsWith(".json")) return target;
+  const candidates = [
     `${root}/evidence-ledger.json`,
     `${root}/artifacts/evidence-ledger.json`,
     `${root}/.boardreadyops/evidence-ledger.json`
-  ].find((p) => {
+  ];
+  for (const candidate of candidates) {
     try {
-      return require("node:fs").existsSync(p);
+      if (require("node:fs").existsSync(candidate)) return candidate;
     } catch {
-      return false;
     }
-  }) ?? `${root}/evidence-ledger.json`);
+  }
+  return `${root}/evidence-ledger.json`;
+}
+function writeVerificationResults(result, streams) {
+  streams.stdout.write(`
+--- Verification Summary ---
+`);
+  streams.stdout.write(`  Calculated Digest: ${result.calculatedDigest}
+`);
+  streams.stdout.write(`  Expected Digest:   ${result.expectedDigest}
+`);
+  streams.stdout.write(`  Manifest Check:    ${result.manifestCheckPassed ? "PASS" : "FAIL"}
+`);
+  if (result.tamperedItems.length > 0) {
+    streams.stderr.write(`
+\u274C Tampered Artifacts Detected:
+`);
+    for (const item2 of result.tamperedItems) {
+      streams.stderr.write(`  - ${item2}
+`);
+    }
+  }
+  if (result.missingItems.length > 0) {
+    streams.stderr.write(`
+\u26A0\uFE0F Missing Artifacts:
+`);
+    for (const item2 of result.missingItems) {
+      streams.stderr.write(`  - ${item2}
+`);
+    }
+  }
+  if (result.errors.length > 0) {
+    streams.stderr.write(`
+\u274C Integrity Errors:
+`);
+    for (const err of result.errors) {
+      streams.stderr.write(`  - ${err}
+`);
+    }
+  }
+  if (result.verified) {
+    streams.stdout.write(`
+\u2714 Hardware Review Evidence Cryptographically Verified (PASS)!
+
+`);
+    return 0;
+  }
+  streams.stderr.write(`
+\u274C Evidence Verification Failed (TAMPERED / INVALID)
+
+`);
+  return 1;
+}
+async function reviewVerifyCommand(target, options, streams) {
+  const root = target ?? process.cwd();
+  const ledgerPath = resolveLedgerPath(target, root, options.ledger);
   streams.stdout.write(`
 \u{1F512} Verifying Hardware Review Evidence Ledger...
 `);
@@ -55400,54 +55462,7 @@ async function reviewVerifyCommand(target, options, streams) {
       result.errors.push(`Expected digest ${options.digest} does not match ledger digest ${result.expectedDigest}`);
       result.verified = false;
     }
-    streams.stdout.write(`
---- Verification Summary ---
-`);
-    streams.stdout.write(`  Calculated Digest: ${result.calculatedDigest}
-`);
-    streams.stdout.write(`  Expected Digest:   ${result.expectedDigest}
-`);
-    streams.stdout.write(`  Manifest Check:    ${result.manifestCheckPassed ? "PASS" : "FAIL"}
-`);
-    if (result.tamperedItems.length > 0) {
-      streams.stderr.write(`
-\u274C Tampered Artifacts Detected:
-`);
-      for (const item2 of result.tamperedItems) {
-        streams.stderr.write(`  - ${item2}
-`);
-      }
-    }
-    if (result.missingItems.length > 0) {
-      streams.stderr.write(`
-\u26A0\uFE0F Missing Artifacts:
-`);
-      for (const item2 of result.missingItems) {
-        streams.stderr.write(`  - ${item2}
-`);
-      }
-    }
-    if (result.errors.length > 0) {
-      streams.stderr.write(`
-\u274C Integrity Errors:
-`);
-      for (const err of result.errors) {
-        streams.stderr.write(`  - ${err}
-`);
-      }
-    }
-    if (result.verified) {
-      streams.stdout.write(`
-\u2714 Hardware Review Evidence Cryptographically Verified (PASS)!
-
-`);
-      return 0;
-    }
-    streams.stderr.write(`
-\u274C Evidence Verification Failed (TAMPERED / INVALID)
-
-`);
-    return 1;
+    return writeVerificationResults(result, streams);
   } catch (error51) {
     streams.stderr.write(`\u274C Verification error: ${error51 instanceof Error ? error51.message : String(error51)}
 `);
