@@ -1,0 +1,21 @@
+{
+  "name": "BoardReadyOps Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-24-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.13"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.defaultFormatter": "biomejs.biome",
+        "editor.formatOnSave": true
+      },
+      "extensions": ["biomejs.biome", "vitest.explorer", "SonarSource.sonarlint-vscode"]
+    }
+  },
+  "postCreateCommand": "corepack enable && corepack prepare pnpm@11.8.0 --activate && corepack pnpm install --frozen-lockfile && node scripts/toolchain.mjs bootstrap",
+  "remoteUser": "node"
+}

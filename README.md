@@ -2,10 +2,9 @@
 
 # BoardReadyOps
 
-**End-to-end hardware release pipeline for KiCad projects.**
+**The trust layer between KiCad commits and manufacturing release.**
 
-Verified, signed, manufacturer-ready release packages for KiCad projects.
-Generate artifacts, validate release readiness, package evidence, and produce a clear release decision.
+Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains what changed in every PR, why it matters for fabrication, and binds every release to auditable, cryptographically verifiable evidence.
 
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
@@ -28,6 +27,10 @@ Generate artifacts, validate release readiness, package evidence, and produce a 
 </div>
 
 BoardReadyOps turns a KiCad project into a verified, signed, manufacturer-ready release package. It generates manufacturing artifacts, validates release readiness, packages evidence, and produces a clear release decision — running locally as a CLI and in CI as a GitHub Action, with JSON, SARIF, Markdown, HTML, JUnit, and workflow annotation output.
+
+- **Does NOT replace KiCad DRC/ERC**: Uses native `kicad-cli` DRC/ERC checks alongside BOM lifecycle, footprint consistency, pinmap contracts, and vendor preflights.
+- **Does NOT have to replace KiBot**: Works standalone or alongside KiBot/artifact automation tools, adding governance, PR hardware diff, signed evidence manifests, and handoff packages.
+- **100% Local-First & Zero-Trust**: Designs and IP stay in your private workspace or GitHub runner. No schematics or source files are sent to external cloud servers.
 
 ```
 Generate → Validate → Decide → Package → Attest → Review → Handoff

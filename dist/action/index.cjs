@@ -103220,6 +103220,25 @@ async function loadPlugins(root, config2) {
   const errors = [];
   for (const specifier of specifiers) {
     try {
+      const staticManifest = await readStaticPluginManifest(root, specifier);
+      if (staticManifest?.permissions && staticManifest.permissions.length > 0) {
+        const preCheck = evaluatePluginPermissions({
+          specifier,
+          name: staticManifest.name ?? specifier,
+          requested: staticManifest.permissions,
+          config: config2.pluginPermissions
+        });
+        if (preCheck.denied.length > 0) {
+          throw new PluginError(
+            pluginPermissionDenialMessage({
+              specifier,
+              name: staticManifest.name ?? specifier,
+              denied: preCheck.denied
+            }),
+            specifier
+          );
+        }
+      }
       const entrypoint = resolvePluginEntrypoint(root, specifier);
       const module2 = await import(entrypoint);
       const plugin = validatePlugin(module2, specifier);
@@ -103342,10 +103361,61 @@ function toCoreRule(pluginRule) {
   return {
     meta: pluginRule.meta,
     async run(context5) {
-      const findings = await pluginRule.run(context5);
-      return findings.map(normalizePluginFinding);
+      try {
+        const findings = await pluginRule.run(context5);
+        if (!Array.isArray(findings)) {
+          return [
+            createFinding({
+              ruleId: "config.invalid",
+              severity: "high",
+              message: `Plugin rule "${pluginRule.meta.id}" returned non-array output.`,
+              project: context5.projects[0]?.projectFile,
+              resource: {
+                path: context5.projects[0]?.projectFile ?? context5.root,
+                kind: "project"
+              }
+            })
+          ];
+        }
+        return findings.map(normalizePluginFinding);
+      } catch (error52) {
+        return [
+          createFinding({
+            ruleId: "config.invalid",
+            severity: "high",
+            message: `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error52)}`,
+            project: context5.projects[0]?.projectFile,
+            resource: {
+              path: context5.projects[0]?.projectFile ?? context5.root,
+              kind: "project"
+            }
+          })
+        ];
+      }
     }
   };
+}
+async function readStaticPluginManifest(root, specifier) {
+  try {
+    let manifestPath;
+    if (isPathSpecifier(specifier)) {
+      const resolved = import_node_path40.default.resolve(root, specifier);
+      const isDir = await import_promises13.default.stat(resolved).then((s) => s.isDirectory()).catch(() => false);
+      manifestPath = isDir ? import_node_path40.default.join(resolved, "package.json") : import_node_path40.default.join(import_node_path40.default.dirname(resolved), "package.json");
+    } else {
+      manifestPath = import_node_path40.default.join(root, "node_modules", specifier, "package.json");
+    }
+    const content = await import_promises13.default.readFile(manifestPath, "utf8");
+    const parsed = JSON.parse(content);
+    const boardreadyops = parsed.boardreadyops && typeof parsed.boardreadyops === "object" ? parsed.boardreadyops : parsed;
+    const permissions = Array.isArray(boardreadyops.permissions) ? boardreadyops.permissions.filter(isPluginPermission) : void 0;
+    return {
+      name: typeof parsed.name === "string" ? parsed.name : void 0,
+      permissions
+    };
+  } catch {
+    return void 0;
+  }
 }
 function normalizePluginFinding(finding2) {
   const input = finding2;

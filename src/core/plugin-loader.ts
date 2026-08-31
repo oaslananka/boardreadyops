@@ -124,6 +124,26 @@ export async function loadPlugins(
 
   for (const specifier of specifiers) {
     try {
+      const staticManifest = await readStaticPluginManifest(root, specifier);
+      if (staticManifest?.permissions && staticManifest.permissions.length > 0) {
+        const preCheck = evaluatePluginPermissions({
+          specifier,
+          name: staticManifest.name ?? specifier,
+          requested: staticManifest.permissions,
+          config: config.pluginPermissions,
+        });
+        if (preCheck.denied.length > 0) {
+          throw new PluginError(
+            pluginPermissionDenialMessage({
+              specifier,
+              name: staticManifest.name ?? specifier,
+              denied: preCheck.denied,
+            }),
+            specifier,
+          );
+        }
+      }
+
       const entrypoint = resolvePluginEntrypoint(root, specifier);
       const module = await import(entrypoint);
       const plugin = validatePlugin(module, specifier);
@@ -271,10 +291,73 @@ function toCoreRule(pluginRule: NonNullable<BoardReadyOpsPlugin["rules"]>[number
   return {
     meta: pluginRule.meta,
     async run(context: RuleContext): Promise<Finding[]> {
-      const findings = await pluginRule.run(context as unknown as PluginRuleContext);
-      return findings.map(normalizePluginFinding);
+      try {
+        const findings = await pluginRule.run(context as unknown as PluginRuleContext);
+        if (!Array.isArray(findings)) {
+          return [
+            createFinding({
+              ruleId: "config.invalid",
+              severity: "high",
+              message: `Plugin rule "${pluginRule.meta.id}" returned non-array output.`,
+              project: context.projects[0]?.projectFile,
+              resource: {
+                path: context.projects[0]?.projectFile ?? context.root,
+                kind: "project",
+              },
+            }),
+          ];
+        }
+        return findings.map(normalizePluginFinding);
+      } catch (error) {
+        return [
+          createFinding({
+            ruleId: "config.invalid",
+            severity: "high",
+            message: `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error)}`,
+            project: context.projects[0]?.projectFile,
+            resource: {
+              path: context.projects[0]?.projectFile ?? context.root,
+              kind: "project",
+            },
+          }),
+        ];
+      }
     },
   };
+}
+
+async function readStaticPluginManifest(
+  root: string,
+  specifier: string,
+): Promise<{ name?: string | undefined; permissions?: PluginPermission[] | undefined } | undefined> {
+  try {
+    let manifestPath: string | undefined;
+    if (isPathSpecifier(specifier)) {
+      const resolved = path.resolve(root, specifier);
+      const isDir = await fs
+        .stat(resolved)
+        .then((s) => s.isDirectory())
+        .catch(() => false);
+      manifestPath = isDir ? path.join(resolved, "package.json") : path.join(path.dirname(resolved), "package.json");
+    } else {
+      manifestPath = path.join(root, "node_modules", specifier, "package.json");
+    }
+    const content = await fs.readFile(manifestPath, "utf8");
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const boardreadyops =
+      parsed.boardreadyops && typeof parsed.boardreadyops === "object"
+        ? (parsed.boardreadyops as Record<string, unknown>)
+        : parsed;
+    const permissions = Array.isArray(boardreadyops.permissions)
+      ? (boardreadyops.permissions.filter(isPluginPermission) as PluginPermission[])
+      : undefined;
+    return {
+      name: typeof parsed.name === "string" ? parsed.name : undefined,
+      permissions,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizePluginFinding(finding: PluginFinding): Finding {

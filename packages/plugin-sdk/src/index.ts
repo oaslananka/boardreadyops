@@ -99,25 +99,37 @@ export interface Rule {
   run(context: PluginRuleContext): PluginFinding[] | Promise<PluginFinding[]>;
 }
 
-/** Component adapter extension point reserved for plugin packages. */
+/**
+ * Component adapter extension point.
+ * @public @reserved - Reserved extension point for future hardware adapter implementations.
+ */
 export interface ComponentAdapter {
   id: string;
   [key: string]: unknown;
 }
 
-/** Report emitter extension point reserved for plugin packages. */
+/**
+ * Report emitter extension point.
+ * @public @reserved - Reserved extension point for custom report formats.
+ */
 export interface ReportEmitter {
   id: string;
   [key: string]: unknown;
 }
 
-/** Vendor profile extension point reserved for plugin packages. */
+/**
+ * Vendor profile extension point.
+ * @public @reserved - Reserved extension point for custom manufacturing profiles.
+ */
 export interface VendorProfile {
   id: string;
   [key: string]: unknown;
 }
 
-/** Notification extension point reserved for plugin packages. */
+/**
+ * Notification extension point.
+ * @public @reserved - Reserved extension point for custom alert dispatchers.
+ */
 export interface Notifier {
   id: string;
   [key: string]: unknown;
@@ -179,7 +191,10 @@ export interface SupplierIntelligenceResult {
   queriedAt?: string | undefined;
 }
 
-/** Supplier intelligence provider extension point for plugins. */
+/**
+ * Supplier intelligence provider extension point for plugins.
+ * @public @experimental - Experimental supplier intelligence provider hook.
+ */
 export interface SupplierIntelligenceProvider {
   id: string;
   name: string;

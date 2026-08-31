@@ -1,47 +1,44 @@
 # BoardReadyOps
 
-BoardReadyOps is a release-readiness gate for KiCad hardware repositories. It answers one practical question before a tag, pull request, or manufacturing handoff: **is this board ready to fabricate, and what evidence supports that decision?**
+> **The trust layer between KiCad commits and manufacturing release.**
 
-It runs design checks, BOM risk checks, pinmap validation, manufacturing preflight, vendor-profile checks, release evidence validation, and CI gates. It is intentionally not a general-purpose KiCad artifact generator. Pair it with KiBot, `kicad-cli`, or an existing fabrication pipeline to produce Gerbers, drill files, BOMs, CPL/position files, drawings, and PDFs; then let BoardReadyOps validate the release evidence, vendor expectations, suppressions, and gate outcome.
+BoardReadyOps is a local-first, policy-as-code hardware review gate for teams designing PCBs with KiCad and GitHub. It explains what changed in every pull request, why it matters for fabrication, and binds every manufacturing release to auditable, cryptographically verifiable evidence.
 
-## Start here
+---
 
-- New to the project? Follow the [Quickstart](quickstart.md) and [Installation](install.md) guides.
-- Adding BoardReadyOps to CI? Use the [GitHub Action](action.md) or the [CLI](cli.md).
-- Deciding what should block a release? Review [Configuration](configuration.md), [Rules](rules/index.md), [Reports](reports/json.md), and [Agent Planning Output](agent-planning.md).
-- Preparing a manufacturer handoff? Read [Vendor Profiles](vendor-profiles.md), [Release Evidence](release/evidence-bundles.md), and [Hardware SBOM](sbom.md).
+## What BoardReadyOps Does (and Doesn't) Do
 
-## Core workflows
+- **Does NOT replace KiCad DRC/ERC**: BoardReadyOps incorporates native `kicad-cli` DRC/ERC outputs and adds higher-order design preflight, BOM lifecycle intelligence, footprint verification, and pin contract checks.
+- **Does NOT have to replace KiBot**: Works standalone or alongside KiBot/artifact automation tools. BoardReadyOps focuses on policy-as-code enforcement, exact PR change impact, explainable release risk, time-bounded waivers, signed evidence bundles, and manufacturer handoff packages.
+- **Zero-Trust & Local-First**: Private designs, source files, and proprietary schematics remain in your local workspace or GitHub runner. No source code is uploaded to external clouds.
 
-### 1. Validate a board before release
+---
 
-Run BoardReadyOps against a KiCad workspace to collect findings across schematic, PCB, BOM, pinmap, manufacturing outputs, and release metadata. The result is a normalized pass/fail decision with actionable findings.
+## 4 Ways to Get Started
 
-### 2. Verify manufacturing evidence
+| Path | Description | Typical Use Case |
+| :--- | :--- | :--- |
+| **[Local First Check](quickstart.md#path-a-local-first-check)** | Run `boardreadyops check . --fail-on never` locally. | Desktop engineers validating before git commit. |
+| **[GitHub PR Gate](quickstart.md#path-b-github-pr-gate)** | Add GitHub Action with sticky review comments & SARIF. | Engineering teams enforcing review policies on PRs. |
+| **[Manufacturer Handoff](quickstart.md#path-c-manufacturer-handoff)** | Generate JLCPCB / PCBWay / OSH Park zip packages. | Releasing production gerbers & BOM to fab houses. |
+| **[Private / Air-Gapped](quickstart.md#path-d-private-local-only-execution)** | Run with `--safe-mode` offline. | High-security, defense, or on-premise hardware teams. |
 
-Use generated Gerbers, drill files, BOMs, CPL/position files, reports, and manifests as release evidence. BoardReadyOps checks whether expected outputs exist, are fresh, and satisfy configured vendor requirements.
+---
 
-### 3. Gate pull requests and tags
+## Core Capabilities
 
-The GitHub Action can annotate pull requests, upload SARIF, publish reports, and enforce severity thresholds. Teams can tune what fails a build while keeping suppressions and waivers auditable.
+1. **Hardware Change Impact**: Deterministically analyzes what changed between the PR base SHA and head SHA across readiness, findings, BOM items, and manufacturing outputs.
+2. **Policy as Code & Governance**: Define release gates per environment (`prototype`, `pilot`, `production`) with enforceable severity thresholds and audit logs.
+3. **Time-Bounded Waivers**: Temporary risk acceptance with mandatory owners, rationale, and expiration dates. Expired waivers automatically block releases.
+4. **Signed Evidence Bundles**: Generate Ed25519-signed release manifests tying every Gerber, drill, BOM, and schematic revision to an immutable release decision.
+5. **Manufacturer Profiles**: Preconfigured rules and handoff templates for JLCPCB, PCBWay, and OSH Park.
 
-### 4. Keep hardware and firmware aligned
+---
 
-Pinmap and firmware-facing checks help catch board/software mismatches before a release. This is especially useful when schematic net names, BOM variants, and firmware constants change independently.
+## Documentation Navigation
 
-## Where to go next
-
-| Goal | Page |
-| --- | --- |
-| Install and run locally | [Installation](install.md) |
-| Add CI enforcement | [GitHub Action](action.md) |
-| Give agents deterministic remediation steps | [Agent Planning Output](agent-planning.md) |
-| Understand rule coverage | [Rules](rules/index.md) |
-| Configure vendor expectations | [Vendor Profiles](vendor-profiles.md) |
-| Generate auditable release packages | [Release Evidence](release/evidence-bundles.md) |
-| Compare with KiBot | [KiBot Integration](integrations/kibot.md) |
-| Extend with custom rules | [Plugin SDK](plugin-sdk.md) |
-
-## Release-readiness, not just checks
-
-A good hardware release is not only a clean DRC/ERC run. It also needs complete fabrication outputs, BOM evidence, variant consistency, documented suppressions, repeatable CI, and a clear decision record. BoardReadyOps treats those items as evidence for a manufacturing decision instead of loose files in a build directory.
+- **Getting Started**: [Quickstart](quickstart.md) · [Installation](install.md) · [Golden Demo](golden-demo.md)
+- **Execution Surfaces**: [CLI Reference](cli.md) · [GitHub Action](action.md) · [Agent Planning Output](agent-planning.md)
+- **Configuration & Rules**: [Configuration Guide](configuration.md) · [Rule Catalog](rules/index.md) · [Vendor Profiles](vendor-profiles.md)
+- **Reports & Artifacts**: [Reports Matrix](reports/json.md) · [Hardware SBOM](sbom.md) · [Release Bundles](release/evidence-bundles.md)
+- **Architecture & Policies**: [Architecture Overview](architecture/overview.md) · [Security Policy](https://github.com/oaslananka/boardreadyops/blob/main/SECURITY.md) · [ADRs](architecture/adr/0001-single-repo-no-mirror.md)

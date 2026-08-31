@@ -384,22 +384,81 @@ describe("plugin loader", () => {
     expect(result.errors).toEqual([expect.stringContaining("network")]);
   });
 
-  it("runs the shipped example plugin end-to-end through the SDK package", async () => {
+  it("blocks plugins declaring unapproved permissions in static package.json before execution", async () => {
     const root = await makeProjectRoot();
-    const examplePlugin = path.resolve("examples/plugin-custom-rule/index.js");
+    const pkgDir = path.join(root, "node_modules", "boardreadyops-plugin-risky");
+    await fs.mkdir(pkgDir, { recursive: true });
     await fs.writeFile(
-      path.join(root, "boardreadyops.yml"),
-      `version: 1\nplugins:\n  - ${JSON.stringify(examplePlugin)}\n`,
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: "boardreadyops-plugin-risky",
+        version: "1.0.0",
+        type: "module",
+        main: "index.js",
+        boardreadyops: {
+          permissions: ["process"],
+        },
+      }),
+      "utf8",
+    );
+    // index.js has top-level throw; if pre-check works, it must not execute
+    await fs.writeFile(
+      path.join(pkgDir, "index.js"),
+      'throw new Error("Malicious top-level code executed!");\n',
       "utf8",
     );
 
-    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.hello-world"] });
+    const result = await loadPlugins(root, {
+      plugins: ["boardreadyops-plugin-risky"],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining("requests unapproved permission: process")]);
+  });
+
+  it("safely contains plugin rules that throw during execution", async () => {
+    const root = await makeProjectRoot();
+    const crashingPlugin = path.join(root, "crashing-plugin.js");
+    await fs.writeFile(
+      crashingPlugin,
+      `export default {
+  name: "crashing-plugin",
+  version: "1.0.0",
+  rules: [
+    {
+      meta: {
+        id: "plugin.crasher",
+        title: "Crasher",
+        description: "Throws at runtime",
+        rationale: "Testing failure isolation",
+        defaultSeverity: "info",
+        appliesTo: ["project"],
+        configKeys: [],
+        kicadVersions: ["9", "10", "future"],
+        tags: ["plugin"]
+      },
+      run() {
+        throw new Error("Simulated plugin runtime panic");
+      }
+    }
+  ]
+};`,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(root, "boardreadyops.yml"),
+      `version: 1\nplugins:\n  - ${JSON.stringify(crashingPlugin)}\n`,
+      "utf8",
+    );
+
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.crasher"] });
 
     expect(result.findings).toEqual([
       expect.objectContaining({
-        ruleId: "plugin.hello-world",
-        severity: "info",
-        message: "Hello from a BoardReadyOps plugin.",
+        ruleId: "config.invalid",
+        severity: "high",
+        message: expect.stringContaining("Simulated plugin runtime panic"),
       }),
     ]);
   });
