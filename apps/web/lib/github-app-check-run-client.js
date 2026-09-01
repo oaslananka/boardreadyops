@@ -14,7 +14,7 @@ function requiredEnv(name) {
 }
 
 function githubPrivateKey() {
-  return requiredEnv("GITHUB_APP_PRIVATE_KEY").replace(/\\n/g, "\n");
+  return requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n");
 }
 
 export function detailsUrl(runId) {

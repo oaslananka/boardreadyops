@@ -306,7 +306,7 @@ class Spinner {
 }
 
 function isFileRelevant(filename: string): boolean {
-  const normalized = filename.replace(/\\/g, "/");
+  const normalized = filename.replaceAll("\\", "/");
   if (
     normalized.includes("/node_modules/") ||
     normalized.includes("/.git/") ||

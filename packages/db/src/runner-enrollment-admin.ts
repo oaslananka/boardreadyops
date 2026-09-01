@@ -399,7 +399,7 @@ function validateDatabaseUrl(value: string): URL {
 }
 
 function pgpassField(value: string): string {
-  const backslash = String.fromCharCode(92);
+  const backslash = String.fromCodePoint(92);
   return value.replaceAll(backslash, backslash.repeat(2)).replaceAll(":", `${backslash}:`);
 }
 

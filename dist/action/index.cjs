@@ -79178,7 +79178,7 @@ function redactString(value, projectRoot, maxFieldLength, key) {
   return output;
 }
 function normalizePath(value) {
-  return import_node_path.default.resolve(value).replace(/\\/g, "/");
+  return import_node_path.default.resolve(value).replaceAll("\\", "/");
 }
 function writeRotatingLine(file2, line, maxFileBytes, retention) {
   import_node_fs.default.mkdirSync(import_node_path.default.dirname(file2), { recursive: true });
@@ -100868,7 +100868,7 @@ function uniqueJobs(jobs) {
   return output;
 }
 function normalizePath2(value) {
-  return import_node_path27.default.normalize(value).replace(/\\/g, "/");
+  return import_node_path27.default.normalize(value).replaceAll("\\", "/");
 }
 
 // src/rules/manufacturing/jobset-outputs.ts
@@ -105035,7 +105035,7 @@ function normalizeLocale(value) {
   if (value === "__PSEUDO__") {
     return "__PSEUDO__";
   }
-  const normalized = value.toLowerCase().replace(/_/g, "-");
+  const normalized = value.toLowerCase().replaceAll("_", "-");
   if (normalized === "en" || normalized.startsWith("en-")) {
     return "en";
   }
@@ -105101,7 +105101,11 @@ function reportCoordinate(value) {
     return value.toString();
   }
   const formatted = value.toFixed(6);
-  const trimmed = formatted.replace(/0+$/, "");
+  let end = formatted.length;
+  while (end > 0 && formatted[end - 1] === "0") {
+    end -= 1;
+  }
+  const trimmed = formatted.slice(0, end);
   return trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
 }
 function reportCoordinateWithUnits(value, units) {
