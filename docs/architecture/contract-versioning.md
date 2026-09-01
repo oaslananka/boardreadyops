@@ -43,6 +43,15 @@ Every machine-readable payload emitted by BoardReadyOps carries an explicit `sch
 └───────────────────────────────┘              └───────────────────────────────┘
 ```
 
+### Automated Enforcement
+
+`tests/snapshot/schemas.snapshot.test.ts` snapshots the required-field set, `additionalProperties`
+strictness, enum/const values, and property structure of every `schemas/*.schema.json` (resolving
+`$ref`/`$defs` so a shared definition's shape is checked everywhere it is used). A shape change of
+any kind fails the snapshot and must be reviewed deliberately: update the snapshot (`vitest -u`)
+only after confirming the change is additive per the table below, or bump `schemaVersion` first if
+it is breaking.
+
 ### Additive vs Breaking Changes
 
 | Change Type | Classification | Policy |

@@ -1,0 +1,3052 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`public schema shape snapshots > keeps the public contract shape of every schemas/*.schema.json stable 1`] = `
+{
+  "agent-plan.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "exitCode": {
+        "type": "integer",
+      },
+      "generatedAt": {
+        "type": "string",
+      },
+      "nextActions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "commandsToVerify": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "confidence": {
+                  "enum": [
+                    "definite",
+                    "high",
+                    "low",
+                    "medium",
+                  ],
+                },
+                "details": {
+                  "additionalProperties": true,
+                  "type": "object",
+                },
+                "message": {
+                  "type": "string",
+                },
+                "references": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "message",
+              ],
+              "type": "object",
+            },
+            "fixStrategy": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                },
+                "steps": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "description",
+                "steps",
+              ],
+              "type": "object",
+            },
+            "id": {
+              "type": "string",
+            },
+            "location": {
+              "additionalProperties": false,
+              "properties": {
+                "boardCoordinates": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "layer": {
+                      "type": "string",
+                    },
+                    "units": {
+                      "enum": [
+                        "in",
+                        "mm",
+                      ],
+                    },
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "units",
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "column": {
+                  "type": "integer",
+                },
+                "line": {
+                  "type": "integer",
+                },
+                "region": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "endColumn": {
+                      "type": "integer",
+                    },
+                    "endLine": {
+                      "type": "integer",
+                    },
+                    "startColumn": {
+                      "type": "integer",
+                    },
+                    "startLine": {
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "endLine",
+                    "startLine",
+                  ],
+                  "type": "object",
+                },
+              },
+              "type": "object",
+            },
+            "resource": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "bom",
+                    "firmware",
+                    "manifest",
+                    "pcb",
+                    "pinmap",
+                    "project",
+                    "schematic",
+                  ],
+                },
+                "path": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+                "path",
+              ],
+              "type": "object",
+            },
+            "ruleId": {
+              "type": "string",
+            },
+            "safeAutoFixPossible": {
+              "type": "boolean",
+            },
+            "severity": {
+              "enum": [
+                "critical",
+                "high",
+                "info",
+                "low",
+                "medium",
+              ],
+            },
+            "title": {
+              "type": "string",
+            },
+            "whyItMatters": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "commandsToVerify",
+            "evidence",
+            "fixStrategy",
+            "id",
+            "resource",
+            "ruleId",
+            "safeAutoFixPossible",
+            "severity",
+            "title",
+            "whyItMatters",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "projectRoot": {
+        "type": "string",
+      },
+      "releaseActions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "commandsToVerify": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "confidence": {
+                  "enum": [
+                    "definite",
+                    "high",
+                    "low",
+                    "medium",
+                  ],
+                },
+                "details": {
+                  "additionalProperties": true,
+                  "type": "object",
+                },
+                "message": {
+                  "type": "string",
+                },
+                "references": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "message",
+              ],
+              "type": "object",
+            },
+            "fixStrategy": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                },
+                "steps": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "description",
+                "steps",
+              ],
+              "type": "object",
+            },
+            "id": {
+              "type": "string",
+            },
+            "location": {
+              "additionalProperties": false,
+              "properties": {
+                "boardCoordinates": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "layer": {
+                      "type": "string",
+                    },
+                    "units": {
+                      "enum": [
+                        "in",
+                        "mm",
+                      ],
+                    },
+                    "x": {
+                      "type": "number",
+                    },
+                    "y": {
+                      "type": "number",
+                    },
+                  },
+                  "required": [
+                    "units",
+                    "x",
+                    "y",
+                  ],
+                  "type": "object",
+                },
+                "column": {
+                  "type": "integer",
+                },
+                "line": {
+                  "type": "integer",
+                },
+                "region": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "endColumn": {
+                      "type": "integer",
+                    },
+                    "endLine": {
+                      "type": "integer",
+                    },
+                    "startColumn": {
+                      "type": "integer",
+                    },
+                    "startLine": {
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "endLine",
+                    "startLine",
+                  ],
+                  "type": "object",
+                },
+              },
+              "type": "object",
+            },
+            "resource": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "bom",
+                    "firmware",
+                    "manifest",
+                    "pcb",
+                    "pinmap",
+                    "project",
+                    "schematic",
+                  ],
+                },
+                "path": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+                "path",
+              ],
+              "type": "object",
+            },
+            "ruleId": {
+              "type": "string",
+            },
+            "safeAutoFixPossible": {
+              "type": "boolean",
+            },
+            "severity": {
+              "enum": [
+                "critical",
+                "high",
+                "info",
+                "low",
+                "medium",
+              ],
+            },
+            "title": {
+              "type": "string",
+            },
+            "whyItMatters": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "commandsToVerify",
+            "evidence",
+            "fixStrategy",
+            "id",
+            "resource",
+            "ruleId",
+            "safeAutoFixPossible",
+            "severity",
+            "title",
+            "whyItMatters",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "schemaVersion": {
+        "const": 1,
+      },
+      "status": {
+        "enum": [
+          "failed",
+          "passed",
+        ],
+      },
+      "summary": {
+        "additionalProperties": false,
+        "properties": {
+          "critical": {
+            "type": "integer",
+          },
+          "failed": {
+            "type": "boolean",
+          },
+          "high": {
+            "type": "integer",
+          },
+          "info": {
+            "type": "integer",
+          },
+          "low": {
+            "type": "integer",
+          },
+          "maxSeverity": {
+            "enum": [
+              "critical",
+              "high",
+              "info",
+              "low",
+              "medium",
+              "none",
+            ],
+          },
+          "medium": {
+            "type": "integer",
+          },
+          "total": {
+            "type": "integer",
+          },
+        },
+        "required": [
+          "critical",
+          "failed",
+          "high",
+          "info",
+          "low",
+          "maxSeverity",
+          "medium",
+          "total",
+        ],
+        "type": "object",
+      },
+      "tool": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "boardreadyops",
+          },
+          "version": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "version",
+        ],
+        "type": "object",
+      },
+    },
+    "required": [
+      "exitCode",
+      "generatedAt",
+      "nextActions",
+      "projectRoot",
+      "releaseActions",
+      "schemaVersion",
+      "status",
+      "summary",
+      "tool",
+    ],
+    "type": "object",
+  },
+  "config.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "baseline": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "type": "string",
+          },
+          "mode": {
+            "enum": [
+              "all",
+              "new-only",
+            ],
+          },
+        },
+        "required": [
+          "file",
+          "mode",
+        ],
+        "type": "object",
+      },
+      "bom": {
+        "additionalProperties": false,
+        "properties": {
+          "alternates": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "alts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "manufacturer": {
+                        "type": "string",
+                      },
+                      "mpn": {
+                        "type": "string",
+                      },
+                      "note": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "mpn",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "mpn": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "alts",
+                "mpn",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "type": "object",
+      },
+      "fail-on": {
+        "enum": [
+          "critical",
+          "high",
+          "low",
+          "medium",
+          "never",
+        ],
+      },
+      "firmware": {
+        "additionalProperties": false,
+        "properties": {
+          "arduino": {
+            "additionalProperties": false,
+            "properties": {
+              "pinAssignments": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "esp-idf": {
+            "additionalProperties": false,
+            "properties": {
+              "pinAssignments": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "platformio": {
+            "additionalProperties": false,
+            "properties": {
+              "pinAssignments": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "stm32cubemx": {
+            "additionalProperties": false,
+            "properties": {
+              "mcuDesignator": {
+                "type": "string",
+              },
+              "project": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "zephyr": {
+            "additionalProperties": false,
+            "properties": {
+              "pinAssignments": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+        },
+        "type": "object",
+      },
+      "fix": {
+        "additionalProperties": false,
+        "properties": {
+          "allow": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "type": "object",
+      },
+      "gates": {
+        "additionalProperties": {
+          "additionalProperties": false,
+          "properties": {
+            "fail-on": {
+              "enum": [
+                "critical",
+                "high",
+                "low",
+                "medium",
+                "never",
+              ],
+            },
+            "require": {
+              "items": {
+                "enum": [
+                  "bom",
+                  "changelog",
+                  "clean-drc",
+                  "clean-erc",
+                  "drill",
+                  "gerber",
+                  "no-eol-components",
+                  "position",
+                  "tagged-release",
+                ],
+              },
+              "type": "array",
+            },
+          },
+          "type": "object",
+        },
+        "type": "object",
+      },
+      "mode": {
+        "enum": [
+          "enforce",
+          "warn",
+        ],
+      },
+      "notifiers": {
+        "additionalProperties": false,
+        "properties": {
+          "discord": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+              },
+              "minSeverity": {
+                "enum": [
+                  "critical",
+                  "high",
+                  "info",
+                  "low",
+                  "medium",
+                ],
+              },
+              "webhookEnv": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "email": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+              },
+              "from": {
+                "type": "string",
+              },
+              "minSeverity": {
+                "enum": [
+                  "critical",
+                  "high",
+                  "info",
+                  "low",
+                  "medium",
+                ],
+              },
+              "recipients": {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "smtpEnv": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "slack": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+              },
+              "minSeverity": {
+                "enum": [
+                  "critical",
+                  "high",
+                  "info",
+                  "low",
+                  "medium",
+                ],
+              },
+              "webhookEnv": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "teams": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+              },
+              "minSeverity": {
+                "enum": [
+                  "critical",
+                  "high",
+                  "info",
+                  "low",
+                  "medium",
+                ],
+              },
+              "webhookEnv": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "telegram": {
+            "additionalProperties": false,
+            "properties": {
+              "botTokenEnv": {
+                "type": "string",
+              },
+              "chatId": {
+                "type": "string",
+              },
+              "enabled": {
+                "type": "boolean",
+              },
+              "minSeverity": {
+                "enum": [
+                  "critical",
+                  "high",
+                  "info",
+                  "low",
+                  "medium",
+                ],
+              },
+            },
+            "type": "object",
+          },
+        },
+        "type": "object",
+      },
+      "pluginPermissions": {
+        "additionalProperties": false,
+        "properties": {
+          "allow": {
+            "additionalProperties": {
+              "items": {
+                "enum": [
+                  "fs:read",
+                  "fs:write",
+                  "kicad-cli",
+                  "network",
+                  "process",
+                ],
+              },
+              "type": "array",
+            },
+            "type": "object",
+          },
+          "default": {
+            "items": {
+              "enum": [
+                "fs:read",
+                "fs:write",
+                "kicad-cli",
+                "network",
+                "process",
+              ],
+            },
+            "type": "array",
+          },
+          "deny": {
+            "additionalProperties": {
+              "items": {
+                "enum": [
+                  "fs:read",
+                  "fs:write",
+                  "kicad-cli",
+                  "network",
+                  "process",
+                ],
+              },
+              "type": "array",
+            },
+            "type": "object",
+          },
+        },
+        "type": "object",
+      },
+      "plugins": {
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "policy": {
+        "additionalProperties": false,
+        "properties": {
+          "enforce": {
+            "type": "boolean",
+          },
+          "rules": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                },
+                "max": {
+                  "type": "integer",
+                },
+                "rules": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "score": {
+                  "type": "integer",
+                },
+                "severity": {
+                  "enum": [
+                    "critical",
+                    "high",
+                    "info",
+                    "low",
+                    "medium",
+                  ],
+                },
+                "status": {
+                  "items": {
+                    "enum": [
+                      "at-risk",
+                      "blocked",
+                      "ready",
+                    ],
+                  },
+                  "type": "array",
+                },
+                "type": {
+                  "enum": [
+                    "forbid-expired-waivers",
+                    "forbid-rules",
+                    "forbid-stale-waivers",
+                    "max-findings",
+                    "max-severity",
+                    "min-readiness-score",
+                    "require-readiness-status",
+                    "require-required-outputs",
+                  ],
+                },
+              },
+              "required": [
+                "id",
+                "type",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "type": "object",
+      },
+      "projects": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "bom": {
+              "type": "string",
+            },
+            "firmware": {
+              "additionalProperties": false,
+              "properties": {
+                "arduino": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "pinAssignments": {
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "esp-idf": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "pinAssignments": {
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "platformio": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "pinAssignments": {
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "stm32cubemx": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "mcuDesignator": {
+                      "type": "string",
+                    },
+                    "project": {
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "zephyr": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "pinAssignments": {
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+              },
+              "type": "object",
+            },
+            "mode": {
+              "enum": [
+                "enforce",
+                "warn",
+              ],
+            },
+            "path": {
+              "type": "string",
+            },
+            "pinmap": {
+              "type": "string",
+            },
+            "releaseMode": {
+              "enum": [
+                "pilot",
+                "production",
+                "prototype",
+              ],
+            },
+            "rules": {
+              "additionalProperties": {
+                "oneOf": [
+                  {
+                    "type": "boolean",
+                  },
+                  {
+                    "additionalProperties": true,
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                      },
+                      "ignore-refs": {
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "required": {
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "severity": {
+                        "enum": [
+                          "critical",
+                          "high",
+                          "info",
+                          "low",
+                          "medium",
+                        ],
+                      },
+                      "severity-overrides": {
+                        "additionalProperties": {
+                          "enum": [
+                            "critical",
+                            "high",
+                            "info",
+                            "low",
+                            "medium",
+                          ],
+                        },
+                        "type": "object",
+                      },
+                      "timeout": {
+                        "type": "integer",
+                      },
+                    },
+                    "type": "object",
+                  },
+                ],
+              },
+              "type": "object",
+            },
+            "variants": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "bom": {
+                    "type": "string",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "name",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+            "vendor": {
+              "additionalProperties": false,
+              "properties": {
+                "assembly": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "requiresFiducials": {
+                      "type": "boolean",
+                    },
+                    "sides": {
+                      "items": {
+                        "enum": [
+                          "both",
+                          "bottom",
+                          "top",
+                        ],
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "type": "object",
+                },
+                "board": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "finish": {
+                      "items": {
+                        "type": "string",
+                      },
+                      "type": "array",
+                    },
+                    "layers": {
+                      "items": {
+                        "type": "integer",
+                      },
+                      "type": "array",
+                    },
+                    "thicknessMm": {
+                      "items": {
+                        "type": "number",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "type": "object",
+                },
+                "profile": {
+                  "type": "string",
+                },
+                "required": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "service": {
+                  "enum": [
+                    "assembly",
+                    "fabrication",
+                    "fabrication+assembly",
+                  ],
+                },
+              },
+              "type": "object",
+            },
+          },
+          "required": [
+            "path",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "releaseMode": {
+        "enum": [
+          "pilot",
+          "production",
+          "prototype",
+        ],
+      },
+      "report": {
+        "additionalProperties": false,
+        "properties": {
+          "html": {
+            "oneOf": [
+              {
+                "type": "string",
+              },
+              {
+                "const": false,
+              },
+            ],
+          },
+          "json": {
+            "oneOf": [
+              {
+                "type": "string",
+              },
+              {
+                "const": false,
+              },
+            ],
+          },
+          "junit": {
+            "oneOf": [
+              {
+                "type": "string",
+              },
+              {
+                "const": false,
+              },
+            ],
+          },
+          "markdown": {
+            "oneOf": [
+              {
+                "type": "string",
+              },
+              {
+                "const": false,
+              },
+            ],
+          },
+          "sarif": {
+            "oneOf": [
+              {
+                "type": "string",
+              },
+              {
+                "const": false,
+              },
+            ],
+          },
+        },
+        "type": "object",
+      },
+      "rules": {
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "boolean",
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                },
+                "ignore-refs": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "patterns": {
+                  "additionalProperties": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "type": "object",
+                },
+                "required": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "severity": {
+                  "enum": [
+                    "critical",
+                    "high",
+                    "info",
+                    "low",
+                    "medium",
+                  ],
+                },
+                "severity-overrides": {
+                  "additionalProperties": {
+                    "enum": [
+                      "critical",
+                      "high",
+                      "info",
+                      "low",
+                      "medium",
+                    ],
+                  },
+                  "type": "object",
+                },
+                "timeout": {
+                  "type": "integer",
+                },
+              },
+              "type": "object",
+            },
+          ],
+        },
+        "type": "object",
+      },
+      "suppressions": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "expires": {
+              "type": "string",
+            },
+            "fingerprint": {
+              "type": "string",
+            },
+            "project": {
+              "type": "string",
+            },
+            "reason": {
+              "type": "string",
+            },
+            "refs": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "rule": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "reason",
+            "rule",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "vendor": {
+        "additionalProperties": false,
+        "properties": {
+          "assembly": {
+            "additionalProperties": false,
+            "properties": {
+              "requiresFiducials": {
+                "type": "boolean",
+              },
+              "sides": {
+                "items": {
+                  "enum": [
+                    "both",
+                    "bottom",
+                    "top",
+                  ],
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "board": {
+            "additionalProperties": false,
+            "properties": {
+              "finish": {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "layers": {
+                "items": {
+                  "type": "integer",
+                },
+                "type": "array",
+              },
+              "thicknessMm": {
+                "items": {
+                  "type": "number",
+                },
+                "type": "array",
+              },
+            },
+            "type": "object",
+          },
+          "profile": {
+            "type": "string",
+          },
+          "required": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "service": {
+            "enum": [
+              "assembly",
+              "fabrication",
+              "fabrication+assembly",
+            ],
+          },
+        },
+        "type": "object",
+      },
+      "version": {
+        "const": 1,
+      },
+      "waivers": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "approvedBy": {
+              "type": "string",
+            },
+            "evidence": {
+              "type": "string",
+            },
+            "expires": {
+              "type": "string",
+            },
+            "fingerprint": {
+              "type": "string",
+            },
+            "owner": {
+              "type": "string",
+            },
+            "project": {
+              "type": "string",
+            },
+            "reason": {
+              "type": "string",
+            },
+            "rule": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "owner",
+            "reason",
+            "rule",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+    },
+    "required": [
+      "version",
+    ],
+    "type": "object",
+  },
+  "doctor.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "checks": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "message": {
+                    "type": "string",
+                  },
+                  "recommendation": {
+                    "type": "string",
+                  },
+                  "severity": {
+                    "enum": [
+                      "fail",
+                      "info",
+                      "pass",
+                      "warn",
+                    ],
+                  },
+                },
+                "required": [
+                  "message",
+                  "severity",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+            "name": {
+              "enum": [
+                "action",
+                "adapters",
+                "kicad",
+                "repository",
+                "runtime",
+                "suppressions",
+              ],
+            },
+            "title": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "items",
+            "name",
+            "title",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "recommendations": {
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "schemaVersion": {
+        "const": 1,
+      },
+      "tool": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "boardreadyops",
+          },
+          "version": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "version",
+        ],
+        "type": "object",
+      },
+    },
+    "required": [
+      "checks",
+      "recommendations",
+      "schemaVersion",
+      "tool",
+    ],
+    "type": "object",
+  },
+  "evidence.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "artifacts": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "bytes": {
+              "type": "integer",
+            },
+            "kind": {
+              "enum": [
+                "bom",
+                "cpl",
+                "drill",
+                "fabrication",
+                "generated",
+                "gerber",
+                "other",
+                "report",
+              ],
+            },
+            "path": {
+              "type": "string",
+            },
+            "sha256": {
+              "type": "string",
+            },
+            "sourcePath": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "bytes",
+            "kind",
+            "path",
+            "sha256",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "decision": {
+        "additionalProperties": false,
+        "properties": {
+          "reasons": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "status": {
+            "enum": [
+              "fail",
+              "pass",
+            ],
+          },
+        },
+        "required": [
+          "reasons",
+          "status",
+        ],
+        "type": "object",
+      },
+      "gaps": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "missing-artifact",
+                "missing-project-file",
+              ],
+            },
+            "message": {
+              "type": "string",
+            },
+            "path": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+            "message",
+            "path",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "generatedAt": {
+        "type": "string",
+      },
+      "git": {
+        "additionalProperties": false,
+        "properties": {
+          "dirty": {
+            "type": "boolean",
+          },
+          "sha": {
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "layout": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "type": "string",
+          },
+          "generated": {
+            "type": "string",
+          },
+          "reports": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "artifacts",
+          "generated",
+          "reports",
+        ],
+        "type": "object",
+      },
+      "projects": {
+        "type": "array",
+      },
+      "provenance": {
+        "additionalProperties": false,
+        "properties": {
+          "attestation": {
+            "type": "string",
+          },
+          "source": {
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "schemaVersion": {
+        "const": 2,
+      },
+      "summary": {
+        "type": "object",
+      },
+      "tool": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "boardreadyops",
+          },
+          "version": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "version",
+        ],
+        "type": "object",
+      },
+      "verification": {
+        "additionalProperties": false,
+        "properties": {
+          "algorithm": {
+            "const": "sha256",
+          },
+          "artifactCount": {
+            "type": "integer",
+          },
+        },
+        "required": [
+          "algorithm",
+          "artifactCount",
+        ],
+        "type": "object",
+      },
+    },
+    "required": [
+      "artifacts",
+      "decision",
+      "gaps",
+      "generatedAt",
+      "git",
+      "layout",
+      "projects",
+      "provenance",
+      "schemaVersion",
+      "summary",
+      "tool",
+      "verification",
+    ],
+    "type": "object",
+  },
+  "findings.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "bomRisk": {
+        "additionalProperties": true,
+        "type": "object",
+      },
+      "boms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "components": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "dnp": {
+                    "type": "boolean",
+                  },
+                  "footprint": {
+                    "type": "string",
+                  },
+                  "identityKey": {
+                    "type": "string",
+                  },
+                  "lifecycle": {
+                    "type": "string",
+                  },
+                  "manufacturer": {
+                    "type": "string",
+                  },
+                  "mpn": {
+                    "type": "string",
+                  },
+                  "quantity": {
+                    "type": "number",
+                  },
+                  "reference": {
+                    "type": "string",
+                  },
+                  "value": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "reference",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+            "project": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "components",
+            "project",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "exitCode": {
+        "type": "integer",
+      },
+      "fabrication": {
+        "additionalProperties": false,
+        "properties": {
+          "bom": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "dnp": {
+                  "type": "boolean",
+                },
+                "footprint": {
+                  "type": "string",
+                },
+                "lifecycle": {
+                  "type": "string",
+                },
+                "manufacturer": {
+                  "type": "string",
+                },
+                "mpn": {
+                  "type": "string",
+                },
+                "quantity": {
+                  "type": "number",
+                },
+                "reference": {
+                  "type": "string",
+                },
+                "sourcePath": {
+                  "type": "string",
+                },
+                "suppliers": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "value": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "reference",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "outputs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "files": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "digest": {
+                        "type": "string",
+                      },
+                      "path": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "digest",
+                      "path",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+                "kind": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "files",
+                "kind",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "bom",
+          "outputs",
+        ],
+        "type": "object",
+      },
+      "findings": {
+        "items": {
+          "additionalProperties": false,
+          "allOf": [
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+            {},
+          ],
+          "properties": {
+            "confidence": {
+              "enum": [
+                "definite",
+                "high",
+                "low",
+                "medium",
+              ],
+            },
+            "details": {
+              "type": "object",
+            },
+            "fingerprint": {
+              "type": "string",
+            },
+            "fix": {
+              "additionalProperties": false,
+              "properties": {
+                "automated": {
+                  "type": "boolean",
+                },
+                "description": {
+                  "type": "string",
+                },
+                "references": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "steps": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "description",
+              ],
+              "type": "object",
+            },
+            "location": {
+              "type": "object",
+            },
+            "message": {
+              "type": "string",
+            },
+            "project": {
+              "type": "string",
+            },
+            "references": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "resource": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "bom",
+                    "firmware",
+                    "manifest",
+                    "pcb",
+                    "pinmap",
+                    "project",
+                    "schematic",
+                  ],
+                },
+                "path": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+                "path",
+              ],
+              "type": "object",
+            },
+            "ruleId": {
+              "oneOf": [
+                {
+                  "enum": [
+                    "bom.dnp-consistency",
+                    "bom.eol-detection",
+                    "bom.footprint-mismatch",
+                    "bom.identity-conflicts",
+                    "bom.lifecycle",
+                    "bom.missing-mpn",
+                    "bom.risk-score",
+                    "bom.single-source",
+                    "bom.variant-consistency",
+                    "config.invalid",
+                    "design.board-outline",
+                    "design.copper-balance",
+                    "environment.kicad-missing",
+                    "firmware.arduino-pin-contract",
+                    "firmware.esp-idf-pin-contract",
+                    "firmware.platformio-pin-contract",
+                    "firmware.stm32cubemx-pin-contract",
+                    "firmware.zephyr-pin-contract",
+                    "gate.requirement",
+                    "manifest.project-discovery",
+                    "manufacturing.drill-coverage",
+                    "manufacturing.fab-notes",
+                    "manufacturing.fiducials",
+                    "manufacturing.jobset-outputs",
+                    "manufacturing.layer-stackup",
+                    "manufacturing.outputs-present",
+                    "manufacturing.package-completeness",
+                    "manufacturing.panel-sanity",
+                    "manufacturing.position-coverage",
+                    "manufacturing.tooling-holes",
+                    "pinmap.collision",
+                    "pinmap.net-label",
+                    "pinmap.unmapped-pin",
+                    "pinmap.verify",
+                    "release.changelog-present",
+                    "release.revision-set",
+                    "release.tag-matches-revision",
+                    "release.version-format",
+                  ],
+                },
+                {
+                  "type": "string",
+                },
+              ],
+            },
+            "severity": {
+              "enum": [
+                "critical",
+                "high",
+                "info",
+                "low",
+                "medium",
+              ],
+            },
+            "suppressed": {
+              "type": "boolean",
+            },
+          },
+          "required": [
+            "fingerprint",
+            "message",
+            "resource",
+            "ruleId",
+            "severity",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "generatedAt": {
+        "type": "string",
+      },
+      "plugins": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+            },
+            "permissions": {
+              "additionalProperties": false,
+              "properties": {
+                "allowed": {
+                  "items": {
+                    "enum": [
+                      "fs:read",
+                      "fs:write",
+                      "kicad-cli",
+                      "network",
+                      "process",
+                    ],
+                  },
+                  "type": "array",
+                },
+                "approvedBy": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "denied": {
+                  "items": {
+                    "enum": [
+                      "fs:read",
+                      "fs:write",
+                      "kicad-cli",
+                      "network",
+                      "process",
+                    ],
+                  },
+                  "type": "array",
+                },
+                "requested": {
+                  "items": {
+                    "enum": [
+                      "fs:read",
+                      "fs:write",
+                      "kicad-cli",
+                      "network",
+                      "process",
+                    ],
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "allowed",
+                "approvedBy",
+                "denied",
+                "requested",
+              ],
+              "type": "object",
+            },
+            "ruleIds": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "specifier": {
+              "type": "string",
+            },
+            "version": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "permissions",
+            "ruleIds",
+            "specifier",
+            "version",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "policy": {
+        "additionalProperties": false,
+        "properties": {
+          "enforced": {
+            "type": "boolean",
+          },
+          "rules": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                },
+                "message": {
+                  "type": "string",
+                },
+                "status": {
+                  "enum": [
+                    "fail",
+                    "pass",
+                  ],
+                },
+                "type": {
+                  "enum": [
+                    "forbid-expired-waivers",
+                    "forbid-rules",
+                    "max-findings",
+                    "max-severity",
+                    "min-readiness-score",
+                    "require-readiness-status",
+                    "require-required-outputs",
+                  ],
+                },
+              },
+              "required": [
+                "id",
+                "message",
+                "status",
+                "type",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "status": {
+            "enum": [
+              "fail",
+              "pass",
+            ],
+          },
+        },
+        "required": [
+          "enforced",
+          "rules",
+          "status",
+        ],
+        "type": "object",
+      },
+      "projects": {
+        "type": "array",
+      },
+      "readiness": {
+        "additionalProperties": false,
+        "properties": {
+          "blocking": {
+            "type": "integer",
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "importance": {
+                  "enum": [
+                    "recommended",
+                    "required",
+                  ],
+                },
+                "output": {
+                  "type": "string",
+                },
+                "present": {
+                  "type": "boolean",
+                },
+              },
+              "required": [
+                "importance",
+                "output",
+                "present",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "missingRecommended": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "missingRequired": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "nonBlocking": {
+            "type": "integer",
+          },
+          "profile": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+              "service": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "id",
+              "name",
+              "service",
+            ],
+            "type": "object",
+          },
+          "score": {
+            "type": "integer",
+          },
+          "status": {
+            "enum": [
+              "at-risk",
+              "blocked",
+              "ready",
+            ],
+          },
+          "warnings": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "blocking",
+          "evidence",
+          "missingRecommended",
+          "missingRequired",
+          "nonBlocking",
+          "score",
+          "status",
+          "warnings",
+        ],
+        "type": "object",
+      },
+      "releaseMode": {
+        "enum": [
+          "pilot",
+          "production",
+          "prototype",
+        ],
+      },
+      "schemaVersion": {
+        "const": 1,
+      },
+      "status": {
+        "enum": [
+          "failed",
+          "passed",
+        ],
+      },
+      "summary": {
+        "type": "object",
+      },
+      "tool": {
+        "properties": {
+          "name": {
+            "const": "boardreadyops",
+          },
+          "version": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "version",
+        ],
+        "type": "object",
+      },
+      "waivers": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "expired": {
+                  "type": "boolean",
+                },
+                "expires": {
+                  "type": "string",
+                },
+                "matched": {
+                  "type": "integer",
+                },
+                "owner": {
+                  "type": "string",
+                },
+                "reason": {
+                  "type": "string",
+                },
+                "rule": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "expired",
+                "matched",
+                "owner",
+                "reason",
+                "rule",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "expired": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "expired": {
+                  "type": "boolean",
+                },
+                "expires": {
+                  "type": "string",
+                },
+                "matched": {
+                  "type": "integer",
+                },
+                "owner": {
+                  "type": "string",
+                },
+                "reason": {
+                  "type": "string",
+                },
+                "rule": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "expired",
+                "matched",
+                "owner",
+                "reason",
+                "rule",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "active",
+          "expired",
+        ],
+        "type": "object",
+      },
+    },
+    "required": [
+      "findings",
+      "schemaVersion",
+      "summary",
+      "tool",
+    ],
+    "type": "object",
+  },
+  "generate-recipe.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "outputDir": {
+        "type": "string",
+      },
+      "schemaVersion": {
+        "const": 1,
+      },
+      "steps": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+            },
+            "kind": {
+              "enum": [
+                "board-pdf",
+                "bom",
+                "drill",
+                "gerbers",
+                "positions",
+                "schematic-pdf",
+              ],
+            },
+            "output": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+    },
+    "required": [
+      "steps",
+    ],
+    "type": "object",
+  },
+  "hbom.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "$schema": {
+        "const": "https://cyclonedx.org/schema/bom-1.7.schema.json",
+      },
+      "bomFormat": {
+        "const": "CycloneDX",
+      },
+      "components": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "bom-ref": {
+              "type": "string",
+            },
+            "externalReferences": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "enum": [
+                      "distribution",
+                      "documentation",
+                      "website",
+                    ],
+                  },
+                  "url": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "type",
+                  "url",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+            "manufacturer": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "name",
+              ],
+              "type": "object",
+            },
+            "name": {
+              "type": "string",
+            },
+            "properties": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                  },
+                  "value": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "name",
+                  "value",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+            "purl": {
+              "type": "string",
+            },
+            "supplier": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "name",
+              ],
+              "type": "object",
+            },
+            "type": {
+              "const": "device",
+            },
+            "version": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "bom-ref",
+            "name",
+            "properties",
+            "type",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "dependencies": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "dependsOn": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "ref": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "dependsOn",
+            "ref",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "metadata": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "additionalProperties": false,
+            "properties": {
+              "bom-ref": {
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+              "type": {
+                "const": "device",
+              },
+            },
+            "required": [
+              "bom-ref",
+              "name",
+              "type",
+            ],
+            "type": "object",
+          },
+          "properties": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                },
+                "value": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "name",
+                "value",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "timestamp": {
+            "type": "string",
+          },
+          "tools": {
+            "additionalProperties": false,
+            "properties": {
+              "components": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "const": "boardreadyops",
+                    },
+                    "type": {
+                      "const": "application",
+                    },
+                    "version": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "name",
+                    "type",
+                    "version",
+                  ],
+                  "type": "object",
+                },
+                "type": "array",
+              },
+            },
+            "required": [
+              "components",
+            ],
+            "type": "object",
+          },
+        },
+        "required": [
+          "component",
+          "timestamp",
+          "tools",
+        ],
+        "type": "object",
+      },
+      "specVersion": {
+        "const": "1.7",
+      },
+      "version": {
+        "type": "integer",
+      },
+    },
+    "required": [
+      "bomFormat",
+      "components",
+      "dependencies",
+      "metadata",
+      "specVersion",
+      "version",
+    ],
+    "type": "object",
+  },
+  "pinmap.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "pins": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "designator": {
+              "type": "string",
+            },
+            "firmware": {
+              "type": "string",
+            },
+            "net": {
+              "type": "string",
+            },
+            "pin": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "designator",
+            "net",
+            "pin",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "version": {
+        "const": 1,
+      },
+    },
+    "required": [
+      "pins",
+      "version",
+    ],
+    "type": "object",
+  },
+  "release-manifest.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "assumptions": {
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "decision": {
+        "additionalProperties": false,
+        "properties": {
+          "missingOutputs": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "status": {
+            "enum": [
+              "incomplete",
+              "ready",
+            ],
+            "type": "string",
+          },
+        },
+        "required": [
+          "missingOutputs",
+          "status",
+        ],
+        "type": "object",
+      },
+      "files": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "bytes": {
+              "type": "integer",
+            },
+            "output": {
+              "type": "string",
+            },
+            "sha256": {
+              "type": "string",
+            },
+            "source": {
+              "type": "string",
+            },
+            "target": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "bytes",
+            "output",
+            "sha256",
+            "source",
+            "target",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "generatedAt": {
+        "type": "string",
+      },
+      "includedOutputs": {
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "requiredOutputs": {
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "schemaVersion": {
+        "const": 1,
+        "type": "integer",
+      },
+      "tool": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "boardreadyops",
+            "type": "string",
+          },
+          "version": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "version",
+        ],
+        "type": "object",
+      },
+      "vendor": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+          },
+          "name": {
+            "type": "string",
+          },
+          "service": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "name",
+          "service",
+        ],
+        "type": "object",
+      },
+    },
+    "required": [
+      "assumptions",
+      "decision",
+      "files",
+      "generatedAt",
+      "includedOutputs",
+      "requiredOutputs",
+      "schemaVersion",
+      "tool",
+      "vendor",
+    ],
+    "type": "object",
+  },
+  "rule-pack.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "author": {
+        "type": "string",
+      },
+      "compatibility": {
+        "additionalProperties": false,
+        "properties": {
+          "boardreadyopsMax": {
+            "type": "string",
+          },
+          "boardreadyopsMin": {
+            "type": "string",
+          },
+          "kicadVersions": {
+            "items": {
+              "enum": [
+                "10",
+                "9",
+                "future",
+              ],
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "type": "object",
+      },
+      "description": {
+        "type": "string",
+      },
+      "homepage": {
+        "type": "string",
+      },
+      "id": {
+        "type": "string",
+      },
+      "license": {
+        "type": "string",
+      },
+      "name": {
+        "type": "string",
+      },
+      "releaseMode": {
+        "enum": [
+          "pilot",
+          "production",
+          "prototype",
+        ],
+        "type": "string",
+      },
+      "rules": {
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "boolean",
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                },
+                "severity": {
+                  "enum": [
+                    "critical",
+                    "high",
+                    "info",
+                    "low",
+                    "medium",
+                  ],
+                  "type": "string",
+                },
+              },
+              "type": "object",
+            },
+          ],
+        },
+        "type": "object",
+      },
+      "tags": {
+        "items": {
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "vendorProfile": {
+        "type": "string",
+      },
+      "version": {
+        "type": "string",
+      },
+    },
+    "required": [
+      "description",
+      "id",
+      "name",
+      "version",
+    ],
+    "type": "object",
+  },
+  "telemetry-event.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "environment": {
+        "additionalProperties": false,
+        "properties": {
+          "ci": {
+            "type": "boolean",
+          },
+          "kicadMajor": {
+            "enum": [
+              "10",
+              "9",
+              "unknown",
+            ],
+            "type": "string",
+          },
+          "nodeVersion": {
+            "type": "string",
+          },
+          "os": {
+            "enum": [
+              "darwin",
+              "linux",
+              "win32",
+            ],
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "eventId": {
+        "type": "string",
+      },
+      "eventName": {
+        "enum": [
+          "doctor.run",
+          "hardware_impact.generated",
+          "release.prepared",
+          "scan.completed",
+          "setup.completed",
+          "waiver.evaluated",
+        ],
+        "type": "string",
+      },
+      "payload": {
+        "additionalProperties": false,
+        "properties": {
+          "activeWaivers": {
+            "type": "integer",
+          },
+          "baselineStatus": {
+            "enum": [
+              "available",
+              "unavailable",
+            ],
+            "type": "string",
+          },
+          "blockedRelease": {
+            "type": "boolean",
+          },
+          "blocking": {
+            "type": "integer",
+          },
+          "durationMs": {
+            "type": "integer",
+          },
+          "expiredWaivers": {
+            "type": "integer",
+          },
+          "failingChecks": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "findingsTotal": {
+            "type": "integer",
+          },
+          "materialChange": {
+            "type": "boolean",
+          },
+          "outputCount": {
+            "type": "integer",
+          },
+          "profile": {
+            "type": "string",
+          },
+          "riskDirection": {
+            "enum": [
+              "decreased",
+              "increased",
+              "unchanged",
+              "unknown",
+            ],
+            "type": "string",
+          },
+          "ruleCount": {
+            "type": "integer",
+          },
+          "signed": {
+            "type": "boolean",
+          },
+          "status": {
+            "enum": [
+              "at-risk",
+              "blocked",
+              "fail",
+              "pass",
+              "ready",
+            ],
+            "type": "string",
+          },
+          "vendorProfile": {
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "timestamp": {
+        "type": "string",
+      },
+      "version": {
+        "const": 1,
+        "type": "integer",
+      },
+    },
+    "required": [
+      "eventId",
+      "eventName",
+      "payload",
+      "timestamp",
+      "version",
+    ],
+    "type": "object",
+  },
+}
+`;
