@@ -19,8 +19,14 @@ vi.mock("next/navigation", () => ({
 // Imported after the mock so review-view.tsx picks up the mocked module.
 const { ReviewView } = await import("../../../apps/web/components/review/review-view.js");
 
+type TestButton = {
+  click(): void;
+  getAttribute(name: string): string | null;
+  dispatchEvent(event: unknown): void;
+};
+
 type TestContainer = {
-  querySelector(selector: string): { click(): void; getAttribute(name: string): string | null } | null;
+  querySelector(selector: string): TestButton | null;
   querySelectorAll(selector: string): Array<{ getAttribute(name: string): string | null; textContent: string | null }>;
   remove(): void;
 };
@@ -95,6 +101,55 @@ describe("ReviewView tab state is URL-backed", () => {
     if (!overviewTab) throw new Error("overview tab not found");
     await act(async () => {
       overviewTab.click();
+    });
+
+    expect(push).toHaveBeenCalledWith("/reviews/rev_gateway_42", { scroll: false });
+  });
+
+  it("uses roving tabindex: only the active tab is tabbable, the rest are -1", async () => {
+    await act(async () => {
+      root.render(createElement(ReviewView, { initialReview: review }));
+    });
+
+    expect(container.querySelector('[role="tab"][id="tab-overview"]')?.getAttribute("tabindex")).toBe("0");
+    expect(container.querySelector('[role="tab"][id="tab-changes"]')?.getAttribute("tabindex")).toBe("-1");
+    expect(container.querySelector('[role="tab"][id="tab-findings"]')?.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("moves to the next tab with ArrowRight and pushes its URL", async () => {
+    await act(async () => {
+      root.render(createElement(ReviewView, { initialReview: review }));
+    });
+
+    const overviewTab = container.querySelector('[role="tab"][id="tab-overview"]');
+    if (!overviewTab) throw new Error("overview tab not found");
+    const KeyboardEventCtor = (
+      globalThis as unknown as {
+        KeyboardEvent: new (type: string, init?: { key?: string; bubbles?: boolean }) => unknown;
+      }
+    ).KeyboardEvent;
+    await act(async () => {
+      overviewTab.dispatchEvent(new KeyboardEventCtor("keydown", { key: "ArrowRight", bubbles: true }));
+    });
+
+    expect(push).toHaveBeenCalledWith("/reviews/rev_gateway_42?tab=changes", { scroll: false });
+  });
+
+  it("wraps from the last tab to the first with ArrowRight", async () => {
+    currentSearch = "tab=evidence";
+    await act(async () => {
+      root.render(createElement(ReviewView, { initialReview: review }));
+    });
+
+    const evidenceTab = container.querySelector('[role="tab"][id="tab-evidence"]');
+    if (!evidenceTab) throw new Error("evidence tab not found");
+    const KeyboardEventCtor = (
+      globalThis as unknown as {
+        KeyboardEvent: new (type: string, init?: { key?: string; bubbles?: boolean }) => unknown;
+      }
+    ).KeyboardEvent;
+    await act(async () => {
+      evidenceTab.dispatchEvent(new KeyboardEventCtor("keydown", { key: "ArrowRight", bubbles: true }));
     });
 
     expect(push).toHaveBeenCalledWith("/reviews/rev_gateway_42", { scroll: false });

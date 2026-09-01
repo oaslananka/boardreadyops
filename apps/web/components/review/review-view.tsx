@@ -2,6 +2,7 @@
 
 import type { FindingDisposition, ReviewDecision } from "@boardreadyops/contracts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { KeyboardEvent } from "react";
 import { useEffect, useState } from "react";
 import type { DemoApproval, DemoChecklistItem, DemoReview } from "../../lib/demo-data.js";
 import { ApprovalModal } from "./approval-modal.js";
@@ -47,6 +48,21 @@ function ReviewNavigationTabs({
   incompleteChecklistCount,
   onSelectTab,
 }: ReviewNavigationTabsProps) {
+  function handleTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, currentTab: ReviewTabKey) {
+    const currentIndex = reviewTabKeys.indexOf(currentTab);
+    let nextIndex: number | null = null;
+    if (e.key === "ArrowRight") nextIndex = (currentIndex + 1) % reviewTabKeys.length;
+    else if (e.key === "ArrowLeft") nextIndex = (currentIndex - 1 + reviewTabKeys.length) % reviewTabKeys.length;
+    else if (e.key === "Home") nextIndex = 0;
+    else if (e.key === "End") nextIndex = reviewTabKeys.length - 1;
+    if (nextIndex === null) return;
+    e.preventDefault();
+    const nextTab = reviewTabKeys[nextIndex];
+    if (!nextTab) return;
+    onSelectTab(nextTab);
+    document.getElementById(`tab-${nextTab}`)?.focus();
+  }
+
   return (
     <div className="review-workspace-nav review-tabs-navigation" aria-label="Review workspace" role="tablist">
       <button
@@ -54,9 +70,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "overview"}
         aria-controls="panel-overview"
+        tabIndex={activeTab === "overview" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "overview" ? "active" : ""}`}
         onClick={() => onSelectTab("overview")}
+        onKeyDown={(e) => handleTabKeyDown(e, "overview")}
       >
         Overview
       </button>
@@ -65,9 +83,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "changes"}
         aria-controls="panel-changes"
+        tabIndex={activeTab === "changes" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "changes" ? "active" : ""}`}
         onClick={() => onSelectTab("changes")}
+        onKeyDown={(e) => handleTabKeyDown(e, "changes")}
       >
         Changes{changedFilesCount !== undefined ? ` (${changedFilesCount})` : ""}
       </button>
@@ -76,9 +96,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "findings"}
         aria-controls="panel-findings"
+        tabIndex={activeTab === "findings" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "findings" ? "active" : ""}`}
         onClick={() => onSelectTab("findings")}
+        onKeyDown={(e) => handleTabKeyDown(e, "findings")}
       >
         Findings ({findingsCount}){blockingCount > 0 ? <span className="tab-pill danger">{blockingCount}</span> : null}
       </button>
@@ -87,9 +109,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "discussion"}
         aria-controls="panel-discussion"
+        tabIndex={activeTab === "discussion" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "discussion" ? "active" : ""}`}
         onClick={() => onSelectTab("discussion")}
+        onKeyDown={(e) => handleTabKeyDown(e, "discussion")}
       >
         Discussion ({commentsCount})
       </button>
@@ -98,9 +122,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "checklist"}
         aria-controls="panel-checklist"
+        tabIndex={activeTab === "checklist" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "checklist" ? "active" : ""}`}
         onClick={() => onSelectTab("checklist")}
+        onKeyDown={(e) => handleTabKeyDown(e, "checklist")}
       >
         Checklist & Approvals
         {incompleteChecklistCount > 0 ? <span className="tab-pill warning">{incompleteChecklistCount}</span> : null}
@@ -110,9 +136,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "evidence"}
         aria-controls="panel-evidence"
+        tabIndex={activeTab === "evidence" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "evidence" ? "active" : ""}`}
         onClick={() => onSelectTab("evidence")}
+        onKeyDown={(e) => handleTabKeyDown(e, "evidence")}
       >
         Evidence
       </button>

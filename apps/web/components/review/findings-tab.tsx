@@ -1,6 +1,7 @@
 "use client";
 
 import type { FindingDisposition } from "@boardreadyops/contracts";
+import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DemoFinding } from "../../lib/demo-data.js";
 import { DecisionModal } from "./decision-modal.js";
@@ -11,8 +12,9 @@ export interface FindingsTabProps {
   onAssign?: (fingerprint: string, assignee: string) => void;
 }
 
-export function FindingsTab({ findings: initialFindings, onUpdateDisposition, onAssign }: Readonly<FindingsTabProps>) {
-  const [findings, setFindings] = useState(initialFindings);
+const diffStateOrder = ["all", "new", "persistent", "regressed", "resolved"] as const;
+
+export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonly<FindingsTabProps>) {
   const [selectedDiffState, setSelectedDiffState] = useState<string>("all");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -23,9 +25,21 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
   } | null>(null);
   const [assigneeDraft, setAssigneeDraft] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    setFindings(initialFindings);
-  }, [initialFindings]);
+  function handleDiffStateTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, currentState: string) {
+    const currentIndex = diffStateOrder.indexOf(currentState as (typeof diffStateOrder)[number]);
+    let nextIndex: number | null = null;
+    if (e.key === "ArrowRight") nextIndex = (currentIndex + 1) % diffStateOrder.length;
+    else if (e.key === "ArrowLeft") nextIndex = (currentIndex - 1 + diffStateOrder.length) % diffStateOrder.length;
+    else if (e.key === "Home") nextIndex = 0;
+    else if (e.key === "End") nextIndex = diffStateOrder.length - 1;
+    if (nextIndex === null) return;
+    e.preventDefault();
+    const nextState = diffStateOrder[nextIndex];
+    if (!nextState) return;
+    setSelectedDiffState(nextState);
+    setSelectedIndex(0);
+    document.getElementById(`diff-state-tab-${nextState}`)?.focus();
+  }
 
   const filteredFindings = useMemo(() => {
     return findings.filter((f) => {
@@ -46,7 +60,6 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
 
   const handleDirectDisposition = useCallback(
     (fingerprint: string, disposition: FindingDisposition) => {
-      setFindings((prev) => prev.map((f) => (f.fingerprint === fingerprint ? { ...f, disposition } : f)));
       onUpdateDisposition?.(fingerprint, disposition);
     },
     [onUpdateDisposition],
@@ -56,9 +69,6 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
     (fingerprint: string, assignee: string) => {
       const trimmed = assignee.trim();
       if (!trimmed) return;
-      setFindings((prev) =>
-        prev.map((f) => (f.fingerprint === fingerprint ? { ...f, assignees: [...f.assignees, trimmed] } : f)),
-      );
       setAssigneeDraft((prev) => ({ ...prev, [fingerprint]: "" }));
       onAssign?.(fingerprint, trimmed);
     },
@@ -115,19 +125,6 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
   function handleModalConfirm(data: { reason: string; owner: string; expiresAt?: string }) {
     if (!modalFinding) return;
     const { finding, targetDisposition } = modalFinding;
-    setFindings((prev) =>
-      prev.map((f) =>
-        f.fingerprint === finding.fingerprint
-          ? {
-              ...f,
-              disposition: targetDisposition,
-              decisionReason: data.reason,
-              decisionOwner: data.owner,
-              decisionExpiresAt: data.expiresAt ?? null,
-            }
-          : f,
-      ),
-    );
     onUpdateDisposition?.(finding.fingerprint, targetDisposition, data.reason, data.owner);
     setModalFinding(null);
   }
@@ -145,54 +142,79 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
   return (
     <div className="findings-tab-content">
       <div className="findings-triage-toolbar panel">
-        <div className="diff-state-tabs" role="tablist">
+        <div className="diff-state-tabs" role="tablist" aria-label="Filter findings by diff state">
           <button
+            id="diff-state-tab-all"
             type="button"
+            role="tab"
+            aria-selected={selectedDiffState === "all"}
+            tabIndex={selectedDiffState === "all" ? 0 : -1}
             className={`tab-btn ${selectedDiffState === "all" ? "active" : ""}`}
             onClick={() => {
               setSelectedDiffState("all");
               setSelectedIndex(0);
             }}
+            onKeyDown={(e) => handleDiffStateTabKeyDown(e, "all")}
           >
             All ({counts.all})
           </button>
           <button
+            id="diff-state-tab-new"
             type="button"
+            role="tab"
+            aria-selected={selectedDiffState === "new"}
+            tabIndex={selectedDiffState === "new" ? 0 : -1}
             className={`tab-btn new-state ${selectedDiffState === "new" ? "active" : ""}`}
             onClick={() => {
               setSelectedDiffState("new");
               setSelectedIndex(0);
             }}
+            onKeyDown={(e) => handleDiffStateTabKeyDown(e, "new")}
           >
             + New ({counts.new})
           </button>
           <button
+            id="diff-state-tab-persistent"
             type="button"
+            role="tab"
+            aria-selected={selectedDiffState === "persistent"}
+            tabIndex={selectedDiffState === "persistent" ? 0 : -1}
             className={`tab-btn persistent-state ${selectedDiffState === "persistent" ? "active" : ""}`}
             onClick={() => {
               setSelectedDiffState("persistent");
               setSelectedIndex(0);
             }}
+            onKeyDown={(e) => handleDiffStateTabKeyDown(e, "persistent")}
           >
             Persistent ({counts.persistent})
           </button>
           <button
+            id="diff-state-tab-regressed"
             type="button"
+            role="tab"
+            aria-selected={selectedDiffState === "regressed"}
+            tabIndex={selectedDiffState === "regressed" ? 0 : -1}
             className={`tab-btn regressed-state ${selectedDiffState === "regressed" ? "active" : ""}`}
             onClick={() => {
               setSelectedDiffState("regressed");
               setSelectedIndex(0);
             }}
+            onKeyDown={(e) => handleDiffStateTabKeyDown(e, "regressed")}
           >
             ⚠ Regressed ({counts.regressed})
           </button>
           <button
+            id="diff-state-tab-resolved"
             type="button"
+            role="tab"
+            aria-selected={selectedDiffState === "resolved"}
+            tabIndex={selectedDiffState === "resolved" ? 0 : -1}
             className={`tab-btn resolved-state ${selectedDiffState === "resolved" ? "active" : ""}`}
             onClick={() => {
               setSelectedDiffState("resolved");
               setSelectedIndex(0);
             }}
+            onKeyDown={(e) => handleDiffStateTabKeyDown(e, "resolved")}
           >
             ✓ Resolved ({counts.resolved})
           </button>
@@ -201,6 +223,7 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
         <div className="triage-filter-row">
           <input
             type="search"
+            aria-label="Search findings"
             placeholder="Search rule, component, message..."
             value={searchQuery}
             onChange={(e) => {
@@ -211,6 +234,7 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
           />
 
           <select
+            aria-label="Filter by severity"
             value={selectedSeverity}
             onChange={(e) => {
               setSelectedSeverity(e.currentTarget.value);
@@ -274,7 +298,9 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
 
                   <div className="finding-header-right">
                     <select
+                      aria-label={`Disposition for finding ${finding.ruleId}`}
                       value={finding.disposition}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         const newDisp = e.currentTarget.value as FindingDisposition;
                         if (newDisp === "accepted_risk" || newDisp === "false_positive") {
@@ -315,6 +341,7 @@ export function FindingsTab({ findings: initialFindings, onUpdateDisposition, on
                     </span>
                     <input
                       type="text"
+                      aria-label={`Add assignee for finding ${finding.ruleId}`}
                       className="assignee-input"
                       placeholder="Add assignee…"
                       value={assigneeDraft[finding.fingerprint] ?? ""}
