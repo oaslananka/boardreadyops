@@ -119,7 +119,7 @@ describe("dependency and security automation configuration", () => {
     expect(ci).toContain(
       "if: $" + "{{ failure() || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}",
     );
-    expect(ci.match(/retention-days: 7/gu) ?? []).toHaveLength(3);
+    expect(ci.match(/retention-days: 7/gu) ?? []).toHaveLength(4);
     expect(benchmark).toContain("retention-days: 7");
     expect(container).toMatch(
       /name: boardreadyops-full-cyclonedx\n\s+path: boardreadyops-full\.cyclonedx\.json\n\s+retention-days: 30/u,

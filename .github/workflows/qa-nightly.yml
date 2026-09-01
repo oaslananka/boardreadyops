@@ -1,0 +1,82 @@
+name: QA nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # nightly, off the hour to avoid GitHub's Actions load spike
+  workflow_dispatch: {}
+
+env:
+  NODE_VERSION: "24.19.0"
+
+permissions:
+  contents: read
+
+jobs:
+  full-audit:
+    name: qa-nightly / full-audit (${{ matrix.browser }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: corepack pnpm run deps:install-ci
+      - run: corepack pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Full route audit (all viewports)
+        run: corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts --project=${{ matrix.browser }}
+        env:
+          CI: "true"
+      - name: Modal / tabs contracts + regression suite
+        if: matrix.browser == 'chromium'
+        run: corepack pnpm run qa:e2e
+        env:
+          CI: "true"
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qa-nightly-report-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            qa-audit-report.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  visual:
+    name: qa-nightly / visual-regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: corepack pnpm run deps:install-ci
+      - run: corepack pnpm exec playwright install --with-deps chromium
+      - name: Visual regression
+        run: corepack pnpm run qa:visual
+        env:
+          CI: "true"
+      - name: Upload diffs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qa-visual-diffs
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: ignore

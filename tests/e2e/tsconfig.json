@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../.tsbuild-e2e",
+    "lib": ["ES2024", "DOM"],
+    "types": ["node", "@playwright/test"]
+  },
+  "include": ["**/*.ts", "../../qa/**/*.ts", "../../playwright.config.ts", "../../playwright.production.config.ts"],
+  "exclude": ["../../node_modules"]
+}

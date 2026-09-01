@@ -54,6 +54,11 @@ test.describe("Review lifecycle", () => {
     await openReviewAndWaitForHydration(page);
     await openTab(page, "Findings (6)");
 
+    // Findings disposition is server-authoritative (no more local optimistic mirror as of the
+    // P1-06/P1-07 fix -- a failed mutation used to show a false success here) and Discussion
+    // persistence is a real PATCH too (P0-05), so both this test and the next two need a real
+    // backend to actually observe the UI update.
+    test.skip(!process.env.DATABASE_URL, "Disposition change is a real API mutation; needs DATABASE_URL");
     const card = page.locator(".finding-triage-card", { hasText: "kicad/track-clearance" });
     await expect(card).toBeVisible();
     await card.locator(".disposition-select").selectOption("fixed");
@@ -61,6 +66,7 @@ test.describe("Review lifecycle", () => {
   });
 
   test("4. Posting a comment adds it to the discussion thread", async ({ page }) => {
+    test.skip(!process.env.DATABASE_URL, "Posting a comment is a real API mutation; needs DATABASE_URL");
     await openReviewAndWaitForHydration(page);
     await openTab(page, "Discussion (3)");
 
@@ -72,6 +78,7 @@ test.describe("Review lifecycle", () => {
   });
 
   test("5. Assigning a finding via the assignee input adds it to that finding's card", async ({ page }) => {
+    test.skip(!process.env.DATABASE_URL, "Assigning a finding is a real API mutation; needs DATABASE_URL");
     await openReviewAndWaitForHydration(page);
     await openTab(page, "Findings (6)");
     await expect(page.getByText("sarah.chen@acme.corp").first()).toBeVisible();
