@@ -594,8 +594,8 @@ code {
     top: 0.65rem;
     left: 0.75rem;
     display: inline-flex;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.75rem;
+    height: 2.75rem;
     align-items: center;
     justify-content: center;
     padding: 0;
@@ -3799,7 +3799,9 @@ code {
 }
 
 .settings-nav-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   color: var(--text-muted);

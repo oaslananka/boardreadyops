@@ -22,4 +22,12 @@ describe("AppShell", () => {
     expect(markup.match(/href="\/settings\/billing"/gu)).toHaveLength(1);
     expect(markup).not.toContain(">BR<");
   });
+
+  it("does not show a fake, unwired search shortcut hint", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AppShell, null, createElement("main", { id: "main-content" }, "content")),
+    );
+    expect(markup).not.toContain("command-hint");
+    expect(markup).not.toContain("⌘");
+  });
 });

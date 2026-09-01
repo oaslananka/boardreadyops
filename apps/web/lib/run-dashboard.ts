@@ -136,6 +136,7 @@ export type RunDetail = {
   githubCommentPublishedAt: string | undefined;
   lastPublicationError: string | undefined;
   repository: string;
+  repositoryId: string;
   repositoryPrivate: boolean;
   trustMode: RunTrustMode;
   safeModeReasons: RunSafeModeReason[];
@@ -815,6 +816,7 @@ export async function lookupRunDashboard(
       githubCommentPublishedAt: stringValue(runRow, "github_comment_published_at"),
       lastPublicationError: stringValue(runRow, "last_publication_error"),
       repository: repositoryName,
+      repositoryId: repository.id,
       repositoryPrivate: repository.private,
       trustMode,
       safeModeReasons,
@@ -1001,6 +1003,7 @@ function buildDemoRun(runId: string, filters: RunDashboardFilters = {}): RunDeta
     githubCommentPublishedAt: undefined,
     lastPublicationError: undefined,
     repository: "boardreadyops/drone-flight-controller",
+    repositoryId: "demo-repo-drone-flight-controller",
     repositoryPrivate: false,
     trustMode: "standard",
     safeModeReasons: [],
