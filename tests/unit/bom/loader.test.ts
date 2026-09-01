@@ -32,4 +32,9 @@ describe("parseDelimited", () => {
     const rows = parseDelimited("Reference\tValue\nR1\t10k\n", "\t");
     expect(rows).toEqual([{ Reference: "R1", Value: "10k" }]);
   });
+
+  it("fills in an empty string for a row with fewer cells than the header", () => {
+    const rows = parseDelimited("Reference,Value,Footprint\nR1,10k\n");
+    expect(rows).toEqual([{ Reference: "R1", Value: "10k", Footprint: "" }]);
+  });
 });
