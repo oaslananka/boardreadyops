@@ -38,6 +38,8 @@ const groups: ReadonlyArray<Readonly<{ label: string; items: readonly Navigation
   },
 ] as const;
 
+const COMPACT_STORAGE_KEY = "boardreadyops.product-nav.compact";
+
 function isCurrentRoute(pathname: string | null | undefined, href: string): boolean {
   if (!pathname) return false;
   if (href === "/settings/billing") return pathname.startsWith("/settings/");
@@ -76,6 +78,29 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, []);
+
+  // Read the persisted collapse state after mount rather than during initial
+  // render, so server and first client render both start expanded (no
+  // hydration mismatch) and only then adopt whatever the viewer chose last.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(COMPACT_STORAGE_KEY) === "true") setCompact(true);
+    } catch {
+      // Storage may be unavailable (private browsing, disabled cookies); collapse just won't persist.
+    }
+  }, []);
+
+  function toggleCompact() {
+    setCompact((value) => {
+      const next = !value;
+      try {
+        window.localStorage.setItem(COMPACT_STORAGE_KEY, String(next));
+      } catch {
+        // Non-fatal: navigation still toggles for this session even if it can't be remembered.
+      }
+      return next;
+    });
+  }
 
   return (
     <>
@@ -149,7 +174,7 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
               type="button"
               aria-label={compact ? "Expand navigation" : "Collapse navigation"}
               title={compact ? "Expand navigation" : "Collapse navigation"}
-              onClick={() => setCompact((value) => !value)}
+              onClick={toggleCompact}
             >
               <ProductIcon name="menu" />
               <span>{compact ? "Expand" : "Collapse"}</span>

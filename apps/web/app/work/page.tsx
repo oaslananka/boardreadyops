@@ -4,7 +4,7 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
 
 export const metadata = {
-  title: "My Work · BoardReadyOps",
+  title: "My Work",
   description: "Your assigned findings, pending reviews, and change requests.",
 };
 

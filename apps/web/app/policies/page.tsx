@@ -3,7 +3,7 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import PoliciesClient from "./policies-client.js";
 
 export const metadata = {
-  title: "Organization Policies · BoardReadyOps",
+  title: "Organization Policies",
   description: "Inheritance: Organization → Team → Repository → Review exception. No hidden precedence.",
 };
 

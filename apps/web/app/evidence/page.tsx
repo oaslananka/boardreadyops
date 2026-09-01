@@ -2,7 +2,7 @@ import { AppShell, Breadcrumbs } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 
 export const metadata = {
-  title: "Releases & Evidence · BoardReadyOps",
+  title: "Releases & Evidence",
   description: "Signed evidence packs bound to review decisions, approvals and artifact digests.",
 };
 
