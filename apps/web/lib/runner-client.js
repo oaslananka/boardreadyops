@@ -5,7 +5,7 @@ const e = () => globalThis["p" + "rocess"]?.["e" + "nv"] ?? {};
 const ev = (name) => e()[name];
 const api = () => ev("GITHUB" + "_API_BASE_URL") ?? "https://api.github.com";
 const appId = () => ev("GITHUB" + "_APP_ID");
-const keyText = () => ev("GITHUB" + "_APP_" + "PRI" + "VATE" + "_KEY")?.replace(/\\n/g, "\n");
+const keyText = () => ev("GITHUB" + "_APP_" + "PRI" + "VATE" + "_KEY")?.replaceAll("\\n", "\n");
 
 function repoTarget(action) {
   const owner = action.repository.owner;

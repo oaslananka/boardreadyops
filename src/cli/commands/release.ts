@@ -476,7 +476,7 @@ async function collectDirEntries(dir: string, baseDir: string): Promise<Array<{ 
     if (item.isDirectory()) {
       entries.push(...(await collectDirEntries(full, baseDir)));
     } else if (item.isFile()) {
-      const rel = path.relative(baseDir, full).replace(/\\/g, "/");
+      const rel = path.relative(baseDir, full).replaceAll("\\", "/");
       entries.push({ name: rel, data: await fs.readFile(full) });
     }
   }

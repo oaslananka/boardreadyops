@@ -373,5 +373,5 @@ async function fileDigest(file: string): Promise<{ sha256: string; bytes: number
 }
 
 function toPosix(value: string): string {
-  return value.split(path.sep).join("/").replace(/\\/g, "/");
+  return value.split(path.sep).join("/").replaceAll("\\", "/");
 }

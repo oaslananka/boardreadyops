@@ -50,7 +50,7 @@ export function writeDelimitedDocument(document: DelimitedDocument): string {
 
 function encodeCell(value: string, delimiter: string): string {
   if (value.includes('"') || value.includes("\n") || value.includes("\r") || value.includes(delimiter)) {
-    return `"${value.replace(/"/g, '""')}"`;
+    return `"${value.replaceAll('"', '""')}"`;
   }
   return value;
 }

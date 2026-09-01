@@ -56,7 +56,11 @@ export function reportCoordinate(value: number): string {
     return value.toString();
   }
   const formatted = value.toFixed(6);
-  const trimmed = formatted.replace(/0+$/, "");
+  let end = formatted.length;
+  while (end > 0 && formatted[end - 1] === "0") {
+    end -= 1;
+  }
+  const trimmed = formatted.slice(0, end);
   return trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
 }
 

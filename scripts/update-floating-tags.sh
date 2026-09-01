@@ -11,7 +11,7 @@ git fetch --tags --force origin
 
 for tag in "v${major}" "v${major}.${minor}"; do
   if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null &&
-    [ "$(git rev-parse "${tag}^{commit}")" = "${target_commit}" ]; then
+    [[ "$(git rev-parse "${tag}^{commit}")" == "${target_commit}" ]]; then
     echo "${tag} already resolves to ${target_commit}; skipping update."
     continue
   fi
@@ -20,6 +20,6 @@ for tag in "v${major}" "v${major}.${minor}"; do
   needs_push=1
 done
 
-if [ "${needs_push}" -eq 1 ]; then
+if [[ "${needs_push}" -eq 1 ]]; then
   git push --force origin "v${major}" "v${major}.${minor}"
 fi
