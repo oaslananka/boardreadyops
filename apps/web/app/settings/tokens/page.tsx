@@ -1,3 +1,7 @@
+export const metadata = {
+  title: "API Tokens",
+};
+
 export default function TokensPage() {
   return (
     <div className="panel">

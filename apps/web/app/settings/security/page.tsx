@@ -1,3 +1,7 @@
+export const metadata = {
+  title: "Security & Access",
+};
+
 export default function SecuritySettingsPage() {
   return (
     <div className="panel">

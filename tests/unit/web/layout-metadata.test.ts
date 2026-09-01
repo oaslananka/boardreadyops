@@ -5,7 +5,11 @@ import { metadata as insightsMetadata } from "../../../apps/web/app/insights/pag
 import { metadata } from "../../../apps/web/app/layout.js";
 import { metadata as policiesMetadata } from "../../../apps/web/app/policies/page.js";
 import { metadata as reviewsMetadata } from "../../../apps/web/app/reviews/page.js";
+import { metadata as billingMetadata } from "../../../apps/web/app/settings/billing/page.js";
 import { metadata as componentIntelligenceMetadata } from "../../../apps/web/app/settings/component-intelligence/page.js";
+import { metadata as dataMetadata } from "../../../apps/web/app/settings/data/page.js";
+import { metadata as securityMetadata } from "../../../apps/web/app/settings/security/page.js";
+import { metadata as tokensMetadata } from "../../../apps/web/app/settings/tokens/page.js";
 import { metadata as setupMetadata } from "../../../apps/web/app/setup/page.js";
 import { metadata as workMetadata } from "../../../apps/web/app/work/page.js";
 
@@ -40,7 +44,11 @@ describe("child page titles don't duplicate the root template's brand suffix", (
     insights: insightsMetadata.title,
     policies: policiesMetadata.title,
     reviews: reviewsMetadata.title,
+    "settings/billing": billingMetadata.title,
     "settings/component-intelligence": componentIntelligenceMetadata.title,
+    "settings/data": dataMetadata.title,
+    "settings/security": securityMetadata.title,
+    "settings/tokens": tokensMetadata.title,
     setup: setupMetadata.title,
     work: workMetadata.title,
   };
