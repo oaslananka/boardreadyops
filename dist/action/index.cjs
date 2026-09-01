@@ -105155,7 +105155,7 @@ function formatFabricationDiff(diff, locale) {
     ...diff,
     bom: {
       ...diff.bom,
-      hasRows: diff.bom.rows.length > 0,
+      hasRows: diff.bom.addedCount + diff.bom.removedCount + diff.bom.changedCount > 0,
       rows: diff.bom.rows.map((row) => ({
         ...row,
         previous: row.previous || "-",
