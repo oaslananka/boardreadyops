@@ -246,6 +246,23 @@ describe("report formats", () => {
     expect(markdown).toContain("New Findings");
   });
 
+  it("renders the no-BOM-changes note when every row is unchanged, not a table of unchanged parts", () => {
+    const markdown = formatMarkdown(sampleResult(), [], {
+      bom: {
+        truncated: false,
+        addedCount: 0,
+        removedCount: 0,
+        changedCount: 0,
+        rows: [{ reference: "U1", previous: "ATmega328P", current: "ATmega328P", status: "unchanged" }],
+      },
+      outputs: [],
+      findings: { added: [], removed: [], unchanged: [] },
+    });
+
+    expect(markdown).toContain("No BOM changes recorded.");
+    expect(markdown).not.toContain("U1");
+  });
+
   it("limits new finding rows in fabrication changes", () => {
     const added = Array.from({ length: 12 }, (_, index) =>
       createFinding({
