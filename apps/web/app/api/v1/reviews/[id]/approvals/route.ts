@@ -34,6 +34,16 @@ async function parseApprovalPayload(
   return { ok: true, data: parsed.data };
 }
 
+function isConflictError(error: unknown): boolean {
+  const hasConflictFlag =
+    error !== null &&
+    typeof error === "object" &&
+    "isConflict" in error &&
+    Boolean((error as { isConflict?: unknown }).isConflict);
+  const hasConflictMessage = error instanceof Error && error.message.includes("Conflicting approval");
+  return hasConflictFlag || hasConflictMessage;
+}
+
 async function verifyRevisionDigest(
   executor: PgQueryExecutor,
   revisionId: string,
@@ -200,11 +210,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     return Response.json({ ok: true, approval }, { status: 201 });
   } catch (error) {
-    const isConflict =
-      (error && typeof error === "object" && "isConflict" in error && Boolean(error.isConflict)) ||
-      (error instanceof Error && error.message.includes("Conflicting approval"));
     const message = error instanceof Error ? error.message : "Failed to record approval";
-    return Response.json({ ok: false, error: message }, { status: isConflict ? 409 : 500 });
+    return Response.json({ ok: false, error: message }, { status: isConflictError(error) ? 409 : 500 });
   } finally {
     await executor.close();
   }
