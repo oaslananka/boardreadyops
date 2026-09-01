@@ -157,6 +157,57 @@ describe("Decision Engine", () => {
     expect(withPolicy.blockers.some((b) => b.type === "unresolved_finding")).toBe(true);
   });
 
+  it("surfaces a changes-requested approval as an explanation graph node", () => {
+    const headEvidenceDigest = "a".repeat(64);
+    const changesRequestedApproval: ReviewApprovalRecord = {
+      id: "rapp-2",
+      repositoryId: "repo-1",
+      reviewId: "rev-1",
+      revisionId: "rev-rev-1",
+      evidenceDigest: headEvidenceDigest,
+      approverId: "bob",
+      status: "changes_requested",
+      reason: "Silkscreen overlaps the fiducial",
+      isBreakGlass: false,
+      invalidatedAt: null,
+      invalidatedBy: null,
+      invalidationReason: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const withReason = evaluateReviewReadiness({
+      findings: [],
+      decisions: new Map(),
+      approvals: [changesRequestedApproval],
+      checklist: [],
+      headEvidenceDigest,
+    });
+
+    expect(withReason.decision).toBe("changes_requested");
+    expect(withReason.explanationGraph.nodes).toContainEqual(
+      expect.objectContaining({
+        category: "approvals",
+        condition: "Changes Requested",
+        status: "fail",
+        details: "Changes requested by bob: Silkscreen overlaps the fiducial",
+        referenceId: "rapp-2",
+      }),
+    );
+
+    const withoutReason = evaluateReviewReadiness({
+      findings: [],
+      decisions: new Map(),
+      approvals: [{ ...changesRequestedApproval, reason: null }],
+      checklist: [],
+      headEvidenceDigest,
+    });
+
+    expect(withoutReason.explanationGraph.nodes.find((n) => n.condition === "Changes Requested")?.details).toBe(
+      "Changes requested by bob: No reason provided",
+    );
+  });
+
   it("blocks when a policy-required checklist item was never added to the review", () => {
     const headEvidenceDigest = "a".repeat(64);
 
