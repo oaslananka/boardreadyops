@@ -63,7 +63,7 @@ describe("run investigation routes", () => {
     expect(component).toContain("Deletion pending");
     expect(component).toContain("Deletion failed");
     expect(component).toContain("Open GitHub checks");
-    expect(component).toContain("Operator authentication required");
+    expect(component).toContain("Full audit export requires operator access");
     expect(styles).toContain(":focus-visible");
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(styles).toContain(".status-icon");

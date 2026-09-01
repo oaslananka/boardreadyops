@@ -383,6 +383,7 @@ export function ReviewCanvas({
                 value={opacity}
                 onChange={(e) => setOpacity(Number.parseFloat(e.currentTarget.value))}
                 className="opacity-slider"
+                aria-label="Overlay blend: base vs. head snapshot opacity"
                 title={`Head Opacity: ${Math.round(opacity * 100)}%`}
               />
               <span className="slider-label">Head ({Math.round(opacity * 100)}%)</span>
@@ -390,14 +391,26 @@ export function ReviewCanvas({
           ) : null}
 
           <div className="zoom-controls">
-            <button type="button" onClick={handleZoomOut} className="zoom-btn" title="Zoom Out (-)">
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              className="zoom-btn"
+              aria-label="Zoom out"
+              title="Zoom Out (-)"
+            >
               −
             </button>
             <span className="zoom-level">{Math.round(zoom * 100)}%</span>
-            <button type="button" onClick={handleZoomIn} className="zoom-btn" title="Zoom In (+)">
+            <button type="button" onClick={handleZoomIn} className="zoom-btn" aria-label="Zoom in" title="Zoom In (+)">
               +
             </button>
-            <button type="button" onClick={handleReset} className="zoom-btn reset-btn" title="Reset View (0)">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="zoom-btn reset-btn"
+              aria-label="Reset zoom and pan"
+              title="Reset View (0)"
+            >
               ↺ Reset
             </button>
           </div>
