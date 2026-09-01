@@ -4,7 +4,7 @@ export default function LoadingRun() {
   return (
     <AppShell>
       <main className="shell" id="main-content" aria-busy="true">
-        <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Loading run" }]} />
+        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Loading run" }]} />
         <section className="run-state-surface">
           <div className="loading-header skeleton" />
           <Panel title="Loading this run" description="Fetching the results.">

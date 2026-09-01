@@ -13,7 +13,7 @@ describe("ProductNavigation", () => {
     expect(markup).toContain("Workspace");
     expect(markup).toContain("My Work");
     expect(markup).toContain("Reviews");
-    expect(markup).toContain("Projects");
+    expect(markup).toContain("Dashboard");
     expect(markup).toContain("Governance");
     expect(markup).toContain("Administration");
     expect(markup).toContain("Settings");

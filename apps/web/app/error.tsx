@@ -9,7 +9,7 @@ export default function GlobalError({
   return (
     <AppShell>
       <main className="shell compact-shell" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Application error" }]} />
+        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Application error" }]} />
         <section className="run-state-surface">
           <Alert title="Something went wrong" tone="danger">
             <p>

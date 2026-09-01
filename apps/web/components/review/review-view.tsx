@@ -102,7 +102,13 @@ function ReviewNavigationTabs({
         onClick={() => onSelectTab("findings")}
         onKeyDown={(e) => handleTabKeyDown(e, "findings")}
       >
-        Findings ({findingsCount}){blockingCount > 0 ? <span className="tab-pill danger">{blockingCount}</span> : null}
+        Findings ({findingsCount})
+        {blockingCount > 0 ? (
+          <span className="tab-pill danger" aria-hidden="true">
+            {blockingCount}
+          </span>
+        ) : null}
+        {blockingCount > 0 ? <span className="sr-only">, {blockingCount} blocking</span> : null}
       </button>
       <button
         id="tab-discussion"
@@ -129,7 +135,12 @@ function ReviewNavigationTabs({
         onKeyDown={(e) => handleTabKeyDown(e, "checklist")}
       >
         Checklist & Approvals
-        {incompleteChecklistCount > 0 ? <span className="tab-pill warning">{incompleteChecklistCount}</span> : null}
+        {incompleteChecklistCount > 0 ? (
+          <span className="tab-pill warning" aria-hidden="true">
+            {incompleteChecklistCount}
+          </span>
+        ) : null}
+        {incompleteChecklistCount > 0 ? <span className="sr-only">, {incompleteChecklistCount} incomplete</span> : null}
       </button>
       <button
         id="tab-evidence"

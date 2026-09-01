@@ -53,7 +53,7 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
   return (
     <div className="component-intelligence-settings">
       <header className="page-heading">
-        <h1>Component intelligence</h1>
+        <h2>Component intelligence</h2>
         <p>
           Continuous supply watch checks every part on your boards for lifecycle changes. Lookups run under{" "}
           <strong>your own provider account</strong>, not a shared BoardReadyOps subscription, because provider licences
