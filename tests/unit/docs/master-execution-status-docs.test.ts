@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -44,5 +44,19 @@ describe("master-execution-status.md docs contract", () => {
     expect(packageJson.scripts["execution-status:render"]).toBe("node scripts/master-execution-status.mjs render");
     expect(packageJson.scripts["verify:execution-status"]).toBe("node scripts/master-execution-status.mjs check");
     expect(packageJson.scripts.verify).toContain("corepack pnpm run verify:execution-status");
+  });
+
+  it("every repo-relative path cited in the doc resolves to a real file or directory", () => {
+    const content = readFileSync(masterStatusPath, "utf8");
+    const pathPattern =
+      /`(src\/[^`]+|apps\/[^`]+|packages\/[^`]+|schemas\/[^`]+|docs\/[^`]+|scripts\/[^`]+|tests\/[^`]+)`/g;
+    const cited = new Set(
+      [...content.matchAll(pathPattern)]
+        .map((match) => match[1])
+        .filter((value): value is string => value !== undefined),
+    );
+
+    const missing = [...cited].filter((relativePath) => !existsSync(resolve(repoRoot, relativePath)));
+    expect(missing, `stale doc references (file/directory does not exist): ${missing.join(", ")}`).toEqual([]);
   });
 });
