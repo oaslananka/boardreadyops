@@ -318,7 +318,7 @@ describe("HTML report", () => {
 
   it("renders an empty BOM note when the diff has no BOM rows", () => {
     const diff = sampleFabricationDiff();
-    diff.bom = { rows: [], truncated: false };
+    diff.bom = { rows: [], truncated: false, changedCount: 0 };
     const html = formatHtml(sampleResult(), "en", [], diff);
 
     expect(html).toContain("Fabrication Changes");
@@ -462,6 +462,7 @@ function sampleFabricationDiff(): FabricationDiff {
         { reference: "U1", previous: "ATmega328P", current: "ATmega328P", status: "unchanged" },
       ],
       truncated: false,
+      changedCount: 3,
     },
     outputs: [
       { kind: "gerber", status: "changed", changed: 2, added: 1, removed: 0 },

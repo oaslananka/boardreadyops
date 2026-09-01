@@ -53,7 +53,7 @@ export function diffReleases(
   });
   const readiness = diffReadiness(previous.readiness, current.readiness);
   const summary: ReleaseDiffSummary = {
-    bomChanged: fabrication.bom.rows.filter((row) => row.status !== "unchanged").length,
+    bomChanged: fabrication.bom.changedCount,
     outputsChanged: fabrication.outputs.filter((output) => output.status !== "unchanged").length,
     findingsAdded: fabrication.findings.added.length,
     findingsRemoved: fabrication.findings.removed.length,
@@ -112,7 +112,63 @@ export function formatReleaseDiffText(diff: ReleaseDiff): string {
   lines.push(`  bom rows changed: ${diff.summary.bomChanged}`);
   lines.push(`  outputs changed: ${diff.summary.outputsChanged}`);
   lines.push(`  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved}`);
+
+  const changedRows = diff.fabrication.bom.rows.filter((row) => row.status !== "unchanged");
+  if (changedRows.length > 0) {
+    lines.push("  bom row changes:");
+    const shown = changedRows.slice(0, MAX_DETAIL_LINES);
+    for (const row of shown) {
+      lines.push(`    - ${bomRowSummary(row)}`);
+    }
+    // diff.fabrication.bom.rows can itself already be capped (see FabricationDiffOptions.maxBomRows), so
+    // changedCount -- computed before that cap -- is the only accurate source for how many rows remain.
+    const remaining = diff.fabrication.bom.changedCount - shown.length;
+    if (remaining > 0) {
+      lines.push(`    - (+${remaining} more)`);
+    }
+  }
+
+  const changedOutputs = diff.fabrication.outputs.filter((output) => output.status !== "unchanged");
+  if (changedOutputs.length > 0) {
+    lines.push("  output changes:");
+    for (const output of changedOutputs) {
+      lines.push(`    - ${output.kind}: ${output.status} (+${output.added} -${output.removed} ~${output.changed})`);
+    }
+  }
+
+  const addedFindings = diff.fabrication.findings.added.map(findingSummary);
+  if (addedFindings.length > 0) {
+    lines.push("  new findings:");
+    for (const line of withOverflowNote(addedFindings, MAX_DETAIL_LINES)) {
+      lines.push(`    - ${line}`);
+    }
+  }
+  const removedFindings = diff.fabrication.findings.removed.map(findingSummary);
+  if (removedFindings.length > 0) {
+    lines.push("  resolved findings:");
+    for (const line of withOverflowNote(removedFindings, MAX_DETAIL_LINES)) {
+      lines.push(`    - ${line}`);
+    }
+  }
+
   return `${lines.join("\n")}\n`;
+}
+
+const MAX_DETAIL_LINES = 20;
+
+function findingSummary(finding: Finding): string {
+  return `${finding.severity} ${finding.ruleId} at ${finding.resource.path}`;
+}
+
+function bomRowSummary(row: { reference: string; previous: string; current: string; status: string }): string {
+  if (row.status === "added") return `${row.reference}: added (${row.current})`;
+  if (row.status === "removed") return `${row.reference}: removed (was ${row.previous})`;
+  return `${row.reference}: ${row.previous} -> ${row.current}`;
+}
+
+function withOverflowNote(lines: readonly string[], max: number): string[] {
+  if (lines.length <= max) return [...lines];
+  return [...lines.slice(0, max), `(+${lines.length - max} more)`];
 }
 
 function formatScore(score: number | undefined): string {

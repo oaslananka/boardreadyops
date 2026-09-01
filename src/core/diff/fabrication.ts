@@ -29,7 +29,7 @@ export interface FabricationSnapshot {
   outputs: FabricationOutput[];
 }
 
-interface FabricationBomDiffRow {
+export interface FabricationBomDiffRow {
   reference: string;
   previous: string;
   current: string;
@@ -39,6 +39,7 @@ interface FabricationBomDiffRow {
 interface FabricationBomDiff {
   rows: FabricationBomDiffRow[];
   truncated: boolean;
+  changedCount: number;
 }
 
 export interface FabricationOutputDiff {
@@ -99,6 +100,7 @@ function diffBom(previous: FabricationBomEntry[], current: FabricationBomEntry[]
   return {
     rows: rows.slice(0, Math.max(0, maxRows)),
     truncated: rows.length > maxRows,
+    changedCount: rows.filter((row) => row.status !== "unchanged").length,
   };
 }
 

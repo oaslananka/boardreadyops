@@ -110101,7 +110101,8 @@ function diffBom(previous, current, maxRows) {
   rows.sort(compareBomDiffRows);
   return {
     rows: rows.slice(0, Math.max(0, maxRows)),
-    truncated: rows.length > maxRows
+    truncated: rows.length > maxRows,
+    changedCount: rows.filter((row) => row.status !== "unchanged").length
   };
 }
 function diffOutputs(previous, current) {
