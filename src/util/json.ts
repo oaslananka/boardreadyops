@@ -1,3 +1,9 @@
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
 export function parseJsonValue(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
@@ -37,7 +43,7 @@ export function canonicalizeJson(value: unknown): string {
       const v = obj[k];
       return v !== undefined && typeof v !== "function" && typeof v !== "symbol";
     })
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    .sort(compareCodeUnits);
 
   const entries = keys.map((key) => {
     const formattedKey = JSON.stringify(key);
