@@ -182,6 +182,27 @@ export function formatRunPageTitle(run: RunDetail, section: string): string {
   return `${section} · ${run.repository} ${identity}`;
 }
 
+/**
+ * Shared by every runs/[runId]/**\/page.tsx's generateMetadata(): each page needs the same
+ * lookup-then-title-or-fallback logic, just with a different section label.
+ */
+export async function resolveRunPageTitle(
+  runId: string,
+  section: string,
+  authorizeRepository: RunDashboardLoaderDependencies["authorizeRepository"],
+): Promise<string> {
+  const result = await loadRunDashboard(
+    runId,
+    process.env,
+    {},
+    {
+      ...runDashboardLoaderDependencies,
+      ...(authorizeRepository ? { authorizeRepository } : {}),
+    },
+  );
+  return result.state === "found" ? formatRunPageTitle(result.run, section) : "Run";
+}
+
 export type RunDashboardQueryExecutor = {
   query(sql: string, params?: readonly unknown[]): Promise<unknown>;
 };

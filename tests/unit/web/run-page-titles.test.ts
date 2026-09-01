@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as runDashboard from "../../../apps/web/lib/run-dashboard.js";
 import { formatRunPageTitle, type RunDetail } from "../../../apps/web/lib/run-dashboard.js";
 import * as viewerAuth from "../../../apps/web/lib/viewer-authorization.js";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const { generateMetadata: summaryMetadata } = await import("../../../apps/web/app/runs/[runId]/page.js");
 const { generateMetadata: attemptsMetadata } = await import("../../../apps/web/app/runs/[runId]/attempts/page.js");
@@ -28,35 +32,67 @@ describe("formatRunPageTitle", () => {
 });
 
 describe("run page generateMetadata carries run context in the browser title", () => {
-  it("Summary page title names the repository and section instead of a generic 'Run'", async () => {
+  it("Summary page passes its runId, section, and the viewer's authorizer to resolveRunPageTitle", async () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
-      status: "authenticated",
       session: {
         login: "acme-corp",
         name: "Acme Lead",
         email: "lead@acme.com",
         avatarUrl: "https://github.com/acme.png",
       },
-    } as viewerAuth.ViewerAuthorizationResult);
-    vi.spyOn(runDashboard, "loadRunDashboard").mockResolvedValue({ state: "found", run: sampleRun() });
+      authorizeRepository: vi.fn().mockResolvedValue(true),
+      authorizeInstallation: vi.fn().mockResolvedValue(true),
+    } as unknown as viewerAuth.ViewerAuthorization);
+    const resolveSpy = vi
+      .spyOn(runDashboard, "resolveRunPageTitle")
+      .mockResolvedValue("Summary · acme/power-distribution PR #42");
 
     const metadata = await summaryMetadata({ params: Promise.resolve({ runId: "run-1" }) });
+
     expect(metadata.title).toBe("Summary · acme/power-distribution PR #42");
+    expect(resolveSpy).toHaveBeenCalledWith("run-1", "Summary", expect.any(Function));
   });
 
-  it("Attempts page falls back to a generic title when the run cannot be loaded", async () => {
+  it("Attempts page carries through resolveRunPageTitle's fallback when the run cannot be loaded", async () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
-      status: "authenticated",
       session: {
         login: "acme-corp",
         name: "Acme Lead",
         email: "lead@acme.com",
         avatarUrl: "https://github.com/acme.png",
       },
-    } as viewerAuth.ViewerAuthorizationResult);
-    vi.spyOn(runDashboard, "loadRunDashboard").mockResolvedValue({ state: "not-found" });
+      authorizeRepository: vi.fn().mockResolvedValue(true),
+      authorizeInstallation: vi.fn().mockResolvedValue(true),
+    } as unknown as viewerAuth.ViewerAuthorization);
+    vi.spyOn(runDashboard, "resolveRunPageTitle").mockResolvedValue("Run");
 
     const metadata = await attemptsMetadata({ params: Promise.resolve({ runId: "missing" }) });
     expect(metadata.title).toBe("Run");
+  });
+});
+
+describe("resolveRunPageTitle", () => {
+  // No DATABASE_URL in this test environment: loadRunDashboard serves the built-in demo run for
+  // an id starting with "demo" when NODE_ENV is "development" or "test", and reports
+  // "not-configured" for anything else -- real, unmocked branches of the same code the page
+  // components call.
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  beforeEach(() => {
+    process.env.NODE_ENV = "test";
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  it("returns the formatted title for the demo run", async () => {
+    const title = await runDashboard.resolveRunPageTitle("demo-1", "Summary", undefined);
+    expect(title).toBe("Summary · boardreadyops/drone-flight-controller PR #42");
+  });
+
+  it("falls back to a generic title when the run cannot be loaded", async () => {
+    const title = await runDashboard.resolveRunPageTitle("not-a-demo-run", "Attempts", undefined);
+    expect(title).toBe("Run");
   });
 });
