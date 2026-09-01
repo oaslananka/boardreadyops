@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <AppShell>
       <main className="shell compact-shell" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Page not found" }]} />
+        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Page not found" }]} />
         <section className="run-state-surface">
           <EmptyState
             title="This page does not exist"

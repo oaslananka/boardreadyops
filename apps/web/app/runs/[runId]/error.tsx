@@ -9,7 +9,7 @@ export default function RunError({
   return (
     <AppShell>
       <main className="shell compact-shell" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Run error" }]} />
+        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Run error" }]} />
         <section className="run-state-surface">
           <Alert title="Could not load this run" tone="danger">
             <p>Something went wrong on our side. Try again — the run itself is unaffected.</p>

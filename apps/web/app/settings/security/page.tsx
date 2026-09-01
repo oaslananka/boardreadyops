@@ -3,7 +3,7 @@ export default function SecuritySettingsPage() {
     <div className="panel">
       <header className="panel-header">
         <div>
-          <h1>Security</h1>
+          <h2>Security</h2>
           <p>SAML SSO, SCIM provisioning, audit export and SIEM streaming.</p>
         </div>
       </header>

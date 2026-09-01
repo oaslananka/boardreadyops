@@ -3,7 +3,7 @@ export default function TokensPage() {
     <div className="panel">
       <header className="panel-header">
         <div>
-          <h1>API Tokens</h1>
+          <h2>API Tokens</h2>
           <p>Workspace-scoped bearer tokens for CLI and automation.</p>
         </div>
       </header>

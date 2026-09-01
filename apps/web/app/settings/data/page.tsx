@@ -3,7 +3,7 @@ export default function DataSettingsPage() {
     <div className="panel">
       <header className="panel-header">
         <div>
-          <h1>Data & Retention</h1>
+          <h2>Data & Retention</h2>
           <p>Retention policies, legal holds, exports and erasures.</p>
         </div>
       </header>

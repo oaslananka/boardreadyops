@@ -49,6 +49,13 @@ describe("Review Detail Tabs", () => {
     expect(view).toContain('role="tabpanel"');
   });
 
+  it("hides the tab count pill from assistive tech instead of gluing it onto the tab name", () => {
+    const view = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
+    expect(view).toContain('<span class="tab-pill danger" aria-hidden="true">');
+    expect(view).toContain('<span class="sr-only">, ');
+    expect(view).toContain(" blocking</span>");
+  });
+
   it("renders OverviewTab with readiness gate status and metadata", () => {
     const overview = OverviewTab({ review });
     expect(overview).toBeDefined();

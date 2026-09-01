@@ -10,7 +10,7 @@ export default async function BillingSettingsPage() {
   if (!viewer.session) {
     return (
       <div className="panel">
-        <h1>Marketplace plan</h1>
+        <h2>Marketplace plan</h2>
         <p>Sign in to view your BoardReadyOps plan.</p>
       </div>
     );
@@ -35,7 +35,7 @@ export default async function BillingSettingsPage() {
     <div className="panel">
       <header className="panel-header">
         <div>
-          <h1 id="billing-heading">Marketplace Plan</h1>
+          <h2 id="billing-heading">Marketplace Plan</h2>
           <p>
             BoardReadyOps is currently offered on GitHub Marketplace through the Community plan. The Marketplace plan is
             free and does not require an external payment method.
