@@ -1,31 +1,53 @@
-# Merge Queue remains maintainer-controlled. A PR enters the queue only after a
-# maintainer explicitly applies the `queue-me` label; automation must never add
-# that label. Repository rulesets remain the authoritative merge gate.
+# Merge Queue remains maintainer-controlled.
+# A PR enters the queue only after a maintainer explicitly applies the
+# `queue-me` label. Automation must never add that label.
+#
+# GitHub repository rulesets remain the authoritative merge gate.
 merge_queue:
+  # Process queued PRs in order.
   mode: serial
+
+  # Only one queue validation runs at a time.
+  # Together with batch_size: 1 and max_checks_retries: 0,
+  # this allows Mergify to use in-place checks.
   max_parallel_checks: 1
+
+  # Only post final queue outcomes instead of every queue event.
   status_comments: outcomes
+
+  # If something is merged into main outside Mergify,
+  # rebuild/re-evaluate the queue against the new main.
   reset_on_external_merge: always
+
+  # Keep current anti-flake behavior.
   skip_intermediate_results: true
 
-# File-pattern scopes are used only by Mergify to avoid running conflicting
-# queued changes in parallel. BoardReadyOps CI continues to use its own
-# risk-profile job for validation routing.
+  # Do not expose Mergify's queue/requeue checkbox controls.
+  # Queue entry stays driven by the `queue-me` label rule below.
+  queue_controls_comment: false
+
+
+# File-pattern scopes are kept for Mergify's understanding of affected areas.
+# BoardReadyOps CI continues to use its own risk-profile job for
+# validation routing.
 scopes:
   source:
     files:
       cli:
         include:
           - "src/cli/**/*"
+
       core:
         include:
           - "src/**/*"
           - "packages/cloud-core/**/*"
           - "packages/db/**/*"
+
       web:
         include:
           - "apps/web/**/*"
           - "packages/db/**/*"
+
       repository:
         include:
           - ".github/**/*"
@@ -33,14 +55,37 @@ scopes:
           - "package.json"
           - "pnpm-lock.yaml"
           - "renovate.json"
+
   merge_queue_scope: merge-queue
+
 
 queue_rules:
   - name: default
+
+    # One PR per queue batch.
     batch_size: 1
+
+    # IMPORTANT:
+    # If the PR is behind main, update the PR branch by merging
+    # the latest main into it before final validation.
+    update_method: merge
+
+    # Keep in-place checks enabled.
+    # Values > 0 force Mergify to create temporary batch PRs.
+    max_checks_retries: 0
+
+    # Wait indefinitely for required checks.
+    # Change to `auto` later if you want Mergify to manage timeouts.
     checks_timeout: null
+
+    # With batch_size: 1 this normally has no practical waiting effect,
+    # but keeping it is harmless.
     batch_max_wait_time: 5 min
+
+    # Final merge into main is always squash.
     merge_method: squash
+
+    # Conditions required before Mergify accepts the PR into the queue.
     queue_conditions:
       - label = queue-me
       - -draft
@@ -52,6 +97,15 @@ queue_rules:
       - check-success = ci / verify-dist
       - check-success = ci / coverage-gate
       - check-success = security / gate
+
+    # Conditions that must still be true immediately before merge.
+    #
+    # These intentionally match queue_conditions so that Mergify can
+    # use in-place checks with:
+    #   mode: serial
+    #   max_parallel_checks: 1
+    #   batch_size: 1
+    #   max_checks_retries: 0
     merge_conditions:
       - label = queue-me
       - -draft
@@ -64,7 +118,9 @@ queue_rules:
       - check-success = ci / coverage-gate
       - check-success = security / gate
 
+
 pull_request_rules:
+  # Queue only when a maintainer has explicitly applied `queue-me`.
   - name: queue explicitly approved pull requests
     conditions:
       - label = queue-me
@@ -73,16 +129,21 @@ pull_request_rules:
       queue:
         name: default
 
+  # Security workflow changes require explicit manual review.
   - name: label security workflow changes
     conditions:
       - files ~= ^\.github/workflows/security
     actions:
       label:
-        add: ["security", "manual-review"]
+        add:
+          - security
+          - manual-review
 
+  # Documentation-only/path-related changes get a documentation label.
   - name: label documentation changes
     conditions:
       - files ~= ^docs/
     actions:
       label:
-        add: ["documentation"]
+        add:
+          - documentation
