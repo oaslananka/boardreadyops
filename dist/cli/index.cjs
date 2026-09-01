@@ -54445,10 +54445,12 @@ function formatReleaseDiffText(diff) {
   lines.push(`  bom rows changed: ${diff.summary.bomChanged}`);
   lines.push(`  outputs changed: ${diff.summary.outputsChanged}`);
   lines.push(`  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved}`);
-  lines.push(...bomRowChangeLines(diff.fabrication.bom));
-  lines.push(...outputChangeLines(diff.fabrication.outputs));
-  lines.push(...findingChangeLines("new findings", diff.fabrication.findings.added));
-  lines.push(...findingChangeLines("resolved findings", diff.fabrication.findings.removed));
+  lines.push(
+    ...bomRowChangeLines(diff.fabrication.bom),
+    ...outputChangeLines(diff.fabrication.outputs),
+    ...findingChangeLines("new findings", diff.fabrication.findings.added),
+    ...findingChangeLines("resolved findings", diff.fabrication.findings.removed)
+  );
   return `${lines.join("\n")}
 `;
 }
