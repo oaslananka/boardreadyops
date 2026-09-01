@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { RunPageFrame, RunUnavailable, SummaryView } from "../../../components/run-investigation.js";
-import { formatRunPageTitle, loadRunDashboard, runDashboardLoaderDependencies } from "../../../lib/run-dashboard.js";
+import { loadRunDashboard, resolveRunPageTitle, runDashboardLoaderDependencies } from "../../../lib/run-dashboard.js";
 import { shouldLiveRefreshRun } from "../../../lib/run-live-refresh.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 
@@ -11,16 +11,7 @@ type RunPageProps = { params: Promise<{ runId: string }> };
 export async function generateMetadata({ params }: RunPageProps) {
   const { runId } = await params;
   const viewer = await viewerAuthorization();
-  const result = await loadRunDashboard(
-    runId,
-    process.env,
-    {},
-    {
-      ...runDashboardLoaderDependencies,
-      authorizeRepository: viewer.authorizeRepository,
-    },
-  );
-  return { title: result.state === "found" ? formatRunPageTitle(result.run, "Summary") : "Run" };
+  return { title: await resolveRunPageTitle(runId, "Summary", viewer.authorizeRepository) };
 }
 
 export default async function RunPage({ params }: RunPageProps) {
