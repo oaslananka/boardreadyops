@@ -35723,6 +35723,10 @@ async function verifyReleaseEvidenceBundle(bundleDir) {
   }
   return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors, manifest };
 }
+function signatureStatusText(signature) {
+  if (!signature.present) return "none";
+  return signature.ok ? "valid Ed25519" : "present but INVALID";
+}
 function formatReleaseCertificateText(manifest, signature) {
   const toolVersion = manifest.tool?.version ?? "unknown";
   const generatedAt = manifest.generatedAt ?? "unknown";
@@ -35732,7 +35736,7 @@ function formatReleaseCertificateText(manifest, signature) {
   const decisionReasons = manifest.decision?.reasons?.length ? ` (${manifest.decision.reasons.join("; ")})` : "";
   const artifactCount = manifest.artifacts?.length ?? 0;
   const algorithm = manifest.verification?.algorithm ?? "sha256";
-  const signatureText = signature.present ? signature.ok ? "valid Ed25519" : "present but INVALID" : "none";
+  const signatureText = signatureStatusText(signature);
   const lines = [
     "",
     "Release Certificate",

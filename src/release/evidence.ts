@@ -224,6 +224,11 @@ export async function verifyReleaseEvidenceBundle(bundleDir: string): Promise<Re
  * read) so a minimal or partially-malformed manifest still produces a readable, honest output
  * instead of throwing.
  */
+function signatureStatusText(signature: { present: boolean; ok: boolean }): string {
+  if (!signature.present) return "none";
+  return signature.ok ? "valid Ed25519" : "present but INVALID";
+}
+
 export function formatReleaseCertificateText(
   manifest: ReleaseEvidenceManifest,
   signature: { present: boolean; ok: boolean },
@@ -236,7 +241,7 @@ export function formatReleaseCertificateText(
   const decisionReasons = manifest.decision?.reasons?.length ? ` (${manifest.decision.reasons.join("; ")})` : "";
   const artifactCount = manifest.artifacts?.length ?? 0;
   const algorithm = manifest.verification?.algorithm ?? "sha256";
-  const signatureText = signature.present ? (signature.ok ? "valid Ed25519" : "present but INVALID") : "none";
+  const signatureText = signatureStatusText(signature);
 
   const lines = [
     "",
