@@ -34523,7 +34523,7 @@ function formatFabricationDiff(diff, locale) {
     ...diff,
     bom: {
       ...diff.bom,
-      hasRows: diff.bom.rows.length > 0,
+      hasRows: diff.bom.addedCount + diff.bom.removedCount + diff.bom.changedCount > 0,
       rows: diff.bom.rows.map((row) => ({
         ...row,
         previous: row.previous || "-",
@@ -50942,7 +50942,7 @@ function renderReleaseDiffSection(fabrication, locale) {
     </section>`;
 }
 function renderBomDiff(bom, locale) {
-  if (bom.rows.length === 0) {
+  if (bom.addedCount + bom.removedCount + bom.changedCount === 0) {
     return `<p class="muted">${escapeHtml2(t("report.noBomChanges", {}, locale))}</p>`;
   }
   const headers = `<tr><th scope="col">${escapeHtml2(t("report.ref", {}, locale))}</th><th scope="col">${escapeHtml2(

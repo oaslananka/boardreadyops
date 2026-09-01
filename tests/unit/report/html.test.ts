@@ -325,6 +325,21 @@ describe("HTML report", () => {
     expect(html).toContain("No BOM changes recorded.");
   });
 
+  it("renders an empty BOM note when every row is unchanged, not a table of unchanged parts", () => {
+    const diff = sampleFabricationDiff();
+    diff.bom = {
+      rows: [{ reference: "U1", previous: "ATmega328P", current: "ATmega328P", status: "unchanged" }],
+      truncated: false,
+      addedCount: 0,
+      removedCount: 0,
+      changedCount: 0,
+    };
+    const html = formatHtml(sampleResult(), "en", [], diff);
+
+    expect(html).toContain("No BOM changes recorded.");
+    expect(html).not.toContain("<code>U1</code>");
+  });
+
   it("omits the fabrication diff section when no diff is provided", () => {
     expect(formatHtml(sampleResult())).not.toContain('id="fabrication-diff-heading"');
   });

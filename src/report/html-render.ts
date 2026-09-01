@@ -225,7 +225,7 @@ export function renderReleaseDiffSection(fabrication: FabricationDiff, locale: L
 }
 
 function renderBomDiff(bom: FabricationDiff["bom"], locale: Locale): string {
-  if (bom.rows.length === 0) {
+  if (bom.addedCount + bom.removedCount + bom.changedCount === 0) {
     return `<p class="muted">${escapeHtml(t("report.noBomChanges", {}, locale))}</p>`;
   }
   const headers = `<tr><th scope="col">${escapeHtml(t("report.ref", {}, locale))}</th><th scope="col">${escapeHtml(
