@@ -29,7 +29,7 @@ export function parseSentryDsn(dsn: string): SentryDsnParts | undefined {
     return undefined;
   }
   const publicKey = parsed.username;
-  const projectId = parsed.pathname.split("/").filter(Boolean).pop();
+  const projectId = parsed.pathname.split("/").findLast(Boolean);
   if (!publicKey || !projectId || !parsed.host) return undefined;
   return { publicKey, host: parsed.host, projectId };
 }
