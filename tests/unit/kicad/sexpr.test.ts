@@ -11,4 +11,10 @@ describe("S-expression parser", () => {
     expect(source).toContain("stack.toReversed()");
     expect(source).not.toContain("stack.reverse()");
   });
+
+  it("safely handles deeply nested adversarial input exceeding max depth", () => {
+    const deepInput = `${"(".repeat(600)}atom${")".repeat(600)}`;
+    const document = parseSexprDocument(deepInput);
+    expect(document.errors.some((err) => err.message.includes("Maximum S-expression nesting depth"))).toBe(true);
+  });
 });
