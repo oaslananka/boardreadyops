@@ -1,4 +1,7 @@
 import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 export const executionStatusIds = Object.freeze(
   Array.from({ length: 37 }, (_, index) => `W${String(index).padStart(2, "0")}`),
@@ -9,6 +12,8 @@ const priorities = new Set(["P0", "P1", "P2", "P3"]);
 const verificationResults = new Set(["pass", "fail", "not_run"]);
 const evidenceKeys = ["code", "tests", "docs", "deployed", "commits", "pullRequests"];
 const roadmapSource = "https://github.com/oaslananka/boardreadyops/issues/191";
+const generatedStart = "<!-- master-execution-status:start -->";
+const generatedEnd = "<!-- master-execution-status:end -->";
 
 export function validateExecutionStatus(value, options = {}) {
   const ledger = recordValue(value, "execution status");
@@ -33,6 +38,66 @@ export function validateExecutionStatus(value, options = {}) {
   }
   validateDependencyGraph(byId);
   return ledger;
+}
+
+export function renderExecutionStatus(status) {
+  const rows = [...status.workstreams]
+    .sort(
+      (left, right) =>
+        left.phase - right.phase || left.priority.localeCompare(right.priority) || left.id.localeCompare(right.id),
+    )
+    .map((entry) =>
+      [
+        entry.id,
+        entry.name,
+        entry.priority,
+        String(entry.phase),
+        entry.status,
+        entry.owner,
+        entry.dependencies.join(", ") || "—",
+        entry.milestone,
+      ]
+        .map(markdownCell)
+        .join(" | "),
+    )
+    .map((row) => `| ${row} |`);
+
+  return [
+    "| Workstream | Name | Priority | Phase | Status | Owner | Dependencies | Roadmap target |",
+    "| --- | --- | --- | ---: | --- | --- | --- | --- |",
+    ...rows,
+  ].join("\n");
+}
+
+export function replaceExecutionStatusSection(document, rendered) {
+  const start = document.indexOf(generatedStart);
+  const end = document.indexOf(generatedEnd);
+  const duplicateStart = start >= 0 && document.indexOf(generatedStart, start + generatedStart.length) >= 0;
+  const duplicateEnd = end >= 0 && document.indexOf(generatedEnd, end + generatedEnd.length) >= 0;
+  if (start < 0 || end < start || duplicateStart || duplicateEnd) {
+    throw new Error("generated execution status markers missing or duplicated");
+  }
+  const contentStart = start + generatedStart.length;
+  return `${document.slice(0, contentStart)}\n${rendered.trim()}\n${document.slice(end)}`;
+}
+
+export async function main(root = process.cwd(), args = process.argv.slice(2)) {
+  const mode = args[0];
+  if (mode !== "render" && mode !== "check") throw new Error("expected render or check mode");
+  const dataPath = join(root, "docs", "development", "master-execution-status.json");
+  const documentPath = join(root, "docs", "development", "master-execution-status.md");
+  const status = validateExecutionStatus(JSON.parse(await readFile(dataPath, "utf8")), {
+    pathExists: (path) => existsSync(join(root, path)),
+  });
+  const document = await readFile(documentPath, "utf8");
+  const next = replaceExecutionStatusSection(document, renderExecutionStatus(status));
+  if (mode === "check") {
+    if (next !== document) {
+      throw new Error("master execution status drift; run corepack pnpm run execution-status:render");
+    }
+    return;
+  }
+  await writeFile(documentPath, next, "utf8");
 }
 
 function validateSpec(value) {
@@ -153,5 +218,18 @@ function validateTimestamp(value, label) {
   const timestamp = requiredString(value, label);
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(timestamp) || Number.isNaN(Date.parse(timestamp))) {
     throw new Error(`${label} must be UTC ISO-8601`);
+  }
+}
+
+function markdownCell(value) {
+  return String(value).replaceAll("|", "\\|").replaceAll(/\r?\n/gu, " ").trim();
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : "master execution status failed"}\n`);
+    process.exitCode = 1;
   }
 }
