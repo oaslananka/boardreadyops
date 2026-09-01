@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { DemoApproval, DemoChecklistItem } from "../../lib/demo-data.js";
 import { Panel, StatusBadge } from "../ui.js";
 
@@ -18,6 +18,7 @@ export function ChecklistApprovalsTab({
   onAddChecklist?: (title: string) => void;
 }) {
   const [newItemTitle, setNewItemTitle] = useState("");
+  const newItemFieldId = useId();
 
   function handleToggle(id: string) {
     const item = checklist.find((c) => c.id === id);
@@ -74,7 +75,11 @@ export function ChecklistApprovalsTab({
         </div>
 
         <form onSubmit={handleAdd} className="add-checklist-form">
+          <label htmlFor={newItemFieldId} className="sr-only">
+            Add custom verification check
+          </label>
           <input
+            id={newItemFieldId}
             type="text"
             placeholder="Add custom verification check (e.g. 'Validate high-speed differential pairs match within 0.1mm')..."
             value={newItemTitle}

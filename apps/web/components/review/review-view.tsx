@@ -1,8 +1,10 @@
 "use client";
 
 import type { FindingDisposition, ReviewDecision } from "@boardreadyops/contracts";
-import { useState } from "react";
-import type { DemoApproval, DemoChecklistItem, DemoComment, DemoReview } from "../../lib/demo-data.js";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
+import type { DemoApproval, DemoChecklistItem, DemoReview } from "../../lib/demo-data.js";
 import { ApprovalModal } from "./approval-modal.js";
 import { ChangesTab } from "./changes-tab.js";
 import { ChecklistApprovalsTab } from "./checklist-approvals-tab.js";
@@ -13,6 +15,19 @@ import { OverviewTab } from "./overview-tab.js";
 import { ReviewHeader } from "./review-header.js";
 
 export type ReviewTabKey = "overview" | "changes" | "findings" | "discussion" | "checklist" | "evidence";
+
+const reviewTabKeys: readonly ReviewTabKey[] = [
+  "overview",
+  "changes",
+  "findings",
+  "discussion",
+  "checklist",
+  "evidence",
+];
+
+function tabFromSearchParam(value: string | null): ReviewTabKey {
+  return (reviewTabKeys as readonly string[]).includes(value ?? "") ? (value as ReviewTabKey) : "overview";
+}
 
 interface ReviewNavigationTabsProps {
   readonly activeTab: ReviewTabKey;
@@ -33,6 +48,21 @@ function ReviewNavigationTabs({
   incompleteChecklistCount,
   onSelectTab,
 }: ReviewNavigationTabsProps) {
+  function handleTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, currentTab: ReviewTabKey) {
+    const currentIndex = reviewTabKeys.indexOf(currentTab);
+    let nextIndex: number | null = null;
+    if (e.key === "ArrowRight") nextIndex = (currentIndex + 1) % reviewTabKeys.length;
+    else if (e.key === "ArrowLeft") nextIndex = (currentIndex - 1 + reviewTabKeys.length) % reviewTabKeys.length;
+    else if (e.key === "Home") nextIndex = 0;
+    else if (e.key === "End") nextIndex = reviewTabKeys.length - 1;
+    if (nextIndex === null) return;
+    e.preventDefault();
+    const nextTab = reviewTabKeys[nextIndex];
+    if (!nextTab) return;
+    onSelectTab(nextTab);
+    document.getElementById(`tab-${nextTab}`)?.focus();
+  }
+
   return (
     <div className="review-workspace-nav review-tabs-navigation" aria-label="Review workspace" role="tablist">
       <button
@@ -40,9 +70,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "overview"}
         aria-controls="panel-overview"
+        tabIndex={activeTab === "overview" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "overview" ? "active" : ""}`}
         onClick={() => onSelectTab("overview")}
+        onKeyDown={(e) => handleTabKeyDown(e, "overview")}
       >
         Overview
       </button>
@@ -51,9 +83,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "changes"}
         aria-controls="panel-changes"
+        tabIndex={activeTab === "changes" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "changes" ? "active" : ""}`}
         onClick={() => onSelectTab("changes")}
+        onKeyDown={(e) => handleTabKeyDown(e, "changes")}
       >
         Changes{changedFilesCount !== undefined ? ` (${changedFilesCount})` : ""}
       </button>
@@ -62,9 +96,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "findings"}
         aria-controls="panel-findings"
+        tabIndex={activeTab === "findings" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "findings" ? "active" : ""}`}
         onClick={() => onSelectTab("findings")}
+        onKeyDown={(e) => handleTabKeyDown(e, "findings")}
       >
         Findings ({findingsCount}){blockingCount > 0 ? <span className="tab-pill danger">{blockingCount}</span> : null}
       </button>
@@ -73,9 +109,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "discussion"}
         aria-controls="panel-discussion"
+        tabIndex={activeTab === "discussion" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "discussion" ? "active" : ""}`}
         onClick={() => onSelectTab("discussion")}
+        onKeyDown={(e) => handleTabKeyDown(e, "discussion")}
       >
         Discussion ({commentsCount})
       </button>
@@ -84,9 +122,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "checklist"}
         aria-controls="panel-checklist"
+        tabIndex={activeTab === "checklist" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "checklist" ? "active" : ""}`}
         onClick={() => onSelectTab("checklist")}
+        onKeyDown={(e) => handleTabKeyDown(e, "checklist")}
       >
         Checklist & Approvals
         {incompleteChecklistCount > 0 ? <span className="tab-pill warning">{incompleteChecklistCount}</span> : null}
@@ -96,9 +136,11 @@ function ReviewNavigationTabs({
         role="tab"
         aria-selected={activeTab === "evidence"}
         aria-controls="panel-evidence"
+        tabIndex={activeTab === "evidence" ? 0 : -1}
         type="button"
         className={`review-tab-link ${activeTab === "evidence" ? "active" : ""}`}
         onClick={() => onSelectTab("evidence")}
+        onKeyDown={(e) => handleTabKeyDown(e, "evidence")}
       >
         Evidence
       </button>
@@ -106,9 +148,36 @@ function ReviewNavigationTabs({
   );
 }
 
-export function ReviewView({ initialReview }: { readonly initialReview: DemoReview }) {
+export function ReviewView({
+  initialReview,
+  viewerLogin,
+}: {
+  readonly initialReview: DemoReview;
+  readonly viewerLogin?: string | undefined;
+}) {
   const [review, setReview] = useState<DemoReview>(initialReview);
-  const [activeTab, setActiveTab] = useState<ReviewTabKey>("overview");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [rawActiveTab, setRawActiveTab] = useState<ReviewTabKey>(() => tabFromSearchParam(searchParams.get("tab")));
+
+  // The URL is the single source of truth for which tab is open: this keeps
+  // browser Back/Forward and a shared/reloaded ?tab= link in sync with what
+  // renders, instead of a separate state that can drift from it.
+  useEffect(() => {
+    setRawActiveTab(tabFromSearchParam(searchParams.get("tab")));
+  }, [searchParams]);
+
+  function setActiveTab(tab: ReviewTabKey) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
   const [approvalModalType, setApprovalModalType] = useState<"approve" | "request_changes" | null>(null);
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -213,7 +282,7 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
     }
   }
 
-  async function handleAddComment(comment: DemoComment) {
+  async function handleAddComment(content: string, findingFingerprint?: string) {
     if (submittingAction) return;
     setSubmittingAction("comment");
     setMutationError(null);
@@ -223,8 +292,8 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          content: comment.content,
-          ...(comment.findingFingerprint ? { findingFingerprint: comment.findingFingerprint } : {}),
+          content,
+          ...(findingFingerprint ? { findingFingerprint } : {}),
         }),
       });
       const data = (await res.json()) as {
@@ -245,22 +314,58 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
         return;
       }
       const saved = data.comment;
-      const mapped: DemoComment = {
-        id: saved.id,
-        content: saved.content,
-        authorId: saved.authorId,
-        authorType: saved.authorType,
-        status: saved.status === "stale" ? "outdated" : (saved.status ?? "open"),
-        createdAt: saved.createdAt,
-        ...(saved.findingFingerprint ? { findingFingerprint: saved.findingFingerprint } : {}),
-      };
       setReview((prev) => ({
         ...prev,
-        comments: [...prev.comments, mapped],
+        comments: [
+          ...prev.comments,
+          {
+            id: saved.id,
+            content: saved.content,
+            authorId: saved.authorId,
+            authorType: saved.authorType,
+            status: saved.status === "stale" ? "outdated" : (saved.status ?? "open"),
+            createdAt: saved.createdAt,
+            ...(saved.findingFingerprint ? { findingFingerprint: saved.findingFingerprint } : {}),
+          },
+        ],
       }));
       setMutationSuccess("Comment posted.");
     } catch (err) {
       setMutationError(`Failed to post comment: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
+  async function handleToggleCommentStatus(commentId: string, nextStatus: "open" | "resolved") {
+    if (submittingAction) return;
+    setSubmittingAction(`comment_status_${commentId}`);
+    setMutationError(null);
+    setMutationSuccess(null);
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/comments`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ commentId, status: nextStatus }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        comment?: { id: string; status: "open" | "resolved" | "stale" };
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.comment) {
+        setMutationError(`Failed to update comment: ${data.error || res.statusText}`);
+        return;
+      }
+      const saved = data.comment;
+      setReview((prev) => ({
+        ...prev,
+        comments: prev.comments.map((c) =>
+          c.id === commentId ? { ...c, status: saved.status === "stale" ? "outdated" : saved.status } : c,
+        ),
+      }));
+    } catch (err) {
+      setMutationError(`Failed to update comment: ${err instanceof Error ? err.message : "Network error"}`);
     } finally {
       setSubmittingAction(null);
     }
@@ -443,7 +548,7 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
       ) : null}
 
       <ReviewNavigationTabs
-        activeTab={activeTab}
+        activeTab={rawActiveTab}
         changedFilesCount={review.changedFiles?.length}
         findingsCount={review.findings.length}
         blockingCount={blockingCount}
@@ -452,20 +557,30 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
         onSelectTab={setActiveTab}
       />
 
-      <main id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="review-tab-body">
-        {activeTab === "overview" ? <OverviewTab review={review} /> : null}
-        {activeTab === "changes" ? <ChangesTab review={review} /> : null}
-        {activeTab === "findings" ? (
+      <main
+        id={`panel-${rawActiveTab}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${rawActiveTab}`}
+        className="review-tab-body"
+      >
+        {rawActiveTab === "overview" ? <OverviewTab review={review} /> : null}
+        {rawActiveTab === "changes" ? <ChangesTab review={review} /> : null}
+        {rawActiveTab === "findings" ? (
           <FindingsTab
             findings={review.findings}
             onUpdateDisposition={handleUpdateDisposition}
             onAssign={handleAssign}
           />
         ) : null}
-        {activeTab === "discussion" ? (
-          <DiscussionTab comments={review.comments} onAddComment={handleAddComment} />
+        {rawActiveTab === "discussion" ? (
+          <DiscussionTab
+            comments={review.comments}
+            viewerLogin={viewerLogin}
+            onAddComment={handleAddComment}
+            onToggleStatus={handleToggleCommentStatus}
+          />
         ) : null}
-        {activeTab === "checklist" ? (
+        {rawActiveTab === "checklist" ? (
           <ChecklistApprovalsTab
             checklist={review.checklist}
             approvals={review.approvals}
@@ -474,7 +589,7 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
             onAddChecklist={handleAddChecklist}
           />
         ) : null}
-        {activeTab === "evidence" ? <EvidenceTab review={review} /> : null}
+        {rawActiveTab === "evidence" ? <EvidenceTab review={review} /> : null}
       </main>
 
       {approvalModalType ? (
