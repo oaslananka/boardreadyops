@@ -78,19 +78,29 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [329, 321, 330, 331, 332, 333, 334, 546],
       "evidence": {
-        "code": ["scripts/toolchain.mjs"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "scripts/toolchain.mjs",
+          "scripts/compatibility.mjs",
+          "scripts/compatibility-utils.mjs",
+          "scripts/verify-release-channels.mjs"
+        ],
+        "tests": [
+          "tests/unit/scripts/compatibility.test.ts",
+          "tests/unit/scripts/toolchain.test.ts",
+          "tests/unit/scripts/verify-release-channels.test.ts",
+          "tests/unit/scripts/governance-ruleset.test.ts"
+        ],
+        "docs": ["docs/compatibility.yaml", "docs/support-matrix.md", "docs/security/release-integrity.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/scripts/compatibility.test.ts tests/unit/scripts/toolchain.test.ts tests/unit/scripts/verify-release-channels.test.ts tests/unit/scripts/governance-ruleset.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Roadmap maintenance issues #321 and #329-#334 are closed; compatibility drift issue #546 remains open without a milestone."
+      "remaining": "Issue #546 is now closed (PR #566). Reproducible-build/clean-room independent rebuild evidence is documented as future work in docs/security/release-integrity.md; no other tracked blocker remains open."
     },
     {
       "id": "W02",
@@ -103,19 +113,31 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [289],
       "evidence": {
-        "code": ["schemas/config.schema.json"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "schemas/agent-plan.schema.json",
+          "schemas/findings.schema.json",
+          "schemas/release-manifest.schema.json",
+          "src/util/json.ts"
+        ],
+        "tests": [
+          "tests/unit/contracts/billing.test.ts",
+          "tests/unit/contracts/review-contracts.test.ts",
+          "tests/unit/contracts/runner-protocol.test.ts",
+          "tests/snapshot/schemas.snapshot.test.ts",
+          "tests/unit/core/schema-compatibility.test.ts",
+          "tests/unit/util/json.test.ts"
+        ],
+        "docs": ["docs/architecture/contract-versioning.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/contracts/billing.test.ts tests/unit/contracts/review-contracts.test.ts tests/unit/contracts/runner-protocol.test.ts tests/snapshot/schemas.snapshot.test.ts tests/unit/core/schema-compatibility.test.ts tests/unit/util/json.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "The schema-shape drift guard (tests/snapshot/schemas.snapshot.test.ts, PR #568) and RFC 8785 canonicalization (src/util/json.ts) now close two acceptance items. Remaining: consumer-driven contract tests spanning CLI→Cloud/Action→Cloud/Runner→Control-Plane boundaries specifically, and explicit unknown-enum-value forward-compatibility tests."
     },
     {
       "id": "W03",
@@ -128,19 +150,30 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [280],
       "evidence": {
-        "code": ["src/kicad/sexpr.ts"],
-        "tests": [],
+        "code": [
+          "src/kicad/pcb.ts",
+          "src/kicad/schematic.ts",
+          "src/kicad/schematic-graph.ts",
+          "src/kicad/variants.ts",
+          "src/kicad/sexpr.ts",
+          "src/bom/normalizer.ts"
+        ],
+        "tests": [
+          "tests/unit/kicad/coverage.test.ts",
+          "tests/unit/kicad/variants.test.ts",
+          "tests/unit/kicad/sexpr.test.ts"
+        ],
         "docs": [],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/kicad/coverage.test.ts tests/unit/kicad/variants.test.ts tests/unit/kicad/sexpr.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No Gerber X2/X3 or Excellon metadata parser, no IPC-2581/ODB++ adapter, no parser confidence/provenance fields, and no hostile-input size/DoS guard beyond the sexpr nesting-depth cap (PR #565) were found."
     },
     {
       "id": "W04",
@@ -153,19 +186,24 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [261],
       "evidence": {
-        "code": ["src/release/generate.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "src/release/generate.ts",
+          "src/kicad/cli.ts",
+          "src/kicad/version.ts",
+          "schemas/generate-recipe.schema.json"
+        ],
+        "tests": ["tests/unit/release/generate.test.ts"],
+        "docs": ["docs/integrations/kibot.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/release/generate.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No integration test exercises real kicad-cli output generation (tests/integration/e2e.test.ts runs with --skip-generate); the manifest omits source-commit/KiCad-version/recipe-hash/environment provenance fields; no jobset-vs-recipe conflict reporting or reproducibility score."
     },
     {
       "id": "W05",
@@ -178,19 +216,29 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [274],
       "evidence": {
-        "code": ["src/rules/manufacturing"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "src/rules/manufacturing/pin1-markers.ts",
+          "src/rules/manufacturing/fiducials.ts",
+          "src/rules/manufacturing/test-points.ts",
+          "src/rules/manufacturing/drill-coverage.ts",
+          "src/core/rule-registry.ts"
+        ],
+        "tests": [
+          "tests/unit/rules/manufacturing/assembly-sides.test.ts",
+          "tests/unit/rules/manufacturing/drill-coverage.test.ts",
+          "tests/unit/rules/metadata.test.ts"
+        ],
+        "docs": ["docs/rules/manufacturing.dfm-pin1-markers.md", "docs/rules/drc.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/rules/manufacturing/assembly-sides.test.ts tests/unit/rules/manufacturing/drill-coverage.test.ts tests/unit/rules/metadata.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Geometry-heavy DFM (trace/spacing/copper-edge/hole-hole/annular-ring/via-aspect-ratio) is delegated entirely to KiCad's native DRC/ERC, not owned by a BoardReadyOps rule engine; no solder-mask/paste/NPTH-PTH-slot semantics; RuleMetadata lacks category/evidence-type/fixability/vendor-dependence fields; no false-positive telemetry hook."
     },
     {
       "id": "W06",
@@ -203,19 +251,19 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [286],
       "evidence": {
-        "code": ["packages/cloud-core/src/decision-engine.ts"],
-        "tests": [],
-        "docs": [],
+        "code": ["packages/cloud-core/src/decision-engine.ts", "src/core/policy.ts", "src/core/readiness.ts"],
+        "tests": ["tests/unit/cloud-core/decision-engine.test.ts", "tests/unit/cloud-core/policy-engine.test.ts"],
+        "docs": ["docs/release/policy-engine.md", "docs/release/readiness-scoring.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/cloud-core/decision-engine.test.ts tests/unit/cloud-core/policy-engine.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No explicit named PASS/FAIL/CONDITIONAL/UNKNOWN vocabulary (readiness.ts uses ready/at-risk/blocked; policy.ts uses pass/fail) and no dedicated cross-run decision fingerprint/hash for same-input-same-decision regression testing, though the DecisionExplanationGraph (PR #565) and injectable clock cover the core acceptance criteria."
     },
     {
       "id": "W07",
@@ -228,19 +276,19 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [263, 448],
       "evidence": {
-        "code": ["src/release/evidence.ts"],
-        "tests": [],
-        "docs": [],
+        "code": ["src/release/evidence.ts", "src/release/signing.ts"],
+        "tests": ["tests/unit/release/evidence.test.ts", "tests/unit/release/signing.test.ts"],
+        "docs": ["docs/release/artifact-attestation.md", "docs/security/release-integrity.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/release/evidence.test.ts tests/unit/release/signing.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Hardware Release Passport vertical slice #448 remains open and unmilestoned."
+      "remaining": "No signing-key rotation/revocation/trust-store mechanism, no signed-release-certificate UI/API, and no formal Hardware Release Level model exists yet (tracked as roadmap Epic #271); matches the ledger's own note on the unmilestoned Hardware Release Passport slice (#448)."
     },
     {
       "id": "W08",
@@ -253,19 +301,28 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [267, 447],
       "evidence": {
-        "code": ["src/release/diff.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "src/release/diff.ts",
+          "src/core/diff/run.ts",
+          "src/core/diff/hardware-impact.ts",
+          "src/core/baseline.ts"
+        ],
+        "tests": [
+          "tests/unit/core/diff.test.ts",
+          "tests/unit/core/hardware-impact.test.ts",
+          "tests/unit/release/diff.test.ts"
+        ],
+        "docs": ["docs/release/release-diff.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/core/diff.test.ts tests/unit/core/hardware-impact.test.ts tests/unit/release/diff.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "PR-native hardware change impact vertical slice #447 remains open and unmilestoned."
+      "remaining": "Impact dimensions cover readiness/findings/bom/manufacturing only (not electrical/assembly/test/firmware/supply/cost/mechanical); no worsened/improved per-finding classification beyond added/resolved/unchanged; no explicit merge-base/previous-release/selected-release baseline modes; no hosted web visualization route. Matches the unmilestoned PR-native hardware-change-impact slice (#447)."
     },
     {
       "id": "W09",
@@ -278,19 +335,19 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [268],
       "evidence": {
-        "code": ["src/kicad/variants.ts"],
-        "tests": [],
-        "docs": [],
+        "code": ["src/kicad/variants.ts", "src/rules/bom/variant-consistency.ts", "src/rules/bom/dnp-consistency.ts"],
+        "tests": ["tests/unit/kicad/variants.test.ts", "tests/unit/rules/bom/variant-consistency.test.ts"],
+        "docs": ["docs/rules/bom.variant-consistency.md", "docs/architecture/adr/0004-kicad10-variant-support.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/kicad/variants.test.ts tests/unit/rules/bom/variant-consistency.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No product→board→variant→revision canonical hierarchy exists in packages/db/prisma/schema.prisma (only a flat Board table); no multi-board release manifest, cross-variant diff, fleet BOM-exposure analysis, or cloud navigation for the hierarchy."
     },
     {
       "id": "W10",
@@ -303,19 +360,19 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [265],
       "evidence": {
-        "code": ["src/vendor"],
-        "tests": [],
-        "docs": [],
+        "code": ["src/vendor/profiles.ts", "src/vendor/outputs.ts"],
+        "tests": ["tests/unit/cli/vendor.test.ts"],
+        "docs": ["docs/vendor-profiles.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/cli/vendor.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "src/vendor/profiles.ts is a static hardcoded array of 9 vendor presets answering only 'what output evidence does vendor X require' — no versioned/immutable profile revisions, source/date/verifier/confidence metadata, freshness alerting, verified-badge workflow, or cross-vendor manufacturability compare."
     },
     {
       "id": "W11",
@@ -328,19 +385,30 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [272, 449],
       "evidence": {
-        "code": ["src/bom"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "src/bom/identity.ts",
+          "src/bom/lifecycle.ts",
+          "src/bom/risk.ts",
+          "src/bom/supplier.ts",
+          "packages/db/src/board-bom-store.ts"
+        ],
+        "tests": [
+          "tests/unit/bom/identity.test.ts",
+          "tests/unit/bom/lifecycle.test.ts",
+          "tests/unit/bom/supplier.test.ts",
+          "tests/unit/rules/bom/risk-score.test.ts"
+        ],
+        "docs": ["docs/bom-alternates.md", "docs/rules/bom.lifecycle.md", "docs/rules/bom.risk-score.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/bom/identity.test.ts tests/unit/bom/lifecycle.test.ts tests/unit/bom/supplier.test.ts tests/unit/rules/bom/risk-score.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Continuous supplier monitoring vertical slice #449 remains open and unmilestoned."
+      "remaining": "No provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; fleet BOM exposure (which releases contain MPN X) is not queryable — board-bom-store.ts only exposes a write path. Matches open issue #449."
     },
     {
       "id": "W12",
@@ -353,19 +421,27 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [273],
       "evidence": {
-        "code": ["src/firmware/contract.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "src/firmware/contract.ts",
+          "src/firmware/arduino.ts",
+          "src/firmware/stm32cubemx.ts",
+          "src/firmware/yaml-contract.ts"
+        ],
+        "tests": [
+          "tests/unit/rules/firmware/stm32cubemx-pin-contract.test.ts",
+          "tests/unit/rules/firmware/platformio-pin-contract.test.ts"
+        ],
+        "docs": ["docs/integrations/firmware-contracts.md", "docs/rules/firmware.stm32cubemx-pin-contract.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/rules/firmware/stm32cubemx-pin-contract.test.ts tests/unit/rules/firmware/platformio-pin-contract.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Zephyr and ESP-IDF adapters (src/firmware/zephyr.ts, esp-idf.ts) are thin wrappers around the generic YAML contract loader, not real DeviceTree/ESP-IDF-format parsers as specified; no firmware commit-SHA/artifact-identity binding to a hardware release; no MCU-specific voltage-domain plugin boundary."
     },
     {
       "id": "W13",
@@ -403,19 +479,29 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [269],
       "evidence": {
-        "code": ["src/core/policy.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "src/core/policy.ts",
+          "src/core/waivers.ts",
+          "packages/cloud-core/src/policy-engine.ts",
+          "packages/db/src/review-approval-store.ts"
+        ],
+        "tests": [
+          "tests/unit/core/policy.test.ts",
+          "tests/unit/core/waivers.test.ts",
+          "tests/unit/cloud-core/policy-engine.test.ts",
+          "tests/unit/db/review-approval-store.test.ts"
+        ],
+        "docs": ["docs/release/policy-engine.md", "docs/release/waivers.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/core/policy.test.ts tests/unit/core/waivers.test.ts tests/unit/cloud-core/policy-engine.test.ts tests/unit/db/review-approval-store.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No waiver carry-forward-by-fingerprint-equivalence workflow, no separation-of-duties enforcement, and no emergency-release/post-release-review workflow were found, though fail-closed expiry, org-hierarchy policy inheritance with dry-run impact preview, and digest-change approval invalidation are all real and tested."
     },
     {
       "id": "W15",
@@ -428,19 +514,29 @@
       "milestone": "v2.2 — GitHub Cloud GA",
       "issues": [149, 42, 154, 88],
       "evidence": {
-        "code": ["packages/contracts/src/runner-protocol.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "apps/web/app/api/github/webhook/route.ts",
+          "apps/web/lib/github-app-check-run-client.js",
+          "apps/web/lib/webhook-rate-limit.ts",
+          "packages/contracts/src/runner-protocol.ts",
+          "scripts/target-repository-isolation.mjs"
+        ],
+        "tests": [
+          "tests/unit/web/github-app-check-run-client.test.ts",
+          "tests/unit/web/webhook-rate-limit.test.ts",
+          "tests/unit/scripts/target-repository-isolation.test.ts"
+        ],
+        "docs": ["docs/security/github-app-permissions.md", "docs/architecture/github-app-rfc.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/web/github-app-check-run-client.test.ts tests/unit/web/webhook-rate-limit.test.ts tests/unit/scripts/target-repository-isolation.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "GitHub Cloud GA blockers #42, #88, #149, and #154 remain open."
+      "remaining": "No Check-Run annotations array is emitted (only markdown output.summary/text), so annotation limit/pagination/truncation is unverified; no explicit re-run command/API found. HMAC verification, delivery idempotency, fail-closed safeMode, OIDC result binding, and two-installation isolation evidence are all real and tested."
     },
     {
       "id": "W16",
@@ -478,19 +574,28 @@
       "milestone": "v2.2 — GitHub Cloud GA",
       "issues": [154, 88],
       "evidence": {
-        "code": ["apps/web/lib/api-auth.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "apps/web/lib/api-auth.ts",
+          "packages/db/src/api-token-store.ts",
+          "apps/web/lib/control-plane-operator-auth.ts",
+          "apps/web/lib/user-session.ts"
+        ],
+        "tests": [
+          "tests/unit/db/api-token-store.test.ts",
+          "tests/unit/web/api-auth-repository-scope.test.ts",
+          "tests/unit/web/viewer-authorization.test.ts"
+        ],
+        "docs": ["docs/security/audit-logs.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/db/api-token-store.test.ts tests/unit/web/api-auth-repository-scope.test.ts tests/unit/web/viewer-authorization.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user; no session revocation/device-management UI or store; no auth-attempt-specific rate limiting; no end-user docs for the bro_live_ API token feature."
     },
     {
       "id": "W18",
@@ -503,19 +608,28 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [44],
       "evidence": {
-        "code": ["packages/cloud-core/src/storage.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "packages/cloud-core/src/storage.ts",
+          "apps/web/lib/runner-artifact-routes.ts",
+          "packages/db/src/runner-artifact-store.ts",
+          "apps/web/lib/retention-maintenance-worker.ts"
+        ],
+        "tests": [
+          "tests/integration/artifact-deletion-store-postgres.test.ts",
+          "tests/unit/web/artifact-download-route.test.ts",
+          "tests/unit/web/retention-maintenance-worker.test.ts"
+        ],
+        "docs": ["docs/security/data-lifecycle.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "corepack pnpm vitest run tests/integration/artifact-deletion-store-postgres.test.ts tests/unit/web/artifact-download-route.test.ts tests/unit/web/retention-maintenance-worker.test.ts",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Retention, deletion, and privacy blocker #44 remains open."
+      "remaining": "Only the local-filesystem storage driver is wired (S3/GCS/Azure Blob return HTTP 501, per the driver's own docs); no malware/archive-bomb scanning; region/residency routing (kms-adapter.ts getTenantDataRegion) is an unused stub; age-based retention purge is previewed but not activated, matching open issue #44."
     },
     {
       "id": "W19",
@@ -528,19 +642,32 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [],
       "evidence": {
-        "code": ["packages/cloud-core/src/entitlements.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "packages/cloud-core/src/entitlements.ts",
+          "packages/cloud-core/src/stripe-service.ts",
+          "apps/web/app/api/v1/billing/webhook/route.ts",
+          "apps/web/lib/marketplace-free-billing.ts"
+        ],
+        "tests": [
+          "tests/unit/cloud-core/billing-transitions.test.ts",
+          "tests/unit/cloud-core/entitlements.test.ts",
+          "tests/unit/web/billing-routes.test.ts",
+          "tests/unit/db/marketplace-billing-atomic.test.ts"
+        ],
+        "docs": [
+          "docs/architecture/adr/0014-seat-based-entitlement-tier-rename.md",
+          "docs/gtm/pricing-and-packaging.md"
+        ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/cloud-core/billing-transitions.test.ts tests/unit/cloud-core/entitlements.test.ts tests/unit/web/billing-routes.test.ts tests/unit/db/marketplace-billing-atomic.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Stripe webhook signature verification and idempotent event recording are real, but the route's own comments admit subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are unimplemented stubs on that path; the GitHub Marketplace billing path is materially more complete."
     },
     {
       "id": "W20",
@@ -553,19 +680,29 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [25],
       "evidence": {
-        "code": ["apps/web/lib/run-dashboard.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "apps/web/lib/run-verdict.ts",
+          "apps/web/components/review/overview-tab.tsx",
+          "apps/web/components/run-investigation.tsx",
+          "apps/web/lib/run-dashboard.ts"
+        ],
+        "tests": [
+          "tests/e2e/qa-audit.spec.ts",
+          "tests/e2e/visual.spec.ts",
+          "tests/unit/web/run-investigation-accessibility.test.ts",
+          "tests/unit/web/review-canvas.test.ts"
+        ],
+        "docs": ["docs/superpowers/specs/2026-08-28-foundry-editorial-product-ui-design.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "corepack pnpm vitest run tests/unit/web/run-investigation-accessibility.test.ts tests/unit/web/review-canvas.test.ts && corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts tests/e2e/visual.spec.ts",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Hosted run dashboard blocker #25 remains open."
+      "remaining": "No per-domain score cards (Design/DFM/DFA/DFT/BOM/Supply/Firmware/Manufacturer/Policy) were found — findings appear as a flat/tabbed list; no 'Open in KiCad' deep link (only GitHub Actions deep links)."
     },
     {
       "id": "W21",
@@ -578,19 +715,27 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [26],
       "evidence": {
-        "code": ["src/report/html.ts"],
-        "tests": [],
+        "code": [
+          "packages/contracts/src/snapshots.ts",
+          "src/kicad/snapshots.ts",
+          "apps/web/components/review/review-canvas.tsx"
+        ],
+        "tests": [
+          "tests/unit/web/review-canvas.test.ts",
+          "tests/unit/kicad/snapshots.test.ts",
+          "tests/e2e/visual.spec.ts"
+        ],
         "docs": [],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "corepack pnpm vitest run tests/unit/web/review-canvas.test.ts tests/unit/kicad/snapshots.test.ts && corepack pnpm exec playwright test tests/e2e/visual.spec.ts",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No true 3D viewer implementation exists (3d_render is a schema enum value only, no renderer); no dedicated Gerber-layer-stack/drill-overlay parser (the view is generated from parsed .kicad_pcb data, not exported Gerbers); no large-board performance/LOD test; no dedicated documentation page."
     },
     {
       "id": "W22",
@@ -603,19 +748,30 @@
       "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
       "issues": [41, 45],
       "evidence": {
-        "code": ["packages/contracts/src/runner-protocol.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "packages/db/src/runner-registration-enrollment-store.ts",
+          "packages/db/src/runner-lease-store.ts",
+          "apps/web/lib/runner-lease-routes.ts",
+          "packages/cloud-core/src/enterprise/saml-adapter.ts"
+        ],
+        "tests": [
+          "tests/integration/runner-enrollment-admin-psql.test.ts",
+          "tests/unit/web/runner-lease-routes.test.ts"
+        ],
+        "docs": [
+          "docs/deployment/self-hosted-runner.md",
+          "docs/architecture/adr/0015-enterprise-governance-sso-scim.md"
+        ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "corepack pnpm vitest run tests/integration/runner-enrollment-admin-psql.test.ts tests/unit/web/runner-lease-routes.test.ts",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Enterprise blockers #41 and #45 remain open."
+      "remaining": "SSO (OIDC/SAML), SCIM provisioning, customer-managed keys, and SIEM export are all in-memory stub adapters with no wired API routes, honestly labeled 'Proposed / Blueprint (planned upon enterprise customer commitment)' in ADR-0015. Only the customer-hosted execution agent (enrollment/lease/heartbeat/revocation) is production-grade."
     },
     {
       "id": "W23",
@@ -628,19 +784,19 @@
       "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
       "issues": [],
       "evidence": {
-        "code": ["src/notifiers"],
-        "tests": [],
+        "code": ["src/notifiers/dispatch.ts", "src/notifiers/webhook.ts"],
+        "tests": ["tests/unit/notifiers/notifiers.test.ts"],
         "docs": [],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/notifiers/notifiers.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Only Slack/Teams webhook notifications exist. GitLab, Azure DevOps, Jira, PLM, and ERP adapters, an integration-SDK capability manifest, encrypted credential storage/rotation, per-integration audit trail, and retry/idempotency semantics are all absent — repo-wide search found zero matches for gitlab/azure-devops/jira in code."
     },
     {
       "id": "W24",
@@ -654,18 +810,18 @@
       "issues": [],
       "evidence": {
         "code": ["src/release/handoff.ts"],
-        "tests": [],
-        "docs": [],
+        "tests": ["tests/unit/release/handoff.test.ts"],
+        "docs": ["docs/release/manufacturer-handoff.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/release/handoff.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No external manufacturer/CM web portal exists — no time-bound access token, CM accept/issue-found/clarification state, question threads, or RFQ/vendor-quote metadata. boardreadyops release handoff is a real local CLI command producing a signed vendor-profile zip, not a collaboration portal."
     },
     {
       "id": "W25",
@@ -678,7 +834,7 @@
       "milestone": "Backlog — Manufacturer Collaboration & Production Loop",
       "issues": [450, 451],
       "evidence": {
-        "code": ["packages/contracts/src/evidence-ledger.ts"],
+        "code": [],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -686,11 +842,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "repo-wide audit: no production-run/yield/traceability model found in packages/db/prisma/schema.prisma, src/, apps/, or packages/ (2026-09-01)",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Production outcome ingestion #450 and Evidence Graph #451 remain open and unmilestoned."
+      "remaining": "Entirely unimplemented: no production-run entity, no built/pass/fail/rework/scrap outcome counts, no failure taxonomy, no yield calculation, no CM-vs-internal access split. ReleaseRun/ReleaseRunAttempt in the Prisma schema are CI/CD check-run models, not physical production runs. Matches open issues #450 and #451."
     },
     {
       "id": "W26",
@@ -703,19 +859,23 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [52],
       "evidence": {
-        "code": ["packages/cloud-core/src/assist"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "packages/cloud-core/src/assist/ai-assistant.ts",
+          "packages/cloud-core/src/assist/dfm-adapter.ts",
+          "src/cli/commands/plan.ts"
+        ],
+        "tests": ["tests/unit/assist/ai-assistant.test.ts", "tests/unit/cli/plan.test.ts"],
+        "docs": ["docs/agent-planning.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/assist/ai-assistant.test.ts tests/unit/cli/plan.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "AI reviewer guardrail issue #52 remains open."
+      "remaining": "No real model integration exists yet — NoOpAiAssistant is a hardcoded deterministic stub, off by default. No explain/prioritize/propose-fix action taxonomy, prompt-injection defense, tool allowlist/sandbox, agent audit log, or human-approval workflow for design-intent edits, beyond the single AI_ASSIST_ENABLED kill switch. boardreadyops plan itself (safeAutoFixPossible, commandsToVerify) is real. Matches open issue #52."
     },
     {
       "id": "W27",
@@ -728,19 +888,23 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [],
       "evidence": {
-        "code": ["packages/plugin-sdk"],
-        "tests": [],
-        "docs": [],
+        "code": ["packages/plugin-sdk/src/index.ts", "src/core/plugin-loader.ts", "src/core/plugin-permissions.ts"],
+        "tests": ["tests/unit/core/plugin-loader.test.ts", "tests/integration/plugin-sdk-contract.test.ts"],
+        "docs": [
+          "docs/plugin-sdk.md",
+          "docs/architecture/adr/0009-plugin-sandboxing.md",
+          "docs/integrations/boardreadyops-mcp.md"
+        ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/core/plugin-loader.test.ts tests/integration/plugin-sdk-contract.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No actual MCP server implementation exists (no @modelcontextprotocol/sdk dependency anywhere) — docs/integrations/boardreadyops-mcp.md only documents a proposed tool contract. The Plugin SDK half is genuinely strong (real capability manifest, pre-import permission checks, honest ADR-0009 rejecting a false node:vm sandbox claim)."
     },
     {
       "id": "W28",
@@ -778,19 +942,26 @@
       "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
       "issues": [190],
       "evidence": {
-        "code": ["src/core/logger.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "apps/web/lib/control-plane-slo.ts",
+          "apps/web/lib/control-plane-dead-letter-routes.ts",
+          "packages/db/src/control-plane-operations-store.ts"
+        ],
+        "tests": [
+          "tests/unit/web/control-plane-slo.test.ts",
+          "tests/unit/web/control-plane-dead-letter-routes.test.ts"
+        ],
+        "docs": ["docs/operations/control-plane-reconciliation.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/web/control-plane-slo.test.ts tests/unit/web/control-plane-dead-letter-routes.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No distributed tracing implementation exists (no OpenTelemetry dependency; webhook→job→dispatch→ingestion→decision trace propagation is unbuilt); no visual admin dashboard UI for dead-letters (only operator API routes); no explicit correlation-id field threading requests/webhooks/jobs/runs."
     },
     {
       "id": "W30",
@@ -803,19 +974,28 @@
       "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
       "issues": [222],
       "evidence": {
-        "code": ["scripts/control-plane-scale-envelope.mjs"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "scripts/control-plane-scale-envelope.mjs",
+          "scripts/control-plane-load.mjs",
+          "apps/web/lib/webhook-rate-limit.ts"
+        ],
+        "tests": [
+          "tests/unit/scripts/control-plane-load.test.ts",
+          "tests/integration/control-plane-load.test.ts",
+          "tests/unit/web/webhook-rate-limit.test.ts",
+          "tests/benchmark/pipeline.bench.ts"
+        ],
+        "docs": ["docs/architecture/transactional-outbox.md", "docs/operations/control-plane-load-validation.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "corepack pnpm vitest run tests/unit/scripts/control-plane-load.test.ts tests/integration/control-plane-load.test.ts tests/unit/web/webhook-rate-limit.test.ts",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No per-tenant quotas beyond webhook rate limiting, no viewer payload/LOD sizing, no explicit cost-attribution tags/counters, and no documented cloud run list/query pagination benchmark, though real p50/p95/p99 load benchmarking with numeric broker-migration trigger thresholds exists and runs in CI."
     },
     {
       "id": "W31",
@@ -828,19 +1008,27 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [25, 26, 445, 446],
       "evidence": {
-        "code": [],
-        "tests": [],
-        "docs": ["docs/golden-demo.md"],
+        "code": [
+          "examples/golden-demo/expected-findings.json",
+          "tests/fixtures/bad-board-zoo/README.md",
+          "scripts/check-docs-a11y.mjs"
+        ],
+        "tests": [
+          "tests/unit/examples/golden-demo.test.ts",
+          "tests/integration/fixtures.test.ts",
+          "tests/unit/scripts/check-docs-a11y.test.ts"
+        ],
+        "docs": ["docs/golden-demo.md", "docs/quickstart.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/examples/golden-demo.test.ts tests/integration/fixtures.test.ts tests/unit/scripts/check-docs-a11y.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Website #445 and onboarding #446 remain open and unmilestoned."
+      "remaining": "No timing assertion or E2E smoke enforces the specific '<2 minute' golden-demo target, and there is no dedicated error-code reference doc, though the golden demo is a genuine closed-loop system (expected-findings.json asserted by test) and the bad-board-zoo has 16 real enforced fixtures."
     },
     {
       "id": "W32",
@@ -855,17 +1043,17 @@
       "evidence": {
         "code": ["schemas/telemetry-event.schema.json"],
         "tests": [],
-        "docs": [],
+        "docs": ["docs/gtm/product-metrics-and-telemetry.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "repo-wide audit: grep for telemetry-emitting code in src/, apps/, packages/ (2026-09-01)",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "No source code anywhere in src/, apps/, or packages/ emits or consumes telemetry events, and no test validates the schema — this is a schema-and-plan artifact; the doc itself frames most validation gates as 'External Validation Required.'"
     },
     {
       "id": "W33",
@@ -878,19 +1066,28 @@
       "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
       "issues": [],
       "evidence": {
-        "code": ["packages/db/src/audit-log-store.ts"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "packages/db/src/audit-log-store.ts",
+          "apps/web/lib/control-plane-audit-routes.ts",
+          "packages/db/src/data-lifecycle-store.ts",
+          "src/report/hbom.ts"
+        ],
+        "tests": [
+          "tests/unit/web/control-plane-audit-routes.test.ts",
+          "tests/unit/db/audit-log-store.test.ts",
+          "tests/unit/report/hbom.test.ts"
+        ],
+        "docs": ["docs/security/audit-logs.md", "docs/security/data-lifecycle.md", "docs/sbom.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/web/control-plane-audit-routes.test.ts tests/unit/db/audit-log-store.test.ts tests/unit/report/hbom.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "The audit export endpoint emits JSON only (no CSV/PDF/JSONL), and there is no watermark or tamper-evidence hash on exported evidence, though authorization enforcement, legal-hold blocking of erasure/cancellation, and CycloneDX 1.7 HBOM generation are all real, tested, and schema-validated."
     },
     {
       "id": "W34",
@@ -903,19 +1100,24 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [329],
       "evidence": {
-        "code": [],
-        "tests": ["tests/property"],
-        "docs": [],
+        "code": [
+          "stryker.config.mjs",
+          "scripts/check-mutation-thresholds.mjs",
+          "tests/property/config-report.property.test.ts",
+          "tests/property/findings.property.test.ts"
+        ],
+        "tests": ["tests/integration/cross-platform-paths.test.ts", "tests/e2e/regression-audit-findings.spec.ts"],
+        "docs": ["docs/development/testing-policy.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
+        "command": "corepack pnpm vitest run tests/integration/cross-platform-paths.test.ts --no-file-parallelism && corepack pnpm exec playwright test tests/e2e/regression-audit-findings.spec.ts",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Only two fast-check property-test files exist, scoped to findings/config/report formatting, not dedicated BOM/CSV/YAML/JSON/KiCad-text parser fuzzing or state-machine/waiver-combinatorial property tests; no licensing-aware record/replay network cassette system, though mutation testing has real per-module thresholds enforced in CI and the flaky-test policy explicitly rejects silent quarantine."
     },
     {
       "id": "W35",
@@ -928,19 +1130,27 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [88],
       "evidence": {
-        "code": ["scripts/check-marketplace-listing.mjs"],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "scripts/check-marketplace-listing.mjs",
+          "scripts/verify-release-channels.mjs",
+          "Formula/boardreadyops.rb"
+        ],
+        "tests": [
+          "tests/unit/marketplace-listing.test.ts",
+          "tests/unit/scripts/verify-release-channels.test.ts",
+          "tests/unit/web/marketplace-webhook-route.test.ts"
+        ],
+        "docs": ["docs/github-marketplace.md", "docs/support-matrix.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/unit/marketplace-listing.test.ts tests/unit/scripts/verify-release-channels.test.ts tests/unit/web/marketplace-webhook-route.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-01T17:57:55Z"
       },
-      "remaining": "Marketplace remains downstream of open least-privilege GitHub App blocker #88."
+      "remaining": "verify-release-channels.mjs genuinely cross-checks npm/GitHub-Release/Homebrew/container digest identity in CI, but the public GitHub Marketplace listing itself remains gated on open issue #88 (least-privilege GitHub App permissions) before it can be considered a fully shipped, unblocked capability."
     },
     {
       "id": "W36",
