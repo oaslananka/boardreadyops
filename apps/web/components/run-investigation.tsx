@@ -137,11 +137,18 @@ export function RunUnavailable({ runId }: Readonly<{ runId: string }>) {
     <AppShell viewerNav={<ViewerNav />}>
       <main className="shell compact-shell" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Run unavailable" }]} />
-        <Alert title="Run dashboard is not configured" tone="warning">
+        <Alert title="Run details temporarily unavailable" tone="warning">
           <p>
-            This deployment cannot load run <code>{runId}</code> because its PostgreSQL connection is not configured.
+            This deployment can't load run <code>{runId}</code> right now. No run data was inferred or cached by this
+            page.
           </p>
-          <p>Configure the cloud database and retry. No run data was inferred or cached by this page.</p>
+          <p>
+            If this persists, report it via a{" "}
+            <a href="https://github.com/oaslananka/boardreadyops/issues/new" rel="noreferrer">
+              GitHub issue
+            </a>{" "}
+            with this run ID; the operator responsible for this deployment can see the underlying cause in server logs.
+          </p>
         </Alert>
       </main>
     </AppShell>
@@ -154,9 +161,10 @@ export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
       <Alert title="Recovery requires operator action" tone="danger">
         <p>
           {run.deadLetterCount} reconciliation item{run.deadLetterCount === 1 ? " is" : "s are"} in dead-letter state.
-          The visible result is preserved, but automated recovery has stopped for those items.
+          The visible result is preserved, but automated recovery has stopped for those items and needs the deployment
+          operator to intervene.
         </p>
-        <Link href={`/runs/${run.id}/audit`}>Open audit and recovery guidance</Link>
+        <Link href={`/runs/${run.id}/audit`}>See what to report and to whom</Link>
       </Alert>
     );
   }
@@ -945,10 +953,15 @@ export function AuditView({ run }: Readonly<{ run: RunDetail }>) {
         description="Operational records are kept apart from your board content, and never mixed into it."
         id="audit"
       >
-        <Alert title="Operator authentication required" tone="info">
+        <Alert title="Full audit export requires operator access" tone="info">
           <p>
-            Audit events are available through the tenant-scoped operator API and are not embedded in this public run
-            route.
+            Detailed audit events for this run are kept in a tenant-scoped operator system, not embedded in this
+            dashboard. If you need the full export -- for a recovery, a compliance request, or a dead-letter item below
+            -- report it via a{" "}
+            <a href="https://github.com/oaslananka/boardreadyops/issues/new" rel="noreferrer">
+              GitHub issue
+            </a>{" "}
+            with the run ID below; the operator for this deployment can pull it for you.
           </p>
         </Alert>
         <DefinitionGrid>
@@ -957,9 +970,6 @@ export function AuditView({ run }: Readonly<{ run: RunDetail }>) {
             <code>{run.id}</code>
           </Definition>
           <Definition label="Reconciliation backlog">{run.reconciliationCount}</Definition>
-          <Definition label="Export surface">
-            <code>/api/v1/operator/installations/&lt;installationId&gt;/audit-events?releaseRunId={run.id}</code>
-          </Definition>
         </DefinitionGrid>
       </Panel>
       <Panel

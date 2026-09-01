@@ -2374,7 +2374,7 @@ code {
 }
 
 .settings-form input:focus-visible {
-  outline: var(--bro-focus);
+  outline: 0.2rem solid var(--bro-focus);
   outline-offset: 1px;
   border-color: var(--bro-border-accent);
 }
@@ -2554,7 +2554,7 @@ code {
 }
 
 .run-verdict-action:focus-visible {
-  outline: var(--bro-focus);
+  outline: 0.2rem solid var(--bro-focus);
   outline-offset: 2px;
 }
 
