@@ -5,7 +5,7 @@ export default function RunNotFound() {
   return (
     <AppShell>
       <main className="shell compact-shell" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Run unavailable" }]} />
+        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]} />
         <section className="run-state-surface">
           <EmptyState
             title="This run is not available"

@@ -18,7 +18,7 @@ const groups: ReadonlyArray<Readonly<{ label: string; items: readonly Navigation
     items: [
       { label: "My Work", href: "/work", icon: "work" },
       { label: "Reviews", href: "/reviews", icon: "reviews" },
-      { label: "Projects", href: "/dashboard", icon: "projects" },
+      { label: "Dashboard", href: "/dashboard", icon: "projects" },
     ],
   },
   {

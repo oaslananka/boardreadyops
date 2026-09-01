@@ -10,6 +10,7 @@ export const metadata = {
 
 export default function ReviewsListPage() {
   const reviews = DEMO_REVIEWS;
+  const activeCount = reviews.filter((review) => review.decision === "pending").length;
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
@@ -24,7 +25,8 @@ export default function ReviewsListPage() {
         <section className="review-registry-toolbar decision-band" aria-label="Review registry summary">
           <div className="metric-strip">
             <span className="metric-pill">
-              Showing <strong>{reviews.length}</strong> active reviews
+              Showing <strong>{reviews.length}</strong> review{reviews.length === 1 ? "" : "s"} (
+              <strong>{activeCount}</strong> awaiting a decision)
             </span>
           </div>
         </section>

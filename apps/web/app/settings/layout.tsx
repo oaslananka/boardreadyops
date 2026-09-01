@@ -1,15 +1,7 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppShell, Breadcrumbs } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
-
-const destinations = [
-  { label: "Billing & Seats", href: "/settings/billing" },
-  { label: "Security & Access", href: "/settings/security" },
-  { label: "Data & Retention", href: "/settings/data" },
-  { label: "API Tokens", href: "/settings/tokens" },
-  { label: "Component Intelligence", href: "/settings/component-intelligence" },
-] as const;
+import { SettingsNav } from "./settings-nav.js";
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
@@ -22,17 +14,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         </header>
 
         <div className="settings-layout-grid">
-          <nav className="settings-navigation panel surface-raised" aria-label="Settings navigation">
-            <ul className="settings-nav-list">
-              {destinations.map((dest) => (
-                <li key={dest.href}>
-                  <Link href={dest.href} className="settings-nav-link">
-                    {dest.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <SettingsNav />
 
           <section className="settings-content">{children}</section>
         </div>

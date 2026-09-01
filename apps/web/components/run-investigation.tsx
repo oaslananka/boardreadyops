@@ -90,7 +90,7 @@ export function RunPageFrame({
       <main className="page-frame operational-page" id="main-content">
         <Breadcrumbs
           items={[
-            { href: "/", label: "BoardReadyOps" },
+            { href: "/", label: "Home" },
             { href: `/runs/${run.id}`, label: run.repository },
             { label: currentLabel },
           ]}
@@ -136,7 +136,7 @@ export function RunUnavailable({ runId }: Readonly<{ runId: string }>) {
   return (
     <AppShell viewerNav={<ViewerNav />}>
       <main className="shell compact-shell" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "BoardReadyOps" }, { label: "Run unavailable" }]} />
+        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]} />
         <Alert title="Run details temporarily unavailable" tone="warning">
           <p>
             This deployment can't load run <code>{runId}</code> right now. No run data was inferred or cached by this

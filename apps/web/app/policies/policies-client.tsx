@@ -592,7 +592,7 @@ export default function PoliciesClient() {
               title="No governance policies configured yet"
               action={
                 <button type="button" className="button button-primary" onClick={() => setShowBuilder(true)}>
-                  + Create Governance Policy
+                  + New Governance Policy
                 </button>
               }
             >

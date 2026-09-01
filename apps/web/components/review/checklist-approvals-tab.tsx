@@ -66,7 +66,7 @@ export function ChecklistApprovalsTab({
                 <span className="checklist-item-title">{item.title}</span>
                 {item.completed && item.completedBy ? (
                   <span className="checklist-item-meta">
-                    Completed by {item.completedBy} at {new Date(item.completedAt ?? "").toLocaleTimeString()}
+                    Completed by {item.completedBy} at {new Date(item.completedAt ?? "").toLocaleString()}
                   </span>
                 ) : null}
               </div>
