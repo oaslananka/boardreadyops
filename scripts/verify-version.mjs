@@ -29,10 +29,10 @@ if (readmeVersionMatch) {
 }
 
 if (!process.env.ALLOW_MAJOR_RELEASE && isMajorRelease(packageJson.version)) {
-  throw new Error("version 1.0.0 or later requires ALLOW_MAJOR_RELEASE=true");
+  throw new Error("version 2.0.0 or later requires ALLOW_MAJOR_RELEASE=true");
 }
 
 function isMajorRelease(version) {
   const major = Number(/^(\d+)\./.exec(version)?.[1] ?? "0");
-  return major >= 1;
+  return major >= 2;
 }

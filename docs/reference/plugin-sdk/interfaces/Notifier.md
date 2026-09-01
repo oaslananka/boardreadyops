@@ -6,14 +6,20 @@
 
 # Interface: Notifier
 
-Notification extension point reserved for plugin packages.
+**`Experimental`**
+
+Notification extension point.
+  - Reserved extension point for custom alert dispatchers.
 
 ## Indexable
 
 > \[`key`: `string`\]: `unknown`
+**`Experimental`**
 
 ## Properties
 
 ### id
 
 > **id**: `string`
+
+**`Experimental`**

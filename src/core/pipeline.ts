@@ -203,8 +203,30 @@ async function validatePhase(
         rule: rule.meta.id,
         project: project.projectFile,
       });
+      const ruleConf = projectConfig.rules?.[rule.meta.id] ?? ctx.config.rules?.[rule.meta.id];
+      const ruleTimeout =
+        typeof ruleConf === "object" &&
+        ruleConf !== null &&
+        typeof ruleConf.timeout === "number" &&
+        ruleConf.timeout > 0
+          ? ruleConf.timeout
+          : undefined;
+
       try {
-        output.push(...(await rule.run(context)));
+        let rulePromise = Promise.resolve(rule.run(context));
+        if (ruleTimeout !== undefined) {
+          let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new Error(`Rule "${rule.meta.id}" timed out after ${ruleTimeout}ms.`));
+            }, ruleTimeout);
+            timeoutHandle.unref?.();
+          });
+          rulePromise = Promise.race([rulePromise, timeoutPromise]).finally(() => {
+            if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+          });
+        }
+        output.push(...(await rulePromise));
         ctx.logger.debug("pipeline.rule.finish", {
           rule: rule.meta.id,
           project: project.projectFile,

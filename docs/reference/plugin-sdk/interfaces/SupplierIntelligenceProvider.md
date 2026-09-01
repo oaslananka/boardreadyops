@@ -6,7 +6,10 @@
 
 # Interface: SupplierIntelligenceProvider
 
+**`Experimental`**
+
 Supplier intelligence provider extension point for plugins.
+  - Experimental supplier intelligence provider hook.
 
 ## Properties
 
@@ -14,17 +17,23 @@ Supplier intelligence provider extension point for plugins.
 
 > **id**: `string`
 
+**`Experimental`**
+
 ***
 
 ### name
 
 > **name**: `string`
 
+**`Experimental`**
+
 ***
 
 ### requiresNetwork?
 
 > `optional` **requiresNetwork?**: `boolean`
+
+**`Experimental`**
 
 True when this provider requires network access.
 
@@ -33,6 +42,8 @@ True when this provider requires network access.
 ### query()
 
 > **query**(`input`): `Promise`\<[`SupplierIntelligenceResult`](SupplierIntelligenceResult.md)\>
+
+**`Experimental`**
 
 Fetch supplier intelligence for the given components.
 

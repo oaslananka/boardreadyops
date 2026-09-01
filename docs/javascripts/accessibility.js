@@ -41,11 +41,22 @@
     }
   }
 
+  function patchScrollableRegions() {
+    for (const element of document.querySelectorAll(".md-typeset__scrollwrap, .md-typeset__table")) {
+      if (element.scrollWidth > element.clientWidth) {
+        setMissingAttribute(element, "tabindex", "0");
+        setMissingAttribute(element, "role", "region");
+        setMissingAttribute(element, "aria-label", "Scrollable table");
+      }
+    }
+  }
+
   function patchAccessibility() {
     ensureSubmitButtons();
     patchSearch();
     patchTocToggle();
     patchScrollableCode();
+    patchScrollableRegions();
   }
 
   if (document.readyState === "loading") {

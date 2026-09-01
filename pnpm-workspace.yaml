@@ -30,6 +30,7 @@ packages:
 
 allowBuilds:
   '@prisma/engines': true
+  '@sentry/cli': false
   esbuild: true
   libxmljs2: false
   prisma: true

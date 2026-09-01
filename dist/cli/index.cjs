@@ -34844,7 +34844,7 @@ var init_billing = __esm({
   "packages/contracts/src/billing.ts"() {
     "use strict";
     init_zod();
-    billingTierSchema = external_exports.enum(["free", "team", "business", "enterprise"]);
+    billingTierSchema = external_exports.enum(["free", "team", "business"]);
     billingIntervalSchema = external_exports.enum(["month", "year"]);
     billingCustomerSchema = external_exports.object({
       id: external_exports.string().uuid(),
@@ -41927,6 +41927,11 @@ var config_schema_default = {
                       items: {
                         type: "string"
                       }
+                    },
+                    timeout: {
+                      type: "integer",
+                      minimum: 1,
+                      description: "Maximum rule execution time in milliseconds."
                     }
                   }
                 }
@@ -42003,6 +42008,11 @@ var config_schema_default = {
                     minLength: 1
                   }
                 }
+              },
+              timeout: {
+                type: "integer",
+                minimum: 1,
+                description: "Maximum rule execution time in milliseconds."
               }
             }
           }
@@ -48980,6 +48990,25 @@ async function loadPlugins(root, config2) {
   const errors = [];
   for (const specifier of specifiers) {
     try {
+      const staticManifest = await readStaticPluginManifest(root, specifier);
+      if (staticManifest?.permissions && staticManifest.permissions.length > 0) {
+        const preCheck = evaluatePluginPermissions({
+          specifier,
+          name: staticManifest.name ?? specifier,
+          requested: staticManifest.permissions,
+          config: config2.pluginPermissions
+        });
+        if (preCheck.denied.length > 0) {
+          throw new PluginError(
+            pluginPermissionDenialMessage({
+              specifier,
+              name: staticManifest.name ?? specifier,
+              denied: preCheck.denied
+            }),
+            specifier
+          );
+        }
+      }
       const entrypoint = resolvePluginEntrypoint(root, specifier);
       const module2 = await import(entrypoint);
       const plugin = validatePlugin(module2, specifier);
@@ -49098,14 +49127,61 @@ function assertUniqueRuleIds(ruleIds, specifier) {
     seen.add(ruleId6);
   }
 }
+function createPluginErrorFinding(context, message) {
+  return createFinding({
+    ruleId: "config.invalid",
+    severity: "high",
+    message,
+    project: context.projects[0]?.projectFile,
+    resource: {
+      path: context.projects[0]?.projectFile ?? context.root,
+      kind: "project"
+    }
+  });
+}
 function toCoreRule(pluginRule) {
   return {
     meta: pluginRule.meta,
     async run(context) {
-      const findings = await pluginRule.run(context);
-      return findings.map(normalizePluginFinding);
+      try {
+        const findings = await pluginRule.run(context);
+        if (!Array.isArray(findings)) {
+          return [createPluginErrorFinding(context, `Plugin rule "${pluginRule.meta.id}" returned non-array output.`)];
+        }
+        return findings.map(normalizePluginFinding);
+      } catch (error51) {
+        return [
+          createPluginErrorFinding(context, `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error51)}`)
+        ];
+      }
     }
   };
+}
+async function readStaticPluginManifest(root, specifier) {
+  try {
+    let manifestPath;
+    if (isPathSpecifier(specifier)) {
+      const resolved = import_node_path41.default.resolve(root, specifier);
+      const isDir = await import_promises13.default.stat(resolved).then((s) => s.isDirectory()).catch(() => false);
+      manifestPath = isDir ? import_node_path41.default.join(resolved, "package.json") : import_node_path41.default.join(import_node_path41.default.dirname(resolved), "package.json");
+    } else {
+      manifestPath = import_node_path41.default.join(root, "node_modules", specifier, "package.json");
+    }
+    const content = await import_promises13.default.readFile(manifestPath, "utf8");
+    const parsed = JSON.parse(content);
+    const boardreadyops = parsed.boardreadyops && typeof parsed.boardreadyops === "object" ? parsed.boardreadyops : parsed;
+    const permissions = Array.isArray(boardreadyops.permissions) ? boardreadyops.permissions.filter(isPluginPermission) : void 0;
+    const manifest = {};
+    if (typeof parsed.name === "string") {
+      manifest.name = parsed.name;
+    }
+    if (permissions && permissions.length > 0) {
+      manifest.permissions = permissions;
+    }
+    return manifest;
+  } catch {
+    return void 0;
+  }
 }
 function normalizePluginFinding(finding2) {
   const input = finding2;
@@ -49567,8 +49643,23 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
         rule: rule2.meta.id,
         project: project.projectFile
       });
+      const ruleConf = projectConfig.rules?.[rule2.meta.id] ?? ctx.config.rules?.[rule2.meta.id];
+      const ruleTimeout = typeof ruleConf === "object" && ruleConf !== null && typeof ruleConf.timeout === "number" && ruleConf.timeout > 0 ? ruleConf.timeout : void 0;
       try {
-        output.push(...await rule2.run(context));
+        let rulePromise = Promise.resolve(rule2.run(context));
+        if (ruleTimeout !== void 0) {
+          let timeoutHandle;
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new Error(`Rule "${rule2.meta.id}" timed out after ${ruleTimeout}ms.`));
+            }, ruleTimeout);
+            timeoutHandle.unref?.();
+          });
+          rulePromise = Promise.race([rulePromise, timeoutPromise]).finally(() => {
+            if (timeoutHandle !== void 0) clearTimeout(timeoutHandle);
+          });
+        }
+        output.push(...await rulePromise);
         ctx.logger.debug("pipeline.rule.finish", {
           rule: rule2.meta.id,
           project: project.projectFile,

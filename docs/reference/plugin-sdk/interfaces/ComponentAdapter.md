@@ -6,14 +6,20 @@
 
 # Interface: ComponentAdapter
 
-Component adapter extension point reserved for plugin packages.
+**`Experimental`**
+
+Component adapter extension point.
+  - Reserved extension point for future hardware adapter implementations.
 
 ## Indexable
 
 > \[`key`: `string`\]: `unknown`
+**`Experimental`**
 
 ## Properties
 
 ### id
 
 > **id**: `string`
+
+**`Experimental`**

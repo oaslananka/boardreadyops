@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const billingTierSchema = z.enum(["free", "team", "business", "enterprise"]);
+export const billingTierSchema = z.enum(["free", "team", "business"]);
 export type BillingTier = z.infer<typeof billingTierSchema>;
 
 export const billingIntervalSchema = z.enum(["month", "year"]);

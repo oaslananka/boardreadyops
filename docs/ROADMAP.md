@@ -16,6 +16,32 @@ BoardReadyOps should turn a KiCad project into a verified, signed, manufacturer-
 
 ---
 
+## Outcome Alignment
+
+Every roadmap workstream is tied directly to measurable user and business outcomes:
+
+| Workstream / Epic | Strategic Outcome | Key Value Delivered |
+| :--- | :--- | :--- |
+| **Epic #261**: Artifact Generation Engine | `recurring usage` | First-party Gerber/BOM/drill generation replaces KiBot in daily workflows. |
+| **Epic #262**: Release Prepare Pipeline | `activation` | One-command release preparation removes onboarding friction. |
+| **Epic #263**: Evidence Bundle v2 & Signing | `trust/security` | Cryptographic provenance (Ed25519) guarantees release authenticity. |
+| **Epic #264**: Manufacturer Handoff Packages | `first useful finding` | Vendor-packaged zip files ready for direct fabrication upload. |
+| **Epic #265**: Vendor Readiness Scoring | `finding quality` | 0–100 vendor profile scoring explains release readiness objectively. |
+| **Epic #266**: Visual Release Dashboard | `trusted PR decisions` | Human-readable engineering review dashboard on PRs and releases. |
+| **Epic #267**: Release-to-Release Diff Engine | `trusted PR decisions` | Hardware Change Impact shows exact facts, risk direction, and delta. |
+| **Epic #268**: Variant-Aware Hardware Release | `recurring usage` | Production vs prototype variant handling in multi-board repositories. |
+| **Epic #269**: Policy Engine & Release Governance | `trusted PR decisions` | Policy-as-code with simulation (`policy --simulate`) and severity gates. |
+| **Epic #270**: Waivers & Approval Workflow | `trusted PR decisions` | Formal waiver lifecycle; expired waivers block production release policy. |
+| **Epic #271**: Provenance & Hardware SLSA | `trust/security` | Supply chain attestation and Hardware Release Level assurance. |
+| **Epic #272**: HBOM & BOM Intelligence | `finding quality` | Structured CycloneDX HBOM and lifecycle risk detection. |
+| **Epic #273**: Firmware-Hardware Contracts | `first useful finding` | Cross-discipline pin and peripheral consistency verification. |
+| **Epic #274**: DFM/DFA Rule Corpus Expansion | `finding quality` | Polarity, silkscreen, and fiducial checks prevent board scrap. |
+| **Epic #275**: GitHub App & PR Release Gate | `activation` | Zero-config PR review comments and Check Run status reporting. |
+| **Epic #276**: Cloud Dashboard & Control Plane | `paid validation` | Multi-board supply watch, seat-based governance, and tenant workspace. |
+| **Epic #277**: Golden Demo & Bad-Board Zoo | `activation` | Immediate <2min evaluation and regression testing on real KiCad boards. |
+
+---
+
 ## Milestones
 
 ### v1.6.0 — Artifact Generation MVP ✅

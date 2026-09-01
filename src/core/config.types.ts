@@ -21,6 +21,7 @@ export interface RuleConfig {
   patterns?: Record<string, string[]>;
   "severity-overrides"?: Record<string, Severity>;
   "ignore-refs"?: string[];
+  timeout?: number;
   [key: string]: unknown;
 }
 

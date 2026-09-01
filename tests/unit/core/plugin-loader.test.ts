@@ -384,6 +384,98 @@ describe("plugin loader", () => {
     expect(result.errors).toEqual([expect.stringContaining("network")]);
   });
 
+  it("blocks plugins declaring unapproved permissions in static package.json before execution", async () => {
+    const root = await makeProjectRoot();
+    const pkgDir = path.join(root, "node_modules", "boardreadyops-plugin-risky");
+    await fs.mkdir(pkgDir, { recursive: true });
+    await fs.writeFile(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: "boardreadyops-plugin-risky",
+        version: "1.0.0",
+        type: "module",
+        main: "index.js",
+        boardreadyops: {
+          permissions: ["process"],
+        },
+      }),
+      "utf8",
+    );
+    // index.js has top-level throw; if pre-check works, it must not execute
+    await fs.writeFile(
+      path.join(pkgDir, "index.js"),
+      'throw new Error("Malicious top-level code executed!");\n',
+      "utf8",
+    );
+
+    const result = await loadPlugins(root, {
+      plugins: ["boardreadyops-plugin-risky"],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining("requests unapproved permission: process")]);
+  });
+
+  it("normalizes a plugin rule that returns non-array output into a config.invalid finding", async () => {
+    const root = await makeProjectRoot();
+    const pluginFile = path.join(root, "non-array-plugin.js");
+    await fs.writeFile(
+      pluginFile,
+      `export default {
+  name: "non-array-plugin",
+  version: "1.0.0",
+  rules: [
+    {
+      meta: {
+        id: "plugin.non-array",
+        title: "Non-array",
+        description: "Returns something that isn't an array",
+        rationale: "Testing non-array output normalization",
+        defaultSeverity: "info",
+        appliesTo: ["project"],
+        configKeys: [],
+        kicadVersions: ["9", "10", "future"],
+        tags: ["plugin"]
+      },
+      run() {
+        return { notAnArray: true };
+      }
+    }
+  ]
+};`,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(root, "boardreadyops.yml"),
+      `version: 1\nplugins:\n  - ${JSON.stringify(pluginFile)}\n`,
+      "utf8",
+    );
+
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.non-array"] });
+
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "config.invalid",
+        severity: "high",
+        message: expect.stringContaining("returned non-array output"),
+      }),
+    ]);
+  });
+
+  it("falls back to a directory-adjacent package.json when a path-specifier plugin file doesn't exist", async () => {
+    const root = await makeProjectRoot();
+    const missingPlugin = path.join(root, "does-not-exist.js");
+
+    const result = await loadPlugins(root, {
+      plugins: [missingPlugin],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining(missingPlugin)]);
+  });
+
   it("runs the shipped example plugin end-to-end through the SDK package", async () => {
     const root = await makeProjectRoot();
     const examplePlugin = path.resolve("examples/plugin-custom-rule/index.js");
@@ -402,6 +494,178 @@ describe("plugin loader", () => {
         message: "Hello from a BoardReadyOps plugin.",
       }),
     ]);
+  });
+
+  it("documents the known trust-boundary limit: permissions declared only on the exported object still run top-level code before the permission decision (ADR 0009)", async () => {
+    const root = await makeProjectRoot();
+    const markerFile = path.join(root, "import-ran.marker");
+    const pluginFile = path.join(root, "undeclared-permissions-plugin.js");
+    await fs.writeFile(
+      pluginFile,
+      `import fs from "node:fs";
+fs.writeFileSync(${JSON.stringify(markerFile)}, "ran");
+export default {
+  name: "undeclared-permissions-plugin",
+  version: "1.0.0",
+  permissions: ["process"],
+  rules: [],
+};
+`,
+      "utf8",
+    );
+
+    const result = await loadPlugins(root, {
+      plugins: [pluginFile],
+      pluginPermissions: { allow: {} },
+    });
+
+    // Denied, because nothing allows "process" — but only after the module already ran.
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining("process")]);
+    // There is no static package.json manifest to pre-check for a bare path-specifier
+    // plugin, and the loader must import the module to read its exported `permissions`
+    // in the first place. The marker file proves the top-level code already executed
+    // before the denial was known. This is the accepted, documented trust boundary
+    // (ADR 0009): standard-mode plugins are trusted workspace code, not sandboxed.
+    await expect(fs.stat(markerFile)).resolves.toBeDefined();
+  });
+
+  it("safely contains plugin rules that throw during execution", async () => {
+    const root = await makeProjectRoot();
+    const crashingPlugin = path.join(root, "crashing-plugin.js");
+    await fs.writeFile(
+      crashingPlugin,
+      `export default {
+  name: "crashing-plugin",
+  version: "1.0.0",
+  rules: [
+    {
+      meta: {
+        id: "plugin.crasher",
+        title: "Crasher",
+        description: "Throws at runtime",
+        rationale: "Testing failure isolation",
+        defaultSeverity: "info",
+        appliesTo: ["project"],
+        configKeys: [],
+        kicadVersions: ["9", "10", "future"],
+        tags: ["plugin"]
+      },
+      run() {
+        throw new Error("Simulated plugin runtime panic");
+      }
+    }
+  ]
+};`,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(root, "boardreadyops.yml"),
+      `version: 1\nplugins:\n  - ${JSON.stringify(crashingPlugin)}\n`,
+      "utf8",
+    );
+
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.crasher"] });
+
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "config.invalid",
+        severity: "high",
+        message: expect.stringContaining("Simulated plugin runtime panic"),
+      }),
+    ]);
+  });
+
+  it("safely contains a plugin rule that throws a non-Error value", async () => {
+    const root = await makeProjectRoot();
+    const crashingPlugin = path.join(root, "string-throw-plugin.js");
+    await fs.writeFile(
+      crashingPlugin,
+      `export default {
+  name: "string-throw-plugin",
+  version: "1.0.0",
+  rules: [
+    {
+      meta: {
+        id: "plugin.string-thrower",
+        title: "String thrower",
+        description: "Throws a plain string instead of an Error",
+        rationale: "Testing non-Error throw normalization",
+        defaultSeverity: "info",
+        appliesTo: ["project"],
+        configKeys: [],
+        kicadVersions: ["9", "10", "future"],
+        tags: ["plugin"]
+      },
+      run() {
+        throw "boom";
+      }
+    }
+  ]
+};`,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(root, "boardreadyops.yml"),
+      `version: 1\nplugins:\n  - ${JSON.stringify(crashingPlugin)}\n`,
+      "utf8",
+    );
+
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["plugin.string-thrower"] });
+
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        ruleId: "config.invalid",
+        severity: "high",
+        message: expect.stringContaining("unknown error"),
+      }),
+    ]);
+  });
+
+  it("falls back to the specifier for the denial message when a static manifest has permissions but no name", async () => {
+    const root = await makeProjectRoot();
+    const pkgDir = path.join(root, "node_modules", "boardreadyops-plugin-unnamed");
+    await fs.mkdir(pkgDir, { recursive: true });
+    await fs.writeFile(
+      path.join(pkgDir, "package.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        type: "module",
+        main: "index.js",
+        boardreadyops: { permissions: ["network"] },
+      }),
+      "utf8",
+    );
+    await fs.writeFile(path.join(pkgDir, "index.js"), 'throw new Error("must not run");\n', "utf8");
+
+    const result = await loadPlugins(root, {
+      plugins: ["boardreadyops-plugin-unnamed"],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.plugins).toEqual([]);
+    expect(result.errors).toEqual([expect.stringContaining("boardreadyops-plugin-unnamed")]);
+  });
+
+  it("accepts a plugin that declares extension points other than rules", async () => {
+    const root = await makeProjectRoot();
+    const noRulesPlugin = path.join(root, "no-rules-plugin.js");
+    await fs.writeFile(
+      noRulesPlugin,
+      `export default {
+  name: "no-rules-plugin",
+  version: "1.0.0"
+};`,
+      "utf8",
+    );
+
+    const result = await loadPlugins(root, {
+      plugins: [noRulesPlugin],
+      pluginPermissions: { allow: {} },
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.plugins).toEqual([expect.objectContaining({ name: "no-rules-plugin", ruleIds: [] })]);
   });
 });
 
