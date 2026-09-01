@@ -53032,30 +53032,44 @@ async function planReleaseRevisions(root, config2, projects, allowed, plan, virt
     return;
   }
   for (const project of projects) {
-    const projectVersionAllowed = versionAllowed && isRuleEnabledForProjectContext(root, config2, project, versionRule);
-    const projectRevisionAllowed = revisionAllowed && isRuleEnabledForProjectContext(root, config2, project, revisionRule);
-    if (projectVersionAllowed || projectRevisionAllowed) {
-      await planProjectBoardRevisions(root, project, {
-        vAllowed: projectVersionAllowed,
-        rAllowed: projectRevisionAllowed,
-        vRule: versionRule,
-        rRule: revisionRule,
-        vRegex: versionRegex,
-        rRegex: tagRegex,
-        plan,
-        virtualTexts
-      });
-      if (projectVersionAllowed && versionRegex) {
-        await planProjectSchematicRevisions({
-          root,
-          project,
-          versionRule,
-          versionRegex,
-          plan,
-          virtualTexts
-        });
-      }
-    }
+    await planProjectRevisions(root, project, config2, {
+      versionAllowed,
+      revisionAllowed,
+      versionRule,
+      revisionRule,
+      versionRegex,
+      tagRegex,
+      plan,
+      virtualTexts
+    });
+  }
+}
+async function planProjectRevisions(root, project, config2, opts) {
+  const { versionAllowed, revisionAllowed, versionRule, revisionRule, versionRegex, tagRegex, plan, virtualTexts } = opts;
+  const projectVersionAllowed = versionAllowed && isRuleEnabledForProjectContext(root, config2, project, versionRule);
+  const projectRevisionAllowed = revisionAllowed && isRuleEnabledForProjectContext(root, config2, project, revisionRule);
+  if (!projectVersionAllowed && !projectRevisionAllowed) {
+    return;
+  }
+  await planProjectBoardRevisions(root, project, {
+    vAllowed: projectVersionAllowed,
+    rAllowed: projectRevisionAllowed,
+    vRule: versionRule,
+    rRule: revisionRule,
+    vRegex: versionRegex,
+    rRegex: tagRegex,
+    plan,
+    virtualTexts
+  });
+  if (projectVersionAllowed && versionRegex) {
+    await planProjectSchematicRevisions({
+      root,
+      project,
+      versionRule,
+      versionRegex,
+      plan,
+      virtualTexts
+    });
   }
 }
 async function planProjectBoardRevisions(root, project, opts) {

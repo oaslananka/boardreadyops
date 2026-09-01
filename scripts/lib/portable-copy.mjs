@@ -11,33 +11,7 @@ async function copyEntry(source, destination, options) {
   const metadata = await lstat(source);
 
   if (metadata.isSymbolicLink()) {
-    if (options.dereferenceSymlinks) {
-      await copyEntry(await realpath(source), destination, options);
-      return;
-    }
-
-    const target = await readlink(source);
-    const targetMetadata = await stat(resolve(dirname(source), target));
-    await mkdir(dirname(destination), { recursive: true });
-    try {
-      await symlink(target, destination, targetMetadata.isDirectory() ? "dir" : "file");
-    } catch (error) {
-      if (process.platform === "win32") {
-        if (targetMetadata.isDirectory()) {
-          try {
-            await symlink(target, destination, "junction");
-            return;
-          } catch {
-            // fallback to dereferencing
-          }
-        }
-        if (error?.code === "EPERM" || error?.code === "EACCES") {
-          await copyEntry(await realpath(source), destination, options);
-          return;
-        }
-      }
-      throw error;
-    }
+    await copySymlinkEntry(source, destination, options);
     return;
   }
 
@@ -58,4 +32,36 @@ async function copyEntry(source, destination, options) {
   }
 
   throw new Error(`Unsupported filesystem entry in portable copy: ${source}`);
+}
+
+async function copySymlinkEntry(source, destination, options) {
+  if (options.dereferenceSymlinks) {
+    await copyEntry(await realpath(source), destination, options);
+    return;
+  }
+
+  const target = await readlink(source);
+  const targetMetadata = await stat(resolve(dirname(source), target));
+  await mkdir(dirname(destination), { recursive: true });
+  try {
+    await symlink(target, destination, targetMetadata.isDirectory() ? "dir" : "file");
+  } catch (error) {
+    if (process.platform === "win32" && targetMetadata.isDirectory() && (await tryJunction(target, destination))) {
+      return;
+    }
+    if (process.platform === "win32" && (error?.code === "EPERM" || error?.code === "EACCES")) {
+      await copyEntry(await realpath(source), destination, options);
+      return;
+    }
+    throw error;
+  }
+}
+
+async function tryJunction(target, destination) {
+  try {
+    await symlink(target, destination, "junction");
+    return true;
+  } catch {
+    return false;
+  }
 }
