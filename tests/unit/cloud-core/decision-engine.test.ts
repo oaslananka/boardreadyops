@@ -122,9 +122,15 @@ describe("Decision Engine", () => {
       headEvidenceDigest,
     });
 
+    expect(eval1.explanationGraph).toBeDefined();
+    expect(eval1.explanationGraph.summary).toContain("Release readiness blocked");
+    expect(eval1.explanationGraph.nodes.length).toBeGreaterThan(0);
+
     expect(eval2.isReady).toBe(true);
     expect(eval2.decision).toBe("approved");
     expect(eval2.blockers.length).toBe(0);
+    expect(eval2.explanationGraph.summary).toContain("All release readiness conditions");
+    expect(eval2.explanationGraph.nodes.some((n) => n.status === "waived")).toBe(true);
   });
 
   it("blocks on a 'high' severity finding when the policy severity gate is 'high', unlike the default gate", () => {
