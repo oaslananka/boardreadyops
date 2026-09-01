@@ -91,7 +91,7 @@ export function RunPageFrame({
         <Breadcrumbs
           items={[
             { href: "/", label: "Home" },
-            { href: `/runs/${run.id}`, label: run.repository },
+            { href: `/repositories/${run.repositoryId}`, label: run.repository },
             { label: currentLabel },
           ]}
         />
