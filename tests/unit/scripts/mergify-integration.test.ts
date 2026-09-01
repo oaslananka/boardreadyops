@@ -55,6 +55,7 @@ describe("Mergify integration contract", () => {
     expect(mergify).toContain("batch_size: 1");
     expect(mergify).toContain("max_checks_retries: 0");
     expect(mergify).toContain("update_method: merge");
+    expect(mergify).toContain("merge_method: squash");
     expect(mergify).toContain("checks_timeout: null");
     const statusChecksRule = mainRuleset.rules.find((rule) => rule.type === "required_status_checks");
     expect(statusChecksRule?.parameters?.strict_required_status_checks_policy).toBe(true);
