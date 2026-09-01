@@ -6,7 +6,10 @@ const ci = readFileSync(".github/workflows/ci.yml", "utf8");
 const mainRuleset = JSON.parse(readFileSync(".github/rulesets/main.json", "utf8")) as {
   rules: Array<{
     type: string;
-    parameters?: { required_status_checks?: Array<{ context: string }> };
+    parameters?: {
+      required_status_checks?: Array<{ context: string }>;
+      strict_required_status_checks_policy?: boolean;
+    };
   }>;
 };
 
@@ -37,11 +40,12 @@ describe("Mergify integration contract", () => {
     expect(mergify).not.toContain("auto-queue feature PRs");
   });
 
-  it("uses the repository stable required checks for final queue validation", () => {
+  it("delegates stable required checks to GitHub ruleset injection", () => {
+    expect(stableRequiredChecks.length).toBeGreaterThan(0);
+    expect(mergify).toContain("branch_protection_injection_mode: queue");
     for (const check of stableRequiredChecks) {
-      expect(mergify).toContain(`check-success = ${check}`);
+      expect(mergify).not.toContain(`check-success = ${check}`);
     }
-    expect(mergify).not.toContain("check-success = ci / security");
   });
 
   it("uses serial in-place queue checks with the strict required-check ruleset", () => {
@@ -49,14 +53,14 @@ describe("Mergify integration contract", () => {
     expect(mergify).not.toContain("mode: parallel");
     expect(mergify).toContain("max_parallel_checks: 1");
     expect(mergify).toContain("batch_size: 1");
+    expect(mergify).toContain("max_checks_retries: 0");
+    expect(mergify).toContain("update_method: merge");
     expect(mergify).toContain("checks_timeout: null");
+    const statusChecksRule = mainRuleset.rules.find((rule) => rule.type === "required_status_checks");
+    expect(statusChecksRule?.parameters?.strict_required_status_checks_policy).toBe(true);
     const queueConditions = readQueueConditionList("queue_conditions");
     const mergeConditions = readQueueConditionList("merge_conditions");
-    expect(queueConditions).toEqual([
-      "label = queue-me",
-      "-draft",
-      ...stableRequiredChecks.map((check) => `check-success = ${check}`),
-    ]);
+    expect(queueConditions).toEqual(["label = queue-me", "-draft"]);
     expect(mergeConditions).toEqual(queueConditions);
   });
 
