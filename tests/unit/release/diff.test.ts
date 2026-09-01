@@ -144,7 +144,7 @@ describe("release diff engine", () => {
     // diffFabrication's own maxBomRows default (20) caps diff.fabrication.bom.rows, but the
     // summary must reflect all 25 rows that actually changed, not just the 20 that are listed.
     expect(diff.fabrication.bom.rows).toHaveLength(20);
-    expect(diff.fabrication.bom.changedCount).toBe(25);
+    expect(diff.fabrication.bom.addedCount).toBe(25);
     expect(diff.summary.bomChanged).toBe(25);
     expect(formatReleaseDiffText(diff)).toContain("bom rows changed: 25");
   });

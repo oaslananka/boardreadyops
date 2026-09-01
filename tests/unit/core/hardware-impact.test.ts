@@ -111,6 +111,24 @@ describe("buildHardwareImpact", () => {
     expect(impact.evidence.length).toBeLessThanOrEqual(12);
   });
 
+  it("reports the true bom fact counts even when the underlying row list is capped for display", () => {
+    const manyBom = Array.from({ length: 25 }, (_, index) => ({
+      reference: `R${index}`,
+      value: "1k",
+      footprint: "0402",
+    }));
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run({ readiness: readiness(82, "ready") }) },
+      candidate: {
+        sha: headSha,
+        result: run({ readiness: readiness(82, "ready"), fabrication: { bom: manyBom, outputs: [] } }),
+      },
+    });
+
+    // diffFabrication's own row-list cap (20 by default) must not leak into the fact counts.
+    expect(impact.facts.bom).toMatchObject({ added: 25, removed: 0, changed: 0 });
+  });
+
   it("returns identical output for semantically identical inputs in different source order", () => {
     const first = buildHardwareImpact({
       baseline: { status: "available", sha: baseSha, result: previousRun() },

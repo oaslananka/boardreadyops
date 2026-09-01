@@ -39,6 +39,8 @@ export interface FabricationBomDiffRow {
 interface FabricationBomDiff {
   rows: FabricationBomDiffRow[];
   truncated: boolean;
+  addedCount: number;
+  removedCount: number;
   changedCount: number;
 }
 
@@ -100,7 +102,9 @@ function diffBom(previous: FabricationBomEntry[], current: FabricationBomEntry[]
   return {
     rows: rows.slice(0, Math.max(0, maxRows)),
     truncated: rows.length > maxRows,
-    changedCount: rows.filter((row) => row.status !== "unchanged").length,
+    addedCount: rows.filter((row) => row.status === "added").length,
+    removedCount: rows.filter((row) => row.status === "removed").length,
+    changedCount: rows.filter((row) => row.status === "changed").length,
   };
 }
 

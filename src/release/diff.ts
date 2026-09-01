@@ -53,7 +53,7 @@ export function diffReleases(
   });
   const readiness = diffReadiness(previous.readiness, current.readiness);
   const summary: ReleaseDiffSummary = {
-    bomChanged: fabrication.bom.changedCount,
+    bomChanged: fabrication.bom.addedCount + fabrication.bom.removedCount + fabrication.bom.changedCount,
     outputsChanged: fabrication.outputs.filter((output) => output.status !== "unchanged").length,
     findingsAdded: fabrication.findings.added.length,
     findingsRemoved: fabrication.findings.removed.length,
@@ -121,8 +121,11 @@ export function formatReleaseDiffText(diff: ReleaseDiff): string {
       lines.push(`    - ${bomRowSummary(row)}`);
     }
     // diff.fabrication.bom.rows can itself already be capped (see FabricationDiffOptions.maxBomRows), so
-    // changedCount -- computed before that cap -- is the only accurate source for how many rows remain.
-    const remaining = diff.fabrication.bom.changedCount - shown.length;
+    // the added/removed/changed counts -- computed before that cap -- are the only accurate source for
+    // how many rows remain.
+    const totalChanged =
+      diff.fabrication.bom.addedCount + diff.fabrication.bom.removedCount + diff.fabrication.bom.changedCount;
+    const remaining = totalChanged - shown.length;
     if (remaining > 0) {
       lines.push(`    - (+${remaining} more)`);
     }

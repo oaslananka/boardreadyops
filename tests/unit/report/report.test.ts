@@ -214,7 +214,9 @@ describe("report formats", () => {
     const markdown = formatMarkdown(sampleResult(), [], {
       bom: {
         truncated: false,
-        changedCount: 1,
+        addedCount: 1,
+        removedCount: 0,
+        changedCount: 0,
         rows: [
           {
             reference: "C45",
@@ -255,7 +257,7 @@ describe("report formats", () => {
     );
 
     const markdown = formatMarkdown(sampleResult(), [], {
-      bom: { truncated: false, rows: [], changedCount: 0 },
+      bom: { truncated: false, rows: [], addedCount: 0, removedCount: 0, changedCount: 0 },
       outputs: [],
       findings: {
         added,

@@ -54311,7 +54311,9 @@ function diffBom(previous, current, maxRows) {
   return {
     rows: rows2.slice(0, Math.max(0, maxRows)),
     truncated: rows2.length > maxRows,
-    changedCount: rows2.filter((row) => row.status !== "unchanged").length
+    addedCount: rows2.filter((row) => row.status === "added").length,
+    removedCount: rows2.filter((row) => row.status === "removed").length,
+    changedCount: rows2.filter((row) => row.status === "changed").length
   };
 }
 function diffOutputs(previous, current) {
@@ -54393,7 +54395,7 @@ function diffReleases(previous, current, options = {}) {
   });
   const readiness = diffReadiness(previous.readiness, current.readiness);
   const summary = {
-    bomChanged: fabrication.bom.changedCount,
+    bomChanged: fabrication.bom.addedCount + fabrication.bom.removedCount + fabrication.bom.changedCount,
     outputsChanged: fabrication.outputs.filter((output) => output.status !== "unchanged").length,
     findingsAdded: fabrication.findings.added.length,
     findingsRemoved: fabrication.findings.removed.length,
@@ -54450,7 +54452,8 @@ function formatReleaseDiffText(diff) {
     for (const row of shown) {
       lines.push(`    - ${bomRowSummary(row)}`);
     }
-    const remaining = diff.fabrication.bom.changedCount - shown.length;
+    const totalChanged = diff.fabrication.bom.addedCount + diff.fabrication.bom.removedCount + diff.fabrication.bom.changedCount;
+    const remaining = totalChanged - shown.length;
     if (remaining > 0) {
       lines.push(`    - (+${remaining} more)`);
     }
