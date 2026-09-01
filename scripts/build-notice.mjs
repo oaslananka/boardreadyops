@@ -116,10 +116,10 @@ export function renderNotice(report) {
     for (const item of section.packages) {
       lines.push(`- ${packageVersions(item)}`);
       if (item.description) {
-        lines.push(`  - Description: ${item.description}`);
+        lines.push(`  - Description: ${item.description.trim()}`);
       }
       if (item.homepage) {
-        lines.push(`  - Homepage: ${item.homepage}`);
+        lines.push(`  - Homepage: ${item.homepage.trim()}`);
       }
     }
     lines.push("");

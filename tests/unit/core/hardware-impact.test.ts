@@ -314,4 +314,96 @@ describe("buildHardwareImpact", () => {
     expect(impact.facts.readiness.currentScore).toBeNull();
     expect(impact.facts.readiness.currentStatus).toBeNull();
   });
+
+  it("handles invalid-artifact and candidate-mismatch baseline reasons correctly", () => {
+    const invalid = buildHardwareImpact({
+      baseline: { status: "unavailable", sha: baseSha, reason: "invalid-artifact" },
+      candidate: { sha: headSha, result: run({ readiness: readiness(80, "ready") }) },
+    });
+    expect(invalid.baseline).toEqual({ status: "unavailable", sha: baseSha, reason: "invalid-artifact" });
+    expect(invalid.assessment.materialChange).toBe(false);
+
+    const mismatch = buildHardwareImpact({
+      baseline: { status: "unavailable", sha: baseSha, reason: "candidate-mismatch" },
+      candidate: { sha: headSha, result: run({ readiness: readiness(80, "ready") }) },
+    });
+    expect(mismatch.baseline).toEqual({ status: "unavailable", sha: baseSha, reason: "candidate-mismatch" });
+  });
+
+  it("correctly isolates schematic-only changes", () => {
+    const schFinding = createFinding({
+      ruleId: "schematic.unconnected-pin",
+      severity: "high",
+      message: "Pin 1 of U1 is unconnected",
+      resource: { path: "main.kicad_sch", kind: "schematic" },
+    });
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run() },
+      candidate: { sha: headSha, result: run({ findings: [schFinding] }) },
+    });
+
+    expect(impact.assessment.affectedDomains).toEqual(["findings"]);
+    expect(impact.assessment.riskDirection).toBe("increased");
+    expect(impact.facts.findings.addedBlocking).toBe(1);
+    const findingEv = impact.evidence.find((e) => e.kind === "finding");
+    expect(findingEv?.path).toBe("main.kicad_sch");
+  });
+
+  it("correctly isolates PCB-only changes", () => {
+    const pcbFinding = createFinding({
+      ruleId: "pcb.clearance",
+      severity: "high",
+      message: "Clearance error on top layer",
+      resource: { path: "main.kicad_pcb", kind: "pcb" },
+    });
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run() },
+      candidate: { sha: headSha, result: run({ findings: [pcbFinding] }) },
+    });
+
+    expect(impact.assessment.affectedDomains).toEqual(["findings"]);
+    expect(impact.assessment.riskDirection).toBe("increased");
+    const findingEv = impact.evidence.find((e) => e.kind === "finding");
+    expect(findingEv?.path).toBe("main.kicad_pcb");
+  });
+
+  it("correctly isolates BOM-only changes with unknown risk direction", () => {
+    const previous = run({ fabrication: { bom: [{ reference: "C1", value: "100nF" }], outputs: [] } });
+    const current = run({ fabrication: { bom: [{ reference: "C1", value: "10uF" }], outputs: [] } });
+
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: previous },
+      candidate: { sha: headSha, result: current },
+    });
+
+    expect(impact.assessment.affectedDomains).toEqual(["bom"]);
+    expect(impact.assessment.riskDirection).toBe("unknown");
+    expect(impact.facts.bom.changed).toBe(1);
+  });
+
+  it("tracks resolved and new violations accurately", () => {
+    const prevBlocker = createFinding({
+      ruleId: "bom.missing-mpn",
+      severity: "high",
+      message: "Old violation",
+      resource: { path: "bom.csv", kind: "bom" },
+    });
+    const newWarning = createFinding({
+      ruleId: "bom.lifecycle",
+      severity: "medium",
+      message: "New warning",
+      resource: { path: "bom.csv", kind: "bom" },
+    });
+
+    const impact = buildHardwareImpact({
+      baseline: { status: "available", sha: baseSha, result: run({ findings: [prevBlocker] }) },
+      candidate: { sha: headSha, result: run({ findings: [newWarning] }) },
+    });
+
+    expect(impact.facts.findings.resolved).toBe(1);
+    expect(impact.facts.findings.resolvedBlocking).toBe(1);
+    expect(impact.facts.findings.added).toBe(1);
+    expect(impact.facts.findings.addedBlocking).toBe(0);
+    expect(impact.assessment.riskDirection).toBe("decreased");
+  });
 });

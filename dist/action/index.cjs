@@ -51078,121 +51078,6 @@ var require_browser = __commonJS({
   }
 });
 
-// node_modules/has-flag/index.js
-var require_has_flag = __commonJS({
-  "node_modules/has-flag/index.js"(exports2, module2) {
-    "use strict";
-    module2.exports = (flag, argv = process.argv) => {
-      const prefix2 = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
-      const position = argv.indexOf(prefix2 + flag);
-      const terminatorPosition = argv.indexOf("--");
-      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
-    };
-  }
-});
-
-// node_modules/supports-color/index.js
-var require_supports_color = __commonJS({
-  "node_modules/supports-color/index.js"(exports2, module2) {
-    "use strict";
-    var os10 = require("os");
-    var tty = require("tty");
-    var hasFlag = require_has_flag();
-    var { env } = process;
-    var forceColor;
-    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
-      forceColor = 0;
-    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
-      forceColor = 1;
-    }
-    if ("FORCE_COLOR" in env) {
-      if (env.FORCE_COLOR === "true") {
-        forceColor = 1;
-      } else if (env.FORCE_COLOR === "false") {
-        forceColor = 0;
-      } else {
-        forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
-      }
-    }
-    function translateLevel(level) {
-      if (level === 0) {
-        return false;
-      }
-      return {
-        level,
-        hasBasic: true,
-        has256: level >= 2,
-        has16m: level >= 3
-      };
-    }
-    function supportsColor(haveStream, streamIsTTY) {
-      if (forceColor === 0) {
-        return 0;
-      }
-      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
-        return 3;
-      }
-      if (hasFlag("color=256")) {
-        return 2;
-      }
-      if (haveStream && !streamIsTTY && forceColor === void 0) {
-        return 0;
-      }
-      const min = forceColor || 0;
-      if (env.TERM === "dumb") {
-        return min;
-      }
-      if (process.platform === "win32") {
-        const osRelease = os10.release().split(".");
-        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
-          return Number(osRelease[2]) >= 14931 ? 3 : 2;
-        }
-        return 1;
-      }
-      if ("CI" in env) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env) || env.CI_NAME === "codeship") {
-          return 1;
-        }
-        return min;
-      }
-      if ("TEAMCITY_VERSION" in env) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
-      }
-      if (env.COLORTERM === "truecolor") {
-        return 3;
-      }
-      if ("TERM_PROGRAM" in env) {
-        const version4 = parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env.TERM_PROGRAM) {
-          case "iTerm.app":
-            return version4 >= 3 ? 3 : 2;
-          case "Apple_Terminal":
-            return 2;
-        }
-      }
-      if (/-256(color)?$/i.test(env.TERM)) {
-        return 2;
-      }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
-        return 1;
-      }
-      if ("COLORTERM" in env) {
-        return 1;
-      }
-      return min;
-    }
-    function getSupportLevel(stream4) {
-      const level = supportsColor(stream4, stream4 && stream4.isTTY);
-      return translateLevel(level);
-    }
-    module2.exports = {
-      supportsColor: getSupportLevel,
-      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
-      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
-    };
-  }
-});
-
 // node_modules/debug/src/node.js
 var require_node = __commonJS({
   "node_modules/debug/src/node.js"(exports2, module2) {
@@ -51211,7 +51096,7 @@ var require_node = __commonJS({
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
-      const supportsColor = require_supports_color();
+      const supportsColor = require("supports-color");
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
           20,
@@ -82298,6 +82183,11 @@ var config_schema_default = {
                       items: {
                         type: "string"
                       }
+                    },
+                    timeout: {
+                      type: "integer",
+                      minimum: 1,
+                      description: "Maximum rule execution time in milliseconds."
                     }
                   }
                 }
@@ -82374,6 +82264,11 @@ var config_schema_default = {
                     minLength: 1
                   }
                 }
+              },
+              timeout: {
+                type: "integer",
+                minimum: 1,
+                description: "Maximum rule execution time in milliseconds."
               }
             }
           }
@@ -103220,6 +103115,25 @@ async function loadPlugins(root, config2) {
   const errors = [];
   for (const specifier of specifiers) {
     try {
+      const staticManifest = await readStaticPluginManifest(root, specifier);
+      if (staticManifest?.permissions && staticManifest.permissions.length > 0) {
+        const preCheck = evaluatePluginPermissions({
+          specifier,
+          name: staticManifest.name ?? specifier,
+          requested: staticManifest.permissions,
+          config: config2.pluginPermissions
+        });
+        if (preCheck.denied.length > 0) {
+          throw new PluginError(
+            pluginPermissionDenialMessage({
+              specifier,
+              name: staticManifest.name ?? specifier,
+              denied: preCheck.denied
+            }),
+            specifier
+          );
+        }
+      }
       const entrypoint = resolvePluginEntrypoint(root, specifier);
       const module2 = await import(entrypoint);
       const plugin = validatePlugin(module2, specifier);
@@ -103338,14 +103252,61 @@ function assertUniqueRuleIds(ruleIds, specifier) {
     seen.add(ruleId6);
   }
 }
+function createPluginErrorFinding(context5, message) {
+  return createFinding({
+    ruleId: "config.invalid",
+    severity: "high",
+    message,
+    project: context5.projects[0]?.projectFile,
+    resource: {
+      path: context5.projects[0]?.projectFile ?? context5.root,
+      kind: "project"
+    }
+  });
+}
 function toCoreRule(pluginRule) {
   return {
     meta: pluginRule.meta,
     async run(context5) {
-      const findings = await pluginRule.run(context5);
-      return findings.map(normalizePluginFinding);
+      try {
+        const findings = await pluginRule.run(context5);
+        if (!Array.isArray(findings)) {
+          return [createPluginErrorFinding(context5, `Plugin rule "${pluginRule.meta.id}" returned non-array output.`)];
+        }
+        return findings.map(normalizePluginFinding);
+      } catch (error52) {
+        return [
+          createPluginErrorFinding(context5, `Plugin rule "${pluginRule.meta.id}" failed: ${messageFromError(error52)}`)
+        ];
+      }
     }
   };
+}
+async function readStaticPluginManifest(root, specifier) {
+  try {
+    let manifestPath;
+    if (isPathSpecifier(specifier)) {
+      const resolved = import_node_path40.default.resolve(root, specifier);
+      const isDir = await import_promises13.default.stat(resolved).then((s) => s.isDirectory()).catch(() => false);
+      manifestPath = isDir ? import_node_path40.default.join(resolved, "package.json") : import_node_path40.default.join(import_node_path40.default.dirname(resolved), "package.json");
+    } else {
+      manifestPath = import_node_path40.default.join(root, "node_modules", specifier, "package.json");
+    }
+    const content = await import_promises13.default.readFile(manifestPath, "utf8");
+    const parsed = JSON.parse(content);
+    const boardreadyops = parsed.boardreadyops && typeof parsed.boardreadyops === "object" ? parsed.boardreadyops : parsed;
+    const permissions = Array.isArray(boardreadyops.permissions) ? boardreadyops.permissions.filter(isPluginPermission) : void 0;
+    const manifest = {};
+    if (typeof parsed.name === "string") {
+      manifest.name = parsed.name;
+    }
+    if (permissions && permissions.length > 0) {
+      manifest.permissions = permissions;
+    }
+    return manifest;
+  } catch {
+    return void 0;
+  }
 }
 function normalizePluginFinding(finding2) {
   const input = finding2;
@@ -103796,8 +103757,23 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
         rule: rule2.meta.id,
         project: project.projectFile
       });
+      const ruleConf = projectConfig.rules?.[rule2.meta.id] ?? ctx.config.rules?.[rule2.meta.id];
+      const ruleTimeout = typeof ruleConf === "object" && ruleConf !== null && typeof ruleConf.timeout === "number" && ruleConf.timeout > 0 ? ruleConf.timeout : void 0;
       try {
-        output.push(...await rule2.run(context5));
+        let rulePromise = Promise.resolve(rule2.run(context5));
+        if (ruleTimeout !== void 0) {
+          let timeoutHandle;
+          const timeoutPromise = new Promise((_2, reject) => {
+            timeoutHandle = setTimeout(() => {
+              reject(new Error(`Rule "${rule2.meta.id}" timed out after ${ruleTimeout}ms.`));
+            }, ruleTimeout);
+            timeoutHandle.unref?.();
+          });
+          rulePromise = Promise.race([rulePromise, timeoutPromise]).finally(() => {
+            if (timeoutHandle !== void 0) clearTimeout(timeoutHandle);
+          });
+        }
+        output.push(...await rulePromise);
         ctx.logger.debug("pipeline.rule.finish", {
           rule: rule2.meta.id,
           project: project.projectFile,
@@ -105573,7 +105549,7 @@ var runnerMutationResponseSchema = external_exports.object({
 }).strict();
 
 // packages/contracts/src/billing.ts
-var billingTierSchema = external_exports.enum(["free", "team", "business", "enterprise"]);
+var billingTierSchema = external_exports.enum(["free", "team", "business"]);
 var billingIntervalSchema = external_exports.enum(["month", "year"]);
 var billingCustomerSchema = external_exports.object({
   id: external_exports.string().uuid(),

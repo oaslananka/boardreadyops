@@ -11,13 +11,14 @@
     "worker": "node .next/worker.mjs"
   },
   "dependencies": {
-    "next": "16.2.12",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
     "@boardreadyops/cloud-core": "workspace:*",
     "@boardreadyops/contracts": "workspace:*",
     "@boardreadyops/db": "workspace:*",
-    "@octokit/auth-app": "8.2.0"
+    "@octokit/auth-app": "8.2.0",
+    "@sentry/nextjs": "^10.71.0",
+    "next": "16.2.12",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
