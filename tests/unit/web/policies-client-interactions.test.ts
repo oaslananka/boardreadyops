@@ -181,4 +181,18 @@ describe("PoliciesClient interactions (delete confirmation, cancel draft reset)"
 
     expect((container.querySelector("#policy-name") as unknown as { value: string }).value).toBe("");
   });
+
+  it("does not claim multi-tenant hierarchy or active gates for a single advisory-only policy", async () => {
+    await act(async () => {
+      root.render(createElement(PoliciesClient));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Organization-Only");
+    expect(container.textContent).toContain("Advisory Only");
+    expect(container.textContent).not.toContain("Multi-Tenant Hierarchical");
+    expect(container.textContent).not.toContain("Pre-Fabrication Gates Active");
+  });
 });
