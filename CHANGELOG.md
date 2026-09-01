@@ -4,6 +4,30 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.38.0](https://github.com/oaslananka/boardreadyops/compare/v1.37.0...v1.38.0) (2026-09-01)
+
+
+### Features
+
+* persistent agentic QA/E2E/a11y/visual audit infrastructure ([#563](https://github.com/oaslananka/boardreadyops/issues/563)) ([f45050e](https://github.com/oaslananka/boardreadyops/commit/f45050e873caed17fb984615d2ae344b410de03b))
+
+
+### Bug Fixes
+
+* **ci:** bump verified KiCad and Node.js patch baselines ([#566](https://github.com/oaslananka/boardreadyops/issues/566)) ([cf2ba5b](https://github.com/oaslananka/boardreadyops/commit/cf2ba5b673de452255b1d29fd39d5f9e5d44a58e))
+* **ci:** point cloud-deploy.yml at the real production topology ([#550](https://github.com/oaslananka/boardreadyops/issues/550)) ([cfadd7c](https://github.com/oaslananka/boardreadyops/commit/cfadd7cf4975278b10fefa8828944820946603b1))
+* **deps:** pin mysql2 past GHSA-rgwj-5xj2-c3m3 ([#564](https://github.com/oaslananka/boardreadyops/issues/564)) ([0831efc](https://github.com/oaslananka/boardreadyops/commit/0831efcbc65a53b119f41f1f04af1e134b8829d2))
+* **review:** accessible Dialog primitive, policy delete confirm, cancel reset ([#555](https://github.com/oaslananka/boardreadyops/issues/555)) ([85c4920](https://github.com/oaslananka/boardreadyops/commit/85c4920c088e809603af388d0ddee04ff24f4629))
+* **review:** resolve quality gate findings, redos patterns, and complexity ([#552](https://github.com/oaslananka/boardreadyops/issues/552)) ([5939a1c](https://github.com/oaslananka/boardreadyops/commit/5939a1c136df39d99737cbaa5f9fc4ef288188d5))
+* **review:** stop policy metrics overclaiming enforcement scope/state ([#556](https://github.com/oaslananka/boardreadyops/issues/556)) ([7676d86](https://github.com/oaslananka/boardreadyops/commit/7676d8666bde0a532f23e5d1a4e79f399bac2a85))
+* **review:** UI/UX audit P0/P1 fixes — policy gate, discussion persistence, a11y, URL tabs ([#554](https://github.com/oaslananka/boardreadyops/issues/554)) ([f1a9a15](https://github.com/oaslananka/boardreadyops/commit/f1a9a1576248f6a92a02a263a20fb5306fd7122f))
+* **web:** active nav state, duplicate H1s, count accuracy (P2 batch) ([#557](https://github.com/oaslananka/boardreadyops/issues/557)) ([8123c4f](https://github.com/oaslananka/boardreadyops/commit/8123c4fa8ca46be7ab150c1ab65c3d6a1ebd3ffe))
+* **web:** add browser titles to settings pages missing them (P3-02) ([#560](https://github.com/oaslananka/boardreadyops/issues/560)) ([885a6e6](https://github.com/oaslananka/boardreadyops/commit/885a6e66ddd2ce90a6228bda5043da8eeb004114))
+* **web:** dedupe run page generateMetadata (SonarCloud duplication gate) ([#562](https://github.com/oaslananka/boardreadyops/issues/562)) ([78d642f](https://github.com/oaslananka/boardreadyops/commit/78d642fba39288519cfb12dfa4d746f571657fa4))
+* **web:** fake search hint, run repo link, missing 404 H1s (P2 batch) ([#558](https://github.com/oaslananka/boardreadyops/issues/558)) ([1873a59](https://github.com/oaslananka/boardreadyops/commit/1873a59193d226ad9699fe7c37022ae9ecc4c108))
+* **web:** give run sub-pages section-specific browser titles (P3-04) ([#561](https://github.com/oaslananka/boardreadyops/issues/561)) ([e674849](https://github.com/oaslananka/boardreadyops/commit/e674849008a15333d62eebdbb5e2f7a16961279f))
+* **web:** persist sidebar collapse state across navigation ([#559](https://github.com/oaslananka/boardreadyops/issues/559)) ([8674f74](https://github.com/oaslananka/boardreadyops/commit/8674f7478a536a942b63827690589cf104762dcb))
+
 ## [1.37.0](https://github.com/oaslananka/boardreadyops/compare/v1.36.0...v1.37.0) (2026-08-30)
 
 
