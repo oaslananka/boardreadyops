@@ -63,6 +63,7 @@ function sampleRun(): RunDetail {
     githubCommentPublishedAt: undefined,
     lastPublicationError: undefined,
     repository: "oaslananka/boardreadyops",
+    repositoryId: "repo-accessible",
     repositoryPrivate: false,
     trustMode: "safe",
     safeModeReasons: ["private-repository"],
