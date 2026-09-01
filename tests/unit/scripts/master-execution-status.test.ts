@@ -7,6 +7,7 @@ import {
   main,
   renderExecutionStatus,
   replaceExecutionStatusSection,
+  validateExecutionDetailsSection,
   validateExecutionStatus,
 } from "../../../scripts/master-execution-status.mjs";
 
@@ -130,9 +131,12 @@ describe("master execution status rendering", () => {
       join(root, "docs", "development", "master-execution-status.json"),
       `${JSON.stringify(validLedger(), null, 2)}\n`,
     );
+    const details = executionStatusIds
+      .map((id) => `### ${id} — Workstream ${id}\n- **Status:** \`Missing\`\n`)
+      .join("\n");
     await writeFile(
       join(root, "docs", "development", "master-execution-status.md"),
-      "before\n<!-- master-execution-status:start -->\nold\n<!-- master-execution-status:end -->\nafter\n",
+      `before\n<!-- master-execution-status:start -->\nold\n<!-- master-execution-status:end -->\n${details}\nafter\n`,
     );
 
     await expect(main(root, ["check"])).rejects.toThrow("master execution status drift");
@@ -140,6 +144,49 @@ describe("master execution status rendering", () => {
     await expect(main(root, ["check"])).resolves.toBeUndefined();
     expect(await readFile(join(root, "docs", "development", "master-execution-status.md"), "utf8")).toContain(
       "| W00 |",
+    );
+  });
+});
+
+describe("master execution status details section", () => {
+  function detailsDoc(statusLine: string) {
+    return executionStatusIds.map((id) => `### ${id} — Workstream ${id}\n${statusLine}\n`).join("\n");
+  }
+
+  it("accepts a details section whose statuses match the ledger", () => {
+    const status = validateExecutionStatus(validLedger());
+    expect(() => validateExecutionDetailsSection(detailsDoc("- **Status:** `Missing`"), status)).not.toThrow();
+  });
+
+  it("rejects a details section whose status contradicts the ledger", () => {
+    const ledger = validLedger();
+    const first = ledger.workstreams[0];
+    if (!first) throw new Error("test fixture workstream missing");
+    first.status = "implemented";
+    delete first.remaining;
+    first.evidence = {
+      code: ["package.json"],
+      tests: ["package.json"],
+      docs: ["package.json"],
+      deployed: ["package.json"],
+      commits: ["abc123"],
+      pullRequests: [],
+    };
+    first.verification.result = "pass";
+    const status = validateExecutionStatus(ledger);
+    expect(() => validateExecutionDetailsSection(detailsDoc("- **Status:** `Missing`"), status)).toThrow(
+      "execution status details drift: W00 Section 3 says",
+    );
+  });
+
+  it("rejects a details section missing a workstream entry", () => {
+    const status = validateExecutionStatus(validLedger());
+    const doc = executionStatusIds
+      .filter((id) => id !== "W36")
+      .map((id) => `### ${id} — Workstream ${id}\n- **Status:** \`Missing\`\n`)
+      .join("\n");
+    expect(() => validateExecutionDetailsSection(doc, status)).toThrow(
+      "execution status details: missing Section 3 entry for W36",
     );
   });
 });

@@ -81,6 +81,40 @@ export function replaceExecutionStatusSection(document, rendered) {
   return `${document.slice(0, contentStart)}\n${rendered.trim()}\n${document.slice(end)}`;
 }
 
+const detailStatusLabels = {
+  implemented: "Implemented",
+  partial: "Partial",
+  missing: "Missing",
+  blocked: "Blocked",
+  deferred: "Deferred / Moat",
+};
+
+export function validateExecutionDetailsSection(document, status) {
+  const byId = new Map(status.workstreams.map((entry) => [entry.id, entry]));
+  const seen = new Set();
+  const headerRe = /^### (W\d{2}) —/;
+  const statusRe = /^- \*\*Status:\*\* `([^`]+)`$/;
+  let currentId = null;
+  for (const line of document.split("\n")) {
+    const headerMatch = line.match(headerRe);
+    if (headerMatch) currentId = headerMatch[1];
+    const statusMatch = currentId && line.match(statusRe);
+    if (!statusMatch) continue;
+    const entry = byId.get(currentId);
+    if (!entry) throw new Error(`execution status details: unknown workstream ${currentId}`);
+    const expected = detailStatusLabels[entry.status];
+    if (statusMatch[1] !== expected) {
+      throw new Error(
+        `execution status details drift: ${currentId} Section 3 says "${statusMatch[1]}" but the ledger says "${expected}" (run corepack pnpm run execution-status:render and reconcile Section 3 by hand)`,
+      );
+    }
+    seen.add(currentId);
+  }
+  for (const id of executionStatusIds) {
+    if (!seen.has(id)) throw new Error(`execution status details: missing Section 3 entry for ${id}`);
+  }
+}
+
 export async function main(root = process.cwd(), args = process.argv.slice(2)) {
   const mode = args[0];
   if (mode !== "render" && mode !== "check") throw new Error("expected render or check mode");
@@ -90,6 +124,7 @@ export async function main(root = process.cwd(), args = process.argv.slice(2)) {
     pathExists: (path) => existsSync(join(root, path)),
   });
   const document = await readFile(documentPath, "utf8");
+  validateExecutionDetailsSection(document, status);
   const next = replaceExecutionStatusSection(document, renderExecutionStatus(status));
   if (mode === "check") {
     if (next !== document) {

@@ -53,4 +53,5 @@ export const executionStatusIds: readonly string[];
 export function validateExecutionStatus(value: unknown, options?: ValidationOptions): ExecutionStatus;
 export function renderExecutionStatus(status: ExecutionStatus): string;
 export function replaceExecutionStatusSection(document: string, rendered: string): string;
+export function validateExecutionDetailsSection(document: string, status: ExecutionStatus): void;
 export function main(root?: string, args?: string[]): Promise<void>;
