@@ -173,6 +173,7 @@ nav:
           - Tooling: development/tooling.md
           - CI Policy: development/ci-policy.md
           - Debugging: development/debugging.md
+          - Master Execution Status: development/master-execution-status.md
       - Architecture:
           - Overview: architecture/overview.md
           - Pipeline: architecture/pipeline.md
@@ -192,3 +193,8 @@ nav:
               - "0008: Vercel Control Plane": architecture/adr/0008-vercel-control-plane.md
               - "0009: Managed Execution Plane": architecture/adr/0009-managed-execution-plane.md
               - "0010: Target-repository GitHub Actions": architecture/adr/0010-target-repository-github-actions-execution.md
+              - "0011: Continuous Supply Watch": architecture/adr/0011-continuous-supply-watch.md
+              - "0012: Component Intelligence Provider": architecture/adr/0012-component-intelligence-provider.md
+              - "0013: Finding Fingerprint Wire Contract": architecture/adr/0013-finding-fingerprint-wire-contract.md
+              - "0014: Seat-Based Entitlement Tier Rename": architecture/adr/0014-seat-based-entitlement-tier-rename.md
+              - "0015: Enterprise Governance SSO SCIM": architecture/adr/0015-enterprise-governance-sso-scim.md
