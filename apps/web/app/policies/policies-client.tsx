@@ -53,6 +53,22 @@ function mapGateTone(gate: "error" | "high" | "medium"): "danger" | "warning" | 
   return "info";
 }
 
+function summarizeScope(policies: readonly PolicyRecord[]): string {
+  if (policies.length === 0) return "Default baseline";
+  const scopes = new Set(policies.map((p) => p.scope));
+  if (scopes.size > 1) return "Multi-Tenant Hierarchical";
+  const [onlyScope] = scopes;
+  if (onlyScope === "organization") return "Organization-Only";
+  if (onlyScope === "team") return "Team-Only";
+  if (onlyScope === "repository") return "Repository-Only";
+  return "Default baseline";
+}
+
+function summarizeEnforcement(policies: readonly PolicyRecord[]): string {
+  if (policies.length === 0) return "Default open review";
+  return policies.some((p) => p.severityGate !== null) ? "Pre-Fabrication Gates Active" : "Advisory Only";
+}
+
 interface PolicyCardProps {
   readonly policy: PolicyRecord;
   readonly onDelete: (id: string, name: string) => void;
@@ -458,7 +474,11 @@ export default function PoliciesClient() {
         return;
       }
 
-      setSuccessMessage(`Policy "${draft.name}" created and enforced.`);
+      setSuccessMessage(
+        draft.severityGate
+          ? `Policy "${draft.name}" created and enforced.`
+          : `Policy "${draft.name}" created (advisory only — no severity gate configured).`,
+      );
       setDraft(emptyDraft);
       setShowBuilder(false);
       await loadPolicies();
@@ -498,9 +518,8 @@ export default function PoliciesClient() {
     setDraft(emptyDraft);
   }
 
-  const hasPolicies = Boolean(policies && policies.length > 0);
-  const scopeSummary = hasPolicies ? "Multi-Tenant Hierarchical" : "Default baseline";
-  const enforcementSummary = hasPolicies ? "Pre-Fabrication Gates Active" : "Default open review";
+  const scopeSummary = summarizeScope(policies ?? []);
+  const enforcementSummary = summarizeEnforcement(policies ?? []);
 
   return (
     <div className="policies-workspace">
