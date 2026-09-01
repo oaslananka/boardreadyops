@@ -57,6 +57,62 @@ async function verifyRevisionDigest(
   return { ok: true };
 }
 
+// The effective policy's severity gate and required-checklist blockers must
+// actually stop an approval, not just be summarized in the UI's readiness
+// display -- a policy configured to block on e.g. "high" severity was
+// previously only advisory here. isBreakGlass is the sanctioned, already-
+// audited (is_break_glass column, ChecklistApprovalsTab surfaces it) bypass
+// for this gate; it is not a new escape hatch.
+//
+// Deliberately excluded from this gate:
+// - "missing_approval": evaluated before this approval is recorded, so it
+//   would always report itself as missing -- it's what this action fulfills.
+// - "missing_required_approver_role": collectRoleBlockers() requires an
+//   approverId -> roles map that nothing in this codebase populates yet
+//   (evaluateReviewReadiness is never called with `approverRoles`), so this
+//   blocker type currently fires (and never clears) whenever a policy sets
+//   requiredRoles at all, regardless of who approves. Enforcing it here
+//   would deadlock every review under such a policy, not fix bypass -- the
+//   fix for that is the role-mapping feature itself, out of scope here.
+const enforcedBlockerTypes = new Set(["unresolved_finding", "incomplete_checklist", "missing_required_checklist_item"]);
+
+async function enforceApprovalPolicyGate(input: {
+  executor: PgQueryExecutor;
+  repositoryId: string;
+  reviewId: string;
+  headRunId: string;
+  evidenceDigest: string;
+  tenantId: string;
+  status: RecordApprovalInput["status"];
+  isBreakGlass?: boolean | undefined;
+}): Promise<Response | null> {
+  if (input.status !== "approved" || input.isBreakGlass) {
+    return null;
+  }
+
+  const { readiness } = await computeReviewReadiness({
+    executor: input.executor,
+    repositoryId: input.repositoryId,
+    reviewId: input.reviewId,
+    headRunId: input.headRunId,
+    headEvidenceDigest: input.evidenceDigest,
+    tenantId: input.tenantId,
+  });
+  const gatingBlockers = readiness.blockers.filter((blocker) => enforcedBlockerTypes.has(blocker.type));
+  if (gatingBlockers.length === 0) {
+    return null;
+  }
+
+  return Response.json(
+    {
+      ok: false,
+      error: "Review does not meet the effective policy's readiness requirements",
+      blockers: gatingBlockers,
+    },
+    { status: 409 },
+  );
+}
+
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }): Promise<Response> {
   const auth = await authenticateApiRequest(request, "reviews:read");
   if (!auth.ok) {
@@ -116,48 +172,18 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       return Response.json({ ok: false, error: verification.error }, { status: verification.status });
     }
 
-    // The effective policy's severity gate and required-checklist blockers must
-    // actually stop an approval, not just be summarized in the UI's readiness
-    // display -- a policy configured to block on e.g. "high" severity was
-    // previously only advisory here. isBreakGlass is the sanctioned, already-
-    // audited (is_break_glass column, ChecklistApprovalsTab surfaces it) bypass
-    // for this gate; it is not a new escape hatch.
-    //
-    // Deliberately excluded from this gate:
-    // - "missing_approval": evaluated before this approval is recorded, so it
-    //   would always report itself as missing -- it's what this action fulfills.
-    // - "missing_required_approver_role": collectRoleBlockers() requires an
-    //   approverId -> roles map that nothing in this codebase populates yet
-    //   (evaluateReviewReadiness is never called with `approverRoles`), so this
-    //   blocker type currently fires (and never clears) whenever a policy sets
-    //   requiredRoles at all, regardless of who approves. Enforcing it here
-    //   would deadlock every review under such a policy, not fix bypass -- the
-    //   fix for that is the role-mapping feature itself, out of scope here.
-    const enforcedBlockerTypes = new Set([
-      "unresolved_finding",
-      "incomplete_checklist",
-      "missing_required_checklist_item",
-    ]);
-    if (payload.data.status === "approved" && !payload.data.isBreakGlass) {
-      const { readiness } = await computeReviewReadiness({
-        executor,
-        repositoryId,
-        reviewId,
-        headRunId,
-        headEvidenceDigest: payload.data.evidenceDigest,
-        tenantId: auth.actorId,
-      });
-      const gatingBlockers = readiness.blockers.filter((blocker) => enforcedBlockerTypes.has(blocker.type));
-      if (gatingBlockers.length > 0) {
-        return Response.json(
-          {
-            ok: false,
-            error: "Review does not meet the effective policy's readiness requirements",
-            blockers: gatingBlockers,
-          },
-          { status: 409 },
-        );
-      }
+    const policyGateResponse = await enforceApprovalPolicyGate({
+      executor,
+      repositoryId,
+      reviewId,
+      headRunId,
+      evidenceDigest: payload.data.evidenceDigest,
+      tenantId: auth.actorId,
+      status: payload.data.status,
+      isBreakGlass: payload.data.isBreakGlass,
+    });
+    if (policyGateResponse) {
+      return policyGateResponse;
     }
 
     const store = new ReviewApprovalStore(executor);

@@ -159,13 +159,13 @@ export function ReviewView({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTabState] = useState<ReviewTabKey>(() => tabFromSearchParam(searchParams.get("tab")));
+  const [rawActiveTab, setRawActiveTab] = useState<ReviewTabKey>(() => tabFromSearchParam(searchParams.get("tab")));
 
   // The URL is the single source of truth for which tab is open: this keeps
   // browser Back/Forward and a shared/reloaded ?tab= link in sync with what
   // renders, instead of a separate state that can drift from it.
   useEffect(() => {
-    setActiveTabState(tabFromSearchParam(searchParams.get("tab")));
+    setRawActiveTab(tabFromSearchParam(searchParams.get("tab")));
   }, [searchParams]);
 
   function setActiveTab(tab: ReviewTabKey) {
@@ -548,7 +548,7 @@ export function ReviewView({
       ) : null}
 
       <ReviewNavigationTabs
-        activeTab={activeTab}
+        activeTab={rawActiveTab}
         changedFilesCount={review.changedFiles?.length}
         findingsCount={review.findings.length}
         blockingCount={blockingCount}
@@ -557,17 +557,22 @@ export function ReviewView({
         onSelectTab={setActiveTab}
       />
 
-      <main id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="review-tab-body">
-        {activeTab === "overview" ? <OverviewTab review={review} /> : null}
-        {activeTab === "changes" ? <ChangesTab review={review} /> : null}
-        {activeTab === "findings" ? (
+      <main
+        id={`panel-${rawActiveTab}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${rawActiveTab}`}
+        className="review-tab-body"
+      >
+        {rawActiveTab === "overview" ? <OverviewTab review={review} /> : null}
+        {rawActiveTab === "changes" ? <ChangesTab review={review} /> : null}
+        {rawActiveTab === "findings" ? (
           <FindingsTab
             findings={review.findings}
             onUpdateDisposition={handleUpdateDisposition}
             onAssign={handleAssign}
           />
         ) : null}
-        {activeTab === "discussion" ? (
+        {rawActiveTab === "discussion" ? (
           <DiscussionTab
             comments={review.comments}
             viewerLogin={viewerLogin}
@@ -575,7 +580,7 @@ export function ReviewView({
             onToggleStatus={handleToggleCommentStatus}
           />
         ) : null}
-        {activeTab === "checklist" ? (
+        {rawActiveTab === "checklist" ? (
           <ChecklistApprovalsTab
             checklist={review.checklist}
             approvals={review.approvals}
@@ -584,7 +589,7 @@ export function ReviewView({
             onAddChecklist={handleAddChecklist}
           />
         ) : null}
-        {activeTab === "evidence" ? <EvidenceTab review={review} /> : null}
+        {rawActiveTab === "evidence" ? <EvidenceTab review={review} /> : null}
       </main>
 
       {approvalModalType ? (
