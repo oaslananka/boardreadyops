@@ -87,4 +87,15 @@ describe("release sign / verify commands", () => {
     const io = streams();
     expect(await releaseVerifyCommand(bundle, { publicKey: pubPath }, io.streams)).toBe(1);
   });
+
+  it("prints a release certificate after a successful verification", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await releaseSignCommand(bundle, { key: keyPath }, streams().streams);
+
+    const verify = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath }, verify.streams)).toBe(0);
+    const stdout = verify.output().stdout;
+    expect(stdout).toContain("Release Certificate");
+    expect(stdout).toContain("Signature:     valid Ed25519");
+  });
 });
