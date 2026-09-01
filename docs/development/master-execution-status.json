@@ -1,0 +1,971 @@
+{
+  "version": 1,
+  "spec": {
+    "path": "../BoardReadyOps_Agent_Master_Development_Spec.md",
+    "sha256": "e02df14e4105945ac1d8bb8dc13d132e04dd27803e560288548f9c3e60857c62"
+  },
+  "roadmap": {
+    "source": "https://github.com/oaslananka/boardreadyops/issues/191",
+    "checkedAt": "2026-09-01T12:28:13Z",
+    "orderedMilestones": [
+      "Repository Maintenance & Release Health",
+      "Cloud Control Plane Reliability — GitHub GA Prerequisite",
+      "v2.2 — GitHub Cloud GA",
+      "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "v2.6 — Enterprise Trust & Customer-Hosted Execution",
+      "v2.7 — Marketplace, Ecosystem & AI Reviewer"
+    ],
+    "completedMilestones": [
+      "v1.8.0 — Release & Distribution Reliability",
+      "v1.9.0 — Test Quality & Documentation Accessibility",
+      "v2.0.0 — Governance & Supply Chain Assurance",
+      "v2.1 — Product Experience & Golden Path",
+      "v2.4 — Manufacturing Intelligence",
+      "v2.5 — BOM & Supply Chain Intelligence"
+    ]
+  },
+  "baseline": {
+    "command": "task verify; fallback: corepack pnpm run verify",
+    "result": "fail",
+    "commit": "a214d2a",
+    "checkedAt": "2026-09-01T12:30:50Z",
+    "blockers": [
+      "task verify: task binary not found on PATH",
+      "corepack pnpm run verify: verify:dist failed because pre-existing dist/action/index.cjs and dist/cli/index.cjs changes make dist dirty",
+      "sonar analyze agentic: Vortex analysis unavailable; four W00 files skipped (remote main Quality Gate is OK baseline only)"
+    ]
+  },
+  "workstreams": [
+    {
+      "id": "W00",
+      "name": "Repository Inventory & Execution Ledger",
+      "phase": 0,
+      "priority": "P0",
+      "status": "implemented",
+      "owner": "maintainers",
+      "dependencies": [],
+      "milestone": "Repository Maintenance & Release Health",
+      "issues": [191],
+      "evidence": {
+        "code": ["scripts/master-execution-status.mjs", "scripts/master-execution-status.d.mts"],
+        "tests": [
+          "tests/unit/scripts/master-execution-status.test.ts",
+          "tests/unit/docs/master-execution-status-docs.test.ts"
+        ],
+        "docs": [
+          "docs/development/master-execution-status.md",
+          "docs/superpowers/specs/2026-09-01-master-execution-ledger-design.md",
+          "docs/superpowers/plans/2026-09-01-master-execution-ledger.md"
+        ],
+        "deployed": ["not-applicable: repository audit tooling runs in local and CI verification"],
+        "commits": ["4310ad9", "28cbc94", "375ecf1", "a214d2a"],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "corepack pnpm vitest run tests/unit/scripts/master-execution-status.test.ts tests/unit/docs/master-execution-status-docs.test.ts && corepack pnpm run verify:execution-status",
+        "result": "pass",
+        "checkedAt": "2026-09-01T12:30:50Z"
+      }
+    },
+    {
+      "id": "W01",
+      "name": "Repository Maintenance & Release Health",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Repository Maintenance & Release Health",
+      "issues": [329, 321, 330, 331, 332, 333, 334, 546],
+      "evidence": {
+        "code": ["scripts/toolchain.mjs"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Roadmap maintenance issues #321 and #329-#334 are closed; compatibility drift issue #546 remains open without a milestone."
+    },
+    {
+      "id": "W02",
+      "name": "Schema & Contract Governance",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Repository Maintenance & Release Health",
+      "issues": [289],
+      "evidence": {
+        "code": ["schemas/config.schema.json"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W03",
+      "name": "Core Discovery, Parsers & Normalized Hardware Model",
+      "phase": 4,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W02", "W04"],
+      "milestone": "Backlog — Core Engineering Depth",
+      "issues": [280],
+      "evidence": {
+        "code": ["src/kicad/sexpr.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W04",
+      "name": "Artifact Generation Engine",
+      "phase": 3,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W02", "W06"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [261],
+      "evidence": {
+        "code": ["src/release/generate.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W05",
+      "name": "DFM / DFA / DFT Rule Engine",
+      "phase": 4,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W03", "W04"],
+      "milestone": "Backlog — Core Engineering Depth",
+      "issues": [274],
+      "evidence": {
+        "code": ["src/rules/manufacturing"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W06",
+      "name": "Deterministic Release Decision Engine",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Repository Maintenance & Release Health",
+      "issues": [286],
+      "evidence": {
+        "code": ["packages/cloud-core/src/decision-engine.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W07",
+      "name": "Evidence Bundle, Signing, Provenance & Hardware SLSA",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Repository Maintenance & Release Health",
+      "issues": [263, 448],
+      "evidence": {
+        "code": ["src/release/evidence.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Hardware Release Passport vertical slice #448 remains open and unmilestoned."
+    },
+    {
+      "id": "W08",
+      "name": "Release-to-Release Diff & Hardware Change Impact",
+      "phase": 3,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W06", "W07"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [267, 447],
+      "evidence": {
+        "code": ["src/release/diff.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "PR-native hardware change impact vertical slice #447 remains open and unmilestoned."
+    },
+    {
+      "id": "W09",
+      "name": "Variants, Multi-Board & Product Hierarchy",
+      "phase": 4,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W03", "W04"],
+      "milestone": "Backlog — Core Engineering Depth",
+      "issues": [268],
+      "evidence": {
+        "code": ["src/kicad/variants.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W10",
+      "name": "Manufacturer Intelligence & Versioned Process Profiles",
+      "phase": 3,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W06", "W07"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [265],
+      "evidence": {
+        "code": ["src/vendor"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W11",
+      "name": "BOM, Supply Chain & Cost Intelligence",
+      "phase": 3,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W06", "W07"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [272, 449],
+      "evidence": {
+        "code": ["src/bom"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Continuous supplier monitoring vertical slice #449 remains open and unmilestoned."
+    },
+    {
+      "id": "W12",
+      "name": "Firmware ↔ Hardware Contract",
+      "phase": 4,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W03", "W06"],
+      "milestone": "Backlog — Core Engineering Depth",
+      "issues": [273],
+      "evidence": {
+        "code": ["src/firmware/contract.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W13",
+      "name": "Mechanical ↔ PCB Contract",
+      "phase": 4,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W03", "W04"],
+      "milestone": "Backlog — Core Engineering Depth",
+      "issues": [],
+      "evidence": {
+        "code": ["src/release/generate.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W14",
+      "name": "Policy, Waivers & Approval Governance",
+      "phase": 3,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W06", "W07"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [269],
+      "evidence": {
+        "code": ["src/core/policy.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W15",
+      "name": "GitHub App & PR Manufacturing Gate",
+      "phase": 2,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W01", "W16", "W28"],
+      "milestone": "v2.2 — GitHub Cloud GA",
+      "issues": [149, 42, 154, 88],
+      "evidence": {
+        "code": ["packages/contracts/src/runner-protocol.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "GitHub Cloud GA blockers #42, #88, #149, and #154 remain open."
+    },
+    {
+      "id": "W16",
+      "name": "Cloud Control Plane Reliability",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
+      "issues": [190, 222],
+      "evidence": {
+        "code": ["packages/db"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Cloud reliability blocker #222 remains open; #190 is closed."
+    },
+    {
+      "id": "W17",
+      "name": "Authentication, Tenant Isolation, RBAC & API Tokens",
+      "phase": 2,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W16", "W28"],
+      "milestone": "v2.2 — GitHub Cloud GA",
+      "issues": [154, 88],
+      "evidence": {
+        "code": ["apps/web/lib/api-auth.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W18",
+      "name": "Artifact Storage, Access, Retention & Privacy",
+      "phase": 2,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W16", "W17"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [44],
+      "evidence": {
+        "code": ["packages/cloud-core/src/storage.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Retention, deletion, and privacy blocker #44 remains open."
+    },
+    {
+      "id": "W19",
+      "name": "Billing, Entitlements & Metering",
+      "phase": 3,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W17", "W18"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [],
+      "evidence": {
+        "code": ["packages/cloud-core/src/entitlements.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W20",
+      "name": "Release Command Center & Cloud UX",
+      "phase": 3,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W15", "W17", "W18"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [25],
+      "evidence": {
+        "code": ["apps/web/lib/run-dashboard.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Hosted run dashboard blocker #25 remains open."
+    },
+    {
+      "id": "W21",
+      "name": "PCB/Schematic/Gerber/3D Viewers & Visual Diff",
+      "phase": 3,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W15", "W18"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [26],
+      "evidence": {
+        "code": ["src/report/html.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W22",
+      "name": "Enterprise Trust: SSO, SCIM, Customer-Hosted Agent",
+      "phase": 5,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W17", "W18", "W20"],
+      "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
+      "issues": [41, 45],
+      "evidence": {
+        "code": ["packages/contracts/src/runner-protocol.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Enterprise blockers #41 and #45 remain open."
+    },
+    {
+      "id": "W23",
+      "name": "Integrations: GitLab, Azure DevOps, Jira, Slack/Teams",
+      "phase": 5,
+      "priority": "P2",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W17", "W20"],
+      "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
+      "issues": [],
+      "evidence": {
+        "code": ["src/notifiers"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W24",
+      "name": "Manufacturer / CM Handoff Portal, RFQ & Questions",
+      "phase": 6,
+      "priority": "P2",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W20", "W22"],
+      "milestone": "Backlog — Manufacturer Collaboration & Production Loop",
+      "issues": [],
+      "evidence": {
+        "code": ["src/release/handoff.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W25",
+      "name": "Production Runs, Traceability, Yield & Outcomes",
+      "phase": 6,
+      "priority": "P2",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W20", "W22", "W24"],
+      "milestone": "Backlog — Manufacturer Collaboration & Production Loop",
+      "issues": [450, 451],
+      "evidence": {
+        "code": ["packages/contracts/src/evidence-ledger.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Production outcome ingestion #450 and Evidence Graph #451 remain open and unmilestoned."
+    },
+    {
+      "id": "W26",
+      "name": "AI Reviewer & Agent Remediation Layer",
+      "phase": 7,
+      "priority": "P2",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W06", "W20", "W22"],
+      "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
+      "issues": [52],
+      "evidence": {
+        "code": ["packages/cloud-core/src/assist"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "AI reviewer guardrail issue #52 remains open."
+    },
+    {
+      "id": "W27",
+      "name": "MCP / Agent API / Plugin SDK",
+      "phase": 7,
+      "priority": "P2",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W06", "W20", "W22"],
+      "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
+      "issues": [],
+      "evidence": {
+        "code": ["packages/plugin-sdk"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W28",
+      "name": "Security, Privacy, Threat Modeling & Trust Center",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Repository Maintenance & Release Health",
+      "issues": [329],
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": ["SECURITY.md"],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W29",
+      "name": "Observability, SLOs & Operations",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
+      "issues": [190],
+      "evidence": {
+        "code": ["src/core/logger.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W30",
+      "name": "Performance, Scalability & Cost Controls",
+      "phase": 1,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
+      "issues": [222],
+      "evidence": {
+        "code": ["scripts/control-plane-scale-envelope.mjs"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W31",
+      "name": "Documentation, Onboarding, Golden Demo & DevEx",
+      "phase": 3,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W15", "W20"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [25, 26, 445, 446],
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": ["docs/golden-demo.md"],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Website #445 and onboarding #446 remain open and unmilestoned."
+    },
+    {
+      "id": "W32",
+      "name": "Product Analytics & Privacy-Safe Adoption Metrics",
+      "phase": 3,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W17", "W20"],
+      "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
+      "issues": [],
+      "evidence": {
+        "code": ["schemas/telemetry-event.schema.json"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W33",
+      "name": "Compliance & Audit Export",
+      "phase": 5,
+      "priority": "P1",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W17", "W18", "W22"],
+      "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
+      "issues": [],
+      "evidence": {
+        "code": ["packages/db/src/audit-log-store.ts"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W34",
+      "name": "Quality Engineering: Fuzz, Mutation, Bad-Board Zoo",
+      "phase": 1,
+      "priority": "P0",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W00"],
+      "milestone": "Repository Maintenance & Release Health",
+      "issues": [329],
+      "evidence": {
+        "code": [],
+        "tests": ["tests/property"],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+    },
+    {
+      "id": "W35",
+      "name": "Marketplace, Ecosystem & Distribution",
+      "phase": 7,
+      "priority": "P2",
+      "status": "partial",
+      "owner": "maintainers",
+      "dependencies": ["W15", "W22"],
+      "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
+      "issues": [88],
+      "evidence": {
+        "code": ["scripts/check-marketplace-listing.mjs"],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "remaining": "Marketplace remains downstream of open least-privilege GitHub App blocker #88."
+    },
+    {
+      "id": "W36",
+      "name": "Manufacturing Feedback Intelligence & Predictive Risk",
+      "phase": 8,
+      "priority": "P3",
+      "status": "deferred",
+      "owner": "maintainers",
+      "dependencies": ["W25"],
+      "milestone": "Deferred — outcome-data trigger",
+      "issues": [450, 451],
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [],
+        "deployed": [],
+        "commits": [],
+        "pullRequests": []
+      },
+      "verification": {
+        "command": "not run",
+        "result": "not_run",
+        "checkedAt": "2026-09-01T12:21:04Z"
+      },
+      "deferUntil": "Production outcome dataset reaches a documented statistically useful threshold."
+    }
+  ]
+}

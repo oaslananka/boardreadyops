@@ -8,11 +8,6 @@ import { defineConfig } from "@playwright/test";
  * the hard guard in qa/audit/production-guard.ts and docs/qa-agent.md.
  */
 const baseURL = process.env.PLAYWRIGHT_BASE_URL;
-if (!baseURL) {
-  throw new Error(
-    "qa:production-smoke requires PLAYWRIGHT_BASE_URL (e.g. https://boardreadyops.com) -- refusing to default to any URL for a suite that talks to a real deployment.",
-  );
-}
 
 export default defineConfig({
   testDir: "tests/e2e",

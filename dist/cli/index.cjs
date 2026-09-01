@@ -43617,6 +43617,7 @@ function advance(position, char) {
   }
   position.column += 1;
 }
+var MAX_SEXPR_NESTING_DEPTH = 512;
 function processSexprToken(text, char, position, nodes, stack, errors) {
   if (/\s/.test(char)) {
     advance(position, char);
@@ -43629,6 +43630,13 @@ function processSexprToken(text, char, position, nodes, stack, errors) {
   if (char === "(") {
     const start = mark(position);
     advance(position, char);
+    if (stack.length >= MAX_SEXPR_NESTING_DEPTH) {
+      errors.push({
+        message: `Maximum S-expression nesting depth (${MAX_SEXPR_NESTING_DEPTH}) exceeded`,
+        span: { start, end: mark(position) }
+      });
+      return;
+    }
     appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
     const list = lastList(stack, nodes);
     if (list) {
@@ -46057,7 +46065,7 @@ var import_node_path23 = __toESM(require("node:path"), 1);
 
 // src/firmware/stm32cubemx.ts
 var import_promises11 = __toESM(require("node:fs/promises"), 1);
-var IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.(\w+)=(.+)$/;
+var IOC_LINE_PATTERN = /^([A-Za-z0-9_-]+(?:\.\d+)?)\.(\w+)=(.+)$/;
 async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   let text;
   try {
@@ -54575,18 +54583,24 @@ function signManifestBytes(bytes, privateKeyPem, signedAt) {
 }
 function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   const errors = [];
+  const errorCodes = [];
   if (signature.algorithm !== "ed25519") {
-    return { ok: false, errors: [`unsupported signature algorithm: ${signature.algorithm}`] };
+    return {
+      ok: false,
+      errors: [`unsupported signature algorithm: ${signature.algorithm}`],
+      errorCodes: ["UNSUPPORTED_ALGORITHM"]
+    };
   }
   const digest2 = (0, import_node_crypto9.createHash)("sha256").update(bytes).digest("hex");
   if (signature.manifestDigest && signature.manifestDigest !== digest2) {
     errors.push("manifest digest in signature does not match manifest contents");
+    errorCodes.push("DIGEST_MISMATCH");
   }
   let publicKey;
   try {
     publicKey = loadKey(signature.publicKey, "public");
   } catch {
-    return { ok: false, errors: ["signature public key could not be parsed"] };
+    return { ok: false, errors: ["signature public key could not be parsed"], errorCodes: ["INVALID_PUBLIC_KEY"] };
   }
   let valid = false;
   try {
@@ -54596,13 +54610,15 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   }
   if (!valid) {
     errors.push("signature does not match manifest contents");
+    errorCodes.push("INVALID_SIGNATURE");
   }
   if (trustedPublicKeyPem !== void 0) {
     if (!publicKeysMatch(publicKey, trustedPublicKeyPem)) {
       errors.push("signature public key does not match the trusted public key");
+      errorCodes.push("KEY_NOT_TRUSTED");
     }
   }
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, errorCodes };
 }
 async function signReleaseBundle(bundleDir, privateKeyPem, signedAt) {
   const bytes = await import_promises20.default.readFile(import_node_path57.default.join(bundleDir, MANIFEST_FILE));
@@ -54618,19 +54634,29 @@ async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
   try {
     signatureRaw = await import_promises20.default.readFile(signaturePath, "utf8");
   } catch {
-    return { ok: false, present: false, errors: [] };
+    return { ok: false, present: false, errors: [], errorCodes: [] };
   }
   let signature;
   try {
     signature = JSON.parse(signatureRaw);
   } catch {
-    return { ok: false, present: true, errors: ["manifest.sig is not valid JSON"] };
+    return {
+      ok: false,
+      present: true,
+      errors: ["manifest.sig is not valid JSON"],
+      errorCodes: ["MALFORMED_SIGNATURE_FILE"]
+    };
   }
   let bytes;
   try {
     bytes = await import_promises20.default.readFile(import_node_path57.default.join(bundleDir, MANIFEST_FILE));
   } catch (error51) {
-    return { ok: false, present: true, errors: [`manifest could not be read: ${asMessage(error51)}`] };
+    return {
+      ok: false,
+      present: true,
+      errors: [`manifest could not be read: ${asMessage(error51)}`],
+      errorCodes: ["MANIFEST_UNREADABLE"]
+    };
   }
   return { present: true, ...verifyManifestSignature(bytes, signature, trustedPublicKeyPem) };
 }

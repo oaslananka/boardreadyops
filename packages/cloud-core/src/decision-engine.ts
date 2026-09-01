@@ -114,6 +114,19 @@ function isAtOrAboveSeverityGate(severity: string, gate: "error" | "high" | "med
   return severityRank >= gateRank;
 }
 
+export interface DecisionExplanationNode {
+  category: "findings" | "checklist" | "approvals" | "policy" | "waivers";
+  condition: string;
+  status: "pass" | "fail" | "waived" | "neutral";
+  details?: string | undefined;
+  referenceId?: string | undefined;
+}
+
+export interface DecisionExplanationGraph {
+  nodes: DecisionExplanationNode[];
+  summary: string;
+}
+
 export interface ReviewReadinessEvaluation {
   decision: ReviewDecision;
   isReady: boolean;
@@ -121,6 +134,7 @@ export interface ReviewReadinessEvaluation {
   approvedCount: number;
   totalChecklistCount: number;
   completedChecklistCount: number;
+  explanationGraph: DecisionExplanationGraph;
 }
 
 function collectFindingBlockers(
@@ -276,6 +290,76 @@ export function evaluateReviewReadiness(options: {
     decision = "approved";
   }
 
+  const nodes: DecisionExplanationNode[] = [];
+
+  for (const finding of findings) {
+    const isBlockingSeverity = policy?.severityGate
+      ? isAtOrAboveSeverityGate(finding.severity, policy.severityGate)
+      : finding.severity === "error" || finding.severity === "critical";
+    const dec = decisions.get(finding.fingerprint);
+    const evalRes = evaluateFindingDecision(finding, dec, now);
+    if (evalRes.isWaived) {
+      nodes.push({
+        category: "waivers",
+        condition: finding.ruleId,
+        status: "waived",
+        details: `Waived via ${evalRes.disposition}: ${dec?.reason ?? "approved exception"}`,
+        referenceId: finding.fingerprint,
+      });
+    } else if (isBlockingSeverity) {
+      nodes.push({
+        category: "findings",
+        condition: finding.ruleId,
+        status: "fail",
+        details: `Blocking finding (${finding.severity}) at ${finding.path}`,
+        referenceId: finding.fingerprint,
+      });
+    } else {
+      nodes.push({
+        category: "findings",
+        condition: finding.ruleId,
+        status: "pass",
+        details: `Non-blocking finding (${finding.severity}) at ${finding.path}`,
+        referenceId: finding.fingerprint,
+      });
+    }
+  }
+
+  for (const item of checklist) {
+    nodes.push({
+      category: "checklist",
+      condition: item.title,
+      status: item.completed ? "pass" : "fail",
+      referenceId: item.id,
+    });
+  }
+
+  nodes.push({
+    category: "approvals",
+    condition: `Required Approvals (>= ${requiredApprovalsCount})`,
+    status: validApprovals.length >= requiredApprovalsCount ? "pass" : "fail",
+    details: `${validApprovals.length} of ${requiredApprovalsCount} valid approvals received`,
+  });
+
+  if (changesRequested) {
+    nodes.push({
+      category: "approvals",
+      condition: "Changes Requested",
+      status: "fail",
+      details: `Changes requested by ${changesRequested.approverId}: ${changesRequested.reason ?? "No reason provided"}`,
+      referenceId: changesRequested.id,
+    });
+  }
+
+  const summary = isReady
+    ? "All release readiness conditions, approvals, and checklist items satisfied."
+    : `Release readiness blocked by ${blockers.length} item(s): ${blockers.map((b) => b.message).join("; ")}`;
+
+  const explanationGraph: DecisionExplanationGraph = {
+    nodes,
+    summary,
+  };
+
   return {
     decision,
     isReady,
@@ -283,5 +367,6 @@ export function evaluateReviewReadiness(options: {
     approvedCount: validApprovals.length,
     totalChecklistCount,
     completedChecklistCount,
+    explanationGraph,
   };
 }
