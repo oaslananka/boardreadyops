@@ -17,7 +17,11 @@ export async function pathExists(file: string): Promise<boolean> {
 }
 
 export async function readTextFile(file: string): Promise<string> {
-  return fs.readFile(file, "utf8");
+  const text = await fs.readFile(file, "utf8");
+  // Node's utf8 decoder does not strip a leading UTF-8 BOM (U+FEFF); it stays as the first
+  // character. Common exporters (Excel, some KiCad BOM plugins) write one, which would
+  // otherwise corrupt the first CSV header cell or make JSON.parse/YAML parsing fail.
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
 export async function writeTextFile(file: string, text: string): Promise<void> {
