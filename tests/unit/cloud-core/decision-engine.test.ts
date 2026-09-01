@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { evaluateFindingDecision, evaluateReviewReadiness } from "../../../packages/cloud-core/src/decision-engine.js";
+import {
+  computeDecisionFingerprint,
+  evaluateFindingDecision,
+  evaluateReviewReadiness,
+} from "../../../packages/cloud-core/src/decision-engine.js";
 import type {
   FindingDecisionRecord,
   ReviewApprovalRecord,
@@ -155,6 +159,44 @@ describe("Decision Engine", () => {
       policy: { requiredChecklist: [], requiredRoles: [], severityGate: "high" },
     });
     expect(withPolicy.blockers.some((b) => b.type === "unresolved_finding")).toBe(true);
+  });
+
+  it("computes an order-independent decision fingerprint that changes only when the outcome changes", () => {
+    const headEvidenceDigest = "a".repeat(64);
+    const findingA = { fingerprint: "fp-a", severity: "error", ruleId: "clearance", path: "a.kicad_pcb" };
+    const findingB = { fingerprint: "fp-b", severity: "high", ruleId: "silkscreen", path: "b.kicad_pcb" };
+    const checklistA = { id: "chk-a", title: "Verify silk", completed: true };
+    const checklistB = { id: "chk-b", title: "Verify BOM", completed: false };
+
+    const forwardOrder = evaluateReviewReadiness({
+      findings: [findingA, findingB],
+      decisions: new Map(),
+      approvals: [],
+      checklist: [checklistA, checklistB],
+      headEvidenceDigest,
+    });
+
+    const reverseOrder = evaluateReviewReadiness({
+      findings: [findingB, findingA],
+      decisions: new Map(),
+      approvals: [],
+      checklist: [checklistB, checklistA],
+      headEvidenceDigest,
+    });
+
+    expect(forwardOrder.decisionFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(forwardOrder.decisionFingerprint).toBe(reverseOrder.decisionFingerprint);
+    expect(computeDecisionFingerprint(forwardOrder)).toBe(forwardOrder.decisionFingerprint);
+
+    const extraBlockingFinding = evaluateReviewReadiness({
+      findings: [findingA, findingB, { fingerprint: "fp-c", severity: "error", ruleId: "drc", path: "c.kicad_pcb" }],
+      decisions: new Map(),
+      approvals: [],
+      checklist: [checklistA, checklistB],
+      headEvidenceDigest,
+    });
+
+    expect(extraBlockingFinding.decisionFingerprint).not.toBe(forwardOrder.decisionFingerprint);
   });
 
   it("surfaces a changes-requested approval as an explanation graph node", () => {
