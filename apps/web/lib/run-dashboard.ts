@@ -177,6 +177,11 @@ export type RunDashboardFilters = {
 
 export type RunLookupResult = { state: "not-configured" } | { state: "not-found" } | { state: "found"; run: RunDetail };
 
+export function formatRunPageTitle(run: RunDetail, section: string): string {
+  const identity = run.pullRequestNumber !== undefined ? `PR #${run.pullRequestNumber}` : run.commitSha.slice(0, 7);
+  return `${section} · ${run.repository} ${identity}`;
+}
+
 export type RunDashboardQueryExecutor = {
   query(sql: string, params?: readonly unknown[]): Promise<unknown>;
 };
