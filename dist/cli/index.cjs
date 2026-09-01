@@ -283,7 +283,7 @@ function normalizeLocale(value) {
   if (value === "__PSEUDO__") {
     return "__PSEUDO__";
   }
-  const normalized = value.toLowerCase().replace(/_/g, "-");
+  const normalized = value.toLowerCase().replaceAll("_", "-");
   if (normalized === "en" || normalized.startsWith("en-")) {
     return "en";
   }
@@ -34455,7 +34455,11 @@ function reportCoordinate(value) {
     return value.toString();
   }
   const formatted = value.toFixed(6);
-  const trimmed = formatted.replace(/0+$/, "");
+  let end = formatted.length;
+  while (end > 0 && formatted[end - 1] === "0") {
+    end -= 1;
+  }
+  const trimmed = formatted.slice(0, end);
   return trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
 }
 function reportCoordinateWithUnits(value, units) {
@@ -46586,7 +46590,7 @@ function uniqueJobs(jobs) {
   return output;
 }
 function normalizePath(value) {
-  return import_node_path28.default.normalize(value).replace(/\\/g, "/");
+  return import_node_path28.default.normalize(value).replaceAll("\\", "/");
 }
 
 // src/rules/manufacturing/jobset-outputs.ts
@@ -48835,7 +48839,7 @@ function redactString(value, projectRoot, maxFieldLength, key) {
   return output;
 }
 function normalizePath2(value) {
-  return import_node_path40.default.resolve(value).replace(/\\/g, "/");
+  return import_node_path40.default.resolve(value).replaceAll("\\", "/");
 }
 function writeRotatingLine(file2, line, maxFileBytes, retention) {
   import_node_fs3.default.mkdirSync(import_node_path40.default.dirname(file2), { recursive: true });
@@ -50223,7 +50227,7 @@ async function requiredBaseline(file2, root, streams) {
   return baseline;
 }
 function baselineDisplayPath(root, file2) {
-  return import_node_path43.default.relative(root, file2).replace(/\\/g, "/") || import_node_path43.default.basename(file2);
+  return import_node_path43.default.relative(root, file2).replaceAll("\\", "/") || import_node_path43.default.basename(file2);
 }
 
 // src/cli/commands/run.ts
@@ -51831,7 +51835,7 @@ var Spinner = class {
   }
 };
 function isFileRelevant(filename) {
-  const normalized = filename.replace(/\\/g, "/");
+  const normalized = filename.replaceAll("\\", "/");
   if (normalized.includes("/node_modules/") || normalized.includes("/.git/") || normalized.includes("/build/") || normalized.includes("/dist/") || normalized.includes("/coverage/") || normalized.startsWith("node_modules/") || normalized.startsWith(".git/") || normalized.startsWith("build/") || normalized.startsWith("dist/") || normalized.startsWith("coverage/")) {
     return false;
   }
@@ -52554,7 +52558,7 @@ function writeDelimitedDocument(document) {
 }
 function encodeCell(value, delimiter) {
   if (value.includes('"') || value.includes("\n") || value.includes("\r") || value.includes(delimiter)) {
-    return `"${value.replace(/"/g, '""')}"`;
+    return `"${value.replaceAll('"', '""')}"`;
   }
   return value;
 }
@@ -53752,7 +53756,7 @@ async function fileDigest(file2) {
   return { sha256: (0, import_node_crypto6.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function toPosix(value) {
-  return value.split(import_node_path51.default.sep).join("/").replace(/\\/g, "/");
+  return value.split(import_node_path51.default.sep).join("/").replaceAll("\\", "/");
 }
 
 // src/cli/commands/generate.ts
@@ -55233,7 +55237,7 @@ async function collectDirEntries(dir, baseDir) {
     if (item2.isDirectory()) {
       entries.push(...await collectDirEntries(full, baseDir));
     } else if (item2.isFile()) {
-      const rel = import_node_path58.default.relative(baseDir, full).replace(/\\/g, "/");
+      const rel = import_node_path58.default.relative(baseDir, full).replaceAll("\\", "/");
       entries.push({ name: rel, data: await import_promises21.default.readFile(full) });
     }
   }
@@ -55299,7 +55303,7 @@ function compareText(left, right) {
 function encodeQueryComponent(value) {
   return encodeURIComponent(value).replace(
     /[!'()*]/gu,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    (character) => `%${(character.codePointAt(0) ?? 0).toString(16).toUpperCase()}`
   );
 }
 function assertLowercaseUuid(name, value) {
@@ -56181,7 +56185,7 @@ function validateDatabaseUrl(value) {
   return url2;
 }
 function pgpassField(value) {
-  const backslash = String.fromCharCode(92);
+  const backslash = String.fromCodePoint(92);
   return value.replaceAll(backslash, backslash.repeat(2)).replaceAll(":", `${backslash}:`);
 }
 function sanitizedPsqlError(value) {

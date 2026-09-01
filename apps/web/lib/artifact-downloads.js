@@ -31,7 +31,7 @@ function isInside(root, candidate) {
 function rfc5987Value(input) {
   return encodeURIComponent(input).replaceAll(
     /[!'()*]/g,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    (character) => `%${(character.codePointAt(0) ?? 0).toString(16).toUpperCase()}`,
   );
 }
 

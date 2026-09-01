@@ -30,7 +30,7 @@ function normalizeLocale(value: string | undefined): Locale | undefined {
   if (value === "__PSEUDO__") {
     return "__PSEUDO__";
   }
-  const normalized = value.toLowerCase().replace(/_/g, "-");
+  const normalized = value.toLowerCase().replaceAll("_", "-");
   if (normalized === "en" || normalized.startsWith("en-")) {
     return "en";
   }

@@ -61,8 +61,8 @@ export function buildDemoSnapshots(
       for (const layer of ["F.Cu", "B.Cu"]) {
         const { svg, anchors } = createPcbLayerSvg(layer, footprints);
         artifacts.push({
-          id: `demo_snap_pcb_${layer.replace(/\./g, "_")}`,
-          name: `pcb_${layer.replace(/\./g, "_")}.svg`,
+          id: `demo_snap_pcb_${layer.replaceAll(".", "_")}`,
+          name: `pcb_${layer.replaceAll(".", "_")}.svg`,
           kind: "pcb_layer",
           format: "svg",
           sheetOrLayer: layer,
