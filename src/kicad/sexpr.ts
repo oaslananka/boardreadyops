@@ -261,6 +261,8 @@ function advance(position: MutablePosition, char: string): void {
   position.column += 1;
 }
 
+const MAX_SEXPR_NESTING_DEPTH = 512;
+
 function processSexprToken(
   text: string,
   char: string,
@@ -280,6 +282,13 @@ function processSexprToken(
   if (char === "(") {
     const start = mark(position);
     advance(position, char);
+    if (stack.length >= MAX_SEXPR_NESTING_DEPTH) {
+      errors.push({
+        message: `Maximum S-expression nesting depth (${MAX_SEXPR_NESTING_DEPTH}) exceeded`,
+        span: { start, end: mark(position) },
+      });
+      return;
+    }
     appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
     const list = lastList(stack, nodes);
     if (list) {
@@ -287,6 +296,7 @@ function processSexprToken(
     }
     return;
   }
+
   if (char === ")") {
     const start = mark(position);
     advance(position, char);

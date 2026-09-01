@@ -83432,6 +83432,7 @@ function advance(position, char) {
   }
   position.column += 1;
 }
+var MAX_SEXPR_NESTING_DEPTH = 512;
 function processSexprToken(text, char, position, nodes, stack, errors) {
   if (/\s/.test(char)) {
     advance(position, char);
@@ -83444,6 +83445,13 @@ function processSexprToken(text, char, position, nodes, stack, errors) {
   if (char === "(") {
     const start = mark(position);
     advance(position, char);
+    if (stack.length >= MAX_SEXPR_NESTING_DEPTH) {
+      errors.push({
+        message: `Maximum S-expression nesting depth (${MAX_SEXPR_NESTING_DEPTH}) exceeded`,
+        span: { start, end: mark(position) }
+      });
+      return;
+    }
     appendNode(nodes, stack, { kind: "list", children: [], span: { start, end: mark(position) } });
     const list = lastList(stack, nodes);
     if (list) {
@@ -100380,7 +100388,7 @@ var import_node_path22 = __toESM(require("node:path"), 1);
 
 // src/firmware/stm32cubemx.ts
 var import_promises10 = __toESM(require("node:fs/promises"), 1);
-var IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.(\w+)=(.+)$/;
+var IOC_LINE_PATTERN = /^([A-Za-z0-9_-]+(?:\.\d+)?)\.(\w+)=(.+)$/;
 async function loadStm32CubeMxContract(file2, mcuDesignator = "U1") {
   let text;
   try {

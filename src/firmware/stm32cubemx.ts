@@ -10,7 +10,7 @@ import {
  * Pattern that matches a KV line in a STM32CubeMX .ioc file.
  * e.g. `PA0.GPIO_Label=BTN_USER` or `PB6.Signal=USART1_TX`
  */
-const IOC_LINE_PATTERN = /^([A-Z]+\d+(?:\.\d+)?)\.(\w+)=(.+)$/;
+const IOC_LINE_PATTERN = /^([A-Za-z0-9_-]+(?:\.\d+)?)\.(\w+)=(.+)$/;
 
 /**
  * Parse a STM32CubeMX `.ioc` project file and extract pin-to-signal mappings.

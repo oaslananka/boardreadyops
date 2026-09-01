@@ -18,9 +18,19 @@ export interface ReleaseManifestSignature {
   signedAt: string;
 }
 
+type SignatureErrorCode =
+  | "UNSUPPORTED_ALGORITHM"
+  | "DIGEST_MISMATCH"
+  | "INVALID_PUBLIC_KEY"
+  | "INVALID_SIGNATURE"
+  | "KEY_NOT_TRUSTED"
+  | "MALFORMED_SIGNATURE_FILE"
+  | "MANIFEST_UNREADABLE";
+
 export interface SignatureVerification {
   ok: boolean;
   errors: string[];
+  errorCodes?: SignatureErrorCode[];
 }
 
 const SIGNATURE_FILE = "manifest.sig";
@@ -53,18 +63,24 @@ export function verifyManifestSignature(
   trustedPublicKeyPem?: string,
 ): SignatureVerification {
   const errors: string[] = [];
+  const errorCodes: SignatureErrorCode[] = [];
   if (signature.algorithm !== "ed25519") {
-    return { ok: false, errors: [`unsupported signature algorithm: ${signature.algorithm}`] };
+    return {
+      ok: false,
+      errors: [`unsupported signature algorithm: ${signature.algorithm}`],
+      errorCodes: ["UNSUPPORTED_ALGORITHM"],
+    };
   }
   const digest = createHash("sha256").update(bytes).digest("hex");
   if (signature.manifestDigest && signature.manifestDigest !== digest) {
     errors.push("manifest digest in signature does not match manifest contents");
+    errorCodes.push("DIGEST_MISMATCH");
   }
   let publicKey: KeyObject;
   try {
     publicKey = loadKey(signature.publicKey, "public");
   } catch {
-    return { ok: false, errors: ["signature public key could not be parsed"] };
+    return { ok: false, errors: ["signature public key could not be parsed"], errorCodes: ["INVALID_PUBLIC_KEY"] };
   }
   let valid = false;
   try {
@@ -74,13 +90,15 @@ export function verifyManifestSignature(
   }
   if (!valid) {
     errors.push("signature does not match manifest contents");
+    errorCodes.push("INVALID_SIGNATURE");
   }
   if (trustedPublicKeyPem !== undefined) {
     if (!publicKeysMatch(publicKey, trustedPublicKeyPem)) {
       errors.push("signature public key does not match the trusted public key");
+      errorCodes.push("KEY_NOT_TRUSTED");
     }
   }
-  return { ok: errors.length === 0, errors };
+  return { ok: errors.length === 0, errors, errorCodes };
 }
 
 export interface SignReleaseBundleResult {
@@ -115,19 +133,29 @@ export async function verifyReleaseBundleSignature(
   try {
     signatureRaw = await fs.readFile(signaturePath, "utf8");
   } catch {
-    return { ok: false, present: false, errors: [] };
+    return { ok: false, present: false, errors: [], errorCodes: [] };
   }
   let signature: ReleaseManifestSignature;
   try {
     signature = JSON.parse(signatureRaw) as ReleaseManifestSignature;
   } catch {
-    return { ok: false, present: true, errors: ["manifest.sig is not valid JSON"] };
+    return {
+      ok: false,
+      present: true,
+      errors: ["manifest.sig is not valid JSON"],
+      errorCodes: ["MALFORMED_SIGNATURE_FILE"],
+    };
   }
   let bytes: Buffer;
   try {
     bytes = await fs.readFile(path.join(bundleDir, MANIFEST_FILE));
   } catch (error) {
-    return { ok: false, present: true, errors: [`manifest could not be read: ${asMessage(error)}`] };
+    return {
+      ok: false,
+      present: true,
+      errors: [`manifest could not be read: ${asMessage(error)}`],
+      errorCodes: ["MANIFEST_UNREADABLE"],
+    };
   }
   return { present: true, ...verifyManifestSignature(bytes, signature, trustedPublicKeyPem) };
 }

@@ -13,6 +13,11 @@ import { guardProductionSafety } from "../../qa/audit/production-guard.js";
  */
 
 test.beforeEach(async ({ baseURL }) => {
+  if (!baseURL) {
+    throw new Error(
+      "qa:production-smoke requires PLAYWRIGHT_BASE_URL (e.g. https://boardreadyops.com) -- refusing to default to any URL for a suite that talks to a real deployment.",
+    );
+  }
   guardProductionSafety(baseURL, false);
 });
 
