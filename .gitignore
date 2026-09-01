@@ -25,6 +25,9 @@ apps/web/.next/
 /playwright-report/
 /blob-report/
 tests/e2e/.auth/
+/qa-audit-report.json
+/qa-report.json
+/lighthouse-results/
 
 **/node_modules/
 

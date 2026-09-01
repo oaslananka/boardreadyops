@@ -137,6 +137,7 @@ export function RunUnavailable({ runId }: Readonly<{ runId: string }>) {
     <AppShell viewerNav={<ViewerNav />}>
       <main className="shell compact-shell" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]} />
+        <h1 className="sr-only">Run details temporarily unavailable</h1>
         <Alert title="Run details temporarily unavailable" tone="warning">
           <p>
             This deployment can't load run <code>{runId}</code> right now. No run data was inferred or cached by this
