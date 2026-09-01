@@ -4,7 +4,9 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import evidenceSchema from "../../../schemas/evidence.schema.json" with { type: "json" };
 import { runPipeline } from "../../../src/core/pipeline.js";
+import type { ReleaseEvidenceManifest } from "../../../src/release/evidence.js";
 import {
+  formatReleaseCertificateText,
   verifyManifestCoverage,
   verifyReleaseEvidenceBundle,
   writeReleaseEvidenceBundle,
@@ -104,6 +106,48 @@ describe("release evidence bundles", () => {
     const verification = await verifyReleaseEvidenceBundle(path.join(root, "bundle"));
     expect(verification.ok).toBe(false);
     expect(verification.errors.join("\n")).toContain("checksum or size mismatch");
+  });
+});
+
+describe("formatReleaseCertificateText", () => {
+  it("renders tool version, commit, decision, artifact count, and signature status from a real bundle", async () => {
+    const root = await writeFixture({
+      "board.kicad_pro": "{}",
+      "board.kicad_sch": "(kicad_sch)",
+      "boardreadyops.yml": "version: 1\nfail-on: never\n",
+    });
+    const result = await runPipeline({ path: root, failOn: "never", rules: ["manifest.project-discovery"] });
+    await writeReleaseEvidenceBundle(root, result, {
+      outputDir: "bundle",
+      generatedAt: "2026-06-20T00:00:00.000Z",
+      gitSha: "abc1234",
+      gitDirty: true,
+    });
+    const verification = await verifyReleaseEvidenceBundle(path.join(root, "bundle"));
+    expect(verification.manifest).toBeDefined();
+
+    const text = formatReleaseCertificateText(verification.manifest as ReleaseEvidenceManifest, {
+      present: true,
+      ok: true,
+    });
+
+    expect(text).toContain("Release Certificate");
+    expect(text).toContain("Generated at:  2026-06-20T00:00:00.000Z");
+    expect(text).toContain("Source commit: abc1234 (dirty working tree)");
+    expect(text).toContain("Decision:      PASS");
+    expect(text).toContain("Signature:     valid Ed25519");
+  });
+
+  it("falls back to defensive placeholders instead of throwing on a minimal manifest", () => {
+    const minimal = { schemaVersion: 2, artifacts: [] } as unknown as ReleaseEvidenceManifest;
+
+    const text = formatReleaseCertificateText(minimal, { present: false, ok: false });
+
+    expect(text).toContain("Tool:          boardreadyops vunknown");
+    expect(text).toContain("Source commit: unknown");
+    expect(text).toContain("Decision:      UNKNOWN");
+    expect(text).toContain("Artifacts:     0");
+    expect(text).toContain("Signature:     none");
   });
 });
 

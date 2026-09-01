@@ -8,7 +8,11 @@ import { resolveLocale, t } from "../../i18n/t.js";
 import { detectKicadCli } from "../../kicad/cli.js";
 import { runJobset } from "../../kicad/jobset.js";
 import { diffReleases, formatReleaseDiffText, type ReleaseSnapshot } from "../../release/diff.js";
-import { verifyReleaseEvidenceBundle, writeReleaseEvidenceBundle } from "../../release/evidence.js";
+import {
+  formatReleaseCertificateText,
+  verifyReleaseEvidenceBundle,
+  writeReleaseEvidenceBundle,
+} from "../../release/evidence.js";
 import { createKicadCliRunner, DEFAULT_GENERATE_RECIPE, runGenerate } from "../../release/generate.js";
 import {
   buildHandoffManifest,
@@ -270,6 +274,11 @@ export async function releaseVerifyCommand(
   } else if (ok) {
     const signatureNote = signature.present ? " and Ed25519 signature" : "";
     streams.stdout.write(`Release evidence bundle verified: ${verification.checked} artifact(s)${signatureNote}\n`);
+    if (verification.manifest) {
+      streams.stdout.write(
+        formatReleaseCertificateText(verification.manifest, { present: signature.present, ok: signatureOk }),
+      );
+    }
   } else {
     streams.stderr.write(
       `Release evidence bundle verification failed: ${[...verification.errors, ...signatureErrors].join("; ")}\n`,

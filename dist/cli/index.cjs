@@ -35623,6 +35623,7 @@ var init_src = __esm({
 // src/release/evidence.ts
 var evidence_exports = {};
 __export(evidence_exports, {
+  formatReleaseCertificateText: () => formatReleaseCertificateText,
   verifyManifestCoverage: () => verifyManifestCoverage,
   verifyReleaseEvidenceBundle: () => verifyReleaseEvidenceBundle,
   verifyReviewEvidenceOffline: () => verifyReviewEvidenceOffline,
@@ -35720,7 +35721,34 @@ async function verifyReleaseEvidenceBundle(bundleDir) {
       errors.push(`${artifact.path}: ${error51 instanceof Error ? error51.message : String(error51)}`);
     }
   }
-  return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors };
+  return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors, manifest };
+}
+function signatureStatusText(signature) {
+  if (!signature.present) return "none";
+  return signature.ok ? "valid Ed25519" : "present but INVALID";
+}
+function formatReleaseCertificateText(manifest, signature) {
+  const toolVersion = manifest.tool?.version ?? "unknown";
+  const generatedAt = manifest.generatedAt ?? "unknown";
+  const gitSha = manifest.git?.sha ?? "unknown";
+  const gitDirty = manifest.git?.dirty ? " (dirty working tree)" : "";
+  const decisionStatus = manifest.decision?.status?.toUpperCase() ?? "UNKNOWN";
+  const decisionReasons = manifest.decision?.reasons?.length ? ` (${manifest.decision.reasons.join("; ")})` : "";
+  const artifactCount = manifest.artifacts?.length ?? 0;
+  const algorithm = manifest.verification?.algorithm ?? "sha256";
+  const signatureText = signatureStatusText(signature);
+  const lines = [
+    "",
+    "Release Certificate",
+    `  Tool:          boardreadyops v${toolVersion}`,
+    `  Generated at:  ${generatedAt}`,
+    `  Source commit: ${gitSha}${gitDirty}`,
+    `  Decision:      ${decisionStatus}${decisionReasons}`,
+    `  Artifacts:     ${artifactCount} (${algorithm})`,
+    `  Signature:     ${signatureText}`
+  ];
+  return `${lines.join("\n")}
+`;
 }
 async function readBundleManifest(manifestPath) {
   try {
@@ -54970,6 +54998,11 @@ async function releaseVerifyCommand(bundleInput, options, streams) {
     const signatureNote = signature.present ? " and Ed25519 signature" : "";
     streams.stdout.write(`Release evidence bundle verified: ${verification.checked} artifact(s)${signatureNote}
 `);
+    if (verification.manifest) {
+      streams.stdout.write(
+        formatReleaseCertificateText(verification.manifest, { present: signature.present, ok: signatureOk })
+      );
+    }
   } else {
     streams.stderr.write(
       `Release evidence bundle verification failed: ${[...verification.errors, ...signatureErrors].join("; ")}

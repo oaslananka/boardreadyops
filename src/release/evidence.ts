@@ -40,7 +40,7 @@ interface ReleaseEvidenceVerificationMetadata {
   artifactCount: number;
 }
 
-interface ReleaseEvidenceManifest {
+export interface ReleaseEvidenceManifest {
   schemaVersion: 2;
   tool: { name: "boardreadyops"; version: string };
   generatedAt: string;
@@ -76,6 +76,7 @@ export interface ReleaseEvidenceVerification {
   manifestPath: string;
   checked: number;
   errors: string[];
+  manifest?: ReleaseEvidenceManifest | undefined;
 }
 
 const FABRICATION_DIRS = ["fab", "fabrication", "manufacturing", "gerbers", "gerber", "production"];
@@ -213,7 +214,46 @@ export async function verifyReleaseEvidenceBundle(bundleDir: string): Promise<Re
       errors.push(`${artifact.path}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors };
+  return { ok: errors.length === 0, manifestPath, checked: manifest.artifacts?.length ?? 0, errors, manifest };
+}
+
+/**
+ * Renders a human-readable certificate summary of a verified evidence bundle: tool version,
+ * source commit, decision, artifact count, and signature status. Manifest fields are read
+ * defensively (no runtime schema validation gates verifyReleaseEvidenceBundle's manifest.json
+ * read) so a minimal or partially-malformed manifest still produces a readable, honest output
+ * instead of throwing.
+ */
+function signatureStatusText(signature: { present: boolean; ok: boolean }): string {
+  if (!signature.present) return "none";
+  return signature.ok ? "valid Ed25519" : "present but INVALID";
+}
+
+export function formatReleaseCertificateText(
+  manifest: ReleaseEvidenceManifest,
+  signature: { present: boolean; ok: boolean },
+): string {
+  const toolVersion = manifest.tool?.version ?? "unknown";
+  const generatedAt = manifest.generatedAt ?? "unknown";
+  const gitSha = manifest.git?.sha ?? "unknown";
+  const gitDirty = manifest.git?.dirty ? " (dirty working tree)" : "";
+  const decisionStatus = manifest.decision?.status?.toUpperCase() ?? "UNKNOWN";
+  const decisionReasons = manifest.decision?.reasons?.length ? ` (${manifest.decision.reasons.join("; ")})` : "";
+  const artifactCount = manifest.artifacts?.length ?? 0;
+  const algorithm = manifest.verification?.algorithm ?? "sha256";
+  const signatureText = signatureStatusText(signature);
+
+  const lines = [
+    "",
+    "Release Certificate",
+    `  Tool:          boardreadyops v${toolVersion}`,
+    `  Generated at:  ${generatedAt}`,
+    `  Source commit: ${gitSha}${gitDirty}`,
+    `  Decision:      ${decisionStatus}${decisionReasons}`,
+    `  Artifacts:     ${artifactCount} (${algorithm})`,
+    `  Signature:     ${signatureText}`,
+  ];
+  return `${lines.join("\n")}\n`;
 }
 
 async function readBundleManifest(
