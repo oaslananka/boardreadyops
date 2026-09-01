@@ -113,5 +113,5 @@ async function requiredBaseline(file: string, root: string, streams: Streams) {
 }
 
 function baselineDisplayPath(root: string, file: string): string {
-  return path.relative(root, file).replace(/\\/g, "/") || path.basename(file);
+  return path.relative(root, file).replaceAll("\\", "/") || path.basename(file);
 }

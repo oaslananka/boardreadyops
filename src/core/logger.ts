@@ -262,7 +262,7 @@ function redactString(value: string, projectRoot: string | undefined, maxFieldLe
 }
 
 function normalizePath(value: string): string {
-  return path.resolve(value).replace(/\\/g, "/");
+  return path.resolve(value).replaceAll("\\", "/");
 }
 
 function writeRotatingLine(file: string, line: string, maxFileBytes: number, retention: number): void {

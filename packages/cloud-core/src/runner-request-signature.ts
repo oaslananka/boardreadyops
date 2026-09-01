@@ -44,7 +44,7 @@ function compareText(left: string, right: string): number {
 function encodeQueryComponent(value: string): string {
   return encodeURIComponent(value).replace(
     /[!'()*]/gu,
-    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+    (character) => `%${(character.codePointAt(0) ?? 0).toString(16).toUpperCase()}`,
   );
 }
 

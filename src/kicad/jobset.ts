@@ -139,5 +139,5 @@ function uniqueJobs(jobs: KicadJobset["jobs"]): KicadJobset["jobs"] {
 }
 
 function normalizePath(value: string): string {
-  return path.normalize(value).replace(/\\/g, "/");
+  return path.normalize(value).replaceAll("\\", "/");
 }
