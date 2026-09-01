@@ -2,34 +2,34 @@
 # A PR enters the queue only after a maintainer explicitly applies the
 # `queue-me` label. Automation must never add that label.
 #
-# GitHub repository rulesets remain the authoritative merge gate.
+# GitHub repository rulesets are the authoritative merge gate.
+# Required GitHub status checks are NOT duplicated here.
+# Mergify reads and injects the applicable GitHub ruleset requirements.
+
 merge_queue:
-  # Process queued PRs in order.
+  # Process queued PRs serially.
   mode: serial
 
-  # Only one queue validation runs at a time.
+  # One validation at a time.
   # Together with batch_size: 1 and max_checks_retries: 0,
-  # this allows Mergify to use in-place checks.
+  # this keeps the queue eligible for in-place checks.
   max_parallel_checks: 1
 
-  # Only post final queue outcomes instead of every queue event.
+  # Only report final queue outcomes.
   status_comments: outcomes
 
-  # If something is merged into main outside Mergify,
-  # rebuild/re-evaluate the queue against the new main.
+  # If main changes outside Mergify, re-evaluate the queue.
   reset_on_external_merge: always
 
-  # Keep current anti-flake behavior.
+  # Avoid unnecessary intermediate queue results.
   skip_intermediate_results: true
 
-  # Do not expose Mergify's queue/requeue checkbox controls.
-  # Queue entry stays driven by the `queue-me` label rule below.
+  # Queue admission is controlled exclusively by the `queue-me` label.
   queue_controls_comment: false
 
 
-# File-pattern scopes are kept for Mergify's understanding of affected areas.
-# BoardReadyOps CI continues to use its own risk-profile job for
-# validation routing.
+# File scopes are used by Mergify for change-area awareness.
+# BoardReadyOps CI remains responsible for its own risk-profile routing.
 scopes:
   source:
     files:
@@ -62,65 +62,57 @@ scopes:
 queue_rules:
   - name: default
 
-    # One PR per queue batch.
+    # Only one PR is validated/merged at a time.
     batch_size: 1
 
-    # IMPORTANT:
-    # If the PR is behind main, update the PR branch by merging
-    # the latest main into it before final validation.
+    # Explicitly let Mergify import the GitHub branch/ruleset protections.
+    #
+    # With `queue`:
+    # - GitHub ruleset requirements are checked before queue admission.
+    # - They are checked again before the final merge.
+    #
+    # This keeps GitHub Rulesets as the source of truth and avoids
+    # duplicating every required check in this file.
+    branch_protection_injection_mode: queue
+
+    # When a queued PR is behind main, merge the latest main into
+    # the PR branch before final validation.
     update_method: merge
 
-    # Keep in-place checks enabled.
-    # Values > 0 force Mergify to create temporary batch PRs.
+    # Keep in-place checks possible.
+    # A value > 0 would force temporary batch PRs for retries.
     max_checks_retries: 0
 
-    # Wait indefinitely for required checks.
-    # Change to `auto` later if you want Mergify to manage timeouts.
+    # Do not dequeue simply because CI takes longer than expected.
     checks_timeout: null
 
-    # With batch_size: 1 this normally has no practical waiting effect,
-    # but keeping it is harmless.
+    # With batch_size: 1 there is normally nothing to batch together,
+    # but keeping this value is harmless.
     batch_max_wait_time: 5 min
 
-    # Final merge into main is always squash.
+    # Final integration into main uses squash.
     merge_method: squash
 
-    # Conditions required before Mergify accepts the PR into the queue.
+    # Maintainer-controlled queue admission.
+    #
+    # Do NOT repeat ci / lint, ci / build, etc. here.
+    # GitHub Rulesets define those requirements.
     queue_conditions:
       - label = queue-me
       - -draft
-      - check-success = ci / risk-profile
-      - check-success = ci / lint
-      - check-success = ci / typecheck
-      - check-success = ci / test-unit
-      - check-success = ci / build
-      - check-success = ci / verify-dist
-      - check-success = ci / coverage-gate
-      - check-success = security / gate
 
-    # Conditions that must still be true immediately before merge.
+    # Keep these identical to queue_conditions so the queue stays
+    # compatible with Mergify's in-place checking model.
     #
-    # These intentionally match queue_conditions so that Mergify can
-    # use in-place checks with:
-    #   mode: serial
-    #   max_parallel_checks: 1
-    #   batch_size: 1
-    #   max_checks_retries: 0
+    # GitHub Ruleset requirements are injected automatically in addition
+    # to these conditions.
     merge_conditions:
       - label = queue-me
       - -draft
-      - check-success = ci / risk-profile
-      - check-success = ci / lint
-      - check-success = ci / typecheck
-      - check-success = ci / test-unit
-      - check-success = ci / build
-      - check-success = ci / verify-dist
-      - check-success = ci / coverage-gate
-      - check-success = security / gate
 
 
 pull_request_rules:
-  # Queue only when a maintainer has explicitly applied `queue-me`.
+  # A PR is queued only after a maintainer explicitly adds `queue-me`.
   - name: queue explicitly approved pull requests
     conditions:
       - label = queue-me
@@ -129,7 +121,7 @@ pull_request_rules:
       queue:
         name: default
 
-  # Security workflow changes require explicit manual review.
+  # Security workflow changes require manual attention.
   - name: label security workflow changes
     conditions:
       - files ~= ^\.github/workflows/security
@@ -139,7 +131,7 @@ pull_request_rules:
           - security
           - manual-review
 
-  # Documentation-only/path-related changes get a documentation label.
+  # Automatically classify documentation changes.
   - name: label documentation changes
     conditions:
       - files ~= ^docs/
