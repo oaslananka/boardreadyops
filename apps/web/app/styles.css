@@ -21,6 +21,9 @@
   --foundry-line: #1f2937;
   --foundry-line-strong: #374151;
   --foundry-copper: #3b82f6;
+  /* 5.77:1 against a dark surface vs. --foundry-copper's 3.99:1; for text-on-dark usages like
+     .review-back-link, not a replacement for --foundry-copper generally. */
+  --foundry-copper-on-dark: #60a5fa;
   --foundry-copper-strong: #4d8eff;
   --foundry-copper-soft: rgba(59, 130, 246, 0.12);
   --foundry-brass: #4d8eff;
@@ -103,6 +106,10 @@
   --danger: #ef4444;
   --danger-surface: #1a1a28;
   --danger-border: #ef4444;
+  /* var(--danger) is 3.9:1 against a dark row background, short of the 4.5:1 WCAG AA floor for
+     normal text (found by qa:audit's axe-core pass) -- this lighter variant is for text-on-dark
+     usages like .blocker-indicator.has-blockers, not a replacement for --danger generally. */
+  --danger-on-dark: #f87171;
   --info: #3b82f6;
   --info-surface: #131c2f;
   --info-border: #3b82f6;
@@ -1048,6 +1055,7 @@ code {
   color: var(--text);
   gap: var(--space-3);
   grid-template-columns: auto minmax(0, 1fr);
+  overflow-wrap: break-word;
 }
 
 .alert[data-tone="warning"] {
@@ -2619,6 +2627,8 @@ code {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .review-command-header,
@@ -2658,7 +2668,10 @@ code {
 }
 
 .review-back-link {
-  color: var(--foundry-copper);
+  /* var(--foundry-copper) is 3.99:1 against this dark background, short of the 4.5:1 WCAG AA
+     floor for normal text (found by qa:audit's axe-core pass) -- lightened just for this
+     usage rather than changing the shared token, which many other surfaces rely on. */
+  color: var(--foundry-copper-on-dark);
   font-weight: 500;
   text-decoration: none;
 }
@@ -2756,6 +2769,29 @@ code {
   border-bottom: 1px solid var(--border);
   padding-bottom: var(--space-1);
   overflow-x: auto;
+  /* Flex items default to min-width: auto, which for a nowrap row means "at least as wide as
+     my content" -- with six white-space: nowrap tab buttons that's ~818px, so without this the
+     column-flex parent (.review-view-container) grows to fit it instead of letting overflow-x
+     scroll it, pushing the whole page wider than the viewport on mobile. Found by qa:audit
+     (tests/e2e/review-lifecycle.spec.ts test 17, tests/e2e/qa-audit.spec.ts).
+
+     UNRESOLVED: this alone (plus the matching min-width/max-width on .review-view-container)
+     does not fully fix it. With this rule applied, getComputedStyle on this element reports a
+     correctly bounded 327px width and a real internal horizontal scrollbar (clientWidth 327 /
+     scrollWidth 818, own overflow contained) -- yet document.documentElement.scrollWidth still
+     reports the full ~818px-driven width, and only recovers to the viewport width when this
+     element is set to display:none entirely (confirmed: forcing this element's own width,
+     max-width, and overflow-x:hidden via !important inline styles, with display left as flex,
+     did NOT fix document-level scrollWidth). The sticky .review-command-header sibling was
+     ruled out the same way (forcing position:static made no difference). Root cause not fully
+     identified; likely a rendering-engine quirk in how a flex item's own overflow:auto
+     scrollable region is (or isn't) excluded from the document's own scrollable-overflow
+     calculation. Next step for whoever picks this up: try restructuring so the scrollable
+     region isn't itself a flex item (wrap it in a non-flex block, or give
+     .review-view-container an explicit width instead of relying on flex sizing), or add
+     `contain: layout` to this rule and check whether Chromium DevTools' own layout inspector
+     attributes the extra scrollWidth to this element or somewhere else entirely. */
+  min-width: 0;
 }
 
 .review-tab-link {
@@ -3712,7 +3748,7 @@ code {
 }
 
 .blocker-indicator.has-blockers {
-  color: var(--danger);
+  color: var(--danger-on-dark);
 }
 
 .blocker-indicator.no-blockers {

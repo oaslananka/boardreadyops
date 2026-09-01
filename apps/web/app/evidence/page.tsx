@@ -21,7 +21,10 @@ export default function EvidencePage() {
             Evidence packs are deterministic, offline-verifiable, and include base/head SHAs, tool versions, digests and
             decision history.
           </p>
-          <pre className="setup-code-preview">boardreadyops release verify --ledger ./evidence-ledger.json</pre>
+          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable overflow-x region needs tabIndex so keyboard users can scroll it (WCAG 2.1.1, axe scrollable-region-focusable). */}
+          <pre className="setup-code-preview" tabIndex={0}>
+            boardreadyops release verify --ledger ./evidence-ledger.json
+          </pre>
         </div>
       </main>
     </AppShell>

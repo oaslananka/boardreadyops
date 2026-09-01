@@ -15,6 +15,7 @@ narrowest meaningful test and pass the repository gate before merge.
 | Coverage | `corepack pnpm run coverage` | Coverage thresholds. |
 | Mutation | `corepack pnpm run mutation` | Test strength for core/rule/parser paths. |
 | Accessibility | `corepack pnpm run test:a11y` | HTML and docs accessibility coverage. |
+| QA / E2E | `corepack pnpm run qa:audit` | Real-browser route audit: HTTP health, console/page errors, axe WCAG A/AA, DOM sanity, overflow, touch targets. See [QA agent guide](qa-agent.md). |
 
 ## Integration isolation
 

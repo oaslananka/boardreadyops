@@ -1,0 +1,44 @@
+name: Lighthouse
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - ".lighthouserc.json"
+      - ".github/workflows/lighthouse.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - ".lighthouserc.json"
+
+env:
+  NODE_VERSION: "24.19.0"
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: lighthouse / audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: corepack pnpm run deps:install-ci
+      - name: Build web app
+        run: corepack pnpm --filter @boardreadyops/web run build
+      - name: Lighthouse CI
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
+        with:
+          configPath: ".lighthouserc.json"
+          uploadArtifacts: true
+          temporaryPublicStorage: false

@@ -492,6 +492,37 @@ jobs:
         run: google-chrome --version
       - run: pnpm run test:a11y
 
+  qa-e2e:
+    needs: risk-profile
+    if: needs.risk-profile.outputs.needs_accessibility == 'true'
+    name: ci / qa-e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: corepack pnpm run deps:install-ci
+      - run: corepack pnpm exec playwright install --with-deps chromium
+      - name: QA smoke suite (Chromium, critical routes)
+        run: corepack pnpm run qa:smoke
+        env:
+          CI: "true"
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
   build:
     needs: risk-profile
     if: needs.risk-profile.outputs.needs_build == 'true'
