@@ -4,6 +4,9 @@ exports[`release diff engine > produces a stable diff snapshot for a sample rele
 {
   "fabrication": {
     "bom": {
+      "addedCount": 1,
+      "changedCount": 1,
+      "removedCount": 0,
       "rows": [
         {
           "current": "NEW-1",

@@ -93,9 +93,12 @@ function factsFromDiff(diff: RunDiff): HardwareImpactFacts {
       resolvedBlocking: diff.findings.resolved.filter((finding) => blockingSeverity(finding.severity)).length,
     },
     bom: {
-      added: countByStatus(diff.fabrication.bom.rows, "added"),
-      removed: countByStatus(diff.fabrication.bom.rows, "removed"),
-      changed: countByStatus(diff.fabrication.bom.rows, "changed"),
+      // diff.fabrication.bom.rows is capped for display (see FabricationDiffOptions.maxBomRows), so
+      // counting from it would silently undercount past the cap. addedCount/removedCount/changedCount
+      // are computed before that cap and are the accurate source.
+      added: diff.fabrication.bom.addedCount,
+      removed: diff.fabrication.bom.removedCount,
+      changed: diff.fabrication.bom.changedCount,
       truncated: diff.fabrication.bom.truncated,
     },
     manufacturing: {

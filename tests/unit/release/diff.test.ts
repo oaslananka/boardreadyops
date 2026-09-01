@@ -90,4 +90,62 @@ describe("release diff engine", () => {
     expect(text).toContain("resolved required: drill");
     expect(text).toContain("findings: +1 / -1");
   });
+
+  it("lists which bom rows, outputs, and findings actually changed, not just their counts", () => {
+    const diff = diffReleases(previous, current, { generatedAt: "2026-06-22T00:00:00.000Z" });
+    const text = formatReleaseDiffText(diff);
+
+    expect(text).toContain("bom row changes:");
+    expect(text).toContain("R1: OLD-1 -> NEW-1");
+    expect(text).toContain("R3: added (ADDED-3)");
+    expect(text).not.toContain("R2:");
+
+    expect(text).toContain("output changes:");
+    expect(text).toContain("gerber: changed");
+
+    expect(text).toContain("new findings:");
+    expect(text).toContain("critical manufacturing.outputs-present at board.kicad_pcb");
+    expect(text).toContain("resolved findings:");
+    expect(text).toContain("high bom.missing-mpn at board.kicad_pcb");
+  });
+
+  it("truncates long change lists with an overflow note instead of flooding the output", () => {
+    const manyBom = Array.from({ length: 25 }, (_, index) => ({
+      reference: `R${index}`,
+      value: "1k",
+      mpn: `MPN-${index}`,
+    }));
+    const diff = diffReleases(
+      { fabrication: { bom: [], outputs: [] }, findings: [] },
+      { fabrication: { bom: manyBom, outputs: [] }, findings: [] },
+      { generatedAt: "2026-06-22T00:00:00.000Z" },
+    );
+    const text = formatReleaseDiffText(diff);
+
+    // Rows sort alphabetically (R0, R1, R10..R19, R2, R20..R24, R3, R4, R5, ...), so the first
+    // 20 of 25 are R0, R1, R10-R19, R2, R20-R24, R3, R4 -- R5 is the first to be dropped.
+    expect(text).toContain("R4: added (MPN-4)");
+    expect(text).not.toContain("R5: added");
+    expect(text).toContain("(+5 more)");
+  });
+
+  it("reports the true bom-changed count even when the row list itself is capped", () => {
+    const manyBom = Array.from({ length: 25 }, (_, index) => ({
+      reference: `R${index}`,
+      value: "1k",
+      mpn: `MPN-${index}`,
+    }));
+    const diff = diffReleases(
+      { fabrication: { bom: [], outputs: [] }, findings: [] },
+      { fabrication: { bom: manyBom, outputs: [] }, findings: [] },
+      { generatedAt: "2026-06-22T00:00:00.000Z" },
+    );
+
+    // diffFabrication's own maxBomRows default (20) caps diff.fabrication.bom.rows, but the
+    // summary must reflect all 25 rows that actually changed, not just the 20 that are listed.
+    expect(diff.fabrication.bom.rows).toHaveLength(20);
+    expect(diff.fabrication.bom.addedCount).toBe(25);
+    expect(diff.summary.bomChanged).toBe(25);
+    expect(formatReleaseDiffText(diff)).toContain("bom rows changed: 25");
+  });
 });
