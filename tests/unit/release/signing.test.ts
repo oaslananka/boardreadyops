@@ -45,7 +45,7 @@ describe("signManifestBytes / verifyManifestSignature", () => {
 
     expect(signature.algorithm).toBe("ed25519");
     expect(signature.manifestDigest).toMatch(/^[0-9a-f]{64}$/);
-    expect(verifyManifestSignature(bytes, signature)).toEqual({ ok: true, errors: [] });
+    expect(verifyManifestSignature(bytes, signature)).toEqual({ ok: true, errors: [], errorCodes: [] });
     expect(verifyManifestSignature(bytes, signature, publicPem).ok).toBe(true);
   });
 
@@ -55,6 +55,7 @@ describe("signManifestBytes / verifyManifestSignature", () => {
     const result = verifyManifestSignature(Buffer.from("tampered"), signature);
     expect(result.ok).toBe(false);
     expect(result.errors.join(" ")).toMatch(/digest|does not match/);
+    expect(result.errorCodes).toContain("DIGEST_MISMATCH");
   });
 
   it("fails when a different trusted public key is pinned", () => {
