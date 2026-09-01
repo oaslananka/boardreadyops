@@ -43409,8 +43409,17 @@ async function loadBom(file2) {
 }
 function parseDelimited(text, delimiter = ",") {
   const rows2 = parseDelimitedRows(text, delimiter);
-  const header = rows2.shift()?.map((cell) => cell.trim()) ?? [];
+  const rawHeader = rows2.shift()?.map((cell) => cell.trim()) ?? [];
+  const header = dedupeHeaderNames(rawHeader);
   return rows2.filter((row) => row.some((cell) => cell.trim() !== "")).map((row) => Object.fromEntries(header.map((key, index) => [key, row[index]?.trim() ?? ""])));
+}
+function dedupeHeaderNames(header) {
+  const seen = /* @__PURE__ */ new Map();
+  return header.map((name) => {
+    const count = seen.get(name) ?? 0;
+    seen.set(name, count + 1);
+    return count === 0 ? name : `${name}_${count + 1}`;
+  });
 }
 
 // src/kicad/parsers/project-files.ts
