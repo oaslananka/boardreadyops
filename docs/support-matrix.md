@@ -6,12 +6,12 @@ BoardReadyOps compatibility is defined in `docs/compatibility.yaml` and rendered
 
 ## KiCad
 
-Minimum supported KiCad: **9.0**. Recommended KiCad line: **10.0**. Latest verified patch: **10.0.5**.
+Minimum supported KiCad: **9.0**. Recommended KiCad line: **10.0**. Latest verified patch: **10.0.6**.
 
 | Runtime | Version | Status | Latest verified | Notes |
 | --- | --- | --- | --- | --- |
 | KiCad | 9.0 | Minimum supported, upstream EOL, not CI-tested |  | Upstream EOL since April 2026. Removed from CI in May 2026 — may still work but is untested. |
-| KiCad | 10.0 | Recommended CI-tested line | 10.0.5 | Current recommended stable line. CI installs ppa:kicad/kicad-10.0-releases and asserts kicad-cli 10.0.x. |
+| KiCad | 10.0 | Recommended CI-tested line | 10.0.6 | Current recommended stable line. CI installs ppa:kicad/kicad-10.0-releases and asserts kicad-cli 10.0.x. |
 
 ## Node.js
 
@@ -20,7 +20,7 @@ Minimum supported Node.js: **22.14.0**. Recommended Node.js major: **24**.
 | Runtime | Version | Status | Tested latest | Policy |
 | --- | --- | --- | --- | --- |
 | Node.js | 22 | Minimum supported runtime | 22.23.2 | Maintenance LTS. Supported from 22.14.0 upward for existing users and tested in unit and KiCad integration jobs. |
-| Node.js | 24 | Recommended Active LTS runtime | 24.19.0 | Active LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs. |
+| Node.js | 24 | Recommended Active LTS runtime | 24.20.0 | Active LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs. |
 | Node.js | 26 | Current, not supported |  | Current release line. Tracked by drift guard but not in package engines or CI until it reaches LTS and dependency/tooling validation is added. |
 
 ## CycloneDX HBOM

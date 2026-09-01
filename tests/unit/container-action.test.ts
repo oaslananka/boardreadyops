@@ -46,7 +46,7 @@ describe("container action release surfaces", () => {
     const dockerfile = await readFile("apps/container/Dockerfile", "utf8");
 
     expect(dockerfile).toContain("FROM ubuntu:26.04@sha256:");
-    expect(dockerfile).toContain("ARG NODE_VERSION=24.19.0");
+    expect(dockerfile).toContain("ARG NODE_VERSION=24.20.0");
     expect(dockerfile).toContain("ARG BOARDREADYOPS_VERSION");
     expect(dockerfile).not.toContain("ARG BOARDREADYOPS_VERSION=latest");
     expect(dockerfile).toContain("BOARDREADYOPS_VERSION must be an exact semantic version");
@@ -113,7 +113,7 @@ describe("container action release surfaces", () => {
       {
         "kicad-version": "10.0",
         "kicad-ppa-series": "10.0",
-        "node-version": "24.19.0",
+        "node-version": "24.20.0",
       },
     ]);
   });
