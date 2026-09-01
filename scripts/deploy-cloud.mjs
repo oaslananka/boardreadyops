@@ -89,7 +89,16 @@ export function readDeployOptions(env = process.env) {
 }
 
 export function dockerTagFromRevision(revision) {
-  const normalized = revision.replace(/[^A-Za-z0-9_.-]/g, "-").replace(/^-+|-+$/g, "");
+  const cleaned = revision.replace(/[^A-Za-z0-9_.-]/g, "-");
+  let start = 0;
+  let end = cleaned.length;
+  while (start < end && cleaned[start] === "-") {
+    start += 1;
+  }
+  while (end > start && cleaned[end - 1] === "-") {
+    end -= 1;
+  }
+  const normalized = cleaned.slice(start, end);
   return (normalized || "unknown").slice(0, 128);
 }
 

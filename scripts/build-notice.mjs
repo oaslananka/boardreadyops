@@ -23,7 +23,7 @@ function readLockfilePlatformPackages(root) {
   let hasOsOrCpu = false;
 
   for (const line of content.split("\n")) {
-    const pkgMatch = line.match(/^ {2}'(.+)@(.+)':\s*$/);
+    const pkgMatch = line.match(/^ {2}'(.+)@([^@]+)':\s*$/);
     if (pkgMatch) {
       if (currentName !== null && hasOsOrCpu) {
         platformPackages.add(currentName);
