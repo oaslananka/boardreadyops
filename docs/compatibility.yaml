@@ -1,11 +1,11 @@
 source_checked:
-  date: "2026-08-08"
+  date: "2026-09-01"
   node:
     releases: "https://nodejs.org/en/about/previous-releases"
     schedule: "https://github.com/nodejs/Release#release-schedule"
     index: "https://nodejs.org/dist/index.json"
   kicad:
-    release: "https://www.kicad.org/blog/2026/07/KiCad-10.0.5-Release/"
+    release: "https://www.kicad.org/blog/2026/08/KiCad-10.0.6-Release/"
     linux_packages: "https://www.kicad.org/download/linux-distros/"
     tags: "https://gitlab.com/kicad/code/kicad/-/tags"
   cyclonedx:
@@ -17,7 +17,7 @@ source_checked:
 kicad:
   minimum: "9.0"
   recommended: "10.0"
-  latestVerified: "10.0.5"
+  latestVerified: "10.0.6"
   eol:
     - "9.0"
   tested:
@@ -33,7 +33,7 @@ node:
   current: ["26"]
   tested:
     "22": "22.23.2"
-    "24": "24.19.0"
+    "24": "24.20.0"
   policy:
     "22": "Maintenance LTS. Supported from 22.14.0 upward for existing users and tested in unit and KiCad integration jobs."
     "24": "Active LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs."

@@ -1,4 +1,4 @@
-FROM node:24.19.0-slim AS base
+FROM node:24.20.0-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
@@ -19,7 +19,7 @@ FROM deps AS build
 COPY . .
 RUN pnpm --filter @boardreadyops/web build
 
-FROM node:24.19.0-slim AS runner
+FROM node:24.20.0-slim AS runner
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG VERSION=dev
