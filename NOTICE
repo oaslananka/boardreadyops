@@ -168,7 +168,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `bare-url@2.4.3`
   - Description: WHATWG URL implementation for JavaScript
   - Homepage: https://github.com/holepunchto/bare-url
-- `baseline-browser-mapping@2.10.30`
+- `baseline-browser-mapping@2.10.30`, `baseline-browser-mapping@2.11.19`
   - Description: A library for obtaining browser versions with their maximum supported Baseline feature set and Widely Available status.
   - Homepage: https://github.com/web-platform-dx/baseline-browser-mapping#readme
 - `before-after-hook@4.0.0`
@@ -349,7 +349,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## CC-BY-4.0
 
-- `caniuse-lite@1.0.30001793`
+- `caniuse-lite@1.0.30001793`, `caniuse-lite@1.0.30001810`
   - Description: A smaller version of caniuse-db, with only the essentials!
   - Homepage: https://github.com/browserslist/caniuse-lite#readme
 
@@ -417,7 +417,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `delaunator@5.1.0`
   - Description: An incredibly fast JavaScript library for Delaunay triangulation of 2D points
   - Homepage: https://github.com/mapbox/delaunator#readme
-- `electron-to-chromium@1.5.357`
+- `electron-to-chromium@1.5.414`
   - Description: Provides a list of electron-to-chromium version mappings
   - Homepage: https://github.com/Kilian/electron-to-chromium#readme
 - `fastq@1.20.1`
@@ -1231,7 +1231,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `braces@3.0.3`
   - Description: Bash-like brace expansion, implemented in JavaScript. Safer than other brace expansion libs, with complete support for the Bash 4.3 braces specification, without sacrificing speed.
   - Homepage: https://github.com/micromatch/braces
-- `browserslist@4.28.2`
+- `browserslist@4.28.7`
   - Description: Share target browsers between different front-end tools, like Autoprefixer, Stylelint and babel-env-preset
   - Homepage: https://github.com/browserslist/browserslist#readme
 - `buffer@6.0.3`
@@ -1712,7 +1712,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `node-fetch@2.7.0`
   - Description: A light-weight module that brings window.fetch to node.js
   - Homepage: https://github.com/bitinn/node-fetch
-- `node-releases@2.0.44`
+- `node-releases@2.0.53`
   - Description: Node.js releases data
   - Homepage: https://github.com/chicoxyzzy/node-releases#readme
 - `normalize-path@3.0.0`
