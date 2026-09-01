@@ -105,7 +105,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Status:** `Partial`
 - **Remaining:** No Gerber X2/X3 or Excellon metadata parser, no IPC-2581/ODB++ adapter, no parser confidence/provenance fields, and no hostile-input size/DoS guard beyond the sexpr nesting-depth cap (PR #565) were found.
 - **Scope:** Deterministic KiCad project/schematic/PCB discovery, S-expression parsing, variants extraction, and normalized BOM loading.
-- **Code & Test Evidence:** `src/kicad/discovery.ts`, `src/kicad/sexpr.ts`, `src/bom/loader.ts`, `src/bom/identity.ts`.
+- **Code & Test Evidence:** `src/core/discovery.ts`, `src/kicad/sexpr.ts`, `src/bom/loader.ts`, `src/bom/identity.ts`.
 
 ### W04 — Artifact Generation Engine
 - **Status:** `Partial`
@@ -117,19 +117,19 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Status:** `Partial`
 - **Remaining:** Geometry-heavy DFM (trace/spacing/copper-edge/hole-hole/annular-ring/via-aspect-ratio) is delegated entirely to KiCad's native DRC/ERC, not owned by a BoardReadyOps rule engine; no solder-mask/paste/NPTH-PTH-slot semantics; RuleMetadata lacks category/evidence-type/fixability/vendor-dependence fields; no false-positive telemetry hook.
 - **Scope:** Comprehensive DRC/ERC execution, manufacturing clearance, annular ring, solder mask, silkscreen, and DFA component checks.
-- **Code & Test Evidence:** `src/rules/drc/`, `src/rules/erc/`, `src/rules/dfa/`, `src/rules/manufacturing/`.
+- **Code & Test Evidence:** `src/rules/drc/`, `src/rules/erc/`, `src/rules/manufacturing/`.
 
 ### W06 — Deterministic Release Decision Engine
 - **Status:** `Partial`
 - **Remaining:** No explicit named PASS/FAIL/CONDITIONAL/UNKNOWN vocabulary (readiness.ts uses ready/at-risk/blocked; policy.ts uses pass/fail) and no dedicated cross-run decision fingerprint/hash for same-input-same-decision regression testing, though the DecisionExplanationGraph (PR #565) and injectable clock cover the core acceptance criteria.
 - **Scope:** Pure functional release decision synthesis (PASS / FAIL / CONDITIONAL / UNKNOWN) based on findings, policies, and waivers.
-- **Code & Test Evidence:** `src/core/decision.ts`, `packages/cloud-core/src/decision-engine.ts`, `tests/unit/cloud-core/decision-engine.test.ts`.
+- **Code & Test Evidence:** `src/core/policy.ts`, `src/core/readiness.ts`, `packages/cloud-core/src/decision-engine.ts`, `tests/unit/cloud-core/decision-engine.test.ts`.
 
 ### W07 — Evidence Bundle, Signing, Provenance & Hardware SLSA
 - **Status:** `Partial`
 - **Remaining:** No signing-key rotation/revocation/trust-store mechanism, no signed-release-certificate UI/API, and no formal Hardware Release Level model exists yet (tracked as roadmap Epic #271); matches the ledger's own note on the unmilestoned Hardware Release Passport slice (#448).
 - **Scope:** Cryptographic release packaging (v2 layout), checksum manifests, Ed25519 digital signatures, and offline verification.
-- **Code & Test Evidence:** `src/release/evidence.ts`, `src/release/sign.ts`, `src/release/verify.ts`, `src/cli/commands/verify-bundle.ts`.
+- **Code & Test Evidence:** `src/release/evidence.ts`, `src/release/signing.ts`, `src/cli/commands/release.ts`.
 
 ### W08 — Release-to-Release Diff & Hardware Change Impact
 - **Status:** `Partial`
@@ -147,13 +147,13 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Status:** `Partial`
 - **Remaining:** src/vendor/profiles.ts is a static hardcoded array of 9 vendor presets answering only 'what output evidence does vendor X require' — no versioned/immutable profile revisions, source/date/verifier/confidence metadata, freshness alerting, verified-badge workflow, or cross-vendor manufacturability compare.
 - **Scope:** Manufacturer capability modeling (JLCPCB, PCBWay, OSH Park), 0–100 vendor readiness scoring, and handoff zip packaging.
-- **Code & Test Evidence:** `src/vendor/profiles/`, `src/vendor/scoring.ts`, `src/release/handoff.ts`.
+- **Code & Test Evidence:** `src/vendor/profiles.ts`, `src/vendor/outputs.ts`, `src/release/handoff.ts`.
 
 ### W11 — BOM, Supply Chain & Cost Intelligence
 - **Status:** `Partial`
 - **Remaining:** No provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; fleet BOM exposure (which releases contain MPN X) is not queryable — board-bom-store.ts only exposes a write path. Matches open issue #449.
 - **Scope:** Component MPN normalization, lifecycle tracking (Active/NRND/EOL), CycloneDX HBOM generation, and provider abstraction (Nexar).
-- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/bom/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`.
+- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/report/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`.
 
 ### W12 — Firmware ↔ Hardware Contract
 - **Status:** `Partial`
@@ -189,7 +189,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Status:** `Partial`
 - **Remaining:** No granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user; no session revocation/device-management UI or store; no auth-attempt-specific rate limiting; no end-user docs for the bro_live_ API token feature.
 - **Scope:** Secure session auth with HMAC-signed cookies, tenant-isolated Prisma queries, and scoped API tokens for runners/CLI.
-- **Code & Test Evidence:** `apps/web/lib/api-auth.ts`, `apps/web/lib/api-token-store.ts`, `packages/cloud-core/src/entitlements.ts`.
+- **Code & Test Evidence:** `apps/web/lib/api-auth.ts`, `packages/db/src/api-token-store.ts`, `packages/cloud-core/src/entitlements.ts`.
 
 ### W18 — Artifact Storage, Access, Retention & Privacy
 - **Status:** `Partial`
@@ -213,13 +213,13 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Status:** `Partial`
 - **Remaining:** No true 3D viewer implementation exists (3d_render is a schema enum value only, no renderer); no dedicated Gerber-layer-stack/drill-overlay parser (the view is generated from parsed .kicad_pcb data, not exported Gerbers); no large-board performance/LOD test; no dedicated documentation page.
 - **Scope:** Interactive HTML fabrication reports with findings overlay, Playwright visual snapshot regression baselines, and web components.
-- **Code & Test Evidence:** `src/report/html.ts`, `tests/e2e/visual.spec.ts`, `apps/web/app/components/`.
+- **Code & Test Evidence:** `src/report/html.ts`, `tests/e2e/visual.spec.ts`, `apps/web/components/`.
 
 ### W22 — Enterprise Trust: SSO, SCIM, Customer-Hosted Agent
 - **Status:** `Partial`
 - **Remaining:** SSO (OIDC/SAML), SCIM provisioning, customer-managed keys, and SIEM export are all in-memory stub adapters with no wired API routes, honestly labeled 'Proposed / Blueprint (planned upon enterprise customer commitment)' in ADR-0015. Only the customer-hosted execution agent (enrollment/lease/heartbeat/revocation) is production-grade.
 - **Scope:** Enterprise governance architecture (ADR-0015), customer-hosted execution agent protocol, and KMS residency isolation.
-- **Code & Test Evidence:** `ADR-0015`, `packages/contracts/src/runner-protocol.ts`, `packages/db/src/runner-registration-revocation-store.ts`.
+- **Code & Test Evidence:** `ADR-0015`, `packages/contracts/src/runner-protocol.ts`, `packages/db/src/runner-registration-enrollment-store.ts`.
 
 ### W23 — Integrations: GitLab, Azure DevOps, Jira, Slack/Teams
 - **Status:** `Partial`
@@ -285,7 +285,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Status:** `Partial`
 - **Remaining:** The audit export endpoint emits JSON only (no CSV/PDF/JSONL), and there is no watermark or tamper-evidence hash on exported evidence, though authorization enforcement, legal-hold blocking of erasure/cancellation, and CycloneDX 1.7 HBOM generation are all real, tested, and schema-validated.
 - **Scope:** Tamper-evident audit logging, Hardware BOM (HBOM) export, and cryptographically signed release certificates.
-- **Code & Test Evidence:** `packages/db/src/audit-log-store.ts`, `src/bom/hbom.ts`.
+- **Code & Test Evidence:** `packages/db/src/audit-log-store.ts`, `src/report/hbom.ts`.
 
 ### W34 — Quality Engineering: Fuzz, Mutation, Bad-Board Zoo
 - **Status:** `Partial`
