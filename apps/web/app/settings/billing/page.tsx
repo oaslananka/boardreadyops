@@ -5,6 +5,10 @@ import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
 
+export const metadata = {
+  title: "Billing & Seats",
+};
+
 export default async function BillingSettingsPage() {
   const viewer = await viewerAuthorization();
   if (!viewer.session) {
