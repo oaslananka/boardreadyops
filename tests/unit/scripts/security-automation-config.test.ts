@@ -241,6 +241,7 @@ describe("dependency and security automation configuration", () => {
       "@octokit/request",
       "@octokit/request-error",
       "brace-expansion",
+      "browserslist",
       "deepmerge-ts",
       "diff",
       "esbuild",
