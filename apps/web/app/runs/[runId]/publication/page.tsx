@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { PublicationView, RunPageFrame, RunUnavailable } from "../../../../components/run-investigation.js";
-import { formatRunPageTitle, loadRunDashboard, runDashboardLoaderDependencies } from "../../../../lib/run-dashboard.js";
+import {
+  loadRunDashboard,
+  resolveRunPageTitle,
+  runDashboardLoaderDependencies,
+} from "../../../../lib/run-dashboard.js";
 import { shouldLiveRefreshRun } from "../../../../lib/run-live-refresh.js";
 import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
@@ -11,16 +15,7 @@ type PageProps = Readonly<{ params: Promise<{ runId: string }> }>;
 export async function generateMetadata({ params }: PageProps) {
   const { runId } = await params;
   const viewer = await viewerAuthorization();
-  const result = await loadRunDashboard(
-    runId,
-    process.env,
-    {},
-    {
-      ...runDashboardLoaderDependencies,
-      authorizeRepository: viewer.authorizeRepository,
-    },
-  );
-  return { title: result.state === "found" ? formatRunPageTitle(result.run, "Publication") : "Run" };
+  return { title: await resolveRunPageTitle(runId, "Publication", viewer.authorizeRepository) };
 }
 
 export default async function PublicationPage({ params }: PageProps) {
