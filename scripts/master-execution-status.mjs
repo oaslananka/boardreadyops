@@ -72,8 +72,8 @@ export function renderExecutionStatus(status) {
 export function replaceExecutionStatusSection(document, rendered) {
   const start = document.indexOf(generatedStart);
   const end = document.indexOf(generatedEnd);
-  const duplicateStart = start >= 0 && document.indexOf(generatedStart, start + generatedStart.length) >= 0;
-  const duplicateEnd = end >= 0 && document.indexOf(generatedEnd, end + generatedEnd.length) >= 0;
+  const duplicateStart = start >= 0 && document.includes(generatedStart, start + generatedStart.length);
+  const duplicateEnd = end >= 0 && document.includes(generatedEnd, end + generatedEnd.length);
   if (start < 0 || end < start || duplicateStart || duplicateEnd) {
     throw new Error("generated execution status markers missing or duplicated");
   }
@@ -172,13 +172,7 @@ function validateWorkstream(rawEntry, roadmap, byId, pathExists) {
   requiredString(entry.owner, `${id} owner`);
   requiredString(entry.milestone, `${id} milestone`);
 
-  const dependencies = stringArray(entry.dependencies, `${id} dependencies`);
-  for (const dependency of dependencies) {
-    if (dependency === id) throw new Error(`${id} cannot depend on itself`);
-    const target = byId.get(dependency);
-    if (!target) throw new Error(`${id} dependency missing: ${dependency}`);
-    if (target.phase > entry.phase) throw new Error(`${id} scheduled before dependency ${dependency}`);
-  }
+  validateWorkstreamDependencies(id, entry, byId);
 
   if (!Array.isArray(entry.issues) || entry.issues.some((issue) => !Number.isSafeInteger(issue) || issue <= 0)) {
     throw new Error(`${id} issues invalid`);
@@ -187,17 +181,39 @@ function validateWorkstream(rawEntry, roadmap, byId, pathExists) {
     throw new Error(`${id} targets completed milestone ${entry.milestone}`);
   }
 
+  const evidence = validateWorkstreamEvidence(id, entry, pathExists);
+  const verification = validateWorkstreamVerification(id, entry);
+  validateWorkstreamStatusRequirements(id, entry, evidence, verification);
+}
+
+function validateWorkstreamDependencies(id, entry, byId) {
+  const dependencies = stringArray(entry.dependencies, `${id} dependencies`);
+  for (const dependency of dependencies) {
+    if (dependency === id) throw new Error(`${id} cannot depend on itself`);
+    const target = byId.get(dependency);
+    if (!target) throw new Error(`${id} dependency missing: ${dependency}`);
+    if (target.phase > entry.phase) throw new Error(`${id} scheduled before dependency ${dependency}`);
+  }
+}
+
+function validateWorkstreamEvidence(id, entry, pathExists) {
   const evidence = recordValue(entry.evidence, `${id} evidence`);
   for (const key of evidenceKeys) stringArray(evidence[key], `${id} evidence.${key}`);
   for (const path of [...evidence.code, ...evidence.tests, ...evidence.docs]) {
     if (!pathExists(path)) throw new Error(`${id} evidence path missing: ${path}`);
   }
+  return evidence;
+}
 
+function validateWorkstreamVerification(id, entry) {
   const verification = recordValue(entry.verification, `${id} verification`);
   requiredString(verification.command, `${id} verification command`);
   validateTimestamp(verification.checkedAt, `${id} verification checkedAt`);
   if (!verificationResults.has(verification.result)) throw new Error(`${id} verification invalid`);
+  return verification;
+}
 
+function validateWorkstreamStatusRequirements(id, entry, evidence, verification) {
   if (entry.status === "implemented") {
     const changeEvidence = evidence.commits.length + evidence.pullRequests.length > 0;
     const complete =
@@ -257,7 +273,7 @@ function validateTimestamp(value, label) {
 }
 
 function markdownCell(value) {
-  return String(value).replaceAll("|", "\\|").replaceAll(/\r?\n/gu, " ").trim();
+  return String(value).replaceAll("|", String.raw`\|`).replaceAll(/\r?\n/gu, " ").trim();
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
