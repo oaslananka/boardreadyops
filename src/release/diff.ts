@@ -113,51 +113,52 @@ export function formatReleaseDiffText(diff: ReleaseDiff): string {
   lines.push(`  outputs changed: ${diff.summary.outputsChanged}`);
   lines.push(`  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved}`);
 
-  const changedRows = diff.fabrication.bom.rows.filter((row) => row.status !== "unchanged");
-  if (changedRows.length > 0) {
-    lines.push("  bom row changes:");
-    const shown = changedRows.slice(0, MAX_DETAIL_LINES);
-    for (const row of shown) {
-      lines.push(`    - ${bomRowSummary(row)}`);
-    }
-    // diff.fabrication.bom.rows can itself already be capped (see FabricationDiffOptions.maxBomRows), so
-    // the added/removed/changed counts -- computed before that cap -- are the only accurate source for
-    // how many rows remain.
-    const totalChanged =
-      diff.fabrication.bom.addedCount + diff.fabrication.bom.removedCount + diff.fabrication.bom.changedCount;
-    const remaining = totalChanged - shown.length;
-    if (remaining > 0) {
-      lines.push(`    - (+${remaining} more)`);
-    }
-  }
-
-  const changedOutputs = diff.fabrication.outputs.filter((output) => output.status !== "unchanged");
-  if (changedOutputs.length > 0) {
-    lines.push("  output changes:");
-    for (const output of changedOutputs) {
-      lines.push(`    - ${output.kind}: ${output.status} (+${output.added} -${output.removed} ~${output.changed})`);
-    }
-  }
-
-  const addedFindings = diff.fabrication.findings.added.map(findingSummary);
-  if (addedFindings.length > 0) {
-    lines.push("  new findings:");
-    for (const line of withOverflowNote(addedFindings, MAX_DETAIL_LINES)) {
-      lines.push(`    - ${line}`);
-    }
-  }
-  const removedFindings = diff.fabrication.findings.removed.map(findingSummary);
-  if (removedFindings.length > 0) {
-    lines.push("  resolved findings:");
-    for (const line of withOverflowNote(removedFindings, MAX_DETAIL_LINES)) {
-      lines.push(`    - ${line}`);
-    }
-  }
+  lines.push(...bomRowChangeLines(diff.fabrication.bom));
+  lines.push(...outputChangeLines(diff.fabrication.outputs));
+  lines.push(...findingChangeLines("new findings", diff.fabrication.findings.added));
+  lines.push(...findingChangeLines("resolved findings", diff.fabrication.findings.removed));
 
   return `${lines.join("\n")}\n`;
 }
 
 const MAX_DETAIL_LINES = 20;
+
+function bomRowChangeLines(bom: FabricationDiff["bom"]): string[] {
+  const changedRows = bom.rows.filter((row) => row.status !== "unchanged");
+  if (changedRows.length === 0) return [];
+
+  const shown = changedRows.slice(0, MAX_DETAIL_LINES);
+  const lines = ["  bom row changes:", ...shown.map((row) => `    - ${bomRowSummary(row)}`)];
+
+  // bom.rows can itself already be capped (see FabricationDiffOptions.maxBomRows), so the
+  // added/removed/changed counts -- computed before that cap -- are the only accurate source
+  // for how many rows remain.
+  const totalChanged = bom.addedCount + bom.removedCount + bom.changedCount;
+  const remaining = totalChanged - shown.length;
+  if (remaining > 0) {
+    lines.push(`    - (+${remaining} more)`);
+  }
+  return lines;
+}
+
+function outputChangeLines(outputs: FabricationDiff["outputs"]): string[] {
+  const changedOutputs = outputs.filter((output) => output.status !== "unchanged");
+  if (changedOutputs.length === 0) return [];
+
+  return [
+    "  output changes:",
+    ...changedOutputs.map(
+      (output) => `    - ${output.kind}: ${output.status} (+${output.added} -${output.removed} ~${output.changed})`,
+    ),
+  ];
+}
+
+function findingChangeLines(label: string, findings: readonly Finding[]): string[] {
+  if (findings.length === 0) return [];
+
+  const summaries = withOverflowNote(findings.map(findingSummary), MAX_DETAIL_LINES);
+  return [`  ${label}:`, ...summaries.map((line) => `    - ${line}`)];
+}
 
 function findingSummary(finding: Finding): string {
   return `${finding.severity} ${finding.ruleId} at ${finding.resource.path}`;

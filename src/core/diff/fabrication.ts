@@ -29,7 +29,7 @@ export interface FabricationSnapshot {
   outputs: FabricationOutput[];
 }
 
-export interface FabricationBomDiffRow {
+interface FabricationBomDiffRow {
   reference: string;
   previous: string;
   current: string;
