@@ -21,8 +21,8 @@ const outputPath = "qa-audit-report.json";
 
 /** Appends one finding. Tests call this as they run; the summary is written once at the end. */
 export class AuditReport {
-  private findings: RouteFinding[] = [];
-  private routesCovered = new Set<string>();
+  private readonly findings: RouteFinding[] = [];
+  private readonly routesCovered = new Set<string>();
 
   constructor(private readonly routesDiscovered: number) {}
 
@@ -57,30 +57,28 @@ export function formatReport(summary: AuditSummary): string {
   const p1 = summary.findings.filter((f) => f.severity === "P1");
   const p2 = summary.findings.filter((f) => f.severity === "P2");
 
-  const lines: string[] = [];
-  lines.push("BoardReadyOps QA Audit");
-  lines.push("─".repeat(40));
-  lines.push("");
-  lines.push(`Routes discovered:      ${summary.routesDiscovered}`);
-  lines.push(`Routes covered:         ${summary.routesCovered}`);
-  lines.push(`States checked:         ${summary.statesChecked}`);
-  lines.push("");
-  lines.push(`P0 findings:            ${p0.length}`);
-  lines.push(`P1 findings:            ${p1.length}`);
-  lines.push(`P2 findings:            ${p2.length}`);
-  lines.push("");
+  const lines: string[] = [
+    "BoardReadyOps QA Audit",
+    "─".repeat(40),
+    "",
+    `Routes discovered:      ${summary.routesDiscovered}`,
+    `Routes covered:         ${summary.routesCovered}`,
+    `States checked:         ${summary.statesChecked}`,
+    "",
+    `P0 findings:            ${p0.length}`,
+    `P1 findings:            ${p1.length}`,
+    `P2 findings:            ${p2.length}`,
+    "",
+  ];
 
   if (summary.findings.length === 0) {
     lines.push("PASS");
     return lines.join("\n");
   }
 
-  lines.push("FINDINGS");
-  lines.push("");
+  lines.push("FINDINGS", "");
   for (const f of [...p0, ...p1, ...p2]) {
-    lines.push(`[${f.severity}] ${f.path} (${f.viewport})`);
-    lines.push(`${f.rule}: ${f.detail}`);
-    lines.push("");
+    lines.push(`[${f.severity}] ${f.path} (${f.viewport})`, `${f.rule}: ${f.detail}`, "");
   }
   lines.push(p0.length > 0 ? "FAIL" : "PASS (with P1/P2 findings)");
   return lines.join("\n");
