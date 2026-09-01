@@ -13,14 +13,19 @@ import { ViewerNav } from "../../../components/viewer-nav.js";
 import { loadRepositoryDetail } from "../../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 
-export const metadata = {
-  title: "Repository · BoardReadyOps",
-  description: "Recent release readiness runs and open supply findings for one repository.",
-};
-
 type PageProps = {
   params: Promise<{ repositoryId: string }>;
 };
+
+export async function generateMetadata({ params }: PageProps) {
+  const { repositoryId } = await params;
+  const viewer = await viewerAuthorization();
+  const detail = await loadRepositoryDetail(repositoryId, viewer.session);
+  return {
+    title: detail ? `${detail.repository.owner}/${detail.repository.name}` : "Repository",
+    description: "Recent release readiness runs and open supply findings for one repository.",
+  };
+}
 
 function when(value: string | undefined): string {
   if (!value) return "unknown";

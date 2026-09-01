@@ -4,7 +4,7 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
 
 export const metadata = {
-  title: "Hardware Reviews · BoardReadyOps",
+  title: "Hardware Reviews",
   description: "All active and completed KiCad hardware reviews and sign-offs.",
 };
 

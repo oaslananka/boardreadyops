@@ -3,7 +3,7 @@ import { AppShell, Breadcrumbs } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 
 export const metadata = {
-  title: "Insights · BoardReadyOps",
+  title: "Insights",
   description: "Weekly Decision-Ready Reviews (WDRR) and content-free product analytics.",
 };
 

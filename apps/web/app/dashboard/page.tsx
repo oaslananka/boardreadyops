@@ -5,7 +5,7 @@ import { loadViewerRepositories } from "../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
-  title: "Dashboard · BoardReadyOps",
+  title: "Dashboard",
   description: "Repositories BoardReadyOps is watching, their latest release readiness, and open findings.",
 };
 
