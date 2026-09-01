@@ -101,9 +101,12 @@ Required policy:
 ## Branch Protection
 
 The committed repository ruleset at `.github/rulesets/main.json` is the source
-of truth for `main`. It requires signed commits, zero required human approvals while the project is
+of truth for `main`. It requires zero human approvals while the project is
 single-maintainer, stale-review dismissal, resolved review conversations, strict
-stable status checks, linear history, and squash-only merging. The admin bypass is limited to pull requests.
+stable status checks, linear history, and squash-only merging. The administrator
+retains a PR-only emergency bypass. The Mergify GitHub App has an exempt automation
+bypass so it can operate the merge queue; `.mergify.yml` injects the GitHub ruleset
+requirements at queue admission and again before merge.
 
 Apply or update the ruleset from an authenticated administrator context:
 

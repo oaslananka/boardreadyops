@@ -52,14 +52,14 @@ merge decision.
 `main` is protected by `.github/rulesets/main.json`, which is the repository
 source of truth. The active baseline requires:
 
-- signed commits with a GitHub-verified signature;
 - zero required human approvals while the repository remains single-maintainer;
 - stale approvals dismissed after reviewable pushes;
 - all review conversations resolved;
 - strict required status checks and an up-to-date branch;
 - squash-only merges and linear history;
 - no force pushes or branch deletion; and
-- a PR-only emergency bypass for the repository administrator role.
+- a PR-only emergency bypass for the repository administrator role; and
+- an exempt Mergify GitHub App bypass used only to operate the configured merge queue.
 
 The stable required checks are:
 
@@ -71,6 +71,7 @@ The stable required checks are:
 | `ci / test-unit` | Deterministic unit regression suite |
 | `ci / build` | Bundle and artifact compilation |
 | `ci / verify-dist` | Committed bundle integrity |
+| `ci / coverage-gate` | Core and cloud coverage enforcement |
 | `security / gate` | Aggregate mandatory security, dependency, secret, compliance, and SBOM decision |
 
 Conditional matrix, integration, accessibility, coverage, mutation, and
@@ -81,9 +82,13 @@ branch-protection contracts.
 
 ## Emergency Bypass
 
-The only bypass actor is the repository administrator role with
+The human emergency bypass is the repository administrator role with
 `bypass_mode: pull_request`. This PR-only emergency bypass preserves the pull
-request and audit trail and cannot be used for a direct push.
+request and audit trail and cannot be used for a direct push. The Mergify GitHub
+App is separately configured with `bypass_mode: exempt` solely for merge-queue
+operation. Mergify must continue to use `branch_protection_injection_mode: queue`
+so the GitHub ruleset requirements are enforced by the queue before admission and
+again before merge.
 
 Use it only when a ruleset or CI infrastructure failure blocks a material
 security, release, or availability fix. Before merge:

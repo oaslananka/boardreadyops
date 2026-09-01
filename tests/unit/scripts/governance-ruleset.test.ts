@@ -50,7 +50,10 @@ describe("main branch governance ruleset", () => {
       required_approving_review_count: 0,
       required_review_thread_resolution: true,
     });
-    expect(ruleset.bypass_actors).toEqual([{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" }]);
+    expect(ruleset.bypass_actors).toEqual([
+      { actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" },
+      { actor_id: 10562, actor_type: "Integration", bypass_mode: "exempt" },
+    ]);
   });
 
   it("keeps the committed stable merge gates aligned with the live baseline", async () => {
@@ -59,7 +62,7 @@ describe("main branch governance ruleset", () => {
     };
     const statusChecks = ruleset.rules.find((rule): rule is StatusChecksRule => rule.type === "required_status_checks");
 
-    expect(ruleset.rules.some((rule) => rule.type === "required_signatures")).toBe(true);
+    expect(ruleset.rules.some((rule) => rule.type === "required_signatures")).toBe(false);
     expect(statusChecks?.parameters.strict_required_status_checks_policy).toBe(true);
     expect(statusChecks?.parameters.required_status_checks.map(({ context }) => context)).toEqual([
       "ci / risk-profile",
@@ -112,6 +115,17 @@ describe("main branch governance ruleset", () => {
     },
   );
 
+  it("keeps Mergify queue enforcement delegated to the GitHub ruleset", async () => {
+    const mergify = await repositoryFile(".mergify.yml");
+    const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
+      bypass_actors: Array<{ actor_id: number; actor_type: string; bypass_mode: string }>;
+    };
+
+    expect(mergify).toContain("branch_protection_injection_mode: queue");
+    expect(mergify).not.toMatch(/check-success\s*=/u);
+    expect(ruleset.bypass_actors).toContainEqual({ actor_id: 10562, actor_type: "Integration", bypass_mode: "exempt" });
+  });
+
   it("keeps the public contribution path GitHub-native and security reports private", async () => {
     const contributing = await repositoryFile("CONTRIBUTING.md");
     const detailedGovernance = await repositoryFile("docs/governance.md");
@@ -146,7 +160,8 @@ describe("main branch governance ruleset", () => {
     for (const document of [governance, detailedGovernance]) {
       const normalized = document.replace(/\s+/g, " ");
       expect(normalized).toContain("zero required human approvals");
-      expect(normalized).toContain("signed commits");
+      expect(normalized).not.toContain("signed commits");
+      expect(normalized).toContain("Mergify");
       expect(normalized).toContain("PR-only emergency bypass");
       expect(normalized).toContain("retrospective review");
     }
