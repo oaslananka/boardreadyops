@@ -250,6 +250,7 @@ describe("dependency and security automation configuration", () => {
       "ip-address",
       "js-yaml",
       "linkify-it",
+      "mysql2",
       "nanoid",
       "postcss",
       "puppeteer",

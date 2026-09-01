@@ -1694,7 +1694,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mustache@4.2.0`
   - Description: Logic-less {{mustache}} templates with JavaScript
   - Homepage: https://github.com/janl/mustache.js
-- `mysql2@3.15.3`
+- `mysql2@3.23.1`
   - Description: fast mysql driver. Implements core protocol, prepared statements, ssl and compression in native JS
   - Homepage: https://sidorares.github.io/node-mysql2/docs
 - `named-placeholders@1.1.6`
@@ -1903,9 +1903,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `schema-utils@4.3.3`
   - Description: webpack Validation Utils
   - Homepage: https://github.com/webpack/schema-utils
-- `seq-queue@0.0.5`
-  - Description: A simple tool to keep requests to be executed in order.
-  - Homepage: https://github.com/changchang/seq-queue
 - `shebang-command@2.0.0`
   - Description: Get the command from a shebang
   - Homepage: https://github.com/kevva/shebang-command#readme
@@ -1930,9 +1927,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `source-map-support@0.5.21`
   - Description: Fixes stack traces for files with source maps
   - Homepage: https://github.com/evanw/node-source-map-support#readme
-- `sqlstring@2.3.3`
-  - Description: Simple SQL escape and format for MySQL
-  - Homepage: https://github.com/mysqljs/sqlstring#readme
+- `sql-escaper@1.5.1`
+  - Description: 🛡️ Faster SQL escape and format for JavaScript (Node.js, Bun, and Deno).
+  - Homepage: https://github.com/mysqljs/sql-escaper#readme
 - `stackback@0.0.2`
   - Description: return list of CallSite objects from a captured stacktrace
   - Homepage: https://github.com/shtylman/node-stackback#readme
