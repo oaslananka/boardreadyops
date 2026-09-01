@@ -38,4 +38,11 @@ describe("master-execution-status.md docs contract", () => {
     );
     expect(readFileSync(masterStatusPath, "utf8")).toContain("<!-- master-execution-status:start -->");
   });
+
+  it("runs ledger drift validation in normal verification", () => {
+    const packageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
+    expect(packageJson.scripts["execution-status:render"]).toBe("node scripts/master-execution-status.mjs render");
+    expect(packageJson.scripts["verify:execution-status"]).toBe("node scripts/master-execution-status.mjs check");
+    expect(packageJson.scripts.verify).toContain("corepack pnpm run verify:execution-status");
+  });
 });
