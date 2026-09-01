@@ -1,3 +1,7 @@
+export const metadata = {
+  title: "Data & Retention",
+};
+
 export default function DataSettingsPage() {
   return (
     <div className="panel">
