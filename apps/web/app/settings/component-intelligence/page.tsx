@@ -8,7 +8,7 @@ import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 import { viewerInstallations } from "../../../lib/viewer-installations.js";
 
 export const metadata = {
-  title: "Component intelligence · BoardReadyOps",
+  title: "Component intelligence",
   description: "Supply your own component data provider credentials for continuous supply watch.",
 };
 

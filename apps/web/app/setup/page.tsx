@@ -11,7 +11,7 @@ import { Alert, AppShell, Breadcrumbs, Definition, DefinitionGrid, Panel, Status
 import { ViewerNav } from "../../components/viewer-nav.js";
 
 export const metadata = {
-  title: "Repository setup preview · BoardReadyOps",
+  title: "Repository setup preview",
   description: "Preview BoardReadyOps policy presets, repository files, permissions, and readiness validation.",
 };
 
