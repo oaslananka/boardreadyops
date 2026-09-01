@@ -1,6 +1,13 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/reviews/rev_gateway_42",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { ChangesTab } from "../../../apps/web/components/review/changes-tab.js";
 import { ChecklistApprovalsTab } from "../../../apps/web/components/review/checklist-approvals-tab.js";
 import { EvidenceTab } from "../../../apps/web/components/review/evidence-tab.js";

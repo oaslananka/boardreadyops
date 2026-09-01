@@ -1,7 +1,8 @@
 "use client";
 
 import type { FindingDisposition, ReviewDecision } from "@boardreadyops/contracts";
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { DemoApproval, DemoChecklistItem, DemoReview } from "../../lib/demo-data.js";
 import { ApprovalModal } from "./approval-modal.js";
 import { ChangesTab } from "./changes-tab.js";
@@ -13,6 +14,19 @@ import { OverviewTab } from "./overview-tab.js";
 import { ReviewHeader } from "./review-header.js";
 
 export type ReviewTabKey = "overview" | "changes" | "findings" | "discussion" | "checklist" | "evidence";
+
+const reviewTabKeys: readonly ReviewTabKey[] = [
+  "overview",
+  "changes",
+  "findings",
+  "discussion",
+  "checklist",
+  "evidence",
+];
+
+function tabFromSearchParam(value: string | null): ReviewTabKey {
+  return (reviewTabKeys as readonly string[]).includes(value ?? "") ? (value as ReviewTabKey) : "overview";
+}
 
 interface ReviewNavigationTabsProps {
   readonly activeTab: ReviewTabKey;
@@ -114,7 +128,28 @@ export function ReviewView({
   readonly viewerLogin?: string | undefined;
 }) {
   const [review, setReview] = useState<DemoReview>(initialReview);
-  const [activeTab, setActiveTab] = useState<ReviewTabKey>("overview");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTabState] = useState<ReviewTabKey>(() => tabFromSearchParam(searchParams.get("tab")));
+
+  // The URL is the single source of truth for which tab is open: this keeps
+  // browser Back/Forward and a shared/reloaded ?tab= link in sync with what
+  // renders, instead of a separate state that can drift from it.
+  useEffect(() => {
+    setActiveTabState(tabFromSearchParam(searchParams.get("tab")));
+  }, [searchParams]);
+
+  function setActiveTab(tab: ReviewTabKey) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "overview") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
   const [approvalModalType, setApprovalModalType] = useState<"approve" | "request_changes" | null>(null);
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
