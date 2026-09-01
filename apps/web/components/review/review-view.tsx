@@ -2,7 +2,7 @@
 
 import type { FindingDisposition, ReviewDecision } from "@boardreadyops/contracts";
 import { useState } from "react";
-import type { DemoApproval, DemoChecklistItem, DemoComment, DemoReview } from "../../lib/demo-data.js";
+import type { DemoApproval, DemoChecklistItem, DemoReview } from "../../lib/demo-data.js";
 import { ApprovalModal } from "./approval-modal.js";
 import { ChangesTab } from "./changes-tab.js";
 import { ChecklistApprovalsTab } from "./checklist-approvals-tab.js";
@@ -106,7 +106,13 @@ function ReviewNavigationTabs({
   );
 }
 
-export function ReviewView({ initialReview }: { readonly initialReview: DemoReview }) {
+export function ReviewView({
+  initialReview,
+  viewerLogin,
+}: {
+  readonly initialReview: DemoReview;
+  readonly viewerLogin?: string | undefined;
+}) {
   const [review, setReview] = useState<DemoReview>(initialReview);
   const [activeTab, setActiveTab] = useState<ReviewTabKey>("overview");
   const [approvalModalType, setApprovalModalType] = useState<"approve" | "request_changes" | null>(null);
@@ -213,7 +219,7 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
     }
   }
 
-  async function handleAddComment(comment: DemoComment) {
+  async function handleAddComment(content: string, findingFingerprint?: string) {
     if (submittingAction) return;
     setSubmittingAction("comment");
     setMutationError(null);
@@ -223,8 +229,8 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          content: comment.content,
-          ...(comment.findingFingerprint ? { findingFingerprint: comment.findingFingerprint } : {}),
+          content,
+          ...(findingFingerprint ? { findingFingerprint } : {}),
         }),
       });
       const data = (await res.json()) as {
@@ -245,22 +251,58 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
         return;
       }
       const saved = data.comment;
-      const mapped: DemoComment = {
-        id: saved.id,
-        content: saved.content,
-        authorId: saved.authorId,
-        authorType: saved.authorType,
-        status: saved.status === "stale" ? "outdated" : (saved.status ?? "open"),
-        createdAt: saved.createdAt,
-        ...(saved.findingFingerprint ? { findingFingerprint: saved.findingFingerprint } : {}),
-      };
       setReview((prev) => ({
         ...prev,
-        comments: [...prev.comments, mapped],
+        comments: [
+          ...prev.comments,
+          {
+            id: saved.id,
+            content: saved.content,
+            authorId: saved.authorId,
+            authorType: saved.authorType,
+            status: saved.status === "stale" ? "outdated" : (saved.status ?? "open"),
+            createdAt: saved.createdAt,
+            ...(saved.findingFingerprint ? { findingFingerprint: saved.findingFingerprint } : {}),
+          },
+        ],
       }));
       setMutationSuccess("Comment posted.");
     } catch (err) {
       setMutationError(`Failed to post comment: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
+  async function handleToggleCommentStatus(commentId: string, nextStatus: "open" | "resolved") {
+    if (submittingAction) return;
+    setSubmittingAction(`comment_status_${commentId}`);
+    setMutationError(null);
+    setMutationSuccess(null);
+    try {
+      const res = await fetch(`/api/v1/reviews/${review.id}/comments`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ commentId, status: nextStatus }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        comment?: { id: string; status: "open" | "resolved" | "stale" };
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.comment) {
+        setMutationError(`Failed to update comment: ${data.error || res.statusText}`);
+        return;
+      }
+      const saved = data.comment;
+      setReview((prev) => ({
+        ...prev,
+        comments: prev.comments.map((c) =>
+          c.id === commentId ? { ...c, status: saved.status === "stale" ? "outdated" : saved.status } : c,
+        ),
+      }));
+    } catch (err) {
+      setMutationError(`Failed to update comment: ${err instanceof Error ? err.message : "Network error"}`);
     } finally {
       setSubmittingAction(null);
     }
@@ -463,7 +505,12 @@ export function ReviewView({ initialReview }: { readonly initialReview: DemoRevi
           />
         ) : null}
         {activeTab === "discussion" ? (
-          <DiscussionTab comments={review.comments} onAddComment={handleAddComment} />
+          <DiscussionTab
+            comments={review.comments}
+            viewerLogin={viewerLogin}
+            onAddComment={handleAddComment}
+            onToggleStatus={handleToggleCommentStatus}
+          />
         ) : null}
         {activeTab === "checklist" ? (
           <ChecklistApprovalsTab

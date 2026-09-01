@@ -1,42 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { DemoComment } from "../../lib/demo-data.js";
 import { Panel } from "../ui.js";
 
 export function DiscussionTab({
-  comments: initialComments,
+  comments,
+  viewerLogin,
   onAddComment,
+  onToggleStatus,
 }: {
   comments: DemoComment[];
-  onAddComment?: (comment: DemoComment) => void;
+  viewerLogin?: string | undefined;
+  onAddComment?: (content: string) => void;
+  onToggleStatus?: (commentId: string, nextStatus: "open" | "resolved") => void;
 }) {
-  const [comments, setComments] = useState(initialComments);
   const [newContent, setNewContent] = useState("");
-  const [authorId, setAuthorId] = useState("engineer@company.com");
+  const commentFieldId = useId();
 
   function handlePost(e: React.FormEvent) {
     e.preventDefault();
-    if (!newContent.trim()) return;
-
-    const newComment: DemoComment = {
-      id: `cmt_${Date.now()}`,
-      authorId,
-      authorType: "internal",
-      content: newContent.trim(),
-      status: "open",
-      createdAt: new Date().toISOString(),
-    };
-
-    setComments((prev) => [...prev, newComment]);
-    onAddComment?.(newComment);
+    const trimmed = newContent.trim();
+    if (!trimmed) return;
+    onAddComment?.(trimmed);
     setNewContent("");
-  }
-
-  function handleToggleStatus(commentId: string) {
-    setComments((prev) =>
-      prev.map((c) => (c.id === commentId ? { ...c, status: c.status === "open" ? "resolved" : "open" } : c)),
-    );
   }
 
   return (
@@ -58,7 +45,8 @@ export function DiscussionTab({
                     <button
                       type="button"
                       className={`button button-small ${cmt.status === "resolved" ? "button-secondary" : "button-ghost"}`}
-                      onClick={() => handleToggleStatus(cmt.id)}
+                      onClick={() => onToggleStatus?.(cmt.id, cmt.status === "resolved" ? "open" : "resolved")}
+                      disabled={cmt.status === "outdated"}
                     >
                       {cmt.status === "resolved" ? "✓ Resolved" : "Mark Resolved"}
                     </button>
@@ -82,7 +70,9 @@ export function DiscussionTab({
 
         <form onSubmit={handlePost} className="new-comment-form panel">
           <h4>Add to Discussion</h4>
+          <label htmlFor={commentFieldId}>Comment</label>
           <textarea
+            id={commentFieldId}
             rows={3}
             value={newContent}
             onChange={(e) => setNewContent(e.currentTarget.value)}
@@ -91,14 +81,7 @@ export function DiscussionTab({
             required
           />
           <footer className="comment-form-footer">
-            <input
-              type="email"
-              value={authorId}
-              onChange={(e) => setAuthorId(e.currentTarget.value)}
-              className="form-input author-input"
-              placeholder="Your email / ID"
-              required
-            />
+            <span className="comment-author-identity">Commenting as {viewerLogin ?? "you"}</span>
             <button type="submit" className="button button-primary">
               Post Comment
             </button>

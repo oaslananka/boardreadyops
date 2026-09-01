@@ -34,7 +34,7 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
             { label: `PR #${review.pullRequestNumber}` },
           ]}
         />
-        <ReviewView initialReview={review} />
+        <ReviewView initialReview={review} viewerLogin={viewer.session?.login} />
       </main>
     </AppShell>
   );
