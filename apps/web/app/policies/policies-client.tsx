@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Dialog } from "../../components/dialog.js";
 import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 
 export interface PolicyRecord {
@@ -384,6 +385,7 @@ export default function PoliciesClient() {
   const [draft, setDraft] = useState<DraftPolicyState>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadPolicies = useCallback(async () => {
     try {
@@ -484,6 +486,18 @@ export default function PoliciesClient() {
     }
   }
 
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const { id, name } = pendingDelete;
+    setPendingDelete(null);
+    await handleDelete(id, name);
+  }
+
+  function closeBuilder() {
+    setShowBuilder(false);
+    setDraft(emptyDraft);
+  }
+
   const hasPolicies = Boolean(policies && policies.length > 0);
   const scopeSummary = hasPolicies ? "Multi-Tenant Hierarchical" : "Default baseline";
   const enforcementSummary = hasPolicies ? "Pre-Fabrication Gates Active" : "Default open review";
@@ -509,7 +523,11 @@ export default function PoliciesClient() {
             type="button"
             className={`button ${showBuilder ? "button-secondary" : "button-primary"}`}
             onClick={() => {
-              setShowBuilder(!showBuilder);
+              if (showBuilder) {
+                closeBuilder();
+              } else {
+                setShowBuilder(true);
+              }
               setError(null);
               setSuccessMessage(null);
             }}
@@ -533,7 +551,7 @@ export default function PoliciesClient() {
           submitting={submitting}
           onChange={setDraft}
           onSubmit={handleCreate}
-          onClose={() => setShowBuilder(false)}
+          onClose={closeBuilder}
         />
       ) : null}
 
@@ -568,11 +586,41 @@ export default function PoliciesClient() {
         ) : (
           <div className="policies-grid">
             {policies.map((policy) => (
-              <PolicyCard key={policy.id} policy={policy} onDelete={handleDelete} />
+              <PolicyCard key={policy.id} policy={policy} onDelete={(id, name) => setPendingDelete({ id, name })} />
             ))}
           </div>
         )}
       </section>
+
+      {pendingDelete ? (
+        <Dialog titleId="delete-policy-title" onClose={() => setPendingDelete(null)}>
+          <header className="modal-header">
+            <h2 id="delete-policy-title">Delete Policy</h2>
+            <button
+              type="button"
+              className="modal-close-button"
+              onClick={() => setPendingDelete(null)}
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+          </header>
+          <div className="modal-body">
+            <p>
+              Delete <strong>{pendingDelete.name}</strong>? This removes it from enforcement immediately — hardware
+              reviews currently gated by this policy will no longer be blocked by it.
+            </p>
+          </div>
+          <footer className="modal-footer">
+            <button type="button" className="button button-secondary" onClick={() => setPendingDelete(null)}>
+              Cancel
+            </button>
+            <button type="button" className="button button-danger" onClick={() => void confirmDelete()}>
+              Delete Policy
+            </button>
+          </footer>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
