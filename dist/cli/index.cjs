@@ -39407,7 +39407,7 @@ async function pathExists(file2) {
 }
 async function readTextFile(file2) {
   const text = await import_promises.default.readFile(file2, "utf8");
-  return text.charCodeAt(0) === 65279 ? text.slice(1) : text;
+  return text.codePointAt(0) === 65279 ? text.slice(1) : text;
 }
 async function writeTextFile(file2, text) {
   await import_promises.default.mkdir(import_node_path2.default.dirname(file2), { recursive: true });
