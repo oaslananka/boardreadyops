@@ -86,14 +86,20 @@ describe("master execution status validation", () => {
 
   it("rejects a dependency cycle", () => {
     const ledger = validLedger();
-    ledger.workstreams[0].dependencies = ["W01"];
-    ledger.workstreams[1].dependencies = ["W00"];
+    const first = ledger.workstreams[0];
+    const second = ledger.workstreams[1];
+    if (!first || !second) throw new Error("test fixture workstreams missing");
+    first.dependencies = ["W01"];
+    second.dependencies = ["W00"];
     expect(() => validateExecutionStatus(ledger)).toThrow("dependency cycle: W00 -> W01 -> W00");
   });
 
   it("rejects implemented work without complete evidence", () => {
     const ledger = validLedger();
-    ledger.workstreams[0] = { ...ledger.workstreams[0], status: "implemented", remaining: undefined };
+    const first = ledger.workstreams[0];
+    if (!first) throw new Error("test fixture workstream missing");
+    first.status = "implemented";
+    delete first.remaining;
     expect(() => validateExecutionStatus(ledger)).toThrow("W00 implemented evidence missing");
   });
 });

@@ -6,7 +6,7 @@
   },
   "roadmap": {
     "source": "https://github.com/oaslananka/boardreadyops/issues/191",
-    "checkedAt": "2026-09-01T12:21:04Z",
+    "checkedAt": "2026-09-01T12:28:13Z",
     "orderedMilestones": [
       "Repository Maintenance & Release Health",
       "Cloud Control Plane Reliability — GitHub GA Prerequisite",
@@ -25,11 +25,15 @@
     ]
   },
   "baseline": {
-    "command": "task verify",
-    "result": "not_run",
-    "commit": "28cbc94",
-    "checkedAt": "2026-09-01T12:21:04Z",
-    "blockers": []
+    "command": "task verify; fallback: corepack pnpm run verify",
+    "result": "fail",
+    "commit": "a214d2a",
+    "checkedAt": "2026-09-01T12:30:50Z",
+    "blockers": [
+      "task verify: task binary not found on PATH",
+      "corepack pnpm run verify: verify:dist failed because pre-existing dist/action/index.cjs and dist/cli/index.cjs changes make dist dirty",
+      "sonar analyze agentic: Vortex analysis unavailable; four W00 files skipped (remote main Quality Gate is OK baseline only)"
+    ]
   },
   "workstreams": [
     {
@@ -37,25 +41,31 @@
       "name": "Repository Inventory & Execution Ledger",
       "phase": 0,
       "priority": "P0",
-      "status": "partial",
+      "status": "implemented",
       "owner": "maintainers",
       "dependencies": [],
       "milestone": "Repository Maintenance & Release Health",
       "issues": [191],
       "evidence": {
-        "code": [],
-        "tests": [],
-        "docs": [],
-        "deployed": [],
-        "commits": [],
+        "code": ["scripts/master-execution-status.mjs", "scripts/master-execution-status.d.mts"],
+        "tests": [
+          "tests/unit/scripts/master-execution-status.test.ts",
+          "tests/unit/docs/master-execution-status-docs.test.ts"
+        ],
+        "docs": [
+          "docs/development/master-execution-status.md",
+          "docs/superpowers/specs/2026-09-01-master-execution-ledger-design.md",
+          "docs/superpowers/plans/2026-09-01-master-execution-ledger.md"
+        ],
+        "deployed": ["not-applicable: repository audit tooling runs in local and CI verification"],
+        "commits": ["4310ad9", "28cbc94", "375ecf1", "a214d2a"],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
-      },
-      "remaining": "Validator and renderer exist; canonical adoption, verification wiring, evidence reconciliation, and baseline recording remain."
+        "command": "corepack pnpm vitest run tests/unit/scripts/master-execution-status.test.ts tests/unit/docs/master-execution-status-docs.test.ts && corepack pnpm run verify:execution-status",
+        "result": "pass",
+        "checkedAt": "2026-09-01T12:30:50Z"
+      }
     },
     {
       "id": "W01",
@@ -66,9 +76,9 @@
       "owner": "maintainers",
       "dependencies": ["W00"],
       "milestone": "Repository Maintenance & Release Health",
-      "issues": [329, 321, 330, 331, 332, 333, 334],
+      "issues": [329, 321, 330, 331, 332, 333, 334, 546],
       "evidence": {
-        "code": [],
+        "code": ["scripts/toolchain.mjs"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -80,7 +90,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Roadmap maintenance issues #321 and #329-#334 are closed; compatibility drift issue #546 remains open without a milestone."
     },
     {
       "id": "W02",
@@ -93,7 +103,7 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [289],
       "evidence": {
-        "code": [],
+        "code": ["schemas/config.schema.json"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -118,7 +128,7 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [280],
       "evidence": {
-        "code": [],
+        "code": ["src/kicad/sexpr.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -143,7 +153,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [261],
       "evidence": {
-        "code": [],
+        "code": ["src/release/generate.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -168,7 +178,7 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [274],
       "evidence": {
-        "code": [],
+        "code": ["src/rules/manufacturing"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -193,7 +203,7 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [286],
       "evidence": {
-        "code": [],
+        "code": ["packages/cloud-core/src/decision-engine.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -216,9 +226,9 @@
       "owner": "maintainers",
       "dependencies": ["W00"],
       "milestone": "Repository Maintenance & Release Health",
-      "issues": [263],
+      "issues": [263, 448],
       "evidence": {
-        "code": [],
+        "code": ["src/release/evidence.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -230,7 +240,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Hardware Release Passport vertical slice #448 remains open and unmilestoned."
     },
     {
       "id": "W08",
@@ -241,9 +251,9 @@
       "owner": "maintainers",
       "dependencies": ["W06", "W07"],
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
-      "issues": [267],
+      "issues": [267, 447],
       "evidence": {
-        "code": [],
+        "code": ["src/release/diff.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -255,7 +265,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "PR-native hardware change impact vertical slice #447 remains open and unmilestoned."
     },
     {
       "id": "W09",
@@ -268,7 +278,7 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [268],
       "evidence": {
-        "code": [],
+        "code": ["src/kicad/variants.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -293,7 +303,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [265],
       "evidence": {
-        "code": [],
+        "code": ["src/vendor"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -316,9 +326,9 @@
       "owner": "maintainers",
       "dependencies": ["W06", "W07"],
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
-      "issues": [272],
+      "issues": [272, 449],
       "evidence": {
-        "code": [],
+        "code": ["src/bom"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -330,7 +340,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Continuous supplier monitoring vertical slice #449 remains open and unmilestoned."
     },
     {
       "id": "W12",
@@ -343,7 +353,7 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [273],
       "evidence": {
-        "code": [],
+        "code": ["src/firmware/contract.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -368,7 +378,7 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [],
       "evidence": {
-        "code": [],
+        "code": ["src/release/generate.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -393,7 +403,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [269],
       "evidence": {
-        "code": [],
+        "code": ["src/core/policy.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -418,7 +428,7 @@
       "milestone": "v2.2 — GitHub Cloud GA",
       "issues": [149, 42, 154, 88],
       "evidence": {
-        "code": [],
+        "code": ["packages/contracts/src/runner-protocol.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -430,7 +440,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "GitHub Cloud GA blockers #42, #88, #149, and #154 remain open."
     },
     {
       "id": "W16",
@@ -443,7 +453,7 @@
       "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
       "issues": [190, 222],
       "evidence": {
-        "code": [],
+        "code": ["packages/db"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -455,7 +465,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Cloud reliability blocker #222 remains open; #190 is closed."
     },
     {
       "id": "W17",
@@ -468,7 +478,7 @@
       "milestone": "v2.2 — GitHub Cloud GA",
       "issues": [154, 88],
       "evidence": {
-        "code": [],
+        "code": ["apps/web/lib/api-auth.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -493,7 +503,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [44],
       "evidence": {
-        "code": [],
+        "code": ["packages/cloud-core/src/storage.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -505,7 +515,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Retention, deletion, and privacy blocker #44 remains open."
     },
     {
       "id": "W19",
@@ -518,7 +528,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [],
       "evidence": {
-        "code": [],
+        "code": ["packages/cloud-core/src/entitlements.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -543,7 +553,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [25],
       "evidence": {
-        "code": [],
+        "code": ["apps/web/lib/run-dashboard.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -555,7 +565,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Hosted run dashboard blocker #25 remains open."
     },
     {
       "id": "W21",
@@ -568,7 +578,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [26],
       "evidence": {
-        "code": [],
+        "code": ["src/report/html.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -593,7 +603,7 @@
       "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
       "issues": [41, 45],
       "evidence": {
-        "code": [],
+        "code": ["packages/contracts/src/runner-protocol.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -605,7 +615,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Enterprise blockers #41 and #45 remain open."
     },
     {
       "id": "W23",
@@ -618,7 +628,7 @@
       "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
       "issues": [],
       "evidence": {
-        "code": [],
+        "code": ["src/notifiers"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -643,7 +653,7 @@
       "milestone": "Backlog — Manufacturer Collaboration & Production Loop",
       "issues": [],
       "evidence": {
-        "code": [],
+        "code": ["src/release/handoff.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -666,9 +676,9 @@
       "owner": "maintainers",
       "dependencies": ["W20", "W22", "W24"],
       "milestone": "Backlog — Manufacturer Collaboration & Production Loop",
-      "issues": [],
+      "issues": [450, 451],
       "evidence": {
-        "code": [],
+        "code": ["packages/contracts/src/evidence-ledger.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -680,7 +690,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Production outcome ingestion #450 and Evidence Graph #451 remain open and unmilestoned."
     },
     {
       "id": "W26",
@@ -693,7 +703,7 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [52],
       "evidence": {
-        "code": [],
+        "code": ["packages/cloud-core/src/assist"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -705,7 +715,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "AI reviewer guardrail issue #52 remains open."
     },
     {
       "id": "W27",
@@ -718,7 +728,7 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [],
       "evidence": {
-        "code": [],
+        "code": ["packages/plugin-sdk"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -745,7 +755,7 @@
       "evidence": {
         "code": [],
         "tests": [],
-        "docs": [],
+        "docs": ["SECURITY.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
@@ -768,7 +778,7 @@
       "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
       "issues": [190],
       "evidence": {
-        "code": [],
+        "code": ["src/core/logger.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -793,7 +803,7 @@
       "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
       "issues": [222],
       "evidence": {
-        "code": [],
+        "code": ["scripts/control-plane-scale-envelope.mjs"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -816,11 +826,11 @@
       "owner": "maintainers",
       "dependencies": ["W15", "W20"],
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
-      "issues": [25, 26],
+      "issues": [25, 26, 445, 446],
       "evidence": {
         "code": [],
         "tests": [],
-        "docs": [],
+        "docs": ["docs/golden-demo.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
@@ -830,7 +840,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Website #445 and onboarding #446 remain open and unmilestoned."
     },
     {
       "id": "W32",
@@ -843,7 +853,7 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [],
       "evidence": {
-        "code": [],
+        "code": ["schemas/telemetry-event.schema.json"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -868,7 +878,7 @@
       "milestone": "v2.6 — Enterprise Trust & Customer-Hosted Execution",
       "issues": [],
       "evidence": {
-        "code": [],
+        "code": ["packages/db/src/audit-log-store.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -894,7 +904,7 @@
       "issues": [329],
       "evidence": {
         "code": [],
-        "tests": [],
+        "tests": ["tests/property"],
         "docs": [],
         "deployed": [],
         "commits": [],
@@ -918,7 +928,7 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [88],
       "evidence": {
-        "code": [],
+        "code": ["scripts/check-marketplace-listing.mjs"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -930,7 +940,7 @@
         "result": "not_run",
         "checkedAt": "2026-09-01T12:21:04Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "Marketplace remains downstream of open least-privilege GitHub App blocker #88."
     },
     {
       "id": "W36",
@@ -941,7 +951,7 @@
       "owner": "maintainers",
       "dependencies": ["W25"],
       "milestone": "Deferred — outcome-data trigger",
-      "issues": [],
+      "issues": [450, 451],
       "evidence": {
         "code": [],
         "tests": [],

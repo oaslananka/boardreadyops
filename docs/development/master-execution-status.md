@@ -39,7 +39,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 <!-- master-execution-status:start -->
 | Workstream | Name | Priority | Phase | Status | Owner | Dependencies | Roadmap target |
 | --- | --- | --- | ---: | --- | --- | --- | --- |
-| W00 | Repository Inventory & Execution Ledger | P0 | 0 | partial | maintainers | — | Repository Maintenance & Release Health |
+| W00 | Repository Inventory & Execution Ledger | P0 | 0 | implemented | maintainers | — | Repository Maintenance & Release Health |
 | W01 | Repository Maintenance & Release Health | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
 | W02 | Schema & Contract Governance | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
 | W06 | Deterministic Release Decision Engine | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
