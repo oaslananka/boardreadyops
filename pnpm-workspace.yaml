@@ -39,6 +39,7 @@ allowBuilds:
 
 overrides:
   'archiver>readdir-glob': 3.0.0
+  browserslist@<=4.28.6: 4.28.7
   '@prisma/config>deepmerge-ts': 8.0.0
   'pa11y>puppeteer': 25.8.0
   '@hono/node-server@<2.0.12': 2.0.12
