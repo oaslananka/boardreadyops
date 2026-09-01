@@ -77,13 +77,23 @@ describe("resolveRunPageTitle", () => {
   // "not-configured" for anything else -- real, unmocked branches of the same code the page
   // components call.
   const originalNodeEnv = process.env.NODE_ENV;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
 
   beforeEach(() => {
     process.env.NODE_ENV = "test";
+    // CI sets DATABASE_URL at the workflow level for every job (see ci.yml), including this one,
+    // which has no reachable Postgres -- clear it so loadRunDashboard takes the "not-configured"
+    // branch this suite is actually testing, instead of trying a real connection and ECONNREFUSING.
+    delete process.env.DATABASE_URL;
   });
 
   afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    }
   });
 
   it("returns the formatted title for the demo run", async () => {
