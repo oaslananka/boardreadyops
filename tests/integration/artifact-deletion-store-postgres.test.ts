@@ -8,6 +8,7 @@ const connectionString = getPostgresTestConnectionString();
 const describeDatabase = connectionString ? describe : describe.skip;
 const executor = connectionString ? createPgQueryExecutor({ connectionString, max: 4 }) : undefined;
 let githubIdentifier = 995_000_000;
+const createdInstallationIds: string[] = [];
 
 function requireExecutor() {
   if (!executor) throw new Error("DATABASE_URL is required");
@@ -30,6 +31,7 @@ async function fixture(label: string) {
      values ($1, $2, $3, 'Organization')`,
     [installationId, githubIdentifier, `artifact-delete-${label}`],
   );
+  createdInstallationIds.push(installationId);
   githubIdentifier += 1;
   await requireExecutor().query(
     `insert into repositories (id, installation_id, github_repo_id, owner, name, private, default_branch)
@@ -66,6 +68,12 @@ async function insertJob(input: Awaited<ReturnType<typeof fixture>>, artifactId:
 }
 
 afterAll(async () => {
+  if (executor && createdInstallationIds.length > 0) {
+    // Cascades to repositories/release_runs/artifact_deletion_jobs. Without this the fixed-
+    // start githubIdentifier counter collides with leftover rows on a re-run against a
+    // persistent database (CI's ephemeral Postgres service never hits this).
+    await executor.query("delete from installations where id = any($1::text[])", [createdInstallationIds]);
+  }
   await executor?.close();
 });
 
