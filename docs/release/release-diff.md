@@ -20,7 +20,7 @@ The current side is produced by running the normal pipeline on `[path]` (default
 
 - **BOM** — added, removed, and changed components (by reference and source), reusing the fabrication diff.
 - **Outputs / CPL** — fabrication output kinds (Gerber, drill, position/CPL, …) compared by file digest, so a changed placement file is reported as a changed `position` output.
-- **Findings** — findings added and removed between the two releases, by fingerprint.
+- **Findings** — findings added and removed between the two releases, by fingerprint, plus a **worsened/improved** breakdown: findings present in both releases (same fingerprint) whose severity changed. A finding's fingerprint does not include its severity, so a finding matched as "unchanged" can still have gotten more or less severe.
 - **Readiness** — the [readiness score](readiness-scoring.md) delta, status change, and which required outputs became newly missing or were resolved.
 
 ## Output
@@ -35,6 +35,8 @@ The diff is available as JSON (`--format json` or `--output <file>`):
     "outputsChanged": 1,
     "findingsAdded": 1,
     "findingsRemoved": 1,
+    "findingsWorsened": 0,
+    "findingsImproved": 0,
     "scoreDelta": 20
   },
   "readiness": {
@@ -49,7 +51,9 @@ The diff is available as JSON (`--format json` or `--output <file>`):
 }
 ```
 
-The default text format prints a compact summary of the readiness change, BOM and output changes, and the net findings delta. The command exits `0`; it reports differences rather than gating a release.
+The default text format prints a compact summary of the readiness change, BOM and output changes, and the net findings delta — including worsened/improved counts and a `worsened findings:` / `improved findings:` detail section listing each finding's severity transition (e.g. `low -> critical design.clearance at board.kicad_pcb`). The command exits `0`; it reports differences rather than gating a release.
+
+The worsened/improved breakdown is not yet visualized in the `--html` dashboard below (only added/removed findings are); it is available today in the JSON and text output.
 
 ## HTML dashboard
 

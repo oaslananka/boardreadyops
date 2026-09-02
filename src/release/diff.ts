@@ -1,4 +1,9 @@
-import { diffFabrication, type FabricationDiff, type FabricationSnapshot } from "../core/diff/fabrication.js";
+import {
+  diffFabrication,
+  type FabricationDiff,
+  type FabricationSnapshot,
+  type FindingSeverityChange,
+} from "../core/diff/fabrication.js";
 import type { Finding } from "../core/findings.js";
 import type { ReadinessScore } from "../core/readiness.js";
 import { boardReadyVersion } from "../generated/version.js";
@@ -25,6 +30,8 @@ interface ReleaseDiffSummary {
   outputsChanged: number;
   findingsAdded: number;
   findingsRemoved: number;
+  findingsWorsened: number;
+  findingsImproved: number;
   scoreDelta: number;
 }
 
@@ -57,6 +64,8 @@ export function diffReleases(
     outputsChanged: fabrication.outputs.filter((output) => output.status !== "unchanged").length,
     findingsAdded: fabrication.findings.added.length,
     findingsRemoved: fabrication.findings.removed.length,
+    findingsWorsened: fabrication.findings.worsened.length,
+    findingsImproved: fabrication.findings.improved.length,
     scoreDelta: readiness.scoreDelta,
   };
   return {
@@ -111,13 +120,17 @@ export function formatReleaseDiffText(diff: ReleaseDiff): string {
   }
   lines.push(`  bom rows changed: ${diff.summary.bomChanged}`);
   lines.push(`  outputs changed: ${diff.summary.outputsChanged}`);
-  lines.push(`  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved}`);
+  lines.push(
+    `  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved} / ~${diff.summary.findingsWorsened} worse / ~${diff.summary.findingsImproved} better`,
+  );
 
   lines.push(
     ...bomRowChangeLines(diff.fabrication.bom),
     ...outputChangeLines(diff.fabrication.outputs),
     ...findingChangeLines("new findings", diff.fabrication.findings.added),
     ...findingChangeLines("resolved findings", diff.fabrication.findings.removed),
+    ...findingSeverityChangeLines("worsened findings", diff.fabrication.findings.worsened),
+    ...findingSeverityChangeLines("improved findings", diff.fabrication.findings.improved),
   );
 
   return `${lines.join("\n")}\n`;
@@ -164,6 +177,17 @@ function findingChangeLines(label: string, findings: readonly Finding[]): string
 
 function findingSummary(finding: Finding): string {
   return `${finding.severity} ${finding.ruleId} at ${finding.resource.path}`;
+}
+
+function findingSeverityChangeLines(label: string, changes: readonly FindingSeverityChange[]): string[] {
+  if (changes.length === 0) return [];
+
+  const summaries = withOverflowNote(changes.map(findingSeverityChangeSummary), MAX_DETAIL_LINES);
+  return [`  ${label}:`, ...summaries.map((line) => `    - ${line}`)];
+}
+
+function findingSeverityChangeSummary(change: FindingSeverityChange): string {
+  return `${change.previousSeverity} -> ${change.finding.severity} ${change.finding.ruleId} at ${change.finding.resource.path}`;
 }
 
 function bomRowSummary(row: { reference: string; previous: string; current: string; status: string }): string {

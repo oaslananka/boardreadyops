@@ -146,6 +146,33 @@ describe("diffRuns", () => {
     expect(diff.findings.added.map((finding) => finding.ruleId)).toEqual(["bom.eol-detection"]);
     expect(diff.findings.resolved.map((finding) => finding.ruleId)).toEqual(["design.board-outline"]);
     expect(diff.findings.unchanged.map((finding) => finding.ruleId)).toEqual(["bom.missing-mpn"]);
+    expect(diff.findings.worsened).toEqual([]);
+    expect(diff.findings.improved).toEqual([]);
+  });
+
+  it("classifies a finding present in both runs as worsened or improved when its severity changes", () => {
+    const finding = createFinding({
+      ruleId: "design.clearance",
+      severity: "low",
+      message: "Clearance is tight.",
+      resource: { path: "board.kicad_pcb", kind: "pcb" },
+      fingerprint: "shared-fingerprint",
+    });
+    const escalated = { ...finding, severity: "critical" as const };
+
+    const previous = makeRun({ findings: [finding] });
+    const current = makeRun({ findings: [escalated] });
+
+    const diff = diffRuns(previous, current);
+
+    expect(diff.findings.unchanged.map((f) => f.ruleId)).toEqual(["design.clearance"]);
+    expect(diff.findings.worsened).toEqual([
+      {
+        finding: expect.objectContaining({ ruleId: "design.clearance", severity: "critical" }),
+        previousSeverity: "low",
+      },
+    ]);
+    expect(diff.findings.improved).toEqual([]);
   });
 
   it("includes fabrication diff for BOM and outputs", () => {

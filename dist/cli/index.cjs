@@ -54352,10 +54352,22 @@ function diffOutputs(previous, current) {
 function diffFindings(previous, current) {
   const previousFingerprints = new Map(previous.map((finding2) => [finding2.fingerprint, finding2]));
   const currentFingerprints = new Map(current.map((finding2) => [finding2.fingerprint, finding2]));
+  const worsened = [];
+  const improved = [];
+  for (const finding2 of current) {
+    const prior = previousFingerprints.get(finding2.fingerprint);
+    if (!prior || prior.severity === finding2.severity) {
+      continue;
+    }
+    const change = { finding: finding2, previousSeverity: prior.severity };
+    (severityRankValue(finding2.severity) > severityRankValue(prior.severity) ? worsened : improved).push(change);
+  }
   return {
     added: current.filter((finding2) => !previousFingerprints.has(finding2.fingerprint)),
     removed: previous.filter((finding2) => !currentFingerprints.has(finding2.fingerprint)),
-    unchanged: current.filter((finding2) => previousFingerprints.has(finding2.fingerprint))
+    unchanged: current.filter((finding2) => previousFingerprints.has(finding2.fingerprint)),
+    worsened,
+    improved
   };
 }
 function describeBomRow(row) {
@@ -54427,6 +54439,8 @@ function diffReleases(previous, current, options = {}) {
     outputsChanged: fabrication.outputs.filter((output) => output.status !== "unchanged").length,
     findingsAdded: fabrication.findings.added.length,
     findingsRemoved: fabrication.findings.removed.length,
+    findingsWorsened: fabrication.findings.worsened.length,
+    findingsImproved: fabrication.findings.improved.length,
     scoreDelta: readiness.scoreDelta
   };
   return {
@@ -54472,12 +54486,16 @@ function formatReleaseDiffText(diff) {
   }
   lines.push(`  bom rows changed: ${diff.summary.bomChanged}`);
   lines.push(`  outputs changed: ${diff.summary.outputsChanged}`);
-  lines.push(`  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved}`);
+  lines.push(
+    `  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved} / ~${diff.summary.findingsWorsened} worse / ~${diff.summary.findingsImproved} better`
+  );
   lines.push(
     ...bomRowChangeLines(diff.fabrication.bom),
     ...outputChangeLines(diff.fabrication.outputs),
     ...findingChangeLines("new findings", diff.fabrication.findings.added),
-    ...findingChangeLines("resolved findings", diff.fabrication.findings.removed)
+    ...findingChangeLines("resolved findings", diff.fabrication.findings.removed),
+    ...findingSeverityChangeLines("worsened findings", diff.fabrication.findings.worsened),
+    ...findingSeverityChangeLines("improved findings", diff.fabrication.findings.improved)
   );
   return `${lines.join("\n")}
 `;
@@ -54512,6 +54530,14 @@ function findingChangeLines(label, findings) {
 }
 function findingSummary(finding2) {
   return `${finding2.severity} ${finding2.ruleId} at ${finding2.resource.path}`;
+}
+function findingSeverityChangeLines(label, changes) {
+  if (changes.length === 0) return [];
+  const summaries = withOverflowNote(changes.map(findingSeverityChangeSummary), MAX_DETAIL_LINES);
+  return [`  ${label}:`, ...summaries.map((line) => `    - ${line}`)];
+}
+function findingSeverityChangeSummary(change) {
+  return `${change.previousSeverity} -> ${change.finding.severity} ${change.finding.ruleId} at ${change.finding.resource.path}`;
 }
 function bomRowSummary(row) {
   if (row.status === "added") return `${row.reference}: added (${row.current})`;

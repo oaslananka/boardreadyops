@@ -496,6 +496,8 @@ function sampleFabricationDiff(): FabricationDiff {
       ],
       removed: [],
       unchanged: [],
+      worsened: [],
+      improved: [],
     },
   };
 }

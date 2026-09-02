@@ -1,4 +1,4 @@
-import type { Finding } from "../findings.js";
+import { type Finding, severityRankValue } from "../findings.js";
 
 interface FabricationBomEntry {
   reference: string;
@@ -52,10 +52,20 @@ export interface FabricationOutputDiff {
   removed: number;
 }
 
+/** A finding present in both snapshots (same fingerprint) whose severity changed. */
+export interface FindingSeverityChange {
+  finding: Finding;
+  previousSeverity: Finding["severity"];
+}
+
 interface FabricationFindingDiff {
   added: Finding[];
   removed: Finding[];
   unchanged: Finding[];
+  /** Subset of `unchanged` whose severity increased. */
+  worsened: FindingSeverityChange[];
+  /** Subset of `unchanged` whose severity decreased. */
+  improved: FindingSeverityChange[];
 }
 
 export interface FabricationDiff {
@@ -119,10 +129,22 @@ function diffOutputs(previous: FabricationOutput[], current: FabricationOutput[]
 function diffFindings(previous: Finding[], current: Finding[]): FabricationFindingDiff {
   const previousFingerprints = new Map(previous.map((finding) => [finding.fingerprint, finding]));
   const currentFingerprints = new Map(current.map((finding) => [finding.fingerprint, finding]));
+  const worsened: FindingSeverityChange[] = [];
+  const improved: FindingSeverityChange[] = [];
+  for (const finding of current) {
+    const prior = previousFingerprints.get(finding.fingerprint);
+    if (!prior || prior.severity === finding.severity) {
+      continue;
+    }
+    const change: FindingSeverityChange = { finding, previousSeverity: prior.severity };
+    (severityRankValue(finding.severity) > severityRankValue(prior.severity) ? worsened : improved).push(change);
+  }
   return {
     added: current.filter((finding) => !previousFingerprints.has(finding.fingerprint)),
     removed: previous.filter((finding) => !currentFingerprints.has(finding.fingerprint)),
     unchanged: current.filter((finding) => previousFingerprints.has(finding.fingerprint)),
+    worsened,
+    improved,
   };
 }
 

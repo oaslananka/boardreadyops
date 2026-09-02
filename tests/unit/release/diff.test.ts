@@ -129,6 +129,34 @@ describe("release diff engine", () => {
     expect(text).toContain("(+5 more)");
   });
 
+  it("counts and lists findings whose severity changed between snapshots, separate from added/removed", () => {
+    const stable = finding("bom.missing-mpn", "high");
+    const worsenedBefore = createFinding({
+      ruleId: "design.clearance",
+      severity: "low",
+      message: "Clearance is tight.",
+      resource: { path: "board.kicad_pcb", kind: "pcb" },
+      fingerprint: "shared-fingerprint",
+    });
+    const worsenedAfter = { ...worsenedBefore, severity: "critical" as const };
+
+    const diff = diffReleases(
+      { fabrication: { bom: [], outputs: [] }, findings: [stable, worsenedBefore] },
+      { fabrication: { bom: [], outputs: [] }, findings: [stable, worsenedAfter] },
+      { generatedAt: "2026-06-22T00:00:00.000Z" },
+    );
+
+    expect(diff.summary.findingsWorsened).toBe(1);
+    expect(diff.summary.findingsImproved).toBe(0);
+    expect(diff.fabrication.findings.worsened).toEqual([{ finding: worsenedAfter, previousSeverity: "low" }]);
+
+    const text = formatReleaseDiffText(diff);
+    expect(text).toContain("~1 worse / ~0 better");
+    expect(text).toContain("worsened findings:");
+    expect(text).toContain("low -> critical design.clearance at board.kicad_pcb");
+    expect(text).not.toContain("improved findings:");
+  });
+
   it("reports the true bom-changed count even when the row list itself is capped", () => {
     const manyBom = Array.from({ length: 25 }, (_, index) => ({
       reference: `R${index}`,
