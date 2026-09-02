@@ -45,8 +45,34 @@ export type RecordBoardBomSnapshotsResult = {
   boardsEnrolled: number;
 };
 
+/** One component reference on a board matching a queried MPN, from that board's latest snapshot. */
+export type BoardBomExposureMatch = {
+  reference: string;
+  mpn: string;
+  manufacturer?: string | undefined;
+  quantity?: number | undefined;
+};
+
+/** A board whose most recent BOM snapshot references a queried MPN. */
+export type BoardBomExposureEntry = {
+  boardId: string;
+  repositoryId: string;
+  projectPath: string;
+  displayName: string;
+  snapshotId: string;
+  capturedAt: string;
+  matches: readonly BoardBomExposureMatch[];
+};
+
 export type BoardBomStore = {
   recordSnapshots(input: RecordBoardBomSnapshotsInput): Promise<RecordBoardBomSnapshotsResult>;
+  /**
+   * Boards in this installation whose *current* (latest snapshot) BOM references `mpn`,
+   * case-insensitively -- e.g. "which of our boards use this now-recalled part". Deliberately
+   * scoped to the latest snapshot per board, not every historical snapshot: exposure is a
+   * question about what ships today, not what a board's BOM has ever contained.
+   */
+  findBoardsByMpn(installationId: string, mpn: string): Promise<readonly BoardBomExposureEntry[]>;
 };
 
 export type BoardBomStoreOptions = { now?: () => Date };
@@ -63,6 +89,17 @@ function rows(result: unknown): readonly Record<string, unknown>[] {
 function integerColumn(row: Record<string, unknown> | undefined, key: string): number {
   const value = row?.[key];
   return typeof value === "number" ? value : Number(value ?? 0);
+}
+
+function text(row: Record<string, unknown>, key: string): string | undefined {
+  const value = row[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function required(row: Record<string, unknown>, key: string): string {
+  const value = text(row, key);
+  if (value === undefined) throw new Error(`expected column ${key}`);
+  return value;
 }
 
 /** Last path segment without its extension, so `a/b/mainboard.kicad_pro` reads as `mainboard`. */
@@ -243,6 +280,73 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
         componentsWritten: integerColumn(row, "components_written"),
         boardsEnrolled: integerColumn(row, "boards_enrolled"),
       };
+    },
+
+    async findBoardsByMpn(installationId, mpn) {
+      const trimmedMpn = mpn.trim();
+      if (trimmedMpn.length === 0) {
+        return [];
+      }
+
+      const result = await executor.query(
+        `with scoped_boards as (
+           select boards.id as board_id, boards.repository_id, boards.project_path, boards.display_name
+           from boards
+           join repositories on repositories.id = boards.repository_id
+           where repositories.installation_id = $1
+             and boards.archived_at is null
+         ),
+         newest as (
+           select distinct on (snapshot.board_id)
+                  snapshot.board_id, snapshot.id as snapshot_id, snapshot.captured_at
+           from board_bom_snapshots as snapshot
+           join scoped_boards on scoped_boards.board_id = snapshot.board_id
+           order by snapshot.board_id, snapshot.captured_at desc, snapshot.id desc
+         )
+         select scoped_boards.board_id,
+                scoped_boards.repository_id,
+                scoped_boards.project_path,
+                scoped_boards.display_name,
+                newest.snapshot_id,
+                newest.captured_at,
+                jsonb_agg(
+                  jsonb_build_object(
+                    'reference', component.reference,
+                    'mpn', component.mpn,
+                    'manufacturer', component.manufacturer,
+                    'quantity', component.quantity
+                  )
+                  order by component.reference
+                ) as matches
+         from newest
+         join scoped_boards on scoped_boards.board_id = newest.board_id
+         join board_bom_components as component
+           on component.snapshot_id = newest.snapshot_id
+          and lower(component.mpn) = lower($2)
+         group by scoped_boards.board_id, scoped_boards.repository_id, scoped_boards.project_path,
+                  scoped_boards.display_name, newest.snapshot_id, newest.captured_at
+         order by scoped_boards.project_path`,
+        [installationId, trimmedMpn],
+      );
+
+      return rows(result).map((row): BoardBomExposureEntry => {
+        const raw = row.matches;
+        const parsed = Array.isArray(raw) ? raw : typeof raw === "string" ? JSON.parse(raw) : [];
+        return {
+          boardId: required(row, "board_id"),
+          repositoryId: required(row, "repository_id"),
+          projectPath: required(row, "project_path"),
+          displayName: required(row, "display_name"),
+          snapshotId: required(row, "snapshot_id"),
+          capturedAt: new Date(row.captured_at as string | number | Date).toISOString(),
+          matches: (parsed as Record<string, unknown>[]).map((match) => ({
+            reference: String(match.reference ?? ""),
+            mpn: String(match.mpn ?? ""),
+            manufacturer: typeof match.manufacturer === "string" ? match.manufacturer : undefined,
+            quantity: typeof match.quantity === "number" ? match.quantity : undefined,
+          })),
+        };
+      });
     },
   };
 }
