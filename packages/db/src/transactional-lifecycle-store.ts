@@ -77,7 +77,8 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
            $8,
            $9,
            $10,
-           $11::jsonb
+           $11::jsonb,
+           $12
          )`,
         [
           action.repository.id,
@@ -91,6 +92,7 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
           idempotencyKey,
           outboxId,
           JSON.stringify(payload),
+          action.deliveryId ?? null,
         ],
       );
       const row = rows(result)[0];

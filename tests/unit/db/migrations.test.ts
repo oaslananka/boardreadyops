@@ -98,6 +98,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0055_marketplace_billing_events.sql",
       "0056_marketplace_subscription_state.sql",
       "0057_review_approval_uniqueness.sql",
+      "0058_release_run_delivery_id.sql",
     ]);
   });
 
@@ -119,6 +120,16 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("unique index if not exists");
     expect(sql).toContain("on review_approvals (review_id, revision_id, approver_id, status)");
     expect(sql).toContain("status in ('approved', 'changes_requested')");
+  });
+
+  it("adds a nullable delivery id column and index for release-run traceability in schema v58", async () => {
+    const sql = (await readFile(join(migrationsDir, "0058_release_run_delivery_id.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table release_runs");
+    expect(sql).toContain("add column if not exists delivery_id text");
+    expect(sql).toContain("create index if not exists release_runs_delivery_id_idx");
+    expect(sql).toContain("on release_runs(delivery_id)");
+    expect(sql).toContain("where delivery_id is not null");
   });
 
   it("indexes canceled Marketplace subscriptions by stable installation id in schema v56", async () => {

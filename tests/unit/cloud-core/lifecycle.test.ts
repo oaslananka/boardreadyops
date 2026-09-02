@@ -199,6 +199,7 @@ describe("GitHub App lifecycle normalization", () => {
           enabled: true,
           reasons: ["private-repository"],
         },
+        deliveryId: "delivery-3",
       },
     ]);
   });

@@ -61,6 +61,8 @@ export type GitHubAppLifecycleAction =
       pullRequestDraft?: boolean;
       pullRequestFromFork?: boolean;
       safeMode?: PullRequestSafeMode;
+      /** The GitHub webhook delivery (`X-GitHub-Delivery`) that produced this run, for DB-only correlation. */
+      deliveryId?: string | undefined;
     };
 
 export type GitHubAppLifecycleResult = {
@@ -402,6 +404,7 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
       triggerKind: "pr",
       pullRequestDraft,
       pullRequestFromFork,
+      deliveryId: options.delivery,
     };
     const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
 
