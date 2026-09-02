@@ -98,4 +98,51 @@ describe("release sign / verify commands", () => {
     expect(stdout).toContain("Release Certificate");
     expect(stdout).toContain("Signature:     valid Ed25519");
   });
+
+  it("verifies against an active trust store entry", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await releaseSignCommand(bundle, { key: keyPath }, streams().streams);
+
+    const dir = path.dirname(bundle);
+    const trustStorePath = path.join(dir, "trust-store.json");
+    await fs.writeFile(
+      trustStorePath,
+      JSON.stringify([
+        { keyId: "key-2026", publicKey: await fs.readFile(pubPath, "utf8"), validFrom: "2020-01-01T00:00:00.000Z" },
+      ]),
+    );
+
+    const io = streams();
+    expect(await releaseVerifyCommand(bundle, { trustStore: trustStorePath, format: "json" }, io.streams)).toBe(0);
+    expect(JSON.parse(io.output().stdout).signature.matchedKeyId).toBe("key-2026");
+  });
+
+  it("fails verification when the matching trust store key is revoked", async () => {
+    const { bundle, keyPath, pubPath } = await makeBundle();
+    await releaseSignCommand(bundle, { key: keyPath }, streams().streams);
+
+    const dir = path.dirname(bundle);
+    const trustStorePath = path.join(dir, "trust-store.json");
+    await fs.writeFile(
+      trustStorePath,
+      JSON.stringify([
+        {
+          keyId: "key-2026",
+          publicKey: await fs.readFile(pubPath, "utf8"),
+          validFrom: "2020-01-01T00:00:00.000Z",
+          revokedAt: "2020-06-01T00:00:00.000Z",
+        },
+      ]),
+    );
+
+    const io = streams();
+    expect(await releaseVerifyCommand(bundle, { trustStore: trustStorePath }, io.streams)).toBe(1);
+  });
+
+  it("rejects passing both --public-key and --trust-store", async () => {
+    const { bundle, pubPath } = await makeBundle();
+    const io = streams();
+    expect(await releaseVerifyCommand(bundle, { publicKey: pubPath, trustStore: pubPath }, io.streams)).toBe(2);
+    expect(io.output().stderr).toContain("either --public-key or --trust-store");
+  });
 });
