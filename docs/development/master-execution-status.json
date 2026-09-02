@@ -268,9 +268,9 @@
       "verification": {
         "command": "corepack pnpm vitest run tests/unit/cloud-core/decision-engine.test.ts tests/unit/cloud-core/policy-engine.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T02:39:36Z"
       },
-      "remaining": "No explicit named PASS/FAIL/CONDITIONAL/UNKNOWN vocabulary (readiness.ts uses ready/at-risk/blocked; policy.ts uses pass/fail) and no dedicated cross-run decision fingerprint/hash for same-input-same-decision regression testing, though the DecisionExplanationGraph (PR #565) and injectable clock cover the core acceptance criteria."
+      "remaining": "CORRECTION: the prior note claimed no dedicated cross-run decision fingerprint/hash existed for same-input-same-decision regression testing. That's stale — packages/cloud-core/src/decision-engine.ts:159 exports computeDecisionFingerprint() (canonical JSON over sorted explanation-graph nodes, SHA-256), and tests/unit/cloud-core/decision-engine.test.ts:164 ('computes an order-independent decision fingerprint that changes only when the outcome changes') already proves forward- vs reverse-input-order produces an identical fingerprint, that the standalone function matches the embedded fingerprint, and that a genuine outcome change produces a different one. Still genuinely missing: an explicit named PASS/FAIL/CONDITIONAL/UNKNOWN vocabulary. Three different vocabularies exist across the three evidence files with no canonical mapping between them: readiness.ts uses ready/at-risk/blocked, policy.ts uses pass/fail, and decision-engine.ts's ReviewDecision (from @boardreadyops/contracts, a wire-protocol type) uses pending/approved/changes_requested. Introducing a canonical status on top of three existing, wire-protocol-touching vocabularies is a real design task, not a quick fix — deliberately not attempted in this correction-only change."
     },
     {
       "id": "W07",
