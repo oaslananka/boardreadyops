@@ -34759,12 +34759,12 @@ var init_runner_protocol = __esm({
         protocolVersion: runnerProtocolVersionSchema,
         status: external_exports.literal("empty"),
         retryAfterSeconds: external_exports.number().int().min(1).max(300)
-      }).strict(),
+      }).strip(),
       external_exports.object({
         protocolVersion: runnerProtocolVersionSchema,
         status: external_exports.literal("claimed"),
         job: runnerClaimedJobSchema
-      }).strict()
+      }).strip()
     ]);
     runnerLeaseContextSchema = external_exports.object({
       protocolVersion: runnerProtocolVersionSchema,
@@ -34791,11 +34791,11 @@ var init_runner_protocol = __esm({
         status: external_exports.literal("active"),
         leaseExpiresAt: external_exports.string().datetime({ offset: true }),
         maximumLeaseExpiresAt: external_exports.string().datetime({ offset: true })
-      }).strict(),
+      }).strip(),
       external_exports.object({
         protocolVersion: runnerProtocolVersionSchema,
         status: external_exports.enum(["expired", "revoked", "completed", "stale"])
-      }).strict()
+      }).strip()
     ]);
     runnerLeaseRelinquishRequestSchema = runnerLeaseContextSchema.extend({
       reason: external_exports.enum(["shutdown", "capacity", "operator", "job_error"]),
@@ -34822,7 +34822,7 @@ var init_runner_protocol = __esm({
     runnerArtifactCapabilityResponseSchema = external_exports.object({
       protocolVersion: runnerProtocolVersionSchema,
       uploads: external_exports.array(runnerArtifactUploadCapabilitySchema).min(1).max(100)
-    }).strict();
+    }).strip();
     runnerRegistrationActivationRequestSchema = external_exports.object({
       protocolVersion: runnerProtocolVersionSchema,
       enrollmentToken: runnerEnrollmentTokenSchema,
@@ -34838,7 +34838,7 @@ var init_runner_protocol = __esm({
     runnerMutationResponseSchema = external_exports.object({
       protocolVersion: runnerProtocolVersionSchema,
       status: external_exports.enum(["accepted", "replayed"])
-    }).strict();
+    }).strip();
   }
 });
 
