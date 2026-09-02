@@ -794,11 +794,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/integration/runner-enrollment-admin-psql.test.ts tests/unit/web/runner-lease-routes.test.ts",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "command": "BOARDREADYOPS_PSQL_TEST=1 corepack pnpm vitest run tests/integration/runner-enrollment-admin-psql.test.ts tests/unit/web/runner-lease-routes.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-02T21:51:35Z"
       },
-      "remaining": "SSO (OIDC/SAML), SCIM provisioning, customer-managed keys, and SIEM export are all in-memory stub adapters with no wired API routes, honestly labeled 'Proposed / Blueprint (planned upon enterprise customer commitment)' in ADR-0015. Only the customer-hosted execution agent (enrollment/lease/heartbeat/revocation) is production-grade."
+      "remaining": "Verification confirmed real, not just asserted: runner-enrollment-admin-psql.test.ts is gated behind BOARDREADYOPS_PSQL_TEST=1 (not the usual BOARDREADYOPS_POSTGRES_TESTS flag used elsewhere in this repo) because the code under test (packages/db/src/runner-enrollment-admin.ts) deliberately hardens against PATH-based binary resolution -- it spawns /usr/bin/psql by an absolute path with PATH restricted to /usr/bin:/bin, rather than trusting an untrusted PATH the way most of this repo's git/kicad-cli invocations now do (see the resolveGitExecutable() pattern). That means the test needs a real system psql client at that exact path, which this environment didn't have; installed the standard postgresql-client system package to get it, then ran the test against a real, isolated disposable PostgreSQL instance -- 2 files, 16 tests, all pass. SSO (OIDC/SAML), SCIM provisioning, customer-managed keys, and SIEM export are all in-memory stub adapters with no wired API routes, honestly labeled 'Proposed / Blueprint (planned upon enterprise customer commitment)' in ADR-0015. Only the customer-hosted execution agent (enrollment/lease/heartbeat/revocation) is production-grade."
     },
     {
       "id": "W23",
