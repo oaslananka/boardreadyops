@@ -179,3 +179,121 @@ function publicKeysMatch(publicKey: KeyObject, trustedPublicKeyPem: string): boo
 function asMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+// --- Trust store: signing-key rotation & revocation ------------------------
+//
+// verifyManifestSignature() above only supports a single pinned key: exactly one trusted key can
+// be checked per call, with no concept of that key's validity window or of it being retired. That
+// makes ordinary key rotation unsafe -- there's no way to have an old key still verify releases
+// signed just before rotation while a new key takes over, and no way to declare a compromised key
+// permanently untrusted short of removing the only pin (which also breaks verification of every
+// past release signed with it).
+//
+// A TrustStore is a list of keys, each with its own validity window and optional revocation. This
+// is the verification-side model only: how a trust store itself gets distributed to and updated on
+// a consumer's machine (e.g. a signed trust-store bundle, TUF-style delegation, a well-known URL)
+// is a separate, larger problem intentionally out of scope here -- see the W07 ledger entry for
+// what's covered by this change vs. what remains (signed-release-certificate UI/API, Hardware
+// Release Level model).
+
+interface TrustedSigningKey {
+  /** Stable identifier for this key (e.g. a fingerprint or a human-assigned name); not
+   * cryptographically meaningful, used only to report which key matched. */
+  keyId: string;
+  /** PEM-encoded Ed25519 public key. */
+  publicKey: string;
+  /** ISO 8601 timestamp; the key is not trusted before this instant. */
+  validFrom: string;
+  /** ISO 8601 timestamp; the key is not trusted from this instant onward. Absent means no planned
+   * expiry (rotation is expected to be managed via revocation instead). */
+  validUntil?: string | undefined;
+  /** ISO 8601 timestamp. Once set, the key is untrusted from this instant onward for ALL
+   * verification -- including of signatures whose signedAt predates the revocation. A compromised
+   * key must not keep verifying past releases as trusted; that would defeat the purpose of
+   * revoking it. There is deliberately no "grandfather signatures made before compromise" carve-out
+   * here, which would require a trusted timestamping authority this design does not have. */
+  revokedAt?: string | undefined;
+}
+
+export type TrustStore = TrustedSigningKey[];
+
+export interface TrustStoreVerification extends SignatureVerification {
+  /** The keyId of the trust store entry the signature's embedded key matched, when ok is true. */
+  matchedKeyId?: string | undefined;
+}
+
+/**
+ * Verify a manifest signature against a trust store of possibly-multiple, possibly-time-limited,
+ * possibly-revoked keys, evaluated as of `verifiedAt`. Unlike verifyManifestSignature's single
+ * `trustedPublicKeyPem` pin, this supports rotation (old and new keys both valid across an overlap
+ * window) and revocation (a key stops being trusted for all verification from revokedAt onward,
+ * regardless of when the signature itself was created).
+ */
+export function verifyManifestSignatureAgainstTrustStore(
+  bytes: Buffer,
+  signature: ReleaseManifestSignature,
+  trustStore: TrustStore,
+  verifiedAt: string,
+): TrustStoreVerification {
+  const base = verifyManifestSignature(bytes, signature);
+  if (!base.ok) {
+    return base;
+  }
+
+  let embeddedPublicKey: KeyObject;
+  try {
+    embeddedPublicKey = createPublicKey(signature.publicKey);
+  } catch {
+    return { ok: false, errors: ["signature public key could not be parsed"], errorCodes: ["INVALID_PUBLIC_KEY"] };
+  }
+
+  const verifiedAtMs = Date.parse(verifiedAt);
+  const match = trustStore.find((entry) => {
+    if (entry.revokedAt !== undefined && Date.parse(entry.revokedAt) <= verifiedAtMs) {
+      return false;
+    }
+    if (Date.parse(entry.validFrom) > verifiedAtMs) {
+      return false;
+    }
+    if (entry.validUntil !== undefined && Date.parse(entry.validUntil) < verifiedAtMs) {
+      return false;
+    }
+    return publicKeysMatch(embeddedPublicKey, entry.publicKey);
+  });
+
+  if (!match) {
+    return {
+      ok: false,
+      errors: ["signature public key is not an active entry in the trust store"],
+      errorCodes: ["KEY_NOT_TRUSTED"],
+    };
+  }
+
+  return { ok: true, errors: [], matchedKeyId: match.keyId };
+}
+
+/** Load a trust store from a JSON file. Throws if the file is missing, unreadable, or malformed. */
+export async function loadTrustStore(filePath: string): Promise<TrustStore> {
+  const raw = await fs.readFile(filePath, "utf8");
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error(`trust store at ${filePath} must be a JSON array`);
+  }
+  for (const [index, entry] of parsed.entries()) {
+    if (
+      typeof entry !== "object" ||
+      entry === null ||
+      typeof (entry as Partial<TrustedSigningKey>).keyId !== "string" ||
+      typeof (entry as Partial<TrustedSigningKey>).publicKey !== "string" ||
+      typeof (entry as Partial<TrustedSigningKey>).validFrom !== "string"
+    ) {
+      throw new Error(`trust store at ${filePath} entry ${index} is missing required fields`);
+    }
+  }
+  return parsed as TrustStore;
+}
+
+/** Write a trust store to a JSON file. */
+export async function saveTrustStore(filePath: string, trustStore: TrustStore): Promise<void> {
+  await fs.writeFile(filePath, `${JSON.stringify(trustStore, null, 2)}\n`, "utf8");
+}
