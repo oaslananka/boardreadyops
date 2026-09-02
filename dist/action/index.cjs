@@ -84898,6 +84898,7 @@ function runProcess(command, args, options = {}) {
     } : { command, args };
     const child = (0, import_node_child_process.spawn)(commandLine.command, commandLine.args, {
       cwd: options.cwd,
+      env: options.env,
       windowsHide: true,
       windowsVerbatimArguments: useCmdShim,
       stdio: ["ignore", "pipe", "pipe"]

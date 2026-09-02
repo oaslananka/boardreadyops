@@ -35635,10 +35635,10 @@ __export(evidence_exports, {
   writeReviewEvidenceLedger: () => writeReviewEvidenceLedger
 });
 async function writeReleaseEvidenceBundle(root, result, options) {
-  const outputDir = import_node_path56.default.resolve(root, options.outputDir);
+  const outputDir = import_node_path57.default.resolve(root, options.outputDir);
   await import_promises19.default.rm(outputDir, { recursive: true, force: true });
-  await import_promises19.default.mkdir(import_node_path56.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
-  await import_promises19.default.mkdir(import_node_path56.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
+  await import_promises19.default.mkdir(import_node_path57.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
+  await import_promises19.default.mkdir(import_node_path57.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
   const artifacts = [];
   artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)));
   artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)));
@@ -35664,10 +35664,10 @@ async function writeReleaseEvidenceBundle(root, result, options) {
     provenance: cleanObject(options.provenance ?? {}),
     verification: { algorithm: "sha256", artifactCount: artifacts.length }
   };
-  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
+  const manifestPath = import_node_path57.default.join(outputDir, "manifest.json");
   await import_promises19.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
-  const checksumsPath = import_node_path56.default.join(outputDir, "checksums.txt");
+  const checksumsPath = import_node_path57.default.join(outputDir, "checksums.txt");
   await import_promises19.default.writeFile(checksumsPath, formatChecksumsTxt(artifacts), "utf8");
   return { outputDir, manifestPath, checksumsPath, manifest };
 }
@@ -35687,23 +35687,23 @@ function formatChecksumsTxt(artifacts) {
 `;
 }
 async function verifyManifestCoverage(bundleDir) {
-  const outputDir = import_node_path56.default.resolve(bundleDir);
-  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
+  const outputDir = import_node_path57.default.resolve(bundleDir);
+  const manifestPath = import_node_path57.default.join(outputDir, "manifest.json");
   const readResult = await readBundleManifest(manifestPath);
   if (!readResult.ok) {
     return { ok: false, manifestPath, uncovered: [], errors: readResult.errors };
   }
   const manifest = readResult.manifest;
-  const covered = new Set((manifest.artifacts ?? []).map((artifact) => import_node_path56.default.resolve(outputDir, artifact.path)));
+  const covered = new Set((manifest.artifacts ?? []).map((artifact) => import_node_path57.default.resolve(outputDir, artifact.path)));
   const SKIP = /* @__PURE__ */ new Set(["manifest.json", "checksums.txt", "manifest.sig"]);
   const allFiles = [];
   await collectFiles(outputDir, allFiles);
-  const uncovered = allFiles.filter((file2) => !SKIP.has(import_node_path56.default.basename(file2)) && !covered.has(file2)).map((file2) => import_node_path56.default.relative(outputDir, file2).split(import_node_path56.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
+  const uncovered = allFiles.filter((file2) => !SKIP.has(import_node_path57.default.basename(file2)) && !covered.has(file2)).map((file2) => import_node_path57.default.relative(outputDir, file2).split(import_node_path57.default.sep).join("/")).sort((left, right) => left.localeCompare(right));
   return { ok: uncovered.length === 0, manifestPath, uncovered, errors: [] };
 }
 async function verifyReleaseEvidenceBundle(bundleDir) {
-  const outputDir = import_node_path56.default.resolve(bundleDir);
-  const manifestPath = import_node_path56.default.join(outputDir, "manifest.json");
+  const outputDir = import_node_path57.default.resolve(bundleDir);
+  const manifestPath = import_node_path57.default.join(outputDir, "manifest.json");
   const readResult = await readBundleManifest(manifestPath);
   if (!readResult.ok) {
     return { ok: false, manifestPath, checked: 0, errors: readResult.errors };
@@ -35711,7 +35711,7 @@ async function verifyReleaseEvidenceBundle(bundleDir) {
   const manifest = readResult.manifest;
   const errors = [];
   for (const artifact of manifest.artifacts ?? []) {
-    const artifactPath = import_node_path56.default.resolve(outputDir, artifact.path);
+    const artifactPath = import_node_path57.default.resolve(outputDir, artifact.path);
     if (!isInside2(outputDir, artifactPath)) {
       errors.push(`${artifact.path}: path escapes bundle directory`);
       continue;
@@ -35766,8 +35766,8 @@ async function readBundleManifest(manifestPath) {
   }
 }
 async function writeReport(outputDir, relativePath, content) {
-  const target = import_node_path56.default.join(outputDir, relativePath);
-  await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
+  const target = import_node_path57.default.join(outputDir, relativePath);
+  await import_promises19.default.mkdir(import_node_path57.default.dirname(target), { recursive: true });
   await import_promises19.default.writeFile(target, content, "utf8");
   const digest2 = await fileDigest2(target);
   return { path: relativePath, kind: "report", ...digest2 };
@@ -35777,9 +35777,9 @@ async function copyManufacturingArtifacts(root, outputDir) {
   const artifacts = [];
   for (const source of files) {
     const relativeSource = normalizeRelative(root, source);
-    const targetRelative = import_node_path56.default.join("artifacts", relativeSource).split(import_node_path56.default.sep).join("/");
-    const target = import_node_path56.default.join(outputDir, targetRelative);
-    await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
+    const targetRelative = import_node_path57.default.join("artifacts", relativeSource).split(import_node_path57.default.sep).join("/");
+    const target = import_node_path57.default.join(outputDir, targetRelative);
+    await import_promises19.default.mkdir(import_node_path57.default.dirname(target), { recursive: true });
     await import_promises19.default.copyFile(source, target);
     const digest2 = await fileDigest2(target);
     artifacts.push({ path: targetRelative, sourcePath: relativeSource, kind: artifactKind(source), ...digest2 });
@@ -35787,7 +35787,7 @@ async function copyManufacturingArtifacts(root, outputDir) {
   return artifacts;
 }
 async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
-  const sourceDir = import_node_path56.default.resolve(root, includeGenerated);
+  const sourceDir = import_node_path57.default.resolve(root, includeGenerated);
   if (sourceDir === outputDir || isInside2(outputDir, sourceDir) || isInside2(sourceDir, outputDir)) {
     return [];
   }
@@ -35797,9 +35797,9 @@ async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
   const artifacts = [];
   for (const source of files) {
     const relativeSource = normalizeRelative(sourceDir, source);
-    const targetRelative = import_node_path56.default.join(BUNDLE_LAYOUT.generated, relativeSource).split(import_node_path56.default.sep).join("/");
-    const target = import_node_path56.default.join(outputDir, targetRelative);
-    await import_promises19.default.mkdir(import_node_path56.default.dirname(target), { recursive: true });
+    const targetRelative = import_node_path57.default.join(BUNDLE_LAYOUT.generated, relativeSource).split(import_node_path57.default.sep).join("/");
+    const target = import_node_path57.default.join(outputDir, targetRelative);
+    await import_promises19.default.mkdir(import_node_path57.default.dirname(target), { recursive: true });
     await import_promises19.default.copyFile(source, target);
     const digest2 = await fileDigest2(target);
     artifacts.push({
@@ -35814,10 +35814,10 @@ async function copyGeneratedOutputs(root, outputDir, includeGenerated) {
 async function discoverManufacturingArtifacts(root) {
   const discovered = [];
   for (const directory of FABRICATION_DIRS) {
-    await collectFiles(import_node_path56.default.join(root, directory), discovered);
+    await collectFiles(import_node_path57.default.join(root, directory), discovered);
   }
   return [...new Set(discovered)].filter(
-    (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path56.default.extname(file2).toLowerCase()) || import_node_path56.default.basename(file2).toLowerCase().includes("readme")
+    (file2) => MANUFACTURING_EXTENSIONS.has(import_node_path57.default.extname(file2).toLowerCase()) || import_node_path57.default.basename(file2).toLowerCase().includes("readme")
   ).sort((left, right) => left.localeCompare(right));
 }
 async function collectFiles(directory, output) {
@@ -35828,7 +35828,7 @@ async function collectFiles(directory, output) {
     return;
   }
   for (const entry of entries) {
-    const target = import_node_path56.default.join(directory, entry.name);
+    const target = import_node_path57.default.join(directory, entry.name);
     if (entry.isDirectory()) {
       await collectFiles(target, output);
     } else if (entry.isFile()) {
@@ -35868,8 +35868,8 @@ function evidenceGaps(root, result, artifacts) {
   return gaps;
 }
 function artifactKind(file2) {
-  const lower = import_node_path56.default.basename(file2).toLowerCase();
-  const extension = import_node_path56.default.extname(lower);
+  const lower = import_node_path57.default.basename(file2).toLowerCase();
+  const extension = import_node_path57.default.extname(lower);
   if (extension === ".drl" || extension === ".xln") {
     return "drill";
   }
@@ -35882,7 +35882,7 @@ function artifactKind(file2) {
   if (lower.includes("cpl") || lower.includes("pos") || lower.includes("centroid")) {
     return "cpl";
   }
-  if (FABRICATION_DIRS.some((name) => file2.split(import_node_path56.default.sep).includes(name))) {
+  if (FABRICATION_DIRS.some((name) => file2.split(import_node_path57.default.sep).includes(name))) {
     return "fabrication";
   }
   return "other";
@@ -35895,8 +35895,8 @@ function cleanObject(value) {
   return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== void 0));
 }
 function isInside2(root, target) {
-  const relative = import_node_path56.default.relative(root, target);
-  return Boolean(relative) && !relative.startsWith("..") && !import_node_path56.default.isAbsolute(relative);
+  const relative = import_node_path57.default.relative(root, target);
+  return Boolean(relative) && !relative.startsWith("..") && !import_node_path57.default.isAbsolute(relative);
 }
 async function writeReviewEvidenceLedger(options) {
   await import_promises19.default.mkdir(options.outputDir, { recursive: true });
@@ -35919,18 +35919,18 @@ async function writeReviewEvidenceLedger(options) {
     checklist: options.checklist,
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
-  const ledgerPath = import_node_path56.default.join(options.outputDir, "evidence-ledger.json");
-  const manifestPath = import_node_path56.default.join(options.outputDir, "manifest.json");
+  const ledgerPath = import_node_path57.default.join(options.outputDir, "evidence-ledger.json");
+  const manifestPath = import_node_path57.default.join(options.outputDir, "manifest.json");
   await import_promises19.default.writeFile(ledgerPath, JSON.stringify(ledgerDoc, null, 2), "utf8");
   await import_promises19.default.writeFile(manifestPath, JSON.stringify(options.manifest, null, 2), "utf8");
   return { ledgerPath, manifestPath, evidenceDigest };
 }
 async function resolveFileHash(item2, baseDir) {
   const candidatePaths = [
-    import_node_path56.default.resolve(baseDir, item2.path),
-    import_node_path56.default.resolve(baseDir, item2.name),
-    import_node_path56.default.resolve(baseDir, "artifacts", item2.name),
-    import_node_path56.default.resolve(baseDir, "artifacts", item2.path)
+    import_node_path57.default.resolve(baseDir, item2.path),
+    import_node_path57.default.resolve(baseDir, item2.name),
+    import_node_path57.default.resolve(baseDir, "artifacts", item2.name),
+    import_node_path57.default.resolve(baseDir, "artifacts", item2.path)
   ];
   for (const candidate of candidatePaths) {
     try {
@@ -35945,7 +35945,7 @@ async function verifyReviewEvidenceOffline(ledgerFilePath, artifactsRootDir) {
   const content = await import_promises19.default.readFile(ledgerFilePath, "utf8");
   const ledgerDoc = JSON.parse(content);
   const fileHashes = {};
-  const baseDir = artifactsRootDir ?? import_node_path56.default.dirname(ledgerFilePath);
+  const baseDir = artifactsRootDir ?? import_node_path57.default.dirname(ledgerFilePath);
   for (const item2 of ledgerDoc.manifest) {
     const hash2 = await resolveFileHash(item2, baseDir);
     if (hash2) {
@@ -35994,13 +35994,13 @@ async function verifyReviewEvidenceOffline(ledgerFilePath, artifactsRootDir) {
     errors
   };
 }
-var import_node_crypto8, import_promises19, import_node_path56, FABRICATION_DIRS, MANUFACTURING_EXTENSIONS, BUNDLE_LAYOUT;
+var import_node_crypto8, import_promises19, import_node_path57, FABRICATION_DIRS, MANUFACTURING_EXTENSIONS, BUNDLE_LAYOUT;
 var init_evidence = __esm({
   "src/release/evidence.ts"() {
     "use strict";
     import_node_crypto8 = require("node:crypto");
     import_promises19 = __toESM(require("node:fs/promises"), 1);
-    import_node_path56 = __toESM(require("node:path"), 1);
+    import_node_path57 = __toESM(require("node:path"), 1);
     init_src();
     init_version();
     init_json();
@@ -43469,12 +43469,48 @@ function dedupeHeaderNames(header) {
 var import_promises4 = __toESM(require("node:fs/promises"), 1);
 
 // src/util/json.ts
+function compareCodeUnits(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
 function parseJsonValue(text) {
   try {
     return JSON.parse(text);
   } catch {
     return void 0;
   }
+}
+function canonicalizeJson(value) {
+  if (value === null || typeof value !== "object") {
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) {
+        return "null";
+      }
+      return Object.is(value, -0) ? "0" : String(value);
+    }
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    const elements = value.map((element) => {
+      if (element === void 0 || typeof element === "function" || typeof element === "symbol") {
+        return "null";
+      }
+      return canonicalizeJson(element);
+    });
+    return `[${elements.join(",")}]`;
+  }
+  const obj = value;
+  const keys = Object.keys(obj).filter((k) => {
+    const v = obj[k];
+    return v !== void 0 && typeof v !== "function" && typeof v !== "symbol";
+  }).sort(compareCodeUnits);
+  const entries = keys.map((key) => {
+    const formattedKey = JSON.stringify(key);
+    const formattedVal = canonicalizeJson(obj[key]);
+    return `${formattedKey}:${formattedVal}`;
+  });
+  return `{${entries.join(",")}}`;
 }
 
 // src/kicad/sexpr.ts
@@ -45116,6 +45152,7 @@ function runProcess(command, args, options = {}) {
     } : { command, args };
     const child = (0, import_node_child_process2.spawn)(commandLine.command, commandLine.args, {
       cwd: options.cwd,
+      env: options.env,
       windowsHide: true,
       windowsVerbatimArguments: useCmdShim,
       stdio: ["ignore", "pipe", "pipe"]
@@ -53491,13 +53528,13 @@ async function confirmApply(streams) {
 }
 
 // src/cli/commands/generate.ts
-var import_node_path52 = __toESM(require("node:path"), 1);
+var import_node_path53 = __toESM(require("node:path"), 1);
 init_t();
 
 // src/release/generate.ts
 var import_node_crypto6 = require("node:crypto");
 var import_promises17 = __toESM(require("node:fs/promises"), 1);
-var import_node_path51 = __toESM(require("node:path"), 1);
+var import_node_path52 = __toESM(require("node:path"), 1);
 var import__2 = __toESM(require__(), 1);
 
 // schemas/generate-recipe.schema.json
@@ -53552,6 +53589,56 @@ var generate_recipe_schema_default = {
 
 // src/release/generate.ts
 init_version();
+
+// src/util/git-resolver.ts
+var import_node_fs5 = require("node:fs");
+var import_node_path51 = require("node:path");
+function defaultIsRegularFile(filePath) {
+  try {
+    return (0, import_node_fs5.statSync)(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+function resolveGitExecutable(options = {}) {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
+  const checkFile = options.isRegularFile ?? defaultIsRegularFile;
+  const override = env.BOARDREADYOPS_GIT_PATH;
+  if (override !== void 0 && override.trim() !== "") {
+    const trimmed = override.trim();
+    if (!(0, import_node_path51.isAbsolute)(trimmed)) {
+      throw new Error(`BOARDREADYOPS_GIT_PATH must be an absolute path, got: "${trimmed}"`);
+    }
+    if (!checkFile(trimmed)) {
+      throw new Error(`BOARDREADYOPS_GIT_PATH does not point to an existing regular file: "${trimmed}"`);
+    }
+    return trimmed;
+  }
+  const candidates = [];
+  if (platform === "win32") {
+    candidates.push(
+      String.raw`C:\Program Files\Git\cmd\git.exe`,
+      String.raw`C:\Program Files\Git\bin\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\cmd\git.exe`,
+      String.raw`C:\Program Files (x86)\Git\bin\git.exe`
+    );
+  } else if (platform === "darwin") {
+    candidates.push("/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git");
+  } else {
+    candidates.push("/usr/bin/git", "/usr/local/bin/git");
+  }
+  for (const candidate of candidates) {
+    if (checkFile(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error(
+    "Safe git executable not found in standard system locations. Set the BOARDREADYOPS_GIT_PATH environment variable to the absolute path of your git binary."
+  );
+}
+
+// src/release/generate.ts
 var OUTPUT_KINDS = {
   gerbers: { source: "pcb", artifactKind: "gerber", isDirectory: true, defaultOutput: "gerbers" },
   drill: { source: "pcb", artifactKind: "drill", isDirectory: true, defaultOutput: "drill" },
@@ -53651,8 +53738,41 @@ function createKicadCliRunner(cliPath) {
     return { code: result.code ?? 1, stdout: result.stdout, stderr: result.stderr, timedOut: result.timedOut };
   };
 }
+var GIT_DISCOVERY_OVERRIDE_VARS = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_COMMON_DIR",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CEILING_DIRECTORIES"
+];
+function gitDiscoveryEnv() {
+  const env = { ...process.env };
+  for (const key of GIT_DISCOVERY_OVERRIDE_VARS) {
+    delete env[key];
+  }
+  return env;
+}
+async function gitState(root) {
+  try {
+    const gitExecutable = resolveGitExecutable();
+    const env = gitDiscoveryEnv();
+    const [sha, status] = await Promise.all([
+      runProcess(gitExecutable, ["rev-parse", "HEAD"], { cwd: root, env, timeoutMs: 1e4 }),
+      runProcess(gitExecutable, ["status", "--porcelain"], { cwd: root, env, timeoutMs: 1e4 })
+    ]);
+    if (sha.code !== 0) {
+      return {};
+    }
+    const trimmedSha = sha.stdout.trim();
+    return trimmedSha ? { sha: trimmedSha, dirty: status.stdout.trim().length > 0 } : {};
+  } catch {
+    return {};
+  }
+}
 async function runGenerate(recipe, options) {
-  const outputDir = import_node_path51.default.resolve(options.outputDir);
+  const outputDir = import_node_path52.default.resolve(options.outputDir);
   const available = {
     board: Boolean(options.boardFile),
     schematic: Boolean(options.schematicFile)
@@ -53667,11 +53787,11 @@ async function runGenerate(recipe, options) {
   }));
   const artifacts = [];
   for (const step of plan.steps) {
-    const absoluteOutput = import_node_path51.default.join(outputDir, step.output);
+    const absoluteOutput = import_node_path52.default.join(outputDir, step.output);
     if (step.isDirectory) {
       await import_promises17.default.mkdir(absoluteOutput, { recursive: true });
     } else {
-      await import_promises17.default.mkdir(import_node_path51.default.dirname(absoluteOutput), { recursive: true });
+      await import_promises17.default.mkdir(import_node_path52.default.dirname(absoluteOutput), { recursive: true });
     }
     const args = generateStepArgs(step, {
       boardFile: options.boardFile,
@@ -53696,21 +53816,26 @@ ${result.stderr}`).trim() || `${step.kind} export failed`
   }
   artifacts.sort((left, right) => left.path.localeCompare(right.path));
   outcomes.sort((left, right) => KIND_ORDER.indexOf(left.kind) - KIND_ORDER.indexOf(right.kind));
+  const recipeHash = (0, import_node_crypto6.createHash)("sha256").update(canonicalizeJson(recipe)).digest("hex");
+  const git = options.gitRoot ? await gitState(options.gitRoot) : {};
   const manifest = {
     schemaVersion: 1,
     tool: { name: "boardreadyops", version: boardReadyVersion },
     generatedAt: options.generatedAt ?? (/* @__PURE__ */ new Date()).toISOString(),
     project: {
       ...options.projectName ? { name: options.projectName } : {},
-      ...options.boardFile ? { board: import_node_path51.default.basename(options.boardFile) } : {},
-      ...options.schematicFile ? { schematic: import_node_path51.default.basename(options.schematicFile) } : {},
+      ...options.boardFile ? { board: import_node_path52.default.basename(options.boardFile) } : {},
+      ...options.schematicFile ? { schematic: import_node_path52.default.basename(options.schematicFile) } : {},
       ...options.variant ? { variant: options.variant } : {}
     },
-    recipe: { source: options.recipeSource ?? "default", steps: recipe.steps },
+    recipe: { source: options.recipeSource ?? "default", hash: recipeHash, steps: recipe.steps },
+    ...options.kicadVersion ? { kicadVersion: options.kicadVersion } : {},
+    ...git.sha ? { git } : {},
+    environment: { platform: process.platform, nodeVersion: process.version },
     steps: outcomes,
     artifacts
   };
-  const manifestPath = import_node_path51.default.join(outputDir, "manifest.json");
+  const manifestPath = import_node_path52.default.join(outputDir, "manifest.json");
   await import_promises17.default.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}
 `, "utf8");
   return {
@@ -53744,7 +53869,7 @@ async function collectStepArtifacts(outputDir, absoluteOutput, step) {
   }
   const artifacts = [];
   for (const file2 of files) {
-    const relativePath = toPosix(import_node_path51.default.relative(outputDir, file2));
+    const relativePath = toPosix(import_node_path52.default.relative(outputDir, file2));
     const digest2 = await fileDigest(file2);
     artifacts.push({ path: relativePath, kind: step.artifactKind, ...digest2 });
   }
@@ -53759,7 +53884,7 @@ async function walkFiles(directory) {
     return output;
   }
   for (const entry of entries.toSorted((left, right) => left.name.localeCompare(right.name))) {
-    const target = import_node_path51.default.join(directory, entry.name);
+    const target = import_node_path52.default.join(directory, entry.name);
     if (entry.isDirectory()) {
       output.push(...await walkFiles(target));
     } else if (entry.isFile()) {
@@ -53780,14 +53905,14 @@ async function fileDigest(file2) {
   return { sha256: (0, import_node_crypto6.createHash)("sha256").update(content).digest("hex"), bytes: content.byteLength };
 }
 function toPosix(value) {
-  return value.split(import_node_path51.default.sep).join("/").replaceAll("\\", "/");
+  return value.split(import_node_path52.default.sep).join("/").replaceAll("\\", "/");
 }
 
 // src/cli/commands/generate.ts
 init_path();
 async function generateCommand(pathInput, options, streams) {
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path52.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path53.default.resolve(normalizePathInput(pathInput ?? ".")));
   if (!await loadConfigOrReportErrors(root, options.config, streams, locale)) {
     return 2;
   }
@@ -53808,9 +53933,9 @@ async function generateCommand(pathInput, options, streams) {
 `);
     return 3;
   }
-  const boardFile = project.boardFiles[0] ? import_node_path52.default.resolve(root, project.boardFiles[0]) : void 0;
-  const schematicFile = project.schematicFiles[0] ? import_node_path52.default.resolve(root, project.schematicFiles[0]) : void 0;
-  const outputDir = import_node_path52.default.resolve(
+  const boardFile = project.boardFiles[0] ? import_node_path53.default.resolve(root, project.boardFiles[0]) : void 0;
+  const schematicFile = project.schematicFiles[0] ? import_node_path53.default.resolve(root, project.schematicFiles[0]) : void 0;
+  const outputDir = import_node_path53.default.resolve(
     root,
     normalizePathInput(options.output ?? recipe.outputDir ?? DEFAULT_GENERATE_OUTPUT_DIR)
   );
@@ -53820,8 +53945,10 @@ async function generateCommand(pathInput, options, streams) {
     schematicFile,
     variant: options.variant,
     runner: createKicadCliRunner(cli.path),
-    projectName: import_node_path52.default.basename(project.projectFile, ".kicad_pro"),
-    recipeSource: options.recipe ? normalizePathInput(options.recipe) : "default"
+    projectName: import_node_path53.default.basename(project.projectFile, ".kicad_pro"),
+    recipeSource: options.recipe ? normalizePathInput(options.recipe) : "default",
+    ...cli.version ? { kicadVersion: cli.version } : {},
+    gitRoot: root
   });
   if (options.format === "json") {
     streams.stdout.write(`${JSON.stringify(result, null, 2)}
@@ -53835,7 +53962,7 @@ async function resolveRecipe(root, recipeOption, stderr) {
   if (!recipeOption) {
     return DEFAULT_GENERATE_RECIPE;
   }
-  const recipePath = import_node_path52.default.resolve(root, normalizePathInput(recipeOption));
+  const recipePath = import_node_path53.default.resolve(root, normalizePathInput(recipeOption));
   let text;
   try {
     text = await readTextFile(recipePath);
@@ -53877,7 +54004,7 @@ function writeSummary(outputDir, result, stdout) {
 
 // src/cli/commands/init.ts
 var import_promises18 = require("node:fs/promises");
-var import_node_path53 = __toESM(require("node:path"), 1);
+var import_node_path54 = __toESM(require("node:path"), 1);
 var import_node_readline = __toESM(require("node:readline"), 1);
 init_t();
 var yamlHeader = `version: 1
@@ -54037,7 +54164,7 @@ jobs:
           comment-pr: "true"
 `;
 async function initCommand(cwd, options, streams) {
-  const outputDir = options.output ? import_node_path53.default.resolve(cwd, options.output) : cwd;
+  const outputDir = options.output ? import_node_path54.default.resolve(cwd, options.output) : cwd;
   let profile = options.profile ?? "basic";
   let workflow = options.workflow;
   let mode;
@@ -54059,7 +54186,7 @@ async function initCommand(cwd, options, streams) {
   if (mode && failOn) {
     configContent = baseConfig.replace(/^mode:\s+\S+/m, `mode: ${mode}`).replace(/^fail-on:\s+\S+/m, `fail-on: ${failOn}`);
   }
-  const configFile = import_node_path53.default.resolve(outputDir, "boardreadyops.yml");
+  const configFile = import_node_path54.default.resolve(outputDir, "boardreadyops.yml");
   const configExists = await pathExists(configFile);
   if (configExists && !options.force) {
     streams.stdout.write(`${t("cli.init.exists")}
@@ -54072,9 +54199,9 @@ async function initCommand(cwd, options, streams) {
 `);
   }
   if (workflow === "github") {
-    const workflowDir = import_node_path53.default.resolve(outputDir, ".github/workflows");
+    const workflowDir = import_node_path54.default.resolve(outputDir, ".github/workflows");
     await (0, import_promises18.mkdir)(workflowDir, { recursive: true });
-    const workflowFile = import_node_path53.default.resolve(workflowDir, "boardreadyops.yml");
+    const workflowFile = import_node_path54.default.resolve(workflowDir, "boardreadyops.yml");
     if (!await pathExists(workflowFile) || options.force) {
       await (0, import_promises18.writeFile)(workflowFile, githubWorkflowYml, "utf-8");
       streams.stdout.write(`\u2728 ${t("cli.init.workflowCreated")}: ${workflowFile}
@@ -54118,11 +54245,11 @@ async function runInteractiveWizard(streams) {
 }
 
 // src/cli/commands/plan.ts
-var import_node_path54 = __toESM(require("node:path"), 1);
+var import_node_path55 = __toESM(require("node:path"), 1);
 init_version();
 init_path();
 async function planCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path54.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path55.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     const findings = loaded.errors.map(
@@ -54277,10 +54404,10 @@ function shellToken(value) {
 }
 
 // src/cli/commands/policy.ts
-var import_node_path55 = __toESM(require("node:path"), 1);
+var import_node_path56 = __toESM(require("node:path"), 1);
 init_path();
 async function policyCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path55.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path56.default.resolve(normalizePathInput(pathInput ?? ".")));
   const result = await runPipeline(pipelineInputFromCli(root, options, false));
   const policy = result.policy;
   if (!policy) {
@@ -54307,7 +54434,7 @@ async function policyCommand(pathInput, options, streams) {
 // src/cli/commands/release.ts
 var import_node_child_process3 = require("node:child_process");
 var import_promises21 = __toESM(require("node:fs/promises"), 1);
-var import_node_path58 = __toESM(require("node:path"), 1);
+var import_node_path59 = __toESM(require("node:path"), 1);
 var import_node_util3 = require("node:util");
 init_t();
 
@@ -54701,7 +54828,7 @@ function releasePrepareExitCode(summary) {
 // src/release/signing.ts
 var import_node_crypto9 = require("node:crypto");
 var import_promises20 = __toESM(require("node:fs/promises"), 1);
-var import_node_path57 = __toESM(require("node:path"), 1);
+var import_node_path58 = __toESM(require("node:path"), 1);
 var SIGNATURE_FILE = "manifest.sig";
 var MANIFEST_FILE = "manifest.json";
 function signManifestBytes(bytes, privateKeyPem, signedAt) {
@@ -54762,15 +54889,15 @@ function verifyManifestSignature(bytes, signature, trustedPublicKeyPem) {
   return { ok: errors.length === 0, errors, errorCodes };
 }
 async function signReleaseBundle(bundleDir, privateKeyPem, signedAt) {
-  const bytes = await import_promises20.default.readFile(import_node_path57.default.join(bundleDir, MANIFEST_FILE));
+  const bytes = await import_promises20.default.readFile(import_node_path58.default.join(bundleDir, MANIFEST_FILE));
   const signature = signManifestBytes(bytes, privateKeyPem, signedAt);
-  const signaturePath = import_node_path57.default.join(bundleDir, SIGNATURE_FILE);
+  const signaturePath = import_node_path58.default.join(bundleDir, SIGNATURE_FILE);
   await import_promises20.default.writeFile(signaturePath, `${JSON.stringify(signature, null, 2)}
 `, "utf8");
   return { signaturePath, signature };
 }
 async function readBundleManifestAndSignature(bundleDir) {
-  const signaturePath = import_node_path57.default.join(bundleDir, SIGNATURE_FILE);
+  const signaturePath = import_node_path58.default.join(bundleDir, SIGNATURE_FILE);
   let signatureRaw;
   try {
     signatureRaw = await import_promises20.default.readFile(signaturePath, "utf8");
@@ -54788,7 +54915,7 @@ async function readBundleManifestAndSignature(bundleDir) {
   }
   let bytes;
   try {
-    bytes = await import_promises20.default.readFile(import_node_path57.default.join(bundleDir, MANIFEST_FILE));
+    bytes = await import_promises20.default.readFile(import_node_path58.default.join(bundleDir, MANIFEST_FILE));
   } catch (error51) {
     return {
       present: true,
@@ -54996,8 +55123,8 @@ function createZipBuffer(entries, date5 = /* @__PURE__ */ new Date()) {
 // src/cli/commands/release.ts
 var execFileAsync = (0, import_node_util3.promisify)(import_node_child_process3.execFile);
 async function releasePackCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path58.default.resolve(normalizePathInput(pathInput ?? ".")));
-  const git = await gitState(root);
+  const root = await canonicalRoot(import_node_path59.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const git = await gitState2(root);
   const result = await runPipeline(pipelineInputFromCli(root, options, false));
   const bundle = await writeReleaseEvidenceBundle(root, result, {
     outputDir: options.output ?? "build/boardreadyops-release",
@@ -55023,7 +55150,7 @@ async function releasePackCommand(pathInput, options, streams) {
 }
 async function releasePrepareCommand(pathInput, options, streams) {
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path58.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path59.default.resolve(normalizePathInput(pathInput ?? ".")));
   if (!await loadConfigOrReportErrors(root, options.config, streams, locale)) {
     return 2;
   }
@@ -55038,7 +55165,7 @@ async function releasePrepareCommand(pathInput, options, streams) {
     summary: result.summary
   };
   const summary = buildReleasePrepareSummary({ generate: generation.stage, validate: validate2 });
-  await writeTextFile(import_node_path58.default.resolve(root, outputDir, "release-prepare.json"), `${JSON.stringify(summary, null, 2)}
+  await writeTextFile(import_node_path59.default.resolve(root, outputDir, "release-prepare.json"), `${JSON.stringify(summary, null, 2)}
 `);
   if (options.format === "json") {
     streams.stdout.write(`${JSON.stringify(summary, null, 2)}
@@ -55066,14 +55193,14 @@ async function runGenerationStage(root, outputDir, options, streams, locale) {
   if (!project) {
     return { kind: "stage", stage: { status: "skipped", reason: "no KiCad project found" } };
   }
-  const generateOutputDir = import_node_path58.default.resolve(root, outputDir, "outputs");
+  const generateOutputDir = import_node_path59.default.resolve(root, outputDir, "outputs");
   const generated = await runGenerate(DEFAULT_GENERATE_RECIPE, {
-    outputDir: import_node_path58.default.join(generateOutputDir, "default"),
-    boardFile: project.boardFiles[0] ? import_node_path58.default.resolve(root, project.boardFiles[0]) : void 0,
-    schematicFile: project.schematicFiles[0] ? import_node_path58.default.resolve(root, project.schematicFiles[0]) : void 0,
+    outputDir: import_node_path59.default.join(generateOutputDir, "default"),
+    boardFile: project.boardFiles[0] ? import_node_path59.default.resolve(root, project.boardFiles[0]) : void 0,
+    schematicFile: project.schematicFiles[0] ? import_node_path59.default.resolve(root, project.schematicFiles[0]) : void 0,
     variant: options.variant,
     runner: createKicadCliRunner(cli.path),
-    projectName: import_node_path58.default.basename(project.projectFile, ".kicad_pro")
+    projectName: import_node_path59.default.basename(project.projectFile, ".kicad_pro")
   });
   const jobsetRun = await runProjectJobsets(root, project, cli.path, generateOutputDir);
   const failures = generated.failures + jobsetRun.failures;
@@ -55091,11 +55218,11 @@ async function runProjectJobsets(root, project, cliPath, outputDir) {
   if (project.jobsetFiles.length === 0) {
     return { artifacts: 0, failures: 0 };
   }
-  const jobsetOutputDir = import_node_path58.default.join(outputDir, "jobsets");
+  const jobsetOutputDir = import_node_path59.default.join(outputDir, "jobsets");
   await import_promises21.default.mkdir(jobsetOutputDir, { recursive: true });
-  const result = await runJobset(cliPath, import_node_path58.default.resolve(root, project.projectFile), jobsetOutputDir);
+  const result = await runJobset(cliPath, import_node_path59.default.resolve(root, project.projectFile), jobsetOutputDir);
   await writeTextFile(
-    import_node_path58.default.join(jobsetOutputDir, "boardreadyops-jobset-run.json"),
+    import_node_path59.default.join(jobsetOutputDir, "boardreadyops-jobset-run.json"),
     `${JSON.stringify(
       {
         schemaVersion: 1,
@@ -55129,11 +55256,11 @@ function writePrepareSummary(summary, outputDir, stdout) {
     stdout.write(`  - ${reason}
 `);
   }
-  stdout.write(`Summary written to ${import_node_path58.default.join(outputDir, "release-prepare.json")}
+  stdout.write(`Summary written to ${import_node_path59.default.join(outputDir, "release-prepare.json")}
 `);
 }
 async function releaseVerifyCommand(bundleInput, options, streams) {
-  const bundleDir = import_node_path58.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
+  const bundleDir = import_node_path59.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   const verification = await verifyReleaseEvidenceBundle(bundleDir);
   if (options.publicKey && options.trustStore) {
     streams.stderr.write("Pass either --public-key or --trust-store, not both.\n");
@@ -55144,7 +55271,7 @@ async function releaseVerifyCommand(bundleInput, options, streams) {
   if (options.trustStore) {
     let trustStore;
     try {
-      trustStore = await loadTrustStore(import_node_path58.default.resolve(normalizePathInput(options.trustStore)));
+      trustStore = await loadTrustStore(import_node_path59.default.resolve(normalizePathInput(options.trustStore)));
     } catch (error51) {
       streams.stderr.write(
         `Trust store could not be loaded: ${error51 instanceof Error ? error51.message : String(error51)}
@@ -55157,7 +55284,7 @@ async function releaseVerifyCommand(bundleInput, options, streams) {
     let trustedKey;
     if (options.publicKey) {
       try {
-        trustedKey = await readTextFile(import_node_path58.default.resolve(normalizePathInput(options.publicKey)));
+        trustedKey = await readTextFile(import_node_path59.default.resolve(normalizePathInput(options.publicKey)));
       } catch {
         streams.stderr.write(`Public key not found: ${options.publicKey}
 `);
@@ -55208,19 +55335,19 @@ async function releaseVerifyCommand(bundleInput, options, streams) {
   return ok ? 0 : 1;
 }
 async function releaseSignCommand(bundleInput, options, streams) {
-  const bundleDir = import_node_path58.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
+  const bundleDir = import_node_path59.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   if (!options.key) {
     streams.stderr.write("A private key is required: pass --key <path to an Ed25519 private key PEM>.\n");
     return 2;
   }
-  if (!await pathExists(import_node_path58.default.join(bundleDir, "manifest.json"))) {
+  if (!await pathExists(import_node_path59.default.join(bundleDir, "manifest.json"))) {
     streams.stderr.write(`No manifest.json found in ${bundleDir}. Run \`release pack\` first.
 `);
     return 2;
   }
   let privateKeyPem;
   try {
-    privateKeyPem = await readTextFile(import_node_path58.default.resolve(normalizePathInput(options.key)));
+    privateKeyPem = await readTextFile(import_node_path59.default.resolve(normalizePathInput(options.key)));
   } catch {
     streams.stderr.write(`Private key not found: ${options.key}
 `);
@@ -55230,7 +55357,7 @@ async function releaseSignCommand(bundleInput, options, streams) {
     const result = await signReleaseBundle(bundleDir, privateKeyPem, (/* @__PURE__ */ new Date()).toISOString());
     streams.stdout.write(`Signed release manifest with an Ed25519 key.
 `);
-    streams.stdout.write(`Signature written to ${import_node_path58.default.relative(process.cwd(), result.signaturePath)}
+    streams.stdout.write(`Signature written to ${import_node_path59.default.relative(process.cwd(), result.signaturePath)}
 `);
     return 0;
   } catch (error51) {
@@ -55240,7 +55367,7 @@ async function releaseSignCommand(bundleInput, options, streams) {
   }
 }
 async function releaseHandoffCommand(pathInput, options, streams) {
-  const root = await canonicalRoot(import_node_path58.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path59.default.resolve(normalizePathInput(pathInput ?? ".")));
   const profileId = options.profile ?? "jlcpcb";
   const resolved = resolveVendorProfile({
     profile: profileId,
@@ -55260,7 +55387,7 @@ async function releaseHandoffCommand(pathInput, options, streams) {
     assumptions: resolved.assumptions,
     caveats: resolved.profile.caveats
   };
-  const outputDir = import_node_path58.default.resolve(root, normalizePathInput(options.output ?? "build/boardreadyops-handoff"));
+  const outputDir = import_node_path59.default.resolve(root, normalizePathInput(options.output ?? "build/boardreadyops-handoff"));
   const outputDirPrefix = `${normalizeRelative(root, outputDir)}/`;
   const outputs = {};
   for (const kind of VENDOR_OUTPUT_KINDS) {
@@ -55272,17 +55399,17 @@ async function releaseHandoffCommand(pathInput, options, streams) {
   await import_promises21.default.mkdir(outputDir, { recursive: true });
   const manifestFiles = [];
   for (const file2 of plan.files) {
-    const target = import_node_path58.default.join(outputDir, file2.target);
-    await import_promises21.default.mkdir(import_node_path58.default.dirname(target), { recursive: true });
-    await import_promises21.default.copyFile(import_node_path58.default.resolve(root, file2.source), target);
+    const target = import_node_path59.default.join(outputDir, file2.target);
+    await import_promises21.default.mkdir(import_node_path59.default.dirname(target), { recursive: true });
+    await import_promises21.default.copyFile(import_node_path59.default.resolve(root, file2.source), target);
     const digest2 = await sha256File(target);
     manifestFiles.push({ ...file2, ...digest2 });
   }
   const generatedAt = (/* @__PURE__ */ new Date()).toISOString();
   const manifest = buildHandoffManifest(summary, plan, manifestFiles, generatedAt);
-  await writeTextFile(import_node_path58.default.join(outputDir, "handoff-manifest.json"), `${JSON.stringify(manifest, null, 2)}
+  await writeTextFile(import_node_path59.default.join(outputDir, "handoff-manifest.json"), `${JSON.stringify(manifest, null, 2)}
 `);
-  await writeTextFile(import_node_path58.default.join(outputDir, "README.md"), renderHandoffReadme(summary, plan, generatedAt));
+  await writeTextFile(import_node_path59.default.join(outputDir, "README.md"), renderHandoffReadme(summary, plan, generatedAt));
   let zipPath;
   if (options.zip !== false) {
     zipPath = `${outputDir}.zip`;
@@ -55316,8 +55443,8 @@ async function releaseDiffCommand(previousInput, pathInput, options, streams) {
     streams.stderr.write("A previous release report or evidence bundle is required.\n");
     return 2;
   }
-  const root = await canonicalRoot(import_node_path58.default.resolve(normalizePathInput(pathInput ?? ".")));
-  const previous = await loadReleaseSnapshot(import_node_path58.default.resolve(normalizePathInput(previousInput)));
+  const root = await canonicalRoot(import_node_path59.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const previous = await loadReleaseSnapshot(import_node_path59.default.resolve(normalizePathInput(previousInput)));
   if (!previous) {
     streams.stderr.write(`Could not read a previous release report from ${previousInput}.
 `);
@@ -55331,12 +55458,12 @@ async function releaseDiffCommand(previousInput, pathInput, options, streams) {
   };
   const diff = diffReleases(previous, current);
   if (options.output) {
-    await writeTextFile(import_node_path58.default.resolve(root, normalizePathInput(options.output)), `${JSON.stringify(diff, null, 2)}
+    await writeTextFile(import_node_path59.default.resolve(root, normalizePathInput(options.output)), `${JSON.stringify(diff, null, 2)}
 `);
   }
   if (options.html) {
     await writeTextFile(
-      import_node_path58.default.resolve(root, normalizePathInput(options.html)),
+      import_node_path59.default.resolve(root, normalizePathInput(options.html)),
       formatHtml(result, resolveLocale(), [], diff.fabrication)
     );
   }
@@ -55351,8 +55478,8 @@ async function releaseDiffCommand(previousInput, pathInput, options, streams) {
 async function loadReleaseSnapshot(input) {
   const candidates = [
     input,
-    import_node_path58.default.join(input, "reports", "boardreadyops-report.json"),
-    import_node_path58.default.join(input, "manifest.json")
+    import_node_path59.default.join(input, "reports", "boardreadyops-report.json"),
+    import_node_path59.default.join(input, "manifest.json")
   ];
   for (const candidate of candidates) {
     if (!await pathExists(candidate)) {
@@ -55376,17 +55503,17 @@ async function collectDirEntries(dir, baseDir) {
   const entries = [];
   const items = await import_promises21.default.readdir(dir, { withFileTypes: true });
   for (const item2 of items) {
-    const full = import_node_path58.default.join(dir, item2.name);
+    const full = import_node_path59.default.join(dir, item2.name);
     if (item2.isDirectory()) {
       entries.push(...await collectDirEntries(full, baseDir));
     } else if (item2.isFile()) {
-      const rel = import_node_path58.default.relative(baseDir, full).replaceAll("\\", "/");
+      const rel = import_node_path59.default.relative(baseDir, full).replaceAll("\\", "/");
       entries.push({ name: rel, data: await import_promises21.default.readFile(full) });
     }
   }
   return entries;
 }
-async function gitState(root) {
+async function gitState2(root) {
   try {
     const [{ stdout: sha }, { stdout: status }] = await Promise.all([
       execFileAsync("git", ["rev-parse", "HEAD"], { cwd: root }),
@@ -55548,54 +55675,6 @@ function mapFindingForCloud(finding2) {
 }
 function mapFindingsForCloud(findings) {
   return findings.map(mapFindingForCloud);
-}
-
-// src/util/git-resolver.ts
-var import_node_fs5 = require("node:fs");
-var import_node_path59 = require("node:path");
-function defaultIsRegularFile(filePath) {
-  try {
-    return (0, import_node_fs5.statSync)(filePath).isFile();
-  } catch {
-    return false;
-  }
-}
-function resolveGitExecutable(options = {}) {
-  const env = options.env ?? process.env;
-  const platform = options.platform ?? process.platform;
-  const checkFile = options.isRegularFile ?? defaultIsRegularFile;
-  const override = env.BOARDREADYOPS_GIT_PATH;
-  if (override !== void 0 && override.trim() !== "") {
-    const trimmed = override.trim();
-    if (!(0, import_node_path59.isAbsolute)(trimmed)) {
-      throw new Error(`BOARDREADYOPS_GIT_PATH must be an absolute path, got: "${trimmed}"`);
-    }
-    if (!checkFile(trimmed)) {
-      throw new Error(`BOARDREADYOPS_GIT_PATH does not point to an existing regular file: "${trimmed}"`);
-    }
-    return trimmed;
-  }
-  const candidates = [];
-  if (platform === "win32") {
-    candidates.push(
-      String.raw`C:\Program Files\Git\cmd\git.exe`,
-      String.raw`C:\Program Files\Git\bin\git.exe`,
-      String.raw`C:\Program Files (x86)\Git\cmd\git.exe`,
-      String.raw`C:\Program Files (x86)\Git\bin\git.exe`
-    );
-  } else if (platform === "darwin") {
-    candidates.push("/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git");
-  } else {
-    candidates.push("/usr/bin/git", "/usr/local/bin/git");
-  }
-  for (const candidate of candidates) {
-    if (checkFile(candidate)) {
-      return candidate;
-    }
-  }
-  throw new Error(
-    "Safe git executable not found in standard system locations. Set the BOARDREADYOPS_GIT_PATH environment variable to the absolute path of your git binary."
-  );
 }
 
 // src/cli/commands/review.ts

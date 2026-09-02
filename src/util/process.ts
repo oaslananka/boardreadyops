@@ -15,6 +15,8 @@ export interface ProcessOptions {
   maxStdoutBytes?: number;
   maxStderrBytes?: number;
   signal?: AbortSignal;
+  /** Overrides the child's environment. Omit to inherit `process.env` (the default). */
+  env?: NodeJS.ProcessEnv;
 }
 
 export function runProcess(command: string, args: string[], options: ProcessOptions = {}): Promise<ProcessResult> {
@@ -39,6 +41,7 @@ export function runProcess(command: string, args: string[], options: ProcessOpti
       : { command, args };
     const child = spawn(commandLine.command, commandLine.args, {
       cwd: options.cwd,
+      env: options.env,
       windowsHide: true,
       windowsVerbatimArguments: useCmdShim,
       stdio: ["ignore", "pipe", "pipe"],
