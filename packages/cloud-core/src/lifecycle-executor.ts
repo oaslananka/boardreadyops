@@ -44,6 +44,18 @@ export type DispatchReleaseRunWorkflowInput = CreatePullRequestCheckRunInput & {
   executionAttemptId: string;
 };
 
+export type GitHubCheckRunAnnotation = {
+  path: string;
+  startLine: number;
+  endLine: number;
+  annotationLevel: "notice" | "warning" | "failure";
+  message: string;
+  startColumn?: number | undefined;
+  endColumn?: number | undefined;
+  title?: string | undefined;
+  rawDetails?: string | undefined;
+};
+
 export type CompleteGitHubCheckRunInput = {
   installationId: string | number;
   repositoryOwner: string;
@@ -54,6 +66,9 @@ export type CompleteGitHubCheckRunInput = {
   title: string;
   summary: string;
   completedAt?: string | undefined;
+  // GitHub allows at most 50 annotations per API request; the client chunks this array and
+  // makes one PATCH per chunk. See github-app-check-run-client.js#completeGitHubCheckRun.
+  annotations?: GitHubCheckRunAnnotation[] | undefined;
 };
 
 export type GitHubAppCheckRunClient = {
