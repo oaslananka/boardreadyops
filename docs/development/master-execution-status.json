@@ -1,8 +1,10 @@
 {
   "version": 1,
   "spec": {
-    "path": "../BoardReadyOps_Agent_Master_Development_Spec.md",
-    "sha256": "e02df14e4105945ac1d8bb8dc13d132e04dd27803e560288548f9c3e60857c62"
+    "path": "BoardReadyOps_Agent_Master_Development_Spec.md",
+    "sha256": "e02df14e4105945ac1d8bb8dc13d132e04dd27803e560288548f9c3e60857c62",
+    "verified": false,
+    "provenance": "SHA-256 asserted by the BoardReadyOps Autonomous Completion Agent standing execution order. The document itself is not present anywhere in this repository's tree (checked at root and one level above) as of 2026-09-02, so the digest cannot be verified locally. This field will flip to verified:true once the spec file is committed at the path above and its digest is confirmed to match."
   },
   "roadmap": {
     "source": "https://github.com/oaslananka/boardreadyops/issues/191",
@@ -27,12 +29,13 @@
   "baseline": {
     "command": "task verify; fallback: corepack pnpm run verify",
     "result": "fail",
-    "commit": "a214d2a",
-    "checkedAt": "2026-09-01T12:30:50Z",
+    "commit": "6d62128",
+    "checkedAt": "2026-09-02T00:18:46Z",
     "blockers": [
-      "task verify: task binary not found on PATH",
-      "corepack pnpm run verify: verify:dist failed because pre-existing dist/action/index.cjs and dist/cli/index.cjs changes make dist dirty",
-      "sonar analyze agentic: Vortex analysis unavailable; four W00 files skipped (remote main Quality Gate is OK baseline only)"
+      "task verify: task binary not found on PATH; used fallback corepack pnpm run verify",
+      "corepack pnpm run verify: halted at the lint step — biome check flags .mcp.json (tracked, CRLF line endings) as a formatting violation, exit code 1. Because verify is a single && chain, every later step (verify:execution-status, typecheck, knip, compatibility:check, build, verify:dist, verify:version, verify:marketplace, test:unit, test:property, test:snapshot, test:action, test:a11y, coverage, verify:structure, gc, docs, security) did not execute in this run and its pass/fail is unknown from this baseline alone.",
+      "Independently (outside the chained verify command) this cycle confirmed passing: typecheck, and vitest for tests/unit/scripts/master-execution-status.test.ts + tests/unit/docs/master-execution-status-docs.test.ts (22/22), plus verify:execution-status (no drift) — these are W00-scoped checks only, not a substitute for the full chain.",
+      "sonar analyze agentic: not run this cycle; SonarQube MCP tools were still connecting at time of audit"
     ]
   },
   "workstreams": [
@@ -58,13 +61,13 @@
           "docs/superpowers/plans/2026-09-01-master-execution-ledger.md"
         ],
         "deployed": ["not-applicable: repository audit tooling runs in local and CI verification"],
-        "commits": ["4310ad9", "28cbc94", "375ecf1", "a214d2a"],
+        "commits": ["4310ad9", "28cbc94", "375ecf1", "a214d2a", "5545810"],
         "pullRequests": []
       },
       "verification": {
         "command": "corepack pnpm vitest run tests/unit/scripts/master-execution-status.test.ts tests/unit/docs/master-execution-status-docs.test.ts && corepack pnpm run verify:execution-status",
         "result": "pass",
-        "checkedAt": "2026-09-01T12:30:50Z"
+        "checkedAt": "2026-09-02T00:18:46Z"
       }
     },
     {
