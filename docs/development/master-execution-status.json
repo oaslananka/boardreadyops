@@ -525,6 +525,7 @@
           "apps/web/app/api/github/webhook/route.ts",
           "apps/web/lib/github-app-check-run-client.js",
           "apps/web/lib/webhook-rate-limit.ts",
+          "packages/cloud-core/src/lifecycle-executor.ts",
           "packages/contracts/src/runner-protocol.ts",
           "scripts/target-repository-isolation.mjs"
         ],
@@ -541,9 +542,9 @@
       "verification": {
         "command": "corepack pnpm vitest run tests/unit/web/github-app-check-run-client.test.ts tests/unit/web/webhook-rate-limit.test.ts tests/unit/scripts/target-repository-isolation.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T03:40:19Z"
       },
-      "remaining": "No Check-Run annotations array is emitted (only markdown output.summary/text), so annotation limit/pagination/truncation is unverified; no explicit re-run command/API found. HMAC verification, delivery idempotency, fail-closed safeMode, OIDC result binding, and two-installation isolation evidence are all real and tested."
+      "remaining": "PARTIAL CLOSE: 'no Check-Run annotations array is emitted, so limit/pagination/truncation is unverified' is narrower now. apps/web/lib/github-app-check-run-client.js exports completeGitHubCheckRun(), which accepts an optional annotations array (GitHubCheckRunAnnotation, packages/cloud-core/src/lifecycle-executor.ts), maps it to GitHub's snake_case annotation shape, and chunks it into groups of <=50 per GitHub's documented per-request limit (https://docs.github.com/en/rest/checks/runs#update-a-check-run), issuing one PATCH per chunk (the first carries status/conclusion/completed_at, later ones append annotations only, matching GitHub's documented append-on-repeated-PATCH behavior). 3 new regression tests cover: no-annotations backward compatibility (identical request body to before), field-mapping correctness for <=50, and correct chunking/pagination for 120 annotations (50+50+20, 3 requests). Deliberately not done in this slice: no caller passes real annotations yet -- nothing in the pipeline currently maps individual findings (file/line/message) into GitHubCheckRunAnnotation objects and threads them into completeCheckRun's input, so the capability exists but isn't wired to real finding data end-to-end. Still also missing: no explicit re-run command/API found. HMAC verification, delivery idempotency, fail-closed safeMode, OIDC result binding, and two-installation isolation evidence remain real and tested."
     },
     {
       "id": "W16",
