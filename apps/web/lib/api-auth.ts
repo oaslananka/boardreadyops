@@ -165,6 +165,7 @@ export interface ReviewApiContext {
   repositoryId: string;
   headRunId: string;
   currentRevisionId: string | null;
+  createdBy: string;
   executor: PgQueryExecutor;
 }
 
@@ -184,6 +185,7 @@ export async function resolveReviewApiContext(
               reviews.repository_id,
               reviews.head_run_id,
               reviews.current_revision_id,
+              reviews.created_by,
               installations.github_installation_id
          from reviews
          join repositories on repositories.id = reviews.repository_id
@@ -235,6 +237,8 @@ export async function resolveReviewApiContext(
       }
     }
 
+    const createdBy = parseSafeString(first.created_by) ?? "system";
+
     const githubInstallationId = safeInstallationId(first.github_installation_id);
 
     if (githubInstallationId === undefined) {
@@ -257,6 +261,7 @@ export async function resolveReviewApiContext(
       repositoryId,
       headRunId,
       currentRevisionId,
+      createdBy,
       executor,
     };
   } catch (error) {

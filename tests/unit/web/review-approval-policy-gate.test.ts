@@ -115,7 +115,7 @@ function createMockExecutor(options: MockOptions = {}) {
   };
 }
 
-function mockAuthAndContext(executor: ReturnType<typeof createMockExecutor>) {
+function mockAuthAndContext(executor: ReturnType<typeof createMockExecutor>, createdBy = "author@company.com") {
   vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
     ok: true,
     repositoryId,
@@ -129,6 +129,7 @@ function mockAuthAndContext(executor: ReturnType<typeof createMockExecutor>) {
     repositoryId,
     headRunId,
     currentRevisionId: revisionId,
+    createdBy,
     executor: executor as unknown as PgQueryExecutor,
   });
 }
@@ -223,5 +224,43 @@ describe("POST /api/v1/reviews/[id]/approvals enforces effective policy readines
     expect(res.status).toBe(201);
     const policyQueries = executor.queries.filter((q) => q.sql.toLowerCase().includes("from review_policies"));
     expect(policyQueries).toHaveLength(0);
+  });
+
+  it("blocks approval with 409 when the approver is the review's own author", async () => {
+    const executor = createMockExecutor({ findingSeverity: "medium", severityGate: "high" });
+    mockAuthAndContext(executor, tenantId);
+
+    const res = await postApproval(approvalRequest({ status: "approved" }), {
+      params: Promise.resolve({ id: reviewId }),
+    });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { ok: boolean; error: string; code: string };
+    expect(body.ok).toBe(false);
+    expect(body.code).toBe("self_approval_not_allowed");
+    const policyQueries = executor.queries.filter((q) => q.sql.toLowerCase().includes("from review_policies"));
+    expect(policyQueries).toHaveLength(0);
+  });
+
+  it("does not block self-approval for a changes_requested submission", async () => {
+    const executor = createMockExecutor({ findingSeverity: "medium", severityGate: "high" });
+    mockAuthAndContext(executor, tenantId);
+
+    const res = await postApproval(approvalRequest({ status: "changes_requested", reason: "Needs rework" }), {
+      params: Promise.resolve({ id: reviewId }),
+    });
+
+    expect(res.status).toBe(201);
+  });
+
+  it("lets a break-glass approval bypass the self-approval block", async () => {
+    const executor = createMockExecutor({ findingSeverity: "medium", severityGate: "high" });
+    mockAuthAndContext(executor, tenantId);
+
+    const res = await postApproval(approvalRequest({ status: "approved", isBreakGlass: true }), {
+      params: Promise.resolve({ id: reviewId }),
+    });
+
+    expect(res.status).toBe(201);
   });
 });
