@@ -248,4 +248,89 @@ describeDatabase("board BOM store", () => {
       }),
     ).rejects.toThrow(/repository/u);
   });
+
+  describe("findBoardsByMpn", () => {
+    it("finds a board whose current snapshot references the MPN, case-insensitively", async () => {
+      const store = createSqlBoardBomStore(database());
+      await store.recordSnapshots({
+        runId: runOneId,
+        repositoryId,
+        commitSha: commitOne,
+        watchedBoardLimit: 100,
+        boms: [
+          {
+            project: "hardware/exposure/exposure.kicad_pro",
+            components: [{ reference: "U9", mpn: "LM358DR", manufacturer: "TI", quantity: 2 }],
+          },
+        ],
+      });
+
+      const results = await store.findBoardsByMpn(installationId, "lm358dr");
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        repositoryId,
+        projectPath: "hardware/exposure/exposure.kicad_pro",
+        matches: [{ reference: "U9", mpn: "LM358DR", manufacturer: "TI", quantity: 2 }],
+      });
+    });
+
+    it("reflects only the latest snapshot, not a part a board used to contain", async () => {
+      const store = createSqlBoardBomStore(database());
+      await store.recordSnapshots({
+        runId: runOneId,
+        repositoryId,
+        commitSha: commitOne,
+        watchedBoardLimit: 100,
+        boms: [
+          {
+            project: "hardware/revision/revision.kicad_pro",
+            components: [{ reference: "U1", mpn: "PART-REV-A", manufacturer: "Acme" }],
+          },
+        ],
+      });
+      await store.recordSnapshots({
+        runId: runTwoId,
+        repositoryId,
+        commitSha: commitTwo,
+        watchedBoardLimit: 100,
+        boms: [
+          {
+            project: "hardware/revision/revision.kicad_pro",
+            components: [{ reference: "U1", mpn: "PART-REV-B", manufacturer: "Acme" }],
+          },
+        ],
+      });
+
+      expect(await store.findBoardsByMpn(installationId, "PART-REV-A")).toEqual([]);
+      const current = await store.findBoardsByMpn(installationId, "PART-REV-B");
+      expect(current).toHaveLength(1);
+      expect(current[0]?.projectPath).toBe("hardware/revision/revision.kicad_pro");
+    });
+
+    it("returns an empty array for an unknown MPN or a blank MPN", async () => {
+      const store = createSqlBoardBomStore(database());
+      expect(await store.findBoardsByMpn(installationId, "NO-SUCH-PART")).toEqual([]);
+      expect(await store.findBoardsByMpn(installationId, "   ")).toEqual([]);
+    });
+
+    it("does not return boards from another installation", async () => {
+      const store = createSqlBoardBomStore(database());
+      await store.recordSnapshots({
+        runId: runOneId,
+        repositoryId,
+        commitSha: commitOne,
+        watchedBoardLimit: 100,
+        boms: [
+          {
+            project: "hardware/tenant-scoped/tenant-scoped.kicad_pro",
+            components: [{ reference: "U1", mpn: "SCOPED-PART", manufacturer: "Acme" }],
+          },
+        ],
+      });
+
+      const otherInstallationId = "40000000-0000-4000-8000-0000000000fe";
+      expect(await store.findBoardsByMpn(otherInstallationId, "SCOPED-PART")).toEqual([]);
+    });
+  });
 });

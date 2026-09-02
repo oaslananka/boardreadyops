@@ -413,7 +413,9 @@
           "tests/unit/bom/identity.test.ts",
           "tests/unit/bom/lifecycle.test.ts",
           "tests/unit/bom/supplier.test.ts",
-          "tests/unit/rules/bom/risk-score.test.ts"
+          "tests/unit/rules/bom/risk-score.test.ts",
+          "tests/unit/db/board-bom-store.test.ts",
+          "tests/integration/board-bom-store-postgres.test.ts"
         ],
         "docs": ["docs/bom-alternates.md", "docs/rules/bom.lifecycle.md", "docs/rules/bom.risk-score.md"],
         "deployed": [],
@@ -421,11 +423,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/bom/identity.test.ts tests/unit/bom/lifecycle.test.ts tests/unit/bom/supplier.test.ts tests/unit/rules/bom/risk-score.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/bom/identity.test.ts tests/unit/bom/lifecycle.test.ts tests/unit/bom/supplier.test.ts tests/unit/rules/bom/risk-score.test.ts tests/unit/db/board-bom-store.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T14:46:09Z"
       },
-      "remaining": "No provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; fleet BOM exposure (which releases contain MPN X) is not queryable — board-bom-store.ts only exposes a write path. Matches open issue #449."
+      "remaining": "PARTIAL CLOSE: fleet BOM exposure ('which of our boards use MPN X') is now queryable at the store layer, closing one of four gaps. board-bom-store.ts's BoardBomStore gains findBoardsByMpn(installationId, mpn), scoped by installation_id (matching audit-log-store.ts's tenant-scoping convention) and deliberately restricted to each board's LATEST snapshot only (a distinct-on-board_id CTE, matching the same idiom already used in board-supply-watch-store.ts's claimDueBoards) -- exposure is a question about what ships today, not what a board's BOM has ever contained, so a part removed in a later revision correctly stops showing up. Case-insensitive MPN match (lower(mpn) = lower($2)), reuses the pre-existing but previously-unused board_bom_components_mpn_idx index. 4 mocked-executor unit tests (tests/unit/db/board-bom-store.test.ts, this store's first unit test file -- it previously had integration coverage only) plus 4 new Postgres integration test cases (tenant scoping, latest-snapshot-only, case-insensitivity, unknown/blank MPN) appended to the existing suite; the integration cases could not be run in this environment (no local Postgres) but were typechecked and confirmed to load/skip cleanly. Deliberately NOT built in this change: an HTTP API route exposing this query. Investigated first -- there is no existing installation-level (cross-repository) API auth context resolver in apps/web/lib/api-auth.ts (resolveRepositoryApiContext only handles one repository at a time), and no ApiTokenScope value for it either. Building both plus a new route is a separate, larger design decision (who should be allowed to query fleet-wide component exposure across a customer's repositories is an access-control question, not just a query-shape one) -- deliberately left for a dedicated follow-up rather than bolted on here. Still remaining: no provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; no HTTP surface for the new query (see above). Matches open issue #449."
     },
     {
       "id": "W12",
