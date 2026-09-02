@@ -235,6 +235,8 @@ describe("report formats", () => {
         added: [sampleFinding()],
         removed: [],
         unchanged: [],
+        worsened: [],
+        improved: [],
       },
     });
 
@@ -256,7 +258,7 @@ describe("report formats", () => {
         rows: [{ reference: "U1", previous: "ATmega328P", current: "ATmega328P", status: "unchanged" }],
       },
       outputs: [],
-      findings: { added: [], removed: [], unchanged: [] },
+      findings: { added: [], removed: [], unchanged: [], worsened: [], improved: [] },
     });
 
     expect(markdown).toContain("No BOM changes recorded.");
@@ -280,6 +282,8 @@ describe("report formats", () => {
         added,
         removed: [],
         unchanged: [],
+        worsened: [],
+        improved: [],
       },
     });
 

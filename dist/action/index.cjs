@@ -110129,10 +110129,22 @@ function diffOutputs(previous, current) {
 function diffFindings(previous, current) {
   const previousFingerprints = new Map(previous.map((finding2) => [finding2.fingerprint, finding2]));
   const currentFingerprints = new Map(current.map((finding2) => [finding2.fingerprint, finding2]));
+  const worsened = [];
+  const improved = [];
+  for (const finding2 of current) {
+    const prior = previousFingerprints.get(finding2.fingerprint);
+    if (!prior || prior.severity === finding2.severity) {
+      continue;
+    }
+    const change = { finding: finding2, previousSeverity: prior.severity };
+    (severityRankValue(finding2.severity) > severityRankValue(prior.severity) ? worsened : improved).push(change);
+  }
   return {
     added: current.filter((finding2) => !previousFingerprints.has(finding2.fingerprint)),
     removed: previous.filter((finding2) => !currentFingerprints.has(finding2.fingerprint)),
-    unchanged: current.filter((finding2) => previousFingerprints.has(finding2.fingerprint))
+    unchanged: current.filter((finding2) => previousFingerprints.has(finding2.fingerprint)),
+    worsened,
+    improved
   };
 }
 function describeBomRow(row) {
@@ -145827,10 +145839,22 @@ function toFindingRef(finding2) {
 function buildFindingsDelta(previous, current) {
   const previousByFingerprint = new Map(previous.map((finding2) => [finding2.fingerprint, finding2]));
   const currentByFingerprint = new Map(current.map((finding2) => [finding2.fingerprint, finding2]));
+  const worsened = [];
+  const improved = [];
+  for (const finding2 of current) {
+    const prior = previousByFingerprint.get(finding2.fingerprint);
+    if (!prior || prior.severity === finding2.severity) {
+      continue;
+    }
+    const change = { finding: toFindingRef(finding2), previousSeverity: prior.severity };
+    (severityRankValue(finding2.severity) > severityRankValue(prior.severity) ? worsened : improved).push(change);
+  }
   return {
     added: current.filter((finding2) => !previousByFingerprint.has(finding2.fingerprint)).map(toFindingRef),
     resolved: previous.filter((finding2) => !currentByFingerprint.has(finding2.fingerprint)).map(toFindingRef),
-    unchanged: current.filter((finding2) => previousByFingerprint.has(finding2.fingerprint)).map(toFindingRef)
+    unchanged: current.filter((finding2) => previousByFingerprint.has(finding2.fingerprint)).map(toFindingRef),
+    worsened,
+    improved
   };
 }
 

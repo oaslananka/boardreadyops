@@ -60,7 +60,46 @@ describe("fabrication diff", () => {
       added: [currentFinding],
       removed: [previousFinding],
       unchanged: [],
+      worsened: [],
+      improved: [],
     });
+  });
+
+  it("classifies a finding present in both snapshots as worsened or improved when its severity changes", () => {
+    const stableFinding = createFinding({
+      ruleId: "bom.missing-mpn",
+      severity: "medium",
+      message: "R1 is missing an MPN.",
+      resource: { path: "bom.csv", kind: "bom" },
+    });
+    const worsenedPrevious = createFinding({
+      ruleId: "design.clearance",
+      severity: "low",
+      message: "Clearance is tight.",
+      resource: { path: "board.kicad_pcb", kind: "pcb" },
+      fingerprint: "shared-fingerprint",
+    });
+    const worsenedCurrent = { ...worsenedPrevious, severity: "critical" as const };
+
+    const diff = diffFabrication(
+      { bom: [], outputs: [] },
+      { bom: [], outputs: [] },
+      [stableFinding, worsenedPrevious],
+      [stableFinding, worsenedCurrent],
+    );
+
+    expect(diff.findings.unchanged).toEqual([stableFinding, worsenedCurrent]);
+    expect(diff.findings.worsened).toEqual([{ finding: worsenedCurrent, previousSeverity: "low" }]);
+    expect(diff.findings.improved).toEqual([]);
+
+    const reverseDiff = diffFabrication(
+      { bom: [], outputs: [] },
+      { bom: [], outputs: [] },
+      [worsenedCurrent],
+      [worsenedPrevious],
+    );
+    expect(reverseDiff.findings.worsened).toEqual([]);
+    expect(reverseDiff.findings.improved).toEqual([{ finding: worsenedPrevious, previousSeverity: "critical" }]);
   });
 
   it("uses default limits and marks changed BOM rows and removed outputs", () => {

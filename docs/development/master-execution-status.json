@@ -325,6 +325,7 @@
         ],
         "tests": [
           "tests/unit/core/diff.test.ts",
+          "tests/unit/core/run-diff.test.ts",
           "tests/unit/core/hardware-impact.test.ts",
           "tests/unit/release/diff.test.ts"
         ],
@@ -334,11 +335,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/core/diff.test.ts tests/unit/core/hardware-impact.test.ts tests/unit/release/diff.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/core/diff.test.ts tests/unit/core/run-diff.test.ts tests/unit/core/hardware-impact.test.ts tests/unit/release/diff.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T09:40:32Z"
       },
-      "remaining": "Impact dimensions cover readiness/findings/bom/manufacturing only (not electrical/assembly/test/firmware/supply/cost/mechanical); no worsened/improved per-finding classification beyond added/resolved/unchanged; no explicit merge-base/previous-release/selected-release baseline modes; no hosted web visualization route. Matches the unmilestoned PR-native hardware-change-impact slice (#447)."
+      "remaining": "PARTIAL CLOSE: worsened/improved per-finding classification is now implemented, closing one of four previously-named gaps. A finding's fingerprint (src/core/findings.ts's fingerprintFor) deliberately excludes severity, so a finding matched as 'unchanged' between two snapshots can still have gotten more or less severe -- previously this was invisible in the diff output. src/core/diff/fabrication.ts's diffFindings() and src/core/diff/run.ts's buildFindingsDelta() (two independent implementations, both fingerprint-matching findings) now each additionally return worsened/improved arrays (using the existing severityRankValue() from src/core/findings.ts) alongside the existing added/removed/unchanged -- additive fields, no existing field removed or retyped, so schemaVersion is unchanged per docs/architecture/contract-versioning.md. src/release/diff.ts's ReleaseDiffSummary gained findingsWorsened/findingsImproved counts, and formatReleaseDiffText() gained 'worsened findings:'/'improved findings:' detail sections (each finding's severity transition, e.g. 'low -> critical design.clearance at board.kicad_pcb'). Deliberately NOT extended: the release diff `--html` dashboard's Fabrication Changes section still only visualizes added/removed findings, not worsened/improved -- that's a separate, larger UI-design task (color-coded badges, template changes, accessibility re-verification), documented as a known gap in docs/release/release-diff.md rather than rushed. Still remaining: impact dimensions cover readiness/findings/bom/manufacturing only (not electrical/assembly/test/firmware/supply/cost/mechanical); no explicit merge-base/previous-release/selected-release baseline modes; no hosted web visualization route; HTML dashboard doesn't yet show severity-change findings. Matches the unmilestoned PR-native hardware-change-impact slice (#447)."
     },
     {
       "id": "W09",

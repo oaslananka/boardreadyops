@@ -12,7 +12,7 @@
  * callers can use it from CLI commands, report emitters, or dashboard APIs.
  */
 
-import type { Finding } from "../findings.js";
+import { type Finding, severityRankValue } from "../findings.js";
 import type { RunResult } from "../result.js";
 import { diffFabrication, type FabricationDiff, type FabricationDiffOptions } from "./fabrication.js";
 
@@ -43,6 +43,12 @@ interface FindingRef {
   resourcePath: string;
 }
 
+/** A finding present in both runs (same fingerprint) whose severity changed. */
+interface FindingSeverityChange {
+  finding: FindingRef;
+  previousSeverity: string;
+}
+
 /** New, resolved, and unchanged finding sets. */
 interface FindingsDelta {
   /** Findings present in current but absent in previous (new risk introduced). */
@@ -51,6 +57,10 @@ interface FindingsDelta {
   resolved: FindingRef[];
   /** Findings present in both runs. */
   unchanged: FindingRef[];
+  /** Subset of `unchanged` whose severity increased. */
+  worsened: FindingSeverityChange[];
+  /** Subset of `unchanged` whose severity decreased. */
+  improved: FindingSeverityChange[];
 }
 
 /** Top-level diff between two runs. */
@@ -140,9 +150,22 @@ function buildFindingsDelta(previous: Finding[], current: Finding[]): FindingsDe
   const previousByFingerprint = new Map(previous.map((finding) => [finding.fingerprint, finding]));
   const currentByFingerprint = new Map(current.map((finding) => [finding.fingerprint, finding]));
 
+  const worsened: FindingSeverityChange[] = [];
+  const improved: FindingSeverityChange[] = [];
+  for (const finding of current) {
+    const prior = previousByFingerprint.get(finding.fingerprint);
+    if (!prior || prior.severity === finding.severity) {
+      continue;
+    }
+    const change: FindingSeverityChange = { finding: toFindingRef(finding), previousSeverity: prior.severity };
+    (severityRankValue(finding.severity) > severityRankValue(prior.severity) ? worsened : improved).push(change);
+  }
+
   return {
     added: current.filter((finding) => !previousByFingerprint.has(finding.fingerprint)).map(toFindingRef),
     resolved: previous.filter((finding) => !currentByFingerprint.has(finding.fingerprint)).map(toFindingRef),
     unchanged: current.filter((finding) => previousByFingerprint.has(finding.fingerprint)).map(toFindingRef),
+    worsened,
+    improved,
   };
 }
