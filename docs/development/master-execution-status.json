@@ -28,13 +28,13 @@
   },
   "baseline": {
     "command": "task verify; fallback: corepack pnpm run verify",
-    "result": "fail",
-    "commit": "6d62128",
-    "checkedAt": "2026-09-02T00:18:46Z",
+    "result": "pass",
+    "commit": "4178ad0",
+    "checkedAt": "2026-09-02T01:15:10Z",
     "blockers": [
-      "task verify: task binary not found on PATH; used fallback corepack pnpm run verify",
-      "corepack pnpm run verify: halted at the lint step — biome check flags .mcp.json (tracked, CRLF line endings) as a formatting violation, exit code 1. Because verify is a single && chain, every later step (verify:execution-status, typecheck, knip, compatibility:check, build, verify:dist, verify:version, verify:marketplace, test:unit, test:property, test:snapshot, test:action, test:a11y, coverage, verify:structure, gc, docs, security) did not execute in this run and its pass/fail is unknown from this baseline alone.",
-      "Independently (outside the chained verify command) this cycle confirmed passing: typecheck, and vitest for tests/unit/scripts/master-execution-status.test.ts + tests/unit/docs/master-execution-status-docs.test.ts (22/22), plus verify:execution-status (no drift) — these are W00-scoped checks only, not a substitute for the full chain.",
+      "task binary not found on PATH; used fallback corepack pnpm run verify",
+      "CORRECTION of a claim merged in #590: an earlier pass of this baseline reported corepack pnpm run verify halting at the lint step because .mcp.json appeared to have CRLF line endings. That was a false positive caused by one specific pre-existing worktree's local checkout state — the actual git blob is clean LF (.gitattributes already declares `* text=auto eol=lf`) and biome passes on it in any freshly checked-out worktree. No repository fix was needed or made for that.",
+      "The real remaining failure, found by running the full chain end-to-end in a clean worktree: corepack pnpm run security's notice:check sub-step failed because the committed NOTICE file had drifted from the actual pnpm-lock.yaml dependency tree (transitive bumps, one dropped dependency, a missing license section). Fixed by regenerating NOTICE (corepack pnpm run notice) in this same commit. Every other step in the chain — lint, verify:execution-status, typecheck, knip, compatibility:check, build, verify:dist, verify:version, verify:marketplace, test:unit, test:property, test:snapshot, test:action, test:a11y, coverage, verify:structure, gc, docs, licenses:check, check:reuse — passed cleanly with no changes needed.",
       "sonar analyze agentic: not run this cycle; SonarQube MCP tools were still connecting at time of audit"
     ]
   },
