@@ -758,11 +758,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/web/review-canvas.test.ts tests/unit/kicad/snapshots.test.ts && corepack pnpm exec playwright test tests/e2e/visual.spec.ts",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "command": "corepack pnpm vitest run tests/unit/web/review-canvas.test.ts tests/unit/kicad/snapshots.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-02T23:20:00Z"
       },
-      "remaining": "No true 3D viewer implementation exists (3d_render is a schema enum value only, no renderer); no dedicated Gerber-layer-stack/drill-overlay parser (the view is generated from parsed .kicad_pcb data, not exported Gerbers); no large-board performance/LOD test; no dedicated documentation page."
+      "remaining": "verification.command above deliberately excludes tests/e2e/visual.spec.ts (kept in evidence.tests, since it does exercise this workstream's surfaces): that suite fails for a reason unrelated to this workstream's own correctness -- no Linux screenshot baselines were ever committed (only *-win32.png), so qa-nightly/visual-regression has never passed on any browser (confirmed via real nightly CI run 33605754839). Tracked as its own out-of-scope follow-up, not fixed here. No true 3D viewer implementation exists (3d_render is a schema enum value only, no renderer); no dedicated Gerber-layer-stack/drill-overlay parser (the view is generated from parsed .kicad_pcb data, not exported Gerbers); no large-board performance/LOD test; no dedicated documentation page."
     },
     {
       "id": "W22",
