@@ -283,19 +283,28 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [263, 448],
       "evidence": {
-        "code": ["src/release/evidence.ts", "src/release/signing.ts"],
-        "tests": ["tests/unit/release/evidence.test.ts", "tests/unit/release/signing.test.ts"],
-        "docs": ["docs/release/artifact-attestation.md", "docs/security/release-integrity.md"],
+        "code": ["src/release/evidence.ts", "src/release/signing.ts", "src/cli/commands/release.ts"],
+        "tests": [
+          "tests/unit/release/evidence.test.ts",
+          "tests/unit/release/signing.test.ts",
+          "tests/unit/cli/release-sign.test.ts"
+        ],
+        "docs": [
+          "docs/release/artifact-attestation.md",
+          "docs/security/release-integrity.md",
+          "docs/cli.md",
+          "docs/release/evidence-bundles.md"
+        ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/release/evidence.test.ts tests/unit/release/signing.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/release/evidence.test.ts tests/unit/release/signing.test.ts tests/unit/cli/release-sign.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-02T04:34:51Z"
+        "checkedAt": "2026-09-02T08:06:08Z"
       },
-      "remaining": "PARTIAL CLOSE: signing-key rotation/revocation/trust-store is now implemented. src/release/signing.ts's prior verifyManifestSignature() supported only a single pinned key with no validity window or revocation concept -- unsafe for ordinary key rotation (no overlap between an outgoing and incoming key) and unable to durably distrust a compromised key. Added a TrustStore (array of {keyId, publicKey, validFrom, validUntil?, revokedAt?}) and verifyManifestSignatureAgainstTrustStore(bytes, signature, trustStore, verifiedAt), evaluated as-of a given instant: rejects not-yet-valid keys, rejects expired keys, and -- the important safety property -- rejects a revoked key for ALL verification from revokedAt onward regardless of whether the signature itself predates the revocation (no 'grandfather signatures signed before compromise' carve-out, since that would need a trusted timestamping authority this design doesn't have). loadTrustStore()/saveTrustStore() persist a store as JSON. 10 new regression tests cover: active key accepted, not-yet-valid rejected, expired rejected, revoked-despite-predating-signature rejected, rotation overlap (old and new key both verify simultaneously, matched to the correct keyId), unknown key rejected, and bad signatures rejected before the trust store is even consulted. Deliberately out of scope for this change (see docs/development/master-execution-status.json's own note on this workstream and issue #448): CLI wiring (a --trust-store flag alongside the existing --public-key on the release verify command), and -- a materially harder, separate problem -- secure DISTRIBUTION of a trust store update to a consumer's machine (e.g. a signed trust-store bundle, TUF-style delegation), which this verification-side model does not address. Also still missing: signed-release-certificate UI/API, and no formal Hardware Release Level model (tracked as roadmap Epic #271)."
+      "remaining": "PARTIAL CLOSE: signing-key rotation/revocation/trust-store is implemented, and the CLI is now wired to it. `boardreadyops release verify [bundle] --trust-store <path>` loads a JSON TrustStore and calls the new verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustStore, verifiedAt) (src/release/signing.ts), which reads the bundle's manifest.sig/manifest.json the same way verifyReleaseBundleSignature does and delegates to verifyManifestSignatureAgainstTrustStore. --public-key and --trust-store are mutually exclusive (exit 2 if both are passed); matchedKeyId is surfaced in --format json output. 3 new CLI regression tests cover: verification against an active trust store entry, failure when the matching key is revoked, and rejection of passing both flags together. Documented in docs/cli.md and docs/release/evidence-bundles.md#key-rotation-and-revocation. Still deliberately out of scope (see issue #448): secure DISTRIBUTION of a trust store update to a consumer's machine (e.g. a signed trust-store bundle, TUF-style delegation) -- this wiring only lets a consumer point at a trust store file they already have. Also still missing: signed-release-certificate UI/API, and no formal Hardware Release Level model (tracked as roadmap Epic #271)."
     },
     {
       "id": "W08",
