@@ -165,6 +165,90 @@ describe("runGenerate", () => {
     expect(manifest.artifacts.length).toBe(result.artifacts.length);
   });
 
+  it("records a deterministic recipe hash, environment, and kicad version, with no git block by default", async () => {
+    const outputDir = await makeTempDir();
+    await runGenerate(DEFAULT_GENERATE_RECIPE, {
+      outputDir,
+      boardFile: "/project/board.kicad_pcb",
+      schematicFile: "/project/board.kicad_sch",
+      runner: writingRunner(),
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      kicadVersion: "9.0.1",
+    });
+    const manifest = JSON.parse(await fs.readFile(path.join(outputDir, "manifest.json"), "utf8")) as {
+      recipe: { hash: string };
+      kicadVersion?: string;
+      environment: { platform: string; nodeVersion: string };
+      git?: unknown;
+    };
+
+    expect(manifest.recipe.hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.kicadVersion).toBe("9.0.1");
+    expect(manifest.environment).toEqual({ platform: process.platform, nodeVersion: process.version });
+    expect(manifest.git).toBeUndefined();
+  });
+
+  it("computes the same recipe hash for equivalent recipes regardless of a caller's key order", async () => {
+    const outputDirA = await makeTempDir();
+    const outputDirB = await makeTempDir();
+    const options = {
+      boardFile: "/project/board.kicad_pcb",
+      schematicFile: "/project/board.kicad_sch",
+      runner: writingRunner(),
+      generatedAt: "2026-06-21T00:00:00.000Z",
+    };
+    await runGenerate(
+      { schemaVersion: 1, steps: [{ kind: "gerbers", enabled: true }] },
+      { outputDir: outputDirA, ...options },
+    );
+    await runGenerate(
+      { steps: [{ enabled: true, kind: "gerbers" }], schemaVersion: 1 },
+      { outputDir: outputDirB, ...options },
+    );
+
+    const manifestA = JSON.parse(await fs.readFile(path.join(outputDirA, "manifest.json"), "utf8")) as {
+      recipe: { hash: string };
+    };
+    const manifestB = JSON.parse(await fs.readFile(path.join(outputDirB, "manifest.json"), "utf8")) as {
+      recipe: { hash: string };
+    };
+    expect(manifestA.recipe.hash).toBe(manifestB.recipe.hash);
+  });
+
+  it("omits git provenance when gitRoot is not a git repository", async () => {
+    const outputDir = await makeTempDir();
+    const notARepo = await makeTempDir();
+    await runGenerate(DEFAULT_GENERATE_RECIPE, {
+      outputDir,
+      boardFile: "/project/board.kicad_pcb",
+      schematicFile: "/project/board.kicad_sch",
+      runner: writingRunner(),
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      gitRoot: notARepo,
+    });
+    const manifest = JSON.parse(await fs.readFile(path.join(outputDir, "manifest.json"), "utf8")) as {
+      git?: unknown;
+    };
+    expect(manifest.git).toBeUndefined();
+  });
+
+  it("records the commit sha when gitRoot points at a real git checkout", async () => {
+    const outputDir = await makeTempDir();
+    await runGenerate(DEFAULT_GENERATE_RECIPE, {
+      outputDir,
+      boardFile: "/project/board.kicad_pcb",
+      schematicFile: "/project/board.kicad_sch",
+      runner: writingRunner(),
+      generatedAt: "2026-06-21T00:00:00.000Z",
+      gitRoot: process.cwd(),
+    });
+    const manifest = JSON.parse(await fs.readFile(path.join(outputDir, "manifest.json"), "utf8")) as {
+      git?: { sha?: string; dirty?: boolean };
+    };
+    expect(manifest.git?.sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(typeof manifest.git?.dirty).toBe("boolean");
+  });
+
   it("records a failed step without aborting the remaining outputs", async () => {
     const outputDir = await makeTempDir();
     const result = await runGenerate(

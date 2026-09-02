@@ -194,7 +194,7 @@ boardreadyops generate . --recipe generate-recipe.json --output build/release-ou
 boardreadyops generate . --format json
 ```
 
-The command exits `2` for usage or configuration problems (no project, unreadable or schema-invalid recipe), `3` when `kicad-cli` is not available, and `1` when at least one export step fails. `manifest.json` records the tool version, project, recipe, per-step status, and the SHA-256 digest and size of every generated artifact.
+The command exits `2` for usage or configuration problems (no project, unreadable or schema-invalid recipe), `3` when `kicad-cli` is not available, and `1` when at least one export step fails. `manifest.json` records the tool version, project, recipe (including a SHA-256 hash of the recipe's canonicalized contents), the detected `kicad-cli` version, git commit/dirty state when run inside a git checkout, the OS platform and Node.js version, per-step status, and the SHA-256 digest and size of every generated artifact.
 
 `--recipe <path>` accepts a JSON recipe validated against `boardreadyops schema generate`. The recipe selects which outputs to produce, lets a step be disabled with `"enabled": false`, and can override the output directory or a step's relative output path.
 
