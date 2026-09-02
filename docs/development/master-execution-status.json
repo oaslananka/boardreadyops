@@ -457,7 +457,7 @@
       "milestone": "Backlog — Core Engineering Depth",
       "issues": [],
       "evidence": {
-        "code": ["src/release/generate.ts"],
+        "code": ["src/rules/design/board-outline.ts"],
         "tests": [],
         "docs": [],
         "deployed": [],
@@ -467,9 +467,9 @@
       "verification": {
         "command": "not run",
         "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "checkedAt": "2026-09-02T00:18:46Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "The prior matrix entry cited src/release/generate.ts as evidence — checked and it is a false positive: that file's 'step' references are release-recipe pipeline stages (gerbers, drill, bom, positions, schematic-pdf), unrelated to mechanical CAD/STEP-format exchange. There is no mechanical-PCB contract implementation in this repository: no STEP/IDF import-export, no keepout-zone or component-height exchange with mechanical CAD, no 3D collision/courtyard checking. The only tangentially related code is src/rules/design/board-outline.ts, a 2D DRC rule that only checks Edge.Cuts outline closure — a prerequisite for any future mechanical contract, not an implementation of one. No tracked GitHub issue exists for this workstream. Per the audit brief, the correct minimal scope here is a minimal mechanical contract, not a full CAD kernel — that scoping decision and the actual implementation are still open."
     },
     {
       "id": "W14",
@@ -920,19 +920,25 @@
       "milestone": "Repository Maintenance & Release Health",
       "issues": [329],
       "evidence": {
-        "code": [],
-        "tests": [],
-        "docs": ["SECURITY.md"],
+        "code": ["src/core/logger.ts"],
+        "tests": ["tests/integration/security-adversarial.test.ts"],
+        "docs": [
+          "SECURITY.md",
+          "docs/security/threat-model.md",
+          "docs/security/input-validation.md",
+          "docs/security/data-lifecycle.md",
+          "docs/architecture/adr/0009-plugin-sandboxing.md"
+        ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "not run",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T12:21:04Z"
+        "command": "corepack pnpm vitest run tests/integration/security-adversarial.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-02T00:18:46Z"
       },
-      "remaining": "Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation."
+      "remaining": "The prior matrix entry (SECURITY.md only, verification never run) understated real coverage: tests/integration/security-adversarial.test.ts (11 passing cases) exercises cross-tenant tampering, Stripe webhook signature verification and replay rejection, stored-XSS escaping, path traversal in artifact keys, tenant-scoped DB query enforcement, evidence-ledger tamper detection, and incomplete-check-cannot-go-green; src/core/logger.ts performs secret/token redaction; ADR-0009 documents plugin sandboxing. Genuinely missing against the security checklist cited in the audit brief: no SSRF-specific protection or regression test was found (grep across src/ and docs/ found no match outside this ledger's own text); no dedicated trust-center evidence page; no GA pen-test checklist document. No deployment evidence (this is a repo, not a running service) and no dedicated commit/PR trail for the security posture itself — the docs/tests above were added incrementally across unrelated feature PRs, which is why implemented status is not claimed here."
     },
     {
       "id": "W29",
