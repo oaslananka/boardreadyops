@@ -260,9 +260,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `webdriver-bidi-protocol@0.4.2`
   - Homepage: https://github.com/GoogleChromeLabs/webdriver-bidi-protocol#readme
 
-## Apache-2.0 AND LGPL-3.0-or-later
-
-
 ## BlueOak-1.0.0
 
 - `glob@13.0.6`
@@ -375,7 +372,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `cli-width@4.1.0`
   - Description: Get stdout window width, with two fallbacks, tty and then a default.
   - Homepage: https://github.com/knownasilya/cli-width
-- `cliui@9.0.1`
+- `cliui@8.0.1`, `cliui@9.0.1`
   - Description: easily create complex multi-column command-line-interfaces
   - Homepage: https://github.com/yargs/cliui#readme
 - `conventional-changelog-angular@9.4.0`
@@ -503,7 +500,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `yaml@2.9.0`
   - Description: JavaScript parser and stringifier for YAML
   - Homepage: https://eemeli.org/yaml/
-- `yargs-parser@22.0.0`
+- `yargs-parser@21.1.1`, `yargs-parser@22.0.0`
   - Description: the mighty option parser used by yargs
   - Homepage: https://github.com/yargs/yargs-parser#readme
 
@@ -512,6 +509,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `pa11y@9.1.1`
   - Description: Pa11y is your automated accessibility testing pal
   - Homepage: https://github.com/pa11y/pa11y
+
+## LGPL-3.0-or-later
+
 
 ## MIT
 
@@ -674,6 +674,8 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@bcoe/v8-coverage@1.0.2`
   - Description: Helper functions for V8 coverage files.
   - Homepage: https://github.com/bcoe/v8-coverage#readme
+- `@codecov/bundler-plugin-core@2.0.1`
+  - Description: Official Codecov Bundler Plugin Core
 - `@commitlint/cli@21.2.2`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
@@ -1175,10 +1177,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `angular-html-parser@10.4.0`
   - Description: A HTML parser extracted from Angular with some modifications
   - Homepage: https://github.com/prettier/angular-html-parser/blob/HEAD/packages/angular-html-parser#readme
-- `ansi-regex@6.2.2`
+- `ansi-regex@5.0.1`, `ansi-regex@6.2.2`
   - Description: Regular expression for matching ANSI escape codes
   - Homepage: https://github.com/chalk/ansi-regex#readme
-- `ansi-styles@6.2.3`
+- `ansi-styles@4.3.0`, `ansi-styles@6.2.3`
   - Description: ANSI escape codes for styling strings in the terminal
   - Homepage: https://github.com/chalk/ansi-styles#readme
 - `archiver@7.0.1`
@@ -1258,7 +1260,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `chai@6.2.2`
   - Description: BDD/TDD assertion library for node.js and the browser. Test framework agnostic.
   - Homepage: http://chaijs.com
-- `chalk@5.6.2`
+- `chalk@4.1.2`, `chalk@5.6.2`
   - Description: Terminal string styling done right
   - Homepage: https://github.com/chalk/chalk#readme
 - `chardet@2.1.1`
@@ -1282,6 +1284,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `client-only@0.0.1`
   - Description: This is a marker package to indicate that a module can only be used in Client Components.
   - Homepage: https://reactjs.org/
+- `color-convert@2.0.1`
+  - Description: Plain color conversion functions
+  - Homepage: https://github.com/Qix-/color-convert#readme
+- `color-name@1.1.4`
+  - Description: A list of color names and its values
+  - Homepage: https://github.com/colorjs/color-name
 - `commander@2.20.3`, `commander@14.0.3`, `commander@15.0.0`
   - Description: the complete solution for node.js command-line programs
   - Homepage: https://github.com/tj/commander.js#readme
@@ -1339,7 +1347,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `effect@3.20.0`
   - Description: The missing standard library for TypeScript, for writing production-grade software.
   - Homepage: https://effect.website
-- `emoji-regex@10.6.0`
+- `emoji-regex@8.0.0`, `emoji-regex@10.6.0`
   - Description: A regular expression to match all Emoji-only symbols as per the Unicode Standard.
   - Homepage: https://mths.be/emoji-regex
 - `empathic@2.0.0`
@@ -1537,6 +1545,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `is-extglob@2.1.1`
   - Description: Returns true if a string has an extglob.
   - Homepage: https://github.com/jonschlinkert/is-extglob
+- `is-fullwidth-code-point@3.0.0`
+  - Description: Check if the character represented by a given Unicode code point is fullwidth
+  - Homepage: https://github.com/sindresorhus/is-fullwidth-code-point#readme
 - `is-glob@4.0.3`
   - Description: Returns `true` if the given string looks like a glob pattern or an extglob pattern. This makes it easy to create code that only uses external modules like node-glob when necessary, resulting in much faster code execution and initialization time, and a better user experience.
   - Homepage: https://github.com/micromatch/is-glob
@@ -1844,6 +1855,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `remeda@2.33.4`
   - Description: A utility library for JavaScript and Typescript.
   - Homepage: https://remedajs.com/
+- `require-directory@2.1.1`
+  - Description: Recursively iterates over specified directory, require()'ing each file, and returning a nested hash structure containing those modules.
+  - Homepage: https://github.com/troygoode/node-require-directory/
 - `require-from-string@2.0.2`
   - Description: Require module from string
   - Homepage: https://github.com/floatdrop/require-from-string#readme
@@ -1934,10 +1948,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `string-argv@0.3.2`
   - Description: string-argv parses a string into an argument array to mimic process.argv. This is useful when testing Command Line Utilities that you want to pass arguments to.
   - Homepage: https://github.com/mccormicka/string-argv
-- `string-width@7.2.0`
+- `string-width@4.2.3`, `string-width@7.2.0`
   - Description: Get the visual width of a string - the number of columns required to display it
   - Homepage: https://github.com/sindresorhus/string-width#readme
-- `strip-ansi@7.2.0`
+- `strip-ansi@6.0.1`, `strip-ansi@7.2.0`
   - Description: Strip ANSI escape codes from a string
   - Homepage: https://github.com/chalk/strip-ansi#readme
 - `strip-final-newline@4.0.0`
@@ -2020,6 +2034,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `universal-github-app-jwt@2.2.2`
   - Description: Calculate GitHub App bearer tokens for Node & modern browsers
   - Homepage: https://github.com/gr2m/universal-github-app-jwt#readme
+- `unplugin@1.16.1`
+  - Description: Unified plugin system for build tools
+  - Homepage: https://github.com/unjs/unplugin#readme
 - `unzip-stream@0.3.4`
   - Description: Process zip files using streaming API
   - Homepage: https://github.com/mhr3/unzip-stream#readme
@@ -2046,6 +2063,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `webpack-sources@3.5.1`
   - Description: Source code handling classes for webpack
   - Homepage: https://github.com/webpack/webpack-sources#readme
+- `webpack-virtual-modules@0.6.2`
+  - Description: Webpack Virtual Modules
+  - Homepage: https://github.com/sysgears/webpack-virtual-modules#readme
 - `whatwg-mimetype@3.0.0`
   - Description: Parses, serializes, and manipulates MIME types, according to the WHATWG MIME Sniffing Standard
   - Homepage: https://github.com/jsdom/whatwg-mimetype#readme
@@ -2055,7 +2075,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `why-is-node-running@2.3.0`
   - Description: Node is running but you don't know why? why-is-node-running is here to help you.
   - Homepage: https://github.com/mafintosh/why-is-node-running
-- `wrap-ansi@9.0.2`
+- `wrap-ansi@7.0.0`, `wrap-ansi@9.0.2`
   - Description: Wordwrap a string with ANSI escape codes
   - Homepage: https://github.com/chalk/wrap-ansi#readme
 - `ws@8.21.3`
@@ -2064,7 +2084,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `xtend@4.0.2`
   - Description: extend like a boss
   - Homepage: https://github.com/Raynos/xtend
-- `yargs@18.0.0`
+- `yargs@17.7.3`, `yargs@18.0.0`
   - Description: yargs the modern, pirate-themed, successor to optimist.
   - Homepage: https://yargs.js.org/
 - `yocto-queue@0.1.0`

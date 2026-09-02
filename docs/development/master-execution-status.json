@@ -27,14 +27,15 @@
     ]
   },
   "baseline": {
-    "command": "task verify; fallback: corepack pnpm run verify",
+    "command": "GitHub Actions security workflow (Linux) on origin/main; local corepack pnpm run verify is unreliable for the notice:check sub-step specifically, see blockers",
     "result": "pass",
-    "commit": "4178ad0",
-    "checkedAt": "2026-09-02T01:15:10Z",
+    "commit": "0329e87",
+    "checkedAt": "2026-09-02T01:21:18Z",
     "blockers": [
-      "task binary not found on PATH; used fallback corepack pnpm run verify",
+      "task binary not found on PATH; local runs use fallback corepack pnpm run verify",
       "CORRECTION of a claim merged in #590: an earlier pass of this baseline reported corepack pnpm run verify halting at the lint step because .mcp.json appeared to have CRLF line endings. That was a false positive caused by one specific pre-existing worktree's local checkout state — the actual git blob is clean LF (.gitattributes already declares `* text=auto eol=lf`) and biome passes on it in any freshly checked-out worktree. No repository fix was needed or made for that.",
-      "The real remaining failure, found by running the full chain end-to-end in a clean worktree: corepack pnpm run security's notice:check sub-step failed because the committed NOTICE file had drifted from the actual pnpm-lock.yaml dependency tree (transitive bumps, one dropped dependency, a missing license section). Fixed by regenerating NOTICE (corepack pnpm run notice) in this same commit. Every other step in the chain — lint, verify:execution-status, typecheck, knip, compatibility:check, build, verify:dist, verify:version, verify:marketplace, test:unit, test:property, test:snapshot, test:action, test:a11y, coverage, verify:structure, gc, docs, licenses:check, check:reuse — passed cleanly with no changes needed.",
+      "SECOND CORRECTION, same PR that introduced it: a subsequent pass regenerated NOTICE locally on Windows after seeing notice:check fail there, and that regenerated file was then found to fail CI's (Linux) notice:check with the *opposite* diff. Checked security workflow history on main (runs at 6d62128, c406a91, 0329e87 — before, during, and after this audit cycle) and it was green throughout: the originally-committed NOTICE was correct for CI all along. The failure was corepack pnpm's dependency-tree resolution genuinely differing between this Windows worktree (Node 24.19.0) and the Linux CI runner (Node 24.20.0) for a handful of platform-conditional optional/duplicate transitive packages (cliui, yargs, chalk, ansi-* etc.) — not repository drift. Reverted NOTICE to its original content in this same PR; no repository fix was needed for this either.",
+      "Net effect: local corepack pnpm run verify's notice:check sub-step cannot be trusted as a pass/fail signal for this repository from a Windows checkout — it will disagree with CI regardless of which direction NOTICE is regenerated in. CI (GitHub Actions, Linux) is the authoritative signal for that specific check; every other step in the chain (lint, verify:execution-status, typecheck, knip, compatibility:check, build, verify:dist, verify:version, verify:marketplace, test:unit, test:property, test:snapshot, test:action, test:a11y, coverage, verify:structure, gc, docs, licenses:check, check:reuse) was independently confirmed passing locally and is not known to have this platform sensitivity.",
       "sonar analyze agentic: not run this cycle; SonarQube MCP tools were still connecting at time of audit"
     ]
   },
