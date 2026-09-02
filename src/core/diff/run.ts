@@ -44,7 +44,7 @@ interface FindingRef {
 }
 
 /** A finding present in both runs (same fingerprint) whose severity changed. */
-export interface FindingSeverityChange {
+interface FindingSeverityChange {
   finding: FindingRef;
   previousSeverity: string;
 }
