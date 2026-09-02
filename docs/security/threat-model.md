@@ -21,9 +21,9 @@ inside GitHub Actions.
 | Repository files | Untrusted input | A PR can change KiCad, BOM, config, plugin, and workflow files. |
 | `kicad-cli` | External executable | Invoked with bounded process output and timeouts. |
 | GitHub Actions credential | Sensitive credential | Workflows should use minimum permissions and avoid untrusted writes on fork PRs. |
-| Release signing key | Highly sensitive | Should never be committed; used only through explicit release signing flow. |
+| Release signing key | Highly sensitive | Should never be committed; used only through explicit release signing flow. Rotation and revocation are supported via a trust store (`release verify --trust-store`), so a compromised key can be durably distrusted without breaking verification of unrelated past releases signed by other keys. |
 | Plugin packages/local rules | Trusted-code execution today | Permission declarations exist, but runtime sandboxing is not yet enforced. |
-| Network notifiers | External service boundary | Delivery credentials come from environment variables or GitHub configuration. |
+| Network notifiers | External service boundary | Delivery credentials come from environment variables or GitHub configuration. A `webhookEnv` value that doesn't look like a webhook-related variable name is logged as a warning, not silently trusted. |
 
 ## Threats
 
@@ -32,7 +32,7 @@ inside GitHub Actions.
 | Malicious workflow change | Repository or release compromise | Pinned actions, minimum permissions, review expectations, security workflow. | Enforce required status checks and human review. |
 | Sensitive data leakage in logs/reports | Credential exposure | Logger redaction, issue templates warning about redaction, gitleaks. | Verify secret scanning/push protection in settings. |
 | Malicious plugin code | Arbitrary host process access | Plugin permission declaration and config approval. | v1 trusted-code model documented; runtime sandbox optional future hardening. |
-| Tampered release asset | Unsafe install or CI use | Checksums, SBOM, provenance/attestation docs. | Strengthen reproducible-build verification. |
+| Tampered release asset | Unsafe install or CI use | Checksums, SBOM, provenance/attestation docs, same-machine reproducible-build verification (`verify:reproducible-build`). | Cross-OS/cross-CI-runner reproducibility is not yet verified. |
 | Unsafe manufacturer handoff | Bad board order or assembly failure | Rule checks, vendor profiles, readiness scoring, evidence bundles. | Vendor profile drift review process. |
 | Path traversal via inputs | File overwrite/read outside workspace | Action input path confinement and utility path helpers. | Continue fuzz/property tests for path normalization. |
 | Dependency compromise | Build or runtime compromise | Lockfile, audits, OSV, dependency review, pinned actions. | Review major updates manually. |
@@ -54,4 +54,8 @@ inside GitHub Actions.
 2. Require status checks in branch protection/rulesets.
 3. Verify private vulnerability reporting, sensitive-data scanning, and push protection.
 4. Add vendor profile drift review evidence.
-5. Document release reproducibility expectations for binary assets.
+5. ~~Document release reproducibility expectations for binary assets.~~ Resolved:
+   [Release Integrity](release-integrity.md) documents same-machine
+   reproducibility verification (`verify:reproducible-build`); cross-OS/cross-runner
+   reproducibility remains open.
+6. Publish a GA-readiness penetration-test checklist document.

@@ -14,7 +14,7 @@ release binaries, the GitHub Action, or container images.
 | Checksums | Passed | Install scripts download and verify `SHA256SUMS`. |
 | SBOM | Passed | `pnpm run sbom` and release SBOM artifact. |
 | Artifact attestations | Passed | Provenance/attestation workflow coverage. |
-| Signed evidence bundles | Passed | CLI supports signing and verification for release manifests. |
+| Signed evidence bundles | Passed | CLI supports signing and verification for release manifests, including key rotation and revocation via a trust store (`release verify --trust-store`). See [Key rotation and revocation](../release/evidence-bundles.md#key-rotation-and-revocation). |
 | Reproducible binary builds | Partial | `pnpm run verify:reproducible-build` builds in a detached git worktree (separate directory, separate `node_modules`, frozen lockfile) and SHA-256-compares `dist/action/index.cjs` + `dist/cli/index.cjs` against an in-place rebuild — same-machine independence is verified. Cross-OS/cross-runner reproducibility is not yet verified. |
 
 ## Consumer verification
