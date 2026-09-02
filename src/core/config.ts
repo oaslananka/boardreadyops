@@ -112,7 +112,7 @@ function yamlLoader(_: string, content: string): unknown {
   return loadYamlContent(content);
 }
 
-function loadYamlContent(content: string): unknown {
+export function loadYamlContent(content: string): unknown {
   return content.trim() === "" ? {} : yaml.load(content);
 }
 
