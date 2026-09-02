@@ -53,7 +53,7 @@ describe("transactional release-run outbox store", () => {
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain("boardreadyops_enqueue_release_run_with_outbox");
-    expect(calls[0]?.params).toHaveLength(11);
+    expect(calls[0]?.params).toHaveLength(12);
     expect(calls[0]?.params[9]).toBe("outbox-row-id");
     const payload = JSON.parse(String(calls[0]?.params[10]));
     expect(payload).toMatchObject({
@@ -63,6 +63,36 @@ describe("transactional release-run outbox store", () => {
         commitSha: "0123456789abcdef",
       },
     });
+    expect(calls[0]?.params[11]).toBeNull();
+  });
+
+  it("passes the webhook delivery id through as the last SQL parameter when present", async () => {
+    const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
+    const executor: SqlQueryExecutor = {
+      async query(sql, params = []) {
+        calls.push({ sql, params });
+        return {
+          rows: [
+            {
+              run_id: "run-row-id",
+              idempotency_key: "1283305324:42:0123456789abcdef",
+              run_status: "queued",
+              outbox_id: "outbox-row-id",
+            },
+          ],
+        };
+      },
+    };
+    const ids = ["run-row-id", "outbox-row-id"];
+    const store = createSqlTransactionalGitHubAppLifecycleStore(executor, {
+      id: () => ids.shift() ?? "unexpected-id",
+      now: () => new Date("2026-07-22T02:00:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+
+    await store.enqueueReleaseRunWithOutbox({ ...action, deliveryId: "delivery-xyz" });
+
+    expect(calls[0]?.params[11]).toBe("delivery-xyz");
   });
 
   it("does not create a run or outbox record outside the rollout policy", async () => {

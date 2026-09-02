@@ -198,6 +198,33 @@ describeDatabase("transactional release-run outbox producer", () => {
     });
   });
 
+  it("persists the source webhook delivery id for traceability, and leaves it null when absent", async () => {
+    const withDeliveryStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-delivery-${suffix}`, `outbox-delivery-${suffix}`]),
+      now: () => new Date("2026-07-22T02:02:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const withDelivery = await withDeliveryStore.enqueueReleaseRunWithOutbox({
+      ...action("b".repeat(40)),
+      deliveryId: "delivery-abc-123",
+    });
+
+    const noDeliveryStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-no-delivery-${suffix}`, `outbox-no-delivery-${suffix}`]),
+      now: () => new Date("2026-07-22T02:03:00.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const withoutDelivery = await noDeliveryStore.enqueueReleaseRunWithOutbox(action("c".repeat(40)));
+
+    const state = await database().query(`select id, delivery_id from release_runs where id in ($1, $2)`, [
+      withDelivery.runId,
+      withoutDelivery.runId,
+    ]);
+    const deliveryById = new Map(rows(state).map((row) => [row.id, row.delivery_id]));
+    expect(deliveryById.get(withDelivery.runId)).toBe("delivery-abc-123");
+    expect(deliveryById.get(withoutDelivery.runId)).toBeNull();
+  });
+
   it("persists and audits one immutable safe-mode trust snapshot across webhook replay", async () => {
     const safeAction: ReleaseAction = {
       ...action("9".repeat(40)),
