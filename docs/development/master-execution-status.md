@@ -1,7 +1,7 @@
 # BoardReadyOps — Master Execution Status & Workstream Ledger
 
-> **Last Updated:** September 1, 2026
-> **Source Specification:** `BoardReadyOps_Agent_Master_Development_Spec.md`
+> **Last Updated:** September 2, 2026
+> **Source Specification:** `BoardReadyOps_Agent_Master_Development_Spec.md` (SHA-256 e02df14e…857c62, **not committed to this repository** — provenance unverified; see the `spec` field in [master-execution-status.json](master-execution-status.json))
 > **Public Roadmap Alignment:** [ROADMAP.md](../ROADMAP.md) · **Delivery Sequencing:** Issue [#191](https://github.com/oaslananka/boardreadyops/issues/191)
 
 ---

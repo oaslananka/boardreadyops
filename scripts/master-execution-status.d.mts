@@ -3,6 +3,7 @@ export type VerificationResult = "pass" | "fail" | "not_run";
 
 export interface ValidationOptions {
   pathExists?(path: string): boolean;
+  readSha256?(path: string): string;
 }
 
 export interface WorkstreamEvidence {
@@ -32,7 +33,7 @@ export interface WorkstreamStatus {
 
 export interface ExecutionStatus {
   version: 1;
-  spec: { path: string; sha256: string };
+  spec: { path: string; sha256: string; verified: boolean; provenance?: string };
   roadmap: {
     source: string;
     checkedAt: string;
