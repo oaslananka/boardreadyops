@@ -1133,7 +1133,9 @@
           "tests/property/findings.property.test.ts",
           "tests/property/delimited.property.test.ts",
           "tests/property/sexpr.property.test.ts",
-          "tests/property/yaml-config.property.test.ts"
+          "tests/property/yaml-config.property.test.ts",
+          "tests/property/waivers.property.test.ts",
+          "src/core/waivers.ts"
         ],
         "tests": ["tests/integration/cross-platform-paths.test.ts", "tests/e2e/regression-audit-findings.spec.ts"],
         "docs": ["docs/development/testing-policy.md"],
@@ -1142,11 +1144,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/property/config-report.property.test.ts tests/property/findings.property.test.ts tests/property/delimited.property.test.ts tests/property/sexpr.property.test.ts tests/property/yaml-config.property.test.ts",
+        "command": "corepack pnpm vitest run tests/property/config-report.property.test.ts tests/property/findings.property.test.ts tests/property/delimited.property.test.ts tests/property/sexpr.property.test.ts tests/property/yaml-config.property.test.ts tests/property/waivers.property.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-02T02:58:08Z"
+        "checkedAt": "2026-09-02T08:40:25Z"
       },
-      "remaining": "CORRECTION: the prior note claimed only two fast-check property-test files existed and that BOM/CSV/YAML/JSON/KiCad-text parser fuzzing was entirely missing. That undercounted what already existed: tests/property/delimited.property.test.ts already fuzzes the CSV/BOM delimited-row parser (src/util/delimited.ts) and tests/property/sexpr.property.test.ts already fuzzes the KiCad S-expression parser (src/kicad/sexpr.ts), including hostile-input DoS-timing cases (nesting depth, pathological string length); tests/property/config-report.property.test.ts already fuzzes JSON via fc.jsonValue(). The one genuinely missing parser was YAML: src/core/config.ts's loadYamlContent() (js-yaml) had no fuzz coverage at all. Added tests/property/yaml-config.property.test.ts (exported loadYamlContent for testability) covering never-throws-a-non-Error, purity, deeply-nested-flow-sequence timing, a pathologically long scalar, and — the most valuable case — a crafted anchor/alias ('billion laughs') expansion attack, which passes: js-yaml's built-in guard rejects it well within the 2s budget rather than exhausting memory. Genuinely still missing: state-machine/waiver-combinatorial property tests (tests/unit/core/waivers.test.ts is example-based, no fast-check usage) and a licensing-aware record/replay network cassette system (no cassette/nock/polly-style tooling found in the repo). Mutation testing retains real per-module thresholds enforced in CI and the flaky-test policy explicitly rejects silent quarantine."
+      "remaining": "CORRECTION: the prior note claimed only two fast-check property-test files existed and that BOM/CSV/YAML/JSON/KiCad-text parser fuzzing was entirely missing. That undercounted what already existed: tests/property/delimited.property.test.ts already fuzzes the CSV/BOM delimited-row parser (src/util/delimited.ts) and tests/property/sexpr.property.test.ts already fuzzes the KiCad S-expression parser (src/kicad/sexpr.ts), including hostile-input DoS-timing cases (nesting depth, pathological string length); tests/property/config-report.property.test.ts already fuzzes JSON via fc.jsonValue(). YAML was the one genuinely missing parser, closed by tests/property/yaml-config.property.test.ts (including a billion-laughs anchor/alias attack, which js-yaml's built-in guard rejects). The waiver evaluator (src/core/waivers.ts's applyWaivers -- not a stored state machine, but a pure function that classifies each waiver as active/expired fresh on every call from a `now` timestamp) was the other genuinely missing property-test target: tests/unit/core/waivers.test.ts is example-based only. Added tests/property/waivers.property.test.ts covering: determinism/purity for the same inputs; every waiver partitions into exactly one of active/expired; finding count and order are preserved (only a `suppressed` flag is ever added); a finding whose only match is an expired waiver is never suppressed; a waiver with no `expires` is active for any evaluation date; once a waiver is expired at some date it stays expired at every later date (the one-directional 'no re-approval' property -- there is no approve/reject transition in this codebase, only date-driven active/expired classification); and fingerprint-scoped matching is case-insensitive on the configured fingerprint. Genuinely still missing: a licensing-aware record/replay network cassette system (no cassette/nock/polly-style tooling found in the repo). Mutation testing retains real per-module thresholds enforced in CI and the flaky-test policy explicitly rejects silent quarantine."
     },
     {
       "id": "W35",
