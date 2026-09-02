@@ -86,6 +86,75 @@ export async function readGitHubCheckRun(input) {
   };
 }
 
+// GitHub's Update a check run endpoint accepts at most 50 annotations per request; more than
+// that requires repeated PATCH calls, each of which appends to the annotations already stored on
+// the check run. https://docs.github.com/en/rest/checks/runs#update-a-check-run
+const MAX_ANNOTATIONS_PER_REQUEST = 50;
+
+export async function completeGitHubCheckRun(input) {
+  const request = input.request ?? fetch;
+  const headers = requestHeaders(input.token);
+  const url = checkRunEndpoint(
+    input.apiBaseUrl,
+    input.input.repositoryOwner,
+    input.input.repositoryName,
+    input.input.checkRunId,
+  );
+  const annotationChunks = chunkAnnotations(input.input.annotations);
+  const output = { title: input.input.title, summary: input.input.summary };
+
+  const firstBody = {
+    status: "completed",
+    conclusion: input.input.conclusion,
+    completed_at: input.input.completedAt ?? new Date().toISOString(),
+    output: annotationChunks[0] ? { ...output, annotations: annotationChunks[0] } : output,
+  };
+
+  if (input.detailsUrl) {
+    firstBody.details_url = input.detailsUrl;
+  }
+
+  await readJson(
+    await request(url, { method: "PATCH", headers, body: JSON.stringify(firstBody) }),
+    "GitHub check run completion",
+  );
+
+  for (const chunk of annotationChunks.slice(1)) {
+    await readJson(
+      await request(url, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ output: { ...output, annotations: chunk } }),
+      }),
+      "GitHub check run annotation append",
+    );
+  }
+}
+
+function toGitHubAnnotation(annotation) {
+  return {
+    path: annotation.path,
+    start_line: annotation.startLine,
+    end_line: annotation.endLine,
+    annotation_level: annotation.annotationLevel,
+    message: annotation.message,
+    ...(annotation.startColumn !== undefined ? { start_column: annotation.startColumn } : {}),
+    ...(annotation.endColumn !== undefined ? { end_column: annotation.endColumn } : {}),
+    ...(annotation.title !== undefined ? { title: annotation.title } : {}),
+    ...(annotation.rawDetails !== undefined ? { raw_details: annotation.rawDetails } : {}),
+  };
+}
+
+function chunkAnnotations(annotations) {
+  if (!annotations || annotations.length === 0) return [];
+  const mapped = annotations.map(toGitHubAnnotation);
+  const chunks = [];
+  for (let index = 0; index < mapped.length; index += MAX_ANNOTATIONS_PER_REQUEST) {
+    chunks.push(mapped.slice(index, index + MAX_ANNOTATIONS_PER_REQUEST));
+  }
+  return chunks;
+}
+
 function requestHeaders(token) {
   return {
     accept: "application/vnd.github+json",
@@ -286,30 +355,12 @@ export function createGitHubAppCheckRunClient() {
     createPullRequestCheckRun: ensure,
 
     async completeCheckRun(input) {
-      const token = await installationToken(input.installationId);
-      const body = {
-        status: "completed",
-        conclusion: input.conclusion,
-        completed_at: input.completedAt ?? new Date().toISOString(),
-        output: {
-          title: input.title,
-          summary: input.summary,
-        },
-      };
-      const url = detailsUrl(input.runId);
-
-      if (url) {
-        body.details_url = url;
-      }
-
-      await readJson(
-        await fetch(checkRunEndpoint(apiBaseUrl, input.repositoryOwner, input.repositoryName, input.checkRunId), {
-          method: "PATCH",
-          headers: requestHeaders(token),
-          body: JSON.stringify(body),
-        }),
-        "GitHub check run completion",
-      );
+      return completeGitHubCheckRun({
+        apiBaseUrl,
+        token: await installationToken(input.installationId),
+        input,
+        detailsUrl: detailsUrl(input.runId),
+      });
     },
 
     async createPullRequestComment(input) {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  completeGitHubCheckRun,
   ensurePullRequestCheckRun,
   upsertReadinessComment,
 } from "../../../apps/web/lib/github-app-check-run-client.js";
@@ -276,5 +277,137 @@ describe("GitHub App Check Run observation", () => {
     });
     await expect(promise).rejects.toThrow("GitHub check run lookup failed with status 503");
     await expect(promise).rejects.not.toThrow("do-not-leak");
+  });
+});
+
+describe("GitHub App Check Run completion (annotations)", () => {
+  const baseInput = {
+    installationId: 12345,
+    repositoryOwner: "octo-org",
+    repositoryName: "hardware-board",
+    checkRunId: 77,
+    runId: "run-1",
+    conclusion: "failure" as const,
+    title: "BoardReadyOps release readiness",
+    summary: "2 findings require attention.",
+    completedAt: "2026-05-23T00:00:00.000Z",
+  };
+
+  function patchBodies() {
+    return request.mock.calls.map((call) => JSON.parse(String(call[1]?.body)));
+  }
+
+  it("sends a single PATCH with no annotations key when none are provided (unchanged from before)", async () => {
+    request.mockResolvedValue(jsonResponse({}));
+
+    await completeGitHubCheckRun({
+      apiBaseUrl: "https://api.github.com",
+      token: "installation-token",
+      input: baseInput,
+      detailsUrl: "https://app.boardreadyops.com/runs/run-1",
+      request,
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const [body] = patchBodies();
+    expect(body).toEqual({
+      status: "completed",
+      conclusion: "failure",
+      completed_at: "2026-05-23T00:00:00.000Z",
+      output: { title: baseInput.title, summary: baseInput.summary },
+      details_url: "https://app.boardreadyops.com/runs/run-1",
+    });
+    expect(body.output.annotations).toBeUndefined();
+  });
+
+  it("maps annotation fields to GitHub's snake_case shape in a single PATCH when 50 or fewer", async () => {
+    request.mockResolvedValue(jsonResponse({}));
+
+    await completeGitHubCheckRun({
+      apiBaseUrl: "https://api.github.com",
+      token: "installation-token",
+      input: {
+        ...baseInput,
+        annotations: [
+          {
+            path: "hardware/bom.csv",
+            startLine: 12,
+            endLine: 12,
+            annotationLevel: "failure" as const,
+            message: "R1 is missing an MPN.",
+            title: "bom.missing-mpn",
+          },
+          {
+            path: "hardware/board.kicad_pcb",
+            startLine: 4,
+            endLine: 6,
+            startColumn: 2,
+            endColumn: 9,
+            annotationLevel: "warning" as const,
+            message: "Silkscreen overlaps courtyard.",
+            rawDetails: "extra diagnostic detail",
+          },
+        ],
+      },
+      request,
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const [body] = patchBodies();
+    expect(body.output.annotations).toEqual([
+      {
+        path: "hardware/bom.csv",
+        start_line: 12,
+        end_line: 12,
+        annotation_level: "failure",
+        message: "R1 is missing an MPN.",
+        title: "bom.missing-mpn",
+      },
+      {
+        path: "hardware/board.kicad_pcb",
+        start_line: 4,
+        end_line: 6,
+        start_column: 2,
+        end_column: 9,
+        annotation_level: "warning",
+        message: "Silkscreen overlaps courtyard.",
+        raw_details: "extra diagnostic detail",
+      },
+    ]);
+  });
+
+  it("chunks more than 50 annotations into multiple PATCH requests, appending after the first", async () => {
+    request.mockImplementation(async () => jsonResponse({}));
+    const annotations = Array.from({ length: 120 }, (_, index) => ({
+      path: `hardware/file-${index}.kicad_sch`,
+      startLine: 1,
+      endLine: 1,
+      annotationLevel: "notice" as const,
+      message: `finding ${index}`,
+    }));
+
+    await completeGitHubCheckRun({
+      apiBaseUrl: "https://api.github.com",
+      token: "installation-token",
+      input: { ...baseInput, annotations },
+      request,
+    });
+
+    expect(request).toHaveBeenCalledTimes(3);
+    const [first, second, third] = patchBodies();
+
+    expect(first.status).toBe("completed");
+    expect(first.output.annotations).toHaveLength(50);
+    expect(first.output.annotations[0].message).toBe("finding 0");
+
+    expect(second.status).toBeUndefined();
+    expect(second.output.annotations).toHaveLength(50);
+    expect(second.output.annotations[0].message).toBe("finding 50");
+    expect(second.output.title).toBe(baseInput.title);
+    expect(second.output.summary).toBe(baseInput.summary);
+
+    expect(third.status).toBeUndefined();
+    expect(third.output.annotations).toHaveLength(20);
+    expect(third.output.annotations[0].message).toBe("finding 100");
   });
 });

@@ -51,6 +51,14 @@ export type UpsertReadinessCommentInput = {
   request?: GitHubRequest;
 };
 
+export type CompleteGitHubCheckRunClientInput = {
+  apiBaseUrl: string;
+  token: string;
+  input: CompleteGitHubCheckRunInput;
+  detailsUrl?: string;
+  request?: GitHubRequest;
+};
+
 export type GitHubAppCheckRunClientResult = GitHubAppCheckRunClient & {
   readCheckRun?(input: {
     installationId: number | string;
@@ -72,4 +80,5 @@ export declare function detailsUrl(runId: string): string | undefined;
 export declare function readGitHubCheckRun(input: ReadGitHubCheckRunInput): Promise<GitHubCheckRunObservation>;
 export declare function ensurePullRequestCheckRun(input: EnsurePullRequestCheckRunInput): Promise<{ id: number }>;
 export declare function upsertReadinessComment(input: UpsertReadinessCommentInput): Promise<void>;
+export declare function completeGitHubCheckRun(input: CompleteGitHubCheckRunClientInput): Promise<void>;
 export declare function createGitHubAppCheckRunClient(): GitHubAppCheckRunClientResult | undefined;
