@@ -1,6 +1,10 @@
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import { resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
+import {
+  type CloudPersistenceConfiguration,
+  CloudRuntimeConfigurationError,
+  resolveCloudPersistenceConfiguration,
+} from "./cloud-runtime-config.js";
 import {
   type DemoApproval,
   type DemoChecklistItem,
@@ -345,7 +349,15 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
     }
   }
 
-  const config = resolveCloudPersistenceConfiguration();
+  let config: CloudPersistenceConfiguration;
+  try {
+    config = resolveCloudPersistenceConfiguration();
+  } catch (error) {
+    if (error instanceof CloudRuntimeConfigurationError && error.code === "missing-database-url") {
+      return null;
+    }
+    throw error;
+  }
   if (config.mode !== "postgres") {
     const fixture = getDemoReview(reviewId);
     if (fixture) {

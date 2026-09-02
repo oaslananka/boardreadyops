@@ -10,7 +10,7 @@ import {
   runAxe,
 } from "../../qa/audit/checks.js";
 import { AuditReport, type RouteFinding } from "../../qa/audit/report.js";
-import { errorStates, routes } from "../../qa/audit/routes.js";
+import { brokenDemoReviewId, errorStates, routes } from "../../qa/audit/routes.js";
 import { authenticatedStorageState } from "./fixtures/auth.js";
 
 /**
@@ -117,6 +117,9 @@ for (const viewport of viewports) {
         if (route.expectedLinkPrefixes && viewport.name === "desktop") {
           const origin = new URL(route.path, page.url()).origin;
           for (const result of await checkInternalLinks(page, origin)) {
+            // rev_edge_ble_09 is a deliberate known-bug regression id (routes.ts) that must 404,
+            // not a real broken link -- see tests/e2e/regression-audit-findings.spec.ts.
+            if (result.href === `/reviews/${brokenDemoReviewId}` && result.status === 404) continue;
             if (result.status === "error" || (typeof result.status === "number" && result.status >= 400)) {
               record(
                 route.id,
