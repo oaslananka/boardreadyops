@@ -59,8 +59,8 @@ describe("runner protocol forward compatibility", () => {
     });
   });
 
-  describe("unknown/additional fields from a newer Control Plane are rejected (.strict()), not ignored", () => {
-    it("rejects an extra field on a lease heartbeat response", () => {
+  describe("unknown/additional fields from a newer Control Plane are silently ignored, per docs/architecture/contract-versioning.md", () => {
+    it("ignores (strips) an extra field on a lease heartbeat response instead of rejecting it", () => {
       const result = runnerLeaseHeartbeatResponseSchema.safeParse({
         protocolVersion: 1,
         status: "active",
@@ -68,14 +68,26 @@ describe("runner protocol forward compatibility", () => {
         maximumLeaseExpiresAt: "2026-01-01T00:10:00.000Z",
         estimatedCostCents: 42, // hypothetical future field
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+      expect(result.success && "estimatedCostCents" in result.data).toBe(false);
     });
 
-    it("rejects an extra field on a mutation response", () => {
+    it("ignores (strips) an extra field on a mutation response instead of rejecting it", () => {
       const result = runnerMutationResponseSchema.safeParse({
         protocolVersion: 1,
         status: "accepted",
         auditId: "55555555-5555-4555-8555-555555555555", // hypothetical future field
+      });
+      expect(result.success).toBe(true);
+      expect(result.success && "auditId" in result.data).toBe(false);
+    });
+
+    it("still rejects an extra field on the registration activation response (identity-adjacent, deliberately kept strict)", () => {
+      const result = runnerRegistrationActivationResponseSchema.safeParse({
+        protocolVersion: 1,
+        status: "activated",
+        registrationId: "44444444-4444-4444-8444-444444444444",
+        installationId: "55555555-5555-4555-8555-555555555555", // must never be accepted from response content
       });
       expect(result.success).toBe(false);
     });
