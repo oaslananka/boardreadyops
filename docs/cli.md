@@ -116,6 +116,8 @@ boardreadyops release verify build/boardreadyops-release --public-key release-si
 
 `release verify` exits `1` when a `--public-key` is supplied but the bundle is unsigned, when the signature does not match the manifest, or when the embedded key differs from the trusted key. Without `--public-key`, an unsigned bundle still verifies on checksums alone.
 
+For key rotation and revocation, pass `--trust-store <path>` instead of `--public-key`: a JSON array of `{keyId, publicKey, validFrom, validUntil?, revokedAt?}` entries, verified as of the current time. This lets an old and new key both verify during a rotation overlap, and lets a compromised key be revoked so it no longer verifies any signature — including ones signed before the revocation. `--public-key` and `--trust-store` are mutually exclusive. See [release/evidence-bundles.md](release/evidence-bundles.md#signing-and-provenance) for the trust store format.
+
 ## Release preparation
 
 `boardreadyops release prepare [path]` runs a single end-to-end preparation workflow: it generates first-party manufacturing outputs (when `kicad-cli` is available), validates the project with the full pipeline, and records a release decision. Results are written to `release-prepare.json` under the output directory (`build/boardreadyops-release` by default), and the command exits `0` for a `pass` decision and `1` for a `fail`.

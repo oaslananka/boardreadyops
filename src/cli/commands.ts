@@ -171,6 +171,10 @@ export function registerAllCommands(
     .argument("[bundle]", "release evidence bundle directory")
     .option("--format <format>", "text or json", "text")
     .option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest")
+    .option(
+      "--trust-store <path>",
+      "JSON trust store (array of {keyId, publicKey, validFrom, validUntil?, revokedAt?}) to verify against instead of a single --public-key, supporting key rotation and revocation",
+    )
     .action(async (bundleInput: string | undefined, options: ReleaseVerifyOptions) => {
       process.exitCode = await releaseVerifyCommand(bundleInput, options, streams);
     });

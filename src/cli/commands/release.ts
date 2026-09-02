@@ -27,7 +27,12 @@ import {
   type PrepareValidationStage,
   releasePrepareExitCode,
 } from "../../release/prepare.js";
-import { signReleaseBundle, verifyReleaseBundleSignature } from "../../release/signing.js";
+import {
+  loadTrustStore,
+  signReleaseBundle,
+  verifyReleaseBundleSignature,
+  verifyReleaseBundleSignatureAgainstTrustStore,
+} from "../../release/signing.js";
 import { formatHtml } from "../../report/html.js";
 import { pathExists, readTextFile, sha256File, writeTextFile } from "../../util/fs.js";
 import { globFiles } from "../../util/glob.js";
@@ -54,6 +59,7 @@ export interface ReleasePrepareOptions extends CommonCliOptions {
 export interface ReleaseVerifyOptions {
   format?: "text" | "json";
   publicKey?: string;
+  trustStore?: string;
 }
 
 export interface ReleaseSignOptions {
@@ -245,17 +251,36 @@ export async function releaseVerifyCommand(
   const bundleDir = path.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   const verification = await verifyReleaseEvidenceBundle(bundleDir);
 
-  let trustedKey: string | undefined;
-  if (options.publicKey) {
+  if (options.publicKey && options.trustStore) {
+    streams.stderr.write("Pass either --public-key or --trust-store, not both.\n");
+    return 2;
+  }
+
+  let signature: { present: boolean; ok: boolean; errors: string[]; matchedKeyId?: string | undefined };
+  const signatureRequired = Boolean(options.publicKey || options.trustStore);
+  if (options.trustStore) {
+    let trustStore: Awaited<ReturnType<typeof loadTrustStore>>;
     try {
-      trustedKey = await readTextFile(path.resolve(normalizePathInput(options.publicKey)));
-    } catch {
-      streams.stderr.write(`Public key not found: ${options.publicKey}\n`);
+      trustStore = await loadTrustStore(path.resolve(normalizePathInput(options.trustStore)));
+    } catch (error) {
+      streams.stderr.write(
+        `Trust store could not be loaded: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
       return 2;
     }
+    signature = await verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustStore, new Date().toISOString());
+  } else {
+    let trustedKey: string | undefined;
+    if (options.publicKey) {
+      try {
+        trustedKey = await readTextFile(path.resolve(normalizePathInput(options.publicKey)));
+      } catch {
+        streams.stderr.write(`Public key not found: ${options.publicKey}\n`);
+        return 2;
+      }
+    }
+    signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
   }
-  const signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
-  const signatureRequired = Boolean(options.publicKey);
   const signatureErrors = [...signature.errors];
   if (signatureRequired && !signature.present) {
     signatureErrors.push("expected a signed manifest (manifest.sig) but none was found");
@@ -266,7 +291,16 @@ export async function releaseVerifyCommand(
   if (options.format === "json") {
     streams.stdout.write(
       `${JSON.stringify(
-        { ...verification, ok, signature: { present: signature.present, ok: signatureOk, errors: signatureErrors } },
+        {
+          ...verification,
+          ok,
+          signature: {
+            present: signature.present,
+            ok: signatureOk,
+            errors: signatureErrors,
+            ...(signature.matchedKeyId ? { matchedKeyId: signature.matchedKeyId } : {}),
+          },
+        },
         null,
         2,
       )}\n`,

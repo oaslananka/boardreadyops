@@ -54743,23 +54743,21 @@ async function signReleaseBundle(bundleDir, privateKeyPem, signedAt) {
 `, "utf8");
   return { signaturePath, signature };
 }
-async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
+async function readBundleManifestAndSignature(bundleDir) {
   const signaturePath = import_node_path57.default.join(bundleDir, SIGNATURE_FILE);
   let signatureRaw;
   try {
     signatureRaw = await import_promises20.default.readFile(signaturePath, "utf8");
   } catch {
-    return { ok: false, present: false, errors: [], errorCodes: [] };
+    return { present: false };
   }
   let signature;
   try {
     signature = JSON.parse(signatureRaw);
   } catch {
     return {
-      ok: false,
       present: true,
-      errors: ["manifest.sig is not valid JSON"],
-      errorCodes: ["MALFORMED_SIGNATURE_FILE"]
+      error: { errors: ["manifest.sig is not valid JSON"], errorCodes: ["MALFORMED_SIGNATURE_FILE"] }
     };
   }
   let bytes;
@@ -54767,13 +54765,21 @@ async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
     bytes = await import_promises20.default.readFile(import_node_path57.default.join(bundleDir, MANIFEST_FILE));
   } catch (error51) {
     return {
-      ok: false,
       present: true,
-      errors: [`manifest could not be read: ${asMessage(error51)}`],
-      errorCodes: ["MANIFEST_UNREADABLE"]
+      error: { errors: [`manifest could not be read: ${asMessage(error51)}`], errorCodes: ["MANIFEST_UNREADABLE"] }
     };
   }
-  return { present: true, ...verifyManifestSignature(bytes, signature, trustedPublicKeyPem) };
+  return { present: true, bytes, signature };
+}
+async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
+  const read = await readBundleManifestAndSignature(bundleDir);
+  if (!read.present || !read.bytes || !read.signature) {
+    if (read.error) {
+      return { ok: false, present: true, ...read.error };
+    }
+    return { ok: false, present: read.present, errors: [], errorCodes: [] };
+  }
+  return { present: true, ...verifyManifestSignature(read.bytes, read.signature, trustedPublicKeyPem) };
 }
 function loadKey(pem, kind) {
   return kind === "private" ? (0, import_node_crypto9.createPrivateKey)(pem) : (0, import_node_crypto9.createPublicKey)(pem);
@@ -54791,6 +54797,65 @@ function publicKeysMatch(publicKey, trustedPublicKeyPem) {
 }
 function asMessage(error51) {
   return error51 instanceof Error ? error51.message : String(error51);
+}
+function verifyManifestSignatureAgainstTrustStore(bytes, signature, trustStore, verifiedAt) {
+  const base = verifyManifestSignature(bytes, signature);
+  if (!base.ok) {
+    return base;
+  }
+  let embeddedPublicKey;
+  try {
+    embeddedPublicKey = (0, import_node_crypto9.createPublicKey)(signature.publicKey);
+  } catch {
+    return { ok: false, errors: ["signature public key could not be parsed"], errorCodes: ["INVALID_PUBLIC_KEY"] };
+  }
+  const verifiedAtMs = Date.parse(verifiedAt);
+  const match = trustStore.find((entry) => {
+    if (entry.revokedAt !== void 0 && Date.parse(entry.revokedAt) <= verifiedAtMs) {
+      return false;
+    }
+    if (Date.parse(entry.validFrom) > verifiedAtMs) {
+      return false;
+    }
+    if (entry.validUntil !== void 0 && Date.parse(entry.validUntil) < verifiedAtMs) {
+      return false;
+    }
+    return publicKeysMatch(embeddedPublicKey, entry.publicKey);
+  });
+  if (!match) {
+    return {
+      ok: false,
+      errors: ["signature public key is not an active entry in the trust store"],
+      errorCodes: ["KEY_NOT_TRUSTED"]
+    };
+  }
+  return { ok: true, errors: [], matchedKeyId: match.keyId };
+}
+async function loadTrustStore(filePath) {
+  const raw = await import_promises20.default.readFile(filePath, "utf8");
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error(`trust store at ${filePath} must be a JSON array`);
+  }
+  for (const [index, entry] of parsed.entries()) {
+    if (typeof entry !== "object" || entry === null || typeof entry.keyId !== "string" || typeof entry.publicKey !== "string" || typeof entry.validFrom !== "string") {
+      throw new Error(`trust store at ${filePath} entry ${index} is missing required fields`);
+    }
+  }
+  return parsed;
+}
+async function verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustStore, verifiedAt) {
+  const read = await readBundleManifestAndSignature(bundleDir);
+  if (!read.present || !read.bytes || !read.signature) {
+    if (read.error) {
+      return { ok: false, present: true, ...read.error };
+    }
+    return { ok: false, present: read.present, errors: [], errorCodes: [] };
+  }
+  return {
+    present: true,
+    ...verifyManifestSignatureAgainstTrustStore(read.bytes, read.signature, trustStore, verifiedAt)
+  };
 }
 
 // src/cli/commands/release.ts
@@ -55044,18 +55109,37 @@ function writePrepareSummary(summary, outputDir, stdout) {
 async function releaseVerifyCommand(bundleInput, options, streams) {
   const bundleDir = import_node_path58.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
   const verification = await verifyReleaseEvidenceBundle(bundleDir);
-  let trustedKey;
-  if (options.publicKey) {
+  if (options.publicKey && options.trustStore) {
+    streams.stderr.write("Pass either --public-key or --trust-store, not both.\n");
+    return 2;
+  }
+  let signature;
+  const signatureRequired = Boolean(options.publicKey || options.trustStore);
+  if (options.trustStore) {
+    let trustStore;
     try {
-      trustedKey = await readTextFile(import_node_path58.default.resolve(normalizePathInput(options.publicKey)));
-    } catch {
-      streams.stderr.write(`Public key not found: ${options.publicKey}
-`);
+      trustStore = await loadTrustStore(import_node_path58.default.resolve(normalizePathInput(options.trustStore)));
+    } catch (error51) {
+      streams.stderr.write(
+        `Trust store could not be loaded: ${error51 instanceof Error ? error51.message : String(error51)}
+`
+      );
       return 2;
     }
+    signature = await verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustStore, (/* @__PURE__ */ new Date()).toISOString());
+  } else {
+    let trustedKey;
+    if (options.publicKey) {
+      try {
+        trustedKey = await readTextFile(import_node_path58.default.resolve(normalizePathInput(options.publicKey)));
+      } catch {
+        streams.stderr.write(`Public key not found: ${options.publicKey}
+`);
+        return 2;
+      }
+    }
+    signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
   }
-  const signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
-  const signatureRequired = Boolean(options.publicKey);
   const signatureErrors = [...signature.errors];
   if (signatureRequired && !signature.present) {
     signatureErrors.push("expected a signed manifest (manifest.sig) but none was found");
@@ -55065,7 +55149,16 @@ async function releaseVerifyCommand(bundleInput, options, streams) {
   if (options.format === "json") {
     streams.stdout.write(
       `${JSON.stringify(
-        { ...verification, ok, signature: { present: signature.present, ok: signatureOk, errors: signatureErrors } },
+        {
+          ...verification,
+          ok,
+          signature: {
+            present: signature.present,
+            ok: signatureOk,
+            errors: signatureErrors,
+            ...signature.matchedKeyId ? { matchedKeyId: signature.matchedKeyId } : {}
+          }
+        },
         null,
         2
       )}
@@ -59248,7 +59341,10 @@ function registerAllCommands(program2, streams) {
   release.command("sign").argument("[bundle]", "release evidence bundle directory").option("--key <path>", "Ed25519 private key PEM used to sign the manifest").action(async (bundleInput, options) => {
     process.exitCode = await releaseSignCommand(bundleInput, options, streams);
   });
-  release.command("verify").argument("[bundle]", "release evidence bundle directory").option("--format <format>", "text or json", "text").option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest").action(async (bundleInput, options) => {
+  release.command("verify").argument("[bundle]", "release evidence bundle directory").option("--format <format>", "text or json", "text").option("--public-key <path>", "Ed25519 public key PEM to require and verify a signed manifest").option(
+    "--trust-store <path>",
+    "JSON trust store (array of {keyId, publicKey, validFrom, validUntil?, revokedAt?}) to verify against instead of a single --public-key, supporting key rotation and revocation"
+  ).action(async (bundleInput, options) => {
     process.exitCode = await releaseVerifyCommand(bundleInput, options, streams);
   });
   const handoff = program2.command("handoff").description("create vendor-specific manufacturer handoff packages");

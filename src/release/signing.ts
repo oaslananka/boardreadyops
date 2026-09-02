@@ -123,27 +123,29 @@ export interface BundleSignatureVerification extends SignatureVerification {
   present: boolean;
 }
 
-/** Verify a bundle's `manifest.sig` against its `manifest.json`, optionally pinning a trusted key. */
-export async function verifyReleaseBundleSignature(
-  bundleDir: string,
-  trustedPublicKeyPem?: string,
-): Promise<BundleSignatureVerification> {
+interface BundleManifestRead {
+  present: boolean;
+  bytes?: Buffer;
+  signature?: ReleaseManifestSignature;
+  error?: { errors: string[]; errorCodes: SignatureErrorCode[] };
+}
+
+/** Read and parse a bundle's `manifest.sig` and `manifest.json`, shared by both verification modes. */
+async function readBundleManifestAndSignature(bundleDir: string): Promise<BundleManifestRead> {
   const signaturePath = path.join(bundleDir, SIGNATURE_FILE);
   let signatureRaw: string;
   try {
     signatureRaw = await fs.readFile(signaturePath, "utf8");
   } catch {
-    return { ok: false, present: false, errors: [], errorCodes: [] };
+    return { present: false };
   }
   let signature: ReleaseManifestSignature;
   try {
     signature = JSON.parse(signatureRaw) as ReleaseManifestSignature;
   } catch {
     return {
-      ok: false,
       present: true,
-      errors: ["manifest.sig is not valid JSON"],
-      errorCodes: ["MALFORMED_SIGNATURE_FILE"],
+      error: { errors: ["manifest.sig is not valid JSON"], errorCodes: ["MALFORMED_SIGNATURE_FILE"] },
     };
   }
   let bytes: Buffer;
@@ -151,13 +153,26 @@ export async function verifyReleaseBundleSignature(
     bytes = await fs.readFile(path.join(bundleDir, MANIFEST_FILE));
   } catch (error) {
     return {
-      ok: false,
       present: true,
-      errors: [`manifest could not be read: ${asMessage(error)}`],
-      errorCodes: ["MANIFEST_UNREADABLE"],
+      error: { errors: [`manifest could not be read: ${asMessage(error)}`], errorCodes: ["MANIFEST_UNREADABLE"] },
     };
   }
-  return { present: true, ...verifyManifestSignature(bytes, signature, trustedPublicKeyPem) };
+  return { present: true, bytes, signature };
+}
+
+/** Verify a bundle's `manifest.sig` against its `manifest.json`, optionally pinning a trusted key. */
+export async function verifyReleaseBundleSignature(
+  bundleDir: string,
+  trustedPublicKeyPem?: string,
+): Promise<BundleSignatureVerification> {
+  const read = await readBundleManifestAndSignature(bundleDir);
+  if (!read.present || !read.bytes || !read.signature) {
+    if (read.error) {
+      return { ok: false, present: true, ...read.error };
+    }
+    return { ok: false, present: read.present, errors: [], errorCodes: [] };
+  }
+  return { present: true, ...verifyManifestSignature(read.bytes, read.signature, trustedPublicKeyPem) };
 }
 
 function loadKey(pem: string, kind: "private" | "public"): KeyObject {
@@ -296,4 +311,27 @@ export async function loadTrustStore(filePath: string): Promise<TrustStore> {
 /** Write a trust store to a JSON file. */
 export async function saveTrustStore(filePath: string, trustStore: TrustStore): Promise<void> {
   await fs.writeFile(filePath, `${JSON.stringify(trustStore, null, 2)}\n`, "utf8");
+}
+
+export interface BundleTrustStoreVerification extends TrustStoreVerification {
+  present: boolean;
+}
+
+/** Verify a bundle's `manifest.sig` against its `manifest.json` using a trust store, as of `verifiedAt`. */
+export async function verifyReleaseBundleSignatureAgainstTrustStore(
+  bundleDir: string,
+  trustStore: TrustStore,
+  verifiedAt: string,
+): Promise<BundleTrustStoreVerification> {
+  const read = await readBundleManifestAndSignature(bundleDir);
+  if (!read.present || !read.bytes || !read.signature) {
+    if (read.error) {
+      return { ok: false, present: true, ...read.error };
+    }
+    return { ok: false, present: read.present, errors: [], errorCodes: [] };
+  }
+  return {
+    present: true,
+    ...verifyManifestSignatureAgainstTrustStore(read.bytes, read.signature, trustStore, verifiedAt),
+  };
 }

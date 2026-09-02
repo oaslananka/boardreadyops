@@ -125,6 +125,27 @@ The private key is never read from or written to the bundle — keep it outside 
 
 `release verify` exits non-zero when `--public-key` is supplied but the bundle is unsigned, when the signature does not match the manifest, or when the embedded key differs from the trusted key. Without `--public-key`, verification falls back to checksum-only and an unsigned bundle still passes.
 
+### Key rotation and revocation
+
+`--public-key` pins exactly one trusted key with no validity window, which makes ordinary key rotation unsafe: there's no way for an outgoing and incoming key to both verify during a handover, and no way to permanently distrust a compromised key short of removing the only pin (which also breaks verification of every past release signed with it).
+
+For rotation and revocation, pass `--trust-store <path>` instead: a JSON array of entries, each `{keyId, publicKey, validFrom, validUntil?, revokedAt?}`, evaluated as of the current time.
+
+```json
+[
+  { "keyId": "2025-key", "publicKey": "-----BEGIN PUBLIC KEY-----...", "validFrom": "2025-01-01T00:00:00Z", "revokedAt": "2026-01-15T00:00:00Z" },
+  { "keyId": "2026-key", "publicKey": "-----BEGIN PUBLIC KEY-----...", "validFrom": "2025-12-01T00:00:00Z" }
+]
+```
+
+```bash
+boardreadyops release verify build/boardreadyops-release --trust-store trust-store.json
+```
+
+A revoked key stops verifying **all** signatures from `revokedAt` onward, including ones signed before the revocation — there is deliberately no "grandfathered" carve-out for signatures made before a key was known to be compromised, since that would require a trusted timestamping authority this design does not have. `--public-key` and `--trust-store` are mutually exclusive.
+
+Note: this covers verification against a trust store you already have locally. Securely distributing trust store *updates* to a consumer's machine (a signed trust-store bundle, TUF-style delegation, etc.) is a separate, larger problem not addressed here.
+
 ### CI workflow example
 
 ```yaml
