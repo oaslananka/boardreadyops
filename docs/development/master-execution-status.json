@@ -593,7 +593,7 @@
           "tests/unit/web/api-auth-repository-scope.test.ts",
           "tests/unit/web/viewer-authorization.test.ts"
         ],
-        "docs": ["docs/security/audit-logs.md"],
+        "docs": ["docs/security/audit-logs.md", "docs/api-tokens.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
@@ -601,9 +601,9 @@
       "verification": {
         "command": "corepack pnpm vitest run tests/unit/db/api-token-store.test.ts tests/unit/web/api-auth-repository-scope.test.ts tests/unit/web/viewer-authorization.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T03:52:11Z"
       },
-      "remaining": "No granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user; no session revocation/device-management UI or store; no auth-attempt-specific rate limiting; no end-user docs for the bro_live_ API token feature."
+      "remaining": "PARTIAL CLOSE: docs/api-tokens.md now documents the bro_live_ API token feature end-to-end (creation via POST /api/v1/tokens with the scope table read from apps/web/lib/api-auth.ts, using it as a Bearer token, listing, revocation via DELETE, and the one-time-plaintext/hash-at-rest security note read directly from packages/db/src/api-token-store.ts) — added to the mkdocs nav under Use, verified via node scripts/docs-build.mjs and scripts/verify-structure.mjs. Still genuinely missing: no granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user (apps/web/lib/api-auth.ts's session branch returns all four scopes unconditionally); no session revocation/device-management UI or store; no auth-attempt-specific rate limiting."
     },
     {
       "id": "W18",
