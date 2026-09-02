@@ -129,6 +129,12 @@ export const runnerClaimedJobSchema = z
     }
   });
 
+// .strip(), not .strict(): this is a response the runner receives FROM the control plane.
+// docs/architecture/contract-versioning.md requires "Consumers must ignore unknown fields" for
+// additive optional fields, and this envelope carries no identity/authority-bearing field a future
+// additive field could plausibly be confused with (the nested job.repository already carries
+// explicit, individually-validated identity fields). See runnerRegistrationActivationResponseSchema
+// below for the one response schema that stays .strict() and why.
 export const runnerClaimResponseSchema = z.discriminatedUnion("status", [
   z
     .object({
@@ -136,14 +142,14 @@ export const runnerClaimResponseSchema = z.discriminatedUnion("status", [
       status: z.literal("empty"),
       retryAfterSeconds: z.number().int().min(1).max(300),
     })
-    .strict(),
+    .strip(),
   z
     .object({
       protocolVersion: runnerProtocolVersionSchema,
       status: z.literal("claimed"),
       job: runnerClaimedJobSchema,
     })
-    .strict(),
+    .strip(),
 ]);
 
 export const runnerLeaseContextSchema = z
@@ -172,6 +178,8 @@ export const runnerLeaseHeartbeatRequestSchema = runnerLeaseContextSchema
   })
   .strict();
 
+// .strip(): a response the runner receives, no identity/authority-bearing field. See
+// runnerClaimResponseSchema above for the forward-compatibility rationale.
 export const runnerLeaseHeartbeatResponseSchema = z.union([
   z
     .object({
@@ -180,13 +188,13 @@ export const runnerLeaseHeartbeatResponseSchema = z.union([
       leaseExpiresAt: z.string().datetime({ offset: true }),
       maximumLeaseExpiresAt: z.string().datetime({ offset: true }),
     })
-    .strict(),
+    .strip(),
   z
     .object({
       protocolVersion: runnerProtocolVersionSchema,
       status: z.enum(["expired", "revoked", "completed", "stale"]),
     })
-    .strict(),
+    .strip(),
 ]);
 
 export const runnerLeaseRelinquishRequestSchema = runnerLeaseContextSchema
@@ -248,12 +256,14 @@ export const runnerArtifactUploadCapabilitySchema = z
   })
   .strict();
 
+// .strip(): a response the runner receives, no identity/authority-bearing field. See
+// runnerClaimResponseSchema above for the forward-compatibility rationale.
 export const runnerArtifactCapabilityResponseSchema = z
   .object({
     protocolVersion: runnerProtocolVersionSchema,
     uploads: z.array(runnerArtifactUploadCapabilitySchema).min(1).max(100),
   })
-  .strict();
+  .strip();
 
 export const runnerRegistrationActivationRequestSchema = z
   .object({
@@ -265,6 +275,15 @@ export const runnerRegistrationActivationRequestSchema = z
   })
   .strict();
 
+// KEPT .strict() deliberately (not part of the forward-compatibility relaxation applied to the
+// other response schemas above): this envelope is the one response whose shape is most easily
+// confused with tenant/installation identity. An extra field here named e.g. installationId could,
+// after a future careless refactor, get read as if it were authoritative tenant identity instead of
+// being derived solely from the enrollment token as intended -- exactly the property
+// "keeps activation token-authenticated and rejects caller-selected tenant identity" in
+// tests/unit/contracts/runner-protocol.test.ts asserts for both the request and response side of
+// this flow. Forward-compatibility for this endpoint should be handled by adding a new named field
+// to the schema explicitly (a real, reviewed change) rather than silently accepting anything extra.
 export const runnerRegistrationActivationResponseSchema = z
   .object({
     protocolVersion: runnerProtocolVersionSchema,
@@ -273,12 +292,14 @@ export const runnerRegistrationActivationResponseSchema = z
   })
   .strict();
 
+// .strip(): a response the runner receives, no identity/authority-bearing field. See
+// runnerClaimResponseSchema above for the forward-compatibility rationale.
 export const runnerMutationResponseSchema = z
   .object({
     protocolVersion: runnerProtocolVersionSchema,
     status: z.enum(["accepted", "replayed"]),
   })
-  .strict();
+  .strip();
 
 export type RunnerWorkerClass = z.infer<typeof runnerWorkerClassSchema>;
 export type RunnerSignedRequestEnvelope = z.infer<typeof runnerSignedRequestEnvelopeSchema>;

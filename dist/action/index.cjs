@@ -105482,12 +105482,12 @@ var runnerClaimResponseSchema = external_exports.discriminatedUnion("status", [
     protocolVersion: runnerProtocolVersionSchema,
     status: external_exports.literal("empty"),
     retryAfterSeconds: external_exports.number().int().min(1).max(300)
-  }).strict(),
+  }).strip(),
   external_exports.object({
     protocolVersion: runnerProtocolVersionSchema,
     status: external_exports.literal("claimed"),
     job: runnerClaimedJobSchema
-  }).strict()
+  }).strip()
 ]);
 var runnerLeaseContextSchema = external_exports.object({
   protocolVersion: runnerProtocolVersionSchema,
@@ -105514,11 +105514,11 @@ var runnerLeaseHeartbeatResponseSchema = external_exports.union([
     status: external_exports.literal("active"),
     leaseExpiresAt: external_exports.string().datetime({ offset: true }),
     maximumLeaseExpiresAt: external_exports.string().datetime({ offset: true })
-  }).strict(),
+  }).strip(),
   external_exports.object({
     protocolVersion: runnerProtocolVersionSchema,
     status: external_exports.enum(["expired", "revoked", "completed", "stale"])
-  }).strict()
+  }).strip()
 ]);
 var runnerLeaseRelinquishRequestSchema = runnerLeaseContextSchema.extend({
   reason: external_exports.enum(["shutdown", "capacity", "operator", "job_error"]),
@@ -105552,7 +105552,7 @@ var runnerArtifactUploadCapabilitySchema = external_exports.object({
 var runnerArtifactCapabilityResponseSchema = external_exports.object({
   protocolVersion: runnerProtocolVersionSchema,
   uploads: external_exports.array(runnerArtifactUploadCapabilitySchema).min(1).max(100)
-}).strict();
+}).strip();
 var runnerRegistrationActivationRequestSchema = external_exports.object({
   protocolVersion: runnerProtocolVersionSchema,
   enrollmentToken: runnerEnrollmentTokenSchema,
@@ -105568,7 +105568,7 @@ var runnerRegistrationActivationResponseSchema = external_exports.object({
 var runnerMutationResponseSchema = external_exports.object({
   protocolVersion: runnerProtocolVersionSchema,
   status: external_exports.enum(["accepted", "replayed"])
-}).strict();
+}).strip();
 
 // packages/contracts/src/billing.ts
 var billingTierSchema = external_exports.enum(["free", "team", "business"]);
