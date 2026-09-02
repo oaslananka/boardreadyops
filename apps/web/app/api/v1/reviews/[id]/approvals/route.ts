@@ -95,9 +95,26 @@ async function enforceApprovalPolicyGate(input: {
   tenantId: string;
   status: RecordApprovalInput["status"];
   isBreakGlass?: boolean | undefined;
+  createdBy: string;
+  approverId: string;
 }): Promise<Response | null> {
   if (input.status !== "approved" || input.isBreakGlass) {
     return null;
+  }
+
+  // Separation of duties: the review's author cannot approve their own review.
+  // Bypassable via isBreakGlass like the readiness blockers below -- the
+  // short-circuit above already covers it -- so this stays one audited escape
+  // hatch rather than a second, unaudited one.
+  if (input.createdBy === input.approverId) {
+    return Response.json(
+      {
+        ok: false,
+        error: "The review author cannot approve their own review",
+        code: "self_approval_not_allowed",
+      },
+      { status: 409 },
+    );
   }
 
   const { readiness } = await computeReviewReadiness({
@@ -157,7 +174,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   const ctx = await resolveReviewApiContext(reviewId, auth);
   if (ctx instanceof Response) return ctx;
-  const { repositoryId, headRunId, currentRevisionId, executor } = ctx;
+  const { repositoryId, headRunId, currentRevisionId, createdBy, executor } = ctx;
 
   try {
     const payload = await parseApprovalPayload(request);
@@ -191,6 +208,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       tenantId: auth.actorId,
       status: payload.data.status,
       isBreakGlass: payload.data.isBreakGlass,
+      createdBy,
+      approverId: auth.actorId,
     });
     if (policyGateResponse) {
       return policyGateResponse;
