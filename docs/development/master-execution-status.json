@@ -86,13 +86,15 @@
           "scripts/toolchain.mjs",
           "scripts/compatibility.mjs",
           "scripts/compatibility-utils.mjs",
-          "scripts/verify-release-channels.mjs"
+          "scripts/verify-release-channels.mjs",
+          "scripts/verify-reproducible-build.mjs"
         ],
         "tests": [
           "tests/unit/scripts/compatibility.test.ts",
           "tests/unit/scripts/toolchain.test.ts",
           "tests/unit/scripts/verify-release-channels.test.ts",
-          "tests/unit/scripts/governance-ruleset.test.ts"
+          "tests/unit/scripts/governance-ruleset.test.ts",
+          "tests/unit/scripts/verify-reproducible-build.test.ts"
         ],
         "docs": ["docs/compatibility.yaml", "docs/support-matrix.md", "docs/security/release-integrity.md"],
         "deployed": [],
@@ -100,11 +102,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/scripts/compatibility.test.ts tests/unit/scripts/toolchain.test.ts tests/unit/scripts/verify-release-channels.test.ts tests/unit/scripts/governance-ruleset.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/scripts/compatibility.test.ts tests/unit/scripts/toolchain.test.ts tests/unit/scripts/verify-release-channels.test.ts tests/unit/scripts/governance-ruleset.test.ts tests/unit/scripts/verify-reproducible-build.test.ts && corepack pnpm run verify:reproducible-build",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T02:00:31Z"
       },
-      "remaining": "Issue #546 is now closed (PR #566). Reproducible-build/clean-room independent rebuild evidence is documented as future work in docs/security/release-integrity.md; no other tracked blocker remains open."
+      "remaining": "Issue #546 is now closed (PR #566). corepack pnpm run verify:reproducible-build now provides independent clean-room rebuild evidence — a detached git worktree in a fresh temp directory, its own node_modules from a frozen-lockfile install, rebuilt and SHA-256-compared against the current checkout's dist/action/index.cjs + dist/cli/index.cjs (verified matching on this cycle's commit). This is same-machine, shared-git-object independence (catches build-path/node_modules non-determinism); it does not yet cover cross-OS or cross-CI-runner reproducibility, which remains open. No other tracked blocker remains open."
     },
     {
       "id": "W02",
