@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  type CanonicalDecision,
+  canonicalDecisionFromPolicy,
+  canonicalDecisionFromReadiness,
+  canonicalDecisionFromReviewDecision,
   computeDecisionFingerprint,
   evaluateFindingDecision,
   evaluateReviewReadiness,
@@ -309,5 +313,42 @@ describe("Decision Engine", () => {
     });
     expect(withRoleData.blockers.some((b) => b.type === "missing_required_approver_role")).toBe(false);
     expect(withRoleData.isReady).toBe(true);
+  });
+});
+
+describe("canonical decision vocabulary", () => {
+  it("maps every readiness status to a canonical decision, totally and deterministically", () => {
+    const cases: Array<[Parameters<typeof canonicalDecisionFromReadiness>[0], CanonicalDecision]> = [
+      ["ready", "PASS"],
+      ["at-risk", "CONDITIONAL"],
+      ["blocked", "FAIL"],
+    ];
+    for (const [status, expected] of cases) {
+      expect(canonicalDecisionFromReadiness(status)).toBe(expected);
+      expect(canonicalDecisionFromReadiness(status)).toBe(canonicalDecisionFromReadiness(status));
+    }
+  });
+
+  it("maps every policy status to a canonical decision, totally and deterministically", () => {
+    const cases: Array<[Parameters<typeof canonicalDecisionFromPolicy>[0], CanonicalDecision]> = [
+      ["pass", "PASS"],
+      ["fail", "FAIL"],
+    ];
+    for (const [status, expected] of cases) {
+      expect(canonicalDecisionFromPolicy(status)).toBe(expected);
+      expect(canonicalDecisionFromPolicy(status)).toBe(canonicalDecisionFromPolicy(status));
+    }
+  });
+
+  it("maps every review decision to a canonical decision, totally and deterministically", () => {
+    const cases: Array<[Parameters<typeof canonicalDecisionFromReviewDecision>[0], CanonicalDecision]> = [
+      ["pending", "UNKNOWN"],
+      ["approved", "PASS"],
+      ["changes_requested", "FAIL"],
+    ];
+    for (const [decision, expected] of cases) {
+      expect(canonicalDecisionFromReviewDecision(decision)).toBe(expected);
+      expect(canonicalDecisionFromReviewDecision(decision)).toBe(canonicalDecisionFromReviewDecision(decision));
+    }
   });
 });
