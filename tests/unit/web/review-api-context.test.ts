@@ -56,6 +56,7 @@ function reviewRow(overrides: Record<string, unknown> = {}) {
     repository_id: "repo-123",
     head_run_id: "run-123",
     current_revision_id: "revision-123",
+    created_by: "octo-author",
     github_installation_id: "1001",
     ...overrides,
   };
@@ -75,9 +76,22 @@ describe("review API authorization context", () => {
       repositoryId: "repo-123",
       headRunId: "run-123",
       currentRevisionId: "revision-123",
+      createdBy: "octo-author",
     });
     expect(String(query.mock.calls[0]?.[0])).toContain("github_marketplace_subscriptions");
     expect(close).not.toHaveBeenCalled();
+    await result.executor.close();
+  });
+
+  it("falls back to 'system' when the review has no recorded author", async () => {
+    configurePostgres();
+    query.mockResolvedValueOnce({ rows: [reviewRow({ created_by: null })] });
+
+    const result = await resolveReviewApiContext("rev-123", sessionAuth([1001]));
+
+    expect(result).not.toBeInstanceOf(Response);
+    if (result instanceof Response) throw new Error("expected review context");
+    expect(result.createdBy).toBe("system");
     await result.executor.close();
   });
 

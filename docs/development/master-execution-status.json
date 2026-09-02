@@ -500,13 +500,17 @@
           "src/core/policy.ts",
           "src/core/waivers.ts",
           "packages/cloud-core/src/policy-engine.ts",
-          "packages/db/src/review-approval-store.ts"
+          "packages/db/src/review-approval-store.ts",
+          "apps/web/app/api/v1/reviews/[id]/approvals/route.ts",
+          "apps/web/lib/api-auth.ts"
         ],
         "tests": [
           "tests/unit/core/policy.test.ts",
           "tests/unit/core/waivers.test.ts",
           "tests/unit/cloud-core/policy-engine.test.ts",
-          "tests/unit/db/review-approval-store.test.ts"
+          "tests/unit/db/review-approval-store.test.ts",
+          "tests/unit/web/review-approval-policy-gate.test.ts",
+          "tests/unit/web/review-api-context.test.ts"
         ],
         "docs": ["docs/release/policy-engine.md", "docs/release/waivers.md"],
         "deployed": [],
@@ -514,11 +518,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/core/policy.test.ts tests/unit/core/waivers.test.ts tests/unit/cloud-core/policy-engine.test.ts tests/unit/db/review-approval-store.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/core/policy.test.ts tests/unit/core/waivers.test.ts tests/unit/cloud-core/policy-engine.test.ts tests/unit/db/review-approval-store.test.ts tests/unit/web/review-approval-policy-gate.test.ts tests/unit/web/review-api-context.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T14:14:27Z"
       },
-      "remaining": "No waiver carry-forward-by-fingerprint-equivalence workflow, no separation-of-duties enforcement, and no emergency-release/post-release-review workflow were found, though fail-closed expiry, org-hierarchy policy inheritance with dry-run impact preview, and digest-change approval invalidation are all real and tested."
+      "remaining": "PARTIAL CLOSE: separation-of-duties enforcement is now implemented, but ONLY for the cloud review-approval system, not the CLI waiver system -- deliberately, after checking whether it would be real or checkbox theater. src/core/waivers.ts's WaiverConfig.owner/approvedBy are unauthenticated free-text strings typed into a YAML config file with no identity verification; an owner===approvedBy check there would be trivially bypassable (nothing stops typing two different strings for the same person) and would misrepresent itself as a security control. The cloud review-approval system is different: apps/web/app/api/v1/reviews/[id]/approvals/route.ts's approverId and reviews.created_by are both populated from auth.actorId (apps/web/lib/api-auth.ts), an authenticated GitHub session login or API-token id -- a real, if basic (not yet role-aware, per W17's RBAC gap), identity check. Implementation: ReviewApiContext (api-auth.ts) now carries createdBy (from reviews.created_by, defaulting to 'system' when absent); enforceApprovalPolicyGate (approvals/route.ts) blocks with 409 {code: 'self_approval_not_allowed'} when createdBy === approverId and status is 'approved'. Deliberately bypassable via the existing isBreakGlass short-circuit (same audited escape hatch as the readiness-blocker checks, not a second unaudited one) -- self-'changes_requested' is never blocked, since flagging issues on your own review is normal. 6 new/updated tests cover: same-author block, break-glass bypass, changes_requested exemption, and the createdBy field's plumbing through resolveReviewApiContext (including its 'system' fallback). Still remaining: no waiver carry-forward-by-fingerprint-equivalence workflow, no emergency-release/post-release-review workflow, and no CLI-side SoD equivalent (deliberately not built -- see above). Fail-closed expiry, org-hierarchy policy inheritance with dry-run impact preview, and digest-change approval invalidation remain real and tested. No dedicated doc page exists for the cloud approval-gate/break-glass system at all (docs/release/policy-engine.md and waivers.md cover the CLI side only) -- documenting that undocumented API surface is a separate, larger task, not attempted here."
     },
     {
       "id": "W15",
