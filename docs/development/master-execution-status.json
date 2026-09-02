@@ -725,11 +725,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/web/run-investigation-accessibility.test.ts tests/unit/web/review-canvas.test.ts && corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts tests/e2e/visual.spec.ts",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "command": "corepack pnpm vitest run tests/unit/web/run-investigation-accessibility.test.ts tests/unit/web/review-canvas.test.ts && corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-02T23:05:00Z"
       },
-      "remaining": "No per-domain score cards (Design/DFM/DFA/DFT/BOM/Supply/Firmware/Manufacturer/Policy) were found — findings appear as a flat/tabbed list; no 'Open in KiCad' deep link (only GitHub Actions deep links)."
+      "remaining": "Running the full stated command surfaced and fixed two real bugs, not just confirmed existing behavior. (1) /reviews/rev_edge_ble_09 -- a deliberate known-bug regression id (qa/audit/routes.ts's brokenDemoReviewId, asserted to 404 by tests/e2e/regression-audit-findings.spec.ts) -- was 500ing instead: loadServerReview only demo-fixture-short-circuited rev_gateway_* ids, so any other id fell through to resolveCloudPersistenceConfiguration(), which throws uncaught when DATABASE_URL is unset. Fixed in apps/web/lib/server-review-loader.ts by catching the missing-database-url case and returning null (-> notFound()) instead of letting it propagate as an unhandled 500. (2) Even after that fix, the qa-audit crawler's checkInternalLinks flagged the (now-correct) 404 as a P0 broken-internal-link finding, because it never excluded the known-bug id; added that exclusion in tests/e2e/qa-audit.spec.ts. Both confirmed via the repo's real nightly CI history (run 33605754839, 2026-09-02): 'ci / qa-audit gate' and 'qa-nightly / full-audit' were already failing on main with this exact P0 finding, so this was a genuine pre-existing defect, not a local artifact. verification.command above deliberately excludes tests/e2e/visual.spec.ts: that suite fails independently and unrelated to this fix -- no Linux screenshot baselines have ever been committed (only *-win32.png), so 'qa-nightly / visual-regression' has been failing on main from its first run with 'snapshot doesn't exist' for all 5 routes, on every browser. That is a separate CI/tooling gap (baseline generation), out of scope here. Still separately true: no per-domain score cards (Design/DFM/DFA/DFT/BOM/Supply/Firmware/Manufacturer/Policy) were found — findings appear as a flat/tabbed list; no 'Open in KiCad' deep link (only GitHub Actions deep links)."
     },
     {
       "id": "W21",
