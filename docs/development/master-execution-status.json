@@ -980,11 +980,18 @@
         "code": [
           "apps/web/lib/control-plane-slo.ts",
           "apps/web/lib/control-plane-dead-letter-routes.ts",
-          "packages/db/src/control-plane-operations-store.ts"
+          "packages/db/src/control-plane-operations-store.ts",
+          "packages/cloud-core/src/lifecycle.ts",
+          "packages/db/src/transactional-lifecycle-store.ts",
+          "packages/db/migrations/0058_release_run_delivery_id.sql"
         ],
         "tests": [
           "tests/unit/web/control-plane-slo.test.ts",
-          "tests/unit/web/control-plane-dead-letter-routes.test.ts"
+          "tests/unit/web/control-plane-dead-letter-routes.test.ts",
+          "tests/unit/cloud-core/lifecycle.test.ts",
+          "tests/unit/db/transactional-release-run-store.test.ts",
+          "tests/unit/db/migrations.test.ts",
+          "tests/integration/transactional-release-run-outbox-postgres.test.ts"
         ],
         "docs": ["docs/operations/control-plane-reconciliation.md"],
         "deployed": [],
@@ -992,11 +999,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/web/control-plane-slo.test.ts tests/unit/web/control-plane-dead-letter-routes.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/web/control-plane-slo.test.ts tests/unit/web/control-plane-dead-letter-routes.test.ts tests/unit/cloud-core/lifecycle.test.ts tests/unit/db/transactional-release-run-store.test.ts tests/unit/db/migrations.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T23:24:40Z"
       },
-      "remaining": "No distributed tracing implementation exists (no OpenTelemetry dependency; webhook→job→dispatch→ingestion→decision trace propagation is unbuilt); no visual admin dashboard UI for dead-letters (only operator API routes); no explicit correlation-id field threading requests/webhooks/jobs/runs."
+      "remaining": "PARTIAL CLOSE: 'no explicit correlation-id field threading requests/webhooks/jobs/runs' is now addressed for the webhook->release-run path, closing one of three named gaps -- and DB-only per an earlier explicit user decision this session (never in the aggregate webhook-intake telemetry stream, which has its own privacy-motivated test asserting it never contains delivery/tenant identifiers). Previously the GitHub delivery id (X-GitHub-Delivery) was captured at webhook-intake time (webhook_inbox.delivery_id, used only for dedup) but discarded before reaching release_runs -- no query could answer 'which webhook delivery produced this run'. Migration 0058 adds release_runs.delivery_id (nullable text, indexed) and redefines boardreadyops_enqueue_release_run_with_outbox (the same create-or-replace-per-migration pattern already used by 0017/0027/0032/0033) to accept and persist it. packages/cloud-core/src/lifecycle.ts's normalizeGitHubAppWebhook() sets deliveryId on the release_run.enqueue action directly from its own options.delivery parameter (already threaded end-to-end from the real X-GitHub-Delivery header via apps/web/app/api/github/webhook/route.ts) -- no new context-threading needed through the lifecycle planner. deliveryId is optional, not required, to avoid forcing every pre-existing test fixture across ~7 files to add it. Verified against a real, isolated disposable PostgreSQL instance (the same one used for W16/W30's load validation this session): migration 0058 applies cleanly on top of 0001-0057, and a new integration test proves round-trip persistence (a run enqueued with a delivery id has it in release_runs.delivery_id; one enqueued without has null). Still remaining: no distributed tracing implementation exists (no OpenTelemetry dependency; the broader webhook→job→dispatch→ingestion→decision trace propagation this note originally meant is still unbuilt -- only the webhook→release_run edge of that chain is now traceable); no visual admin dashboard UI for dead-letters (only operator API routes)."
     },
     {
       "id": "W30",
