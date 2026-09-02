@@ -42,6 +42,7 @@ exports[`release diff engine > produces a stable diff snapshot for a sample rele
           "severity": "critical",
         },
       ],
+      "improved": [],
       "removed": [
         {
           "fingerprint": "bd202d5b68441a5846163a5314332922de25ae3fed07e7304be754e68653daca",
@@ -66,6 +67,7 @@ exports[`release diff engine > produces a stable diff snapshot for a sample rele
           "severity": "medium",
         },
       ],
+      "worsened": [],
     },
     "outputs": [
       {
@@ -94,7 +96,9 @@ exports[`release diff engine > produces a stable diff snapshot for a sample rele
   "summary": {
     "bomChanged": 2,
     "findingsAdded": 1,
+    "findingsImproved": 0,
     "findingsRemoved": 1,
+    "findingsWorsened": 0,
     "outputsChanged": 1,
     "scoreDelta": 20,
   },
