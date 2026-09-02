@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,7 +19,9 @@ const generatedEnd = "<!-- master-execution-status:end -->";
 export function validateExecutionStatus(value, options = {}) {
   const ledger = recordValue(value, "execution status");
   if (ledger.version !== 1) throw new Error("execution status version must be 1");
-  validateSpec(ledger.spec);
+  const pathExists = options.pathExists ?? existsSync;
+  const readSha256 = options.readSha256 ?? defaultReadSha256;
+  validateSpec(ledger.spec, pathExists, readSha256);
   const roadmap = validateRoadmap(ledger.roadmap);
   validateBaseline(ledger.baseline);
   if (!Array.isArray(ledger.workstreams)) throw new TypeError("workstreams must be an array");
@@ -34,7 +37,7 @@ export function validateExecutionStatus(value, options = {}) {
   for (const id of byId.keys()) if (!executionStatusIds.includes(id)) throw new Error(`unknown workstream ${id}`);
 
   for (const entry of ledger.workstreams) {
-    validateWorkstream(entry, roadmap, byId, options.pathExists ?? existsSync);
+    validateWorkstream(entry, roadmap, byId, pathExists);
   }
   validateDependencyGraph(byId);
   return ledger;
@@ -122,6 +125,7 @@ export async function main(root = process.cwd(), args = process.argv.slice(2)) {
   const documentPath = join(root, "docs", "development", "master-execution-status.md");
   const status = validateExecutionStatus(JSON.parse(await readFile(dataPath, "utf8")), {
     pathExists: (path) => existsSync(join(root, path)),
+    readSha256: (path) => defaultReadSha256(join(root, path)),
   });
   const document = await readFile(documentPath, "utf8");
   validateExecutionDetailsSection(document, status);
@@ -135,11 +139,25 @@ export async function main(root = process.cwd(), args = process.argv.slice(2)) {
   await writeFile(documentPath, next, "utf8");
 }
 
-function validateSpec(value) {
+function defaultReadSha256(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function validateSpec(value, pathExists, readSha256) {
   const spec = recordValue(value, "spec");
   requiredString(spec.path, "spec path");
   const digest = requiredString(spec.sha256, "spec sha256");
   if (!/^[0-9a-f]{64}$/u.test(digest)) throw new Error("spec sha256 must be lowercase hex");
+  if (typeof spec.verified !== "boolean") throw new TypeError("spec verified must be a boolean");
+  if (spec.verified) {
+    if (!pathExists(spec.path)) throw new Error(`spec path missing: ${spec.path}`);
+    const actual = readSha256(spec.path);
+    if (actual !== digest) {
+      throw new Error(`spec sha256 mismatch: ${spec.path} hashes to ${actual}, ledger expects ${digest}`);
+    }
+  } else {
+    requiredString(spec.provenance, "spec provenance");
+  }
 }
 
 function validateRoadmap(value) {

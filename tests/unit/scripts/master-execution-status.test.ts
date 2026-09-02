@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,6 +51,8 @@ function validLedger() {
     spec: {
       path: "BoardReadyOps_Agent_Master_Development_Spec.md",
       sha256: "e02df14e4105945ac1d8bb8dc13d132e04dd27803e560288548f9c3e60857c62",
+      verified: false,
+      provenance: "Supplied out-of-band; not present in this repository as of this audit.",
     },
     roadmap: {
       source: "https://github.com/oaslananka/boardreadyops/issues/191",
@@ -102,6 +105,36 @@ describe("master execution status validation", () => {
     first.status = "implemented";
     delete first.remaining;
     expect(() => validateExecutionStatus(ledger)).toThrow("W00 implemented evidence missing");
+  });
+
+  it("rejects an unverified spec without a provenance explanation", () => {
+    const ledger = validLedger();
+    ledger.spec = { path: ledger.spec.path, sha256: ledger.spec.sha256, verified: false, provenance: "" };
+    expect(() => validateExecutionStatus(ledger)).toThrow("spec provenance missing");
+  });
+
+  it("rejects a verified spec whose path does not exist", () => {
+    const ledger = validLedger();
+    ledger.spec = { ...ledger.spec, verified: true };
+    expect(() => validateExecutionStatus(ledger, { pathExists: () => false })).toThrow(
+      "spec path missing: BoardReadyOps_Agent_Master_Development_Spec.md",
+    );
+  });
+
+  it("rejects a verified spec whose digest does not match the file", () => {
+    const ledger = validLedger();
+    ledger.spec = { ...ledger.spec, verified: true };
+    expect(() => validateExecutionStatus(ledger, { pathExists: () => true, readSha256: () => "0".repeat(64) })).toThrow(
+      "spec sha256 mismatch",
+    );
+  });
+
+  it("accepts a verified spec whose digest matches the file content", () => {
+    const content = "master spec content";
+    const digest = createHash("sha256").update(content).digest("hex");
+    const ledger = validLedger();
+    ledger.spec = { ...ledger.spec, sha256: digest, verified: true };
+    expect(() => validateExecutionStatus(ledger, { pathExists: () => true, readSha256: () => digest })).not.toThrow();
   });
 });
 
