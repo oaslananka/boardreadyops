@@ -4,6 +4,8 @@ import path from "node:path";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import generateRecipeSchema from "../../schemas/generate-recipe.schema.json" with { type: "json" };
 import { boardReadyVersion } from "../generated/version.js";
+import { resolveGitExecutable } from "../util/git-resolver.js";
+import { canonicalizeJson } from "../util/json.js";
 import { runProcess } from "../util/process.js";
 import { redactControlCharacters } from "../util/strings.js";
 
@@ -186,6 +188,10 @@ export interface GenerateOptions {
   generatedAt?: string | undefined;
   projectName?: string | undefined;
   recipeSource?: string | undefined;
+  /** kicad-cli version string, as reported by `detectKicadCli()`. */
+  kicadVersion?: string | undefined;
+  /** Directory to read git provenance from; typically the project root. */
+  gitRoot?: string | undefined;
 }
 
 interface GenerateStepOutcome {
@@ -212,14 +218,44 @@ export interface GenerateResult {
   failures: number;
 }
 
+interface GenerateGitState {
+  sha?: string | undefined;
+  dirty?: boolean | undefined;
+}
+
 interface GenerateManifest {
   schemaVersion: 1;
   tool: { name: "boardreadyops"; version: string };
   generatedAt: string;
   project: { name?: string; board?: string; schematic?: string; variant?: string };
-  recipe: { source: string; steps: GenerateRecipeStep[] };
+  recipe: { source: string; hash: string; steps: GenerateRecipeStep[] };
+  kicadVersion?: string | undefined;
+  git?: GenerateGitState | undefined;
+  environment: { platform: string; nodeVersion: string };
   steps: GenerateStepOutcome[];
   artifacts: GeneratedArtifact[];
+}
+
+/**
+ * Best-effort git provenance for the manifest: no sha/dirty state when the
+ * directory isn't a git repository, git isn't installed, or the lookup
+ * otherwise fails -- provenance is informational, not a hard requirement.
+ */
+async function gitState(root: string): Promise<GenerateGitState> {
+  try {
+    const gitExecutable = resolveGitExecutable();
+    const [sha, status] = await Promise.all([
+      runProcess(gitExecutable, ["rev-parse", "HEAD"], { cwd: root, timeoutMs: 10_000 }),
+      runProcess(gitExecutable, ["status", "--porcelain"], { cwd: root, timeoutMs: 10_000 }),
+    ]);
+    if (sha.code !== 0) {
+      return {};
+    }
+    const trimmedSha = sha.stdout.trim();
+    return trimmedSha ? { sha: trimmedSha, dirty: status.stdout.trim().length > 0 } : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptions): Promise<GenerateResult> {
@@ -273,6 +309,9 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
   artifacts.sort((left, right) => left.path.localeCompare(right.path));
   outcomes.sort((left, right) => KIND_ORDER.indexOf(left.kind) - KIND_ORDER.indexOf(right.kind));
 
+  const recipeHash = createHash("sha256").update(canonicalizeJson(recipe)).digest("hex");
+  const git = options.gitRoot ? await gitState(options.gitRoot) : {};
+
   const manifest: GenerateManifest = {
     schemaVersion: 1,
     tool: { name: "boardreadyops", version: boardReadyVersion },
@@ -283,7 +322,10 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
       ...(options.schematicFile ? { schematic: path.basename(options.schematicFile) } : {}),
       ...(options.variant ? { variant: options.variant } : {}),
     },
-    recipe: { source: options.recipeSource ?? "default", steps: recipe.steps },
+    recipe: { source: options.recipeSource ?? "default", hash: recipeHash, steps: recipe.steps },
+    ...(options.kicadVersion ? { kicadVersion: options.kicadVersion } : {}),
+    ...(git.sha ? { git } : {}),
+    environment: { platform: process.platform, nodeVersion: process.version },
     steps: outcomes,
     artifacts,
   };

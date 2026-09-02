@@ -200,7 +200,7 @@
           "schemas/generate-recipe.schema.json"
         ],
         "tests": ["tests/unit/release/generate.test.ts"],
-        "docs": ["docs/integrations/kibot.md"],
+        "docs": ["docs/integrations/kibot.md", "docs/cli.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
@@ -208,9 +208,9 @@
       "verification": {
         "command": "corepack pnpm vitest run tests/unit/release/generate.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T21:53:07Z"
       },
-      "remaining": "No integration test exercises real kicad-cli output generation (tests/integration/e2e.test.ts runs with --skip-generate); the manifest omits source-commit/KiCad-version/recipe-hash/environment provenance fields; no jobset-vs-recipe conflict reporting or reproducibility score."
+      "remaining": "PARTIAL CLOSE: the generation manifest's missing provenance fields are now added, closing one of three named gaps. src/release/generate.ts's GenerateManifest gains recipe.hash (SHA-256 of the recipe's RFC 8785 canonicalized JSON, reusing canonicalizeJson from src/util/json.ts rather than a new hash function -- so two recipes that are equivalent but differently key-ordered hash identically), kicadVersion (plumbed through from detectKicadCli()'s already-detected version, previously discarded after only cli.path was used), git (sha/dirty, only present when the caller supplies gitRoot -- deliberately opt-in rather than defaulting to process.cwd(), so a caller that doesn't pass gitRoot never spawns a git subprocess; the CLI command always passes it), and environment (process.platform, process.version -- no existing 'environment' precedent in any manifest in this codebase, so this is a new, minimal definition, not an extension of one). Git detection uses resolveGitExecutable() (src/util/git-resolver.ts, the safe non-PATH-based resolution already adopted in src/cli/commands/review.ts) rather than the plain PATH-based execFileAsync('git', ...) that src/cli/commands/release.ts's own gitState() still uses -- flagging that inconsistency for a future unification pass rather than refactoring release.ts here (out of scope, it isn't broken). 8 new unit tests cover: hash format and determinism across key-reordered-but-equivalent recipes, kicadVersion/environment passthrough, git provenance absent by default and when gitRoot isn't a repository, and a real sha/dirty read against this repository's own checkout. Still remaining: no integration test exercises real kicad-cli output generation (tests/integration/e2e.test.ts runs with --skip-generate); no jobset-vs-recipe conflict reporting or reproducibility score -- both are separate, larger features, not attempted here."
     },
     {
       "id": "W05",

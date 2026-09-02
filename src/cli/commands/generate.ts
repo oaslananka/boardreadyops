@@ -71,6 +71,8 @@ export async function generateCommand(
     runner: createKicadCliRunner(cli.path),
     projectName: path.basename(project.projectFile, ".kicad_pro"),
     recipeSource: options.recipe ? normalizePathInput(options.recipe) : "default",
+    ...(cli.version ? { kicadVersion: cli.version } : {}),
+    gitRoot: root,
   });
 
   if (options.format === "json") {
