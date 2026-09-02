@@ -1,8 +1,24 @@
+import type { Logger } from "../core/logger.js";
+
 export type Fetcher = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
 export interface HttpNotifierDependencies {
   env?: Record<string, string | undefined> | undefined;
   fetcher?: Fetcher | undefined;
+  logger?: Logger | undefined;
+}
+
+// webhookEnv is a repo-controlled config value (config.webhookEnv) naming an environment variable
+// to read the actual webhook URL from. Nothing restricts that name, so a config change could point
+// it at any env var present in the environment for an unrelated purpose. This is a naming
+// convention check only -- it does not block delivery -- because a hard schema restriction is a
+// breaking change per docs/architecture/contract-versioning.md (an existing config with a
+// non-conforming name would silently fall back to the default config, disabling every notifier,
+// not just webhooks). See docs/development/master-execution-status.json's W28 entry.
+const webhookEnvNamePattern = /webhook/iu;
+
+export function isRecognizedWebhookEnvName(name: string | undefined): boolean {
+  return typeof name === "string" && webhookEnvNamePattern.test(name);
 }
 
 export function envValue(

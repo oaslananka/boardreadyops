@@ -42828,6 +42828,10 @@ function renderNotificationText(payload) {
 }
 
 // src/notifiers/http.ts
+var webhookEnvNamePattern = /webhook/iu;
+function isRecognizedWebhookEnvName(name) {
+  return typeof name === "string" && webhookEnvNamePattern.test(name);
+}
 function envValue(env, name) {
   if (!name) {
     return void 0;
@@ -42865,6 +42869,12 @@ var WebhookNotifierBase = class {
     const webhookUrl = this.webhookUrl();
     if (!webhookUrl) {
       return { notifier: this.id, status: "skipped", reason: "unavailable" };
+    }
+    if (!isRecognizedWebhookEnvName(this.config.webhookEnv)) {
+      this.dependencies.logger?.warn("notifier.webhook.unrecognized-env-name", {
+        notifier: this.id,
+        webhookEnv: this.config.webhookEnv
+      });
     }
     await postJson(this.dependencies.fetcher, webhookUrl, this.body(payload));
     return { notifier: this.id, status: "sent" };
