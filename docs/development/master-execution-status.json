@@ -527,12 +527,14 @@
           "apps/web/lib/webhook-rate-limit.ts",
           "packages/cloud-core/src/lifecycle-executor.ts",
           "packages/contracts/src/runner-protocol.ts",
-          "scripts/target-repository-isolation.mjs"
+          "scripts/target-repository-isolation.mjs",
+          "src/core/cloud-findings.ts"
         ],
         "tests": [
           "tests/unit/web/github-app-check-run-client.test.ts",
           "tests/unit/web/webhook-rate-limit.test.ts",
-          "tests/unit/scripts/target-repository-isolation.test.ts"
+          "tests/unit/scripts/target-repository-isolation.test.ts",
+          "tests/unit/core/cloud-findings.test.ts"
         ],
         "docs": ["docs/security/github-app-permissions.md", "docs/architecture/github-app-rfc.md"],
         "deployed": [],
@@ -540,11 +542,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/web/github-app-check-run-client.test.ts tests/unit/web/webhook-rate-limit.test.ts tests/unit/scripts/target-repository-isolation.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/web/github-app-check-run-client.test.ts tests/unit/web/webhook-rate-limit.test.ts tests/unit/scripts/target-repository-isolation.test.ts tests/unit/core/cloud-findings.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-02T03:40:19Z"
+        "checkedAt": "2026-09-02T04:44:21Z"
       },
-      "remaining": "PARTIAL CLOSE: 'no Check-Run annotations array is emitted, so limit/pagination/truncation is unverified' is narrower now. apps/web/lib/github-app-check-run-client.js exports completeGitHubCheckRun(), which accepts an optional annotations array (GitHubCheckRunAnnotation, packages/cloud-core/src/lifecycle-executor.ts), maps it to GitHub's snake_case annotation shape, and chunks it into groups of <=50 per GitHub's documented per-request limit (https://docs.github.com/en/rest/checks/runs#update-a-check-run), issuing one PATCH per chunk (the first carries status/conclusion/completed_at, later ones append annotations only, matching GitHub's documented append-on-repeated-PATCH behavior). 3 new regression tests cover: no-annotations backward compatibility (identical request body to before), field-mapping correctness for <=50, and correct chunking/pagination for 120 annotations (50+50+20, 3 requests). Deliberately not done in this slice: no caller passes real annotations yet -- nothing in the pipeline currently maps individual findings (file/line/message) into GitHubCheckRunAnnotation objects and threads them into completeCheckRun's input, so the capability exists but isn't wired to real finding data end-to-end. Still also missing: no explicit re-run command/API found. HMAC verification, delivery idempotency, fail-closed safeMode, OIDC result binding, and two-installation isolation evidence remain real and tested."
+      "remaining": "FURTHER PARTIAL CLOSE: the client-capability layer (completeGitHubCheckRun with pagination) now has a matching finding-to-annotation mapping. src/core/cloud-findings.ts's findingToCheckRunAnnotation()/findingsToCheckRunAnnotations() convert a Finding (ruleId, severity, message, resource.path, optional location) into the check-run-client's annotation shape: severity critical/high->failure, medium->warning, low/info->notice; a finding with no location returns undefined (dropped) since GitHub annotations require a file+line range to attach to. The type is duplicated structurally in src/core rather than importing GitHubCheckRunAnnotation from packages/cloud-core, matching the CLI/cloud isolation boundary (src/core must never depend on @boardreadyops/cloud-core). 8 new regression tests cover: locationless finding dropped, simple line location, region-over-bare-line preference with columns, all 5 severity-to-level mappings, and batch mapping silently dropping locationless findings. Investigated and deliberately did NOT wire this into src/action/cloud-publish.ts's POST to /api/v1/runs: apps/web/app/api/v1/runs/route.ts's ingestRunRequestSchema has no .strict(), so adding an annotations field to the outbound payload would be silently accepted (safe) but currently unused (the schema doesn't declare it and no DB-backed code reads it) -- sending data nobody consumes yet is speculative, not a real integration. The actual remaining gap: the server-side schema needs an annotations field added, and the check-run-complete effect construction (traced to apps/web/lib/control-plane-outbox-worker.ts / packages/db/src/control-plane-outbox-store.ts) needs to thread it through to completeCheckRun's input -- both require Postgres-backed integration testing not available in this environment (no local DATABASE_URL/Docker), flagged as a follow-up. Still also missing: no explicit re-run command/API found. HMAC verification, delivery idempotency, fail-closed safeMode, OIDC result binding, and two-installation isolation evidence remain real and tested."
     },
     {
       "id": "W16",
