@@ -613,8 +613,10 @@ describe("webhook env-name resolution (SSRF-adjacent confused-deputy characteris
     // workflow that checks out the PR head, a PR author can set webhookEnv to the NAME of any env
     // var they can guess, and this notifier will POST the run's findings to whatever URL-shaped
     // value that name resolves to in the CI environment -- even if that env var was never intended
-    // as a webhook target. This test documents that this is current, real behavior; it is not fixed
-    // here (see the W28 ledger remaining note for the proposed allowlist-pattern follow-up).
+    // as a webhook target. Delivery is intentionally not blocked here (see the naming-convention
+    // warning tests below): a hard schema restriction was rejected as a breaking change per
+    // docs/architecture/contract-versioning.md. This test documents that the redirection itself
+    // still succeeds; it's made visible via a warning, not prevented.
     const requests: string[] = [];
     const fetcher = async (url: string | URL) => {
       requests.push(String(url));
@@ -631,6 +633,44 @@ describe("webhook env-name resolution (SSRF-adjacent confused-deputy characteris
     );
 
     expect(requests).toEqual([env.INTERNAL_METRICS_INGEST_URL]);
+  });
+
+  it("warns (but still delivers) when webhookEnv doesn't look like a webhook secret name", async () => {
+    // A hard schema restriction was considered and rejected: it's a breaking change per
+    // docs/architecture/contract-versioning.md (an existing config with a non-conforming name would
+    // silently fall back to the default config, disabling every notifier, not just webhooks). This
+    // warning is the chosen mitigation instead -- non-blocking, zero backward-compat risk, but makes
+    // the redirection visible in logs rather than silent.
+    const logger = createLogger("silent");
+    const warnSpy = vi.spyOn(logger, "warn");
+    const fetcher = async () => new Response("ok", { status: 200 });
+    const env = { INTERNAL_METRICS_INGEST_URL: "https://internal-metrics.example.test/ingest" };
+
+    const result = await new SlackNotifier(
+      { enabled: true, webhookEnv: "INTERNAL_METRICS_INGEST_URL" },
+      { env, fetcher, logger },
+    ).notify(samplePayload());
+
+    expect(result.status).toBe("sent");
+    expect(warnSpy).toHaveBeenCalledWith("notifier.webhook.unrecognized-env-name", {
+      notifier: "slack",
+      webhookEnv: "INTERNAL_METRICS_INGEST_URL",
+    });
+  });
+
+  it("does not warn when webhookEnv matches the recognized naming convention", async () => {
+    const logger = createLogger("silent");
+    const warnSpy = vi.spyOn(logger, "warn");
+    const fetcher = async () => new Response("ok", { status: 200 });
+    const env = { SLACK_WEBHOOK_URL: "https://hooks.slack.test/services/T000/B000/secret" };
+
+    const result = await new SlackNotifier(
+      { enabled: true, webhookEnv: "SLACK_WEBHOOK_URL" },
+      { env, fetcher, logger },
+    ).notify(samplePayload());
+
+    expect(result.status).toBe("sent");
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it("fails closed (sends nothing) when the named env var is unset, rather than posting to an empty/undefined URL", async () => {
