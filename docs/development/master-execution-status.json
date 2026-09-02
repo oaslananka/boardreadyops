@@ -653,10 +653,10 @@
       },
       "verification": {
         "command": "corepack pnpm vitest run tests/integration/artifact-deletion-store-postgres.test.ts tests/unit/web/artifact-download-route.test.ts tests/unit/web/retention-maintenance-worker.test.ts",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "result": "pass",
+        "checkedAt": "2026-09-03T00:15:20Z"
       },
-      "remaining": "Only the local-filesystem storage driver is wired (S3/GCS/Azure Blob return HTTP 501, per the driver's own docs); no malware/archive-bomb scanning; region/residency routing (kms-adapter.ts getTenantDataRegion) is an unused stub; age-based retention purge is previewed but not activated, matching open issue #44."
+      "remaining": "Verification confirmed real, not just asserted: this workstream's own test command (including a Postgres-integration test) had never actually been run in this environment (result was not_run). Ran it against a real, isolated disposable PostgreSQL instance -- 3 files, 20 tests, all pass. Only the local-filesystem storage driver is wired (S3/GCS/Azure Blob return HTTP 501, per the driver's own docs); no malware/archive-bomb scanning; region/residency routing (kms-adapter.ts getTenantDataRegion) is an unused stub; age-based retention purge is previewed but not activated, matching open issue #44."
     },
     {
       "id": "W19",
