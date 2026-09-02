@@ -45152,6 +45152,7 @@ function runProcess(command, args, options = {}) {
     } : { command, args };
     const child = (0, import_node_child_process2.spawn)(commandLine.command, commandLine.args, {
       cwd: options.cwd,
+      env: options.env,
       windowsHide: true,
       windowsVerbatimArguments: useCmdShim,
       stdio: ["ignore", "pipe", "pipe"]
@@ -53737,12 +53738,29 @@ function createKicadCliRunner(cliPath) {
     return { code: result.code ?? 1, stdout: result.stdout, stderr: result.stderr, timedOut: result.timedOut };
   };
 }
+var GIT_DISCOVERY_OVERRIDE_VARS = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_COMMON_DIR",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CEILING_DIRECTORIES"
+];
+function gitDiscoveryEnv() {
+  const env = { ...process.env };
+  for (const key of GIT_DISCOVERY_OVERRIDE_VARS) {
+    delete env[key];
+  }
+  return env;
+}
 async function gitState(root) {
   try {
     const gitExecutable = resolveGitExecutable();
+    const env = gitDiscoveryEnv();
     const [sha, status] = await Promise.all([
-      runProcess(gitExecutable, ["rev-parse", "HEAD"], { cwd: root, timeoutMs: 1e4 }),
-      runProcess(gitExecutable, ["status", "--porcelain"], { cwd: root, timeoutMs: 1e4 })
+      runProcess(gitExecutable, ["rev-parse", "HEAD"], { cwd: root, env, timeoutMs: 1e4 }),
+      runProcess(gitExecutable, ["status", "--porcelain"], { cwd: root, env, timeoutMs: 1e4 })
     ]);
     if (sha.code !== 0) {
       return {};

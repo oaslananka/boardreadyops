@@ -56,6 +56,26 @@ describe("runProcess cancellation", () => {
     expect(result.timedOut).toBe(false);
     expect(result.error).toBeTruthy();
   });
+
+  it("replaces the child's environment instead of inheriting process.env when env is supplied", async () => {
+    const result = await runProcess(
+      process.execPath,
+      ["-e", "process.stdout.write(JSON.stringify({ marker: process.env.BOARDREADYOPS_TEST_MARKER ?? null }))"],
+      { timeoutMs: 2_000, env: { BOARDREADYOPS_TEST_MARKER: "custom-env" } },
+    );
+
+    expect(JSON.parse(result.stdout)).toEqual({ marker: "custom-env" });
+  });
+
+  it("inherits process.env when no env override is supplied", async () => {
+    const result = await runProcess(
+      process.execPath,
+      ["-e", 'process.stdout.write(JSON.stringify({ hasPath: typeof process.env.PATH === "string" }))'],
+      { timeoutMs: 2_000 },
+    );
+
+    expect(JSON.parse(result.stdout)).toEqual({ hasPath: true });
+  });
 });
 
 async function waitForFile(filePath: string): Promise<void> {

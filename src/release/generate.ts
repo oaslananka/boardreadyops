@@ -236,6 +236,28 @@ interface GenerateManifest {
   artifacts: GeneratedArtifact[];
 }
 
+// Git honors these over cwd-based repository discovery. A caller that invokes this from inside
+// another git operation (a hook, a wrapper script) may have them set for its own repository --
+// left alone, they would make git resolve `root`'s provenance from the WRONG repository instead
+// of failing closed. Stripped so `root` is the sole authority on which repository is inspected.
+const GIT_DISCOVERY_OVERRIDE_VARS = [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_COMMON_DIR",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CEILING_DIRECTORIES",
+];
+
+function gitDiscoveryEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of GIT_DISCOVERY_OVERRIDE_VARS) {
+    delete env[key];
+  }
+  return env;
+}
+
 /**
  * Best-effort git provenance for the manifest: no sha/dirty state when the
  * directory isn't a git repository, git isn't installed, or the lookup
@@ -244,9 +266,10 @@ interface GenerateManifest {
 async function gitState(root: string): Promise<GenerateGitState> {
   try {
     const gitExecutable = resolveGitExecutable();
+    const env = gitDiscoveryEnv();
     const [sha, status] = await Promise.all([
-      runProcess(gitExecutable, ["rev-parse", "HEAD"], { cwd: root, timeoutMs: 10_000 }),
-      runProcess(gitExecutable, ["status", "--porcelain"], { cwd: root, timeoutMs: 10_000 }),
+      runProcess(gitExecutable, ["rev-parse", "HEAD"], { cwd: root, env, timeoutMs: 10_000 }),
+      runProcess(gitExecutable, ["status", "--porcelain"], { cwd: root, env, timeoutMs: 10_000 }),
     ]);
     if (sha.code !== 0) {
       return {};
