@@ -90,6 +90,7 @@ nav:
           - Annotations: reports/annotations.md
       - Multi-project Workspaces: multi-project.md
       - Cross-platform Paths: cross-platform.md
+      - API Tokens: api-tokens.md
       - How-to Guides:
           - CI Quality Gates: how-to/ci-quality-gates.md
   - Hardware Gates:
