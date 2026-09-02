@@ -606,6 +606,50 @@ notifiers:
   });
 });
 
+describe("webhook env-name resolution (SSRF-adjacent confused-deputy characteristic)", () => {
+  it("posts to whatever URL the named env var holds, not just an intended webhook secret", async () => {
+    // config.webhookEnv is only a lookup key (schemas/config.schema.json puts no allowlist/pattern
+    // on it), and boardreadyops.yml is repository-controlled config. On a `pull_request`-triggered
+    // workflow that checks out the PR head, a PR author can set webhookEnv to the NAME of any env
+    // var they can guess, and this notifier will POST the run's findings to whatever URL-shaped
+    // value that name resolves to in the CI environment -- even if that env var was never intended
+    // as a webhook target. This test documents that this is current, real behavior; it is not fixed
+    // here (see the W28 ledger remaining note for the proposed allowlist-pattern follow-up).
+    const requests: string[] = [];
+    const fetcher = async (url: string | URL) => {
+      requests.push(String(url));
+      return new Response("ok", { status: 200 });
+    };
+    const env = {
+      // An env var present for an unrelated purpose (e.g. an internal service used elsewhere in CI),
+      // not set up by the operator as a notification target.
+      INTERNAL_METRICS_INGEST_URL: "https://internal-metrics.example.test/ingest",
+    };
+
+    await new SlackNotifier({ enabled: true, webhookEnv: "INTERNAL_METRICS_INGEST_URL" }, { env, fetcher }).notify(
+      samplePayload(),
+    );
+
+    expect(requests).toEqual([env.INTERNAL_METRICS_INGEST_URL]);
+  });
+
+  it("fails closed (sends nothing) when the named env var is unset, rather than posting to an empty/undefined URL", async () => {
+    const requests: string[] = [];
+    const fetcher = async (url: string | URL) => {
+      requests.push(String(url));
+      return new Response("ok", { status: 200 });
+    };
+
+    const result = await new SlackNotifier(
+      { enabled: true, webhookEnv: "SOME_ENV_VAR_THAT_IS_NOT_SET" },
+      { env: {}, fetcher },
+    ).notify(samplePayload());
+
+    expect(result).toEqual({ notifier: "slack", status: "skipped", reason: "unavailable" });
+    expect(requests).toEqual([]);
+  });
+});
+
 function samplePayload(): NotificationPayload {
   const finding = createFinding({
     ruleId: "bom.missing-mpn",
