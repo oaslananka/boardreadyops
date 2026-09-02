@@ -129,6 +129,7 @@
           "tests/unit/contracts/billing.test.ts",
           "tests/unit/contracts/review-contracts.test.ts",
           "tests/unit/contracts/runner-protocol.test.ts",
+          "tests/unit/contracts/runner-protocol-forward-compat.test.ts",
           "tests/snapshot/schemas.snapshot.test.ts",
           "tests/unit/core/schema-compatibility.test.ts",
           "tests/unit/util/json.test.ts"
@@ -139,11 +140,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/contracts/billing.test.ts tests/unit/contracts/review-contracts.test.ts tests/unit/contracts/runner-protocol.test.ts tests/snapshot/schemas.snapshot.test.ts tests/unit/core/schema-compatibility.test.ts tests/unit/util/json.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/contracts/billing.test.ts tests/unit/contracts/review-contracts.test.ts tests/unit/contracts/runner-protocol.test.ts tests/unit/contracts/runner-protocol-forward-compat.test.ts tests/snapshot/schemas.snapshot.test.ts tests/unit/core/schema-compatibility.test.ts tests/unit/util/json.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T02:22:53Z"
       },
-      "remaining": "The schema-shape drift guard (tests/snapshot/schemas.snapshot.test.ts, PR #568) and RFC 8785 canonicalization (src/util/json.ts) now close two acceptance items. Remaining: consumer-driven contract tests spanning CLI→Cloud/Action→Cloud/Runner→Control-Plane boundaries specifically, and explicit unknown-enum-value forward-compatibility tests."
+      "remaining": "The schema-shape drift guard (tests/snapshot/schemas.snapshot.test.ts, PR #568) and RFC 8785 canonicalization (src/util/json.ts) now close two acceptance items. tests/unit/contracts/runner-protocol-forward-compat.test.ts adds the explicit unknown-enum-value and unknown-additional-field forward-compatibility tests this entry previously lacked, for the Runner<->Control-Plane boundary (packages/contracts/src/runner-protocol.ts). It documents current behavior rather than changing it, because writing it surfaced a real design tension worth flagging rather than resolving in the same PR: docs/architecture/contract-versioning.md states 'Consumers must ignore unknown fields' for additive optional fields, but every response schema the runner client parses uses zod's .strict(), which rejects them -- a documented policy violation. A first attempt to relax .strict() uniformly on all five response schemas broke an existing security test (tests/unit/contracts/runner-protocol.test.ts, 'keeps activation token-authenticated and rejects caller-selected tenant identity'): .strict() is deliberately guarding runnerRegistrationActivationResponseSchema against tenant-identity-field smuggling, not just accidentally strict. Reconciling the two requires a schema-by-schema security triage (which responses carry no identity/authority-bearing fields and can safely tolerate unknown additive fields, vs which must stay strict) that deserves its own focused review, not a blanket sweep. Also still remaining: consumer-driven contract tests spanning the CLI->Cloud and Action->Cloud boundaries specifically (Runner->Control-Plane is now covered)."
     },
     {
       "id": "W03",
