@@ -67,8 +67,7 @@ export function DeadLettersPanel({
 
   return (
     <>
-      {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable overflow-x region needs tabIndex so keyboard users can scroll it (WCAG 2.1.1, axe scrollable-region-focusable). */}
-      <section className="table-scroll" aria-labelledby="dead-letters-table-caption" tabIndex={0}>
+      <section className="table-scroll" aria-labelledby="dead-letters-table-caption">
         <table>
           <caption id="dead-letters-table-caption">Dead-lettered jobs and outbox records</caption>
           <thead>
