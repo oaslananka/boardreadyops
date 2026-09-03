@@ -18,6 +18,9 @@ export function parseAuthenticatedAuditOptions(environment = process.env, argv =
   if (!session) throw new Error("BROPS_SESSION is required");
 
   const url = new URL(environment.BROPS_UNLIGHTHOUSE_SITE || defaultSite);
+  if (url.hostname !== "boardreadyops.com" && !isLoopback(url.hostname)) {
+    throw new Error("BROPS_UNLIGHTHOUSE_SITE must target boardreadyops.com or loopback");
+  }
   if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopback(url.hostname))) {
     throw new Error("BROPS_UNLIGHTHOUSE_SITE must use HTTPS unless it targets loopback");
   }
@@ -49,6 +52,7 @@ export function buildAuthenticatedUnlighthouseConfig({ site, session, routes, he
     },
     puppeteerClusterOptions: { maxConcurrency: 1 },
     puppeteerOptions: { headless: !headful },
+    chrome: { useSystem: true, useDownloadFallback: false },
     lighthouseOptions: {
       disableStorageReset: true,
       onlyCategories: categories,

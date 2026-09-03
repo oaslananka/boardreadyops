@@ -181,3 +181,25 @@ it("loads the generated manifest and ephemeral session through the shared config
   expect(source).toContain("authenticated-routes.json");
   expect(source).not.toContain("valid.session");
 });
+
+it("uses an installed browser and refuses runtime browser downloads", async () => {
+  const { buildAuthenticatedUnlighthouseConfig } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  const config = buildAuthenticatedUnlighthouseConfig({
+    site: "https://boardreadyops.com",
+    session: "ephemeral",
+    routes: ["/dashboard"],
+  });
+
+  expect(config.chrome).toEqual({ useSystem: true, useDownloadFallback: false });
+});
+
+it("never sends the authenticated session to an untrusted host", async () => {
+  const { parseAuthenticatedAuditOptions } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+
+  expect(() =>
+    parseAuthenticatedAuditOptions({
+      BROPS_SESSION: "ephemeral",
+      BROPS_UNLIGHTHOUSE_SITE: "https://example.com",
+    }),
+  ).toThrow("BROPS_UNLIGHTHOUSE_SITE must target boardreadyops.com or loopback");
+});
