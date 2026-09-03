@@ -83118,6 +83118,11 @@ function parseDelimitedRows(text, delimiter2) {
   return rows;
 }
 
+// src/util/errors.ts
+var HostileInputError = class extends Error {
+  name = "HostileInputError";
+};
+
 // src/bom/identity.ts
 var import_node_crypto3 = __toESM(require("node:crypto"), 1);
 function stableComponentKey(reference, mpn, manufacturer) {
@@ -83130,6 +83135,7 @@ function stableComponentKey(reference, mpn, manufacturer) {
 }
 
 // src/bom/normalizer.ts
+var MAX_BOM_ROWS = 1e5;
 var aliases = {
   reference: ["reference", "refs", "ref", "designator", "references"],
   value: ["value", "part", "description"],
@@ -83140,6 +83146,11 @@ var aliases = {
   compliance: ["compliance", "rohs", "reach", "rohs status", "rohs/reach", "environmental"]
 };
 function normalizeBomRows(rows, sourcePath2) {
+  if (rows.length > MAX_BOM_ROWS) {
+    throw new HostileInputError(
+      `BOM input exceeds maximum row count of ${MAX_BOM_ROWS} (received ${rows.length} rows) for ${sourcePath2}`
+    );
+  }
   const output = [];
   for (const [index, raw] of rows.entries()) {
     const normalized = normalizedMap(raw);
@@ -83497,8 +83508,68 @@ function processSexprToken(text, char, position, nodes, stack, errors) {
   appendNode(nodes, stack, parseAtom(text, position));
 }
 
+// src/kicad/project-model.ts
+var MAX_KICAD_TEXT_BYTES = 64 * 1024 * 1024;
+function parseKicadDocument(text, kind = "unknown") {
+  const byteLength = Buffer.byteLength(text, "utf8");
+  if (byteLength > MAX_KICAD_TEXT_BYTES) {
+    throw new HostileInputError(
+      `KiCad ${kind} document exceeds maximum size of ${MAX_KICAD_TEXT_BYTES} bytes (received ${byteLength} bytes)`
+    );
+  }
+  const ast = parseSexprDocument(text);
+  const root = ast.nodes.find((node) => node.kind === "list");
+  const model = { kind, text, ast };
+  if (root) {
+    model.root = root;
+    const version4 = listChildValue(root, "version") ?? listChildValue(root, "generator_version");
+    if (version4) {
+      model.formatVersion = version4;
+    }
+  }
+  return model;
+}
+function findKiCadLists(modelOrList, head, options = {}) {
+  if ("ast" in modelOrList) {
+    return findSexprLists(modelOrList.ast, head, options);
+  }
+  return findSexprLists(modelOrList, head, options);
+}
+function directChildLists(list, head) {
+  return sexprChildLists(list, head);
+}
+function listHead(list) {
+  return sexprHead(list);
+}
+function listValue(list, index = 1) {
+  return sexprListValue(list, index);
+}
+function listChildValue(list, head, index = 1) {
+  return sexprChildValue(list, head, index);
+}
+function propertyValue(list, property2) {
+  for (const child of directChildLists(list, "property")) {
+    if (listValue(child, 1) === property2) {
+      return listValue(child, 2);
+    }
+  }
+  return void 0;
+}
+function descendantScalars(list) {
+  return sexprDescendantScalars(list);
+}
+function sourceText(model, node) {
+  return sexprSourceText(model.text, node);
+}
+
 // src/kicad/variants.ts
 function parseVariants(projectFileContent) {
+  const byteLength = Buffer.byteLength(projectFileContent, "utf8");
+  if (byteLength > MAX_KICAD_TEXT_BYTES) {
+    throw new HostileInputError(
+      `KiCad project/variant input exceeds maximum size of ${MAX_KICAD_TEXT_BYTES} bytes (received ${byteLength} bytes)`
+    );
+  }
   const parsed = parseJson(projectFileContent);
   if (parsed) {
     return collectJsonVariants(parsed);
@@ -83588,53 +83659,6 @@ async function readDesignFile(file2) {
   } catch {
     return void 0;
   }
-}
-
-// src/kicad/project-model.ts
-function parseKicadDocument(text, kind = "unknown") {
-  const ast = parseSexprDocument(text);
-  const root = ast.nodes.find((node) => node.kind === "list");
-  const model = { kind, text, ast };
-  if (root) {
-    model.root = root;
-    const version4 = listChildValue(root, "version") ?? listChildValue(root, "generator_version");
-    if (version4) {
-      model.formatVersion = version4;
-    }
-  }
-  return model;
-}
-function findKiCadLists(modelOrList, head, options = {}) {
-  if ("ast" in modelOrList) {
-    return findSexprLists(modelOrList.ast, head, options);
-  }
-  return findSexprLists(modelOrList, head, options);
-}
-function directChildLists(list, head) {
-  return sexprChildLists(list, head);
-}
-function listHead(list) {
-  return sexprHead(list);
-}
-function listValue(list, index = 1) {
-  return sexprListValue(list, index);
-}
-function listChildValue(list, head, index = 1) {
-  return sexprChildValue(list, head, index);
-}
-function propertyValue(list, property2) {
-  for (const child of directChildLists(list, "property")) {
-    if (listValue(child, 1) === property2) {
-      return listValue(child, 2);
-    }
-  }
-  return void 0;
-}
-function descendantScalars(list) {
-  return sexprDescendantScalars(list);
-}
-function sourceText(model, node) {
-  return sexprSourceText(model.text, node);
 }
 
 // src/kicad/pcb.ts
@@ -100021,6 +100045,7 @@ var import_node_path17 = __toESM(require("node:path"), 1);
 // src/kicad/schematic-graph.ts
 var import_promises8 = __toESM(require("node:fs/promises"), 1);
 var import_node_path16 = __toESM(require("node:path"), 1);
+var MAX_SCHEMATIC_SHEETS = 5e3;
 async function buildSchematicNetGraph(rootFiles) {
   const normalizedRoots = [...new Set(rootFiles.map((file2) => import_node_path16.default.resolve(file2)))].sort(
     (left, right) => left.localeCompare(right)
@@ -100038,6 +100063,9 @@ async function buildSchematicNetGraph(rootFiles) {
     const file2 = import_node_path16.default.resolve(next.file);
     if (visited.has(file2)) {
       continue;
+    }
+    if (visited.size >= MAX_SCHEMATIC_SHEETS) {
+      throw new HostileInputError(`Schematic sheet hierarchy exceeds maximum of ${MAX_SCHEMATIC_SHEETS} sheets`);
     }
     visited.add(file2);
     await processSheetQueueItem(file2, next, sheets, missingSheets, unresolvedSheetPins, queue);

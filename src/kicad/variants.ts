@@ -1,3 +1,5 @@
+import { HostileInputError } from "../util/errors.js";
+import { MAX_KICAD_TEXT_BYTES } from "./project-model.js";
 import { extractBlocks, sexprStringAfter } from "./sexpr.js";
 
 export interface KicadVariant {
@@ -13,6 +15,12 @@ interface RawVariant {
 }
 
 export function parseVariants(projectFileContent: string): KicadVariant[] {
+  const byteLength = Buffer.byteLength(projectFileContent, "utf8");
+  if (byteLength > MAX_KICAD_TEXT_BYTES) {
+    throw new HostileInputError(
+      `KiCad project/variant input exceeds maximum size of ${MAX_KICAD_TEXT_BYTES} bytes (received ${byteLength} bytes)`,
+    );
+  }
   const parsed = parseJson(projectFileContent);
   if (parsed) {
     return collectJsonVariants(parsed);

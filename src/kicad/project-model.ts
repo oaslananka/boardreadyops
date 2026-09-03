@@ -1,3 +1,4 @@
+import { HostileInputError } from "../util/errors.js";
 import type { SexprDocument, SexprListNode, SexprNode, SexprSourceSpan } from "./sexpr.js";
 import {
   findSexprLists,
@@ -20,7 +21,20 @@ export interface KiCadDocumentModel {
   formatVersion?: string | undefined;
 }
 
+/**
+ * Hostile/malformed KiCad input (e.g. a fabricated multi-hundred-MB design file) can burn
+ * excessive memory and parse time before the sexpr nesting-depth cap (PR #565) ever engages.
+ * Reject oversized raw input up front, before tokenizing starts.
+ */
+export const MAX_KICAD_TEXT_BYTES = 64 * 1024 * 1024; // 64 MiB
+
 export function parseKicadDocument(text: string, kind: KiCadDocumentKind = "unknown"): KiCadDocumentModel {
+  const byteLength = Buffer.byteLength(text, "utf8");
+  if (byteLength > MAX_KICAD_TEXT_BYTES) {
+    throw new HostileInputError(
+      `KiCad ${kind} document exceeds maximum size of ${MAX_KICAD_TEXT_BYTES} bytes (received ${byteLength} bytes)`,
+    );
+  }
   const ast = parseSexprDocument(text);
   const root = ast.nodes.find((node): node is SexprListNode => node.kind === "list");
   const model: KiCadDocumentModel = { kind, text, ast };

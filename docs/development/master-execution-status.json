@@ -163,12 +163,17 @@
           "src/kicad/schematic-graph.ts",
           "src/kicad/variants.ts",
           "src/kicad/sexpr.ts",
-          "src/bom/normalizer.ts"
+          "src/bom/normalizer.ts",
+          "src/util/errors.ts"
         ],
         "tests": [
           "tests/unit/kicad/coverage.test.ts",
           "tests/unit/kicad/variants.test.ts",
-          "tests/unit/kicad/sexpr.test.ts"
+          "tests/unit/kicad/sexpr.test.ts",
+          "tests/unit/kicad/pcb.test.ts",
+          "tests/unit/kicad/schematic.test.ts",
+          "tests/unit/kicad/schematic-graph.test.ts",
+          "tests/unit/bom/normalizer.test.ts"
         ],
         "docs": [],
         "deployed": [],
@@ -176,11 +181,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/kicad/coverage.test.ts tests/unit/kicad/variants.test.ts tests/unit/kicad/sexpr.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/kicad/coverage.test.ts tests/unit/kicad/variants.test.ts tests/unit/kicad/sexpr.test.ts tests/unit/kicad/pcb.test.ts tests/unit/kicad/schematic.test.ts tests/unit/kicad/schematic-graph.test.ts tests/unit/bom/normalizer.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-03T01:20:41Z"
       },
-      "remaining": "No Gerber X2/X3 or Excellon metadata parser, no IPC-2581/ODB++ adapter, no parser confidence/provenance fields, and no hostile-input size/DoS guard beyond the sexpr nesting-depth cap (PR #565) were found."
+      "remaining": "Hostile-input guard gap is closed: sexpr.ts already capped nesting depth (PR #565), and now project-model.ts (shared by pcb.ts/schematic.ts) and variants.ts reject oversized raw input (>64MiB) before parsing, schematic-graph.ts caps sheet-hierarchy fan-out at 5000 sheets, and bom/normalizer.ts caps BOM row count at 100000, each throwing a typed HostileInputError (src/util/errors.ts). Still no Gerber X2/X3 or Excellon metadata parser, no IPC-2581/ODB++ adapter, and no parser confidence/provenance fields."
     },
     {
       "id": "W04",
