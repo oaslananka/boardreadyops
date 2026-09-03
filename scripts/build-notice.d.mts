@@ -13,6 +13,10 @@ export declare function main(
   options?: {
     check?: boolean;
     readReport?: (root: string) => Promise<PnpmLicenseReport>;
+    excludedPackageVersions?: ReadonlySet<string>;
   },
 ): Promise<void>;
-export declare function renderNotice(report: PnpmLicenseReport): string;
+
+export declare function readPlatformOnlyPackageVersions(root: string): Set<string>;
+export declare function platformOnlyPackageVersionsFromLockfile(lockfile: unknown): Set<string>;
+export declare function renderNotice(report: PnpmLicenseReport, excludedPackageVersions?: ReadonlySet<string>): string;

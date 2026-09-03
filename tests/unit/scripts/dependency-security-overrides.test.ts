@@ -9,9 +9,17 @@ describe("dependency security overrides", () => {
     };
     const lockfile = await readFile("pnpm-lock.yaml", "utf8");
 
-    // The audited stack is Puppeteer 25. Which patch of it Pa11y sits on is free to move; a
-    // major move is not, because that is a different browser stack and a different audit.
     expect(workspace.overrides?.["pa11y>puppeteer"]).toMatch(/^25\.\d+\.\d+$/u);
     expect(lockfile).not.toContain("extract-zip@2.0.1");
+  });
+
+  it("keeps the authenticated audit off the vulnerable esbuild 0.27 line", async () => {
+    const workspace = yaml.load(await readFile("pnpm-workspace.yaml", "utf8")) as {
+      overrides?: Record<string, string>;
+    };
+    const lockfile = await readFile("pnpm-lock.yaml", "utf8");
+
+    expect(workspace.overrides?.["fontless>esbuild"]).toBe("0.28.2");
+    expect(lockfile).not.toContain("esbuild@0.27.7");
   });
 });

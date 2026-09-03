@@ -159,6 +159,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@webassemblyjs/leb128@1.13.2`
   - Description: LEB128 decoder and encoder
   - Homepage: https://github.com/xtuc/webassemblyjs#readme
+- `@xtuc/long@4.2.2`
+  - Description: A Long class for representing a 64-bit two's-complement integer value.
+  - Homepage: https://github.com/dcodeIO/long.js#readme
 - `b4a@1.8.1`
   - Description: Bridging the gap between buffers and typed arrays
   - Homepage: https://github.com/holepunchto/b4a#readme
@@ -303,9 +306,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/web-platform-dx/web-features#readme
 - `webdriver-bidi-protocol@0.4.2`
   - Homepage: https://github.com/GoogleChromeLabs/webdriver-bidi-protocol#readme
-
-## Apache-2.0 AND LGPL-3.0-or-later
-
 
 ## BlueOak-1.0.0
 
@@ -1791,7 +1791,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `es-toolkit@1.48.1`
   - Description: A state-of-the-art, high-performance JavaScript utility library with a small bundle size and strong type annotations.
   - Homepage: https://es-toolkit.dev
-- `esbuild@0.27.7`, `esbuild@0.28.2`
+- `esbuild@0.28.2`
   - Description: An extremely fast JavaScript and CSS bundler and minifier.
   - Homepage: https://github.com/evanw/esbuild#readme
 - `escalade@3.2.0`
