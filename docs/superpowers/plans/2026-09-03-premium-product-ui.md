@@ -125,7 +125,7 @@ git commit -m "feat(web): tighten product shell hierarchy"
 - Consumes: `RepositoryGroup[]` from `loadViewerRepositories`.
 - Produces: `summarizeViewerRepositories(groups): DashboardRepositorySummary` with `{ repositories, repositoriesWithOpenFindings, supplyAlerts, repositoriesWithoutRuns, watchedBoards }`.
 
-- [ ] **Step 1: Write the failing summary behavior test**
+- [x] **Step 1: Write the failing summary behavior test**
 
 ```ts
 const summary = summarizeViewerRepositories([{ accountLogin: "acme", repositories: [
@@ -138,25 +138,25 @@ const summary = summarizeViewerRepositories([{ accountLogin: "acme", repositorie
 ]}]);
 expect(summary).toEqual({ repositories: 2, repositoriesWithOpenFindings: 1, supplyAlerts: 1, repositoriesWithoutRuns: 1, watchedBoards: 3 });
 ```
-- [ ] **Step 2: Add the failing dashboard markup contract**
+- [x] **Step 2: Add the failing dashboard markup contract**
 
 Assert `dashboard/page.tsx` uses `summarizeViewerRepositories`, renders an `operational-summary` region before repository group tables, labels the derived values without trends, and uses `Panel tone="section"` for repository groups.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
 
 Run: `corepack pnpm exec vitest run tests/unit/web/repository-dashboard-unit.test.ts tests/unit/web/dashboard-page-contract.test.ts`
 Expected: FAIL because the summarizer and operational summary markup do not exist.
 
-- [ ] **Step 4: Implement the minimal dashboard behavior and presentation**
+- [x] **Step 4: Implement the minimal dashboard behavior and presentation**
 
 Add the pure summarizer beside `RepositoryGroup`. In `DashboardPage`, calculate the summary only from loaded groups and render compact metrics for Repositories, Repositories with findings, Supply alerts, No run yet, and Boards watched. Keep signed-out and empty states unchanged. Render organization groups as flat sections and preserve the accessible repository table.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 Run: `corepack pnpm exec vitest run tests/unit/web/repository-dashboard-unit.test.ts tests/unit/web/dashboard-page-contract.test.ts tests/unit/web/product-app-accessibility.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/lib/repository-dashboard.ts apps/web/app/dashboard/page.tsx apps/web/app/styles.css tests/unit/web/repository-dashboard-unit.test.ts tests/unit/web/dashboard-page-contract.test.ts
