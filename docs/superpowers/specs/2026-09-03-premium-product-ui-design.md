@@ -1,7 +1,7 @@
 # Premium Product UI Design
 
-**Date:** 2026-09-03  
-**Branch:** `feat/premium-product-ui`  
+**Date:** 2026-09-03
+**Branch:** `feat/premium-product-ui`
 **Baseline:** `origin/main@0b810e8cffe1f889d34707a98732c3132f5c4ca3`
 
 ## Purpose
