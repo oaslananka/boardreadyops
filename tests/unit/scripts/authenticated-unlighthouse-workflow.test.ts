@@ -30,3 +30,17 @@ describe("authenticated Unlighthouse workflow", () => {
     expect(workflow).not.toContain('echo "$BROPS_SESSION"');
   });
 });
+
+it("scopes the session secret only to the steps that require it", async () => {
+  const yaml = await import("js-yaml");
+  const workflow = yaml.load(await readFile(workflowPath, "utf8")) as {
+    jobs?: { audit?: { env?: Record<string, string>; steps?: Array<{ name?: string; env?: Record<string, string> }> } };
+  };
+  const audit = workflow.jobs?.audit;
+
+  expect(audit?.env?.BROPS_SESSION).toBeUndefined();
+  expect(audit?.steps?.filter((step) => step.env?.BROPS_SESSION).map((step) => step.name)).toEqual([
+    "Require ephemeral authenticated session",
+    "Audit authenticated product routes",
+  ]);
+});

@@ -75,6 +75,46 @@ function evaluateBudgetFailures(reports) {
   return failures;
 }
 
+function evaluateScanFailures(reports, expectedRoutes) {
+  const byPath = new Map(reports.map((report) => [report.route?.path, report]));
+  return expectedRoutes.flatMap((path) => {
+    const report = byPath.get(path);
+    const status = report?.tasks?.runLighthouseTask ?? "missing";
+    return status === "completed" ? [] : [{ path, status }];
+  });
+}
+
+const terminalTaskStatuses = new Set(["completed", "failed", "ignore"]);
+
+export async function closeWorkerCluster(cluster) {
+  if (cluster.display && typeof cluster.display.close !== "function") cluster.display = null;
+  await cluster.close();
+}
+
+export async function waitForWorkerCompletion(
+  worker,
+  expectedRoutes,
+  {
+    timeoutMs = 420_000,
+    pollMs = 250,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    now = () => Date.now(),
+  } = {},
+) {
+  const deadline = now() + timeoutMs;
+  while (true) {
+    const reports = worker.reports();
+    const byPath = new Map(reports.map((report) => [report.route?.path, report]));
+    const allTerminal = expectedRoutes.every((path) =>
+      terminalTaskStatuses.has(byPath.get(path)?.tasks?.runLighthouseTask),
+    );
+    const workerCompleted = worker.monitor?.().status ?? "completed";
+    if (allTerminal && workerCompleted === "completed") return reports;
+    if (now() >= deadline) throw new Error("Timed out waiting for authenticated Unlighthouse routes to finish");
+    await sleep(pollMs);
+  }
+}
+
 async function defaultWriteManifest(payload) {
   await mkdir(resolve(".unlighthouse"), { recursive: true });
   await writeFile(resolve(manifestPath), payload, { encoding: "utf8", mode: 0o600 });
@@ -97,33 +137,37 @@ export async function runAuthenticatedAudit({
   const core = coreImpl ?? (await import("@unlighthouse/core"));
   const config = buildAuthenticatedUnlighthouseConfig({ ...options, routes: manifest.routes });
   const context = await core.createUnlighthouse(config, { name: "authenticated-ci" });
-  let resolveFinished;
-  const finished = new Promise((resolvePromise) => {
-    resolveFinished = resolvePromise;
-  });
+  try {
+    await context.setCiContext();
+    const started = await context.start();
+    if (!started.routes?.length) throw new Error("Unlighthouse did not queue any authenticated routes");
+    const reports = await waitForWorkerCompletion(context.worker, manifest.routes);
+    await context.worker.cluster.idle?.();
 
-  context.hooks.hook("worker-finished", async () => resolveFinished());
-  await context.setCiContext();
-  const started = await context.start();
-  if (!started.routes?.length) throw new Error("Unlighthouse did not queue any authenticated routes");
-  await finished;
+    const budgetFailures = evaluateBudgetFailures(reports);
+    const scanFailures = evaluateScanFailures(reports, manifest.routes);
+    await core.generateClient({ static: true }, context);
 
-  const reports = context.worker.reports();
-  const budgetFailures = evaluateBudgetFailures(reports);
-  await core.generateClient({ static: true }, context);
-
-  return {
-    exitCode: budgetFailures.length === 0 ? 0 : 1,
-    manifest,
-    budgetFailures,
-    reportPath: outputRoot,
-  };
+    return {
+      exitCode: budgetFailures.length === 0 && scanFailures.length === 0 ? 0 : 1,
+      manifest,
+      budgetFailures,
+      scanFailures,
+      reportPath: outputRoot,
+    };
+  } finally {
+    await closeWorkerCluster(context.worker.cluster);
+  }
 }
 
 async function main() {
   const result = await runAuthenticatedAudit();
   process.stdout.write(`Authenticated UI audit routes: ${result.manifest.routes.length}\n`);
   if (result.reportPath) process.stdout.write(`Authenticated UI audit report: ${result.reportPath}\n`);
+
+  for (const failure of result.scanFailures ?? []) {
+    process.stderr.write(`Scan failed: ${failure.path} (${failure.status})\n`);
+  }
 
   for (const failure of result.budgetFailures) {
     process.stderr.write(`Budget failed: ${failure.path} ${failure.category} ${failure.score} < ${failure.minimum}\n`);

@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      BROPS_SESSION: ${{ secrets.BROPS_UNLIGHTHOUSE_SESSION }}
       BROPS_UNLIGHTHOUSE_SITE: https://boardreadyops.com
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -33,6 +32,8 @@ jobs:
       - run: node scripts/toolchain.mjs corepack-install
       - run: corepack pnpm run deps:install-ci
       - name: Require ephemeral authenticated session
+        env:
+          BROPS_SESSION: ${{ secrets.BROPS_UNLIGHTHOUSE_SESSION }}
         shell: bash
         run: |
           if [ -z "${BROPS_SESSION:-}" ]; then
@@ -47,6 +48,8 @@ jobs:
             exit 1
           fi
       - name: Audit authenticated product routes
+        env:
+          BROPS_SESSION: ${{ secrets.BROPS_UNLIGHTHOUSE_SESSION }}
         run: corepack pnpm run qa:unlighthouse:auth
       - name: Upload authenticated audit report
         if: always()

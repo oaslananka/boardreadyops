@@ -134,6 +134,7 @@ it("runs Unlighthouse core, generates a static client, and enforces category bud
   const reports = () => [
     {
       route: { path: "/dashboard" },
+      tasks: { runLighthouseTask: "completed" },
       report: {
         categories: { performance: { score: 0.69 }, accessibility: { score: 0.95 }, "best-practices": { score: 0.9 } },
       },
@@ -151,7 +152,7 @@ it("runs Unlighthouse core, generates a static client, and enforces category bud
       queueMicrotask(() => void finished?.());
       return { routes: [{ path: "/dashboard" }] };
     },
-    worker: { reports },
+    worker: { reports, cluster: { close: async () => {} } },
   };
   const coreImpl = {
     createUnlighthouse: async () => context,
@@ -202,4 +203,184 @@ it("never sends the authenticated session to an untrusted host", async () => {
       BROPS_UNLIGHTHOUSE_SITE: "https://example.com",
     }),
   ).toThrow("BROPS_UNLIGHTHOUSE_SITE must target boardreadyops.com or loopback");
+});
+
+it("closes the browser cluster after a completed audit", async () => {
+  const { runAuthenticatedAudit } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  let finished: (() => void | Promise<void>) | undefined;
+  let closed = false;
+  const context = {
+    hooks: { hook: (_name: string, callback: () => void | Promise<void>) => (finished = callback) },
+    setCiContext: async () => context,
+    start: async () => {
+      queueMicrotask(() => void finished?.());
+      return { routes: [{ path: "/dashboard" }] };
+    },
+    worker: {
+      reports: () => [
+        {
+          route: { path: "/dashboard" },
+          tasks: { runLighthouseTask: "completed" },
+          report: {
+            categories: { performance: { score: 1 }, accessibility: { score: 1 }, "best-practices": { score: 1 } },
+          },
+        },
+      ],
+      cluster: {
+        close: async () => {
+          closed = true;
+        },
+      },
+    },
+  };
+  const coreImpl = { createUnlighthouse: async () => context, generateClient: async () => {} };
+  const result = await runAuthenticatedAudit({
+    environment: { BROPS_SESSION: "valid.session" },
+    discoverImpl: async () => ({ site: "https://boardreadyops.com", generatedAt: "now", routes: ["/dashboard"] }),
+    writeManifestImpl: async () => {},
+    coreImpl,
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(closed).toBe(true);
+});
+
+it("closes the browser cluster when report generation throws", async () => {
+  const { runAuthenticatedAudit } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  let finished: (() => void | Promise<void>) | undefined;
+  let closed = false;
+  const context = {
+    hooks: { hook: (_name: string, callback: () => void | Promise<void>) => (finished = callback) },
+    setCiContext: async () => context,
+    start: async () => {
+      queueMicrotask(() => void finished?.());
+      return { routes: [{ path: "/dashboard" }] };
+    },
+    worker: {
+      reports: () => [
+        {
+          route: { path: "/dashboard" },
+          tasks: { runLighthouseTask: "completed" },
+          report: {
+            categories: { performance: { score: 1 }, accessibility: { score: 1 }, "best-practices": { score: 1 } },
+          },
+        },
+      ],
+      cluster: {
+        close: async () => {
+          closed = true;
+        },
+      },
+    },
+  };
+  const coreImpl = {
+    createUnlighthouse: async () => context,
+    generateClient: async () => {
+      throw new Error("static generation failed");
+    },
+  };
+
+  await expect(
+    runAuthenticatedAudit({
+      environment: { BROPS_SESSION: "valid.session" },
+      discoverImpl: async () => ({ site: "https://boardreadyops.com", generatedAt: "now", routes: ["/dashboard"] }),
+      writeManifestImpl: async () => {},
+      coreImpl,
+    }),
+  ).rejects.toThrow("static generation failed");
+  expect(closed).toBe(true);
+});
+
+it("fails closed when a queued Lighthouse route never completes", async () => {
+  const { runAuthenticatedAudit } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  let finished: (() => void | Promise<void>) | undefined;
+  const context = {
+    hooks: { hook: (_name: string, callback: () => void | Promise<void>) => (finished = callback) },
+    setCiContext: async () => context,
+    start: async () => {
+      queueMicrotask(() => void finished?.());
+      return { routes: [{ path: "/dashboard" }] };
+    },
+    worker: {
+      reports: () => [{ route: { path: "/dashboard" }, tasks: { runLighthouseTask: "failed" } }],
+      cluster: { close: async () => {} },
+    },
+  };
+  const result = await runAuthenticatedAudit({
+    environment: { BROPS_SESSION: "valid.session" },
+    discoverImpl: async () => ({ site: "https://boardreadyops.com", generatedAt: "now", routes: ["/dashboard"] }),
+    writeManifestImpl: async () => {},
+    coreImpl: { createUnlighthouse: async () => context, generateClient: async () => {} },
+  });
+
+  expect(result.exitCode).toBe(1);
+  expect(result.scanFailures).toEqual([{ path: "/dashboard", status: "failed" }]);
+});
+
+it("waits for the browser cluster to become idle before finalizing reports", async () => {
+  const { runAuthenticatedAudit } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  let finished: (() => void | Promise<void>) | undefined;
+  const calls: string[] = [];
+  const context = {
+    hooks: { hook: (_name: string, callback: () => void | Promise<void>) => (finished = callback) },
+    setCiContext: async () => context,
+    start: async () => {
+      queueMicrotask(() => void finished?.());
+      return { routes: [{ path: "/dashboard" }] };
+    },
+    worker: {
+      reports: () => [
+        { route: { path: "/dashboard" }, tasks: { runLighthouseTask: "completed" }, report: { categories: {} } },
+      ],
+      cluster: {
+        idle: async () => calls.push("idle"),
+        close: async () => calls.push("close"),
+      },
+    },
+  };
+  await runAuthenticatedAudit({
+    environment: { BROPS_SESSION: "valid.session" },
+    discoverImpl: async () => ({ site: "https://boardreadyops.com", generatedAt: "now", routes: ["/dashboard"] }),
+    writeManifestImpl: async () => {},
+    coreImpl: { createUnlighthouse: async () => context, generateClient: async () => calls.push("generate") },
+  });
+
+  expect(calls).toEqual(["idle", "generate", "close"]);
+});
+
+it("waits for terminal route reports even if worker-finished is missed", async () => {
+  const module = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  expect(typeof module.waitForWorkerCompletion).toBe("function");
+
+  let poll = 0;
+  const worker = {
+    reports: () => {
+      poll += 1;
+      if (poll === 1) return [];
+      return [{ route: { path: "/dashboard" }, tasks: { runLighthouseTask: "completed" } }];
+    },
+    monitor: () => ({ status: poll >= 2 ? "completed" : "working" }),
+  };
+  const sleeps: number[] = [];
+  await module.waitForWorkerCompletion(worker, ["/dashboard"], {
+    timeoutMs: 1000,
+    pollMs: 25,
+    sleep: async (ms: number) => sleeps.push(ms),
+  });
+
+  expect(sleeps).toEqual([25]);
+});
+
+it("works around the Unlighthouse display shim when closing the cluster", async () => {
+  const { closeWorkerCluster } = await import("../../../scripts/unlighthouse-authenticated.mjs");
+  const cluster = {
+    display: { log() {}, resetCursor() {} },
+    close: async function () {
+      if (this.display && typeof this.display.close !== "function")
+        throw new TypeError("display.close is not a function");
+    },
+  };
+
+  await expect(closeWorkerCluster(cluster)).resolves.toBeUndefined();
+  expect(cluster.display).toBeNull();
 });
