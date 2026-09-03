@@ -60,7 +60,7 @@ describe("authenticated Unlighthouse route policy", () => {
 
 describe("authenticated Unlighthouse route discovery", () => {
   it("uses the browser session on every seed request and returns a secret-free manifest", async () => {
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
     const session = "session-sentinel-123";
     const fetchImpl = async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);

@@ -373,7 +373,10 @@ it("waits for terminal route reports even if worker-finished is missed", async (
 
 it("works around the Unlighthouse display shim when closing the cluster", async () => {
   const { closeWorkerCluster } = await import("../../../scripts/unlighthouse-authenticated.mjs");
-  const cluster = {
+  const cluster: {
+    display: { log(): void; resetCursor(): void; close?: () => void } | null;
+    close(): Promise<void>;
+  } = {
     display: { log() {}, resetCursor() {} },
     close: async function () {
       if (this.display && typeof this.display.close !== "function")
