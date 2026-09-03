@@ -420,7 +420,8 @@ describe("dependency and security automation configuration", () => {
     for (const override of [
       "'archiver>readdir-glob':",
       "'brace-expansion@>=5 <5.0.9':",
-      "'fast-uri@>=3 <3.1.5':",
+      "'fast-uri@>=3 <3.1.6':",
+      "'qs@>=6.11.1 <6.16.0':",
       "js-yaml@>=4 <4.3.0:",
       "linkify-it@>=5 <5.0.2:",
       "ws@>=8 <8.21.1:",

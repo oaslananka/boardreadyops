@@ -373,7 +373,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `esquery@1.7.0`
   - Description: A query library for ECMAScript AST using a CSS selector like query language.
   - Homepage: https://github.com/estools/esquery/
-- `fast-uri@3.1.5`
+- `fast-uri@3.1.6`
   - Description: Dependency-free RFC 3986 URI toolbox
   - Homepage: https://github.com/fastify/fast-uri
 - `ieee754@1.2.1`
@@ -394,7 +394,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `jpeg-js@0.4.4`
   - Description: A pure javascript JPEG encoder and decoder
   - Homepage: https://github.com/eugeneware/jpeg-js#readme
-- `qs@6.15.3`
+- `qs@6.16.0`
   - Description: A querystring parser that supports nesting and arrays, with a depth limit
   - Homepage: https://github.com/ljharb/qs
 - `smol-toml@1.8.0`
