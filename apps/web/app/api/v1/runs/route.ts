@@ -8,7 +8,10 @@ import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
 
-const ingestRunRequestSchema = z.object({
+// Exported for consumer-driven contract tests covering the CLI->Cloud and Action->Cloud
+// boundaries (`src/cli/commands/review.ts` and `src/action/cloud-publish.ts` both POST here):
+// see tests/unit/contracts/cli-cloud-forward-compat.test.ts.
+export const ingestRunRequestSchema = z.object({
   repositoryId: z.string().min(1),
   commitSha: z.string().min(7).max(64),
   ref: z.string().min(1),
