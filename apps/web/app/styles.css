@@ -2254,12 +2254,14 @@ code {
 .run-header-status .score {
   min-width: 0;
   padding: var(--space-5);
-  border-color: var(--bro-border-accent);
+  /* The one number every reviewer looks at first -- identity-brass instead of the functional
+     accent, so this card reads as a signature moment rather than just another interactive
+     element. Decorative only: the number (--bro-text below) and label keep their existing,
+     already-audited colors untouched. */
+  border-color: var(--identity-brass-line);
   border-radius: var(--bro-radius-lg);
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--bro-accent) 11%, transparent), transparent 65%),
-    var(--bro-surface-sunken);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bro-accent) 18%, transparent);
+  background: linear-gradient(145deg, var(--identity-brass-soft), transparent 65%), var(--bro-surface-sunken);
+  box-shadow: inset 0 1px 0 var(--identity-brass-soft);
 }
 
 .run-header-status .score strong {
