@@ -33,6 +33,25 @@ export type RepositoryGroup = {
   repositories: RepositorySummary[];
 };
 
+export type DashboardRepositorySummary = {
+  repositories: number;
+  repositoriesWithOpenFindings: number;
+  supplyAlerts: number;
+  repositoriesWithoutRuns: number;
+  watchedBoards: number;
+};
+
+export function summarizeViewerRepositories(groups: readonly RepositoryGroup[]): DashboardRepositorySummary {
+  const repositories = groups.flatMap((group) => group.repositories);
+  return {
+    repositories: repositories.length,
+    repositoriesWithOpenFindings: repositories.filter((repository) => repository.openFindings > 0).length,
+    supplyAlerts: repositories.reduce((sum, repository) => sum + repository.openSupplyFindings, 0),
+    repositoriesWithoutRuns: repositories.filter((repository) => !repository.latestRunId).length,
+    watchedBoards: repositories.reduce((sum, repository) => sum + repository.watchedBoards, 0),
+  };
+}
+
 function text(row: Record<string, unknown>, name: string): string | undefined {
   const value = row[name];
   if (typeof value === "string") return value;

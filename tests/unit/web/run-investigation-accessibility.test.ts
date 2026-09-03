@@ -189,13 +189,16 @@ describe("run investigation accessibility", () => {
     const markup = viewMarkup("summary");
     expect(markup).toContain("Release readiness");
     expect(markup).toContain("Readiness score");
+    expect(markup).toContain("run-identity-meta");
+    expect(markup).toContain("run-readiness-signature");
     expect(markup).toContain("Open this run in GitHub");
 
     // The verdict is the answer somebody came for, so it comes before the evidence that
     // supports it. Asserting the order rather than mere presence is the point of this test's
     // name; the identity header above it only says which run this is.
     expect(markup).toContain("Ready to fabricate");
-    expect(markup.indexOf("Ready to fabricate")).toBeLessThan(markup.indexOf("Source and runtime"));
+    expect(markup.indexOf("Ready to fabricate")).toBeLessThan(markup.indexOf('aria-label="Run investigation"'));
+    expect(markup.indexOf('aria-label="Run investigation"')).toBeLessThan(markup.indexOf("Source and runtime"));
     expect(markup.indexOf("Ready to fabricate")).toBeLessThan(markup.indexOf("Open this run in GitHub"));
 
     // The header states which run this is; the verdict states the outcome. Repeating the

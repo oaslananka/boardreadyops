@@ -24,7 +24,11 @@ vi.mock("../../../packages/db/src/pg-executor.ts", () => ({
   })),
 }));
 
-import { loadRepositoryDetail, loadViewerRepositories } from "../../../apps/web/lib/repository-dashboard.js";
+import {
+  loadRepositoryDetail,
+  loadViewerRepositories,
+  summarizeViewerRepositories,
+} from "../../../apps/web/lib/repository-dashboard.js";
 import { loadViewerRuns } from "../../../apps/web/lib/run-listing.js";
 import { viewerInstallations } from "../../../apps/web/lib/viewer-installations.js";
 
@@ -67,6 +71,52 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(groups[0]?.accountLogin).toBe("acme-corp");
     expect(groups[0]?.repositories[0]?.name).toBe("gateway");
     expect(groups[0]?.repositories[0]?.openFindings).toBe(2);
+  });
+
+  it("summarizes only repository facts already present in the viewer groups", () => {
+    const summary = summarizeViewerRepositories([
+      {
+        accountLogin: "acme",
+        repositories: [
+          {
+            id: "repo-a",
+            accountLogin: "acme",
+            owner: "acme",
+            name: "power",
+            private: true,
+            latestRunId: "run-1",
+            latestRunStatus: "completed",
+            latestRunDecision: "pass",
+            latestRunAt: "2026-09-03T00:00:00.000Z",
+            openFindings: 3,
+            watchedBoards: 2,
+            openSupplyFindings: 1,
+          },
+          {
+            id: "repo-b",
+            accountLogin: "acme",
+            owner: "acme",
+            name: "sensor",
+            private: false,
+            latestRunId: undefined,
+            latestRunStatus: undefined,
+            latestRunDecision: undefined,
+            latestRunAt: undefined,
+            openFindings: 0,
+            watchedBoards: 1,
+            openSupplyFindings: 0,
+          },
+        ],
+      },
+    ]);
+
+    expect(summary).toEqual({
+      repositories: 2,
+      repositoriesWithOpenFindings: 1,
+      supplyAlerts: 1,
+      repositoriesWithoutRuns: 1,
+      watchedBoards: 3,
+    });
   });
 
   it("loads repository details and associated runs and supply findings", async () => {

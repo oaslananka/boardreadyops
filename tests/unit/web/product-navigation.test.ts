@@ -2,28 +2,54 @@
  * @vitest-environment happy-dom
  */
 
+import { readFileSync } from "node:fs";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProductNavigation } from "../../../apps/web/components/product-navigation.js";
+import { AppShell } from "../../../apps/web/components/ui.js";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/reviews" }));
 
+const css = readFileSync("apps/web/app/styles.css", "utf8");
+
 describe("ProductNavigation", () => {
-  it("groups work, governance, and administration destinations", () => {
+  it("groups destinations around operational product hierarchy", () => {
     const markup = renderToStaticMarkup(createElement(ProductNavigation));
 
     expect(markup).toContain('aria-label="Product navigation"');
-    expect(markup).toContain("Workspace");
+    expect(markup).toContain("Overview");
+    expect(markup).toContain("Engineering");
+    expect(markup).toContain("Governance");
+    expect(markup).toContain("Manage");
     expect(markup).toContain("My Work");
     expect(markup).toContain("Reviews");
     expect(markup).toContain("Dashboard");
-    expect(markup).toContain("Governance");
-    expect(markup).toContain("Administration");
     expect(markup).toContain("Settings");
+    expect(markup.indexOf("Dashboard")).toBeLessThan(markup.indexOf("My Work"));
+    expect(markup.indexOf("My Work")).toBeLessThan(markup.indexOf("Reviews"));
+    expect(markup).not.toContain("Workspace");
+    expect(markup).not.toContain("Administration");
     expect(markup).toContain('aria-current="page"');
     expect(markup).not.toContain(">Billing<");
+  });
+
+  it("renders truthful product context without fake environment controls", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AppShell, null, createElement("main", { id: "main-content" }, "content")),
+    );
+
+    expect(markup).toContain("BoardReadyOps Cloud");
+    expect(markup).toContain("Engineering operations");
+    expect(markup).not.toContain("Production");
+    expect(markup).not.toContain("Organization");
+  });
+
+  it("keeps the operational shell flat, compact, and brass-selected", () => {
+    expect(css).toMatch(/\.product-rail\s*\{[^}]*box-shadow:\s*none/su);
+    expect(css).toMatch(/\.product-context-bar\s*\{[^}]*min-height:\s*3\.25rem/su);
+    expect(css).toMatch(/\.product-navigation a\[aria-current="page"\]\s*\{[^}]*color:\s*var\(--bro-accent-strong\)/su);
   });
 
   it("exposes honest controls for the mobile drawer and compact rail", async () => {

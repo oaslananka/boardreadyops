@@ -46,6 +46,11 @@ describe("run investigation routes", () => {
     }
   });
 
+  it("uses flat summary sections for first-pass run evidence", () => {
+    expect(component).toMatch(/<Panel[^>]*title="Run summary"[^>]*tone="section"[^>]*>/u);
+    expect(component).toMatch(/<Panel[^>]*title="Source and runtime"[^>]*tone="section"[^>]*>/u);
+  });
+
   it("uses semantic, non-color-only status and bounded investigation controls", () => {
     expect(component).toContain("StatusBadge");
     expect(component).toContain("Search findings");

@@ -35,14 +35,21 @@ describe("Technical Premium UI contract", () => {
     expect(css).not.toMatch(/border-radius:\s*(2[0-9]|[3-9][0-9])px/);
   });
 
+  it("uses identity brass for interaction while status colors keep their own roles", () => {
+    expect(css).toContain("--bro-accent: #c69a3e");
+    expect(css).toContain("--bro-focus: #d9b563");
+    expect(css).toContain("--info: #3b82f6");
+    expect(css).toContain(".surface-section");
+    expect(css).toMatch(/\.surface-section\s*\{[^}]*background:\s*transparent/su);
+  });
   it("renders panel tone variants with stable accessibility semantics", async () => {
     const { createElement } = await import("react");
     const { renderToStaticMarkup } = await import("react-dom/server");
     const { Panel } = await import("../../../apps/web/components/ui.js");
     const markup = renderToStaticMarkup(
-      createElement(Panel, { title: "Gate Check", id: "gate", tone: "critical" }, "content"),
+      createElement(Panel, { title: "Gate Check", id: "gate", tone: "section" }, "content"),
     );
-    expect(markup).toContain("surface-critical");
+    expect(markup).toContain("surface-section");
     expect(markup).toContain('id="gate"');
     expect(markup).toContain('aria-labelledby="gate-heading"');
   });
