@@ -99,6 +99,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0056_marketplace_subscription_state.sql",
       "0057_review_approval_uniqueness.sql",
       "0058_release_run_delivery_id.sql",
+      "0059_stripe_subscription_event_ordering.sql",
     ]);
   });
 

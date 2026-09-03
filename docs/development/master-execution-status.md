@@ -199,9 +199,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W19 — Billing, Entitlements & Metering
 - **Status:** `Partial`
-- **Remaining:** Stripe webhook signature verification and idempotent event recording are real, but the route's own comments admit subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are unimplemented stubs on that path; the GitHub Marketplace billing path is materially more complete.
+- **Remaining:** Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are now implemented and unit-tested (`billing-store.ts`: `linkStripeCustomer`, `applyStripeSubscriptionEvent` guarded against out-of-order/redelivered events via a new `last_event_created_at` column, `clearGraceOnPaymentSuccess`; reuses the pre-existing `applyGraceOnPaymentFailure` and the pre-existing `recordEvent` idempotency). Price→tier mapping reuses the pre-existing `STRIPE_*_PRICE_ID` env-driven table — those price ids are illustrative and must be confirmed against the real Stripe dashboard before production use. Still open: (1) `/api/v1/billing/checkout` stays guarded HTTP 410 `marketplace_free_only`, so `checkout.session.completed` — the only event linking a Stripe customer id to a tenant — never fires in production today; the new code is real but dormant until that guard is lifted. (2) Coverage is unit-level only (mocked DB/executor); no live-Postgres integration test exists for the Stripe path, unlike the Marketplace path's `tests/integration/marketplace-billing-postgres.test.ts`. (3) A tier change does not itself call `entitlement-store.ts`'s `applyWatchAllowance`, mirroring the pre-existing Marketplace path's behavior.
 - **Scope:** Tiered plan entitlements (Free / Team / Business / Enterprise), Stripe signature verification, and marketplace billing models.
-- **Code & Test Evidence:** `ADR-0014`, `packages/cloud-core/src/stripe-service.ts`, `packages/db/src/billing-store.ts`.
+- **Code & Test Evidence:** `ADR-0014`, `packages/cloud-core/src/stripe-service.ts`, `packages/db/src/billing-store.ts`, `packages/db/migrations/0059_stripe_subscription_event_ordering.sql`, `apps/web/app/api/v1/billing/webhook/route.ts`.
 
 ### W20 — Release Command Center & Cloud UX
 - **Status:** `Partial`
