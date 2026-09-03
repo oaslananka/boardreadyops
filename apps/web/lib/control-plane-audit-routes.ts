@@ -1,12 +1,76 @@
-import { type AuditLogStore, createSqlAuditLogStore } from "@boardreadyops/db/audit-log-store";
+import { computeCanonicalHash } from "@boardreadyops/cloud-core";
+import {
+  type AuditEventExportItem,
+  type AuditLogStore,
+  createSqlAuditLogStore,
+} from "@boardreadyops/db/audit-log-store";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { authenticateControlPlaneOperator } from "./control-plane-operator-auth.js";
-import { controlPlaneJsonError, controlPlaneJsonResponse } from "./control-plane-operator-response.js";
+import {
+  controlPlaneJsonError,
+  controlPlaneJsonResponse,
+  controlPlaneRawResponse,
+} from "./control-plane-operator-response.js";
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
 const eventTypePattern = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u;
 const cursorPattern = /^[A-Za-z0-9_-]{1,512}$/u;
+
+type AuditExportFormat = "json" | "csv" | "jsonl";
+
+const AUDIT_CSV_COLUMNS: string[] = [
+  "id",
+  "installationId",
+  "eventType",
+  "actorType",
+  "actorId",
+  "actorLogin",
+  "subjectType",
+  "subjectId",
+  "repositoryId",
+  "repositoryFullName",
+  "releaseRunId",
+  "artifactId",
+  "runnerRegistrationId",
+  "requestId",
+  "metadata",
+  "createdAt",
+];
+
+function csvField(value: string): string {
+  return /["\r\n,]/u.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+function auditEventCsvRow(item: AuditEventExportItem): string[] {
+  return [
+    item.id,
+    item.installationId,
+    item.eventType,
+    item.actorType,
+    item.actorId ?? "",
+    item.actorLogin ?? "",
+    item.subjectType,
+    item.subjectId ?? "",
+    item.repositoryId ?? "",
+    item.repositoryFullName ?? "",
+    item.releaseRunId ?? "",
+    item.artifactId ?? "",
+    item.runnerRegistrationId ?? "",
+    item.requestId ?? "",
+    JSON.stringify(item.metadata),
+    item.createdAt,
+  ];
+}
+
+function auditEventsToCsv(items: readonly AuditEventExportItem[]): string {
+  const rows = [AUDIT_CSV_COLUMNS, ...items.map(auditEventCsvRow)];
+  return `${rows.map((row) => row.map(csvField).join(",")).join("\r\n")}\r\n`;
+}
+
+function auditEventsToJsonl(items: readonly AuditEventExportItem[]): string {
+  return items.map((item) => `${JSON.stringify(item)}\n`).join("");
+}
 
 type AuditOperations = Pick<AuditLogStore, "listAuditEvents">;
 
@@ -78,6 +142,7 @@ function encodeCursor(input: { createdAt: string; id: string }): string {
 
 type ParsedAuditQuery = {
   limit: number;
+  format: AuditExportFormat;
   repositoryId?: string;
   releaseRunId?: string;
   eventType?: string;
@@ -114,10 +179,19 @@ function parsedCursor(searchParams: URLSearchParams): ParsedAuditQuery["cursor"]
   return decodeCursor(raw) ?? controlPlaneJsonError("audit cursor is invalid", 400);
 }
 
+function parsedFormat(searchParams: URLSearchParams): AuditExportFormat | Response {
+  const raw = searchParams.get("format");
+  if (raw === null || raw === "json") return "json";
+  if (raw === "csv" || raw === "jsonl") return raw;
+  return controlPlaneJsonError("audit export format is invalid", 400);
+}
+
 function parsedQuery(request: Request): ParsedAuditQuery | Response {
   const searchParams = new URL(request.url).searchParams;
   const limit = parsedLimit(searchParams);
   if (limit instanceof Response) return limit;
+  const format = parsedFormat(searchParams);
+  if (format instanceof Response) return format;
   const repositoryId = parsedIdentifierFilter(searchParams, "repositoryId", "audit repository filter is invalid");
   if (repositoryId instanceof Response) return repositoryId;
   const releaseRunId = parsedIdentifierFilter(searchParams, "releaseRunId", "audit release-run filter is invalid");
@@ -129,6 +203,7 @@ function parsedQuery(request: Request): ParsedAuditQuery | Response {
 
   return {
     limit,
+    format,
     ...(repositoryId ? { repositoryId } : {}),
     ...(releaseRunId ? { releaseRunId } : {}),
     ...(eventType ? { eventType } : {}),
@@ -160,13 +235,29 @@ export async function handleControlPlaneAuditListRequest(
       ...(query.cursor ? { cursor: query.cursor } : {}),
     });
     const lastItem = items.length === query.limit ? items.at(-1) : undefined;
+    const nextCursor = lastItem ? encodeCursor({ createdAt: lastItem.createdAt, id: lastItem.id }) : undefined;
+    const digestHeaders = { "x-content-digest": `sha256:${computeCanonicalHash(items)}` };
+
+    if (query.format === "csv") {
+      return controlPlaneRawResponse(auditEventsToCsv(items), 200, "text/csv; charset=utf-8", {
+        ...digestHeaders,
+        ...(nextCursor ? { "x-next-cursor": nextCursor } : {}),
+      });
+    }
+    if (query.format === "jsonl") {
+      return controlPlaneRawResponse(auditEventsToJsonl(items), 200, "application/x-ndjson; charset=utf-8", {
+        ...digestHeaders,
+        ...(nextCursor ? { "x-next-cursor": nextCursor } : {}),
+      });
+    }
     return controlPlaneJsonResponse(
       {
         ok: true,
         items,
-        ...(lastItem ? { nextCursor: encodeCursor({ createdAt: lastItem.createdAt, id: lastItem.id }) } : {}),
+        ...(nextCursor ? { nextCursor } : {}),
       },
       200,
+      digestHeaders,
     );
   } catch {
     return controlPlaneJsonError("audit export is temporarily unavailable", 503);

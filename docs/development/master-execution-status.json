@@ -1130,9 +1130,9 @@
       "verification": {
         "command": "corepack pnpm vitest run tests/unit/web/control-plane-audit-routes.test.ts tests/unit/db/audit-log-store.test.ts tests/unit/report/hbom.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-02T23:51:06Z"
       },
-      "remaining": "The audit export endpoint emits JSON only (no CSV/PDF/JSONL), and there is no watermark or tamper-evidence hash on exported evidence, though authorization enforcement, legal-hold blocking of erasure/cancellation, and CycloneDX 1.7 HBOM generation are all real, tested, and schema-validated."
+      "remaining": "The audit export endpoint now supports format=csv and format=jsonl alongside the default JSON (hand-rolled CSV quoting, no new dependency), and every export carries an X-Content-Digest: sha256:<hex> response header computed over the returned items via @boardreadyops/cloud-core's computeCanonicalHash (the same canonical-JSON-then-SHA-256 pattern src/release/generate.ts uses for recipe.hash), so a client can detect tampering or corruption in transit/at rest; a next-page cursor is also exposed via an X-Next-Cursor header for the non-JSON formats. Still missing: PDF export, and any watermark beyond this plain content digest (e.g. an embedded/cryptographically signed watermark) — both remain out of scope for this change. Authorization enforcement, legal-hold blocking of erasure/cancellation, and CycloneDX 1.7 HBOM generation remain real, tested, and schema-validated."
     },
     {
       "id": "W34",
