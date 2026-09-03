@@ -8,6 +8,7 @@ import {
   createControlPlaneAuditRouteDependencies,
   handleControlPlaneAuditListRequest,
 } from "../../../apps/web/lib/control-plane-audit-routes.js";
+import { computeCanonicalHash } from "../../../packages/cloud-core/src/evidence-ledger.js";
 import type { AuditLogStore } from "../../../packages/db/src/audit-log-store.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
 
@@ -122,6 +123,7 @@ describe("control-plane audit export route", () => {
     for (const path of [
       `/api/v1/operator/installations/${installationId}/audit-events?limit=0`,
       `/api/v1/operator/installations/${installationId}/audit-events?limit=101`,
+      `/api/v1/operator/installations/${installationId}/audit-events?format=pdf`,
       `/api/v1/operator/installations/${installationId}/audit-events?repositoryId=bad%20id`,
       `/api/v1/operator/installations/${installationId}/audit-events?releaseRunId=bad%20id`,
       `/api/v1/operator/installations/${installationId}/audit-events?eventType=Runner%20Result`,
@@ -209,6 +211,131 @@ describe("control-plane audit export route", () => {
     expect(payload.nextCursor).toBeTypeOf("string");
     expect(JSON.stringify(payload)).not.toContain("password");
     expect(JSON.stringify(payload)).not.toContain("authorization");
+  });
+
+  it("includes a canonical-hash tamper-evidence digest on the default JSON export", async () => {
+    const list = vi.fn(async () => [
+      {
+        id: eventId,
+        installationId,
+        eventType: "runner.result.persisted",
+        actorType: "runner",
+        subjectType: "release_run",
+        metadata: { status: "completed" },
+        createdAt: "2026-07-28T02:00:00.000Z",
+      },
+    ]);
+    const deps = dependencies(auditStore({ listAuditEvents: list }));
+    const response = await handleControlPlaneAuditListRequest(
+      request(`/api/v1/operator/installations/${installationId}/audit-events`),
+      installationId,
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await json(response);
+    const expectedDigest = `sha256:${computeCanonicalHash(payload.items)}`;
+    expect(response.headers.get("x-content-digest")).toBe(expectedDigest);
+  });
+
+  it("exports CSV with a header row, escaped fields, and a tamper-evidence digest", async () => {
+    const items = [
+      {
+        id: eventId,
+        installationId,
+        eventType: "runner.result.persisted",
+        actorType: "runner",
+        subjectType: "release_run",
+        repositoryId,
+        repositoryFullName: "octo/board, inc",
+        releaseRunId: runId,
+        metadata: { status: "completed", conclusion: "success" },
+        createdAt: "2026-07-28T02:00:00.000Z",
+      },
+    ];
+    const list = vi.fn(async () => items);
+    const deps = dependencies(auditStore({ listAuditEvents: list }));
+    const response = await handleControlPlaneAuditListRequest(
+      request(`/api/v1/operator/installations/${installationId}/audit-events?format=csv`),
+      installationId,
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8");
+    expect(response.headers.get("x-content-digest")).toBe(`sha256:${computeCanonicalHash(items)}`);
+
+    const body = await response.text();
+    const [header, row] = body.trim().split("\r\n");
+    expect(header).toBe(
+      "id,installationId,eventType,actorType,actorId,actorLogin,subjectType,subjectId,repositoryId,repositoryFullName,releaseRunId,artifactId,runnerRegistrationId,requestId,metadata,createdAt",
+    );
+    expect(row).toContain(`"octo/board, inc"`);
+    expect(row).toContain(`"${JSON.stringify({ status: "completed", conclusion: "success" }).replaceAll('"', '""')}"`);
+    expect(row.startsWith(eventId)).toBe(true);
+  });
+
+  it("exports newline-delimited JSON with one audit-log row per line", async () => {
+    const items = [
+      {
+        id: eventId,
+        installationId,
+        eventType: "runner.result.persisted",
+        actorType: "runner",
+        subjectType: "release_run",
+        metadata: {},
+        createdAt: "2026-07-28T02:00:00.000Z",
+      },
+      {
+        id: "55555555-5555-4555-8555-555555555555",
+        installationId,
+        eventType: "runner.result.persisted",
+        actorType: "runner",
+        subjectType: "release_run",
+        metadata: {},
+        createdAt: "2026-07-28T02:05:00.000Z",
+      },
+    ];
+    const list = vi.fn(async () => items);
+    const deps = dependencies(auditStore({ listAuditEvents: list }));
+    const response = await handleControlPlaneAuditListRequest(
+      request(`/api/v1/operator/installations/${installationId}/audit-events?format=jsonl`),
+      installationId,
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/x-ndjson; charset=utf-8");
+    expect(response.headers.get("x-content-digest")).toBe(`sha256:${computeCanonicalHash(items)}`);
+
+    const body = await response.text();
+    const lines = body.trimEnd().split("\n");
+    expect(lines).toHaveLength(2);
+    expect(JSON.parse(lines[0] ?? "")).toMatchObject({ id: eventId });
+    expect(JSON.parse(lines[1] ?? "")).toMatchObject({ id: "55555555-5555-4555-8555-555555555555" });
+  });
+
+  it("surfaces a next-page cursor via a header for non-JSON export formats", async () => {
+    const list = vi.fn(async () => [
+      {
+        id: eventId,
+        installationId,
+        eventType: "runner.result.persisted",
+        actorType: "runner",
+        subjectType: "release_run",
+        metadata: {},
+        createdAt: "2026-07-28T02:00:00.000Z",
+      },
+    ]);
+    const deps = dependencies(auditStore({ listAuditEvents: list }));
+    const response = await handleControlPlaneAuditListRequest(
+      request(`/api/v1/operator/installations/${installationId}/audit-events?limit=1&format=csv`),
+      installationId,
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-next-cursor")).toBeTypeOf("string");
   });
 
   it("hides database failures behind a stable unavailable response", async () => {
