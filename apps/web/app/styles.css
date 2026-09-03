@@ -732,18 +732,18 @@ code {
 }
 
 .run-header {
-  display: grid;
-  border: 1px solid var(--border);
-  gap: var(--space-6);
-  grid-template-columns: minmax(0, 1fr) auto;
   position: relative;
+  display: grid;
   overflow: hidden;
-  align-items: stretch;
-  padding: clamp(1.5rem, 4vw, 2.5rem);
-  border-color: var(--bro-border);
-  border-radius: var(--bro-radius-xl);
-  background: var(--bro-bg-elevated);
-  box-shadow: var(--bro-shadow-soft);
+  align-items: end;
+  padding: var(--space-4) 0 var(--space-5) var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--bro-border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 13rem);
 }
 
 .run-context {
@@ -756,12 +756,19 @@ code {
   letter-spacing: 0.12em;
 }
 
-.run-subtitle {
-  margin: 0;
-  margin-top: var(--space-4);
-  color: var(--bro-text-muted);
+.run-identity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: var(--space-3) 0 0;
+  color: var(--bro-text-subtle);
   font-family: var(--font-mono);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
+  gap: var(--space-2) var(--space-4);
+  line-height: 1.5;
+}
+
+.run-identity-meta code {
+  color: var(--bro-text-muted);
 }
 
 .run-header-status {
@@ -770,7 +777,7 @@ code {
   border: 0;
   margin: 0;
   display: grid;
-  min-width: min(100%, 18rem);
+  min-width: min(100%, 13rem);
   align-content: end;
   justify-items: stretch;
   gap: var(--space-3);
@@ -856,14 +863,15 @@ code {
 }
 
 .run-navigation {
-  margin: var(--space-5) 0;
+  margin: var(--space-3) 0 var(--space-5);
   overflow-x: auto;
   scrollbar-width: thin;
-  padding: var(--space-1);
-  border: 1px solid var(--bro-border);
-  border-radius: var(--bro-radius-lg);
-  background: var(--bro-bg-elevated);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bro-text) 3%, transparent);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--bro-border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .run-navigation ul {
@@ -2259,7 +2267,7 @@ code {
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--bro-text);
-  font-size: clamp(2rem, 4.5vw, 4rem);
+  font-size: clamp(1.5rem, 2.4vw, 2.25rem);
   letter-spacing: -0.055em;
   line-height: 1;
 }
