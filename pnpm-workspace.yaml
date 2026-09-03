@@ -36,6 +36,7 @@ allowBuilds:
   prisma: true
   puppeteer: false
   sharp: true
+  vue-demi: false
 
 overrides:
   'archiver>readdir-glob': 3.0.0
