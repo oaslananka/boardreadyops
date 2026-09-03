@@ -610,7 +610,8 @@
         "tests": [
           "tests/unit/db/api-token-store.test.ts",
           "tests/unit/web/api-auth-repository-scope.test.ts",
-          "tests/unit/web/viewer-authorization.test.ts"
+          "tests/unit/web/viewer-authorization.test.ts",
+          "tests/unit/web/auth-rate-limit.test.ts"
         ],
         "docs": ["docs/security/audit-logs.md", "docs/api-tokens.md"],
         "deployed": [],
@@ -618,11 +619,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/db/api-token-store.test.ts tests/unit/web/api-auth-repository-scope.test.ts tests/unit/web/viewer-authorization.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/db/api-token-store.test.ts tests/unit/web/api-auth-repository-scope.test.ts tests/unit/web/viewer-authorization.test.ts tests/unit/web/auth-rate-limit.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-02T03:52:11Z"
+        "checkedAt": "2026-09-02T23:40:00Z"
       },
-      "remaining": "PARTIAL CLOSE: docs/api-tokens.md now documents the bro_live_ API token feature end-to-end (creation via POST /api/v1/tokens with the scope table read from apps/web/lib/api-auth.ts, using it as a Bearer token, listing, revocation via DELETE, and the one-time-plaintext/hash-at-rest security note read directly from packages/db/src/api-token-store.ts) — added to the mkdocs nav under Use, verified via node scripts/docs-build.mjs and scripts/verify-structure.mjs. Still genuinely missing: no granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user (apps/web/lib/api-auth.ts's session branch returns all four scopes unconditionally); no session revocation/device-management UI or store; no auth-attempt-specific rate limiting."
+      "remaining": "FURTHER PARTIAL CLOSE: auth-attempt rate limiting is now implemented for the bearer-token path, closing one of three previously-named gaps. apps/web/lib/auth-rate-limit.ts (new, fixed-window in-process counter, same pattern as webhook-rate-limit.ts -- no Redis exists in this codebase, confirmed by grep, so in-process is the consistent choice, matching the precedent already documented for webhook limiting in docs/deployment/self-hosted.md) is wired into apps/web/lib/api-auth.ts's authenticateApiRequest: only FAILED bearer-token validations count against the limit (20/minute per client by default, BOARDREADYOPS_AUTH_RATE_LIMIT_PER_MINUTE-configurable), keyed by the first hop of X-Forwarded-For; a client already over the limit gets 429 before the DB is even touched. Valid requests never count against it, so legitimate high-frequency API usage (e.g. CI runners) isn't penalized. Documented in docs/api-tokens.md's Security notes. Deliberately scoped to the bearer-token path only (14 routes, the highest-exposed brute-force surface) -- the session-cookie path (HMAC-signed, not a guessable credential the same way) and the operator static-token path (apps/web/lib/control-plane-operator-auth.ts, already timing-safe-compared but still unlimited against repeated guesses) remain unaddressed. Still genuinely missing: no granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user (apps/web/lib/api-auth.ts's session branch returns all four scopes unconditionally); no session revocation/device-management UI or store; operator-token path still has no attempt limiting."
     },
     {
       "id": "W18",

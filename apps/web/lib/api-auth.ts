@@ -1,5 +1,6 @@
 import { type ApiTokenScope, ApiTokenStore } from "@boardreadyops/db";
 import { createPgQueryExecutor, type PgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { checkAuthRateLimit, clientIdentifierFromRequest, recordFailedAuthAttempt } from "./auth-rate-limit.js";
 import { resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
 import { viewerAuthorization } from "./viewer-authorization.js";
 
@@ -26,6 +27,16 @@ export async function authenticateApiRequest(
 
   if (authHeader?.startsWith("Bearer ")) {
     const rawToken = authHeader.slice("Bearer ".length).trim();
+    const clientId = clientIdentifierFromRequest(request);
+    const rateLimit = checkAuthRateLimit(clientId);
+    if (!rateLimit.allowed) {
+      return {
+        ok: false,
+        error: `Too many failed authentication attempts, retry after ${rateLimit.retryAfterSeconds}s`,
+        status: 429,
+      };
+    }
+
     try {
       const config = resolveCloudPersistenceConfiguration();
       if (config.mode !== "postgres") {
@@ -37,6 +48,7 @@ export async function authenticateApiRequest(
         const store = new ApiTokenStore(executor);
         const tokenRecord = await store.validateToken(rawToken);
         if (!tokenRecord) {
+          recordFailedAuthAttempt(clientId);
           return { ok: false, error: "Invalid or expired API token", status: 401 };
         }
 
