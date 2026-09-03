@@ -97,7 +97,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W02 — Schema & Contract Governance
 - **Status:** `Partial`
-- **Remaining:** The schema-shape drift guard (tests/snapshot/schemas.snapshot.test.ts, PR #568) and RFC 8785 canonicalization (src/util/json.ts) now close two acceptance items. Remaining: consumer-driven contract tests spanning CLI→Cloud/Action→Cloud/Runner→Control-Plane boundaries specifically, and explicit unknown-enum-value forward-compatibility tests.
+- **Remaining:** The schema-shape drift guard (tests/snapshot/schemas.snapshot.test.ts, PR #568), RFC 8785 canonicalization (src/util/json.ts), the Runner↔Control-Plane .strict()/.strip() security triage, and explicit unknown-enum-value forward-compatibility tests are all resolved. Consumer-driven contract tests now also span the CLI→Cloud and Action→Cloud boundaries specifically: `tests/unit/contracts/cli-cloud-forward-compat.test.ts` (`review publish` → `POST /api/v1/runs`, `ingestRunRequestSchema`) and `tests/unit/contracts/action-cloud-forward-compat.test.ts` (the Action's two wire paths — OIDC `POST /api/v1/runs/github-actions-result` via `releaseRunResultSchema`, and the bearer-token `POST /api/v1/runs` quick cloud upload). No further gaps are tracked against this workstream's evidence at this time.
 - **Scope:** 11 versioned public JSON schemas in `schemas/` and shared TypeScript contracts in `packages/contracts/`.
 - **Code & Test Evidence:** `schemas/agent-plan.schema.json`, `findings.schema.json`, `release-manifest.schema.json`, `tests/unit/contracts/`.
 
