@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { ReleaseRunFinding } from "@boardreadyops/contracts";
 import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "./lifecycle.js";
 
 export type EnqueueReleaseRunInput = Extract<GitHubAppLifecycleAction, { type: "release_run.enqueue" }>;
@@ -70,6 +71,60 @@ export type CompleteGitHubCheckRunInput = {
   // makes one PATCH per chunk. See github-app-check-run-client.js#completeGitHubCheckRun.
   annotations?: GitHubCheckRunAnnotation[] | undefined;
 };
+
+function annotationLevelForFindingSeverity(
+  severity: ReleaseRunFinding["severity"],
+): GitHubCheckRunAnnotation["annotationLevel"] {
+  switch (severity) {
+    case "error":
+    case "high":
+      return "failure";
+    case "medium":
+      return "warning";
+    case "low":
+    case "info":
+      return "notice";
+  }
+}
+
+/**
+ * Convert a ReleaseRunFinding (the wire/contracts shape, not src/core's CLI-only Finding) into a
+ * GitHub Check Run annotation, or undefined if it has no line location -- GitHub annotations
+ * require a file path and a line range to attach to in the diff view.
+ *
+ * Deliberately does not import src/core/cloud-findings.ts's CLI-side equivalent: apps/web never
+ * depends on src/core (see docs/architecture/contract-versioning.md's isolation boundary), so
+ * this cloud-side mapper works from ReleaseRunFinding's flat startLine/endLine fields instead of
+ * the CLI's nested Finding.location.region shape.
+ */
+export function findingToCheckRunAnnotation(finding: ReleaseRunFinding): GitHubCheckRunAnnotation | undefined {
+  if (finding.path === undefined || finding.startLine === undefined) {
+    return undefined;
+  }
+  const endLine = finding.endLine ?? finding.startLine;
+  return {
+    path: finding.path,
+    startLine: finding.startLine,
+    endLine,
+    annotationLevel: annotationLevelForFindingSeverity(finding.severity),
+    message: finding.message,
+    title: finding.ruleId,
+    ...(finding.startColumn !== undefined ? { startColumn: finding.startColumn } : {}),
+    ...(finding.endColumn !== undefined ? { endColumn: finding.endColumn } : {}),
+  };
+}
+
+/** Maps findings to Check Run annotations, silently dropping findings with no line location. */
+export function findingsToCheckRunAnnotations(findings: ReleaseRunFinding[]): GitHubCheckRunAnnotation[] {
+  const annotations: GitHubCheckRunAnnotation[] = [];
+  for (const finding of findings) {
+    const annotation = findingToCheckRunAnnotation(finding);
+    if (annotation) {
+      annotations.push(annotation);
+    }
+  }
+  return annotations;
+}
 
 export type GitHubAppCheckRunClient = {
   createPullRequestCheckRun(input: CreatePullRequestCheckRunInput): Promise<{ id: number }>;
