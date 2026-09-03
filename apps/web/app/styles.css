@@ -2518,6 +2518,10 @@ code {
   gap: var(--space-6);
 }
 
+.repository-sections > .panel {
+  min-width: 0;
+}
+
 @media (max-width: 64rem) {
   .operational-summary {
     grid-template-columns: 1fr;
@@ -2538,6 +2542,7 @@ code {
    comparable facts, and a table gives screen readers the row and column relationships for
    free. Numerals are tabular so counts line up down a column instead of drifting. */
 .repository-table-wrap {
+  max-width: 100%;
   overflow-x: auto;
 }
 

@@ -21,4 +21,9 @@ describe("dashboard operational hierarchy", () => {
     expect(source.indexOf('className="operational-summary"')).toBeLessThan(source.indexOf("repository-table-wrap"));
     expect(css).toContain(".operational-summary");
   });
+
+  it("contains wide repository tables inside the mobile page frame", () => {
+    expect(css).toMatch(/\.repository-sections\s*>\s*\.panel\s*\{[^}]*min-width:\s*0/su);
+    expect(css).toMatch(/\.repository-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/su);
+  });
 });
