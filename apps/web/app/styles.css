@@ -3,8 +3,8 @@
  *
  * The subject is an engineering instrument, not an illustrated document, so the surface reads
  * as a deep-charcoal control panel: structural borders and tonal layering instead of soft
- * shadows or decoration, and one cobalt accent reserved for action and focus. Semantic colour
- * (pass / warning / danger) stays reserved for status, never decoration.
+ * shadows or decoration, and one warm brass accent reserved for identity, action, selection,
+ * and focus. Semantic colour (pass / warning / danger / info) stays reserved for status.
  */
 :root {
   color-scheme: dark;
@@ -27,17 +27,15 @@
   --foundry-copper-strong: #4d8eff;
   --foundry-copper-soft: rgba(59, 130, 246, 0.12);
   --foundry-brass: #4d8eff;
-  /* Decorative brand-identity accent -- NOT the interactive --foundry-copper/--foundry-brass
-     above (those stay blue and keep every contrast pair theme-contrast.test.ts audits). This
-     systematizes the warm brass the brand mark (brand-mark.tsx) already used as a hardcoded
-     hex, so the same identity color can be reused (mark glow, wordmark hover) without redefining
-     it per component. Decorative-only: never applied to body text. */
+  /* Warm identity brass. The authenticated --bro-* interaction aliases below consume this
+     family for selection/focus/action, while legacy --foundry-copper surfaces remain blue until
+     their own phased UI work. Functional success/warning/danger/info colors stay independent. */
   --identity-brass: #c69a3e;
   --identity-brass-bright: #d9b563;
   --identity-brass-soft: rgba(198, 154, 62, 0.14);
   --identity-brass-line: rgba(198, 154, 62, 0.4);
-  --rail-width: 248px;
-  --rail-width-compact: 72px;
+  --rail-width: 240px;
+  --rail-width-compact: 64px;
   --bro-bg: #0b0e14;
   --bro-bg-elevated: #111827;
   --bro-surface: #111827;
@@ -45,20 +43,19 @@
   --bro-surface-sunken: #070a0f;
   --bro-border: #1f2937;
   --bro-border-strong: #374151;
-  --bro-border-accent: rgba(59, 130, 246, 0.5);
+  --bro-border-accent: rgba(198, 154, 62, 0.5);
   --bro-text: #e1e2eb;
   --bro-text-muted: #c2c6d6;
   --bro-text-subtle: #8c909f;
-  --bro-accent: #3b82f6;
-  --bro-accent-strong: #4d8eff;
-  --bro-accent-soft: #4d8eff;
+  --bro-accent: #c69a3e;
+  --bro-accent-strong: #d9b563;
+  --bro-accent-soft: #d9b563;
   --bro-accent-contrast: #ffffff;
-  /* #3b82f6 reads fine as text on the dark ground, but white text directly on top of it falls
-     short of WCAG AA (3.68:1). Solid-fill surfaces that carry --accent-contrast text use this
-     darker shade instead, so link/icon/focus colour stays the bright Stitch cobalt everywhere
-     else. */
-  --bro-accent-fill: #1d4ed8;
-  --bro-focus: #3b82f6;
+  /* Identity brass is bright enough for text/focus on graphite, but white text on the raw
+     brass fill is not. Solid-fill controls use a darker brass shade so --accent-contrast stays
+     WCAG AA while selection and focus retain the brighter identity colour. */
+  --bro-accent-fill: #825b1d;
+  --bro-focus: #d9b563;
   /* Technical Premium reads elevation from border + tonal layering, not shadow. These
      stay defined (every panel/header/card references them) but are flattened to near-
      nothing so nothing needs a per-selector edit. */
@@ -398,13 +395,20 @@ code {
   z-index: 18;
   top: 0;
   display: flex;
-  min-height: 3.5rem;
+  min-height: 3.25rem;
   align-items: center;
   justify-content: space-between;
-  padding-inline: clamp(1rem, 3vw, 2.5rem);
+  padding-inline: clamp(1rem, 2.5vw, 2rem);
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--background) 92%, transparent);
-  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--background) 96%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.product-context-product {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .context-kicker,
@@ -447,7 +451,7 @@ code {
   overflow: hidden auto;
   border-right: 1px solid var(--foundry-line);
   background: var(--foundry-canvas-subdued);
-  box-shadow: 12px 0 40px var(--shadow-soft-color);
+  box-shadow: none;
   transition: width var(--bro-motion-medium) var(--bro-ease);
 }
 
@@ -457,9 +461,9 @@ code {
 
 .product-brand {
   display: flex;
-  min-height: 4.5rem;
+  min-height: 4rem;
   align-items: center;
-  padding-inline: 1.1rem;
+  padding-inline: 1rem;
   border-bottom: 1px solid var(--foundry-line);
   color: var(--text);
   text-decoration: none;
@@ -476,12 +480,12 @@ code {
 
 .product-navigation {
   flex: 1;
-  padding: 1.15rem 0.75rem;
+  padding: 1rem 0.65rem;
 }
 
 .product-nav-group + .product-nav-group {
-  margin-top: 1.35rem;
-  padding-top: 1.35rem;
+  margin-top: 1.05rem;
+  padding-top: 1.05rem;
   border-top: 1px solid color-mix(in srgb, var(--foundry-line) 72%, transparent);
 }
 
@@ -504,9 +508,9 @@ code {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 2.55rem;
+  min-height: 2.4rem;
   align-items: center;
-  padding: 0.55rem 0.65rem;
+  padding: 0.48rem 0.6rem;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
@@ -533,9 +537,9 @@ code {
 }
 
 .product-navigation a[aria-current="page"] {
-  border-color: color-mix(in srgb, var(--foundry-copper) 38%, var(--foundry-line));
-  background: var(--foundry-copper-soft);
-  color: var(--foundry-copper-strong);
+  border-color: var(--bro-border-accent);
+  background: color-mix(in srgb, var(--bro-accent) 10%, transparent);
+  color: var(--bro-accent-strong);
 }
 
 .product-navigation a[aria-current="page"]::before {
@@ -544,7 +548,7 @@ code {
   bottom: 0.55rem;
   left: -0.78rem;
   width: 3px;
-  background: var(--foundry-copper);
+  background: var(--bro-accent);
   content: "";
 }
 
@@ -728,18 +732,18 @@ code {
 }
 
 .run-header {
-  display: grid;
-  border: 1px solid var(--border);
-  gap: var(--space-6);
-  grid-template-columns: minmax(0, 1fr) auto;
   position: relative;
+  display: grid;
   overflow: hidden;
-  align-items: stretch;
-  padding: clamp(1.5rem, 4vw, 2.5rem);
-  border-color: var(--bro-border);
-  border-radius: var(--bro-radius-xl);
-  background: var(--bro-bg-elevated);
-  box-shadow: var(--bro-shadow-soft);
+  align-items: end;
+  padding: var(--space-4) 0 var(--space-5) var(--space-4);
+  border: 0;
+  border-bottom: 1px solid var(--bro-border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 13rem);
 }
 
 .run-context {
@@ -752,12 +756,19 @@ code {
   letter-spacing: 0.12em;
 }
 
-.run-subtitle {
-  margin: 0;
-  margin-top: var(--space-4);
-  color: var(--bro-text-muted);
+.run-identity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: var(--space-3) 0 0;
+  color: var(--bro-text-subtle);
   font-family: var(--font-mono);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
+  gap: var(--space-2) var(--space-4);
+  line-height: 1.5;
+}
+
+.run-identity-meta code {
+  color: var(--bro-text-muted);
 }
 
 .run-header-status {
@@ -766,7 +777,7 @@ code {
   border: 0;
   margin: 0;
   display: grid;
-  min-width: min(100%, 18rem);
+  min-width: min(100%, 13rem);
   align-content: end;
   justify-items: stretch;
   gap: var(--space-3);
@@ -852,14 +863,17 @@ code {
 }
 
 .run-navigation {
-  margin: var(--space-5) 0;
+  margin: var(--space-3) 0 var(--space-5);
   overflow-x: auto;
   scrollbar-width: thin;
-  padding: var(--space-1);
-  border: 1px solid var(--bro-border);
-  border-radius: var(--bro-radius-lg);
-  background: var(--bro-bg-elevated);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--bro-text) 3%, transparent);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--bro-border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  --panel-header-padding-bottom: var(--space-3);
+  --panel-header-margin-bottom: var(--space-4);
 }
 
 .run-navigation ul {
@@ -973,7 +987,7 @@ code {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--bro-shadow-soft);
+  box-shadow: none;
 }
 
 .panel.surface-default,
@@ -987,6 +1001,17 @@ code {
   background: var(--surface-strong);
   border: 1px solid var(--border-strong);
   box-shadow: var(--bro-shadow-soft);
+}
+
+.panel.surface-section,
+.surface-section {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  --panel-header-padding-bottom: var(--space-3);
+  --panel-header-margin-bottom: var(--space-4);
 }
 
 .panel.surface-inset,
@@ -1008,9 +1033,9 @@ code {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  padding-bottom: var(--space-4);
+  padding-bottom: var(--panel-header-padding-bottom, var(--space-4));
   border-bottom: 1px solid var(--border);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--panel-header-margin-bottom, var(--space-5));
   gap: var(--space-4);
 }
 
@@ -2241,7 +2266,7 @@ code {
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--bro-text);
-  font-size: clamp(2rem, 4.5vw, 4rem);
+  font-size: clamp(1.5rem, 2.4vw, 2.25rem);
   letter-spacing: -0.055em;
   line-height: 1;
 }
@@ -2441,10 +2466,82 @@ code {
   cursor: not-allowed;
 }
 
+.operational-summary {
+  display: grid;
+  padding: var(--space-4) 0;
+  border-block: 1px solid var(--border);
+  gap: var(--space-4);
+  grid-template-columns: minmax(12rem, 0.7fr) minmax(0, 2fr);
+}
+
+.operational-summary > header h2 {
+  margin: var(--space-1) 0 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.operational-summary-grid {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  gap: var(--space-3);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.operational-summary-grid > div {
+  min-width: 0;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--border);
+}
+
+.operational-summary-grid dt {
+  color: var(--text-subtle);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+}
+
+.operational-summary-grid dd {
+  margin: var(--space-2) 0 0;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 1.45rem;
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.repository-sections {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.repository-sections > .panel {
+  min-width: 0;
+}
+
+@media (max-width: 64rem) {
+  .operational-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .operational-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 42rem) {
+  .operational-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Repository listings. Native tables rather than a grid of cards: these are rows of
    comparable facts, and a table gives screen readers the row and column relationships for
    free. Numerals are tabular so counts line up down a column instead of drifting. */
 .repository-table-wrap {
+  max-width: 100%;
   overflow-x: auto;
 }
 

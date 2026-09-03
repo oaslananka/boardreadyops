@@ -56,15 +56,23 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
     <header className="run-header">
       <div className="run-header-copy">
         <p className="run-context">Release readiness</p>
-        <p className="run-repository-kind">{run.repositoryPrivate ? "Private repository" : "Public repository"}</p>
         <h1>{run.repository}</h1>
-        <p className="run-subtitle">
-          Run <code>{run.id}</code> · commit <code>{run.commitSha.slice(0, 12)}</code>
+        <p className="run-identity-meta">
+          <span>{run.repositoryPrivate ? "Private repository" : "Public repository"}</span>
+          <span>
+            Run <code>{run.id}</code>
+          </span>
+          <span>
+            Commit <code>{run.commitSha.slice(0, 12)}</code>
+          </span>
+          <span>
+            <code>{run.ref}</code>
+          </span>
         </p>
       </div>
       <fieldset className="run-header-status">
         <legend className="sr-only">Readiness score</legend>
-        <div className="score">
+        <div className="score run-readiness-signature">
           <strong>{run.readinessScore ?? "—"}</strong>
           <span>Readiness score</span>
           <span className="sr-only">
@@ -279,7 +287,12 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
     <>
-      <Panel title="Run summary" description="Repository, source, execution, and result metadata." id="summary">
+      <Panel
+        title="Run summary"
+        description="Repository, source, execution, and result metadata."
+        id="summary"
+        tone="section"
+      >
         <DefinitionGrid>
           <Definition label="Outcome">
             <StatusBadge value={run.decision ?? run.conclusion ?? run.status} />
@@ -301,6 +314,7 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
         title="Source and runtime"
         description="Exact source identity and tool versions used by the result."
         id="source"
+        tone="section"
       >
         <DefinitionGrid>
           <Definition label="Commit">
