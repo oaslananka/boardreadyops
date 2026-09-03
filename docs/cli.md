@@ -18,6 +18,8 @@ Use `boardreadyops run --gate release` to select a configured gate from `boardre
 
 Use `--format json` with `run` or `check` when another tool should consume diagnostics from stdout. The JSON contract is described in [reports/json.md](reports/json.md) and validated by `schemas/findings.schema.json`. Human logs and annotations are written to stderr, so stdout remains parseable JSON even when the command exits nonzero for findings, configuration, or required-environment failures.
 
+See [Exit Codes & Finding Severities](reference/exit-codes.md) for the full nonzero exit code and severity reference shared across these commands.
+
 ## Self-hosted runner operations
 
 `boardreadyops runner` provides the customer-worker lifecycle for the self-hosted execution plane.

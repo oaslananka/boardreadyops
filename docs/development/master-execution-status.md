@@ -271,9 +271,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W31 — Documentation, Onboarding, Golden Demo & DevEx
 - **Status:** `Partial`
-- **Remaining:** No timing assertion or E2E smoke enforces the specific '<2 minute' golden-demo target, and there is no dedicated error-code reference doc, though the golden demo is a genuine closed-loop system (expected-findings.json asserted by test) and the bad-board-zoo has 16 real enforced fixtures.
+- **Remaining:** Both previously flagged gaps are now closed: `tests/unit/examples/golden-demo.test.ts` gained an end-to-end test that runs the documented two-command walkthrough (`boardreadyops run examples/golden-demo/broken` then `.../fixed`) through the real CLI entrypoint and asserts wall-clock duration stays under the documented `<2 minute` target (120s budget, deliberate CI slack over a raw stopwatch assert, following the existing pattern in `tests/integration/scale-envelope.test.ts`). `docs/reference/exit-codes.md` is a new dedicated reference, cross-checked against the CLI and core source, documenting every real exit code (0-4) and the five finding severities. This closes the specific golden-demo timing and error-code documentation gaps; it is not a full re-audit of the rest of this workstream's broader onboarding/DevEx scope.
 - **Scope:** Comprehensive MkDocs documentation suite, `<2 min` golden demo walkthrough, and bad-board zoo fixture corpus.
-- **Code & Test Evidence:** `docs/`, `docs/golden-demo.md`, `tests/fixtures/bad-board-zoo/`.
+- **Code & Test Evidence:** `docs/`, `docs/golden-demo.md`, `docs/reference/exit-codes.md`, `tests/fixtures/bad-board-zoo/`.
 
 ### W32 — Product Analytics & Privacy-Safe Adoption Metrics
 - **Status:** `Partial`

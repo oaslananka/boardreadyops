@@ -1053,24 +1053,26 @@
         "code": [
           "examples/golden-demo/expected-findings.json",
           "tests/fixtures/bad-board-zoo/README.md",
-          "scripts/check-docs-a11y.mjs"
+          "scripts/check-docs-a11y.mjs",
+          "src/cli/commands/run.ts",
+          "src/core/findings.ts"
         ],
         "tests": [
           "tests/unit/examples/golden-demo.test.ts",
           "tests/integration/fixtures.test.ts",
           "tests/unit/scripts/check-docs-a11y.test.ts"
         ],
-        "docs": ["docs/golden-demo.md", "docs/quickstart.md"],
+        "docs": ["docs/golden-demo.md", "docs/quickstart.md", "docs/reference/exit-codes.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/examples/golden-demo.test.ts tests/integration/fixtures.test.ts tests/unit/scripts/check-docs-a11y.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/examples/golden-demo.test.ts tests/integration/fixtures.test.ts tests/unit/scripts/check-docs-a11y.test.ts && node scripts/docs-build.mjs",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-03T02:55:00Z"
       },
-      "remaining": "No timing assertion or E2E smoke enforces the specific '<2 minute' golden-demo target, and there is no dedicated error-code reference doc, though the golden demo is a genuine closed-loop system (expected-findings.json asserted by test) and the bad-board-zoo has 16 real enforced fixtures."
+      "remaining": "Both previously flagged gaps are now closed: tests/unit/examples/golden-demo.test.ts gained an end-to-end test that runs the actual documented two-command walkthrough ('boardreadyops run examples/golden-demo/broken' then '.../fixed') via the real CLI entrypoint (runCli) and asserts wall-clock duration stays under the documented '<2 minute' target (120s budget; actual runtime is tens of milliseconds, so this is deliberate CI slack over a hard stopwatch assert, matching the existing raw-threshold pattern in tests/integration/scale-envelope.test.ts). docs/reference/exit-codes.md is a new dedicated reference, cross-checked against src/cli/commands/run.ts, src/release/prepare.ts, src/cli/commands/runner.ts, and src/core/findings.ts, documenting every real CLI exit code (0-4) and the five finding severities, wired into mkdocs.yml's Reference nav and linked from docs/cli.md. This closes W31's specific golden-demo timing and error-code documentation gaps; it is not a full re-audit of the rest of this workstream's broader onboarding/DevEx scope."
     },
     {
       "id": "W32",
