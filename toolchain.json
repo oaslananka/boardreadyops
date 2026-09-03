@@ -14,7 +14,7 @@
     "maximumExclusive": "3.14",
     "uv": "0.11.16",
     "mkdocs": "1.6.1",
-    "mkdocsMaterial": "9.7.6",
+    "mkdocsMaterial": "9.7.7",
     "mike": "2.2.0"
   },
   "validation": {
