@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { MAX_KICAD_TEXT_BYTES } from "../../../src/kicad/project-model.js";
 import { activeVariantDnpRefs, parseVariants } from "../../../src/kicad/variants.js";
+import { HostileInputError } from "../../../src/util/errors.js";
 
 describe("KiCad 10 variants", () => {
   it("parses JSON project variant DNP overrides", () => {
@@ -114,5 +116,9 @@ describe("KiCad 10 variants", () => {
         '(project (variants (variant "proto" (dnp "C1")) (variant "" (dnp "C2")) (variant "proto" (dnp "R1"))))',
       ),
     ).toEqual([{ name: "proto", dnpOverrides: ["C1"] }]);
+  });
+
+  it("rejects oversized project/variant input instead of parsing it", () => {
+    expect(() => parseVariants("a".repeat(MAX_KICAD_TEXT_BYTES + 1))).toThrow(HostileInputError);
   });
 });
