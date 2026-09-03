@@ -287,7 +287,12 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
     <>
-      <Panel title="Run summary" description="Repository, source, execution, and result metadata." id="summary" tone="section">
+      <Panel
+        title="Run summary"
+        description="Repository, source, execution, and result metadata."
+        id="summary"
+        tone="section"
+      >
         <DefinitionGrid>
           <Definition label="Outcome">
             <StatusBadge value={run.decision ?? run.conclusion ?? run.status} />

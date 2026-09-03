@@ -872,6 +872,8 @@ code {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  --panel-header-padding-bottom: var(--space-3);
+  --panel-header-margin-bottom: var(--space-4);
 }
 
 .run-navigation ul {
@@ -1008,11 +1010,8 @@ code {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.panel.surface-section .panel-header {
-  padding-bottom: var(--space-3);
-  margin-bottom: var(--space-4);
+  --panel-header-padding-bottom: var(--space-3);
+  --panel-header-margin-bottom: var(--space-4);
 }
 
 .panel.surface-inset,
@@ -1034,9 +1033,9 @@ code {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  padding-bottom: var(--space-4);
+  padding-bottom: var(--panel-header-padding-bottom, var(--space-4));
   border-bottom: 1px solid var(--border);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--panel-header-margin-bottom, var(--space-5));
   gap: var(--space-4);
 }
 
