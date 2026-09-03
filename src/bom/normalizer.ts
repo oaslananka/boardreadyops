@@ -1,6 +1,13 @@
+import { HostileInputError } from "../util/errors.js";
 import { splitRefs } from "../util/strings.js";
 import { type BomFieldProvenance, stableComponentKey } from "./identity.js";
 import type { BomRow } from "./types.js";
+
+/**
+ * A hostile BOM export (e.g. a fabricated CSV/TSV with millions of rows) can exhaust memory and
+ * time during normalization. Reject an absurd row count before processing starts.
+ */
+const MAX_BOM_ROWS = 100_000;
 
 const aliases: Record<
   keyof Pick<BomRow, "reference" | "value" | "footprint" | "manufacturer" | "mpn" | "lifecycle" | "compliance">,
@@ -16,6 +23,11 @@ const aliases: Record<
 };
 
 export function normalizeBomRows(rows: Record<string, string>[], sourcePath: string): BomRow[] {
+  if (rows.length > MAX_BOM_ROWS) {
+    throw new HostileInputError(
+      `BOM input exceeds maximum row count of ${MAX_BOM_ROWS} (received ${rows.length} rows) for ${sourcePath}`,
+    );
+  }
   const output: BomRow[] = [];
   for (const [index, raw] of rows.entries()) {
     const normalized = normalizedMap(raw);

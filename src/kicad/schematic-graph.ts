@@ -1,6 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { HostileInputError } from "../util/errors.js";
 import { parseSchematic, type SchematicSheetReference } from "./schematic.js";
+
+/**
+ * A hostile hierarchical schematic can reference an unbounded number of distinct sheet files
+ * (each individually small, so the per-document size guard in project-model.ts never engages),
+ * causing unbounded fan-out of parses. Cap the total number of sheets a single graph traversal
+ * will visit.
+ */
+const MAX_SCHEMATIC_SHEETS = 5000;
 
 interface SchematicGraphSheet {
   file: string;
@@ -65,6 +74,9 @@ export async function buildSchematicNetGraph(rootFiles: string[]): Promise<Schem
     const file = path.resolve(next.file);
     if (visited.has(file)) {
       continue;
+    }
+    if (visited.size >= MAX_SCHEMATIC_SHEETS) {
+      throw new HostileInputError(`Schematic sheet hierarchy exceeds maximum of ${MAX_SCHEMATIC_SHEETS} sheets`);
     }
     visited.add(file);
     await processSheetQueueItem(file, next, sheets, missingSheets, unresolvedSheetPins, queue);
