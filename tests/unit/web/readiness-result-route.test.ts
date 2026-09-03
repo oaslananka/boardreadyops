@@ -362,6 +362,54 @@ describe("readiness result route authentication and publication", () => {
     expect(persistenceParams[15]).toBe("neutral");
   });
 
+  it("passes GitHub Check Run annotations derived from findings with a line location, dropping findings without one", async () => {
+    const body = JSON.stringify({
+      status: "completed",
+      decision: "fail",
+      findings: [
+        {
+          ruleId: "pcb.unrouted",
+          severity: "error",
+          message: "Two tracks remain unrouted.",
+          path: "board.kicad_pcb",
+          startLine: 10,
+          endLine: 12,
+        },
+        { ruleId: "bom.lifecycle", severity: "medium", message: "Lifecycle status needs review." },
+      ],
+    });
+    query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: "run-123",
+            github_check_run_id: 987,
+            pull_request_number: 42,
+            owner: "octo-org",
+            name: "hardware-board",
+            github_installation_id: 12345,
+          },
+        ],
+      })
+      .mockResolvedValue({ rows: [] });
+
+    await handleResultRequest(resultRequest({ body }), dependencies);
+
+    expect(completeCheckRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        annotations: [
+          expect.objectContaining({
+            path: "board.kicad_pcb",
+            startLine: 10,
+            endLine: 12,
+            annotationLevel: "failure",
+            title: "pcb.unrouted",
+          }),
+        ],
+      }),
+    );
+  });
+
   it("computes the same terminal digest regardless of finding order", async () => {
     const firstBody = JSON.stringify({
       status: "completed",
