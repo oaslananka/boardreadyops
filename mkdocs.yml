@@ -176,6 +176,7 @@ nav:
           - Tooling: development/tooling.md
           - CI Policy: development/ci-policy.md
           - Debugging: development/debugging.md
+          - Authenticated UI Audit: development/authenticated-ui-audit.md
           - Master Execution Status: development/master-execution-status.md
       - Architecture:
           - Overview: architecture/overview.md

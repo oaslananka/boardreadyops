@@ -12,9 +12,9 @@ BoardReadyOps browser authentication is a signed `brops_session` cookie. The coo
 
 ## Design
 
-Use Unlighthouse 0.18.0 as a pinned dev dependency. `unlighthouse.auth.config.ts` will read `BROPS_SESSION`, the target site, and a generated authenticated route manifest. It will inject the cookie into Puppeteer, disable storage reset between page scans, use one browser worker, and produce a static report under an ignored `.unlighthouse/` directory.
+Use `@unlighthouse/core@0.18.0` as a pinned dev dependency. The aggregate `unlighthouse` package is intentionally not installed because its transitive graph violates the repository's provenance no-downgrade policy. `unlighthouse.auth.config.ts` reads `BROPS_SESSION`, the target site, and a generated authenticated route manifest. The programmatic core worker injects the cookie into Puppeteer, disables storage reset between page scans, uses one browser worker, and produces a static report under an ignored `.unlighthouse/` directory.
 
-A Node orchestration script will discover representative signed-in routes before launching Unlighthouse CI. Discovery will request a small set of server-rendered authenticated seed pages with the cookie, extract same-origin links, accept only BoardReadyOps product route families, and synthesize the full run-investigation sub-route set for one discovered run.
+A Node orchestration script will discover representative signed-in routes before invoking the programmatic Unlighthouse worker. Discovery will request a small set of server-rendered authenticated seed pages with the cookie, extract same-origin links, accept only BoardReadyOps product route families, and synthesize the full run-investigation sub-route set for one discovered run.
 ## Route policy
 
 Always include `/dashboard`, `/reviews`, `/settings/billing`, `/settings/component-intelligence`, `/settings/data`, `/settings/security`, and `/settings/tokens` when they are reachable. Dynamic discovery may include only:
@@ -70,3 +70,9 @@ The workflow cannot become fully unattended until BoardReadyOps has a dedicated 
 The change is complete when the pinned Unlighthouse dependency, authenticated config, discovery/orchestration scripts, ignored output paths, documentation, tests, and manual workflow all pass repository verification; a synthetic authenticated fixture proves the cookie path without leaking the secret; and the PR is green through the normal Mergify queue.
 
 A real production scan is an additional runtime verification step that requires a currently valid `brops_session`. If no valid session is available to the automation environment, the implementation remains mergeable because the auth protocol itself is covered by deterministic tests, but production scan evidence must be reported as externally blocked rather than fabricated.
+
+## Runtime compatibility notes
+
+Unlighthouse 0.18.0 can requeue an authenticated Lighthouse navigation after an initial login interstitial. Completion therefore waits for terminal reports for every expected route plus a completed worker monitor state instead of relying solely on the `worker-finished` hook.
+
+Unlighthouse also replaces the underlying `puppeteer-cluster` display object with a no-op object that lacks `close()`. The wrapper clears only that incomplete display shim before calling the normal cluster close path. No patch is applied to installed dependencies.
