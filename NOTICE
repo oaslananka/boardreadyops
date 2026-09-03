@@ -23,7 +23,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## (MIT OR CC0-1.0)
 
-- `type-fest@0.7.1`
+- `type-fest@0.7.1`, `type-fest@4.41.0`
   - Description: A collection of essential TypeScript types
   - Homepage: https://github.com/sindresorhus/type-fest#readme
 
@@ -32,6 +32,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `node.extend@2.0.3`
   - Description: A port of jQuery.extend that actually works on node.js
   - Homepage: https://github.com/dreamerslab/node.extend#readme
+
+## (WTFPL OR MIT)
+
+- `utf8-byte-length@1.0.5`
+  - Description: Get utf8 byte length of string
+  - Homepage: https://github.com/parshap/utf8-byte-length#readme
 
 ## 0BSD
 
@@ -58,6 +64,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@electric-sql/pglite-tools@0.3.3`
   - Description: Tools for working with PGlite databases
   - Homepage: https://pglite.dev
+- `@internationalized/date@3.12.3`
+  - Description: Internationalized calendar, date, and time manipulation utilities
+  - Homepage: https://github.com/adobe/react-spectrum/tree/main#readme
+- `@internationalized/number@3.6.7`
+  - Description: Internationalized number formatting and parsing utilities
+  - Homepage: https://github.com/adobe/react-spectrum#readme
 - `@opentelemetry/api@1.9.1`
   - Description: Public API for OpenTelemetry
   - Homepage: https://github.com/open-telemetry/opentelemetry-js/tree/main/api
@@ -147,6 +159,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@webassemblyjs/leb128@1.13.2`
   - Description: LEB128 decoder and encoder
   - Homepage: https://github.com/xtuc/webassemblyjs#readme
+- `@xtuc/long@4.2.2`
+  - Description: A Long class for representing a 64-bit two's-complement integer value.
+  - Homepage: https://github.com/dcodeIO/long.js#readme
 - `b4a@1.8.1`
   - Description: Bridging the gap between buffers and typed arrays
   - Homepage: https://github.com/holepunchto/b4a#readme
@@ -174,12 +189,21 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `before-after-hook@4.0.0`
   - Description: asynchronous before/error/after hooks for internal functionality
   - Homepage: https://github.com/gr2m/before-after-hook#readme
+- `chrome-launcher@1.2.1`
+  - Description: Launch latest Chrome with the Devtools Protocol port open
+  - Homepage: https://github.com/GoogleChrome/chrome-launcher#readme
 - `chromium-bidi@17.0.2`
   - Description: An implementation of the WebDriver BiDi protocol for Chromium implemented as a JavaScript layer translating between BiDi and CDP, running inside a Chrome tab.
   - Homepage: https://github.com/GoogleChromeLabs/chromium-bidi#readme
+- `colortranslator@5.0.0`
+  - Description: A JavaScript library, written in TypeScript, to convert among different color models
+  - Homepage: https://github.com/elchininet/ColorTranslator#readme
 - `crc-32@1.2.2`
   - Description: Pure-JS CRC-32
   - Homepage: https://sheetjs.com/
+- `csp_evaluator@1.1.8`
+  - Description: Evaluate Content Security Policies for a wide range of bypasses and weaknesses
+  - Homepage: https://csp-evaluator.withgoogle.com/
 - `denque@2.1.0`
   - Description: The fastest javascript implementation of a double-ended queue. Used by the official Redis, MongoDB, MariaDB & MySQL libraries for Node.js and many other libraries. Maintains compatability with deque.
   - Homepage: https://docs.page/invertase/denque
@@ -194,15 +218,35 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/holepunchto/events-universal#readme
 - `expect-type@1.3.0`
   - Homepage: https://github.com/mmkal/expect-type#readme
-- `human-signals@8.0.1`
+- `fuse.js@7.5.0`
+  - Description: Lightweight fuzzy-search
+  - Homepage: http://fusejs.io
+- `human-signals@5.0.0`, `human-signals@8.0.1`
   - Description: Human-friendly process signals
   - Homepage: https://www.github.com/ehmicky/human-signals
 - `import-in-the-middle@3.3.3`
   - Description: Intercept imports in Node.js
   - Homepage: https://github.com/nodejs/import-in-the-middle#readme
+- `legacy-javascript@0.0.1`
+  - Description: Identify legacy polyfills and code transforms.
+  - Homepage: https://github.com/GoogleChrome/lighthouse#readme
+- `lighthouse@13.4.1`
+  - Description: Automated auditing, performance metrics, and best practices for the web.
+  - Homepage: https://github.com/GoogleChrome/lighthouse#readme
+- `lighthouse-logger@2.0.2`
+  - Homepage: https://github.com/GoogleChrome/lighthouse#readme
+- `lighthouse-stack-packs@1.12.3`
+  - Description: Lighthouse Stack Packs
+  - Homepage: https://github.com/GoogleChrome/lighthouse-stack-packs#readme
+- `lightweight-charts@5.2.1`
+  - Description: Performant financial charts built with HTML5 canvas
+  - Homepage: https://www.tradingview.com/lightweight-charts/
 - `long@5.3.2`
   - Description: A Long class for representing a 64-bit two's-complement integer value.
   - Homepage: https://github.com/dcodeIO/long.js#readme
+- `marky@1.3.0`
+  - Description: Performance timer based on performance.mark() and measure()
+  - Homepage: https://github.com/nolanlawson/marky#readme
 - `mutation-server-protocol@0.4.1`
   - Description: Schema validation for the mutation server protocol (MSP).
   - Homepage: https://github.com/stryker-mutator/editor-plugins/tree/main/packages/mutation-server-protocol#readme
@@ -257,6 +301,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `weapon-regex@1.3.6`
   - Description: Weapon regeX mutates regular expressions for use in mutation testing.
   - Homepage: https://github.com/stryker-mutator/weapon-regex#readme
+- `web-features@3.35.1`
+  - Description: Curated list of Web platform features
+  - Homepage: https://github.com/web-platform-dx/web-features#readme
 - `webdriver-bidi-protocol@0.4.2`
   - Homepage: https://github.com/GoogleChromeLabs/webdriver-bidi-protocol#readme
 
@@ -280,6 +327,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## BSD-2-Clause
 
+- `configstore@7.1.0`
+  - Description: Easily load and save config without having to think about where and how
+  - Homepage: https://github.com/sindresorhus/configstore#readme
 - `dotenv@16.6.1`, `dotenv@17.4.2`
   - Description: Loads environment variables from .env file
   - Homepage: https://github.com/motdotla/dotenv#readme
@@ -295,6 +345,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `estraverse@4.3.0`, `estraverse@5.3.0`
   - Description: ECMAScript JS AST traversal functions
   - Homepage: https://github.com/estools/estraverse
+- `http-cache-semantics@4.2.0`
+  - Description: Parses Cache-Control and other headers. Helps building correct HTTP caches and proxies
+  - Homepage: https://github.com/kornelski/http-cache-semantics#readme
 - `terser@5.49.0`
   - Description: JavaScript parser, mangler/compressor and beautifier toolkit for ES6+
   - Homepage: https://terser.org
@@ -307,13 +360,14 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@pa11y/html_codesniffer@2.6.0`
   - Description: HTML_CodeSniffer is a client-side JavaScript that checks a HTML document or source code, and detects violations of a defined coding standard.
   - Homepage: http://squizlabs.github.io/HTML_CodeSniffer/
+- `@paulirish/trace_engine@0.0.65`
 - `@xtuc/ieee754@1.2.0`
   - Description: Read/write IEEE754 floating point numbers from/to a Buffer or array-like object
   - Homepage: https://github.com/feross/ieee754#readme
 - `deepmerge-ts@8.0.0`
   - Description: Deeply merge 2 or more objects respecting type information.
   - Homepage: https://github.com/RebeccaStevens/deepmerge-ts#readme
-- `devtools-protocol@0.0.1666840`
+- `devtools-protocol@0.0.1663043`, `devtools-protocol@0.0.1666840`
   - Description: The Chrome DevTools Protocol JSON
   - Homepage: https://github.com/ChromeDevTools/devtools-protocol#readme
 - `esquery@1.7.0`
@@ -325,6 +379,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `ieee754@1.2.1`
   - Description: Read/write IEEE754 floating point numbers from/to a Buffer or array-like object
   - Homepage: https://github.com/feross/ieee754#readme
+- `intl-messageformat@10.7.18`
+  - Description: Formats ICU Message strings with number, date, plural, and select placeholders to create localized messages.
+  - Homepage: https://github.com/formatjs/formatjs
 - `istanbul-lib-coverage@3.2.2`
   - Description: Data library for istanbul coverage objects
   - Homepage: https://istanbul.js.org/
@@ -334,6 +391,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `istanbul-reports@3.2.0`
   - Description: istanbul reports
   - Homepage: https://istanbul.js.org/
+- `jpeg-js@0.4.4`
+  - Description: A pure javascript JPEG encoder and decoder
+  - Homepage: https://github.com/eugeneware/jpeg-js#readme
 - `qs@6.15.3`
   - Description: A querystring parser that supports nesting and arrays, with a depth limit
   - Homepage: https://github.com/ljharb/qs
@@ -353,6 +413,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Description: A smaller version of caniuse-db, with only the essentials!
   - Homepage: https://github.com/browserslist/caniuse-lite#readme
 
+## CC0-1.0
+
+- `mdn-data@2.27.1`
+  - Description: Open Web data by the Mozilla Developer Network
+  - Homepage: https://developer.mozilla.org
+
 ## EPL-2.0
 
 - `elkjs@0.11.1`
@@ -369,6 +435,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 - `@prisma/dev@0.24.17`
   - Description: A local Prisma Postgres server for development and testing
+- `anymatch@3.1.3`
+  - Description: Matches strings against configurable strings, globs, regular expressions, and/or functions
+  - Homepage: https://github.com/micromatch/anymatch
 - `cli-width@4.1.0`
   - Description: Get stdout window width, with two fallbacks, tty and then a default.
   - Homepage: https://github.com/knownasilya/cli-width
@@ -510,9 +579,6 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Description: Pa11y is your automated accessibility testing pal
   - Homepage: https://github.com/pa11y/pa11y
 
-## LGPL-3.0-or-later
-
-
 ## MIT
 
 - `@actions/artifact@6.2.1`
@@ -533,6 +599,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@actions/io@3.0.2`
   - Description: Actions io lib
   - Homepage: https://github.com/actions/toolkit/tree/main/packages/io
+- `@alloc/quick-lru@5.2.0`
+  - Description: Simple “Least Recently Used” (LRU) cache
+  - Homepage: https://github.com/sindresorhus/quick-lru#readme
+- `@antfu/install-pkg@1.1.0`
+  - Description: Install package programmatically.
+  - Homepage: https://github.com/antfu/install-pkg#readme
 - `@apm-js-collab/code-transformer-bundler-plugins@0.7.4`
   - Description: A universal plugin that uses '@apm-js-collab/code-transformer' to instrument JavaScript code at build time
   - Homepage: https://github.com/apm-js-collab/code-transformer-bundler-plugins#readme
@@ -632,7 +704,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/helpers@7.29.7`
   - Description: Collection of helper functions used by Babel transforms.
   - Homepage: https://babel.dev/docs/en/next/babel-helpers
-- `@babel/parser@7.29.7`
+- `@babel/parser@7.29.7`, `@babel/parser@7.29.8`
   - Description: A JavaScript parser
   - Homepage: https://babel.dev/docs/en/next/babel-parser
 - `@babel/plugin-proposal-decorators@7.29.0`
@@ -668,14 +740,19 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/traverse@7.29.7`
   - Description: The Babel Traverse module maintains the overall tree state, and is responsible for replacing, removing, and adding nodes
   - Homepage: https://babel.dev/docs/en/next/babel-traverse
-- `@babel/types@7.29.7`
+- `@babel/types@7.29.7`, `@babel/types@7.29.8`
   - Description: Babel Types is a Lodash-esque utility library for AST nodes
   - Homepage: https://babel.dev/docs/en/next/babel-types
 - `@bcoe/v8-coverage@1.0.2`
   - Description: Helper functions for V8 coverage files.
   - Homepage: https://github.com/bcoe/v8-coverage#readme
-- `@codecov/bundler-plugin-core@2.0.1`
-  - Description: Official Codecov Bundler Plugin Core
+- `@capsizecss/unpack@4.0.1`
+  - Description: Unpack capsize font metrics from fonts
+  - Homepage: https://github.com/seek-oss/capsize#readme
+- `@clack/core@1.4.3`
+  - Homepage: https://github.com/bombshell-dev/clack/tree/main/packages/core#readme
+- `@clack/prompts@1.7.0`
+  - Homepage: https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme
 - `@commitlint/cli@21.2.2`
   - Description: Lint your commit messages
   - Homepage: https://commitlint.js.org/
@@ -733,11 +810,47 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@conventional-changelog/template@1.4.0`
   - Description: Template utilities for conventional changelog generation.
   - Homepage: https://conventional-changelog.js.org/template/
+- `@floating-ui/core@1.8.0`
+  - Description: Positioning library for floating elements: tooltips, popovers, dropdowns, and more
+  - Homepage: https://floating-ui.com
+- `@floating-ui/dom@1.8.0`
+  - Description: Floating UI for the web
+  - Homepage: https://floating-ui.com
+- `@floating-ui/utils@0.2.12`
+  - Description: Utilities for Floating UI
+  - Homepage: https://floating-ui.com
+- `@floating-ui/vue@1.1.11`
+  - Description: Floating UI for Vue
+  - Homepage: https://floating-ui.com/docs/vue
+- `@formatjs/ecma402-abstract@2.3.6`
+  - Description: A collection of implementation for ECMAScript abstract operations
+  - Homepage: https://github.com/formatjs/formatjs
+- `@formatjs/fast-memoize@2.2.7`
+  - Description: fork of fast-memoize and support esm
+  - Homepage: https://github.com/formatjs/formatjs#readme
+- `@formatjs/icu-messageformat-parser@2.11.4`
+  - Homepage: https://github.com/formatjs/formatjs#readme
+- `@formatjs/icu-skeleton-parser@1.8.16`
+  - Homepage: https://github.com/formatjs/formatjs#readme
+- `@formatjs/intl-localematcher@0.6.2`
+  - Description: Intl.LocaleMatcher ponyfill
+  - Homepage: https://github.com/formatjs/formatjs#readme
 - `@gerrit0/mini-shiki@3.23.0`
   - Homepage: https://github.com/Gerrit0/mini-shiki#readme
 - `@html-validate/stylish@6.0.0`
   - Description: ESLint compatible stylish formatter
   - Homepage: https://gitlab.com/html-validate/stylish
+- `@iconify/collections@1.0.728`
+  - Description: Iconify icon sets list
+- `@iconify/types@2.0.0`
+  - Description: Types for Iconify data
+  - Homepage: https://github.com/iconify/iconify
+- `@iconify/utils@3.1.4`
+  - Description: Common functions for working with Iconify icon sets used by various packages.
+  - Homepage: https://iconify.design/docs/libraries/utils/
+- `@iconify/vue@5.0.1`
+  - Description: Iconify icon component for Vue 3.
+  - Homepage: https://iconify.design/
 - `@img/colour@1.1.0`
   - Description: The ESM-only 'color' package made compatible for use with CommonJS runtimes
   - Homepage: https://github.com/lovell/colour#readme
@@ -821,6 +934,25 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@nodelib/fs.walk@1.2.8`
   - Description: A library for efficiently walking a directory recursively
   - Homepage: https://github.com/nodelib/nodelib/tree/master#readme
+- `@nuxt/devtools-kit@3.4.2`
+  - Homepage: https://devtools.nuxt.com/module/utils-kit
+- `@nuxt/fonts@0.14.0`
+  - Description: Automatic font configuration for Nuxt apps
+  - Homepage: https://github.com/nuxt/fonts#readme
+- `@nuxt/icon@2.5.1`
+  - Homepage: https://github.com/nuxt/icon#readme
+- `@nuxt/kit@4.5.2`
+  - Description: Toolkit for authoring modules and interacting with Nuxt
+  - Homepage: https://nuxt.com/docs/4.x/api/kit
+- `@nuxt/schema@4.5.2`
+  - Description: Nuxt types and default configuration
+  - Homepage: https://nuxt.com
+- `@nuxt/ui@4.11.0`
+  - Description: A UI Library for Modern Web Apps, powered by Vue & Tailwind CSS.
+  - Homepage: https://ui.nuxt.com
+- `@nuxtjs/color-mode@4.0.1`
+  - Description: Dark and light mode for Nuxt with auto detection
+  - Homepage: https://github.com/nuxt-modules/color-mode#readme
 - `@octokit/auth-app@8.2.0`
   - Description: GitHub App authentication for JavaScript
   - Homepage: https://github.com/octokit/auth-app.js#readme
@@ -878,6 +1010,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@oxc-project/types@0.133.0`, `@oxc-project/types@0.143.0`
   - Description: Types for Oxc AST nodes
   - Homepage: https://oxc.rs
+- `@polka/url@1.0.0-next.29`
+  - Description: Super fast, memoized `req.url` parser
+  - Homepage: https://github.com/lukeed/polka#readme
 - `@radix-ui/primitive@1.1.3`
   - Homepage: https://radix-ui.com/primitives
 - `@radix-ui/react-compose-refs@1.1.2`
@@ -980,12 +1115,155 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@simple-libs/stream-utils@2.0.0`
   - Description: A small set of utilities for streams.
   - Homepage: https://github.com/TrigenSoftware/simple-libs/tree/main/packages/stream-utils#readme
+- `@sindresorhus/is@5.6.0`
+  - Description: Type check values
+  - Homepage: https://github.com/sindresorhus/is#readme
 - `@sindresorhus/merge-streams@4.0.0`
   - Description: Merge multiple streams into a unified stream
   - Homepage: https://github.com/sindresorhus/merge-streams#readme
 - `@standard-schema/spec@1.1.0`
   - Description: A family of specs for interoperable TypeScript
   - Homepage: https://standardschema.dev
+- `@szmarczak/http-timer@5.0.1`
+  - Description: Timings for HTTP requests
+  - Homepage: https://github.com/szmarczak/http-timer#readme
+- `@tailwindcss/node@4.3.3`
+  - Description: A utility-first CSS framework for rapidly building custom user interfaces.
+  - Homepage: https://tailwindcss.com
+- `@tailwindcss/oxide@4.3.3`
+  - Homepage: https://github.com/tailwindlabs/tailwindcss#readme
+- `@tailwindcss/postcss@4.3.3`
+  - Description: PostCSS plugin for Tailwind CSS, a utility-first CSS framework for rapidly building custom user interfaces
+  - Homepage: https://tailwindcss.com
+- `@tailwindcss/vite@4.3.3`
+  - Description: A utility-first CSS framework for rapidly building custom user interfaces.
+  - Homepage: https://tailwindcss.com
+- `@tanstack/table-core@8.21.3`
+  - Description: Headless UI for building powerful tables & datagrids for TS/JS.
+  - Homepage: https://tanstack.com/table
+- `@tanstack/virtual-core@3.17.8`
+  - Description: Headless UI for virtualizing scrollable elements in TS/JS + Frameworks
+  - Homepage: https://tanstack.com/virtual
+- `@tanstack/vue-table@8.21.3`
+  - Description: Headless UI for building powerful tables & datagrids for Vue.
+  - Homepage: https://tanstack.com/table
+- `@tanstack/vue-virtual@3.13.36`
+  - Description: Headless UI for virtualizing scrollable elements in Vue
+  - Homepage: https://tanstack.com/virtual
+- `@tiptap/core@3.30.5`
+  - Description: headless rich text editor
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-blockquote@3.30.5`
+  - Description: blockquote extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-bold@3.30.5`
+  - Description: bold extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-bubble-menu@3.30.5`
+  - Description: bubble-menu extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-bullet-list@3.30.5`
+  - Description: bullet list extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-code@3.30.5`
+  - Description: code extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-code-block@3.30.5`
+  - Description: code block extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-collaboration@3.30.5`
+  - Description: collaboration extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-document@3.30.5`
+  - Description: document extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-drag-handle@3.30.5`
+  - Description: drag handle extension for tiptap
+  - Homepage: https://tiptap.dev/docs/editor/extensions/functionality/drag-handle
+- `@tiptap/extension-drag-handle-vue-3@3.30.5`
+  - Description: drag handle extension for tiptap with vue 3
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-dropcursor@3.30.5`
+  - Description: dropcursor extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-floating-menu@3.30.5`
+  - Description: floating-menu extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-gapcursor@3.30.5`
+  - Description: gapcursor extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-hard-break@3.30.5`
+  - Description: hard break extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-heading@3.30.5`
+  - Description: heading extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-horizontal-rule@3.30.5`
+  - Description: horizontal rule extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-image@3.30.5`
+  - Description: image extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-italic@3.30.5`
+  - Description: italic extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-link@3.30.5`
+  - Description: link extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-list@3.30.5`
+  - Description: List extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-list-item@3.30.5`
+  - Description: list item extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-list-keymap@3.30.5`
+  - Description: list keymap extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-mention@3.30.5`
+  - Description: mention extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-node-range@3.30.5`
+  - Description: node range extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-ordered-list@3.30.5`
+  - Description: ordered list extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-paragraph@3.30.5`
+  - Description: paragraph extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-placeholder@3.30.5`
+  - Description: placeholder extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-strike@3.30.5`
+  - Description: strike extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-text@3.30.5`
+  - Description: text extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extension-underline@3.30.5`
+  - Description: underline extension for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/extensions@3.30.5`
+  - Description: various extensions for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/markdown@3.30.5`
+  - Description: markdown parser and serializer for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/pm@3.30.5`
+  - Description: prosemirror wrapper package for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/starter-kit@3.30.5`
+  - Description: starter kit for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/suggestion@3.30.5`
+  - Description: suggestion plugin for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/vue-3@3.30.5`
+  - Description: Vue components for tiptap
+  - Homepage: https://tiptap.dev
+- `@tiptap/y-tiptap@3.0.9`
+  - Description: Tiptap prosemirror bindings for Yjs
+  - Homepage: https://github.com/ueberdosis/y-tiptap#readme
 - `@types/chai@5.2.3`
   - Description: TypeScript definitions for chai
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/chai
@@ -1034,6 +1312,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@types/hast@3.0.4`
   - Description: TypeScript definitions for hast
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/hast
+- `@types/http-cache-semantics@4.2.0`
+  - Description: TypeScript definitions for http-cache-semantics
+  - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/http-cache-semantics
 - `@types/json-schema@7.0.15`
   - Description: TypeScript definitions for json-schema
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/json-schema
@@ -1058,6 +1339,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@types/unist@3.0.3`
   - Description: TypeScript definitions for unist
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/unist
+- `@types/web-bluetooth@0.0.20`, `@types/web-bluetooth@0.0.21`
+  - Description: TypeScript definitions for web-bluetooth
+  - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/web-bluetooth
 - `@types/whatwg-mimetype@3.0.2`
   - Description: TypeScript definitions for whatwg-mimetype
   - Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/whatwg-mimetype
@@ -1069,6 +1353,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@typespec/ts-http-runtime@0.3.5`
   - Description: Isomorphic client library for making HTTP requests in node.js and browser.
   - Homepage: https://github.com/Azure/azure-sdk-for-js/blob/main/sdk/core/ts-http-runtime/
+- `@unhead/bundler@3.4.0`
+  - Description: Unhead build-time optimizations for Vite and Webpack.
+  - Homepage: https://unhead.unjs.io
+- `@unhead/vue@3.4.0`
+  - Description: Full-stack <head> manager built for Vue.
+  - Homepage: https://unhead.unjs.io
+- `@unlighthouse/client@0.18.0`
+  - Description: UI Client for Unlighthouse.
+  - Homepage: https://github.com/harlan-zw/unlighthouse#readme
+- `@unlighthouse/core@0.18.0`
+  - Description: Scan your entire website with Google Lighthouse.
+  - Homepage: https://github.com/harlan-zw/unlighthouse#readme
 - `@visx/curve@4.0.1-alpha.0`
   - Description: visx curve
   - Homepage: https://github.com/airbnb/visx#readme
@@ -1117,6 +1413,44 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@vitest/utils@4.1.10`
   - Description: Shared Vitest utility functions
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/utils
+- `@vue/compiler-core@3.5.41`
+  - Description: @vue/compiler-core
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/compiler-core#readme
+- `@vue/compiler-dom@3.5.41`
+  - Description: @vue/compiler-dom
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/compiler-dom#readme
+- `@vue/compiler-sfc@3.5.41`
+  - Description: @vue/compiler-sfc
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/compiler-sfc#readme
+- `@vue/compiler-ssr@3.5.41`
+  - Description: @vue/compiler-ssr
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/compiler-ssr#readme
+- `@vue/reactivity@3.5.41`
+  - Description: @vue/reactivity
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/reactivity#readme
+- `@vue/runtime-core@3.5.41`
+  - Description: @vue/runtime-core
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/runtime-core#readme
+- `@vue/runtime-dom@3.5.41`
+  - Description: @vue/runtime-dom
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/runtime-dom#readme
+- `@vue/server-renderer@3.5.41`
+  - Description: @vue/server-renderer
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/server-renderer#readme
+- `@vue/shared@3.5.41`
+  - Description: internal utils shared across @vue packages
+  - Homepage: https://github.com/vuejs/core/tree/main/packages/shared#readme
+- `@vueuse/core@10.11.1`, `@vueuse/core@14.4.0`
+  - Description: Collection of essential Vue Composition Utilities
+  - Homepage: https://github.com/vueuse/vueuse#readme
+- `@vueuse/integrations@14.4.0`
+  - Description: Integration wrappers for utility libraries
+  - Homepage: https://github.com/vueuse/vueuse/tree/main/packages/integrations#readme
+- `@vueuse/metadata@10.11.1`, `@vueuse/metadata@14.4.0`
+  - Description: Metadata for VueUse functions
+  - Homepage: https://github.com/vueuse/vueuse/tree/main/packages/metadata#readme
+- `@vueuse/shared@10.11.1`, `@vueuse/shared@14.4.0`
+  - Homepage: https://github.com/vueuse/vueuse/tree/main/packages/shared#readme
 - `@webassemblyjs/ast@1.14.1`
   - Description: AST utils for webassemblyjs
   - Homepage: https://github.com/xtuc/webassemblyjs#readme
@@ -1159,7 +1493,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `abort-controller@3.0.0`
   - Description: An implementation of WHATWG AbortController interface.
   - Homepage: https://github.com/mysticatea/abort-controller#readme
-- `acorn@8.17.0`
+- `acorn@8.17.0`, `acorn@8.18.0`
   - Description: ECMAScript parser
   - Homepage: https://github.com/acornjs/acorn
 - `agent-base@6.0.2`, `agent-base@7.1.4`
@@ -1177,6 +1511,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `angular-html-parser@10.4.0`
   - Description: A HTML parser extracted from Angular with some modifications
   - Homepage: https://github.com/prettier/angular-html-parser/blob/HEAD/packages/angular-html-parser#readme
+- `ansi-colors@4.1.3`
+  - Description: Easily add ANSI colors to your text and symbols in the terminal. A faster drop-in replacement for chalk, kleur and turbocolor (without the dependencies and rendering bugs).
+  - Homepage: https://github.com/doowb/ansi-colors
 - `ansi-regex@5.0.1`, `ansi-regex@6.2.2`
   - Description: Regular expression for matching ANSI escape codes
   - Homepage: https://github.com/chalk/ansi-regex#readme
@@ -1192,6 +1529,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `argue-cli@3.1.0`
   - Description: A thin and strongly typed CLI arguments parser for Node.js.
   - Homepage: https://github.com/TrigenSoftware/Argue#readme
+- `aria-hidden@1.2.6`
+  - Description: Cast aria-hidden to everything, except...
+  - Homepage: https://github.com/theKashey/aria-hidden#readme
 - `assertion-error@2.0.1`
   - Description: Error constructor for test and validation frameworks that implements standardized AssertionError specification.
   - Homepage: https://github.com/chaijs/assertion-error#readme
@@ -1204,6 +1544,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `async@3.2.6`
   - Description: Higher-order functions and common patterns for asynchronous code
   - Homepage: https://caolan.github.io/async/
+- `atomically@2.1.1`
+  - Description: Read and write files atomically and reliably.
+  - Homepage: https://github.com/fabiospampinato/atomically#readme
 - `aws-ssl-profiles@1.1.2`
   - Description: AWS RDS SSL certificates bundles.
   - Homepage: https://github.com/mysqljs/aws-ssl-profiles#readme
@@ -1248,6 +1591,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `c12@3.3.4`
   - Description: Smart Config Loader
   - Homepage: https://github.com/unjs/c12#readme
+- `cacheable-lookup@7.0.0`
+  - Description: A cacheable dns.lookup(…) that respects TTL
+  - Homepage: https://github.com/szmarczak/cacheable-lookup#readme
+- `cacheable-request@10.2.14`
+  - Description: Wrap native HTTP requests with RFC compliant cache support
+  - Homepage: https://github.com/jaredwray/cacheable#readme
 - `call-bind-apply-helpers@1.0.2`
   - Description: Helper functions around Function call/apply/bind, for use in `call-bind`
   - Homepage: https://github.com/ljharb/call-bind-apply-helpers#readme
@@ -1260,7 +1609,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `chai@6.2.2`
   - Description: BDD/TDD assertion library for node.js and the browser. Test framework agnostic.
   - Homepage: http://chaijs.com
-- `chalk@4.1.2`, `chalk@5.6.2`
+- `chalk@5.6.2`
   - Description: Terminal string styling done right
   - Homepage: https://github.com/chalk/chalk#readme
 - `chardet@2.1.1`
@@ -1275,6 +1624,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `chrome-trace-event@1.0.4`
   - Description: A library to create a trace of your node app per Google's Trace Event format.
   - Homepage: https://github.com/samccone/chrome-trace-event#readme
+- `citty@0.1.6`
+  - Description: Elegant CLI Builder
+  - Homepage: https://github.com/unjs/citty#readme
 - `cjs-module-lexer@2.2.1`
   - Description: Lexes CommonJS modules, returning their named exports metadata
   - Homepage: https://github.com/nodejs/cjs-module-lexer#readme
@@ -1299,9 +1651,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `compress-commons@6.0.2`
   - Description: a library that defines a common interface for working with archive formats within node
   - Homepage: https://github.com/archiverjs/node-compress-commons
-- `confbox@0.2.4`
+- `confbox@0.1.8`, `confbox@0.2.4`
   - Description: Compact YAML, TOML, JSONC, JSON5 and INI parser and serializer
   - Homepage: https://github.com/unjs/confbox#readme
+- `consola@3.4.2`
+  - Description: Elegant Console Wrapper
+  - Homepage: https://github.com/unjs/consola#readme
 - `content-type@2.0.0`
   - Description: Create and parse HTTP Content-Type header
   - Homepage: https://github.com/jshttp/content-type#readme
@@ -1311,6 +1666,8 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `convert-source-map@2.0.0`
   - Description: Converts a source-map from/to  different formats and allows adding/changing properties.
   - Homepage: https://github.com/thlorenz/convert-source-map
+- `cookie-es@1.2.3`
+  - Homepage: https://github.com/unjs/cookie-es#readme
 - `core-util-is@1.0.3`
   - Description: The `util.is*` functions introduced in Node v0.12.
   - Homepage: https://github.com/isaacs/core-util-is#readme
@@ -1326,12 +1683,30 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `cross-spawn@7.0.6`
   - Description: Cross platform child_process#spawn and child_process#spawnSync
   - Homepage: https://github.com/moxystudio/node-cross-spawn
+- `crossws@0.3.5`
+  - Description: Cross-platform WebSocket Servers for Node.js, Deno, Bun and Cloudflare Workers
+  - Homepage: https://crossws.h3.dev
+- `css-tree@3.2.1`
+  - Description: A tool set for CSS: fast detailed parser (CSS → AST), walker (AST traversal), generator (AST → CSS) and lexer (validation and matching) based on specs and browser implementations
+  - Homepage: https://github.com/csstree/csstree#readme
 - `csstype@3.2.3`
   - Description: Strict TypeScript and Flow types for style based on MDN data
   - Homepage: https://github.com/frenic/csstype#readme
 - `debug@4.4.3`
   - Description: Lightweight debugging utility for Node.js and the browser
   - Homepage: https://github.com/debug-js/debug#readme
+- `decimal.js@10.6.0`
+  - Description: An arbitrary-precision Decimal type for JavaScript.
+  - Homepage: https://github.com/MikeMcl/decimal.js#readme
+- `decompress-response@6.0.0`
+  - Description: Decompress a HTTP response if needed
+  - Homepage: https://github.com/sindresorhus/decompress-response#readme
+- `defer-to-connect@2.0.1`
+  - Description: The safe way to handle the `connect` socket event
+  - Homepage: https://github.com/szmarczak/defer-to-connect#readme
+- `define-lazy-prop@2.0.0`
+  - Description: Define a lazily evaluated property on an object
+  - Homepage: https://github.com/sindresorhus/define-lazy-prop#readme
 - `defu@6.1.7`
   - Description: Recursively assign default properties. Lightweight and Fast!
   - Homepage: https://github.com/unjs/defu#readme
@@ -1341,12 +1716,42 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `destr@2.0.5`
   - Description: A faster, secure and convenient alternative for JSON.parse
   - Homepage: https://github.com/unjs/destr#readme
+- `dot-prop@9.0.0`
+  - Description: Get, set, or delete a property from a nested object using a dot path
+  - Homepage: https://github.com/sindresorhus/dot-prop#readme
 - `dunder-proto@1.0.1`
   - Description: If available, the `Object.prototype.__proto__` accessor and mutator, call-bound
   - Homepage: https://github.com/es-shims/dunder-proto#readme
 - `effect@3.20.0`
   - Description: The missing standard library for TypeScript, for writing production-grade software.
   - Homepage: https://effect.website
+- `embla-carousel@8.6.0`
+  - Description: A lightweight carousel library with fluid motion and great swipe precision
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-auto-height@8.6.0`
+  - Description: An auto height plugin for Embla Carousel
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-auto-scroll@8.6.0`
+  - Description: An auto scroll plugin for Embla Carousel
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-autoplay@8.6.0`
+  - Description: An autoplay plugin for Embla Carousel
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-class-names@8.6.0`
+  - Description: A class name toggle plugin for Embla Carousel
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-fade@8.6.0`
+  - Description: A fade plugin for Embla Carousel
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-reactive-utils@8.6.0`
+  - Description: Reactive utilities for Embla Carousel
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-vue@8.6.0`
+  - Description: A lightweight carousel library with fluid motion and great swipe precision
+  - Homepage: https://www.embla-carousel.com
+- `embla-carousel-wheel-gestures@8.1.0`
+  - Description: wheel gestures for embla carousel
+  - Homepage: https://github.com/xiel/embla-carousel-wheel-gestures#readme
 - `emoji-regex@8.0.0`, `emoji-regex@10.6.0`
   - Description: A regular expression to match all Emoji-only symbols as per the Unicode Standard.
   - Homepage: https://mths.be/emoji-regex
@@ -1356,6 +1761,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `enhanced-resolve@5.24.5`
   - Description: Offers a async require.resolve function. It's highly configurable.
   - Homepage: https://github.com/webpack/enhanced-resolve#readme
+- `enquirer@2.4.1`
+  - Description: Stylish, intuitive and user-friendly prompt system. Fast and lightweight enough for small projects, powerful and extensible enough for the most advanced use cases.
+  - Homepage: https://github.com/enquirer/enquirer
 - `env-paths@2.2.1`, `env-paths@3.0.0`
   - Description: Get paths for storing things like data, config, cache, etc
   - Homepage: https://github.com/sindresorhus/env-paths#readme
@@ -1365,6 +1773,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `error-ex@1.3.4`
   - Description: Easy error subclassing and stack customization
   - Homepage: https://github.com/qix-/node-error-ex#readme
+- `errx@0.1.2`
+  - Description: Zero dependency library to capture and parse stack traces in Node, Bun and Deno
+  - Homepage: https://github.com/danielroe/errx#readme
 - `es-define-property@1.0.1`
   - Description: `Object.defineProperty`, but not IE 8's broken one.
   - Homepage: https://github.com/ljharb/es-define-property#readme
@@ -1386,6 +1797,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `escalade@3.2.0`
   - Description: A tiny (183B to 210B) and fast utility to ascend parent directories
   - Homepage: https://github.com/lukeed/escalade#readme
+- `escape-string-regexp@4.0.0`, `escape-string-regexp@5.0.0`
+  - Description: Escape RegExp special characters
+  - Homepage: https://github.com/sindresorhus/escape-string-regexp#readme
 - `estree-walker@2.0.2`, `estree-walker@3.0.3`
   - Description: Traverse an ESTree-compliant AST
   - Homepage: https://github.com/Rich-Harris/estree-walker#readme
@@ -1395,12 +1809,14 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `events@3.3.0`
   - Description: Node's event emitter for all engines.
   - Homepage: https://github.com/Gozala/events#readme
-- `execa@9.6.1`
+- `execa@8.0.1`, `execa@9.6.1`
   - Description: Process execution for humans
   - Homepage: https://github.com/sindresorhus/execa#readme
-- `exsolve@1.1.0`
+- `exsolve@1.1.0`, `exsolve@1.1.1`
   - Description: Module resolution utilities based on Node.js upstream implementation.
   - Homepage: https://github.com/unjs/exsolve#readme
+- `fancy-canvas@2.1.0`
+  - Description: Functionality on top of HTML canvas element, including support for HiDPI and pixel-perfect rendering
 - `fast-check@3.23.2`, `fast-check@4.9.0`
   - Description: Property based testing framework for JavaScript (like QuickCheck)
   - Homepage: https://fast-check.dev/
@@ -1455,9 +1871,24 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `find-up@5.0.0`
   - Description: Find a file or directory by walking up parent directories
   - Homepage: https://github.com/sindresorhus/find-up#readme
+- `fontaine@0.8.0`
+  - Description: Automatic font fallback based on font metrics
+  - Homepage: https://github.com/unjs/fontaine#readme
+- `fontkitten@1.0.3`
+  - Description: A lightweight font data library — fontkit’s little sibling
+  - Homepage: https://github.com/delucis/fontkitten#readme
+- `fontless@0.2.1`
+  - Description: Magical plug-and-play font optimization for modern web applications
+  - Homepage: https://github.com/unjs/fontaine#readme
+- `form-data-encoder@2.1.4`
+  - Description: Encode FormData content into the multipart/form-data format
+  - Homepage: https://github.com/octet-stream/form-data-encoder#readme
 - `formatly@0.3.0`
   - Description: Formats your code with whatever formatter your project is already using. 🧼
   - Homepage: https://github.com/JoshuaKGoldberg/formatly#readme
+- `framer-motion@13.1.1`
+  - Description: A simple and powerful JavaScript animation library
+  - Homepage: https://github.com/motiondivision/motion#readme
 - `function-bind@1.1.2`
   - Description: Implementation of Function.prototype.bind
   - Homepage: https://github.com/Raynos/function-bind
@@ -1479,7 +1910,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `get-proto@1.0.1`
   - Description: Robustly get the [[Prototype]] of an object
   - Homepage: https://github.com/ljharb/get-proto#readme
-- `get-stream@9.0.1`
+- `get-stream@6.0.1`, `get-stream@8.0.1`, `get-stream@9.0.1`
   - Description: Get a stream as a string, Buffer, ArrayBuffer or array
   - Homepage: https://github.com/sindresorhus/get-stream#readme
 - `get-tsconfig@4.14.1`
@@ -1494,12 +1925,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `gopd@1.2.0`
   - Description: `Object.getOwnPropertyDescriptor`, but accounts for IE's broken implementation.
   - Homepage: https://github.com/ljharb/gopd#readme
+- `got@13.0.0`
+  - Description: Human-friendly and powerful HTTP request library for Node.js
+  - Homepage: https://github.com/sindresorhus/got#readme
 - `grammex@3.1.12`
   - Description: A tiny, PEG-like system for building language grammars with regexes.
   - Homepage: https://github.com/fabiospampinato/grammex#readme
 - `graphmatch@1.1.1`
   - Description: A low-level utility for matching a string against a directed acyclic graph of regexes.
   - Homepage: https://github.com/fabiospampinato/graphmatch#readme
+- `h3@1.15.11`
+  - Description: Minimal H(TTP) framework built for high performance and portability.
+  - Homepage: https://github.com/h3js/h3#readme
 - `happy-dom@20.11.3`
   - Description: Happy DOM is a JavaScript implementation of a web browser without its graphical user interface. It includes many web standards from WHATWG DOM and HTML.
   - Homepage: https://github.com/capricorn86/happy-dom
@@ -1512,6 +1949,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `hasown@2.0.3`
   - Description: A robust, ES3 compatible, "has own property" predicate.
   - Homepage: https://github.com/inspect-js/hasOwn#readme
+- `hey-listen@1.0.8`
+  - Description: Warning and invariant dev-ex messaging.
+  - Homepage: https://github.com/Popmotion/hey-listen#readme
+- `hookable@6.1.1`
+  - Description: Awaitable hook system
+  - Homepage: https://github.com/unjs/hookable#readme
 - `hoopy@0.1.4`
   - Description: Like an array, but rounder.
   - Homepage: https://gitlab.com/philbooth/hoopy#readme
@@ -1521,9 +1964,15 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `html-validate@11.8.0`
   - Description: Offline HTML5 validator and linter
   - Homepage: https://html-validate.org
+- `http-link-header@1.1.4`
+  - Description: Parse & format HTTP link headers according to RFC 8288
+  - Homepage: https://codeberg.org/jhermsmeier/node-http-link-header
 - `http-proxy-agent@7.0.2`
   - Description: An HTTP(s) proxy `http.Agent` implementation for HTTP
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
+- `http2-wrapper@2.2.1`
+  - Description: HTTP2 client, just with the familiar `https` API
+  - Homepage: https://github.com/szmarczak/http2-wrapper#readme
 - `https-proxy-agent@5.0.1`, `https-proxy-agent@7.0.6`
   - Description: An HTTP(s) proxy `http.Agent` implementation for HTTPS
   - Homepage: https://github.com/TooTallNate/proxy-agents#readme
@@ -1533,15 +1982,30 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `iconv-lite@0.7.2`
   - Description: Convert character encodings in pure javascript.
   - Homepage: https://github.com/pillarjs/iconv-lite
+- `ignore@7.0.6`
+  - Description: Ignore is a manager and filter for .gitignore rules, the one used by eslint, gitbook and many others.
+  - Homepage: https://github.com/kaelzhang/node-ignore#readme
+- `image-ssim@0.2.0`
+  - Description: Image structural similarity (SSIM). In TypeScript/JavaScript. For browser/server.
+  - Homepage: https://github.com/darosh/image-ssim-js/issues
 - `import-fresh@3.3.1`
   - Description: Import a module while bypassing the cache
   - Homepage: https://github.com/sindresorhus/import-fresh#readme
+- `import-meta-resolve@4.2.0`
+  - Description: Resolve things like Node.js — ponyfill for `import.meta.resolve`
+  - Homepage: https://github.com/wooorm/import-meta-resolve#readme
+- `iron-webcrypto@1.2.1`
+  - Description: a cryptographic utility for sealing-unsealing a JSON object using symmetric key encryption with message integrity verification
+  - Homepage: https://github.com/brc-dd/iron-webcrypto#readme
 - `is@3.3.2`
   - Description: the definitive JavaScript type testing library
   - Homepage: https://github.com/enricomarino/is
 - `is-arrayish@0.2.1`
   - Description: Determines if an object can be used as an array
   - Homepage: https://github.com/qix-/node-is-arrayish#readme
+- `is-docker@2.2.1`
+  - Description: Check if the process is running inside a Docker container
+  - Homepage: https://github.com/sindresorhus/is-docker#readme
 - `is-extglob@2.1.1`
   - Description: Returns true if a string has an extglob.
   - Homepage: https://github.com/jonschlinkert/is-extglob
@@ -1563,20 +2027,29 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `is-reference@1.2.1`
   - Description: Determine whether an AST node is a reference
   - Homepage: https://github.com/Rich-Harris/is-reference#readme
-- `is-stream@2.0.1`, `is-stream@4.0.1`
+- `is-stream@2.0.1`, `is-stream@3.0.0`, `is-stream@4.0.1`
   - Description: Check if something is a Node.js stream
   - Homepage: https://github.com/sindresorhus/is-stream#readme
 - `is-unicode-supported@2.1.0`
   - Description: Detect whether the terminal supports Unicode
   - Homepage: https://github.com/sindresorhus/is-unicode-supported#readme
+- `is-wsl@2.2.0`
+  - Description: Check if the process is running inside Windows Subsystem for Linux (Bash on Windows)
+  - Homepage: https://github.com/sindresorhus/is-wsl#readme
 - `isarray@1.0.0`
   - Description: Array#isArray for older browsers
   - Homepage: https://github.com/juliangruber/isarray
+- `isomorphic.js@0.2.5`
+  - Description: Isomorphic JavaScript helper functions (performance, crpyto, ..)
+  - Homepage: https://github.com/dmonad/isomorphic.js#readme
 - `jest-worker@27.5.1`
   - Homepage: https://github.com/facebook/jest#readme
 - `jiti@2.6.1`, `jiti@2.7.0`
   - Description: Runtime typescript and ESM support for Node.js
   - Homepage: https://github.com/unjs/jiti#readme
+- `js-library-detector@6.7.0`
+  - Description: Detects the JavaScript libraries running on a page
+  - Homepage: https://github.com/johnmichel/Library-Detector-for-Chrome#readme
 - `js-md4@0.3.2`
   - Description: A simple MD4 hash function for JavaScript supports UTF-8 encoding.
   - Homepage: https://github.com/emn178/js-md4
@@ -1589,6 +2062,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `jsesc@3.1.0`
   - Description: Given some data, jsesc returns the shortest possible stringified & ASCII-safe representation of that data.
   - Homepage: https://mths.be/jsesc
+- `json-buffer@3.0.1`
+  - Description: JSON parse & stringify that supports binary via bops & base64
+  - Homepage: https://github.com/dominictarr/json-buffer
 - `json-parse-even-better-errors@2.3.1`
   - Description: JSON.parse with context information on error
   - Homepage: https://github.com/npm/json-parse-even-better-errors#readme
@@ -1607,12 +2083,26 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `jwt-decode@4.0.0`
   - Description: Decode JWT tokens, mostly useful for browser applications.
   - Homepage: https://github.com/auth0/jwt-decode#readme
+- `keyv@4.5.4`
+  - Description: Simple key-value storage with support for multiple backends
+  - Homepage: https://github.com/jaredwray/keyv
 - `kleur@3.0.3`, `kleur@4.1.5`
   - Description: The fastest Node.js library for formatting terminal text with ANSI colors~!
   - Homepage: https://github.com/lukeed/kleur#readme
+- `klona@2.0.6`
+  - Description: A tiny (240B to 501B) and fast utility to "deep clone" Objects, Arrays, Dates, RegExps, and more!
+  - Homepage: https://github.com/lukeed/klona#readme
+- `knitwork@1.3.0`
+  - Description: Utilities to generate JavaScript code.
+  - Homepage: https://github.com/unjs/knitwork#readme
+- `launch-editor@2.14.1`
+  - Description: launch editor from node.js
+  - Homepage: https://github.com/vitejs/launch-editor#readme
 - `lazystream@1.0.1`
   - Description: Open Node Streams on demand.
   - Homepage: https://github.com/jpommerening/node-lazystream
+- `lib0@0.2.117`
+  - Homepage: https://github.com/dmonad/lib0#readme
 - `lilconfig@3.1.3`
   - Description: A zero-dependency alternative to cosmiconfig
   - Homepage: https://github.com/antonk52/lilconfig#readme
@@ -1622,25 +2112,43 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `linkify-it@5.0.2`
   - Description: Links recognition library with FULL unicode support
   - Homepage: https://github.com/markdown-it/linkify-it#readme
+- `linkifyjs@4.3.3`
+  - Description: Find URLs, email addresses, #hashtags and @mentions in plain-text strings, then convert them into HTML <a> links.
+  - Homepage: https://linkify.js.org
 - `lint-staged@17.3.0`
   - Description: Lint files staged by git
   - Homepage: https://github.com/lint-staged/lint-staged#readme
+- `local-pkg@1.2.1`
+  - Description: Get information on local packages.
+  - Homepage: https://github.com/antfu-collective/local-pkg#readme
 - `locate-path@6.0.0`
   - Description: Get the first path that exists on disk of multiple paths
   - Homepage: https://github.com/sindresorhus/locate-path#readme
 - `lodash@4.18.1`
   - Description: Lodash modular utilities.
   - Homepage: https://lodash.com/
+- `lodash-es@4.18.1`
+  - Description: Lodash exported as ES modules.
+  - Homepage: https://lodash.com/custom-builds
 - `lodash.groupby@4.6.0`
   - Description: The lodash method `_.groupBy` exported as a module.
   - Homepage: https://lodash.com/
+- `lookup-closest-locale@6.2.0`
+  - Description: Lookup the closest locale from among object keys
+  - Homepage: https://github.com/format-message/format-message/tree/master/packages/lookup-closest-locale
+- `lowercase-keys@3.0.0`
+  - Description: Lowercase the keys of an object
+  - Homepage: https://github.com/sindresorhus/lowercase-keys#readme
 - `lru.min@1.1.4`
   - Description: 🔥 An extremely fast and efficient LRU cache for JavaScript with high compatibility (including Browsers).
   - Homepage: https://github.com/wellwelwel/lru.min#readme
 - `lunr@2.3.9`
   - Description: Simple full-text search in your browser.
   - Homepage: https://lunrjs.com
-- `magic-string@0.30.21`
+- `magic-regexp@0.10.0`
+  - Description: A compiled-away, type-safe, readable RegExp alternative
+  - Homepage: https://github.com/unjs/magic-regexp#readme
+- `magic-string@0.30.21`, `magic-string@1.2.3`
   - Description: Modify strings, generate sourcemaps
   - Homepage: https://github.com/Rich-Harris/magic-string#readme
 - `magicast@0.5.3`
@@ -1652,6 +2160,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `markdown-it@14.3.0`
   - Description: Markdown-it - modern pluggable markdown parser.
   - Homepage: https://github.com/markdown-it/markdown-it#readme
+- `marked@17.0.6`
+  - Description: A markdown parser built for speed
+  - Homepage: https://marked.js.org
 - `math-intrinsics@1.1.0`
   - Description: ES Math-related intrinsics and helpers, robustly cached.
   - Homepage: https://github.com/es-shims/math-intrinsics#readme
@@ -1670,6 +2181,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mime-db@1.54.0`
   - Description: Media Type Database
   - Homepage: https://github.com/jshttp/mime-db#readme
+- `mimic-fn@4.0.0`
+  - Description: Make a function mimic another one
+  - Homepage: https://github.com/sindresorhus/mimic-fn#readme
+- `mimic-response@3.1.0`, `mimic-response@4.0.0`
+  - Description: Mimic a Node.js HTTP response stream
+  - Homepage: https://github.com/sindresorhus/mimic-response#readme
 - `minimist@1.2.8`
   - Description: parse argument options
   - Homepage: https://github.com/minimistjs/minimist
@@ -1682,12 +2199,24 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mkdirp@0.5.6`
   - Description: Recursively mkdir, like `mkdir -p`
   - Homepage: https://github.com/substack/node-mkdirp#readme
+- `mlly@1.8.2`
+  - Description: Missing ECMAScript module utils for Node.js
+  - Homepage: https://github.com/unjs/mlly#readme
 - `modern-tar@0.8.4`
   - Description: Zero dependency streaming tar parser and writer for JavaScript.
   - Homepage: https://github.com/ayuhito/modern-tar
 - `module-details-from-path@1.0.4`
   - Description: Resolve npm package details, like name and base path, given an absolute path to a file inside a package
   - Homepage: https://github.com/watson/module-details-from-path#readme
+- `motion-dom@13.1.1`
+  - Homepage: https://github.com/motiondivision/motion#readme
+- `motion-utils@13.0.0`
+  - Homepage: https://github.com/motiondivision/motion#readme
+- `motion-v@2.4.0`
+  - Homepage: https://github.com/motiondivision/motion-vue
+- `mrmime@2.0.1`
+  - Description: A tiny (2.8kB) and fast utility for getting a MIME type from an extension or filename
+  - Homepage: https://github.com/lukeed/mrmime#readme
 - `ms@2.1.3`
   - Description: Tiny millisecond conversion utility
   - Homepage: https://github.com/vercel/ms#readme
@@ -1712,13 +2241,24 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `node-fetch@2.7.0`
   - Description: A light-weight module that brings window.fetch to node.js
   - Homepage: https://github.com/bitinn/node-fetch
+- `node-fetch-native@1.6.7`
+  - Description: better fetch for Node.js. Works on any JavaScript runtime!
+  - Homepage: https://github.com/unjs/node-fetch-native#readme
+- `node-mock-http@1.0.5`
+  - Homepage: https://github.com/unjs/node-mock-http#readme
 - `node-releases@2.0.53`
   - Description: Node.js releases data
   - Homepage: https://github.com/chicoxyzzy/node-releases#readme
 - `normalize-path@3.0.0`
   - Description: Normalize slashes in a file path to be posix/unix-like forward slashes. Also condenses repeat slashes to a single slash and removes and trailing slashes, unless disabled.
   - Homepage: https://github.com/jonschlinkert/normalize-path
-- `npm-run-path@6.0.0`
+- `normalize-url@8.1.1`
+  - Description: Normalize a URL
+  - Homepage: https://github.com/sindresorhus/normalize-url#readme
+- `nostics@1.2.0`
+  - Description: Structured diagnostic code library
+  - Homepage: https://github.com/vercel-labs/nostics#readme
+- `npm-run-path@5.3.0`, `npm-run-path@6.0.0`
   - Description: Get your PATH prepended with locally installed binaries
   - Homepage: https://github.com/sindresorhus/npm-run-path#readme
 - `object-inspect@1.13.4`
@@ -1727,21 +2267,41 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `obug@2.1.1`
   - Description: A lightweight JavaScript debugging utility, forked from debug, featuring TypeScript and ESM support.
   - Homepage: https://github.com/sxzz/obug#readme
-- `ohash@2.0.11`
+- `ofetch@1.5.1`
+  - Description: A better fetch API. Works on node, browser and workers.
+  - Homepage: https://github.com/unjs/ofetch#readme
+- `ohash@2.0.11`, `ohash@2.0.12`
   - Description: Simple object hashing, serialization and comparison utils.
   - Homepage: https://github.com/unjs/ohash#readme
+- `onetime@6.0.0`
+  - Description: Ensure a function is only called once
+  - Homepage: https://github.com/sindresorhus/onetime#readme
+- `open@8.4.2`
+  - Description: Open stuff like URLs, files, executables. Cross-platform.
+  - Homepage: https://github.com/sindresorhus/open#readme
+- `orderedmap@2.1.1`
+  - Description: Persistent ordered mapping from strings
+  - Homepage: https://github.com/marijnh/orderedmap#readme
 - `oxc-parser@0.143.0`
   - Description: Oxc Parser Node API
   - Homepage: https://oxc.rs/docs/guide/usage/parser
 - `oxc-resolver@11.24.2`
   - Description: Oxc Resolver Node API
   - Homepage: https://oxc.rs
-- `p-limit@3.1.0`
+- `oxc-walker@1.1.1`
+  - Homepage: https://github.com/oxc-project/oxc-walker#readme
+- `p-cancelable@3.0.0`
+  - Description: Create a promise that can be canceled
+  - Homepage: https://github.com/sindresorhus/p-cancelable#readme
+- `p-limit@3.1.0`, `p-limit@6.2.0`
   - Description: Run multiple promise-returning & async functions with limited concurrency
   - Homepage: https://github.com/sindresorhus/p-limit#readme
 - `p-locate@5.0.0`
   - Description: Get the first fulfilled promise that satisfies the provided testing function
   - Homepage: https://github.com/sindresorhus/p-locate#readme
+- `package-manager-detector@1.8.0`
+  - Description: Package manager detector
+  - Homepage: https://github.com/antfu-collective/package-manager-detector#readme
 - `parent-module@1.0.1`
   - Description: Get the path of the parent module
   - Homepage: https://github.com/sindresorhus/parent-module#readme
@@ -1789,7 +2349,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `picomatch@2.3.2`, `picomatch@4.0.5`
   - Description: Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.
   - Homepage: https://github.com/micromatch/picomatch
-- `pkg-types@2.3.1`
+- `pkg-types@1.3.1`, `pkg-types@2.3.1`
   - Description: Node.js utilities and TypeScript definitions for `package.json` and `tsconfig.json`
   - Homepage: https://github.com/unjs/pkg-types#readme
 - `postcss@8.5.26`
@@ -1825,18 +2385,64 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `proper-lockfile@4.1.2`
   - Description: A inter-process and inter-machine lockfile utility that works on a local or network file system
   - Homepage: https://github.com/moxystudio/node-proper-lockfile
+- `prosemirror-changeset@2.4.2`
+  - Description: Distills a series of editing steps into deleted and added ranges
+- `prosemirror-commands@1.7.2`
+  - Description: Editing commands for ProseMirror
+- `prosemirror-dropcursor@1.8.3`
+  - Description: Drop cursor plugin for ProseMirror
+- `prosemirror-gapcursor@1.4.1`
+  - Description: ProseMirror plugin for cursors at normally impossible-to-reach positions
+  - Homepage: https://github.com/prosemirror/prosemirror-gapcursor#readme
+- `prosemirror-history@1.5.0`
+  - Description: Undo history for ProseMirror
+  - Homepage: https://github.com/prosemirror/prosemirror-history#readme
+- `prosemirror-inputrules@1.5.1`
+  - Description: Automatic transforms on text input for ProseMirror
+  - Homepage: https://github.com/prosemirror/prosemirror-inputrules#readme
+- `prosemirror-keymap@1.2.3`
+  - Description: Keymap plugin for ProseMirror
+  - Homepage: https://github.com/prosemirror/prosemirror-keymap#readme
+- `prosemirror-model@1.25.11`
+  - Description: ProseMirror's document model
+- `prosemirror-schema-list@1.5.1`
+  - Description: List-related schema elements and commands for ProseMirror
+  - Homepage: https://github.com/prosemirror/prosemirror-schema-list#readme
+- `prosemirror-state@1.4.4`
+  - Description: ProseMirror editor state
+  - Homepage: https://github.com/prosemirror/prosemirror-state#readme
+- `prosemirror-tables@1.8.5`
+  - Description: ProseMirror's rowspan/colspan tables component
+  - Homepage: https://github.com/ProseMirror/prosemirror-tables#readme
+- `prosemirror-transform@1.12.0`
+  - Description: ProseMirror document transformations
+  - Homepage: https://github.com/prosemirror/prosemirror-transform#readme
+- `prosemirror-view@1.42.3`
+  - Description: ProseMirror's view component
 - `proxy-from-env@1.1.0`
   - Description: Offers getProxyForUrl to get the proxy URL for a URL, respecting the *_PROXY (e.g. HTTP_PROXY) and NO_PROXY environment variables.
   - Homepage: https://github.com/Rob--W/proxy-from-env#readme
 - `punycode.js@2.3.1`
   - Description: A robust Punycode converter that fully complies to RFC 3492 and RFC 5891, and works on nearly all JavaScript platforms.
   - Homepage: https://mths.be/punycode
+- `puppeteer-cluster@0.25.0`
+  - Description: Cluster management for puppeteer
+  - Homepage: https://github.com/thomasdondorf/puppeteer-cluster
 - `pure-rand@6.1.0`, `pure-rand@8.4.0`
   - Description: Pure random number generator written in TypeScript
   - Homepage: https://github.com/dubzzz/pure-rand#readme
+- `quansync@0.2.11`
+  - Description: Create sync/async APIs with usable logic
+  - Homepage: https://github.com/quansync-dev/quansync#readme
 - `queue-microtask@1.2.3`
   - Description: fast, tiny `queueMicrotask` shim for modern engines
   - Homepage: https://github.com/feross/queue-microtask
+- `quick-lru@5.1.1`
+  - Description: Simple “Least Recently Used” (LRU) cache
+  - Homepage: https://github.com/sindresorhus/quick-lru#readme
+- `radix3@1.1.2`
+  - Description: Lightweight and fast router for JavaScript based on Radix Tree
+  - Homepage: https://github.com/unjs/radix3#readme
 - `rc9@3.0.1`
   - Description: Read/Write config couldn't be easier!
   - Homepage: https://github.com/unjs/rc9#readme
@@ -1852,6 +2458,15 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `readdirp@5.0.0`
   - Description: Recursive version of fs.readdir with small RAM & CPU footprint
   - Homepage: https://github.com/paulmillr/readdirp
+- `regexp-tree@0.1.27`
+  - Description: Regular Expressions parser in JavaScript
+  - Homepage: https://github.com/DmitrySoshnikov/regexp-tree
+- `regexparam@3.0.0`
+  - Description: A tiny (399B) utility that converts route patterns into RegExp. Limited alternative to `path-to-regexp` 🙇‍
+  - Homepage: https://github.com/lukeed/regexparam#readme
+- `reka-ui@2.10.3`
+  - Description: Vue port for Radix UI Primitives.
+  - Homepage: https://github.com/unovue/reka-ui
 - `remeda@2.33.4`
   - Description: A utility library for JavaScript and Typescript.
   - Homepage: https://remedajs.com/
@@ -1864,12 +2479,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `require-in-the-middle@8.0.1`
   - Description: Module to hook into the Node.js require function
   - Homepage: https://github.com/nodejs/require-in-the-middle#readme
+- `resolve-alpn@1.2.1`
+  - Description: Detects the ALPN protocol
+  - Homepage: https://github.com/szmarczak/resolve-alpn#readme
 - `resolve-from@4.0.0`, `resolve-from@5.0.0`
   - Description: Resolve the path of a module like `require.resolve()` but from a given path
   - Homepage: https://github.com/sindresorhus/resolve-from#readme
 - `resolve-pkg-maps@1.0.0`
   - Description: Resolve package.json exports & imports maps
   - Homepage: https://github.com/privatenumber/resolve-pkg-maps#readme
+- `responselike@3.0.0`
+  - Description: A response-like object for mocking a Node.js HTTP response stream
+  - Homepage: https://github.com/sindresorhus/responselike#readme
 - `ret@0.5.0`
   - Description: Tokenizes a string that represents a regular expression.
   - Homepage: https://github.com/fent/ret.js#readme
@@ -1879,12 +2500,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `reusify@1.1.0`
   - Description: Reuse objects and functions with style
   - Homepage: https://github.com/mcollina/reusify#readme
+- `robots-parser@3.0.1`
+  - Description: A specification compliant robots.txt parser with wildcard (*) matching support.
+  - Homepage: https://github.com/samclarke/robots-parser
 - `rolldown@1.0.3`
   - Description: Fast JavaScript/TypeScript bundler in Rust with Rollup-compatible API.
   - Homepage: https://rolldown.rs/
 - `rollup@4.62.5`
   - Description: Next-generation ES module bundler
   - Homepage: https://rollupjs.org/
+- `rope-sequence@1.3.4`
+  - Description: Rope-based persistent sequence type
+  - Homepage: https://github.com/marijnh/rope-sequence#readme
 - `run-parallel@1.2.0`
   - Description: Run an array of functions in parallel
   - Homepage: https://github.com/feross/run-parallel
@@ -1903,12 +2530,18 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `schema-utils@4.3.3`
   - Description: webpack Validation Utils
   - Homepage: https://github.com/webpack/schema-utils
+- `scule@1.3.0`
+  - Description: String case utils
+  - Homepage: https://github.com/unjs/scule#readme
 - `shebang-command@2.0.0`
   - Description: Get the command from a shebang
   - Homepage: https://github.com/kevva/shebang-command#readme
 - `shebang-regex@3.0.0`
   - Description: Regular expression for matching a shebang line
   - Homepage: https://github.com/sindresorhus/shebang-regex#readme
+- `shell-quote@1.10.0`
+  - Description: quote and parse shell commands
+  - Homepage: https://github.com/ljharb/shell-quote
 - `side-channel@1.1.1`
   - Description: Store information about any JS value in a side channel. Uses WeakMap if available.
   - Homepage: https://github.com/ljharb/side-channel#readme
@@ -1921,12 +2554,24 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `side-channel-weakmap@1.0.2`
   - Description: Store information about any JS value in a side channel. Uses WeakMap if available.
   - Homepage: https://github.com/ljharb/side-channel-weakmap#readme
+- `sirv@3.0.2`
+  - Description: The optimized & lightweight middleware for serving requests to static assets
+  - Homepage: https://github.com/lukeed/sirv#readme
 - `sisteransi@1.0.5`
   - Description: ANSI escape codes for some terminal swag
   - Homepage: https://github.com/terkelg/sisteransi#readme
+- `sitemapper@4.1.6`
+  - Description: Parser for XML Sitemaps to be used with Robots.txt and web crawlers
+  - Homepage: http://github.com/seantomburke/sitemapper
+- `slugify@1.6.9`
+  - Description: Slugifies a String
+  - Homepage: https://github.com/simov/slugify
 - `source-map-support@0.5.21`
   - Description: Fixes stack traces for files with source maps
   - Homepage: https://github.com/evanw/node-source-map-support#readme
+- `speedline-core@1.4.3`
+  - Description: Get the speed index from chrome dev tool timeline files
+  - Homepage: https://github.com/paulirish/speedline#readme
 - `sql-escaper@1.5.1`
   - Description: 🛡️ Faster SQL escape and format for JavaScript (Node.js, Bun, and Deno).
   - Homepage: https://github.com/mysqljs/sql-escaper#readme
@@ -1936,7 +2581,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `stacktrace-parser@0.1.11`
   - Description: Parses every stack trace into a nicely formatted array of hashes.
   - Homepage: https://github.com/errwischt/stacktrace-parser
-- `std-env@3.10.0`, `std-env@4.1.0`
+- `std-env@3.10.0`, `std-env@4.1.0`, `std-env@4.2.0`
   - Description: Runtime agnostic JS utils
   - Homepage: https://github.com/unjs/std-env#readme
 - `streamx@2.25.0`
@@ -1954,21 +2599,39 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `strip-ansi@6.0.1`, `strip-ansi@7.2.0`
   - Description: Strip ANSI escape codes from a string
   - Homepage: https://github.com/chalk/strip-ansi#readme
-- `strip-final-newline@4.0.0`
+- `strip-final-newline@3.0.0`, `strip-final-newline@4.0.0`
   - Description: Strip the final newline character from a string or Uint8Array
   - Homepage: https://github.com/sindresorhus/strip-final-newline#readme
 - `strip-json-comments@5.0.3`
   - Description: Strip comments from JSON. Lets you use comments in your JSON files!
   - Homepage: https://github.com/sindresorhus/strip-json-comments#readme
+- `strip-literal@4.0.0`
+  - Description: Strip comments and string literals from JavaScript code
+  - Homepage: https://github.com/antfu/strip-literal#readme
 - `strnum@2.2.3`
   - Description: Parse String to Number based on configuration
   - Homepage: https://github.com/NaturalIntelligence/strnum#readme
+- `stubborn-fs@2.0.0`
+  - Description: Stubborn versions of Node's fs functions that try really hard to do their job.
+  - Homepage: https://github.com/fabiospampinato/stubborn-fs#readme
+- `stubborn-utils@1.0.2`
+  - Description: A small collection of utilities for making functions somewhat resilient against errors.
+  - Homepage: https://github.com/fabiospampinato/stubborn-utils#readme
 - `styled-jsx@5.1.6`
   - Description: Full CSS support for JSX without compromises
   - Homepage: https://github.com/vercel/styled-jsx#readme
 - `supports-color@7.2.0`, `supports-color@8.1.1`
   - Description: Detect whether a terminal supports color
   - Homepage: https://github.com/chalk/supports-color#readme
+- `tailwind-merge@3.6.0`
+  - Description: Merge Tailwind CSS classes without style conflicts
+  - Homepage: https://github.com/dcastil/tailwind-merge
+- `tailwind-variants@3.3.1`
+  - Description: 🦄 Tailwindcss first-class variant API
+  - Homepage: https://github.com/heroui-inc/tailwind-variants#readme
+- `tailwindcss@4.3.3`
+  - Description: A utility-first CSS framework for rapidly building custom user interfaces.
+  - Homepage: https://tailwindcss.com
 - `tapable@2.3.3`
   - Description: Just a little module for plugins.
   - Homepage: https://github.com/webpack/tapable
@@ -1978,6 +2641,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `teex@1.0.1`
   - Description: Turn a readable stream into multiple readable streamx streams
   - Homepage: https://github.com/mafintosh/teex
+- `third-party-web@0.29.2`
+  - Description: Categorized data on third party entities on the web.
+  - Homepage: https://github.com/patrickhulce/third-party-web#readme
+- `tiny-inflate@1.0.3`
+  - Description: A tiny inflate implementation
+  - Homepage: https://github.com/devongovett/tiny-inflate
 - `tinybench@2.9.0`
   - Homepage: https://github.com/tinylibs/tinybench#readme
 - `tinyexec@1.2.4`
@@ -1989,12 +2658,21 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `tinyrainbow@3.1.0`
   - Description: A small library to print colourful messages.
   - Homepage: https://github.com/tinylibs/tinyrainbow#readme
+- `tldts-core@7.4.11`
+  - Description: tldts core primitives (internal module)
+  - Homepage: https://github.com/remusao/tldts#readme
+- `tldts-icann@7.4.11`
+  - Description: Library to work against complex domain names, subdomains and URIs. Only contains ICANN section.
+  - Homepage: https://github.com/remusao/tldts#readme
 - `to-regex-range@5.0.1`
   - Description: Pass two numbers, get a regex-compatible source string for matching ranges. Validated against more than 2.78 million test assertions.
   - Homepage: https://github.com/micromatch/to-regex-range
 - `toad-cache@3.7.4`
   - Description: LRU and FIFO caches for Client or Server
   - Homepage: https://github.com/kibertoad/toad-cache
+- `totalist@3.0.1`
+  - Description: A tiny (195B to 220B) utility to recursively list all (total) files in a directory
+  - Homepage: https://github.com/lukeed/totalist#readme
 - `tr46@0.0.3`
   - Description: An implementation of the Unicode TR46 spec
   - Homepage: https://github.com/Sebmaster/tr46.js#readme
@@ -2007,6 +2685,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `tunnel@0.0.6`
   - Description: Node HTTP/HTTPS Agents for tunneling proxies
   - Homepage: https://github.com/koichik/node-tunnel/
+- `type-level-regexp@0.1.17`
+  - Description: Type-Level RegExp parser, matcher and permutation resolver
+  - Homepage: https://github.com/didavid61202/type-level-regexp#readme
 - `typed-query-selector@2.12.2`
   - Description: Better typed `querySelector` and `querySelectorAll`.
   - Homepage: https://github.com/g-plane/typed-query-selector#readme
@@ -2019,6 +2700,17 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `uc.micro@2.1.0`
   - Description: Micro subset of unicode data files for markdown-it projects.
   - Homepage: https://github.com/markdown-it/uc.micro#readme
+- `ufo@1.6.4`
+  - Description: URL utils for humans
+  - Homepage: https://github.com/unjs/ufo#readme
+- `ultrahtml@1.7.0`
+  - Homepage: https://github.com/natemoo-re/ultrahtml#README
+- `uncrypto@0.1.3`
+  - Description: Single API for Web Crypto API and Crypto Subtle working in Node.js, Browsers and other runtimes
+  - Homepage: https://github.com/unjs/uncrypto#readme
+- `unctx@2.5.0`, `unctx@3.0.1`
+  - Description: Composition-api in Vanilla js
+  - Homepage: https://github.com/unjs/unctx#readme
 - `underscore@1.13.8`
   - Description: JavaScript's functional programming helper library.
   - Homepage: https://underscorejs.org
@@ -2028,15 +2720,38 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `undici-types@7.18.2`
   - Description: A stand-alone types package for Undici
   - Homepage: https://undici.nodejs.org
+- `unhead@3.4.0`
+  - Description: Full-stack <head> manager built for any framework.
+  - Homepage: https://unhead.unjs.io
 - `unicorn-magic@0.3.0`
   - Description: Some useful utilities I often need
   - Homepage: https://github.com/sindresorhus/unicorn-magic#readme
+- `unifont@0.7.5`
+  - Description: Framework agnostic tools for accessing data from font CDNs and providers
+  - Homepage: https://github.com/unjs/unifont#readme
+- `unimport@6.4.0`
+  - Description: Unified utils for auto importing APIs in modules
+  - Homepage: https://github.com/unjs/unimport#readme
 - `universal-github-app-jwt@2.2.2`
   - Description: Calculate GitHub App bearer tokens for Node & modern browsers
   - Homepage: https://github.com/gr2m/universal-github-app-jwt#readme
-- `unplugin@1.16.1`
+- `unplugin@2.3.11`, `unplugin@3.3.0`
   - Description: Unified plugin system for build tools
-  - Homepage: https://github.com/unjs/unplugin#readme
+  - Homepage: https://unplugin.unjs.io
+- `unplugin-auto-import@21.1.0`
+  - Description: Register global imports on demand for Vite and Webpack
+  - Homepage: https://github.com/unplugin/unplugin-auto-import#readme
+- `unplugin-utils@0.3.2`
+  - Description: A set of utility functions commonly used by unplugins.
+  - Homepage: https://github.com/sxzz/unplugin-utils#readme
+- `unplugin-vue-components@32.1.0`
+  - Description: Components auto importing for Vue
+  - Homepage: https://github.com/unplugin/unplugin-vue-components#readme
+- `unstorage@1.17.5`
+  - Description: Universal Storage Layer
+  - Homepage: https://unstorage.unjs.io
+- `untyped@2.0.0`
+  - Homepage: https://github.com/unjs/untyped#readme
 - `unzip-stream@0.3.4`
   - Description: Process zip files using streaming API
   - Homepage: https://github.com/mhr3/unzip-stream#readme
@@ -2049,12 +2764,25 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `valibot@1.4.2`
   - Description: The modular and type safe schema library for validating structural data
   - Homepage: https://valibot.dev
+- `verkit@0.3.2`
+  - Description: Fast, zero-dependency SemVer for ESM and TypeScript, with functional, tree-shakeable APIs.
+  - Homepage: https://github.com/sxzz/verkit#readme
 - `vite@8.0.16`
   - Description: Native-ESM powered web dev build tool
   - Homepage: https://vite.dev
 - `vitest@4.1.10`
   - Description: Next generation testing framework powered by Vite
   - Homepage: https://vitest.dev
+- `vue@3.5.41`
+  - Description: The progressive JavaScript framework for building modern web UI.
+  - Homepage: https://vuejs.org/
+- `vue-component-type-helpers@3.3.11`
+  - Homepage: https://github.com/vuejs/language-tools#readme
+- `vue-demi@0.14.10`
+  - Homepage: https://github.com/antfu/vue-demi#readme
+- `w3c-keyname@2.2.8`
+  - Description: Get a KeyboardEvent.key-style string from an event
+  - Homepage: https://github.com/marijnh/w3c-keyname#readme
 - `watchpack@2.5.2`
   - Homepage: https://github.com/webpack/watchpack
 - `webpack@5.109.2`
@@ -2072,22 +2800,37 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `whatwg-url@5.0.0`
   - Description: An implementation of the WHATWG URL Standard's URL API and parsing machinery
   - Homepage: https://github.com/jsdom/whatwg-url#readme
+- `wheel-gestures@2.2.48`
+  - Description: wheel gestures and momentum detection
+  - Homepage: https://github.com/xiel/wheel-gestures#readme
+- `when-exit@2.1.5`
+  - Description: Execute a function right before the process, or the browser's tab, is about to exit.
+  - Homepage: https://github.com/fabiospampinato/when-exit#readme
 - `why-is-node-running@2.3.0`
   - Description: Node is running but you don't know why? why-is-node-running is here to help you.
   - Homepage: https://github.com/mafintosh/why-is-node-running
 - `wrap-ansi@7.0.0`, `wrap-ansi@9.0.2`
   - Description: Wordwrap a string with ANSI escape codes
   - Homepage: https://github.com/chalk/wrap-ansi#readme
-- `ws@8.21.3`
+- `ws@7.5.13`, `ws@8.21.3`
   - Description: Simple to use, blazing fast and thoroughly tested websocket client and server for Node.js
   - Homepage: https://github.com/websockets/ws
+- `xdg-basedir@5.1.0`
+  - Description: Get XDG Base Directory paths
+  - Homepage: https://github.com/sindresorhus/xdg-basedir#readme
 - `xtend@4.0.2`
   - Description: extend like a boss
   - Homepage: https://github.com/Raynos/xtend
+- `y-protocols@1.0.7`
+  - Description: Yjs encoding protocols
+  - Homepage: https://github.com/yjs/y-protocols#readme
 - `yargs@17.7.3`, `yargs@18.0.0`
   - Description: yargs the modern, pirate-themed, successor to optimist.
   - Homepage: https://yargs.js.org/
-- `yocto-queue@0.1.0`
+- `yjs@13.6.32`
+  - Description: Shared Editing Library
+  - Homepage: https://docs.yjs.dev
+- `yocto-queue@0.1.0`, `yocto-queue@1.2.2`
   - Description: Tiny queue data structure
   - Homepage: https://github.com/sindresorhus/yocto-queue#readme
 - `yoctocolors@2.1.2`
@@ -2144,6 +2887,8 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `buffers@0.1.1`
   - Description: Treat a collection of Buffers as a single contiguous partially mutable Buffer.
   - Homepage: https://github.com/substack/node-buffers#readme
+- `vaul-vue@0.4.1`
+  - Homepage: https://github.com/Elliot-Alexander/vaul-vue#readme
 
 ## Unlicense
 
@@ -2153,3 +2898,15 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `robust-predicates@3.0.3`
   - Description: Fast robust predicates for computational geometry
   - Homepage: https://github.com/mourner/robust-predicates#readme
+
+## WTFPL
+
+- `truncate-utf8-bytes@1.0.2`
+  - Description: Truncate string to given length in bytes
+  - Homepage: https://github.com/parshap/truncate-utf8-bytes#readme
+
+## WTFPL OR ISC
+
+- `sanitize-filename@1.6.4`
+  - Description: Sanitize a string for use as a filename
+  - Homepage: https://github.com/parshap/node-sanitize-filename#readme

@@ -35,3 +35,6 @@ tests/e2e/.auth/
 /.boardreadyops/toolchain/
 /.boardreadyops/verification/
 TEMP/
+
+# Authenticated Unlighthouse audit output
+/.unlighthouse/

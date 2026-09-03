@@ -36,12 +36,14 @@ allowBuilds:
   prisma: true
   puppeteer: false
   sharp: true
+  vue-demi: false
 
 overrides:
   'archiver>readdir-glob': 3.0.0
   browserslist@<=4.28.6: 4.28.7
   '@prisma/config>deepmerge-ts': 8.0.0
   'pa11y>puppeteer': 25.8.0
+  'fontless>esbuild': 0.28.2
   '@hono/node-server@<2.0.12': 2.0.12
   'postcss@<8.5.23': 8.5.26
   sharp: 0.35.3
