@@ -161,6 +161,7 @@ nav:
       - Plugin SDK: plugin-sdk.md
       - Plugin SDK API: reference/plugin-sdk/README.md
       - Repository Standards: reference/repository-standards.md
+      - Exit Codes & Finding Severities: reference/exit-codes.md
       - Development:
           - Setup: development/setup.md
           - Reproducible Toolchain: development/toolchain.md

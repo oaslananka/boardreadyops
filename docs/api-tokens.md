@@ -86,4 +86,5 @@ Revocation is immediate and permanent; a revoked token's requests are rejected r
 
 - Treat a token exactly like a password — anyone with it can act with its scopes against the repository it's bound to, until it's revoked or expires.
 - There is currently no built-in rotation reminder or expiry notification; tokens created without `durationDays` never expire on their own, so prefer setting an expiry for anything other than a long-lived service integration, and revoke tokens you no longer use.
+- Failed bearer-token authentication attempts are rate-limited per client (20 failures/minute by default, configurable via `BOARDREADYOPS_AUTH_RATE_LIMIT_PER_MINUTE`); a client that exceeds it gets `429` until the window resets. Valid requests are never counted against this limit.
 - Tokens are not visible per-device or per-session — revoking one affects every place it's used.
