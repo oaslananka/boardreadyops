@@ -22,6 +22,7 @@ const nextConfig = {
         "/reviews/:path*",
         "/runs/:path*",
         "/settings/:path*",
+        "/ops/:path*",
       ].map((source) => ({ source, headers: [noindex] })),
     ];
   },
