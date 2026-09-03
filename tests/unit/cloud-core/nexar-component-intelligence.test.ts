@@ -11,7 +11,15 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
 
-function part(mpn: string, lifecycle: string, manufacturer?: string) {
+function part(
+  mpn: string,
+  lifecycle: string,
+  manufacturer?: string,
+  sellers?: {
+    isAuthorized?: boolean;
+    offers?: { prices?: { quantity?: number; price?: number; currency?: string }[] }[];
+  }[],
+) {
   return {
     mpn,
     ...(manufacturer ? { manufacturer: { name: manufacturer } } : {}),
@@ -19,6 +27,7 @@ function part(mpn: string, lifecycle: string, manufacturer?: string) {
       { attribute: { shortname: "lifecyclestatus" }, displayValue: lifecycle },
       { attribute: { shortname: "rohs" }, displayValue: "Compliant" },
     ],
+    ...(sellers ? { sellers } : {}),
   };
 }
 
@@ -86,8 +95,14 @@ describe("nexar component intelligence", () => {
     const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }, { mpn: "RC0603FR-0710KL" }]);
 
     expect(observed).toEqual([
-      { mpn: "STM32F103C8T6", status: "eol", source: "nexar", observedAt: now },
-      { mpn: "RC0603FR-0710KL", status: "active", source: "nexar", observedAt: now },
+      { mpn: "STM32F103C8T6", status: "eol", source: "nexar", observedAt: now, distributorClassification: "unknown" },
+      {
+        mpn: "RC0603FR-0710KL",
+        status: "active",
+        source: "nexar",
+        observedAt: now,
+        distributorClassification: "unknown",
+      },
     ]);
   });
 
@@ -119,7 +134,14 @@ describe("nexar component intelligence", () => {
     // Attaching one vendor's obsolescence to another's part would be a false alarm on a board
     // that is fine.
     expect(observed).toEqual([
-      { mpn: "LM339", manufacturer: "Texas Instruments", status: "active", source: "nexar", observedAt: now },
+      {
+        mpn: "LM339",
+        manufacturer: "Texas Instruments",
+        status: "active",
+        source: "nexar",
+        observedAt: now,
+        distributorClassification: "unknown",
+      },
     ]);
   });
 
@@ -209,5 +231,222 @@ describe("nexar component intelligence", () => {
     expect(() =>
       createNexarComponentIntelligenceProvider({ clientId: " ", clientSecret: "secret", fetch: fetchImpl }),
     ).toThrow(ComponentIntelligenceCredentialError);
+  });
+});
+
+describe("nexar distributor classification and pricing", () => {
+  it("classifies a part with an authorized seller as authorized-distributor", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [part("STM32F103C8T6", "Production", undefined, [{ isAuthorized: true, offers: [] }])],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.distributorClassification).toBe("authorized-distributor");
+  });
+
+  it("classifies a part with only unauthorized sellers as marketplace", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [part("STM32F103C8T6", "Production", undefined, [{ isAuthorized: false, offers: [] }])],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.distributorClassification).toBe("marketplace");
+  });
+
+  it("classifies a part with a mix of authorized and marketplace sellers as authorized-distributor", async () => {
+    // Any authorized channel means the part is not confined to the grey market, which is the
+    // question this classification exists to answer.
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    { isAuthorized: false, offers: [] },
+                    { isAuthorized: true, offers: [] },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.distributorClassification).toBe("authorized-distributor");
+  });
+
+  it("reports unknown -- not a guess -- when Nexar returns no seller data at all", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: { supMultiMatch: [{ reference: "0", parts: [part("STM32F103C8T6", "Production")] }] },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.distributorClassification).toBe("unknown");
+  });
+
+  it("reports unknown when sellers are present but none carry the isAuthorized signal", async () => {
+    // Ambiguous/unclassifiable case: Nexar returned seller data, but not the specific field
+    // this classification depends on. Reported honestly rather than defaulted either way.
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              { reference: "0", parts: [part("STM32F103C8T6", "Production", undefined, [{ offers: [] }])] },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.distributorClassification).toBe("unknown");
+  });
+
+  it("captures quantity-price tier breaks with their currency from the seller's offers", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    {
+                      isAuthorized: true,
+                      offers: [
+                        {
+                          prices: [
+                            { quantity: 1, price: 2.5, currency: "USD" },
+                            { quantity: 100, price: 1.9, currency: "USD" },
+                          ],
+                        },
+                      ],
+                    },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.priceBreaks).toEqual([
+      { quantity: 1, price: 2.5, currency: "USD" },
+      { quantity: 100, price: 1.9, currency: "USD" },
+    ]);
+  });
+
+  it("prefers an authorized seller's pricing over a marketplace seller's when both are present", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    { isAuthorized: false, offers: [{ prices: [{ quantity: 1, price: 9.99, currency: "USD" }] }] },
+                    { isAuthorized: true, offers: [{ prices: [{ quantity: 1, price: 2.5, currency: "USD" }] }] },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.priceBreaks).toEqual([{ quantity: 1, price: 2.5, currency: "USD" }]);
+  });
+
+  it("omits priceBreaks rather than reporting an empty list when no seller carries priced offers", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [part("STM32F103C8T6", "Production", undefined, [{ isAuthorized: true, offers: [] }])],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.priceBreaks).toBeUndefined();
+  });
+
+  it("drops a price entry missing quantity, price, or currency rather than reporting a partial tier", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    {
+                      isAuthorized: true,
+                      offers: [
+                        {
+                          prices: [
+                            { quantity: 1, price: 2.5, currency: "USD" },
+                            { quantity: 10, price: 2.1 }, // no currency
+                          ],
+                        },
+                      ],
+                    },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.priceBreaks).toEqual([{ quantity: 1, price: 2.5, currency: "USD" }]);
   });
 });

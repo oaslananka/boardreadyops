@@ -415,7 +415,14 @@
           "src/bom/lifecycle.ts",
           "src/bom/risk.ts",
           "src/bom/supplier.ts",
-          "packages/db/src/board-bom-store.ts"
+          "packages/db/src/board-bom-store.ts",
+          "packages/db/src/board-supply-watch-store.ts",
+          "packages/db/migrations/0059_component_pricing_snapshot.sql",
+          "packages/cloud-core/src/component-intelligence.ts",
+          "packages/cloud-core/src/component-intelligence-resilience.ts",
+          "packages/cloud-core/src/nexar-component-intelligence.ts",
+          "packages/cloud-core/src/supply-watch.ts",
+          "apps/web/lib/component-intelligence-resolver.ts"
         ],
         "tests": [
           "tests/unit/bom/identity.test.ts",
@@ -423,7 +430,14 @@
           "tests/unit/bom/supplier.test.ts",
           "tests/unit/rules/bom/risk-score.test.ts",
           "tests/unit/db/board-bom-store.test.ts",
-          "tests/integration/board-bom-store-postgres.test.ts"
+          "tests/integration/board-bom-store-postgres.test.ts",
+          "tests/unit/db/board-supply-watch-store.test.ts",
+          "tests/unit/db/migrations.test.ts",
+          "tests/unit/cloud-core/component-intelligence-resilience.test.ts",
+          "tests/unit/cloud-core/nexar-component-intelligence.test.ts",
+          "tests/unit/cloud-core/supply-watch.test.ts",
+          "tests/unit/web/component-intelligence-resolver.test.ts",
+          "tests/integration/board-supply-watch-postgres.test.ts"
         ],
         "docs": ["docs/bom-alternates.md", "docs/rules/bom.lifecycle.md", "docs/rules/bom.risk-score.md"],
         "deployed": [],
@@ -431,11 +445,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/bom/identity.test.ts tests/unit/bom/lifecycle.test.ts tests/unit/bom/supplier.test.ts tests/unit/rules/bom/risk-score.test.ts tests/unit/db/board-bom-store.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/bom/identity.test.ts tests/unit/bom/lifecycle.test.ts tests/unit/bom/supplier.test.ts tests/unit/rules/bom/risk-score.test.ts tests/unit/db/board-bom-store.test.ts tests/unit/db/board-supply-watch-store.test.ts tests/unit/db/migrations.test.ts tests/unit/cloud-core/component-intelligence-resilience.test.ts tests/unit/cloud-core/nexar-component-intelligence.test.ts tests/unit/cloud-core/supply-watch.test.ts tests/unit/web/component-intelligence-resolver.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-02T14:46:09Z"
+        "checkedAt": "2026-09-04T00:00:00Z"
       },
-      "remaining": "PARTIAL CLOSE: fleet BOM exposure ('which of our boards use MPN X') is now queryable at the store layer, closing one of four gaps. board-bom-store.ts's BoardBomStore gains findBoardsByMpn(installationId, mpn), scoped by installation_id (matching audit-log-store.ts's tenant-scoping convention) and deliberately restricted to each board's LATEST snapshot only (a distinct-on-board_id CTE, matching the same idiom already used in board-supply-watch-store.ts's claimDueBoards) -- exposure is a question about what ships today, not what a board's BOM has ever contained, so a part removed in a later revision correctly stops showing up. Case-insensitive MPN match (lower(mpn) = lower($2)), reuses the pre-existing but previously-unused board_bom_components_mpn_idx index. 4 mocked-executor unit tests (tests/unit/db/board-bom-store.test.ts, this store's first unit test file -- it previously had integration coverage only) plus 4 new Postgres integration test cases (tenant scoping, latest-snapshot-only, case-insensitivity, unknown/blank MPN) appended to the existing suite; the integration cases could not be run in this environment (no local Postgres) but were typechecked and confirmed to load/skip cleanly. Deliberately NOT built in this change: an HTTP API route exposing this query. Investigated first -- there is no existing installation-level (cross-repository) API auth context resolver in apps/web/lib/api-auth.ts (resolveRepositoryApiContext only handles one repository at a time), and no ApiTokenScope value for it either. Building both plus a new route is a separate, larger design decision (who should be allowed to query fleet-wide component exposure across a customer's repositories is an access-control question, not just a query-shape one) -- deliberately left for a dedicated follow-up rather than bolted on here. Still remaining: no provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; no HTTP surface for the new query (see above). Matches open issue #449."
+      "remaining": "PARTIAL CLOSE (this cycle): the three previously-named provider-hardening gaps are closed, in scope deliberately excluding the fourth (HTTP surface), which stays out of scope per the prior cycle's access-control investigation (unchanged, see below). (1) Provider TTL/rate-limit/circuit-breaker: investigated first, and what the prior note called a bare 'freshness age-check' turned out to already be real TTL-based cache invalidation -- board-supply-watch-store.ts's freshObservations() filters `expires_at > now` at the query layer, and supply-watch.ts's observationTtlMs is already clamped to the provider's own cachePolicy.maximumCacheAgeMs. What was genuinely missing was protection on the outbound provider calls themselves: a flaky or down provider had no rate limit and nothing to stop every board in a pass from calling it and failing individually. Added packages/cloud-core/src/component-intelligence-resilience.ts: a fixed-window rate limiter (same in-process algorithm as apps/web/lib/webhook-rate-limit.ts / auth-rate-limit.ts -- no Redis in this codebase, confirmed by grep) and a closed/open/half-open circuit breaker (opens after a configurable consecutive-failure threshold, half-open trial after a cooldown, closes on that trial's success), both keyed per installation so one customer's exhausted quota or broken credential cannot throttle or trip the breaker for another. Wired into apps/web/lib/component-intelligence-resolver.ts between the raw Nexar provider and the existing credential-rejection wrapper, defaulting to 30 calls/min and a 5-failure/5-minute-cooldown breaker, each overridable via BOARDREADYOPS_COMPONENT_INTELLIGENCE_RATE_LIMIT_PER_MINUTE / _CIRCUIT_BREAKER_THRESHOLD / _CIRCUIT_BREAKER_COOLDOWN_MS. (2) Authorized-distributor-vs-marketplace classification: confirmed via Nexar's own published query-template docs (support.nexar.com) that `Seller.isAuthorized` is a real field Nexar returns per seller, not guessed at -- nexarDistributorClassification() in nexar-component-intelligence.ts returns 'authorized-distributor' when any seller on the matched part is authorized, 'marketplace' when sellers exist but none are, and honestly 'unknown' when Nexar returns no seller data at all or returns sellers without the isAuthorized signal (the genuinely unclassifiable case). Limited by provider data as expected: this only classifies Nexar; no other provider is implemented, so the classification is only as good as the one live integration's own signal. (3) Cost/quantity-tier/currency snapshot metadata: confirmed via the same Nexar docs that `Seller.offers[].prices[]` carries {quantity, price, currency} tier breaks. Migration 0059_component_pricing_snapshot.sql adds distributor_classification and price_breaks (jsonb, same jsonb_typeof/pg_column_size check-constraint style as 0004/0006/0008) to component_lifecycle_observations, following that table's existing 'one snapshot row per part identity' shape rather than a new table. board-supply-watch-store.ts's ObservationInput/recordObservations/freshObservations round-trip both fields; nexarPriceBreaks() prefers an authorized seller's offer pricing over a marketplace seller's when a part has both, so a grey-market price is never presented as the authorized channel's. Tests: component-intelligence-resilience.test.ts covers the rate limiter's window/reset/per-key isolation and the breaker's full closed->open->half-open->closed and half-open->open transitions (all via injected `now`, no real timers/sleeps); nexar-component-intelligence.test.ts adds fixture-driven classification cases including the ambiguous/unclassifiable one, plus price-break derivation, seller preference, and malformed-entry rejection; board-supply-watch-store.test.ts (new, mocked-executor, matching board-bom-store.test.ts's pattern) proves both new fields round-trip through recordObservations/freshObservations including the JSON-string-vs-native-jsonb and malformed-entry cases; migrations.test.ts asserts the new migration's shape and keeps the deterministic-file-list check current. Still deliberately out of scope: an HTTP API route exposing findBoardsByMpn or any of this cycle's new fields -- unchanged from the prior cycle's finding that installation-level (cross-repository) API auth context does not exist yet in apps/web/lib/api-auth.ts, which is a separate access-control design decision. Matches open issue #449."
     },
     {
       "id": "W12",
