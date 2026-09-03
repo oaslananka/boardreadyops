@@ -45,20 +45,19 @@
   --bro-surface-sunken: #070a0f;
   --bro-border: #1f2937;
   --bro-border-strong: #374151;
-  --bro-border-accent: rgba(59, 130, 246, 0.5);
+  --bro-border-accent: rgba(198, 154, 62, 0.5);
   --bro-text: #e1e2eb;
   --bro-text-muted: #c2c6d6;
   --bro-text-subtle: #8c909f;
-  --bro-accent: #3b82f6;
-  --bro-accent-strong: #4d8eff;
-  --bro-accent-soft: #4d8eff;
+  --bro-accent: #c69a3e;
+  --bro-accent-strong: #d9b563;
+  --bro-accent-soft: #d9b563;
   --bro-accent-contrast: #ffffff;
-  /* #3b82f6 reads fine as text on the dark ground, but white text directly on top of it falls
-     short of WCAG AA (3.68:1). Solid-fill surfaces that carry --accent-contrast text use this
-     darker shade instead, so link/icon/focus colour stays the bright Stitch cobalt everywhere
-     else. */
-  --bro-accent-fill: #1d4ed8;
-  --bro-focus: #3b82f6;
+  /* Identity brass is bright enough for text/focus on graphite, but white text on the raw
+     brass fill is not. Solid-fill controls use a darker brass shade so --accent-contrast stays
+     WCAG AA while selection and focus retain the brighter identity colour. */
+  --bro-accent-fill: #825b1d;
+  --bro-focus: #d9b563;
   /* Technical Premium reads elevation from border + tonal layering, not shadow. These
      stay defined (every panel/header/card references them) but are flattened to near-
      nothing so nothing needs a per-selector edit. */
@@ -973,7 +972,7 @@ code {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--bro-shadow-soft);
+  box-shadow: none;
 }
 
 .panel.surface-default,
@@ -987,6 +986,20 @@ code {
   background: var(--surface-strong);
   border: 1px solid var(--border-strong);
   box-shadow: var(--bro-shadow-soft);
+}
+
+.panel.surface-section,
+.surface-section {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.panel.surface-section .panel-header {
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .panel.surface-inset,

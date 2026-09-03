@@ -135,7 +135,7 @@ export function Breadcrumbs({ items }: Readonly<{ items: BreadcrumbItem[] }>) {
   );
 }
 
-export type PanelTone = "default" | "raised" | "inset" | "critical";
+export type PanelTone = "default" | "raised" | "inset" | "critical" | "section";
 
 export type PanelProps = {
   children: ReactNode;

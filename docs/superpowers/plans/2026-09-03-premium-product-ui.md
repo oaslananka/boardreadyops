@@ -33,7 +33,7 @@
 - Consumes: existing `Panel({ title, description, actions, id, tone })`, existing `--bro-*` and status tokens.
 - Produces: `PanelTone` includes `section`; `.surface-section` is transparent/flat; `--bro-accent*` and interactive selection aliases resolve to identity brass while `--success`, `--warning`, `--danger`, and `--info` stay status colors.
 
-- [ ] **Step 1: Write the failing visual-contract tests**
+- [x] **Step 1: Write the failing visual-contract tests**
 
 ```ts
 expect(css).toContain("--bro-accent: #c69a3e");
@@ -45,20 +45,20 @@ expect(css).not.toMatch(/\.panel\s*\{[^}]*box-shadow:\s*var\(--bro-shadow-soft\)
 
 Render `Panel tone="section"` and assert it retains `<section>` plus `aria-labelledby` while using `surface-section`.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `corepack pnpm exec vitest run tests/unit/web/foundry-ui-contract.test.ts tests/unit/web/run-design-system.test.ts`
 Expected: FAIL because brass is not the interactive accent and `surface-section` does not exist.
 
-- [ ] **Step 3: Implement the minimal token and primitive changes**
+- [x] **Step 3: Implement the minimal token and primitive changes**
 
 Set the authenticated semantic accent/focus aliases to identity brass, keep info blue independent, remove persistent panel shadows, normalize body operational density, and add `"section"` to `PanelTone` with flat section CSS. Do not change status mappings.
-- [ ] **Step 4: Verify GREEN and regressions**
+- [x] **Step 4: Verify GREEN and regressions**
 
 Run: `corepack pnpm exec vitest run tests/unit/web/foundry-ui-contract.test.ts tests/unit/web/run-design-system.test.ts tests/unit/web/theme-contrast.test.ts`
 Expected: PASS with WCAG contrast checks unchanged for functional status colors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/app/styles.css apps/web/components/ui.tsx tests/unit/web/foundry-ui-contract.test.ts tests/unit/web/run-design-system.test.ts

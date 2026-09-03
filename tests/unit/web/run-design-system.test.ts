@@ -52,6 +52,9 @@ describe("hosted dashboard design system", () => {
     expect(contrast(variable("info"), variable("info-surface"))).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("keeps operational panels flat instead of using persistent shadows", () => {
+    expect(css).toMatch(/\.panel\s*\{[^}]*box-shadow:\s*none/su);
+  });
   it("provides visible focus, responsive tables, and reduced-motion behavior", () => {
     expect(css).toContain(":focus-visible");
     expect(css).toContain("outline: 0.2rem solid var(--focus)");
