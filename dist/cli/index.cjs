@@ -35453,7 +35453,14 @@ var init_src = __esm({
       message: external_exports.string().min(1).max(4e3),
       path: external_exports.string().min(1).max(1024).optional(),
       project: external_exports.string().trim().min(1).max(1024).optional(),
-      fingerprint: findingFingerprintSchema.optional()
+      fingerprint: findingFingerprintSchema.optional(),
+      // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
+      // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
+      // can point at a specific line, and older CLI/Action versions never sent these at all.
+      startLine: external_exports.number().int().positive().optional(),
+      endLine: external_exports.number().int().positive().optional(),
+      startColumn: external_exports.number().int().positive().optional(),
+      endColumn: external_exports.number().int().positive().optional()
     });
     artifactStoragePathSchema = external_exports.string().min(1).max(1024).refine(
       (value) => !value.includes("\0") && !value.startsWith("/") && !value.startsWith("\\") && !/^[A-Za-z]:[\\/]/u.test(value) && !value.split(/[\\/]/u).includes(".."),
@@ -55664,13 +55671,19 @@ function signRunnerRequest(input) {
 
 // src/core/cloud-findings.ts
 function mapFindingForCloud(finding2) {
+  const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
+  const endLine = finding2.location?.region?.endLine ?? startLine;
   return {
     ruleId: finding2.ruleId,
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
     message: finding2.message,
     path: finding2.resource.path,
     project: finding2.project,
-    fingerprint: finding2.fingerprint
+    fingerprint: finding2.fingerprint,
+    ...startLine !== void 0 ? { startLine } : {},
+    ...endLine !== void 0 ? { endLine } : {},
+    ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
+    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
   };
 }
 function mapFindingsForCloud(findings) {
@@ -57312,7 +57325,11 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
       message: finding2.message.slice(0, 4e3),
       ...finding2.resource.path ? { path: finding2.resource.path.slice(0, 1024) } : {},
       ...finding2.project ? { project: finding2.project.slice(0, 1024) } : {},
-      ...fingerprint ? { fingerprint } : {}
+      ...fingerprint ? { fingerprint } : {},
+      ...finding2.startLine !== void 0 ? { startLine: finding2.startLine } : {},
+      ...finding2.endLine !== void 0 ? { endLine: finding2.endLine } : {},
+      ...finding2.startColumn !== void 0 ? { startColumn: finding2.startColumn } : {},
+      ...finding2.endColumn !== void 0 ? { endColumn: finding2.endColumn } : {}
     };
   }) : [
     {
@@ -57505,15 +57522,23 @@ async function executeRunnerPipeline(workspace, job, options) {
       }
     } : {},
     ...report.waivers ? { waivers: report.waivers } : {},
-    findings: report.findings.map((finding2) => ({
-      ruleId: finding2.ruleId,
-      severity: finding2.severity,
-      message: finding2.message,
-      resource: {
-        ...finding2.resource.path === void 0 ? {} : { path: finding2.resource.path }
-      },
-      fingerprint: finding2.fingerprint
-    }))
+    findings: report.findings.map((finding2) => {
+      const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
+      const endLine = finding2.location?.region?.endLine ?? startLine;
+      return {
+        ruleId: finding2.ruleId,
+        severity: finding2.severity,
+        message: finding2.message,
+        resource: {
+          ...finding2.resource.path === void 0 ? {} : { path: finding2.resource.path }
+        },
+        fingerprint: finding2.fingerprint,
+        ...startLine !== void 0 ? { startLine } : {},
+        ...endLine !== void 0 ? { endLine } : {},
+        ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
+        ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
+      };
+    })
   } : void 0;
   const artifacts = [];
   for (const target of targets) {

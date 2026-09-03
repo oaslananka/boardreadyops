@@ -7,9 +7,15 @@ export type CloudFinding = {
   path?: string | undefined;
   project?: string | undefined;
   fingerprint: string;
+  startLine?: number | undefined;
+  endLine?: number | undefined;
+  startColumn?: number | undefined;
+  endColumn?: number | undefined;
 };
 
 function mapFindingForCloud(finding: Finding): CloudFinding {
+  const startLine = finding.location?.region?.startLine ?? finding.location?.line;
+  const endLine = finding.location?.region?.endLine ?? startLine;
   return {
     ruleId: finding.ruleId,
     severity: finding.severity === "critical" ? "error" : finding.severity,
@@ -17,6 +23,12 @@ function mapFindingForCloud(finding: Finding): CloudFinding {
     path: finding.resource.path,
     project: finding.project,
     fingerprint: finding.fingerprint,
+    ...(startLine !== undefined ? { startLine } : {}),
+    ...(endLine !== undefined ? { endLine } : {}),
+    ...(finding.location?.region?.startColumn !== undefined
+      ? { startColumn: finding.location.region.startColumn }
+      : {}),
+    ...(finding.location?.region?.endColumn !== undefined ? { endColumn: finding.location.region.endColumn } : {}),
   };
 }
 

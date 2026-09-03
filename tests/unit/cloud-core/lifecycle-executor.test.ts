@@ -6,9 +6,12 @@ import {
   type DispatchReleaseRunWorkflowInput,
   type EnqueueReleaseRunInput,
   executeGitHubAppLifecycleActions,
+  findingsToCheckRunAnnotations,
+  findingToCheckRunAnnotation,
   type GitHubAppLifecycleStore,
   releaseRunIdempotencyKey,
 } from "../../../packages/cloud-core/src/lifecycle-executor.js";
+import type { ReleaseRunFinding } from "../../../packages/contracts/src/index.js";
 
 const installation = {
   id: 12345,
@@ -376,5 +379,65 @@ describe("GitHub App lifecycle execution", () => {
     );
     expect(store.markReleaseRunDispatched).not.toHaveBeenCalled();
     expect(store.markReleaseRunSkipped).not.toHaveBeenCalled();
+  });
+});
+
+function releaseRunFinding(overrides: Partial<ReleaseRunFinding> = {}): ReleaseRunFinding {
+  return {
+    ruleId: "rules.example",
+    severity: "high",
+    message: "Example finding",
+    ...overrides,
+  };
+}
+
+describe("findingToCheckRunAnnotation", () => {
+  it("returns undefined for a finding with no path", () => {
+    expect(findingToCheckRunAnnotation(releaseRunFinding({ startLine: 4 }))).toBeUndefined();
+  });
+
+  it("returns undefined for a finding with no startLine, since GitHub annotations require a line range", () => {
+    expect(findingToCheckRunAnnotation(releaseRunFinding({ path: "board.kicad_pcb" }))).toBeUndefined();
+  });
+
+  it("defaults endLine to startLine when only a single line is given", () => {
+    const annotation = findingToCheckRunAnnotation(releaseRunFinding({ path: "board.kicad_pcb", startLine: 10 }));
+    expect(annotation).toEqual(
+      expect.objectContaining({ path: "board.kicad_pcb", startLine: 10, endLine: 10, title: "rules.example" }),
+    );
+  });
+
+  it("carries an explicit endLine and start/end columns", () => {
+    const annotation = findingToCheckRunAnnotation(
+      releaseRunFinding({ path: "board.kicad_pcb", startLine: 10, endLine: 14, startColumn: 2, endColumn: 6 }),
+    );
+    expect(annotation).toEqual(expect.objectContaining({ startLine: 10, endLine: 14, startColumn: 2, endColumn: 6 }));
+  });
+
+  it.each([
+    ["error", "failure"],
+    ["high", "failure"],
+    ["medium", "warning"],
+    ["low", "notice"],
+    ["info", "notice"],
+  ] as const)("maps severity %s to annotation level %s", (severity, level) => {
+    const annotation = findingToCheckRunAnnotation(
+      releaseRunFinding({ path: "board.kicad_pcb", startLine: 1, severity }),
+    );
+    expect(annotation?.annotationLevel).toBe(level);
+  });
+});
+
+describe("findingsToCheckRunAnnotations", () => {
+  it("silently drops findings with no line location", () => {
+    const annotations = findingsToCheckRunAnnotations([
+      releaseRunFinding({ path: "board.kicad_pcb", startLine: 1 }),
+      releaseRunFinding({}),
+    ]);
+    expect(annotations).toHaveLength(1);
+  });
+
+  it("maps an empty findings array to an empty result", () => {
+    expect(findingsToCheckRunAnnotations([])).toEqual([]);
   });
 });
