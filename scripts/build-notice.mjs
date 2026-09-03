@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import * as yaml from "js-yaml";
 import { readPnpmLicenseReport } from "./lib/pnpm-licenses.mjs";
 
 const OUTPUT_FILE = "NOTICE";
@@ -14,46 +15,11 @@ const HOST_NATIVE_PACKAGE_PATTERNS = Object.freeze([
   /^lightningcss-/,
 ]);
 
-/** Read pnpm-lock.yaml to find packages with platform constraints (os:/cpu:). */
-function readLockfilePlatformPackages(root) {
-  const lockfilePath = path.join(root, "pnpm-lock.yaml");
-  const content = readFileSync(lockfilePath, "utf8");
-  const platformPackages = new Set();
-  let currentName = null;
-  let hasOsOrCpu = false;
-
-  for (const line of content.split("\n")) {
-    const pkgMatch = line.match(/^ {2}'(.+)@([^@]+)':\s*$/);
-    if (pkgMatch) {
-      if (currentName !== null && hasOsOrCpu) {
-        platformPackages.add(currentName);
-      }
-      currentName = pkgMatch[1];
-      hasOsOrCpu = false;
-    } else if (currentName !== null) {
-      if (/^\s{4}(?:os|cpu):/.test(line)) {
-        hasOsOrCpu = true;
-      } else if (line.trim() === "" && hasOsOrCpu) {
-        platformPackages.add(currentName);
-        currentName = null;
-        hasOsOrCpu = false;
-      }
-    }
-  }
-
-  if (currentName !== null && hasOsOrCpu) {
-    platformPackages.add(currentName);
-  }
-
-  return platformPackages;
-}
-
-const platformPackages = readLockfilePlatformPackages(process.cwd());
-
 export async function main(root = process.cwd(), options = {}) {
   const readReport = options.readReport ?? ((reportRoot) => readPnpmLicenseReport(reportRoot, ["--json"]));
   const report = await readReport(root);
-  const notice = renderNotice(report);
+  const excludedPackageVersions = options.excludedPackageVersions ?? readPlatformOnlyPackageVersions(root);
+  const notice = renderNotice(report, excludedPackageVersions);
   const noticePath = path.join(root, OUTPUT_FILE);
 
   if (options.check) {
@@ -65,6 +31,108 @@ export async function main(root = process.cwd(), options = {}) {
   }
 
   await writeFile(noticePath, notice);
+}
+
+export function readPlatformOnlyPackageVersions(root) {
+  const lockfile = yaml.load(readFileSync(path.join(root, "pnpm-lock.yaml"), "utf8"));
+  return platformOnlyPackageVersionsFromLockfile(lockfile);
+}
+
+export function platformOnlyPackageVersionsFromLockfile(lockfile) {
+  const packages = lockfile?.packages ?? {};
+  const snapshots = lockfile?.snapshots ?? {};
+  const constrainedBaseKeys = new Set(
+    Object.entries(packages)
+      .filter(([, metadata]) => hasPlatformConstraint(metadata))
+      .map(([key]) => packageBaseKey(key))
+      .filter(Boolean),
+  );
+  const roots = importerDependencyKeys(lockfile?.importers ?? {});
+  const allReachable = traverseSnapshots(roots, snapshots, constrainedBaseKeys, false);
+  const portableReachable = traverseSnapshots(roots, snapshots, constrainedBaseKeys, true);
+
+  return new Set(
+    [...allReachable]
+      .filter((key) => !portableReachable.has(key))
+      .map(packageBaseKey)
+      .filter(Boolean),
+  );
+}
+
+function hasPlatformConstraint(metadata) {
+  return Boolean(metadata && (metadata.os !== undefined || metadata.cpu !== undefined));
+}
+
+function importerDependencyKeys(importers) {
+  const keys = [];
+  for (const importer of Object.values(importers)) {
+    for (const field of ["dependencies", "devDependencies", "optionalDependencies"]) {
+      for (const [name, entry] of Object.entries(importer?.[field] ?? {})) {
+        const version = typeof entry === "string" ? entry : entry?.version;
+        const key = dependencySnapshotKey(name, version);
+        if (key) {
+          keys.push(key);
+        }
+      }
+    }
+  }
+  return keys;
+}
+
+function dependencySnapshotKey(name, version) {
+  if (typeof version !== "string" || version.startsWith("link:") || version.startsWith("workspace:")) {
+    return null;
+  }
+  return `${name}@${version}`;
+}
+
+function traverseSnapshots(roots, snapshots, constrainedBaseKeys, stopAtConstrained) {
+  const visited = new Set();
+  const stack = [...roots];
+
+  while (stack.length > 0) {
+    const key = stack.pop();
+    if (!key || visited.has(key)) {
+      continue;
+    }
+    const baseKey = packageBaseKey(key);
+    if (stopAtConstrained && baseKey && constrainedBaseKeys.has(baseKey)) {
+      continue;
+    }
+    visited.add(key);
+    const snapshot = snapshots[key];
+    if (!snapshot) {
+      continue;
+    }
+    for (const field of ["dependencies", "optionalDependencies"]) {
+      for (const [name, version] of Object.entries(snapshot[field] ?? {})) {
+        const dependencyKey = dependencySnapshotKey(name, version);
+        if (dependencyKey) {
+          stack.push(dependencyKey);
+        }
+      }
+    }
+  }
+
+  return visited;
+}
+
+function packageBaseKey(key) {
+  const parsed = splitPackageKey(key);
+  return parsed ? `${parsed.name}@${parsed.version}` : null;
+}
+
+function splitPackageKey(key) {
+  if (typeof key !== "string") {
+    return null;
+  }
+  const delimiter = key.startsWith("@") ? key.indexOf("@", key.indexOf("/") + 1) : key.indexOf("@");
+  if (delimiter <= 0) {
+    return null;
+  }
+  const name = key.slice(0, delimiter);
+  const version = key.slice(delimiter + 1).split("(", 1)[0];
+  return version ? { name, version } : null;
 }
 
 function noticeDriftMessage(current, expected) {
@@ -87,8 +155,8 @@ function packageEntries(notice) {
     .map((line) => line.slice(2));
 }
 
-export function renderNotice(report) {
-  const sections = licenseSections(report);
+export function renderNotice(report, excludedPackageVersions = new Set()) {
+  const sections = licenseSections(report, excludedPackageVersions);
   const lines = [
     "# BoardReadyOps Third-Party Notices",
     "",
@@ -131,8 +199,7 @@ export function renderNotice(report) {
 function finalizeNotice(lines) {
   return `${lines.join("\n").trimEnd()}\n`;
 }
-
-function licenseSections(report) {
+function licenseSections(report, excludedPackageVersions) {
   return Object.entries(report)
     .map(([license, packages]) => ({
       license,
@@ -140,18 +207,22 @@ function licenseSections(report) {
         .filter((item) => !isHostNativePackage(item.name))
         .map((item) => ({
           ...item,
-          versions: [...(item.versions ?? [])].sort(compareText),
+          versions: [...(item.versions ?? [])]
+            .filter((version) => !excludedPackageVersions.has(`${item.name}@${version}`))
+            .sort(compareText),
         }))
+        .filter((item) => item.versions.length > 0)
         .sort(
           (left, right) =>
             compareText(left.name, right.name) || compareText(left.versions[0] ?? "", right.versions[0] ?? ""),
         ),
     }))
+    .filter((section) => section.packages.length > 0)
     .sort((left, right) => compareText(left.license, right.license));
 }
 
 function isHostNativePackage(name) {
-  return HOST_NATIVE_PACKAGE_PATTERNS.some((pattern) => pattern.test(name)) || platformPackages.has(name);
+  return HOST_NATIVE_PACKAGE_PATTERNS.some((pattern) => pattern.test(name));
 }
 
 function packageVersions(item) {

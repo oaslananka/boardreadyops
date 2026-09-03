@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { main, renderNotice } from "../../../scripts/build-notice.mjs";
+import { main, platformOnlyPackageVersionsFromLockfile, renderNotice } from "../../../scripts/build-notice.mjs";
 import { findLicensePolicyViolations } from "../../../scripts/check-licenses.mjs";
 import { pnpmLicenseCommandLine } from "../../../scripts/lib/pnpm-licenses.mjs";
 
@@ -65,6 +65,7 @@ describe("license compliance scripts", () => {
     await expect(
       main(root, {
         check: true,
+        excludedPackageVersions: new Set(),
         readReport: async () => ({
           MIT: [{ name: "sharp", versions: ["0.35.3"], license: "MIT" }],
         }),
@@ -80,6 +81,47 @@ describe("license compliance scripts", () => {
     expect(await readFile(path.join(root, "NOTICE"), "utf8")).toBe(staleNotice);
   });
 
+  it("filters packages reachable only through platform-constrained roots", () => {
+    const excluded = platformOnlyPackageVersionsFromLockfile({
+      importers: {
+        ".": {
+          devDependencies: {
+            "@platform/root": { version: "1.0.0" },
+            portable: { version: "1.0.0" },
+          },
+        },
+      },
+      packages: {
+        "@platform/root@1.0.0": { os: ["linux"] },
+        "transitive-only@1.0.0": {},
+        "shared@1.0.0": {},
+        "portable@1.0.0": {},
+      },
+      snapshots: {
+        "@platform/root@1.0.0": { dependencies: { "transitive-only": "1.0.0", shared: "1.0.0" } },
+        "transitive-only@1.0.0": {},
+        "shared@1.0.0": {},
+        "portable@1.0.0": { dependencies: { shared: "1.0.0" } },
+      },
+    });
+
+    expect([...excluded].sort()).toEqual(["@platform/root@1.0.0", "transitive-only@1.0.0"]);
+    const notice = renderNotice(
+      {
+        MIT: [
+          { name: "@platform/root", versions: ["1.0.0"], license: "MIT" },
+          { name: "transitive-only", versions: ["1.0.0"], license: "MIT" },
+          { name: "shared", versions: ["1.0.0"], license: "MIT" },
+          { name: "portable", versions: ["1.0.0"], license: "MIT" },
+        ],
+      },
+      excluded,
+    );
+    expect(notice).not.toContain("@platform/root@1.0.0");
+    expect(notice).not.toContain("transitive-only@1.0.0");
+    expect(notice).toContain("shared@1.0.0");
+    expect(notice).toContain("portable@1.0.0");
+  });
   it("allows only the approved license policy for distributed dependencies", () => {
     expect(
       findLicensePolicyViolations({
