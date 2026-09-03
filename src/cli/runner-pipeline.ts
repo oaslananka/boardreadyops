@@ -82,15 +82,27 @@ export async function executeRunnerPipeline(
             }
           : {}),
         ...(report.waivers ? { waivers: report.waivers } : {}),
-        findings: report.findings.map((finding) => ({
-          ruleId: finding.ruleId,
-          severity: finding.severity,
-          message: finding.message,
-          resource: {
-            ...(finding.resource.path === undefined ? {} : { path: finding.resource.path }),
-          },
-          fingerprint: finding.fingerprint,
-        })),
+        findings: report.findings.map((finding) => {
+          const startLine = finding.location?.region?.startLine ?? finding.location?.line;
+          const endLine = finding.location?.region?.endLine ?? startLine;
+          return {
+            ruleId: finding.ruleId,
+            severity: finding.severity,
+            message: finding.message,
+            resource: {
+              ...(finding.resource.path === undefined ? {} : { path: finding.resource.path }),
+            },
+            fingerprint: finding.fingerprint,
+            ...(startLine !== undefined ? { startLine } : {}),
+            ...(endLine !== undefined ? { endLine } : {}),
+            ...(finding.location?.region?.startColumn !== undefined
+              ? { startColumn: finding.location.region.startColumn }
+              : {}),
+            ...(finding.location?.region?.endColumn !== undefined
+              ? { endColumn: finding.location.region.endColumn }
+              : {}),
+          };
+        }),
       }
     : undefined;
   const artifacts: RunnerExecutionArtifact[] = [];

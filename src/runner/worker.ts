@@ -65,6 +65,10 @@ type RunnerExecutionReport = {
     project?: string;
     resource: { path?: string };
     fingerprint: string;
+    startLine?: number;
+    endLine?: number;
+    startColumn?: number;
+    endColumn?: number;
   }>;
 };
 
@@ -485,6 +489,10 @@ function terminalResultFromExecution(
           ...(finding.resource.path ? { path: finding.resource.path.slice(0, 1024) } : {}),
           ...(finding.project ? { project: finding.project.slice(0, 1024) } : {}),
           ...(fingerprint ? { fingerprint } : {}),
+          ...(finding.startLine !== undefined ? { startLine: finding.startLine } : {}),
+          ...(finding.endLine !== undefined ? { endLine: finding.endLine } : {}),
+          ...(finding.startColumn !== undefined ? { startColumn: finding.startColumn } : {}),
+          ...(finding.endColumn !== undefined ? { endColumn: finding.endColumn } : {}),
         };
       })
     : [

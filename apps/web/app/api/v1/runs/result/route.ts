@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { planLimits, planTierOf } from "@boardreadyops/cloud-core/entitlements";
+import { findingsToCheckRunAnnotations } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { type ReleaseRunResult, releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createSqlBoardBomStore } from "@boardreadyops/db/board-bom-store";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
@@ -1105,6 +1106,7 @@ async function completeResultCheckRun(input: {
       title: input.checkOutput.title,
       summary: input.checkOutput.summary,
       completedAt: input.completedAt,
+      annotations: findingsToCheckRunAnnotations(input.result.findings),
     });
     return { updated: true, configurationError: false };
   } catch (error) {
