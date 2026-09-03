@@ -27,6 +27,15 @@
   --foundry-copper-strong: #4d8eff;
   --foundry-copper-soft: rgba(59, 130, 246, 0.12);
   --foundry-brass: #4d8eff;
+  /* Decorative brand-identity accent -- NOT the interactive --foundry-copper/--foundry-brass
+     above (those stay blue and keep every contrast pair theme-contrast.test.ts audits). This
+     systematizes the warm brass the brand mark (brand-mark.tsx) already used as a hardcoded
+     hex, so the same identity color can be reused (mark glow, wordmark hover) without redefining
+     it per component. Decorative-only: never applied to body text. */
+  --identity-brass: #c69a3e;
+  --identity-brass-bright: #d9b563;
+  --identity-brass-soft: rgba(198, 154, 62, 0.14);
+  --identity-brass-line: rgba(198, 154, 62, 0.4);
   --rail-width: 248px;
   --rail-width-compact: 72px;
   --bro-bg: #0b0e14;
@@ -293,7 +302,12 @@ code {
 }
 
 .brand-lockup svg {
-  filter: drop-shadow(0 0 1rem var(--bro-border-accent));
+  filter: drop-shadow(0 0 1rem var(--identity-brass-line));
+  transition: filter var(--bro-motion-medium) var(--bro-ease);
+}
+
+.product-brand:hover .brand-lockup svg {
+  filter: drop-shadow(0 0 1.5rem var(--identity-brass-line));
 }
 
 .brand-mark-wordmark {
