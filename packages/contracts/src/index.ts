@@ -41,6 +41,13 @@ export const findingSchema = z.object({
   path: z.string().min(1).max(1024).optional(),
   project: z.string().trim().min(1).max(1024).optional(),
   fingerprint: findingFingerprintSchema.optional(),
+  // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
+  // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
+  // can point at a specific line, and older CLI/Action versions never sent these at all.
+  startLine: z.number().int().positive().optional(),
+  endLine: z.number().int().positive().optional(),
+  startColumn: z.number().int().positive().optional(),
+  endColumn: z.number().int().positive().optional(),
 });
 
 const artifactStoragePathSchema = z
@@ -300,6 +307,7 @@ export const runnerTerminalResultRequestSchema = runnerLeaseContextSchema
   });
 
 export type CreateReleaseRunRequest = z.infer<typeof createReleaseRunRequestSchema>;
+export type ReleaseRunFinding = z.infer<typeof findingSchema>;
 export type ReleaseRunBomComponent = z.infer<typeof releaseRunBomComponentSchema>;
 export type ReleaseRunBoardBom = z.infer<typeof releaseRunBoardBomSchema>;
 export type ReleaseRunResult = z.infer<typeof releaseRunResultSchema>;

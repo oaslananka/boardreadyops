@@ -134,6 +134,7 @@ nav:
           - Data Lifecycle and Privacy: security/data-lifecycle.md
           - GitHub App Permissions: security/github-app-permissions.md
           - Assurance Case: security/assurance-case.md
+          - GA Pen-Test Checklist: security/pentest-checklist.md
           - Scorecard: security/scorecard.md
           - Security Automation: security-automation.md
       - Governance: governance.md

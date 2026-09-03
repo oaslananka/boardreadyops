@@ -106090,7 +106090,14 @@ var findingSchema = external_exports.object({
   message: external_exports.string().min(1).max(4e3),
   path: external_exports.string().min(1).max(1024).optional(),
   project: external_exports.string().trim().min(1).max(1024).optional(),
-  fingerprint: findingFingerprintSchema.optional()
+  fingerprint: findingFingerprintSchema.optional(),
+  // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
+  // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
+  // can point at a specific line, and older CLI/Action versions never sent these at all.
+  startLine: external_exports.number().int().positive().optional(),
+  endLine: external_exports.number().int().positive().optional(),
+  startColumn: external_exports.number().int().positive().optional(),
+  endColumn: external_exports.number().int().positive().optional()
 });
 var artifactStoragePathSchema = external_exports.string().min(1).max(1024).refine(
   (value) => !value.includes("\0") && !value.startsWith("/") && !value.startsWith("\\") && !/^[A-Za-z]:[\\/]/u.test(value) && !value.split(/[\\/]/u).includes(".."),
@@ -106294,13 +106301,19 @@ function computeEvidenceDigest(input) {
 
 // src/core/cloud-findings.ts
 function mapFindingForCloud(finding2) {
+  const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
+  const endLine = finding2.location?.region?.endLine ?? startLine;
   return {
     ruleId: finding2.ruleId,
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
     message: finding2.message,
     path: finding2.resource.path,
     project: finding2.project,
-    fingerprint: finding2.fingerprint
+    fingerprint: finding2.fingerprint,
+    ...startLine !== void 0 ? { startLine } : {},
+    ...endLine !== void 0 ? { endLine } : {},
+    ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
+    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
   };
 }
 function mapFindingsForCloud(findings) {
