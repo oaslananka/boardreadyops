@@ -16,6 +16,8 @@ minimumReleaseAgeExclude:
   - 'valibot@1.4.2'
   - 'fast-uri@3.1.5'
   - 'renovate@43.272.4'
+  # Renovate security update: pnpm@11.11.0
+  - pnpm@11.11.0
 trustPolicy: no-downgrade
 trustPolicyExclude:
   - '@yarnpkg/libzip@3.2.2'
