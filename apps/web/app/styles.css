@@ -3184,7 +3184,9 @@ code {
   background: var(--surface-raised);
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: transform var(--bro-motion-fast) var(--bro-ease);
+  transition:
+    transform var(--bro-motion-fast) var(--bro-ease),
+    box-shadow var(--bro-motion-fast) var(--bro-ease);
 }
 
 .canvas-marker:hover {
@@ -3201,6 +3203,22 @@ code {
 .finding-marker.severity-warning {
   border-color: var(--warning);
   color: var(--warning);
+}
+
+/* The one marker currently in focus -- an outline ring, not a fill override, so severity
+   colour (the marker's actual meaning) stays legible underneath it. Uses --identity-brass
+   (the same brand-identity accent added earlier) rather than the interactive accent: this is a "you are here" spotlight,
+   the same role the readiness score's glow plays, not a clickable/functional state. */
+.canvas-marker.selected {
+  transform: translate(-50%, -50%) scale(1.2);
+  z-index: 11;
+  box-shadow:
+    0 0 0 2px var(--identity-brass),
+    0 0 0 5px var(--identity-brass-soft);
+}
+
+.canvas-marker.selected:hover {
+  transform: translate(-50%, -50%) scale(1.3);
 }
 
 .marker-dot {
