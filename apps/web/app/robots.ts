@@ -18,6 +18,7 @@ export default function robots(): MetadataRoute.Robots {
         "/reviews/",
         "/runs/",
         "/settings/",
+        "/ops/",
       ],
     },
     sitemap: [`${PUBLIC_SITE_ORIGIN}/sitemap.xml`, `${PUBLIC_SITE_ORIGIN}/sitemap.md`],

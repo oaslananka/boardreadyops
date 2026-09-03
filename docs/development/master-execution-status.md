@@ -259,9 +259,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W29 — Observability, SLOs & Operations
 - **Status:** `Partial`
-- **Remaining:** No distributed tracing implementation exists (no OpenTelemetry dependency; webhook→job→dispatch→ingestion→decision trace propagation is unbuilt); no visual admin dashboard UI for dead-letters (only operator API routes); no explicit correlation-id field threading requests/webhooks/jobs/runs.
-- **Scope:** Structured logging with correlation IDs, control-plane SLO tracking, Sentry integration, and automated health checks.
-- **Code & Test Evidence:** `src/core/logger.ts`, `tests/unit/web/control-plane-slo.test.ts`.
+- **Remaining:** No distributed tracing implementation exists (no OpenTelemetry dependency; the broader webhook→job→dispatch→ingestion→decision trace propagation is unbuilt — only the webhook→release_run edge is traceable via `release_runs.delivery_id`). The dead-letter admin dashboard UI gap is closed (`apps/web/app/ops/dead-letters/`) and correlation-id threading is closed for the webhook→release-run path (DB-only, migration 0058) — distributed tracing is the only gap left open.
+- **Scope:** Structured logging with correlation IDs, control-plane SLO tracking, Sentry integration, automated health checks, and an operator dashboard for dead-lettered jobs.
+- **Code & Test Evidence:** `src/core/logger.ts`, `tests/unit/web/control-plane-slo.test.ts`, `apps/web/app/ops/dead-letters/`, `tests/unit/web/dead-letters-page.test.ts`.
 
 ### W30 — Performance, Scalability & Cost Controls
 - **Status:** `Partial`

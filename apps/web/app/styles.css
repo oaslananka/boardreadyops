@@ -4418,6 +4418,16 @@ summary.spec-label {
   border: 1px solid var(--danger-border);
 }
 
+/* ==========================================================================
+   Dead-Letter Admin Dashboard Styles
+   ========================================================================== */
+
+.dead-letters-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
 @media (forced-colors: active) {
   :focus-visible {
     outline: 2px solid CanvasText;
