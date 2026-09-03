@@ -13,6 +13,10 @@ export const assemblySidesRule = rule(
     configKeys: ["rules.manufacturing.assembly-sides.enabled", "rules.manufacturing.assembly-sides.allow-bottom-side"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "manufacturing", "pcb"],
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.assembly-sides")) {

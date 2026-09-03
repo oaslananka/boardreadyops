@@ -22,6 +22,10 @@ export const zephyrPinContractRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "zephyr", "contract"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   makeFirmwareContractHandler(ruleId, zephyrAdapter, resolveContract),
 );

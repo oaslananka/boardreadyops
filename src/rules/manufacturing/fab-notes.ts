@@ -13,6 +13,10 @@ export const fabNotesRule = rule(
     configKeys: ["rules.manufacturing.fab-notes.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["documentation", "fabrication", "manufacturing"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.fab-notes")) {

@@ -13,6 +13,10 @@ export const pinmapNetLabelRule = rule(
     configKeys: ["pinmap", "projects.pinmap", "rules.pinmap.net-label.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "schematic"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.net-label")) {

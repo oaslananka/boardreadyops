@@ -12,6 +12,10 @@ export const eolDetectionRule = rule(
     configKeys: ["rules.bom.eol-detection.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "lifecycle", "sourcing"],
+    category: "sourcing",
+    evidenceType: "heuristic",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.eol-detection")) {

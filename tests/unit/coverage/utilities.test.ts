@@ -157,6 +157,10 @@ describe("support utilities", () => {
         configKeys: [],
         kicadVersions: ["future"],
         tags: ["test"],
+        category: "unclassified",
+        evidenceType: "unclassified",
+        fixability: "unclassified",
+        vendorDependence: "unclassified",
       },
       run: async () => [],
     };

@@ -13,6 +13,10 @@ export const boardOutlineRule = rule(
     configKeys: ["rules.design.board-outline.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["design", "edge-cuts", "pcb"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "design.board-outline")) {

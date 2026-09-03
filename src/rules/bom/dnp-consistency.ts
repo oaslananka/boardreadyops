@@ -12,6 +12,10 @@ export const dnpConsistencyRule = rule(
     configKeys: ["rules.bom.dnp-consistency.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "pcb", "variant"],
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.dnp-consistency")) {

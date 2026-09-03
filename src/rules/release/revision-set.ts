@@ -13,6 +13,10 @@ export const revisionSetRule = rule(
     configKeys: ["rules.release.revision-set.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["pcb", "release", "revision"],
+    category: "release",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "release.revision-set")) {

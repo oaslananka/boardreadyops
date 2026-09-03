@@ -17,6 +17,10 @@ export const identityConflictsRule = rule(
     configKeys: ["rules.bom.identity-conflicts.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "identity", "sourcing"],
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.identity-conflicts")) {

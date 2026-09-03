@@ -13,6 +13,10 @@ export const singleSourceRule = rule(
     configKeys: ["rules.bom.single-source.severity", "bom.alternates"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "sourcing", "supplier"],
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.single-source")) {

@@ -12,6 +12,10 @@ export const footprintMismatchRule = rule(
     configKeys: ["rules.bom.footprint-mismatch.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "footprint", "pcb"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.footprint-mismatch")) {

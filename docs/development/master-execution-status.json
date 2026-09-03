@@ -234,12 +234,16 @@
           "src/rules/manufacturing/fiducials.ts",
           "src/rules/manufacturing/test-points.ts",
           "src/rules/manufacturing/drill-coverage.ts",
-          "src/core/rule-registry.ts"
+          "src/core/rule-registry.ts",
+          "src/core/waivers.ts",
+          "src/core/pipeline.ts",
+          "src/core/plugin-loader.ts"
         ],
         "tests": [
           "tests/unit/rules/manufacturing/assembly-sides.test.ts",
           "tests/unit/rules/manufacturing/drill-coverage.test.ts",
-          "tests/unit/rules/metadata.test.ts"
+          "tests/unit/rules/metadata.test.ts",
+          "tests/unit/core/waivers.test.ts"
         ],
         "docs": ["docs/rules/manufacturing.dfm-pin1-markers.md", "docs/rules/drc.md"],
         "deployed": [],
@@ -247,11 +251,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/rules/manufacturing/assembly-sides.test.ts tests/unit/rules/manufacturing/drill-coverage.test.ts tests/unit/rules/metadata.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/rules/manufacturing/assembly-sides.test.ts tests/unit/rules/manufacturing/drill-coverage.test.ts tests/unit/rules/metadata.test.ts tests/unit/core/waivers.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-03T19:20:47Z"
       },
-      "remaining": "Geometry-heavy DFM (trace/spacing/copper-edge/hole-hole/annular-ring/via-aspect-ratio) is delegated entirely to KiCad's native DRC/ERC, not owned by a BoardReadyOps rule engine; no solder-mask/paste/NPTH-PTH-slot semantics; RuleMetadata lacks category/evidence-type/fixability/vendor-dependence fields; no false-positive telemetry hook."
+      "remaining": "CLOSED (this pass): RuleMetadata (src/core/rule-registry.ts) now carries four required, non-optional classification fields backfilled with a genuine per-rule value for all 44 built-in rules (asserted individually, not just type-shape-checked, in tests/unit/rules/metadata.test.ts) -- category (electrical | manufacturability | assembly | testability | sourcing | release, grounded in this repo's own rule-group split and the pre-existing 'dfa'/'dfm' rule tags), evidenceType (exact | heuristic, grounded in which rules do deterministic presence/equality/count/delegated-KiCad checks vs free-text pattern/scoring heuristics such as bom.risk-score and manufacturing.dfm-pin1-markers), fixability (manual | assisted | none, grounded in the AGENTS.md rule 'rules only report' -- drc.kicad/erc.kicad are 'assisted' since the remedy lives in KiCad's own UI, not a single describable edit), and vendorDependence (manufacturer-specific | profile-specific | none, grounded in the existing src/vendor/profiles.ts vendor-profile mechanism -- only manufacturing.outputs-present resolves a named profile). A fifth 'unclassified' value was added to each enum solely for rules loaded from a plugin, because PluginRuleMetadata (packages/plugin-sdk, a separately versioned public contract) does not yet carry this data -- src/core/plugin-loader.ts's toCoreRule sets it explicitly; the plugin SDK contract itself was deliberately left untouched as out of scope. False-positive telemetry: investigated and confirmed this codebase has exactly one existing mechanism for marking a finding as wrong -- waiving it (src/core/waivers.ts, WaiverConfig.reason, applyWaivers() sets Finding.suppressed) -- there was no separate 'false positive' concept anywhere (no falsePositive field, no distinct UI/CLI flag). Rather than invent a new suppression feature, that existing hook was extended: applyWaivers() now also returns falsePositiveSignals (ruleId, finding fingerprint, waiver reason) whenever a waiver's free-text reason matches /false[\\s-]?positive/i, and src/core/pipeline.ts's postProcessPhase enriches each signal with the waiving rule's new category/evidenceType (looked up via listRules()) and emits it through the existing structured Logger (src/core/logger.ts, already used for every pipeline.* event, JSON-capable, file-rotatable) as a 'pipeline.waiver.false-positive' event -- making false-positive rate queryable per rule category/evidence-type from the logs without a new suppression mechanism or config surface. Still genuinely open, unchanged from before, and explicitly out of scope for this pass: geometry-heavy DFM (trace/spacing/copper-edge/hole-hole/annular-ring/via-aspect-ratio) is delegated entirely to KiCad's native DRC/ERC, not owned by a BoardReadyOps rule engine; no solder-mask/paste/NPTH-PTH-slot semantics."
     },
     {
       "id": "W06",

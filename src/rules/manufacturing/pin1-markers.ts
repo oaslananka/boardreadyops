@@ -41,6 +41,10 @@ export const pin1MarkersRule = rule(
     configKeys: ["rules.manufacturing.dfm-pin1-markers"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "pin1"],
+    category: "manufacturability",
+    evidenceType: "heuristic",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.dfm-pin1-markers")) {

@@ -15,6 +15,10 @@ export const versionFormatRule = rule(
     configKeys: ["rules.release.version-format.pattern"],
     kicadVersions: ["9", "10", "future"],
     tags: ["release", "revision", "versioning"],
+    category: "release",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "release.version-format")) {

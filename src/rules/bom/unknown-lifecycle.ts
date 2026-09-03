@@ -18,6 +18,10 @@ export const unknownLifecycleRule = rule(
     configKeys: ["rules.bom.unknown-lifecycle.severity", "rules.bom.unknown-lifecycle.db"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "lifecycle", "sourcing"],
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "none",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.unknown-lifecycle")) {

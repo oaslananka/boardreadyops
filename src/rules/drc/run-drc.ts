@@ -15,6 +15,10 @@ export const runDrcRule = rule(
     configKeys: ["kicad-cli", "require-kicad", "rules.drc"],
     kicadVersions: ["9", "10", "future"],
     tags: ["drc", "kicad", "pcb"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "assisted",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "drc.kicad")) {

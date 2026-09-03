@@ -12,6 +12,10 @@ export const toolingHolesRule = rule(
     configKeys: ["rules.manufacturing.tooling-holes.minimum"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb"],
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.tooling-holes")) {

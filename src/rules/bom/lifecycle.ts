@@ -18,6 +18,10 @@ export const lifecycleRule = rule(
     configKeys: ["rules.bom.lifecycle.db"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "lifecycle", "sourcing"],
+    category: "sourcing",
+    evidenceType: "heuristic",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.lifecycle")) {

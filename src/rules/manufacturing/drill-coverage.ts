@@ -15,6 +15,10 @@ export const drillCoverageRule = rule(
     configKeys: ["rules.manufacturing.drill-coverage.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["drill", "manufacturing", "pcb"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.drill-coverage")) {

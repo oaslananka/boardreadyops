@@ -32,6 +32,10 @@ export const bomRiskScoreRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "risk", "sourcing", "supply-chain"],
+    category: "sourcing",
+    evidenceType: "heuristic",
+    fixability: "none",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.risk-score")) {

@@ -13,6 +13,10 @@ export const layerStackupRule = rule(
     configKeys: ["rules.manufacturing.layer-stackup.expected-layers"],
     kicadVersions: ["9", "10", "future"],
     tags: ["manufacturing", "pcb", "stackup"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.layer-stackup")) {

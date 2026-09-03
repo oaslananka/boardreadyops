@@ -14,6 +14,10 @@ export const jobsetOutputsRule = rule(
     configKeys: ["rules.manufacturing.jobset-outputs.enabled"],
     kicadVersions: ["10", "future"],
     tags: ["jobset", "kicad", "manufacturing"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.jobset-outputs")) {

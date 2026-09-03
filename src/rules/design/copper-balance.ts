@@ -14,6 +14,10 @@ export const copperBalanceRule = rule(
     configKeys: ["rules.design.copper-balance.min-coverage-percent"],
     kicadVersions: ["9", "10", "future"],
     tags: ["copper", "design", "pcb"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "design.copper-balance")) {

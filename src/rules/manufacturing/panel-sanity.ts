@@ -11,6 +11,10 @@ export const panelSanityRule = rule(
     configKeys: ["rules.manufacturing.panel-sanity.panelized"],
     kicadVersions: ["9", "10", "future"],
     tags: ["manufacturing", "panel", "outputs"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.panel-sanity")) {

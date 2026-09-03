@@ -29,6 +29,10 @@ export const outputsPresentRule = {
       configKeys: ["rules.manufacturing.outputs-present.required", "rules.manufacturing.outputs-present.patterns"],
       kicadVersions: ["9", "10", "future"],
       tags: ["fabrication", "manufacturing", "outputs"],
+      category: "manufacturability",
+      evidenceType: "exact",
+      fixability: "manual",
+      vendorDependence: "manufacturer-specific",
     },
     async (context) => {
       if (!shouldRun(context, "manufacturing.outputs-present")) {

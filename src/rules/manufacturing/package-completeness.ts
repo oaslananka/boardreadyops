@@ -102,6 +102,10 @@ export const packageCompletenessRule = rule(
     configKeys: ["rules.manufacturing.package-completeness.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["completeness", "fabrication", "manufacturing", "release"],
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.package-completeness")) {

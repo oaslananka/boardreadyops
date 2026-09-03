@@ -12,6 +12,10 @@ export const missingMpnRule = rule(
     configKeys: ["rules.bom.missing-mpn.ignore-refs"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "mpn", "sourcing"],
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.missing-mpn")) {

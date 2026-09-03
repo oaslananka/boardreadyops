@@ -14,6 +14,10 @@ export const uniqueReferencesRule = rule(
     configKeys: ["rules.design.unique-references.enabled", "rules.design.unique-references.ignore-refs"],
     kicadVersions: ["9", "10", "future"],
     tags: ["design", "dfm", "pcb"],
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "design.unique-references")) {

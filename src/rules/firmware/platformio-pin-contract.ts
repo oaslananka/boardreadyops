@@ -22,6 +22,10 @@ export const platformioPinContractRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "platformio", "contract"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   makeFirmwareContractHandler(ruleId, platformioAdapter, resolvePlatformioContract),
 );

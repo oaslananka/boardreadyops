@@ -13,6 +13,10 @@ export const tagMatchesRevisionRule = rule(
     configKeys: ["GITHUB_REF_NAME"],
     kicadVersions: ["9", "10", "future"],
     tags: ["git", "release", "revision"],
+    category: "release",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "release.tag-matches-revision")) {

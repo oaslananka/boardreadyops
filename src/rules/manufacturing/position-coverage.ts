@@ -18,6 +18,10 @@ export const positionCoverageRule = rule(
     configKeys: ["rules.manufacturing.position-coverage.patterns"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "cpl", "dfa", "manufacturing", "position"],
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.position-coverage")) {

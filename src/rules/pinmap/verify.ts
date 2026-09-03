@@ -15,6 +15,10 @@ export const pinmapVerifyRule = rule(
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "schematic"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.verify")) {
@@ -91,6 +95,10 @@ export const pinmapCollisionRule = rule(
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "validation"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.collision")) {
@@ -137,6 +145,10 @@ export const pinmapUnmappedPinRule = rule(
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "schematic"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.unmapped-pin")) {

@@ -16,6 +16,10 @@ export const variantConsistencyRule = rule(
     configKeys: ["projects.variants", "rules.bom.variant-consistency.enabled"],
     kicadVersions: ["10", "future"],
     tags: ["bom", "variant", "kicad"],
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "bom.variant-consistency")) {

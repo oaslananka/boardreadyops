@@ -14,6 +14,10 @@ export const changelogPresentRule = rule(
     configKeys: ["rules.release.changelog-present.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["changelog", "release", "traceability"],
+    category: "release",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   async (context) => {
     if (!shouldRun(context, "release.changelog-present")) {

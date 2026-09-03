@@ -12,6 +12,10 @@ export const testPointsRule = rule(
     configKeys: ["rules.manufacturing.test-points.enabled", "rules.manufacturing.test-points.minimum"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "manufacturing", "pcb", "test"],
+    category: "testability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.test-points")) {

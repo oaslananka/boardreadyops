@@ -22,6 +22,10 @@ export const espIdfPinContractRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "esp-idf", "contract"],
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
   },
   makeFirmwareContractHandler(ruleId, espIdfAdapter, resolveContract),
 );
