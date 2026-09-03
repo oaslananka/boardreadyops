@@ -3,8 +3,8 @@
  *
  * The subject is an engineering instrument, not an illustrated document, so the surface reads
  * as a deep-charcoal control panel: structural borders and tonal layering instead of soft
- * shadows or decoration, and one cobalt accent reserved for action and focus. Semantic colour
- * (pass / warning / danger) stays reserved for status, never decoration.
+ * shadows or decoration, and one warm brass accent reserved for identity, action, selection,
+ * and focus. Semantic colour (pass / warning / danger / info) stays reserved for status.
  */
 :root {
   color-scheme: dark;
@@ -27,17 +27,15 @@
   --foundry-copper-strong: #4d8eff;
   --foundry-copper-soft: rgba(59, 130, 246, 0.12);
   --foundry-brass: #4d8eff;
-  /* Decorative brand-identity accent -- NOT the interactive --foundry-copper/--foundry-brass
-     above (those stay blue and keep every contrast pair theme-contrast.test.ts audits). This
-     systematizes the warm brass the brand mark (brand-mark.tsx) already used as a hardcoded
-     hex, so the same identity color can be reused (mark glow, wordmark hover) without redefining
-     it per component. Decorative-only: never applied to body text. */
+  /* Warm identity brass. The authenticated --bro-* interaction aliases below consume this
+     family for selection/focus/action, while legacy --foundry-copper surfaces remain blue until
+     their own phased UI work. Functional success/warning/danger/info colors stay independent. */
   --identity-brass: #c69a3e;
   --identity-brass-bright: #d9b563;
   --identity-brass-soft: rgba(198, 154, 62, 0.14);
   --identity-brass-line: rgba(198, 154, 62, 0.4);
-  --rail-width: 248px;
-  --rail-width-compact: 72px;
+  --rail-width: 240px;
+  --rail-width-compact: 64px;
   --bro-bg: #0b0e14;
   --bro-bg-elevated: #111827;
   --bro-surface: #111827;
@@ -397,13 +395,20 @@ code {
   z-index: 18;
   top: 0;
   display: flex;
-  min-height: 3.5rem;
+  min-height: 3.25rem;
   align-items: center;
   justify-content: space-between;
-  padding-inline: clamp(1rem, 3vw, 2.5rem);
+  padding-inline: clamp(1rem, 2.5vw, 2rem);
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--background) 92%, transparent);
-  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--background) 96%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.product-context-product {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .context-kicker,
@@ -446,7 +451,7 @@ code {
   overflow: hidden auto;
   border-right: 1px solid var(--foundry-line);
   background: var(--foundry-canvas-subdued);
-  box-shadow: 12px 0 40px var(--shadow-soft-color);
+  box-shadow: none;
   transition: width var(--bro-motion-medium) var(--bro-ease);
 }
 
@@ -456,9 +461,9 @@ code {
 
 .product-brand {
   display: flex;
-  min-height: 4.5rem;
+  min-height: 4rem;
   align-items: center;
-  padding-inline: 1.1rem;
+  padding-inline: 1rem;
   border-bottom: 1px solid var(--foundry-line);
   color: var(--text);
   text-decoration: none;
@@ -475,12 +480,12 @@ code {
 
 .product-navigation {
   flex: 1;
-  padding: 1.15rem 0.75rem;
+  padding: 1rem 0.65rem;
 }
 
 .product-nav-group + .product-nav-group {
-  margin-top: 1.35rem;
-  padding-top: 1.35rem;
+  margin-top: 1.05rem;
+  padding-top: 1.05rem;
   border-top: 1px solid color-mix(in srgb, var(--foundry-line) 72%, transparent);
 }
 
@@ -503,9 +508,9 @@ code {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 2.55rem;
+  min-height: 2.4rem;
   align-items: center;
-  padding: 0.55rem 0.65rem;
+  padding: 0.48rem 0.6rem;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
@@ -532,9 +537,9 @@ code {
 }
 
 .product-navigation a[aria-current="page"] {
-  border-color: color-mix(in srgb, var(--foundry-copper) 38%, var(--foundry-line));
-  background: var(--foundry-copper-soft);
-  color: var(--foundry-copper-strong);
+  border-color: var(--bro-border-accent);
+  background: color-mix(in srgb, var(--bro-accent) 10%, transparent);
+  color: var(--bro-accent-strong);
 }
 
 .product-navigation a[aria-current="page"]::before {
@@ -543,7 +548,7 @@ code {
   bottom: 0.55rem;
   left: -0.78rem;
   width: 3px;
-  background: var(--foundry-copper);
+  background: var(--bro-accent);
   content: "";
 }
 

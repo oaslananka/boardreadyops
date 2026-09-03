@@ -78,7 +78,7 @@ git commit -m "feat(web): refine premium design foundation"
 - Consumes: `ProductNavigation({ viewerNav })`, `AppShell({ children, viewerNav })`.
 - Produces: navigation groups `Overview`, `Engineering`, `Governance`, `Manage`; a useful static product context bar containing only truthful product-level context; unchanged compact/mobile behavior.
 
-- [ ] **Step 1: Write the failing navigation and shell tests**
+- [x] **Step 1: Write the failing navigation and shell tests**
 
 ```ts
 expect(markup).toContain("Overview");
@@ -91,21 +91,21 @@ expect(markup).not.toContain("Administration");
 ```
 
 Add an `AppShell` static-render assertion for `BoardReadyOps Cloud` and `Engineering operations`, and ensure no fake `Production`, organization, or environment selector copy is introduced.
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `corepack pnpm exec vitest run tests/unit/web/product-navigation.test.ts tests/unit/web/product-app-accessibility.test.ts`
 Expected: navigation test FAILS on the old group names/order; accessibility remains a guardrail.
 
-- [ ] **Step 3: Implement the minimal shell changes**
+- [x] **Step 3: Implement the minimal shell changes**
 
 Reorder existing destinations without adding routes. Keep `Reviews` under Engineering; keep repository work reachable from Dashboard rather than adding a dead `/repositories` index route. Replace the one-line context kicker with a two-part product context treatment. Tighten rail/header/page-frame CSS, remove the rail shadow, and retain mobile drawer/focus behavior unchanged.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `corepack pnpm exec vitest run tests/unit/web/product-navigation.test.ts tests/unit/web/product-app-accessibility.test.ts`
 Expected: PASS, including compact persistence and WCAG A/AA assertions.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/components/product-navigation.tsx apps/web/components/ui.tsx apps/web/app/styles.css tests/unit/web/product-navigation.test.ts tests/unit/web/product-app-accessibility.test.ts

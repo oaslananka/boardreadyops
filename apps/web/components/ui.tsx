@@ -105,7 +105,8 @@ export function AppShell({ children, viewerNav }: Readonly<{ children: ReactNode
       <ProductNavigation viewerNav={viewerNav} />
       <div className="product-stage">
         <header className="product-context-bar">
-          <span className="context-kicker">Hardware release workspace</span>
+          <span className="product-context-product">BoardReadyOps Cloud</span>
+          <span className="context-kicker">Engineering operations</span>
         </header>
         {children}
         <footer className="site-footer">

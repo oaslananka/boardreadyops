@@ -14,12 +14,15 @@ type NavigationItem = Readonly<{
 
 const groups: ReadonlyArray<Readonly<{ label: string; items: readonly NavigationItem[] }>> = [
   {
-    label: "Workspace",
+    label: "Overview",
     items: [
-      { label: "My Work", href: "/work", icon: "work" },
-      { label: "Reviews", href: "/reviews", icon: "reviews" },
       { label: "Dashboard", href: "/dashboard", icon: "projects" },
+      { label: "My Work", href: "/work", icon: "work" },
     ],
+  },
+  {
+    label: "Engineering",
+    items: [{ label: "Reviews", href: "/reviews", icon: "reviews" }],
   },
   {
     label: "Governance",
@@ -30,7 +33,7 @@ const groups: ReadonlyArray<Readonly<{ label: string; items: readonly Navigation
     ],
   },
   {
-    label: "Administration",
+    label: "Manage",
     items: [
       { label: "Setup", href: "/setup", icon: "setup" },
       { label: "Settings", href: "/settings/billing", icon: "settings" },
