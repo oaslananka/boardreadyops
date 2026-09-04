@@ -696,13 +696,18 @@
         "code": [
           "packages/cloud-core/src/entitlements.ts",
           "packages/cloud-core/src/stripe-service.ts",
+          "packages/db/src/billing-store.ts",
+          "packages/db/migrations/0060_stripe_subscription_event_ordering.sql",
           "apps/web/app/api/v1/billing/webhook/route.ts",
           "apps/web/lib/marketplace-free-billing.ts"
         ],
         "tests": [
           "tests/unit/cloud-core/billing-transitions.test.ts",
           "tests/unit/cloud-core/entitlements.test.ts",
+          "tests/unit/cloud-core/stripe-service.test.ts",
           "tests/unit/web/billing-routes.test.ts",
+          "tests/unit/web/billing-webhook-stripe-projection.test.ts",
+          "tests/unit/db/billing-store-stripe.test.ts",
           "tests/unit/db/marketplace-billing-atomic.test.ts"
         ],
         "docs": [
@@ -714,11 +719,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/cloud-core/billing-transitions.test.ts tests/unit/cloud-core/entitlements.test.ts tests/unit/web/billing-routes.test.ts tests/unit/db/marketplace-billing-atomic.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/cloud-core/billing-transitions.test.ts tests/unit/cloud-core/entitlements.test.ts tests/unit/cloud-core/stripe-service.test.ts tests/unit/web/billing-routes.test.ts tests/unit/web/billing-webhook-stripe-projection.test.ts tests/unit/db/billing-store-stripe.test.ts tests/unit/db/marketplace-billing-atomic.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-03T23:33:36Z"
       },
-      "remaining": "Stripe webhook signature verification and idempotent event recording are real, but the route's own comments admit subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are unimplemented stubs on that path; the GitHub Marketplace billing path is materially more complete."
+      "remaining": "Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are now implemented and unit-tested: packages/db/src/billing-store.ts gained linkStripeCustomer (links a Stripe customer id to a tenant via checkout.session.completed's client_reference_id), applyStripeSubscriptionEvent (projects customer.subscription.created|updated|deleted onto billing_subscriptions + billing_customers + installations.plan_tier, guarded against out-of-order/redelivered events via a new last_event_created_at column added in migration 0060), and clearGraceOnPaymentSuccess (invoice.paid reverses the pre-existing applyGraceOnPaymentFailure, reused as-is for invoice.payment_failed). Idempotency is unchanged and reused as-is (recordEvent's ON CONFLICT (stripe_event_id) DO NOTHING). Price→tier mapping reuses the pre-existing STRIPE_*_PRICE_ID env-driven table in stripe-service.ts rather than inventing a second one — those price ids are illustrative and must be confirmed against the real Stripe dashboard before production use. What is honestly still open: (1) /api/v1/billing/checkout remains guarded with HTTP 410 'marketplace_free_only' per the Marketplace Free-Only Guardrail (docs/product/current-state-matrix.md §9), so in production checkout.session.completed — the only handled event carrying both a Stripe customer id and this repo's tenant id — never fires; the new projection code is real and tested but dormant until that guard is deliberately lifted. (2) Test coverage added here is unit-level only (mocked SqlQueryExecutor / mocked pg-executor at the route boundary); there is no live-Postgres integration test analogous to tests/integration/marketplace-billing-postgres.test.ts for the Stripe path. (3) A tier change does not itself invoke packages/db/src/entitlement-store.ts's applyWatchAllowance to re-enforce watched-board limits immediately — this mirrors the pre-existing GitHub Marketplace path's behavior and is not a new gap introduced here."
     },
     {
       "id": "W20",
