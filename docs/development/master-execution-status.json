@@ -740,7 +740,11 @@
           "packages/db/src/billing-store.ts",
           "packages/db/migrations/0060_stripe_subscription_event_ordering.sql",
           "apps/web/app/api/v1/billing/webhook/route.ts",
-          "apps/web/lib/marketplace-free-billing.ts"
+          "apps/web/app/api/v1/billing/checkout/route.ts",
+          "apps/web/app/api/v1/billing/portal/route.ts",
+          "apps/web/lib/marketplace-free-billing.ts",
+          "apps/web/lib/billing-mode.ts",
+          "apps/web/lib/stripe-billing-client.ts"
         ],
         "tests": [
           "tests/unit/cloud-core/billing-transitions.test.ts",
@@ -748,6 +752,11 @@
           "tests/unit/cloud-core/stripe-service.test.ts",
           "tests/unit/web/billing-routes.test.ts",
           "tests/unit/web/billing-webhook-stripe-projection.test.ts",
+          "tests/unit/web/billing-mode.test.ts",
+          "tests/unit/web/stripe-billing-client.test.ts",
+          "tests/unit/web/billing-checkout-route.test.ts",
+          "tests/unit/web/billing-portal-route.test.ts",
+          "tests/unit/web/marketplace-free-billing-routes.test.ts",
           "tests/unit/db/billing-store-stripe.test.ts",
           "tests/unit/db/marketplace-billing-atomic.test.ts"
         ],
@@ -760,11 +769,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/cloud-core/billing-transitions.test.ts tests/unit/cloud-core/entitlements.test.ts tests/unit/cloud-core/stripe-service.test.ts tests/unit/web/billing-routes.test.ts tests/unit/web/billing-webhook-stripe-projection.test.ts tests/unit/db/billing-store-stripe.test.ts tests/unit/db/marketplace-billing-atomic.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/cloud-core/billing-transitions.test.ts tests/unit/cloud-core/entitlements.test.ts tests/unit/cloud-core/stripe-service.test.ts tests/unit/web/billing-routes.test.ts tests/unit/web/billing-webhook-stripe-projection.test.ts tests/unit/web/billing-mode.test.ts tests/unit/web/stripe-billing-client.test.ts tests/unit/web/billing-checkout-route.test.ts tests/unit/web/billing-portal-route.test.ts tests/unit/web/marketplace-free-billing-routes.test.ts tests/unit/db/billing-store-stripe.test.ts tests/unit/db/marketplace-billing-atomic.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-03T23:33:36Z"
+        "checkedAt": "2026-09-04T23:24:00Z"
       },
-      "remaining": "Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are now implemented and unit-tested: packages/db/src/billing-store.ts gained linkStripeCustomer (links a Stripe customer id to a tenant via checkout.session.completed's client_reference_id), applyStripeSubscriptionEvent (projects customer.subscription.created|updated|deleted onto billing_subscriptions + billing_customers + installations.plan_tier, guarded against out-of-order/redelivered events via a new last_event_created_at column added in migration 0060), and clearGraceOnPaymentSuccess (invoice.paid reverses the pre-existing applyGraceOnPaymentFailure, reused as-is for invoice.payment_failed). Idempotency is unchanged and reused as-is (recordEvent's ON CONFLICT (stripe_event_id) DO NOTHING). Price→tier mapping reuses the pre-existing STRIPE_*_PRICE_ID env-driven table in stripe-service.ts rather than inventing a second one — those price ids are illustrative and must be confirmed against the real Stripe dashboard before production use. What is honestly still open: (1) /api/v1/billing/checkout remains guarded with HTTP 410 'marketplace_free_only' per the Marketplace Free-Only Guardrail (docs/product/current-state-matrix.md §9), so in production checkout.session.completed — the only handled event carrying both a Stripe customer id and this repo's tenant id — never fires; the new projection code is real and tested but dormant until that guard is deliberately lifted. (2) Test coverage added here is unit-level only (mocked SqlQueryExecutor / mocked pg-executor at the route boundary); there is no live-Postgres integration test analogous to tests/integration/marketplace-billing-postgres.test.ts for the Stripe path. (3) A tier change does not itself invoke packages/db/src/entitlement-store.ts's applyWatchAllowance to re-enforce watched-board limits immediately — this mirrors the pre-existing GitHub Marketplace path's behavior and is not a new gap introduced here."
+      "remaining": "Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are implemented and unit-tested (unchanged from the prior pass: linkStripeCustomer, applyStripeSubscriptionEvent guarded via last_event_created_at, clearGraceOnPaymentSuccess). Newly closed this pass: /api/v1/billing/checkout and /portal now create real Stripe Checkout/Billing Portal sessions (apps/web/lib/stripe-billing-client.ts, official stripe SDK) instead of unconditionally returning HTTP 410. A new BILLING_MODE environment switch (apps/web/lib/billing-mode.ts) gates this — it defaults to 'marketplace_free', reproducing today's 410 behavior exactly, so production is unaffected until an operator deliberately sets BILLING_MODE=stripe or 'both' and configures STRIPE_SECRET_KEY. Once flipped, checkout.session.completed can fire for the first time, activating the previously-dormant projection code. Tenant identity for the Stripe path reuses the pre-existing convention (viewer.session.login, matching BillingStore.forecastContributors's usage on the read-only Marketplace billing page) rather than inventing a new one; a forward priceIdForTier helper was added to stripe-service.ts as the missing inverse of the pre-existing resolveTierFromPriceId/resolveIntervalFromPriceId. Both routes are built with injected-dependency handlers (handleCheckoutRequest/handlePortalRequest) so unit tests exercise real request/response logic without mocking the 'stripe' package itself. What is honestly still open: (1) Test coverage is unit-level only (mocked DB, injected fake Stripe client); there is no live-Postgres integration test analogous to tests/integration/marketplace-billing-postgres.test.ts for the Stripe path, and no real Stripe test-mode account has exercised the new routes end-to-end. (2) A tier change does not itself invoke packages/db/src/entitlement-store.ts's applyWatchAllowance — billing_customers.tenant_id has no established mapping back to installations.id (a bare, unconstrained text column; the new routes populate it with the GitHub login), so this is a real, undesigned access-control decision rather than a one-line call, and mirrors the pre-existing GitHub Marketplace path's same gap."
     },
     {
       "id": "W20",

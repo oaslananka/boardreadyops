@@ -6,6 +6,7 @@ import {
   parseStripeCheckoutSessionCompleted,
   parseStripeInvoiceEvent,
   parseStripeSubscriptionEvent,
+  priceIdForTier,
   resolveIntervalFromPriceId,
   resolveTierFromPriceId,
   type StripePriceConfig,
@@ -78,6 +79,21 @@ describe("resolveIntervalFromPriceId", () => {
 
   it("returns null for a price id from no known interval", () => {
     expect(resolveIntervalFromPriceId("price_unknown", config)).toBeNull();
+  });
+});
+
+describe("priceIdForTier", () => {
+  it("resolves the configured price id for each tier/interval combination", () => {
+    expect(priceIdForTier("team", "month", config)).toBe("price_team_month");
+    expect(priceIdForTier("team", "year", config)).toBe("price_team_year");
+    expect(priceIdForTier("business", "month", config)).toBe("price_biz_month");
+    expect(priceIdForTier("business", "year", config)).toBe("price_biz_year");
+  });
+
+  it("round-trips with resolveTierFromPriceId/resolveIntervalFromPriceId", () => {
+    const priceId = priceIdForTier("business", "year", config);
+    expect(resolveTierFromPriceId(priceId, config)).toBe("business");
+    expect(resolveIntervalFromPriceId(priceId, config)).toBe("year");
   });
 });
 
