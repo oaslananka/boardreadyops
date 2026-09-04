@@ -132,6 +132,11 @@ describe("run-listing benchmark report evaluation", () => {
 });
 
 describe("run-listing benchmark repository hygiene", () => {
+  it("does not use Math.random for synthetic benchmark identifiers", () => {
+    const source = readFileSync("scripts/control-plane-run-listing-benchmark.mjs", "utf8");
+    expect(source).not.toContain("Math.random(");
+  });
+
   it("keeps generated local benchmark evidence out of the tracked checkout", () => {
     const gitignore = readFileSync(".gitignore", "utf8");
     expect(gitignore).toContain("/control-plane-run-listing-benchmark-report.json");
