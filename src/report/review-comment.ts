@@ -2,6 +2,7 @@ import type { BomRiskSummary } from "../core/bom-risk.js";
 import type { ReleaseMode } from "../core/config.types.js";
 import type { Finding, Severity } from "../core/findings.js";
 import type { RunResult } from "../core/result.js";
+import type { RuleCategory } from "../core/rule-registry.js";
 import { type Locale, t } from "../i18n/t.js";
 import { stickyMarker } from "./markdown.js";
 
@@ -34,6 +35,12 @@ export function formatReviewComment(
     "",
     ...topFindings(result, locale),
   ];
+  if (result.categoryBreakdown) {
+    const section = categoryBreakdownSection(result.categoryBreakdown);
+    if (section.length > 0) {
+      lines.push("", ...section);
+    }
+  }
   if (result.hardwareImpact) {
     lines.push("", ...hardwareImpactSection(result.hardwareImpact));
   }
@@ -122,6 +129,30 @@ function location(finding: Finding): string {
 
 function severityLabel(severity: Severity, locale: Locale): string {
   return t(`severity.${severity}`, {}, locale);
+}
+
+const CATEGORY_LABEL: Record<RuleCategory, string> = {
+  electrical: "Electrical",
+  manufacturability: "Manufacturability (DFM)",
+  assembly: "Assembly (DFA)",
+  testability: "Testability (DFT)",
+  sourcing: "Sourcing / BOM",
+  release: "Release",
+  unclassified: "Other",
+};
+
+/** Only domains with at least one finding, so a comment with mostly-clean domains stays scannable. */
+function categoryBreakdownSection(breakdown: NonNullable<RunResult["categoryBreakdown"]>): string[] {
+  const withFindings = breakdown.filter((category) => category.total > 0);
+  if (withFindings.length === 0) {
+    return [];
+  }
+  const lines = ["### By domain", "", "| Domain | Findings | Blocking |", "| --- | ---: | ---: |"];
+  for (const category of withFindings) {
+    const blocking = category.critical + category.high;
+    lines.push(`| ${CATEGORY_LABEL[category.category]} | ${category.total} | ${blocking} |`);
+  }
+  return lines;
 }
 
 function hardwareImpactSection(impact: NonNullable<RunResult["hardwareImpact"]>): string[] {

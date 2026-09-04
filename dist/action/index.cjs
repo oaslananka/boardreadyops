@@ -80128,6 +80128,32 @@ function registerRule(rule2) {
 function listRules() {
   return [...registry.values()].sort((a, b) => a.meta.id.localeCompare(b.meta.id));
 }
+var knownCategories = [
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release"
+];
+function emptyCategorySummary(category) {
+  return { category, total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+}
+function categorizeFindings(findings) {
+  const metaById = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta]));
+  const buckets = new Map(
+    knownCategories.map((category) => [category, emptyCategorySummary(category)])
+  );
+  for (const finding2 of findings) {
+    const category = metaById.get(finding2.ruleId)?.category ?? "unclassified";
+    const bucket = buckets.get(category) ?? emptyCategorySummary(category);
+    bucket.total += 1;
+    bucket[finding2.severity] += 1;
+    buckets.set(category, bucket);
+  }
+  const order = buckets.has("unclassified") ? [...knownCategories, "unclassified"] : knownCategories;
+  return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
+}
 
 // src/rules/helpers.ts
 var import_node_path5 = __toESM(require("node:path"), 1);
@@ -104407,6 +104433,7 @@ function assembleRunResult({
     },
     ...releaseMode ? { releaseMode } : {},
     summary: summary2,
+    categoryBreakdown: categorizeFindings(effectiveFindings),
     readiness,
     ...bomRisk ? { bomRisk } : {},
     ...policy ? { policy } : {},
@@ -110719,6 +110746,12 @@ function formatReviewComment(result, reports = [], locale = "en") {
     "",
     ...topFindings2(result, locale)
   ];
+  if (result.categoryBreakdown) {
+    const section = categoryBreakdownSection(result.categoryBreakdown);
+    if (section.length > 0) {
+      lines.push("", ...section);
+    }
+  }
   if (result.hardwareImpact) {
     lines.push("", ...hardwareImpactSection(result.hardwareImpact));
   }
@@ -110798,6 +110831,27 @@ function location(finding2) {
 }
 function severityLabel(severity, locale) {
   return t(`severity.${severity}`, {}, locale);
+}
+var CATEGORY_LABEL = {
+  electrical: "Electrical",
+  manufacturability: "Manufacturability (DFM)",
+  assembly: "Assembly (DFA)",
+  testability: "Testability (DFT)",
+  sourcing: "Sourcing / BOM",
+  release: "Release",
+  unclassified: "Other"
+};
+function categoryBreakdownSection(breakdown) {
+  const withFindings = breakdown.filter((category) => category.total > 0);
+  if (withFindings.length === 0) {
+    return [];
+  }
+  const lines = ["### By domain", "", "| Domain | Findings | Blocking |", "| --- | ---: | ---: |"];
+  for (const category of withFindings) {
+    const blocking = category.critical + category.high;
+    lines.push(`| ${CATEGORY_LABEL[category.category]} | ${category.total} | ${blocking} |`);
+  }
+  return lines;
 }
 function hardwareImpactSection(impact) {
   const lines = ["### Hardware impact"];
