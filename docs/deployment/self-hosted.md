@@ -118,7 +118,7 @@ The initial alert policy is versioned as `github-cloud-ga-v1`. It evaluates only
 
 The terminal failure-rate gate is 500 basis points and is evaluated only when there are at least 20 terminal runs in the preceding 24 hours.
 
-Every successful snapshot emits `worker.control_plane_slo_evaluation` with the policy version, aggregate health, and active signal names. A signal emits `worker.control_plane_slo_firing` only when it first enters the alerting state and `worker.control_plane_slo_recovered` only when it leaves the state. Repeated breached snapshots do not repeat the firing transition.
+Every successful snapshot emits `worker.control_plane_slo_evaluation` with the policy version, aggregate health, and active signal names. A signal emits `worker.control_plane_slo_firing` only when it first enters the alerting state and `worker.control_plane_slo_recovered` only when it leaves that state. Repeated breached snapshots do not repeat the firing transition.
 
 Critical transitions page the platform on-call. Warning transitions open or update operational triage and should be correlated with GitHub status, worker restarts, queue lag, outbox lag, and reconciliation activity. `reconciliationRepairs24h` remains diagnostic and does not alert by itself.
 
