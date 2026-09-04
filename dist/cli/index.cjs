@@ -43766,6 +43766,32 @@ function registerRule(rule2) {
 function listRules() {
   return [...registry.values()].sort((a, b) => a.meta.id.localeCompare(b.meta.id));
 }
+var knownCategories = [
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release"
+];
+function emptyCategorySummary(category) {
+  return { category, total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+}
+function categorizeFindings(findings) {
+  const metaById = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta]));
+  const buckets = new Map(
+    knownCategories.map((category) => [category, emptyCategorySummary(category)])
+  );
+  for (const finding2 of findings) {
+    const category = metaById.get(finding2.ruleId)?.category ?? "unclassified";
+    const bucket = buckets.get(category) ?? emptyCategorySummary(category);
+    bucket.total += 1;
+    bucket[finding2.severity] += 1;
+    buckets.set(category, bucket);
+  }
+  const order = buckets.has("unclassified") ? [...knownCategories, "unclassified"] : knownCategories;
+  return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
+}
 
 // src/rules/helpers.ts
 var import_node_path6 = __toESM(require("node:path"), 1);
@@ -50521,6 +50547,7 @@ function assembleRunResult({
     },
     ...releaseMode ? { releaseMode } : {},
     summary,
+    categoryBreakdown: categorizeFindings(effectiveFindings),
     readiness,
     ...bomRisk ? { bomRisk } : {},
     ...policy ? { policy } : {},
