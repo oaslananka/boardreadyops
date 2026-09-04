@@ -1,0 +1,35 @@
+{
+  "name": "@boardreadyops/mcp-server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server exposing BoardReadyOps read-only hardware release checks to coding agents.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oaslananka/boardreadyops.git",
+    "directory": "packages/mcp-server"
+  },
+  "bin": {
+    "boardreadyops-mcp": "./bin/boardreadyops-mcp.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "boardreadyops": "workspace:*",
+    "zod": "4.4.3"
+  }
+}
