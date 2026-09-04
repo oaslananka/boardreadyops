@@ -110,7 +110,12 @@ function distributorClassification(
 /** node-postgres decodes `jsonb` to a native array; a mocked executor may hand back a JSON string instead. */
 function priceBreaks(row: Record<string, unknown>, key: string): readonly PriceBreak[] | undefined {
   const raw = row[key];
-  const parsed = Array.isArray(raw) ? raw : typeof raw === "string" ? JSON.parse(raw) : undefined;
+  let parsed: unknown;
+  if (Array.isArray(raw)) {
+    parsed = raw;
+  } else if (typeof raw === "string") {
+    parsed = JSON.parse(raw);
+  }
   if (!Array.isArray(parsed) || parsed.length === 0) return undefined;
   return (parsed as Record<string, unknown>[]).flatMap((entry): PriceBreak[] => {
     const quantity = Number(entry.quantity);
