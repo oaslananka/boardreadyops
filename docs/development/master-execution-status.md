@@ -205,9 +205,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W20 — Release Command Center & Cloud UX
 - **Status:** `Partial`
-- **Remaining:** No per-domain score cards (Design/DFM/DFA/DFT/BOM/Supply/Firmware/Manufacturer/Policy) were found — findings appear as a flat/tabbed list; no 'Open in KiCad' deep link (only GitHub Actions deep links).
+- **Remaining:** Per-domain score cards now render in the local CLI/Action PR comment (`### By domain` table, `src/report/review-comment.ts`), backed by a real per-domain finding breakdown (`src/core/rule-registry.ts`'s `categorizeFindings`) attached to `RunResult.categoryBreakdown`. The rule category itself is also now carried on the wire (`findingSchema.category` in `packages/contracts`) and persisted (`findings.category` column, migration 0062) when the CLI publishes a review. Still open: (1) the web dashboard itself (`apps/web/app/runs/[runId]`, the review findings tab) does not yet render per-domain score cards — `apps/web/lib/run-dashboard.ts`'s findings query does not select `category` yet, and its existing unit test suite (`tests/unit/web/run-dashboard.test.ts`) mocks the query executor by fixed call-position rather than SQL content, so adding a new aggregate query there needs its own careful pass rather than a drive-by change. (2) No 'Open in KiCad' deep link (only GitHub Actions deep links).
 - **Scope:** Dedicated web application (`apps/web`) with full route suite for runs, repositories, reviews, settings, and real-time live refresh.
-- **Code & Test Evidence:** `apps/web/app/runs/`, `apps/web/app/reviews/`, `apps/web/app/settings/`, `tests/e2e/qa-audit.spec.ts`.
+- **Code & Test Evidence:** `apps/web/app/runs/`, `apps/web/app/reviews/`, `apps/web/app/settings/`, `tests/e2e/qa-audit.spec.ts`, `src/core/rule-registry.ts`, `src/report/review-comment.ts`, `packages/db/migrations/0062_finding_category.sql`.
 
 ### W21 — PCB/Schematic/Gerber/3D Viewers & Visual Diff
 - **Status:** `Partial`
