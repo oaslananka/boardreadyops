@@ -44,7 +44,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 | W02 | Schema & Contract Governance | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
 | W06 | Deterministic Release Decision Engine | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
 | W07 | Evidence Bundle, Signing, Provenance & Hardware SLSA | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
-| W16 | Cloud Control Plane Reliability | P0 | 1 | partial | maintainers | W00 | Cloud Control Plane Reliability — GitHub GA Prerequisite |
+| W16 | Cloud Control Plane Reliability | P0 | 1 | implemented | maintainers | W00 | Cloud Control Plane Reliability — GitHub GA Prerequisite |
 | W28 | Security, Privacy, Threat Modeling & Trust Center | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
 | W29 | Observability, SLOs & Operations | P0 | 1 | partial | maintainers | W00 | Cloud Control Plane Reliability — GitHub GA Prerequisite |
 | W34 | Quality Engineering: Fuzz, Mutation, Bad-Board Zoo | P0 | 1 | partial | maintainers | W00 | Repository Maintenance & Release Health |
@@ -164,7 +164,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 ### W13 — Mechanical ↔ PCB Contract
 - **Status:** `Partial`
 - **Remaining:** Existing matrix claim requires code, test, documentation, deployment, commit or pull-request, and passing verification reconciliation.
-- **Scope:** STEP model export from KiCad CLI, basic mounting hole/board outline consistency checks. Full MCAD bounding box contract planned.
+- **Scope:** STEP model export from KiCad CLI, basic [REDACTED] hole/board outline consistency checks. Full MCAD bounding box contract planned.
 - **Code & Test Evidence:** `src/release/generate.ts` (STEP recipe).
 
 ### W14 — Policy, Waivers & Approval Governance
@@ -180,8 +180,8 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Code & Test Evidence:** `apps/web/lib/`, `ADR-0010`, `packages/contracts/src/runner-protocol.ts`.
 
 ### W16 — Cloud Control Plane Reliability
-- **Status:** `Partial`
-- **Remaining:** Cloud reliability blocker #222 remains open; #190 is closed.
+- **Status:** `Implemented`
+- **Remaining:** None within W16. Issue #222 and Cloud Control Plane Reliability milestone #11 are closed with public-safe backup/restore, load, soak, failure-recovery, and deploy-topology evidence linked from the milestone. Downstream GitHub Cloud GA isolation and App-permission validation remain owned by W15/W17 and milestone v2.2.
 - **Scope:** Postgres transactional outbox, durable job scheduling with retry/leasing/dead-letter semantics, and disaster restore drills.
 - **Code & Test Evidence:** `packages/db/`, `packages/cloud-core/src/lifecycle.ts`, `scripts/control-plane-restore-drill.mjs`.
 

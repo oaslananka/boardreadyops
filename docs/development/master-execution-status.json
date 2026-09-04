@@ -8,7 +8,7 @@
   },
   "roadmap": {
     "source": "https://github.com/oaslananka/boardreadyops/issues/191",
-    "checkedAt": "2026-09-01T12:28:13Z",
+    "checkedAt": "2026-09-04T08:20:19Z",
     "orderedMilestones": [
       "Repository Maintenance & Release Health",
       "Cloud Control Plane Reliability — GitHub GA Prerequisite",
@@ -598,25 +598,54 @@
       "name": "Cloud Control Plane Reliability",
       "phase": 1,
       "priority": "P0",
-      "status": "partial",
+      "status": "implemented",
       "owner": "maintainers",
       "dependencies": ["W00"],
       "milestone": "Cloud Control Plane Reliability — GitHub GA Prerequisite",
       "issues": [190, 222],
       "evidence": {
-        "code": ["packages/db", "scripts/control-plane-load.mjs"],
-        "tests": [],
-        "docs": ["docs/operations/control-plane-load-validation.md"],
-        "deployed": [],
-        "commits": [],
-        "pullRequests": []
+        "code": [
+          "packages/db",
+          "scripts/control-plane-load.mjs",
+          "scripts/control-plane-restore-drill.mjs",
+          "scripts/control-plane-production-soak.mjs"
+        ],
+        "tests": [
+          "tests/unit/scripts/control-plane-load.test.ts",
+          "tests/integration/control-plane-load.test.ts",
+          "tests/unit/scripts/control-plane-restore-drill.test.ts",
+          "tests/unit/scripts/control-plane-production-soak.test.ts",
+          "tests/integration/postgres-backup-restore.test.ts"
+        ],
+        "docs": [
+          "docs/operations/control-plane-load-validation.md",
+          "docs/operations/control-plane-restore-drill.md",
+          "docs/deployment/self-hosted.md"
+        ],
+        "deployed": [
+          "https://github.com/oaslananka/boardreadyops/issues/222#issuecomment-5375386057",
+          "https://github.com/oaslananka/boardreadyops/issues/222#issuecomment-5468021951",
+          "https://github.com/oaslananka/boardreadyops/milestone/11"
+        ],
+        "commits": [
+          "01c42c389078b996a17a30a3688e5538b457291e",
+          "75c38ea1546c2219af6c0f47dac5bd99450e41ed",
+          "dab4b6e3199cb361be5bc93f8d3bbbb388128427",
+          "9941a1af75e3123d358c2c82e479d0881960419e",
+          "28d8ac5b8f60b78cabfd19e9cd88d1e56fc05c29",
+          "f357592ed52c90cfc66d8dc41eeec79a756a830f",
+          "bc595d8a0702331f0c654a39f0b1db8cbe92b297",
+          "3818d8f969fdbfe567da4e04f0939c31a2f9239b",
+          "34e7fe99c5f0e4d8516ef5b674480e88e1182aeb",
+          "0460c0b7095fee74aa701a2cb158baa9d6de8b78"
+        ],
+        "pullRequests": ["#291", "#293", "#300", "#302", "#303", "#304", "#305", "#318", "#645"]
       },
       "verification": {
         "command": "BOARDREADYOPS_LOAD_CONFIRMATION=isolated-disposable-database BOARDREADYOPS_LOAD_PROFILE=<representative|soak-recovery|database-interruption|worker-process-interruption|worker-fleet-interruption|github-api-interruption> corepack pnpm run cloud:load:verify",
         "result": "pass",
         "checkedAt": "2026-09-02T23:06:42Z"
-      },
-      "remaining": "PARTIAL CLOSE: two of issue #222's three remaining unchecked acceptance criteria are now backed by real evidence, not just the pre-existing (already-checked) backup/restore-drill item. Previously this workstream's own verification had never been run at all (result: not_run) -- this session gained real, disposable PostgreSQL access for the first time (an isolated scratch Postgres container on a separate VPS, network-isolated from and sharing no data with any production system) and ran all six of the already-implemented but never-executed control-plane-load.mjs profiles end-to-end: (1) 'representative' (sustained load) -- 200 unique + 50 duplicate webhook deliveries, 20 concurrency, intake p95 244ms (limit 1000ms), lifecycle p95 182ms (limit 1500ms), dashboard p95 202ms (limit 1000ms), zero cross-tenant mismatches, zero threshold signals -- satisfies 'sustained expected load remains within documented SLO and resource thresholds'. (2)-(6) soak-recovery, database-interruption (real pg_terminate_backend + verified rollback + replacement connection), worker-process-interruption (real child process SIGKILL + lease reclaim), worker-fleet-interruption (3 children killed simultaneously, 9 lease reclaims across 3 rounds), and github-api-interruption (real loopback fault server, 503 then 429-with-Retry-After then success) -- all 3/3 rounds completed, zero dead letters, zero ambiguous non-terminal states, zero cross-tenant mismatches across every profile -- satisfies 'failure injection does not create cross-tenant access, duplicate externally visible effects, or permanently ambiguous run state'. Each profile ran against a freshly migrated, then-discarded scratch database (57 migrations applied cleanly each time). Still remaining: issue #222's third unchecked box ('completed evidence is linked from the Cloud Control Plane Reliability milestone before GA sign-off') is a GitHub milestone-description edit, not attempted here -- flagging for the maintainer rather than editing project metadata unprompted."
+      }
     },
     {
       "id": "W17",
