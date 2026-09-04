@@ -129,3 +129,35 @@ The disposable-database profiles above are bounded engineering regression eviden
 The manual `control-plane-production-soak` GitHub Actions workflow runs this monitor and uploads a mode `0600`, aggregate-only `control-plane-production-soak-report.json` artifact (sample count, elapsed duration, p50/p95/p99/maximum readiness latency, and availability percentage only; no response bodies, headers, or tenant data). It requires an explicit `origin` input and is not scheduled, so it only runs when a maintainer deliberately points it at a commissioned deployment. A run that exceeds the configured consecutive-failure limit stops early and is reported as `soak_terminated_early` rather than silently completing the requested duration.
 
 This tool still does not by itself prove host/availability-zone loss, whole-service or regional PostgreSQL outage, or real GitHub production/shared-rate-limit behavior; those remain separate GA evidence items for issue #222.
+
+## Run-listing pagination benchmark
+
+`GET /api/v1/runs` lists release runs across every repository a signed-in viewer can access, paginated by `apps/web/lib/run-listing.ts`. That module uses **keyset (cursor) pagination**, not `OFFSET`: each page's `WHERE` clause is `(release_runs.started_at, release_runs.id) < ($cursor.startedAt, $cursor.id)` with `ORDER BY started_at DESC, id DESC LIMIT $n`, and the opaque `next` cursor returned to the caller is just the last row's `(started_at, id)` pair. Unlike `OFFSET n`, this does not re-scan or re-sort the rows a deep page skips, so page latency should stay roughly flat as page depth increases rather than growing with it — the "full-table-scan-shaped" degradation offset pagination is prone to at depth.
+
+`scripts/control-plane-run-listing-benchmark.mjs` (`pnpm run cloud:run-listing-benchmark:verify`) measures that claim instead of asserting it. It seeds one isolated tenant with a small run history and, separately, a large run history, then walks each history page by page through the real `loadViewerRuns` query at a few representative page sizes, timing every page fetch. It statically re-reads `apps/web/lib/run-listing.ts` and fails closed if the query ever stops matching the expected keyset predicate or starts using `OFFSET`, so a future change to offset pagination invalidates this benchmark's assumptions loudly rather than silently.
+
+For each `(dataset size, page size)` tier the report records p50/p95/p99/maximum page latency (via the same `percentile`/`summarizeDurations` helpers `control-plane-load.mjs` uses) and a depth-degradation ratio: the p95 latency of the last quarter of pages walked divided by the p95 latency of the first quarter. A tier fails with a stable signal if its p95 exceeds the configured limit or if that ratio exceeds the configured maximum, which is how offset-shaped depth degradation would show up if it existed.
+
+Run locally against the same isolated, disposable PostgreSQL 16 database used above:
+
+```bash
+export DATABASE_URL='postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_load'
+export BOARDREADYOPS_LOAD_CONFIRMATION=isolated-disposable-database
+export BOARDREADYOPS_RUN_LISTING_REPORT_PATH=control-plane-run-listing-benchmark-report.json
+pnpm run cloud:run-listing-benchmark:verify
+```
+
+Optional bounded overrides are:
+
+```dotenv
+BOARDREADYOPS_RUN_LISTING_PAGE_SIZES=10,25,100
+BOARDREADYOPS_RUN_LISTING_PAGE_DEPTH=20
+BOARDREADYOPS_RUN_LISTING_SMALL_DATASET=200
+BOARDREADYOPS_RUN_LISTING_LARGE_DATASET=20000
+BOARDREADYOPS_RUN_LISTING_P95_MS=500
+BOARDREADYOPS_RUN_LISTING_DEPTH_DEGRADATION_RATIO_MAX=3
+```
+
+The generated report is mode `0600` and contains only the pagination style found, per-tier scenario sizes, aggregate timing, and threshold signals; it never includes tenant identifiers, session material, or database connection details. The manual `control-plane-run-listing-benchmark` GitHub Actions workflow provisions an isolated PostgreSQL 16 service, applies every repository migration, runs this benchmark, and uploads `control-plane-run-listing-benchmark-report.json` for 30 days, mirroring the `control-plane-load` workflow above.
+
+**Verified local measurement (2026-09-04):** the PostgreSQL-backed benchmark was run end-to-end against a freshly migrated, disposable Docker PostgreSQL 16.15 instance with the default 200 / 20,000-run datasets, page sizes 10/25/100, and page depth 20. The 20,000-run tiers reported p95 page latency of 49.417 ms (10 rows), 46.47 ms (25 rows), and 46.808 ms (100 rows), with depth-degradation ratios of 0.99, 0.97, and 0.78 respectively; all threshold signals were empty. The paired integration test passed and the database/container were destroyed after the run. These are reproducibility/canary measurements for the disposable local environment, **not** a production latency SLO or a claim about hosted PostgreSQL performance. The manual workflow remains the repeatable CI path for future measurements.
