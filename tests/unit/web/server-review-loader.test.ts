@@ -172,6 +172,193 @@ describe("Server-Side Authoritative Review Loader (Security & Durability)", () =
     expect(review?.approvals[0]?.approverId).toBe("signoff.officer@company.com");
   });
 
+  it("populates headSnapshots from run_snapshots recorded for the revision's head run", async () => {
+    vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
+      mode: "postgres",
+      databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
+    });
+
+    mockLoaderQuery.mockImplementation(async (sql: string) => {
+      const norm = sql.toLowerCase().replace(/\s+/g, " ");
+
+      if (norm.includes("from reviews join repositories")) {
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "repo-hw-prod",
+              pull_request_number: 105,
+              title: "Power Stage Production Review",
+              status: "active",
+              decision: "approved",
+              base_run_id: null,
+              head_run_id: "run-hw-105",
+              current_revision_id: "rev_db_v1",
+              created_by: "lead.eng@company.com",
+              created_at: now,
+              updated_at: now,
+              completed_at: null,
+              owner: "acme-hardware",
+              name: "motor-inverter",
+              private: true,
+              disabled_at: null,
+              suspended_at: null,
+              github_installation_id: 47001,
+              account_login: "acme-hardware",
+            },
+          ],
+        };
+      }
+
+      if (norm.includes("from github_marketplace_subscriptions")) {
+        return { rows: [] };
+      }
+
+      if (norm.includes("from review_revisions where id = $1 and review_id = $2")) {
+        return {
+          rows: [
+            {
+              id: "rev_db_v1",
+              sequence: 1,
+              base_run_id: null,
+              head_run_id: "run-hw-105",
+              base_commit_sha: null,
+              head_commit_sha: "1".repeat(40),
+              evidence_digest: "e".repeat(64),
+            },
+          ],
+        };
+      }
+
+      if (norm.includes("from run_snapshots")) {
+        return {
+          rows: [
+            {
+              snapshot_id: "snap_sch_board",
+              name: "schematic_board.svg",
+              kind: "schematic",
+              format: "svg",
+              sheet_or_layer: "board",
+              width: 1200,
+              height: 800,
+              content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+              sha256: "f".repeat(64),
+              anchors: [{ id: "anchor_comp_U1", kind: "component", targetRef: "U1", x: 0.1, y: 0.2 }],
+            },
+          ],
+        };
+      }
+
+      return { rows: [] };
+    });
+
+    const review = await loadServerReview(reviewId, authorizedSession);
+    expect(review?.headSnapshots).toHaveLength(1);
+    expect(review?.headSnapshots?.[0]).toMatchObject({
+      id: "snap_sch_board",
+      kind: "schematic",
+      sheetOrLayer: "board",
+      content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+    });
+    expect(review?.headSnapshots?.[0]?.anchors).toHaveLength(1);
+  });
+
+  it("populates baseSnapshots by looking up a prior run recorded for the revision's base commit", async () => {
+    vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
+      mode: "postgres",
+      databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
+    });
+
+    const baseCommitSha = `${"0".repeat(39)}9`;
+
+    mockLoaderQuery.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      const norm = sql.toLowerCase().replace(/\s+/g, " ");
+
+      if (norm.includes("from reviews join repositories")) {
+        return {
+          rows: [
+            {
+              id: reviewId,
+              repository_id: "repo-hw-prod",
+              pull_request_number: 105,
+              title: "Power Stage Production Review",
+              status: "active",
+              decision: "approved",
+              base_run_id: null,
+              head_run_id: "run-hw-105",
+              current_revision_id: "rev_db_v1",
+              created_by: "lead.eng@company.com",
+              created_at: now,
+              updated_at: now,
+              completed_at: null,
+              owner: "acme-hardware",
+              name: "motor-inverter",
+              private: true,
+              disabled_at: null,
+              suspended_at: null,
+              github_installation_id: 47001,
+              account_login: "acme-hardware",
+            },
+          ],
+        };
+      }
+
+      if (norm.includes("from github_marketplace_subscriptions")) {
+        return { rows: [] };
+      }
+
+      if (norm.includes("from review_revisions where id = $1 and review_id = $2")) {
+        return {
+          rows: [
+            {
+              id: "rev_db_v1",
+              sequence: 1,
+              base_run_id: null,
+              head_run_id: "run-hw-105",
+              base_commit_sha: baseCommitSha,
+              head_commit_sha: "1".repeat(40),
+              evidence_digest: "e".repeat(64),
+            },
+          ],
+        };
+      }
+
+      if (norm.includes("from release_runs where repository_id = $1 and commit_sha = $2")) {
+        expect(params).toEqual(["repo-hw-prod", baseCommitSha]);
+        return { rows: [{ id: "run-hw-104-base" }] };
+      }
+
+      if (norm.includes("from run_snapshots where run_id = $1") && params[0] === "run-hw-104-base") {
+        return {
+          rows: [
+            {
+              snapshot_id: "snap_sch_board_base",
+              name: "schematic_board.svg",
+              kind: "schematic",
+              format: "svg",
+              sheet_or_layer: "board",
+              width: 1200,
+              height: 800,
+              content: '<svg xmlns="http://www.w3.org/2000/svg"><g id="base"></g></svg>',
+              sha256: "a".repeat(64),
+              anchors: [],
+            },
+          ],
+        };
+      }
+
+      if (norm.includes("from run_snapshots")) {
+        return { rows: [] };
+      }
+
+      return { rows: [] };
+    });
+
+    const review = await loadServerReview(reviewId, authorizedSession);
+    expect(review?.baseSnapshots).toHaveLength(1);
+    expect(review?.baseSnapshots?.[0]).toMatchObject({ id: "snap_sch_board_base" });
+  });
+
   it("fails closed (returns null) for unauthorized viewer on private repository", async () => {
     vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
       mode: "postgres",

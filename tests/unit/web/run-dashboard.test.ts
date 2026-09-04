@@ -18,10 +18,11 @@ function executorWithResults(results: unknown[]): {
 }
 
 function emptyDashboardRows(): unknown[] {
-  // run, findingCount, artifactCount, attempts, transitions, boards, findings, artifacts
+  // run, findingCount, artifactCount, attempts, transitions, boards, findings, artifacts, categoryBreakdown
   return [
     { rows: [{ total: 0 }] },
     { rows: [{ total: 0 }] },
+    { rows: [] },
     { rows: [] },
     { rows: [] },
     { rows: [] },
@@ -154,7 +155,7 @@ describe("run dashboard data", () => {
     const result = await lookupRunDashboard("public-run", executor);
 
     expect(result).toMatchObject({ state: "found", run: { repositoryPrivate: false } });
-    expect(query).toHaveBeenCalledTimes(8);
+    expect(query).toHaveBeenCalledTimes(9);
   });
 
   it("loads a private repository dashboard only after explicit repository authorization", async () => {
@@ -177,7 +178,7 @@ describe("run dashboard data", () => {
       name: "hardware",
       private: true,
     });
-    expect(query).toHaveBeenCalledTimes(8);
+    expect(query).toHaveBeenCalledTimes(9);
   });
 
   it("normalizes malformed scalar, collection, and report-link values", async () => {
@@ -215,6 +216,7 @@ describe("run dashboard data", () => {
           },
         ],
       },
+      { rows: [] },
     ]);
 
     const result = await lookupRunDashboard("run-state", executor, {
@@ -397,6 +399,12 @@ describe("run dashboard data", () => {
           },
         ],
       },
+      {
+        rows: [
+          { category: "electrical", total: 1, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+          { category: "unclassified", total: 1, critical: 0, high: 0, medium: 0, low: 1, info: 0 },
+        ],
+      },
     ]);
 
     const result = await lookupRunDashboard("run-123", executor, {
@@ -473,6 +481,10 @@ describe("run dashboard data", () => {
         ],
         transitions: [{ entityType: "release_run", reasonCode: "runner_result_completed" }],
         reportLinks: [{ label: "HTML report", url: "https://reports.example.test/run-123" }],
+        categoryBreakdown: [
+          { category: "electrical", total: 1, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+          { category: "unclassified", total: 1, critical: 0, high: 0, medium: 0, low: 1, info: 0 },
+        ],
       },
     });
 
@@ -481,6 +493,7 @@ describe("run dashboard data", () => {
     const artifactCountSql = String(query.mock.calls[2]?.[0]);
     const findingSql = String(query.mock.calls[6]?.[0]);
     const artifactSql = String(query.mock.calls[7]?.[0]);
+    const categoryBreakdownSql = String(query.mock.calls[8]?.[0]);
     expect(runSql).toContain("control_plane_reconciliation_items");
     expect(runSql).toContain("dead_letter_count");
     expect(runSql).toContain("last_activity_at");
@@ -503,7 +516,9 @@ describe("run dashboard data", () => {
     expect(query.mock.calls[7]?.[1]).toEqual(["run-123", "%release%", "primary", "release-archive", 10, 0]);
     expect(artifactSql).not.toContain("storage_path");
     expect(JSON.stringify(result)).not.toContain("/data/artifacts/private/internal/path.zip");
-    expect(query).toHaveBeenCalledTimes(8);
+    expect(categoryBreakdownSql).toContain("group by coalesce(category, 'unclassified')");
+    expect(query.mock.calls[8]?.[1]).toEqual(["run-123"]);
+    expect(query).toHaveBeenCalledTimes(9);
   });
 
   it("surfaces stale, reconciliation, dead-letter, and partial-data states from durable data", async () => {

@@ -1,3 +1,4 @@
+import type { SnapshotArtifact } from "@boardreadyops/contracts";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import {
@@ -132,6 +133,19 @@ interface StoredDbArtifactRow {
   sha256: string | null;
 }
 
+interface StoredDbSnapshotRow {
+  snapshot_id: string;
+  name: string;
+  kind: string;
+  format: string;
+  sheet_or_layer: string;
+  width: number;
+  height: number;
+  content: string;
+  sha256: string;
+  anchors: unknown;
+}
+
 function safeInstallationId(value: unknown): number | undefined {
   let parsed = Number.NaN;
   if (typeof value === "number") parsed = value;
@@ -260,6 +274,77 @@ async function loadEvidenceArtifacts(executor: PgQueryExecutor, headRunId: strin
     sizeBytes: Number(a.bytes) || 0,
     verified: true,
   }));
+}
+
+function parseSnapshotAnchors(value: unknown): SnapshotArtifact["anchors"] {
+  if (Array.isArray(value)) {
+    return value as SnapshotArtifact["anchors"];
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as SnapshotArtifact["anchors"]) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/**
+ * Review-canvas snapshots (rendered schematic/PCB SVG + finding anchors) published for this run
+ * by `boardreadyops review publish` (src/kicad/snapshots.ts::generateSnapshots). Absent for runs
+ * published before this capability existed, or for CLI runs that never called `review publish`.
+ */
+async function loadHeadSnapshots(executor: PgQueryExecutor, headRunId: string): Promise<SnapshotArtifact[]> {
+  const result = await executor.query(
+    `SELECT snapshot_id, name, kind, format, sheet_or_layer, width, height, content, sha256, anchors
+     FROM run_snapshots
+     WHERE run_id = $1
+     ORDER BY created_at ASC, snapshot_id ASC`,
+    [headRunId],
+  );
+  const rows = (result as { rows?: StoredDbSnapshotRow[] }).rows ?? [];
+
+  return rows.map((r) => ({
+    id: r.snapshot_id,
+    name: r.name,
+    kind: r.kind as SnapshotArtifact["kind"],
+    format: r.format as SnapshotArtifact["format"],
+    sheetOrLayer: r.sheet_or_layer,
+    width: r.width,
+    height: r.height,
+    content: r.content,
+    sha256: r.sha256,
+    anchors: parseSnapshotAnchors(r.anchors),
+  }));
+}
+
+/**
+ * Snapshots for the revision's base commit, best-effort: only available when some prior run
+ * against this repository happened to publish review-canvas snapshots for that exact commit
+ * (e.g. a previous `review publish` on the base branch). Never fabricated -- absent when no
+ * matching run is found, so the canvas honestly falls back to head-only view.
+ */
+async function loadBaseSnapshots(
+  executor: PgQueryExecutor,
+  repositoryId: string,
+  baseCommitSha: string | null,
+): Promise<SnapshotArtifact[]> {
+  if (!baseCommitSha) return [];
+
+  const runResult = await executor.query(
+    `SELECT id FROM release_runs
+     WHERE repository_id = $1 AND commit_sha = $2
+     ORDER BY completed_at DESC NULLS LAST, started_at DESC
+     LIMIT 1`,
+    [repositoryId, baseCommitSha],
+  );
+  const runRows = (runResult as { rows?: { id: string }[] }).rows ?? [];
+  const baseRunId = runRows[0]?.id;
+  if (!baseRunId) return [];
+
+  return loadHeadSnapshots(executor, baseRunId);
 }
 
 async function loadReviewGovernanceData(
@@ -425,10 +510,12 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       return null;
     }
 
-    const [findings, evidenceItems, governance] = await Promise.all([
+    const [findings, evidenceItems, governance, headSnapshots, baseSnapshots] = await Promise.all([
       loadReconstructedFindings(executor, reviewId, revision.head_run_id),
       loadEvidenceArtifacts(executor, revision.head_run_id),
       loadReviewGovernanceData(executor, reviewId, row.repository_id),
+      loadHeadSnapshots(executor, revision.head_run_id),
+      loadBaseSnapshots(executor, row.repository_id, revision.base_commit_sha),
     ]);
 
     const baseCommit = revision.base_commit_sha ?? "0000000000000000000000000000000000000000";
@@ -457,7 +544,8 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
       approvals: governance.approvals,
       checklist: governance.checklist,
       comments: governance.comments,
-      headSnapshots: undefined,
+      headSnapshots: headSnapshots.length > 0 ? headSnapshots : undefined,
+      baseSnapshots: baseSnapshots.length > 0 ? baseSnapshots : undefined,
     };
   } finally {
     await executor.close();

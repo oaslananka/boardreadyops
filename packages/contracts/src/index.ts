@@ -34,6 +34,21 @@ export const createReleaseRunRequestSchema = z.object({
   triggerKind: triggerKindSchema,
 });
 
+// Mirrors RuleCategory in src/core/rule-registry.ts, duplicated here (structurally, not by
+// import) rather than imported: src/core must never depend on this package's consumer-side
+// direction, and this package must never depend on src/core -- see
+// docs/architecture/contract-versioning.md's isolation boundary.
+export const findingCategorySchema = z.enum([
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release",
+  "unclassified",
+]);
+export type FindingCategory = z.infer<typeof findingCategorySchema>;
+
 export const findingSchema = z.object({
   ruleId: z.string().min(1).max(256),
   severity: findingSeveritySchema,
@@ -41,6 +56,10 @@ export const findingSchema = z.object({
   path: z.string().min(1).max(1024).optional(),
   project: z.string().trim().min(1).max(1024).optional(),
   fingerprint: findingFingerprintSchema.optional(),
+  // The rule's registered domain (src/core/rule-registry.ts's RuleCategory), so the run/review
+  // UI can group findings by domain without needing the CLI's rule registry itself. Optional --
+  // older CLI/Action versions never sent it.
+  category: findingCategorySchema.optional(),
   // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
   // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
   // can point at a specific line, and older CLI/Action versions never sent these at all.

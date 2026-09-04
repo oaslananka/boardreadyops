@@ -1,4 +1,5 @@
 import type { Finding } from "./findings.js";
+import { listRules, type RuleCategory } from "./rule-registry.js";
 
 export type CloudFinding = {
   ruleId: string;
@@ -11,11 +12,14 @@ export type CloudFinding = {
   endLine?: number | undefined;
   startColumn?: number | undefined;
   endColumn?: number | undefined;
+  /** The rule's registered domain; omitted when the rule id isn't in the registry. */
+  category?: RuleCategory | undefined;
 };
 
-function mapFindingForCloud(finding: Finding): CloudFinding {
+function mapFindingForCloud(finding: Finding, categoryByRuleId: ReadonlyMap<string, RuleCategory>): CloudFinding {
   const startLine = finding.location?.region?.startLine ?? finding.location?.line;
   const endLine = finding.location?.region?.endLine ?? startLine;
+  const category = categoryByRuleId.get(finding.ruleId);
   return {
     ruleId: finding.ruleId,
     severity: finding.severity === "critical" ? "error" : finding.severity,
@@ -29,11 +33,13 @@ function mapFindingForCloud(finding: Finding): CloudFinding {
       ? { startColumn: finding.location.region.startColumn }
       : {}),
     ...(finding.location?.region?.endColumn !== undefined ? { endColumn: finding.location.region.endColumn } : {}),
+    ...(category !== undefined ? { category } : {}),
   };
 }
 
 export function mapFindingsForCloud(findings: Finding[]): CloudFinding[] {
-  return findings.map(mapFindingForCloud);
+  const categoryByRuleId = new Map(listRules().map((rule) => [rule.meta.id, rule.meta.category]));
+  return findings.map((finding) => mapFindingForCloud(finding, categoryByRuleId));
 }
 
 // --- GitHub Check Run annotations -------------------------------------------

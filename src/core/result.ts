@@ -7,6 +7,7 @@ import type { Finding, FindingSummary } from "./findings.js";
 import type { LoadedPlugin } from "./plugin-loader.js";
 import type { PolicyEvaluation } from "./policy.js";
 import type { ReadinessScore } from "./readiness.js";
+import type { RuleCategorySummary } from "./rule-registry.js";
 import type { WaiverStatus } from "./waivers.js";
 
 /**
@@ -64,6 +65,7 @@ export interface RunResult {
   exitCode?: number | undefined;
   releaseMode?: ReleaseMode | undefined;
   summary: FindingSummary;
+  categoryBreakdown?: RuleCategorySummary[] | undefined;
   readiness?: ReadinessScore | undefined;
   bomRisk?: BomRiskSummary | undefined;
   policy?: PolicyEvaluation | undefined;

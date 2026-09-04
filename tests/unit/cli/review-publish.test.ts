@@ -1,5 +1,5 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { reviewPublishCommand } from "../../../src/cli/commands/review.js";
 
 const fixtureRoot = path.resolve("tests/fixtures/projects/safe-basic");
@@ -21,6 +21,46 @@ function createMockStream(): { stream: NodeJS.WritableStream; output: string } {
 }
 
 describe("CLI review publish command", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("includes rendered review-canvas snapshots of the project's schematic/PCB files in the publish payload", async () => {
+    const stdout = createMockStream();
+    const stderr = createMockStream();
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, runId: "run-1", reviewUrl: "/reviews/rev-1" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const exitCode = await reviewPublishCommand(
+      fixtureRoot,
+      {
+        dryRun: false,
+        upload: "metadata",
+        repo: "test-org/test-repo",
+        head: "1234567890abcdef1234567890abcdef12345678",
+        rule: ["bom.mpn-present"],
+        token: "test-token",
+      },
+      { stdout: stdout.stream, stderr: stderr.stream },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(requestInit.body as string) as { snapshots?: unknown[] };
+
+    expect(body.snapshots?.length).toBeGreaterThan(0);
+    const schematicSnapshot = body.snapshots?.find(
+      (s): s is { kind: string; content: string } => (s as { kind?: string }).kind === "schematic",
+    );
+    expect(schematicSnapshot).toBeDefined();
+    expect(schematicSnapshot?.content).toContain("<svg");
+  });
+
   it("executes review publish in dry-run mode without network calls", async () => {
     const stdout = createMockStream();
     const stderr = createMockStream();
