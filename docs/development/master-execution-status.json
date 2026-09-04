@@ -1000,23 +1000,37 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [],
       "evidence": {
-        "code": ["packages/plugin-sdk/src/index.ts", "src/core/plugin-loader.ts", "src/core/plugin-permissions.ts"],
-        "tests": ["tests/unit/core/plugin-loader.test.ts", "tests/integration/plugin-sdk-contract.test.ts"],
+        "code": [
+          "packages/plugin-sdk/src/index.ts",
+          "src/core/plugin-loader.ts",
+          "src/core/plugin-permissions.ts",
+          "packages/mcp-server/src/cli-runner.ts",
+          "packages/mcp-server/src/tools.ts",
+          "packages/mcp-server/src/server.ts",
+          "packages/mcp-server/bin/boardreadyops-mcp.js"
+        ],
+        "tests": [
+          "tests/unit/core/plugin-loader.test.ts",
+          "tests/integration/plugin-sdk-contract.test.ts",
+          "tests/unit/mcp-server/tools.test.ts",
+          "tests/unit/mcp-server/server.test.ts"
+        ],
         "docs": [
           "docs/plugin-sdk.md",
           "docs/architecture/adr/0009-plugin-sandboxing.md",
-          "docs/integrations/boardreadyops-mcp.md"
+          "docs/integrations/boardreadyops-mcp.md",
+          "packages/mcp-server/README.md"
         ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/core/plugin-loader.test.ts tests/integration/plugin-sdk-contract.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/core/plugin-loader.test.ts tests/integration/plugin-sdk-contract.test.ts tests/unit/mcp-server/tools.test.ts tests/unit/mcp-server/server.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-05T00:17:56Z"
       },
-      "remaining": "No actual MCP server implementation exists (no @modelcontextprotocol/sdk dependency anywhere) — docs/integrations/boardreadyops-mcp.md only documents a proposed tool contract. The Plugin SDK half is genuinely strong (real capability manifest, pre-import permission checks, honest ADR-0009 rejecting a false node:vm sandbox claim)."
+      "remaining": "A real MCP server now exists: packages/mcp-server (@boardreadyops/mcp-server, using the official @modelcontextprotocol/sdk) implements boardreadyops_check, boardreadyops_plan, and boardreadyops_verify_bundle. Each tool spawns the real boardreadyops CLI binary as a child process (resolved via the installed boardreadyops package's own bin field, not a monorepo-relative path) and returns its parsed JSON output -- no reimplementation of check/plan/verify logic, so results are guaranteed identical to running the CLI by hand. Verified end-to-end, not just against fakes: a real smoke test resolved the CLI entrypoint, spawned it, and ran a real check against tests/fixtures/projects/safe-basic. Still open: (1) boardreadyops_explain and boardreadyops_vendor_score from docs/integrations/boardreadyops-mcp.md are not implemented -- the doc's findingId param doesn't match reality (the CLI only explains a rule id, not a finding fingerprint), and vendor scoring (src/core/readiness.ts::computeReadiness) only exists inside a full pipeline run today, not as a standalone (path, profile) call. (2) The two mutating tools (boardreadyops_generate, boardreadyops_release_prepare) are not implemented -- the documented 'explicit capability elevation' safety mechanism needs its own design rather than a default-on switch added alongside the read-only tools. The Plugin SDK half is unchanged and remains genuinely strong (real capability manifest, pre-import permission checks, honest ADR-0009 rejecting a false node:vm sandbox claim)."
     },
     {
       "id": "W28",
