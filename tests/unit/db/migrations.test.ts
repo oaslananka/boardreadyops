@@ -101,7 +101,24 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0058_release_run_delivery_id.sql",
       "0059_component_pricing_snapshot.sql",
       "0060_stripe_subscription_event_ordering.sql",
+      "0061_run_snapshots.sql",
     ]);
+  });
+
+  it("stores review-canvas snapshot manifests per release run in schema v61", async () => {
+    const sql = (await readFile(join(migrationsDir, "0061_run_snapshots.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("create table if not exists run_snapshots");
+    expect(sql).toContain("references release_runs(id) on delete cascade");
+    expect(sql).toContain("run_snapshots_kind_valid");
+    expect(sql).toContain("'schematic', 'pcb_layer', '3d_render'");
+    expect(sql).toContain("run_snapshots_format_valid");
+    expect(sql).toContain("'svg', 'png', 'webp'");
+    expect(sql).toContain("run_snapshots_sha256_valid");
+    expect(sql).toContain("run_snapshots_anchors_valid");
+    expect(sql).toContain("jsonb_typeof(anchors) = 'array'");
+    expect(sql).toContain("run_snapshots_run_id_idx");
+    expect(sql).toContain("on run_snapshots(run_id, created_at, id)");
   });
 
   it("deduplicates active Marketplace account erasures in schema v56", async () => {
