@@ -38,3 +38,4 @@ TEMP/
 
 # Authenticated Unlighthouse audit output
 /.unlighthouse/
+/control-plane-run-listing-benchmark-report.json

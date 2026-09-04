@@ -1,0 +1,82 @@
+name: control-plane-run-listing-benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      page_sizes:
+        description: Comma-separated page sizes to benchmark
+        required: true
+        default: "10,25,100"
+        type: string
+      page_depth:
+        description: Pages to walk per dataset/page-size tier
+        required: true
+        default: "20"
+        type: string
+      small_dataset:
+        description: Release runs seeded for the small-history tenant
+        required: true
+        default: "200"
+        type: string
+      large_dataset:
+        description: Release runs seeded for the large-history tenant
+        required: true
+        default: "20000"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: control-plane-run-listing-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://boardreadyops@127.0.0.1:5432/boardreadyops_load
+      BOARDREADYOPS_LOAD_CONFIRMATION: isolated-disposable-database
+      BOARDREADYOPS_RUN_LISTING_PAGE_SIZES: ${{ inputs.page_sizes }}
+      BOARDREADYOPS_RUN_LISTING_PAGE_DEPTH: ${{ inputs.page_depth }}
+      BOARDREADYOPS_RUN_LISTING_SMALL_DATASET: ${{ inputs.small_dataset }}
+      BOARDREADYOPS_RUN_LISTING_LARGE_DATASET: ${{ inputs.large_dataset }}
+      BOARDREADYOPS_RUN_LISTING_REPORT_PATH: control-plane-run-listing-benchmark-report.json
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: boardreadyops
+          POSTGRES_DB: boardreadyops_load
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U boardreadyops -d boardreadyops_load"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Apply cloud migrations
+        run: pnpm --filter @boardreadyops/db db:migrate
+      - name: Run the run-listing pagination benchmark
+        run: pnpm run cloud:run-listing-benchmark:verify
+      - name: Upload privacy-safe benchmark report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: control-plane-run-listing-benchmark-report
+          path: control-plane-run-listing-benchmark-report.json
+          if-no-files-found: warn
+          retention-days: 30

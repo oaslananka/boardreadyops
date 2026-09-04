@@ -1067,13 +1067,17 @@
         "code": [
           "scripts/control-plane-scale-envelope.mjs",
           "scripts/control-plane-load.mjs",
-          "apps/web/lib/webhook-rate-limit.ts"
+          "apps/web/lib/webhook-rate-limit.ts",
+          "scripts/control-plane-run-listing-benchmark.mjs",
+          ".github/workflows/control-plane-run-listing-benchmark.yml"
         ],
         "tests": [
           "tests/unit/scripts/control-plane-load.test.ts",
           "tests/integration/control-plane-load.test.ts",
           "tests/unit/web/webhook-rate-limit.test.ts",
-          "tests/benchmark/pipeline.bench.ts"
+          "tests/benchmark/pipeline.bench.ts",
+          "tests/unit/scripts/control-plane-run-listing-benchmark.test.ts",
+          "tests/integration/control-plane-run-listing-benchmark.test.ts"
         ],
         "docs": ["docs/architecture/transactional-outbox.md", "docs/operations/control-plane-load-validation.md"],
         "deployed": [],
@@ -1081,11 +1085,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "BOARDREADYOPS_LOAD_CONFIRMATION=isolated-disposable-database BOARDREADYOPS_LOAD_PROFILE=representative corepack pnpm run cloud:load:verify",
+        "command": "BOARDREADYOPS_LOAD_CONFIRMATION=isolated-disposable-database BOARDREADYOPS_RUN_LISTING_REPORT_PATH=control-plane-run-listing-benchmark-report.json corepack pnpm run cloud:run-listing-benchmark:verify",
         "result": "pass",
-        "checkedAt": "2026-09-02T23:06:42Z"
+        "checkedAt": "2026-09-04T01:55:02Z"
       },
-      "remaining": "PARTIAL CLOSE: the load-benchmarking claim ('real p50/p95/p99 load benchmarking... exists and runs in CI') is now independently confirmed, not just believed from reading the script -- this session ran it against a real, isolated disposable PostgreSQL instance for the first time in this environment (see W16's remaining note for full numbers: representative-profile p95s of 244/182/202ms against 1000/1500/1000ms limits, zero threshold signals, zero cross-tenant mismatches). Still remaining: no per-tenant quotas beyond webhook rate limiting, no viewer payload/LOD sizing, no explicit cost-attribution tags/counters, and no documented cloud run list/query pagination benchmark."
+      "remaining": "PARTIAL CLOSE: run-list/query pagination now has a documented, executable keyset-pagination benchmark plus a manual isolated PostgreSQL 16 workflow. A fresh disposable PostgreSQL 16.15 canary on 2026-09-04, rerun after rebasing onto current main, passed with 20,000-run p95s of 49.417/46.47/46.808ms for page sizes 10/25/100 and depth-degradation ratios 0.99/0.97/0.78, with zero threshold signals. These are local reproducibility measurements, not production SLO evidence. Still remaining: no per-tenant quotas beyond existing rate limiting, no viewer payload/LOD sizing, and no explicit cost-attribution tags/counters."
     },
     {
       "id": "W31",
