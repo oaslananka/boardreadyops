@@ -8,6 +8,7 @@ import {
   createControlPlaneRunnerFleetRouteDependencies,
   handleControlPlaneRunnerFleetRequest,
 } from "../../../apps/web/lib/control-plane-runner-fleet-routes.js";
+import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-rate-limit.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
 import type { RunnerFleetHealthStore } from "../../../packages/db/src/runner-fleet-health-store.js";
 
@@ -16,7 +17,10 @@ const installationId = "11111111-1111-4111-8111-111111111111";
 const observedAt = new Date("2026-08-02T09:30:00.000Z");
 const executor = { query: vi.fn() } as unknown as SqlQueryExecutor;
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetOperatorRateLimitForTests();
+});
 
 function request(authorization = `Bearer ${token}`): Request {
   return new Request(`https://boardreadyops.example/api/v1/operator/installations/${installationId}/runner-fleet`, {
@@ -102,6 +106,25 @@ describe("control-plane runner fleet route", () => {
     const invalidResponse = await handleControlPlaneRunnerFleetRequest(request(), "bad installation", invalid);
     expect(invalidResponse.status).toBe(400);
     expect(invalid.queryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 with Retry-After after repeated operator authentication failures", async () => {
+    const deps = dependencies(
+      { readFleetHealth: vi.fn(async () => snapshot()) },
+      {
+        BOARDREADYOPS_OPERATOR_API_TOKEN: token,
+        BOARDREADYOPS_OPERATOR_ACTOR_ID: "operator.primary",
+        BOARDREADYOPS_OPERATOR_RATE_LIMIT_PER_MINUTE: "1",
+        DATABASE_URL: "postgresql://example.invalid/boardreadyops",
+      },
+    );
+
+    const first = await handleControlPlaneRunnerFleetRequest(request("Bearer invalid"), installationId, deps);
+    expect(first.status).toBe(401);
+    const limited = await handleControlPlaneRunnerFleetRequest(request("Bearer invalid"), installationId, deps);
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(deps.queryExecutor).not.toHaveBeenCalled();
   });
 
   it("returns only aggregate fleet health and fixed observation-window metadata", async () => {

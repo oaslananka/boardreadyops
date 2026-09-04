@@ -633,25 +633,32 @@
           "apps/web/lib/api-auth.ts",
           "packages/db/src/api-token-store.ts",
           "apps/web/lib/control-plane-operator-auth.ts",
+          "apps/web/lib/operator-rate-limit.ts",
           "apps/web/lib/user-session.ts"
         ],
         "tests": [
           "tests/unit/db/api-token-store.test.ts",
           "tests/unit/web/api-auth-repository-scope.test.ts",
           "tests/unit/web/viewer-authorization.test.ts",
-          "tests/unit/web/auth-rate-limit.test.ts"
+          "tests/unit/web/auth-rate-limit.test.ts",
+          "tests/unit/web/operator-rate-limit.test.ts",
+          "tests/unit/web/control-plane-operator-auth.test.ts"
         ],
-        "docs": ["docs/security/audit-logs.md", "docs/api-tokens.md"],
+        "docs": [
+          "docs/security/audit-logs.md",
+          "docs/api-tokens.md",
+          "docs/operations/control-plane-reconciliation.md"
+        ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/db/api-token-store.test.ts tests/unit/web/api-auth-repository-scope.test.ts tests/unit/web/viewer-authorization.test.ts tests/unit/web/auth-rate-limit.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/db/api-token-store.test.ts tests/unit/web/api-auth-repository-scope.test.ts tests/unit/web/viewer-authorization.test.ts tests/unit/web/auth-rate-limit.test.ts tests/unit/web/operator-rate-limit.test.ts tests/unit/web/control-plane-operator-auth.test.ts tests/unit/web/control-plane-audit-routes.test.ts tests/unit/web/control-plane-dead-letter-routes.test.ts tests/unit/web/control-plane-runner-fleet-routes.test.ts tests/unit/web/repository-setup-routes.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-02T23:40:00Z"
+        "checkedAt": "2026-09-04T01:21:40Z"
       },
-      "remaining": "FURTHER PARTIAL CLOSE: auth-attempt rate limiting is now implemented for the bearer-token path, closing one of three previously-named gaps. apps/web/lib/auth-rate-limit.ts (new, fixed-window in-process counter, same pattern as webhook-rate-limit.ts -- no Redis exists in this codebase, confirmed by grep, so in-process is the consistent choice, matching the precedent already documented for webhook limiting in docs/deployment/self-hosted.md) is wired into apps/web/lib/api-auth.ts's authenticateApiRequest: only FAILED bearer-token validations count against the limit (20/minute per client by default, BOARDREADYOPS_AUTH_RATE_LIMIT_PER_MINUTE-configurable), keyed by the first hop of X-Forwarded-For; a client already over the limit gets 429 before the DB is even touched. Valid requests never count against it, so legitimate high-frequency API usage (e.g. CI runners) isn't penalized. Documented in docs/api-tokens.md's Security notes. Deliberately scoped to the bearer-token path only (14 routes, the highest-exposed brute-force surface) -- the session-cookie path (HMAC-signed, not a guessable credential the same way) and the operator static-token path (apps/web/lib/control-plane-operator-auth.ts, already timing-safe-compared but still unlimited against repeated guesses) remain unaddressed. Still genuinely missing: no granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user (apps/web/lib/api-auth.ts's session branch returns all four scopes unconditionally); no session revocation/device-management UI or store; operator-token path still has no attempt limiting."
+      "remaining": "FURTHER PARTIAL CLOSE: auth-attempt rate limiting is now implemented for both the bearer-token path and the operator static-token path, closing two of the three previously-named gaps. apps/web/lib/auth-rate-limit.ts (bearer-token path) and apps/web/lib/operator-rate-limit.ts (new, same fixed-window in-process counter pattern, its own Map and env var so the two token classes don't share a rate budget) are both in-process fixed-window counters, consistent with webhook-rate-limit.ts's precedent -- no Redis exists in this codebase, confirmed by grep. apps/web/lib/control-plane-operator-auth.ts's authenticateControlPlaneOperator now checks operator-rate-limit.ts before the timing-safe token comparison runs: only FAILED comparisons (including malformed-token-shape rejections) count against the limit (20/minute per client by default, BOARDREADYOPS_OPERATOR_RATE_LIMIT_PER_MINUTE-configurable), keyed by the first hop of X-Forwarded-For, matching the bearer-token limiter's convention; a client already over the limit gets a new 'rate_limited' status (→ 429) before the comparison ever runs, and a request bearing the correct token is never counted, so legitimate high-frequency internal ops use isn't penalized. All 4 operator route call sites (repository-setup-routes.ts, control-plane-runner-fleet-routes.ts, control-plane-dead-letter-routes.ts, control-plane-audit-routes.ts) updated to handle the new status and return 429 with a retry-after header. Documented in docs/operations/control-plane-reconciliation.md's Security boundary section, parallel to the existing bearer-token note in docs/api-tokens.md. Tests: operator-rate-limit.test.ts (module-level, mirrors auth-rate-limit.test.ts) plus new integration tests in control-plane-operator-auth.test.ts covering many successive valid-token requests never counting against the limit, repeated invalid attempts tripping 429, and the correct token still being rejected once limited (proving the real comparison is skipped). Still genuinely missing (unchanged, explicitly out of scope for this pass): no granular RBAC role model exists — session auth grants a hardcoded full scope set to every authenticated user (apps/web/lib/api-auth.ts's session branch returns all four scopes unconditionally); no session revocation/device-management UI or store."
     },
     {
       "id": "W18",

@@ -29,6 +29,8 @@ Authorization: Bearer <BOARDREADYOPS_OPERATOR_API_TOKEN>
 
 Authentication uses constant-time comparison after byte-length validation. The configured actor identifier is written to replay operations; callers cannot choose the audit actor in a request body or header.
 
+Failed operator-token attempts are rate-limited per client (20 failures/minute by default, configurable via `BOARDREADYOPS_OPERATOR_RATE_LIMIT_PER_MINUTE`); a client that exceeds it gets `429` before the token comparison runs. Requests bearing the valid operator token are never counted against this limit.
+
 ## List tenant dead letters
 
 ```http

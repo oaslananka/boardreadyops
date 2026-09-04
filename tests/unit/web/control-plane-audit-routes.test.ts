@@ -8,6 +8,7 @@ import {
   createControlPlaneAuditRouteDependencies,
   handleControlPlaneAuditListRequest,
 } from "../../../apps/web/lib/control-plane-audit-routes.js";
+import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-rate-limit.js";
 import { computeCanonicalHash } from "../../../packages/cloud-core/src/evidence-ledger.js";
 import type { AuditLogStore } from "../../../packages/db/src/audit-log-store.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
@@ -19,7 +20,10 @@ const runId = "33333333-3333-4333-8333-333333333333";
 const eventId = "44444444-4444-4444-8444-444444444444";
 const executor = { query: vi.fn() } as unknown as SqlQueryExecutor;
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  resetOperatorRateLimitForTests();
+});
 
 function request(path: string, authorization = `Bearer ${token}`): Request {
   return new Request(`https://boardreadyops.example${path}`, { headers: { authorization } });
@@ -116,6 +120,23 @@ describe("control-plane audit export route", () => {
     expect(unauthorizedResponse.status).toBe(401);
     expect(unauthorizedResponse.headers.get("www-authenticate")).toBe("Bearer");
     expect(unauthorized.queryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 with Retry-After after the operator failure limit is reached", async () => {
+    const deps = dependencies(auditStore(), {
+      BOARDREADYOPS_OPERATOR_API_TOKEN: token,
+      BOARDREADYOPS_OPERATOR_ACTOR_ID: "operator.primary",
+      BOARDREADYOPS_OPERATOR_RATE_LIMIT_PER_MINUTE: "1",
+      DATABASE_URL: "postgresql://example.invalid/boardreadyops",
+    });
+    const path = `/api/v1/operator/installations/${installationId}/audit-events`;
+
+    const first = await handleControlPlaneAuditListRequest(request(path, "Bearer invalid"), installationId, deps);
+    expect(first.status).toBe(401);
+    const limited = await handleControlPlaneAuditListRequest(request(path, "Bearer invalid"), installationId, deps);
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(deps.queryExecutor).not.toHaveBeenCalled();
   });
 
   it("rejects invalid tenant filters and cursor before database access", async () => {

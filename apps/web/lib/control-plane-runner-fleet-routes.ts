@@ -49,6 +49,13 @@ export function createControlPlaneRunnerFleetRouteDependencies(
 function authenticated(request: Request, dependencies: ControlPlaneRunnerFleetRouteDependencies): Response | true {
   const authentication = authenticateControlPlaneOperator(request, dependencies.environment);
   if (authentication.status === "disabled") return controlPlaneJsonError("operator API is not configured", 503);
+  if (authentication.status === "rate_limited") {
+    return controlPlaneJsonError(
+      `Too many failed authentication attempts, retry after ${authentication.retryAfterSeconds}s`,
+      429,
+      { "retry-after": String(authentication.retryAfterSeconds) },
+    );
+  }
   if (authentication.status === "unauthorized") {
     return controlPlaneJsonError("operator authentication is required", 401, { "www-authenticate": "Bearer" });
   }
