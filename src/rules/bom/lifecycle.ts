@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { classifyLifecycleStatus } from "../../bom/lifecycle.js";
 import type { BomRow } from "../../bom/types.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -18,6 +19,7 @@ export const lifecycleRule = rule(
     configKeys: ["rules.bom.lifecycle.db"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "lifecycle", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingHeuristic,
   },
   async (context) => {
     if (!shouldRun(context, "bom.lifecycle")) {

@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -14,6 +15,7 @@ export const copperBalanceRule = rule(
     configKeys: ["rules.design.copper-balance.min-coverage-percent"],
     kicadVersions: ["9", "10", "future"],
     tags: ["copper", "design", "pcb"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold,
   },
   async (context) => {
     if (!shouldRun(context, "design.copper-balance")) {

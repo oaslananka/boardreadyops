@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { loadPinmap } from "../../pinmap/loader.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { resolvePinmap, schematicNetLabels } from "./shared.js";
@@ -13,6 +14,7 @@ export const pinmapNetLabelRule = rule(
     configKeys: ["pinmap", "projects.pinmap", "rules.pinmap.net-label.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "schematic"],
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.net-label")) {

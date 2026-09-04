@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import type { PcbFootprint } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { parsedBoards } from "./shared.js";
@@ -41,6 +42,7 @@ export const pin1MarkersRule = rule(
     configKeys: ["rules.manufacturing.dfm-pin1-markers"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "pin1"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityHeuristic,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.dfm-pin1-markers")) {

@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { zephyrAdapter } from "../../firmware/zephyr.js";
 import { configFor, rule } from "../helpers.js";
 import { makeFirmwareContractHandler } from "./shared.js";
@@ -22,6 +23,7 @@ export const zephyrPinContractRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "zephyr", "contract"],
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   makeFirmwareContractHandler(ruleId, zephyrAdapter, resolveContract),
 );

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -13,6 +14,7 @@ export const boardOutlineRule = rule(
     configKeys: ["rules.design.board-outline.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["design", "edge-cuts", "pcb"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence,
   },
   async (context) => {
     if (!shouldRun(context, "design.board-outline")) {

@@ -1,6 +1,7 @@
 import { buildAlternatesMap } from "../../bom/alternates.js";
 import { type BomRiskWeights, computeComponentRisk, summarizeBomRisk } from "../../bom/risk.js";
 import type { Severity } from "../../core/findings.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -32,6 +33,7 @@ export const bomRiskScoreRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "risk", "sourcing", "supply-chain"],
+    ...RULE_CLASSIFICATIONS.sourcingAggregateHeuristic,
   },
   async (context) => {
     if (!shouldRun(context, "bom.risk-score")) {

@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { espIdfAdapter } from "../../firmware/esp-idf.js";
 import { configFor, rule } from "../helpers.js";
 import { makeFirmwareContractHandler } from "./shared.js";
@@ -22,6 +23,7 @@ export const espIdfPinContractRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "esp-idf", "contract"],
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   makeFirmwareContractHandler(ruleId, espIdfAdapter, resolveContract),
 );

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -13,6 +14,7 @@ export const tagMatchesRevisionRule = rule(
     configKeys: ["GITHUB_REF_NAME"],
     kicadVersions: ["9", "10", "future"],
     tags: ["git", "release", "revision"],
+    ...RULE_CLASSIFICATIONS.releasePresence,
   },
   async (context) => {
     if (!shouldRun(context, "release.tag-matches-revision")) {

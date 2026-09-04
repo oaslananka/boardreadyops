@@ -302,7 +302,16 @@ function createPluginErrorFinding(context: RuleContext, message: string): Findin
 
 function toCoreRule(pluginRule: NonNullable<BoardReadyOpsPlugin["rules"]>[number]): Rule {
   return {
-    meta: pluginRule.meta,
+    // PluginRuleMetadata (the public plugin SDK contract) does not carry category/evidenceType/
+    // fixability/vendorDependence, so plugin-sourced rules are always reported as unclassified
+    // on these axes until the plugin SDK is extended to let authors declare them.
+    meta: {
+      ...pluginRule.meta,
+      category: "unclassified",
+      evidenceType: "unclassified",
+      fixability: "unclassified",
+      vendorDependence: "unclassified",
+    },
     async run(context: RuleContext): Promise<Finding[]> {
       try {
         const findings = await pluginRule.run(context as unknown as PluginRuleContext);

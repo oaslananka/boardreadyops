@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -18,6 +19,7 @@ export const unknownLifecycleRule = rule(
     configKeys: ["rules.bom.unknown-lifecycle.severity", "rules.bom.unknown-lifecycle.db"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "lifecycle", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingAbsenceSignal,
   },
   async (context) => {
     if (!shouldRun(context, "bom.unknown-lifecycle")) {
