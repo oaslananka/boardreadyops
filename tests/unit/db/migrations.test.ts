@@ -102,7 +102,20 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0059_component_pricing_snapshot.sql",
       "0060_stripe_subscription_event_ordering.sql",
       "0061_run_snapshots.sql",
+      "0062_finding_category.sql",
     ]);
+  });
+
+  it("adds a nullable rule-category column to findings in schema v62", async () => {
+    const sql = (await readFile(join(migrationsDir, "0062_finding_category.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table findings");
+    expect(sql).toContain("add column if not exists category text");
+    expect(sql).toContain("findings_category_valid");
+    expect(sql).toContain("category is null or category in (");
+    expect(sql).toContain(
+      "'electrical', 'manufacturability', 'assembly', 'testability', 'sourcing', 'release', 'unclassified'",
+    );
   });
 
   it("stores review-canvas snapshot manifests per release run in schema v61", async () => {

@@ -106569,6 +106569,15 @@ var createReleaseRunRequestSchema = external_exports.object({
   pullRequestNumber: external_exports.number().int().positive().optional(),
   triggerKind: triggerKindSchema
 });
+var findingCategorySchema = external_exports.enum([
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release",
+  "unclassified"
+]);
 var findingSchema = external_exports.object({
   ruleId: external_exports.string().min(1).max(256),
   severity: findingSeveritySchema,
@@ -106576,6 +106585,10 @@ var findingSchema = external_exports.object({
   path: external_exports.string().min(1).max(1024).optional(),
   project: external_exports.string().trim().min(1).max(1024).optional(),
   fingerprint: findingFingerprintSchema.optional(),
+  // The rule's registered domain (src/core/rule-registry.ts's RuleCategory), so the run/review
+  // UI can group findings by domain without needing the CLI's rule registry itself. Optional --
+  // older CLI/Action versions never sent it.
+  category: findingCategorySchema.optional(),
   // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
   // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
   // can point at a specific line, and older CLI/Action versions never sent these at all.
@@ -106785,9 +106798,10 @@ function computeEvidenceDigest(input) {
 }
 
 // src/core/cloud-findings.ts
-function mapFindingForCloud(finding2) {
+function mapFindingForCloud(finding2, categoryByRuleId) {
   const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
   const endLine = finding2.location?.region?.endLine ?? startLine;
+  const category = categoryByRuleId.get(finding2.ruleId);
   return {
     ruleId: finding2.ruleId,
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
@@ -106798,11 +106812,13 @@ function mapFindingForCloud(finding2) {
     ...startLine !== void 0 ? { startLine } : {},
     ...endLine !== void 0 ? { endLine } : {},
     ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
-    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
+    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {},
+    ...category !== void 0 ? { category } : {}
   };
 }
 function mapFindingsForCloud(findings) {
-  return findings.map(mapFindingForCloud);
+  const categoryByRuleId = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta.category]));
+  return findings.map((finding2) => mapFindingForCloud(finding2, categoryByRuleId));
 }
 
 // src/action/cloud-publish.ts

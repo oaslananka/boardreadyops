@@ -35845,7 +35845,7 @@ function inferredConclusion(input) {
   }
   return "neutral";
 }
-var releaseRunStatusSchema, releaseDecisionSchema, releaseRunConclusionSchema, triggerKindSchema, findingSeveritySchema, findingFingerprintSchema, createReleaseRunRequestSchema, findingSchema, artifactStoragePathSchema, releaseRunArtifactSchema, releaseRunBomComponentSchema, releaseRunBoardBomSchema, releaseRunReportLinkSchema, releaseRunMetricsSchema, releaseRunReadinessSchema, releaseRunWaiverSchema, releaseRunWaiversSchema, hardwareImpactDomainSchema, hardwareImpactRiskDirectionSchema, hardwareImpactBaselineReasonSchema, hardwareImpactShaSchema, hardwareImpactCountSchema, hardwareImpactReadinessStatusSchema, hardwareImpactEvidenceSeveritySchema, hardwareImpactAvailableBaselineSchema, hardwareImpactUnavailableBaselineSchema, hardwareImpactEvidenceRefSchema, hardwareImpactV1Schema, releaseRunResultBaseSchema, releaseRunResultSchema, runnerTerminalResultRequestSchema;
+var releaseRunStatusSchema, releaseDecisionSchema, releaseRunConclusionSchema, triggerKindSchema, findingSeveritySchema, findingFingerprintSchema, createReleaseRunRequestSchema, findingCategorySchema, findingSchema, artifactStoragePathSchema, releaseRunArtifactSchema, releaseRunBomComponentSchema, releaseRunBoardBomSchema, releaseRunReportLinkSchema, releaseRunMetricsSchema, releaseRunReadinessSchema, releaseRunWaiverSchema, releaseRunWaiversSchema, hardwareImpactDomainSchema, hardwareImpactRiskDirectionSchema, hardwareImpactBaselineReasonSchema, hardwareImpactShaSchema, hardwareImpactCountSchema, hardwareImpactReadinessStatusSchema, hardwareImpactEvidenceSeveritySchema, hardwareImpactAvailableBaselineSchema, hardwareImpactUnavailableBaselineSchema, hardwareImpactEvidenceRefSchema, hardwareImpactV1Schema, releaseRunResultBaseSchema, releaseRunResultSchema, runnerTerminalResultRequestSchema;
 var init_src = __esm({
   "packages/contracts/src/index.ts"() {
     "use strict";
@@ -35872,6 +35872,15 @@ var init_src = __esm({
       pullRequestNumber: external_exports.number().int().positive().optional(),
       triggerKind: triggerKindSchema
     });
+    findingCategorySchema = external_exports.enum([
+      "electrical",
+      "manufacturability",
+      "assembly",
+      "testability",
+      "sourcing",
+      "release",
+      "unclassified"
+    ]);
     findingSchema = external_exports.object({
       ruleId: external_exports.string().min(1).max(256),
       severity: findingSeveritySchema,
@@ -35879,6 +35888,10 @@ var init_src = __esm({
       path: external_exports.string().min(1).max(1024).optional(),
       project: external_exports.string().trim().min(1).max(1024).optional(),
       fingerprint: findingFingerprintSchema.optional(),
+      // The rule's registered domain (src/core/rule-registry.ts's RuleCategory), so the run/review
+      // UI can group findings by domain without needing the CLI's rule registry itself. Optional --
+      // older CLI/Action versions never sent it.
+      category: findingCategorySchema.optional(),
       // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
       // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
       // can point at a specific line, and older CLI/Action versions never sent these at all.
@@ -56337,9 +56350,10 @@ function signRunnerRequest(input) {
 }
 
 // src/core/cloud-findings.ts
-function mapFindingForCloud(finding2) {
+function mapFindingForCloud(finding2, categoryByRuleId) {
   const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
   const endLine = finding2.location?.region?.endLine ?? startLine;
+  const category = categoryByRuleId.get(finding2.ruleId);
   return {
     ruleId: finding2.ruleId,
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
@@ -56350,11 +56364,13 @@ function mapFindingForCloud(finding2) {
     ...startLine !== void 0 ? { startLine } : {},
     ...endLine !== void 0 ? { endLine } : {},
     ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
-    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
+    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {},
+    ...category !== void 0 ? { category } : {}
   };
 }
 function mapFindingsForCloud(findings) {
-  return findings.map(mapFindingForCloud);
+  const categoryByRuleId = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta.category]));
+  return findings.map((finding2) => mapFindingForCloud(finding2, categoryByRuleId));
 }
 
 // src/kicad/snapshots.ts

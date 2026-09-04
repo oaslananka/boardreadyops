@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   findingsToCheckRunAnnotations,
   findingToCheckRunAnnotation,
   mapFindingsForCloud,
 } from "../../../src/core/cloud-findings.js";
 import { createFinding } from "../../../src/core/findings.js";
+import { clearRulesForTests, registerRule } from "../../../src/core/rule-registry.js";
 
 describe("mapFindingsForCloud", () => {
   it("maps critical severity to error for the cloud wire contract", () => {
@@ -41,6 +42,58 @@ describe("mapFindingsForCloud", () => {
 
   it("maps an empty findings array to an empty result", () => {
     expect(mapFindingsForCloud([])).toEqual([]);
+  });
+
+  describe("with a registered rule category", () => {
+    beforeEach(() => {
+      clearRulesForTests();
+      registerRule({
+        meta: {
+          id: "drc.clearance",
+          title: "drc.clearance",
+          description: "drc.clearance",
+          rationale: "drc.clearance",
+          defaultSeverity: "high",
+          appliesTo: [],
+          configKeys: [],
+          kicadVersions: ["10"],
+          tags: [],
+          category: "electrical",
+          evidenceType: "exact",
+          fixability: "manual",
+          vendorDependence: "none",
+        },
+        async run() {
+          return [];
+        },
+      });
+    });
+
+    afterEach(() => {
+      clearRulesForTests();
+    });
+
+    it("attaches the finding's rule category from the registry", () => {
+      const finding = createFinding({
+        ruleId: "drc.clearance",
+        severity: "high",
+        message: "Clearance violation.",
+        resource: { path: "board.kicad_pcb", kind: "pcb" },
+      });
+
+      expect(mapFindingsForCloud([finding])).toEqual([expect.objectContaining({ category: "electrical" })]);
+    });
+
+    it("omits the category for a finding whose rule id is not registered", () => {
+      const finding = createFinding({
+        ruleId: "plugin.unknown-rule",
+        severity: "high",
+        message: "x",
+        resource: { path: "board.kicad_pcb", kind: "pcb" },
+      });
+
+      expect(mapFindingsForCloud([finding])[0]?.category).toBeUndefined();
+    });
   });
 });
 

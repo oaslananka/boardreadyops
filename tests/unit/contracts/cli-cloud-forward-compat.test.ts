@@ -56,6 +56,37 @@ describe("CLI->Cloud contract: POST /api/v1/runs (review publish)", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a finding's rule category so the run/review UI can group by domain", () => {
+    const result = ingestRunRequestSchema.safeParse({
+      ...minimalOldCliPayload,
+      findings: [
+        {
+          ruleId: "drc.clearance",
+          severity: "error",
+          message: "Clearance violation.",
+          category: "electrical",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.findings[0]?.category).toBe("electrical");
+  });
+
+  it("rejects a finding with an unrecognized rule category", () => {
+    const result = ingestRunRequestSchema.safeParse({
+      ...minimalOldCliPayload,
+      findings: [
+        {
+          ruleId: "drc.clearance",
+          severity: "error",
+          message: "x",
+          category: "not-a-real-category",
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("accepts a review-canvas snapshot manifest produced by `boardreadyops review publish`", () => {
     const result = ingestRunRequestSchema.safeParse({
       ...minimalOldCliPayload,

@@ -123,9 +123,9 @@ async function insertRunEntities(
     const findingId = randomUUID();
     await executor.query(
       `insert into findings (
-        id, run_id, rule_id, severity, message, path, fingerprint
-      ) values ($1, $2, $3, $4, $5, $6, $7)`,
-      [findingId, runId, f.ruleId, f.severity, f.message, f.path ?? null, f.fingerprint ?? null],
+        id, run_id, rule_id, severity, message, path, fingerprint, category
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [findingId, runId, f.ruleId, f.severity, f.message, f.path ?? null, f.fingerprint ?? null, f.category ?? null],
     );
   }
 
