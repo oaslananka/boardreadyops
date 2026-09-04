@@ -99,6 +99,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0056_marketplace_subscription_state.sql",
       "0057_review_approval_uniqueness.sql",
       "0058_release_run_delivery_id.sql",
+      "0059_component_pricing_snapshot.sql",
     ]);
   });
 
@@ -120,6 +121,18 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("unique index if not exists");
     expect(sql).toContain("on review_approvals (review_id, revision_id, approver_id, status)");
     expect(sql).toContain("status in ('approved', 'changes_requested')");
+  });
+
+  it("adds distributor classification and price-break snapshot columns in schema v59", async () => {
+    const sql = (await readFile(join(migrationsDir, "0059_component_pricing_snapshot.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table component_lifecycle_observations");
+    expect(sql).toContain("add column if not exists distributor_classification text");
+    expect(sql).toContain("add column if not exists price_breaks jsonb not null default '[]'::jsonb");
+    expect(sql).toContain("component_lifecycle_observations_distributor_valid");
+    expect(sql).toContain("'authorized-distributor', 'marketplace', 'unknown'");
+    expect(sql).toContain("component_lifecycle_observations_price_breaks_valid");
+    expect(sql).toContain("jsonb_typeof(price_breaks) = 'array'");
   });
 
   it("adds a nullable delivery id column and index for release-run traceability in schema v58", async () => {
