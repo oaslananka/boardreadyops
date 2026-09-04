@@ -2882,32 +2882,14 @@ code {
   border-bottom: 1px solid var(--border);
   padding-bottom: var(--space-1);
   overflow-x: auto;
-  /* Flex items default to min-width: auto, which for a nowrap row means "at least as wide as
-     my content" -- with six white-space: nowrap tab buttons that's ~818px, so without this the
-     column-flex parent (.review-view-container) grows to fit it instead of letting overflow-x
-     scroll it, pushing the whole page wider than the viewport on mobile. Found by qa:audit
-     (tests/e2e/review-lifecycle.spec.ts test 17, tests/e2e/qa-audit.spec.ts).
-
-     UNRESOLVED: this alone (plus the matching min-width/max-width on .review-view-container)
-     does not fully fix it. With this rule applied, getComputedStyle on this element reports a
-     correctly bounded 327px width and a real internal horizontal scrollbar (clientWidth 327 /
-     scrollWidth 818, own overflow contained) -- yet document.documentElement.scrollWidth still
-     reports the full ~818px-driven width, and only recovers to the viewport width when this
-     element is set to display:none entirely (confirmed: forcing this element's own width,
-     max-width, and overflow-x:hidden via !important inline styles, with display left as flex,
-     did NOT fix document-level scrollWidth). The sticky .review-command-header sibling was
-     ruled out the same way (forcing position:static made no difference). Root cause not fully
-     identified; likely a rendering-engine quirk in how a flex item's own overflow:auto
-     scrollable region is (or isn't) excluded from the document's own scrollable-overflow
-     calculation. Next step for whoever picks this up: try restructuring so the scrollable
-     region isn't itself a flex item (wrap it in a non-flex block, or give
-     .review-view-container an explicit width instead of relying on flex sizing), or add
-     `contain: layout` to this rule and check whether Chromium DevTools' own layout inspector
-     attributes the extra scrollWidth to this element or somewhere else entirely. */
+  /* Keep the nowrap tab row internally scrollable on mobile instead of forcing its flex parent
+     wider than the viewport. The tab buttons are also positioned containing blocks so their
+     absolute .sr-only labels stay inside this scroll region rather than extending root scrollWidth. */
   min-width: 0;
 }
 
 .review-tab-link {
+  position: relative;
   padding: var(--space-2) var(--space-3);
   background: transparent;
   border: none;

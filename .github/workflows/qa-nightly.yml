@@ -36,6 +36,7 @@ jobs:
         run: corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts --project=${{ matrix.browser }}
         env:
           CI: "true"
+          QA_CROSS_BROWSER: "1"
       - name: Modal / tabs contracts + regression suite
         if: matrix.browser == 'chromium'
         run: corepack pnpm run qa:e2e

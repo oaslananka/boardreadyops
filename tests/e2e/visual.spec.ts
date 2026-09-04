@@ -19,6 +19,9 @@ for (const routeId of visualRoutes) {
     });
 
     await page.goto(route.path, { waitUntil: "networkidle" });
+    if (route.id === "policies") {
+      await expect(page.getByText("Loading governance policies…")).toBeHidden();
+    }
     await page.waitForTimeout(500);
 
     await expect(page).toHaveScreenshot(`${route.id}.png`, {
