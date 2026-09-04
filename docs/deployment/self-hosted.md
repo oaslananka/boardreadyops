@@ -118,7 +118,7 @@ The initial alert policy is versioned as `github-cloud-ga-v1`. It evaluates only
 
 The terminal failure-rate gate is 500 basis points and is evaluated only when there are at least 20 terminal runs in the preceding 24 hours.
 
-Every successful snapshot emits `worker.control_plane_slo_evaluation` with the policy version, aggregate health, and active signal names. A signal emits `worker.control_plane_slo_firing` only when it first enters the alerting state and `worker.control_plane_slo_recovered` only when it leaves that state. Repeated breached snapshots do not repeat the firing transition.
+Every successful snapshot emits `worker.control_plane_slo_evaluation` with the policy version, aggregate health, and active signal names. A signal emits `worker.control_plane_slo_firing` only when it first enters the alerting state and `worker.control_plane_slo_recovered` only when it leaves the state. Repeated breached snapshots do not repeat the firing transition.
 
 Critical transitions page the platform on-call. Warning transitions open or update operational triage and should be correlated with GitHub status, worker restarts, queue lag, outbox lag, and reconciliation activity. `reconciliationRepairs24h` remains diagnostic and does not alert by itself.
 
@@ -233,9 +233,9 @@ The deploy no longer copies `.next` into a running container. Each release is an
 
 ## Remote deploy trigger
 
-> The current production host does not run the `scripts/deploy-cloud.mjs` runbook described above — it runs a hand-maintained `deploy.sh` wrapper around `docker compose` (project `boardreadyops-cloud`, services `web`/`worker`/`migrate`/`caddy`/`cloudflared`), with the checkout at `/home/ubuntu/boardreadyops-cloud/repo`. The [`cloud-deploy` workflow](../../.github/workflows/cloud-deploy.yml) below targets that real topology, not the section above; treat this as the current source of truth for what a production deploy actually does until the sections are reconciled.
+> The [`cloud-deploy` workflow](../../.github/workflows/cloud-deploy.yml) supports an operator-commissioned deployment target using the legacy Compose topology introduced in #550: a host-local `deploy.sh` wrapper around `docker compose` (project `boardreadyops-cloud`, services `web`/`worker`/`migrate`/`caddy`/`cloudflared`) with the checkout at `/home/ubuntu/boardreadyops-cloud/repo`. That path is a commissioning contract, not evidence that a production host is currently live. Current runtime state belongs in the operations system, not in this public repository.
 
-The [`cloud-deploy` workflow](../../.github/workflows/cloud-deploy.yml) lets an operator trigger a deploy from the GitHub Actions UI instead of an SSH terminal. It is `workflow_dispatch`-only — merging to `main` never triggers it. A run: fast-forwards the production `repo/` checkout to `origin/main`, then over SSH (reached over Tailscale, not the public internet) runs the host's own `./deploy.sh`, which fetches runtime configuration from Doppler itself and drives `docker compose`.
+The workflow is `workflow_dispatch`-only — merging to `main` never triggers it. After Tailscale and SSH authentication, it first verifies that the expected Git checkout and executable deploy runbook already exist. If either is absent, the preflight fails before `git fetch`, build, migration, or container mutation. Treat that as an uncommissioned or drifted deployment target: do not create the missing production tree automatically. Recommission or migrate the host with the procedures above, then retry the workflow. Once preflight succeeds, the run fast-forwards the commissioned `repo/` checkout to `origin/main` and executes the host's own `./deploy.sh`, which fetches runtime configuration from Doppler itself and drives `docker compose`.
 
 One-time setup before the workflow can be used:
 
