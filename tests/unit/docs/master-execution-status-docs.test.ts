@@ -39,6 +39,21 @@ describe("master-execution-status.md docs contract", () => {
     expect(readFileSync(masterStatusPath, "utf8")).toContain("<!-- master-execution-status:start -->");
   });
 
+  it("records the closed W16 reliability prerequisite with complete evidence", () => {
+    const status = JSON.parse(readFileSync(resolve(repoRoot, "docs/development/master-execution-status.json"), "utf8"));
+    const w16 = status.workstreams.find((entry: { id: string }) => entry.id === "W16");
+    const content = readFileSync(masterStatusPath, "utf8");
+
+    expect(w16?.status).toBe("implemented");
+    expect(w16?.issues).toEqual([190, 222]);
+    expect(w16?.evidence.tests.length).toBeGreaterThan(0);
+    expect(w16?.evidence.deployed.length).toBeGreaterThan(0);
+    expect(w16?.evidence.commits.length + w16?.evidence.pullRequests.length).toBeGreaterThan(0);
+    expect(content).toContain("### W16 — Cloud Control Plane Reliability");
+    expect(content).toContain("- **Status:** `Implemented`");
+    expect(content).not.toContain("Cloud reliability blocker #222 remains open");
+  });
+
   it("runs ledger drift validation in normal verification", () => {
     const packageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
     expect(packageJson.scripts["execution-status:render"]).toBe("node scripts/master-execution-status.mjs render");
