@@ -41,6 +41,21 @@ type FindingDetail = {
   waivedAt: string | undefined;
 };
 
+/**
+ * Per-domain finding rollup for the whole run (src/core/rule-registry.ts's RuleCategory on the
+ * CLI side; persisted per finding in the findings.category column, migration 0062). Independent
+ * of the findings table's own filter/pagination -- this describes the run as a whole.
+ */
+type CategoryBreakdownEntry = {
+  category: string;
+  total: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+};
+
 type ArtifactAvailability = "available";
 
 type ArtifactLifecycleSummary = {
@@ -152,6 +167,7 @@ export type RunDetail = {
   lastActivityAt: string | undefined;
   findings: FindingDetail[];
   findingsPage: PageInfo;
+  categoryBreakdown: CategoryBreakdownEntry[];
   artifacts: ArtifactDetail[];
   artifactsPage: PageInfo;
   artifactLifecycle: ArtifactLifecycleSummary;
@@ -696,7 +712,7 @@ export async function lookupRunDashboard(
   const findingOffset = (findingsPage.page - 1) * filters.pageSize;
   const artifactOffset = (artifactsPage.page - 1) * filters.pageSize;
 
-  const [findingsResult, artifactsResult] = await Promise.all([
+  const [findingsResult, artifactsResult, categoryBreakdownResult] = await Promise.all([
     executor.query(
       `select findings.id, findings.rule_id, findings.severity, findings.message,
               findings.path, findings.kind, findings.waived_at
@@ -718,6 +734,23 @@ export async function lookupRunDashboard(
        offset $${artifactScope.parameters.length + 2}`,
       [...artifactScope.parameters, filters.pageSize, artifactOffset],
     ),
+    // Whole-run domain breakdown, independent of the findings table's own filter/pagination --
+    // the score cards answer "what does this run look like overall", the table answers
+    // "show me the filtered detail". lower(severity) equivalences mirror findingOrder() below.
+    executor.query(
+      `select coalesce(category, 'unclassified') as category,
+              count(*)::int as total,
+              count(*) filter (where lower(severity) in ('critical', 'error'))::int as critical,
+              count(*) filter (where lower(severity) = 'high')::int as high,
+              count(*) filter (where lower(severity) in ('medium', 'warning'))::int as medium,
+              count(*) filter (where lower(severity) = 'low')::int as low,
+              count(*) filter (where lower(severity) = 'info')::int as info
+         from findings
+        where run_id = $1
+        group by coalesce(category, 'unclassified')
+        order by coalesce(category, 'unclassified')`,
+      [runId],
+    ),
   ]);
 
   const findings = rows(findingsResult).map(
@@ -729,6 +762,18 @@ export async function lookupRunDashboard(
       path: stringValue(row, "path"),
       kind: stringValue(row, "kind"),
       waivedAt: stringValue(row, "waived_at"),
+    }),
+  );
+
+  const categoryBreakdown = rows(categoryBreakdownResult).map(
+    (row): CategoryBreakdownEntry => ({
+      category: requiredString(row, "category"),
+      total: numberValue(row, "total") ?? 0,
+      critical: numberValue(row, "critical") ?? 0,
+      high: numberValue(row, "high") ?? 0,
+      medium: numberValue(row, "medium") ?? 0,
+      low: numberValue(row, "low") ?? 0,
+      info: numberValue(row, "info") ?? 0,
     }),
   );
 
@@ -865,6 +910,7 @@ export async function lookupRunDashboard(
       lastActivityAt,
       findings,
       findingsPage,
+      categoryBreakdown,
       artifacts,
       artifactsPage,
       artifactLifecycle,
@@ -1045,6 +1091,7 @@ function buildDemoRun(runId: string, filters: RunDashboardFilters = {}): RunDeta
     lastActivityAt: "2026-08-23T18:01:25.000Z",
     findings: filteredFindings,
     findingsPage: { page: 1, pageSize: 25, total: filteredFindings.length, totalPages: 1 },
+    categoryBreakdown: [],
     artifacts: baseArtifacts,
     artifactsPage: { page: 1, pageSize: 25, total: baseArtifacts.length, totalPages: 1 },
     artifactLifecycle: { deleted: 0, missing: 0, pendingDeletion: 0, failedDeletion: 0 },

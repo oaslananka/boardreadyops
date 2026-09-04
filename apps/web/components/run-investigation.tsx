@@ -283,6 +283,67 @@ function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
   );
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  electrical: "Electrical",
+  manufacturability: "Manufacturability (DFM)",
+  assembly: "Assembly (DFA)",
+  testability: "Testability (DFT)",
+  sourcing: "Sourcing / BOM",
+  release: "Release",
+  unclassified: "Other",
+};
+
+function categoryLabel(category: string): string {
+  return CATEGORY_LABEL[category] ?? humanize(category);
+}
+
+/**
+ * Per-domain finding rollup for the whole run, independent of the findings table's own
+ * filter/pagination -- run.categoryBreakdown (apps/web/lib/run-dashboard.ts) answers "what does
+ * this run look like overall". Renders nothing for a run with no recorded category data (older
+ * runs predating the findings.category column) rather than showing a fabricated all-zero grid.
+ */
+function CategoryBreakdownPanel({ run }: Readonly<{ run: RunDetail }>) {
+  if (run.categoryBreakdown.length === 0) {
+    return null;
+  }
+  return (
+    <Panel
+      title="Findings by domain"
+      description="Per-domain finding counts for this run, independent of the findings table's current filter."
+      id="category-breakdown"
+      tone="section"
+    >
+      <section className="table-scroll" aria-label="Findings by domain table">
+        <table className="artifact-table">
+          <thead>
+            <tr>
+              <th scope="col">Domain</th>
+              <th scope="col">Findings</th>
+              <th scope="col">Critical</th>
+              <th scope="col">High</th>
+              <th scope="col">Medium</th>
+              <th scope="col">Low</th>
+            </tr>
+          </thead>
+          <tbody>
+            {run.categoryBreakdown.map((entry) => (
+              <tr key={entry.category}>
+                <td>{categoryLabel(entry.category)}</td>
+                <td>{entry.total}</td>
+                <td>{entry.critical}</td>
+                <td>{entry.high}</td>
+                <td>{entry.medium}</td>
+                <td>{entry.low}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </Panel>
+  );
+}
+
 export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
@@ -307,6 +368,8 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
           <Definition label="Last activity">{formatRunDate(run.lastActivityAt)}</Definition>
         </DefinitionGrid>
       </Panel>
+
+      <CategoryBreakdownPanel run={run} />
 
       <BoardsPanel run={run} />
 
