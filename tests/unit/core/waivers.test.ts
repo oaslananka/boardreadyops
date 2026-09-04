@@ -21,6 +21,48 @@ describe("waivers", () => {
     expect(result.findings).toBe(findings);
     expect(result.active).toEqual([]);
     expect(result.expired).toEqual([]);
+    expect(result.falsePositiveSignals).toEqual([]);
+  });
+
+  it("records a false-positive telemetry signal when a waiver reason reads as a false positive", () => {
+    const target = finding("manufacturing.dfm-pin1-markers");
+    const waivers: WaiverConfig[] = [
+      {
+        rule: "manufacturing.dfm-pin1-markers",
+        owner: "alice",
+        reason: "False positive: library footprint already includes a pin-1 marker.",
+      },
+    ];
+    const result = applyWaivers([target], waivers, now);
+
+    expect(result.findings[0]?.suppressed).toBe(true);
+    expect(result.falsePositiveSignals).toEqual([
+      {
+        ruleId: "manufacturing.dfm-pin1-markers",
+        findingFingerprint: target.fingerprint,
+        reason: "False positive: library footprint already includes a pin-1 marker.",
+      },
+    ]);
+  });
+
+  it("does not record a false-positive signal for an ordinary accepted-risk waiver", () => {
+    const target = finding("bom.missing-mpn");
+    const waivers: WaiverConfig[] = [{ rule: "bom.missing-mpn", owner: "alice", reason: "accepted risk for v1" }];
+    const result = applyWaivers([target], waivers, now);
+
+    expect(result.findings[0]?.suppressed).toBe(true);
+    expect(result.falsePositiveSignals).toEqual([]);
+  });
+
+  it("does not record a false-positive signal for an expired waiver", () => {
+    const target = finding("bom.missing-mpn");
+    const waivers: WaiverConfig[] = [
+      { rule: "bom.missing-mpn", owner: "alice", reason: "false-positive", expires: "2026-01-01" },
+    ];
+    const result = applyWaivers([target], waivers, now);
+
+    expect(result.findings[0]?.suppressed).toBeUndefined();
+    expect(result.falsePositiveSignals).toEqual([]);
   });
 
   it("suppresses matching findings for an active waiver and counts matches", () => {

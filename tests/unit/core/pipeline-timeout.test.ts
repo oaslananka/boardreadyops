@@ -21,6 +21,10 @@ describe("Pipeline Rule Performance Budget & Timeout", () => {
         configKeys: [],
         kicadVersions: ["9", "10"],
         tags: ["test"],
+        category: "unclassified",
+        evidenceType: "unclassified",
+        fixability: "unclassified",
+        vendorDependence: "unclassified",
       },
       run: async () => {
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -69,6 +73,10 @@ rules:
         configKeys: [],
         kicadVersions: ["9", "10"],
         tags: ["test"],
+        category: "unclassified",
+        evidenceType: "unclassified",
+        fixability: "unclassified",
+        vendorDependence: "unclassified",
       },
       run: async () => [],
     };
@@ -97,6 +105,10 @@ rules:
         configKeys: [],
         kicadVersions: ["9", "10"],
         tags: ["test"],
+        category: "unclassified",
+        evidenceType: "unclassified",
+        fixability: "unclassified",
+        vendorDependence: "unclassified",
       },
       run: async () => {
         await new Promise((resolve) => setTimeout(resolve, 20));

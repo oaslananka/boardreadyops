@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -12,6 +13,7 @@ export const eolDetectionRule = rule(
     configKeys: ["rules.bom.eol-detection.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "lifecycle", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingHeuristic,
   },
   async (context) => {
     if (!shouldRun(context, "bom.eol-detection")) {

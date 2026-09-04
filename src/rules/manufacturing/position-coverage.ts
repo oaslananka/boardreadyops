@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import {
   assemblyFootprints,
@@ -18,6 +19,7 @@ export const positionCoverageRule = rule(
     configKeys: ["rules.manufacturing.position-coverage.patterns"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "cpl", "dfa", "manufacturing", "position"],
+    ...RULE_CLASSIFICATIONS.assemblyCapabilityThreshold,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.position-coverage")) {

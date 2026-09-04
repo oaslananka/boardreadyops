@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -12,6 +13,7 @@ export const dnpConsistencyRule = rule(
     configKeys: ["rules.bom.dnp-consistency.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "pcb", "variant"],
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency,
   },
   async (context) => {
     if (!shouldRun(context, "bom.dnp-consistency")) {

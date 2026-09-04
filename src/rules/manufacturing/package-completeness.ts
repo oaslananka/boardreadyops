@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { pathExists } from "../../util/fs.js";
 import { globFiles } from "../../util/glob.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
@@ -102,6 +103,7 @@ export const packageCompletenessRule = rule(
     configKeys: ["rules.manufacturing.package-completeness.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["completeness", "fabrication", "manufacturing", "release"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.package-completeness")) {

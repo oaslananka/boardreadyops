@@ -31,7 +31,7 @@ import { computeReadiness, type ReadinessScore } from "./readiness.js";
 import { type ProjectBom, projectBomComponent, type RunResult } from "./result.js";
 import { listRules } from "./rule-registry.js";
 import { applySuppressions } from "./suppressions.js";
-import { applyWaivers } from "./waivers.js";
+import { applyWaivers, type FalsePositiveSignal } from "./waivers.js";
 
 interface PipelineContext {
   cwd: string;
@@ -252,6 +252,28 @@ async function validatePhase(
   return findings;
 }
 
+/**
+ * Emits one structured log event per finding waived with a "false positive"-worded reason,
+ * enriched with the waiving rule's category/evidenceType (src/core/rule-registry.ts) so
+ * false-positive rate becomes queryable per rule category/evidence-type from the logs.
+ */
+function logFalsePositiveSignals(ctx: PipelineContext, signals: FalsePositiveSignal[]): void {
+  if (signals.length === 0) {
+    return;
+  }
+  const metaById = new Map(listRules().map((rule) => [rule.meta.id, rule.meta]));
+  for (const signal of signals) {
+    const meta = metaById.get(signal.ruleId);
+    ctx.logger.info("pipeline.waiver.false-positive", {
+      rule: signal.ruleId,
+      category: meta?.category,
+      evidenceType: meta?.evidenceType,
+      fingerprint: signal.findingFingerprint,
+      reason: signal.reason,
+    });
+  }
+}
+
 async function postProcessPhase(ctx: PipelineContext, findings: Finding[], projects: ProjectContext[]) {
   const gatedFindings = sortFindings([
     ...findings,
@@ -259,6 +281,7 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
   ]);
   const sorted = await controlledFindings(ctx.root, ctx.config, ctx.options, gatedFindings);
   const waiverResult = applyWaivers(sorted, ctx.config.waivers ?? []);
+  logFalsePositiveSignals(ctx, waiverResult.falsePositiveSignals);
   const effectiveFindings = waiverResult.findings;
   const fabrication = await captureFabricationSnapshot(ctx.root, projects, ctx.options, ctx.config);
   const readiness = await computeRunReadiness(

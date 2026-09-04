@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -14,6 +15,7 @@ export const complianceRule = rule(
     configKeys: ["rules.bom.compliance.enabled", "rules.bom.compliance.require", "rules.bom.compliance.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "compliance", "rohs", "reach", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingHeuristic,
   },
   async (context) => {
     if (!shouldRun(context, "bom.compliance")) {

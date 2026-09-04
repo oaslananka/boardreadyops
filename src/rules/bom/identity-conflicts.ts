@@ -1,5 +1,6 @@
 import type { BomRow } from "../../bom/types.js";
 import type { RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -17,6 +18,7 @@ export const identityConflictsRule = rule(
     configKeys: ["rules.bom.identity-conflicts.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "identity", "sourcing"],
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency,
   },
   async (context) => {
     if (!shouldRun(context, "bom.identity-conflicts")) {

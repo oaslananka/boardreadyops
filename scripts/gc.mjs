@@ -132,6 +132,15 @@ function isAllowedDuplicate(block) {
     // The `if (import.meta.url === ...) { try { await main() } ... }` CLI entrypoint guard is
     // deliberately repeated across scripts/*.mjs; it is boilerplate, not shared logic to extract.
     (block.includes("import.meta.url ===") && block.includes("process.argv[1]")) ||
+    // RuleMetadata's category/evidenceType/fixability/vendorDependence fields (W05) are a fixed,
+    // required shape declared on every rule; two rules sharing the same classification produce
+    // identical boilerplate lines here, not shared logic to extract. These four field names are
+    // unique to RuleMetadata object literals, so any 8-line window touching one of them is part
+    // of that same boilerplate shape (the sliding window does not always land on all four at once).
+    block.includes('category: "') ||
+    block.includes('evidenceType: "') ||
+    block.includes('fixability: "') ||
+    block.includes('vendorDependence: "') ||
     block.split("\n").every((line) => /^"[a-z][a-z0-9.-]+",?$/.test(line) || line === "]," || line === "]")
   );
 }

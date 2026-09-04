@@ -80011,6 +80011,113 @@ function notifierFailureReason(error52) {
 }
 
 // src/core/rule-registry.ts
+var RULE_CLASSIFICATIONS = {
+  /** BOM field carries free-text that is pattern-matched for a specific risk signal. */
+  sourcingHeuristic: {
+    category: "sourcing",
+    evidenceType: "heuristic",
+    fixability: "manual",
+    vendorDependence: "none"
+  },
+  /** BOM field presence/equality check with a deterministic sourcing remedy. */
+  sourcingPresence: {
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none"
+  },
+  /** A weighted aggregate score; fix the constituent per-row findings, not the score itself. */
+  sourcingAggregateHeuristic: {
+    category: "sourcing",
+    evidenceType: "heuristic",
+    fixability: "none",
+    vendorDependence: "none"
+  },
+  /** Absence-of-data is itself the signal; there is no local edit that resolves "unknown". */
+  sourcingAbsenceSignal: {
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "none",
+    vendorDependence: "none"
+  },
+  /** BOM/PCB/schematic identity or population-state consistency needed for correct assembly. */
+  assemblyDataConsistency: {
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none"
+  },
+  /** Assembly coverage/count threshold that commonly varies by contract manufacturer. */
+  assemblyCapabilityThreshold: {
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific"
+  },
+  /** Deterministic presence/format check on a fabrication-facing artifact. */
+  manufacturabilityPresence: {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none"
+  },
+  /** Fabrication capability threshold that commonly varies by manufacturer/process. */
+  manufacturabilityCapabilityThreshold: {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific"
+  },
+  /** Resolves a named vendor profile (src/vendor/profiles.ts) rather than a generic threshold. */
+  manufacturabilityVendorProfile: {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "manufacturer-specific"
+  },
+  /** Naming/library-convention inference with a specific, actionable remedy. */
+  manufacturabilityHeuristic: {
+    category: "manufacturability",
+    evidenceType: "heuristic",
+    fixability: "manual",
+    vendorDependence: "none"
+  },
+  /** Density-based advisory reminder with no single identified defect to fix. */
+  manufacturabilityHeuristicAdvisory: {
+    category: "manufacturability",
+    evidenceType: "heuristic",
+    fixability: "none",
+    vendorDependence: "none"
+  },
+  /** In-circuit/functional test-access coverage threshold, commonly CM/test-house specific. */
+  testabilityCapabilityThreshold: {
+    category: "testability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific"
+  },
+  /** KiCad DRC/ERC delegation: BoardReadyOps only normalizes the diagnostic, never edits files. */
+  electricalDelegatedTool: {
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "assisted",
+    vendorDependence: "none"
+  },
+  /** Pinmap/firmware-contract net or pin equality check with a directly editable remedy. */
+  electricalContract: {
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none"
+  },
+  /** Release/traceability metadata presence or format check. */
+  releasePresence: {
+    category: "release",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none"
+  }
+};
 var registry = /* @__PURE__ */ new Map();
 function registerRule(rule2) {
   if (registry.has(rule2.meta.id)) {
@@ -84281,7 +84388,8 @@ var complianceRule = rule(
     appliesTo: ["bom"],
     configKeys: ["rules.bom.compliance.enabled", "rules.bom.compliance.require", "rules.bom.compliance.severity"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "compliance", "rohs", "reach", "sourcing"]
+    tags: ["bom", "compliance", "rohs", "reach", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingHeuristic
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.compliance")) {
@@ -84344,7 +84452,8 @@ var dnpConsistencyRule = rule(
     appliesTo: ["bom", "pcb"],
     configKeys: ["rules.bom.dnp-consistency.severity"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "pcb", "variant"]
+    tags: ["bom", "pcb", "variant"],
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.dnp-consistency")) {
@@ -84382,7 +84491,8 @@ var eolDetectionRule = rule(
     appliesTo: ["bom"],
     configKeys: ["rules.bom.eol-detection.severity"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "lifecycle", "sourcing"]
+    tags: ["bom", "lifecycle", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingHeuristic
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.eol-detection")) {
@@ -84414,7 +84524,8 @@ var footprintMismatchRule = rule(
     appliesTo: ["bom", "pcb"],
     configKeys: ["rules.bom.footprint-mismatch.severity"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "footprint", "pcb"]
+    tags: ["bom", "footprint", "pcb"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.footprint-mismatch")) {
@@ -84452,7 +84563,8 @@ var identityConflictsRule = rule(
     appliesTo: ["bom", "schematic"],
     configKeys: ["rules.bom.identity-conflicts.severity"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "identity", "sourcing"]
+    tags: ["bom", "identity", "sourcing"],
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.identity-conflicts")) {
@@ -84574,7 +84686,8 @@ var lifecycleRule = rule(
     appliesTo: ["bom"],
     configKeys: ["rules.bom.lifecycle.db"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "lifecycle", "sourcing"]
+    tags: ["bom", "lifecycle", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingHeuristic
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.lifecycle")) {
@@ -84637,7 +84750,8 @@ var missingMpnRule = rule(
     appliesTo: ["bom", "schematic"],
     configKeys: ["rules.bom.missing-mpn.ignore-refs"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "mpn", "sourcing"]
+    tags: ["bom", "mpn", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.missing-mpn")) {
@@ -84756,7 +84870,8 @@ var bomRiskScoreRule = rule(
       "bom.alternates"
     ],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "risk", "sourcing", "supply-chain"]
+    tags: ["bom", "risk", "sourcing", "supply-chain"],
+    ...RULE_CLASSIFICATIONS.sourcingAggregateHeuristic
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.risk-score")) {
@@ -84855,7 +84970,8 @@ var singleSourceRule = rule(
     appliesTo: ["bom"],
     configKeys: ["rules.bom.single-source.severity", "bom.alternates"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "sourcing", "supplier"]
+    tags: ["bom", "sourcing", "supplier"],
+    ...RULE_CLASSIFICATIONS.sourcingPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.single-source")) {
@@ -84892,7 +85008,8 @@ var unknownLifecycleRule = rule(
     appliesTo: ["bom"],
     configKeys: ["rules.bom.unknown-lifecycle.severity", "rules.bom.unknown-lifecycle.db"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["bom", "lifecycle", "sourcing"]
+    tags: ["bom", "lifecycle", "sourcing"],
+    ...RULE_CLASSIFICATIONS.sourcingAbsenceSignal
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.unknown-lifecycle")) {
@@ -84948,7 +85065,8 @@ var variantConsistencyRule = rule(
     appliesTo: ["bom", "project"],
     configKeys: ["projects.variants", "rules.bom.variant-consistency.enabled"],
     kicadVersions: ["10", "future"],
-    tags: ["bom", "variant", "kicad"]
+    tags: ["bom", "variant", "kicad"],
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency
   },
   async (context5) => {
     if (!shouldRun(context5, "bom.variant-consistency")) {
@@ -85021,7 +85139,8 @@ var boardOutlineRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.design.board-outline.enabled"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["design", "edge-cuts", "pcb"]
+    tags: ["design", "edge-cuts", "pcb"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "design.board-outline")) {
@@ -85061,7 +85180,8 @@ var copperBalanceRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.design.copper-balance.min-coverage-percent"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["copper", "design", "pcb"]
+    tags: ["copper", "design", "pcb"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "design.copper-balance")) {
@@ -85116,7 +85236,8 @@ var uniqueReferencesRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.design.unique-references.enabled", "rules.design.unique-references.ignore-refs"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["design", "dfm", "pcb"]
+    tags: ["design", "dfm", "pcb"],
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency
   },
   async (context5) => {
     if (!shouldRun(context5, "design.unique-references")) {
@@ -100096,7 +100217,8 @@ var runDrcRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["kicad-cli", "require-kicad", "rules.drc"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["drc", "kicad", "pcb"]
+    tags: ["drc", "kicad", "pcb"],
+    ...RULE_CLASSIFICATIONS.electricalDelegatedTool
   },
   async (context5) => {
     if (!shouldRun(context5, "drc.kicad")) {
@@ -100135,7 +100257,8 @@ var runErcRule = rule(
     appliesTo: ["schematic"],
     configKeys: ["kicad-cli", "require-kicad", "rules.erc"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["erc", "kicad", "schematic"]
+    tags: ["erc", "kicad", "schematic"],
+    ...RULE_CLASSIFICATIONS.electricalDelegatedTool
   },
   async (context5) => {
     if (!shouldRun(context5, "erc.kicad")) {
@@ -100561,7 +100684,8 @@ var arduinoPinContractRule = rule(
       "rules.firmware.arduino-pin-contract.file"
     ],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "arduino", "contract"]
+    tags: ["firmware", "pinmap", "arduino", "contract"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   async (context5) => {
     if (!shouldRun(context5, ruleId)) {
@@ -100654,7 +100778,8 @@ var espIdfPinContractRule = rule(
       "rules.firmware.esp-idf-pin-contract.file"
     ],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "esp-idf", "contract"]
+    tags: ["firmware", "pinmap", "esp-idf", "contract"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   makeFirmwareContractHandler(ruleId2, espIdfAdapter, resolveContract)
 );
@@ -100694,7 +100819,8 @@ var platformioPinContractRule = rule(
       "rules.firmware.platformio-pin-contract.file"
     ],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "platformio", "contract"]
+    tags: ["firmware", "pinmap", "platformio", "contract"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   makeFirmwareContractHandler(ruleId3, platformioAdapter, resolvePlatformioContract)
 );
@@ -100778,7 +100904,8 @@ var stm32CubeMxPinContractRule = rule(
       "rules.firmware.stm32cubemx-pin-contract.mcu-designator"
     ],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "stm32", "stm32cubemx", "contract"]
+    tags: ["firmware", "pinmap", "stm32", "stm32cubemx", "contract"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   async (context5) => {
     if (!shouldRun(context5, ruleId4)) {
@@ -100835,7 +100962,8 @@ var zephyrPinContractRule = rule(
       "rules.firmware.zephyr-pin-contract.file"
     ],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "zephyr", "contract"]
+    tags: ["firmware", "pinmap", "zephyr", "contract"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   makeFirmwareContractHandler(ruleId5, zephyrAdapter, resolveContract3)
 );
@@ -100935,7 +101063,8 @@ var assemblySidesRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.assembly-sides.enabled", "rules.manufacturing.assembly-sides.allow-bottom-side"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "dfa", "manufacturing", "pcb"]
+    tags: ["assembly", "dfa", "manufacturing", "pcb"],
+    ...RULE_CLASSIFICATIONS.assemblyCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.assembly-sides")) {
@@ -100978,7 +101107,8 @@ var drillCoverageRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.drill-coverage.enabled"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["drill", "manufacturing", "pcb"]
+    tags: ["drill", "manufacturing", "pcb"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.drill-coverage")) {
@@ -101025,7 +101155,8 @@ var fabNotesRule = rule(
     appliesTo: ["manifest"],
     configKeys: ["rules.manufacturing.fab-notes.enabled"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["documentation", "fabrication", "manufacturing"]
+    tags: ["documentation", "fabrication", "manufacturing"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.fab-notes")) {
@@ -101060,7 +101191,8 @@ var fiducialsRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.fiducials.minimum"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "dfa", "manufacturing", "pcb"]
+    tags: ["assembly", "dfa", "manufacturing", "pcb"],
+    ...RULE_CLASSIFICATIONS.assemblyCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.fiducials")) {
@@ -101193,7 +101325,8 @@ var jobsetOutputsRule = rule(
     appliesTo: ["manifest"],
     configKeys: ["rules.manufacturing.jobset-outputs.enabled"],
     kicadVersions: ["10", "future"],
-    tags: ["jobset", "kicad", "manufacturing"]
+    tags: ["jobset", "kicad", "manufacturing"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.jobset-outputs")) {
@@ -101237,7 +101370,8 @@ var layerStackupRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.layer-stackup.expected-layers"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["manufacturing", "pcb", "stackup"]
+    tags: ["manufacturing", "pcb", "stackup"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.layer-stackup")) {
@@ -101778,7 +101912,8 @@ var outputsPresentRule = {
       appliesTo: ["pcb", "manifest"],
       configKeys: ["rules.manufacturing.outputs-present.required", "rules.manufacturing.outputs-present.patterns"],
       kicadVersions: ["9", "10", "future"],
-      tags: ["fabrication", "manufacturing", "outputs"]
+      tags: ["fabrication", "manufacturing", "outputs"],
+      ...RULE_CLASSIFICATIONS.manufacturabilityVendorProfile
     },
     async (context5) => {
       if (!shouldRun(context5, "manufacturing.outputs-present")) {
@@ -101982,7 +102117,8 @@ var packageCompletenessRule = rule(
     appliesTo: ["pcb", "manifest"],
     configKeys: ["rules.manufacturing.package-completeness.severity"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["completeness", "fabrication", "manufacturing", "release"]
+    tags: ["completeness", "fabrication", "manufacturing", "release"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.package-completeness")) {
@@ -102052,7 +102188,8 @@ var panelSanityRule = rule(
     appliesTo: ["manifest"],
     configKeys: ["rules.manufacturing.panel-sanity.panelized"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["manufacturing", "panel", "outputs"]
+    tags: ["manufacturing", "panel", "outputs"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.panel-sanity")) {
@@ -102098,7 +102235,8 @@ var pin1MarkersRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.dfm-pin1-markers"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "pin1"]
+    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "pin1"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityHeuristic
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.dfm-pin1-markers")) {
@@ -102161,7 +102299,8 @@ var polarityMarkersRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.dfm-polarity-markers"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "polarity"]
+    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "polarity"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityHeuristic
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.dfm-polarity-markers")) {
@@ -102207,7 +102346,8 @@ var positionCoverageRule = rule(
     appliesTo: ["pcb", "manifest"],
     configKeys: ["rules.manufacturing.position-coverage.patterns"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "cpl", "dfa", "manufacturing", "position"]
+    tags: ["assembly", "cpl", "dfa", "manufacturing", "position"],
+    ...RULE_CLASSIFICATIONS.assemblyCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.position-coverage")) {
@@ -102275,7 +102415,8 @@ var silkscreenOverPadRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.dfm-silkscreen-over-pad.minimum-smd-count"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "silkscreen"]
+    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "silkscreen"],
+    ...RULE_CLASSIFICATIONS.manufacturabilityHeuristicAdvisory
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.dfm-silkscreen-over-pad")) {
@@ -102321,7 +102462,8 @@ var testPointsRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.test-points.enabled", "rules.manufacturing.test-points.minimum"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "dfa", "manufacturing", "pcb", "test"]
+    tags: ["assembly", "dfa", "manufacturing", "pcb", "test"],
+    ...RULE_CLASSIFICATIONS.testabilityCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.test-points")) {
@@ -102363,7 +102505,8 @@ var toolingHolesRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.tooling-holes.minimum"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb"]
+    tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb"],
+    ...RULE_CLASSIFICATIONS.assemblyCapabilityThreshold
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.tooling-holes")) {
@@ -102405,7 +102548,8 @@ var pinmapNetLabelRule = rule(
     appliesTo: ["pinmap", "schematic"],
     configKeys: ["pinmap", "projects.pinmap", "rules.pinmap.net-label.enabled"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "schematic"]
+    tags: ["firmware", "pinmap", "schematic"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   async (context5) => {
     if (!shouldRun(context5, "pinmap.net-label")) {
@@ -102446,7 +102590,8 @@ var pinmapVerifyRule = rule(
     appliesTo: ["pinmap", "schematic"],
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "schematic"]
+    tags: ["firmware", "pinmap", "schematic"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   async (context5) => {
     if (!shouldRun(context5, "pinmap.verify")) {
@@ -102521,7 +102666,8 @@ var pinmapCollisionRule = rule(
     appliesTo: ["pinmap"],
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "validation"]
+    tags: ["firmware", "pinmap", "validation"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   async (context5) => {
     if (!shouldRun(context5, "pinmap.collision")) {
@@ -102566,7 +102712,8 @@ var pinmapUnmappedPinRule = rule(
     appliesTo: ["pinmap", "schematic"],
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["firmware", "pinmap", "schematic"]
+    tags: ["firmware", "pinmap", "schematic"],
+    ...RULE_CLASSIFICATIONS.electricalContract
   },
   async (context5) => {
     if (!shouldRun(context5, "pinmap.unmapped-pin")) {
@@ -102615,7 +102762,8 @@ var changelogPresentRule = rule(
     appliesTo: ["manifest"],
     configKeys: ["rules.release.changelog-present.enabled"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["changelog", "release", "traceability"]
+    tags: ["changelog", "release", "traceability"],
+    ...RULE_CLASSIFICATIONS.releasePresence
   },
   async (context5) => {
     if (!shouldRun(context5, "release.changelog-present")) {
@@ -102676,7 +102824,8 @@ var revisionSetRule = rule(
     appliesTo: ["pcb"],
     configKeys: ["rules.release.revision-set.enabled"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["pcb", "release", "revision"]
+    tags: ["pcb", "release", "revision"],
+    ...RULE_CLASSIFICATIONS.releasePresence
   },
   async (context5) => {
     if (!shouldRun(context5, "release.revision-set")) {
@@ -102729,7 +102878,8 @@ var tagMatchesRevisionRule = rule(
     appliesTo: ["pcb", "manifest"],
     configKeys: ["GITHUB_REF_NAME"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["git", "release", "revision"]
+    tags: ["git", "release", "revision"],
+    ...RULE_CLASSIFICATIONS.releasePresence
   },
   async (context5) => {
     if (!shouldRun(context5, "release.tag-matches-revision")) {
@@ -102773,7 +102923,8 @@ var versionFormatRule = rule(
     appliesTo: ["pcb", "schematic"],
     configKeys: ["rules.release.version-format.pattern"],
     kicadVersions: ["9", "10", "future"],
-    tags: ["release", "revision", "versioning"]
+    tags: ["release", "revision", "versioning"],
+    ...RULE_CLASSIFICATIONS.releasePresence
   },
   async (context5) => {
     if (!shouldRun(context5, "release.version-format")) {
@@ -103595,7 +103746,16 @@ function createPluginErrorFinding(context5, message) {
 }
 function toCoreRule(pluginRule) {
   return {
-    meta: pluginRule.meta,
+    // PluginRuleMetadata (the public plugin SDK contract) does not carry category/evidenceType/
+    // fixability/vendorDependence, so plugin-sourced rules are always reported as unclassified
+    // on these axes until the plugin SDK is extended to let authors declare them.
+    meta: {
+      ...pluginRule.meta,
+      category: "unclassified",
+      evidenceType: "unclassified",
+      fixability: "unclassified",
+      vendorDependence: "unclassified"
+    },
     async run(context5) {
       try {
         const findings = await pluginRule.run(context5);
@@ -103907,16 +104067,25 @@ function addFindingReference(target, value) {
 }
 
 // src/core/waivers.ts
+var FALSE_POSITIVE_REASON = /false[\s-]?positive/i;
 function applyWaivers(findings, waivers = [], now = /* @__PURE__ */ new Date()) {
   if (waivers.length === 0) {
-    return { active: [], expired: [], findings };
+    return { active: [], expired: [], findings, falsePositiveSignals: [] };
   }
   const today = now.toISOString().slice(0, 10);
   const statuses = waivers.map((waiver) => ({ waiver, expired: isExpired2(waiver.expires, today), matched: 0 }));
+  const falsePositiveSignals = [];
   const waived = findings.map((finding2) => {
     const match = statuses.find((entry) => !entry.expired && waiverMatches(finding2, entry.waiver));
     if (match) {
       match.matched += 1;
+      if (FALSE_POSITIVE_REASON.test(match.waiver.reason)) {
+        falsePositiveSignals.push({
+          ruleId: finding2.ruleId,
+          findingFingerprint: finding2.fingerprint,
+          reason: match.waiver.reason
+        });
+      }
       return { ...finding2, suppressed: true };
     }
     return finding2;
@@ -103930,7 +104099,7 @@ function applyWaivers(findings, waivers = [], now = /* @__PURE__ */ new Date()) 
     const status = toStatus(entry.waiver, entry.expired, entry.matched);
     (entry.expired ? expired : active).push(status);
   }
-  return { active, expired, findings: waived };
+  return { active, expired, findings: waived, falsePositiveSignals };
 }
 function toStatus(waiver, expired, matched) {
   return {
@@ -104125,6 +104294,22 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
   }
   return findings;
 }
+function logFalsePositiveSignals(ctx, signals) {
+  if (signals.length === 0) {
+    return;
+  }
+  const metaById = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta]));
+  for (const signal of signals) {
+    const meta3 = metaById.get(signal.ruleId);
+    ctx.logger.info("pipeline.waiver.false-positive", {
+      rule: signal.ruleId,
+      category: meta3?.category,
+      evidenceType: meta3?.evidenceType,
+      fingerprint: signal.findingFingerprint,
+      reason: signal.reason
+    });
+  }
+}
 async function postProcessPhase(ctx, findings, projects) {
   const gatedFindings = sortFindings([
     ...findings,
@@ -104132,6 +104317,7 @@ async function postProcessPhase(ctx, findings, projects) {
   ]);
   const sorted = await controlledFindings(ctx.root, ctx.config, ctx.options, gatedFindings);
   const waiverResult = applyWaivers(sorted, ctx.config.waivers ?? []);
+  logFalsePositiveSignals(ctx, waiverResult.falsePositiveSignals);
   const effectiveFindings = waiverResult.findings;
   const fabrication = await captureFabricationSnapshot(ctx.root, projects, ctx.options, ctx.config);
   const readiness = await computeRunReadiness(
