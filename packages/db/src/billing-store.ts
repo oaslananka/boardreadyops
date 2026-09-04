@@ -71,6 +71,140 @@ export class BillingStore {
     return mapCustomer(row);
   }
 
+  /**
+   * Links a Stripe customer id to this repo's tenant id.
+   *
+   * `checkout.session.completed` is the only handled Stripe event that carries both, via
+   * `client_reference_id` (tenant id) and `customer` (Stripe customer id) -- every later
+   * `customer.subscription.*` / `invoice.*` event only carries the Stripe customer id, so this
+   * is the sole place the mapping is established. Deliberately leaves tier/status untouched
+   * when the row already exists: checkout completion does not by itself say which price was
+   * selected, so it must not clobber a tier that a subscription event already set.
+   */
+  async linkStripeCustomer(input: { tenantId: string; stripeCustomerId: string }): Promise<BillingCustomer> {
+    const id = randomUUID();
+    const q = `
+      INSERT INTO billing_customers (id, tenant_id, stripe_customer_id, tier, status, created_at, updated_at)
+      VALUES ($1, $2, $3, 'free', 'incomplete', NOW(), NOW())
+      ON CONFLICT (tenant_id) DO UPDATE SET
+        stripe_customer_id = EXCLUDED.stripe_customer_id,
+        updated_at = NOW()
+      RETURNING *
+    `;
+    const r = (await this.db.query(q, [id, input.tenantId, input.stripeCustomerId])) as {
+      rows?: StoredBillingCustomerRow[];
+    };
+    const row = r.rows?.[0];
+    if (!row) throw new Error("linkStripeCustomer upsert failed");
+    return mapCustomer(row);
+  }
+
+  /** The tenant a Stripe customer id was linked to via `linkStripeCustomer`, if any. */
+  async resolveTenantIdByStripeCustomerId(stripeCustomerId: string): Promise<string | null> {
+    const r = (await this.db.query(`SELECT tenant_id FROM billing_customers WHERE stripe_customer_id=$1 LIMIT 1`, [
+      stripeCustomerId,
+    ])) as { rows?: Array<{ tenant_id: string }> };
+    return r.rows?.[0]?.tenant_id ?? null;
+  }
+
+  /**
+   * Projects a `customer.subscription.created|updated|deleted` event onto `billing_customers`
+   * and `billing_subscriptions`, and mirrors the resulting tier onto `installations.plan_tier`
+   * -- the same column the GitHub Marketplace path writes, so a repository's entitlement check
+   * (`entitlement-store.ts`) does not need to know which billing provider is active.
+   *
+   * Guarded against out-of-order delivery: `stripe_subscription_id` is the upsert conflict
+   * target, and the write only applies when the incoming Stripe event's own `created` timestamp
+   * is at least as new as the last event already applied to that subscription. A tenant that
+   * has not yet been linked via `linkStripeCustomer` (i.e. `checkout.session.completed` has not
+   * been processed yet) yields `applied: false` rather than throwing -- the projection is
+   * deferred, not lost, since the underlying event is already durably recorded by `recordEvent`.
+   */
+  async applyStripeSubscriptionEvent(input: {
+    stripeCustomerId: string;
+    stripeSubscriptionId: string;
+    stripePriceId: string;
+    tier: string;
+    interval: string;
+    status: string;
+    customerStatus: string;
+    quantity: number;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    cancelAtPeriodEnd: boolean;
+    trialEndsAt: string | null;
+    eventCreatedAt: string;
+  }): Promise<{ tenantId: string | null; applied: boolean }> {
+    const q = `
+      WITH target_customer AS (
+        SELECT tenant_id FROM billing_customers WHERE stripe_customer_id = $1
+      ),
+      upserted_subscription AS (
+        INSERT INTO billing_subscriptions (
+          id, tenant_id, stripe_subscription_id, stripe_price_id, tier, interval, status,
+          quantity, current_period_start, current_period_end, cancel_at_period_end,
+          last_event_created_at, created_at, updated_at
+        )
+        SELECT $2, target_customer.tenant_id, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::timestamptz, $11, $12::timestamptz, NOW(), NOW()
+        FROM target_customer
+        ON CONFLICT (stripe_subscription_id) DO UPDATE SET
+          stripe_price_id = EXCLUDED.stripe_price_id,
+          tier = EXCLUDED.tier,
+          interval = EXCLUDED.interval,
+          status = EXCLUDED.status,
+          quantity = EXCLUDED.quantity,
+          current_period_start = EXCLUDED.current_period_start,
+          current_period_end = EXCLUDED.current_period_end,
+          cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+          last_event_created_at = EXCLUDED.last_event_created_at,
+          updated_at = NOW()
+        WHERE billing_subscriptions.last_event_created_at IS NULL
+           OR EXCLUDED.last_event_created_at >= billing_subscriptions.last_event_created_at
+        RETURNING tenant_id
+      ),
+      updated_customer AS (
+        UPDATE billing_customers
+        SET tier = $5, status = $13, trial_ends_at = $14::timestamptz, current_period_end = $10::timestamptz, updated_at = NOW()
+        WHERE tenant_id IN (SELECT tenant_id FROM upserted_subscription)
+        RETURNING tenant_id
+      ),
+      updated_installation AS (
+        UPDATE installations SET plan_tier = $5
+        WHERE account_login IN (SELECT tenant_id FROM updated_customer)
+        RETURNING id
+      )
+      SELECT
+        (SELECT tenant_id FROM target_customer) AS tenant_id,
+        EXISTS (SELECT 1 FROM upserted_subscription) AS applied
+    `;
+    const r = (await this.db.query(q, [
+      input.stripeCustomerId,
+      randomUUID(),
+      input.stripeSubscriptionId,
+      input.stripePriceId,
+      input.tier,
+      input.interval,
+      input.status,
+      input.quantity,
+      input.currentPeriodStart,
+      input.currentPeriodEnd,
+      input.cancelAtPeriodEnd,
+      input.eventCreatedAt,
+      input.customerStatus,
+      input.trialEndsAt,
+    ])) as { rows?: Array<{ tenant_id: string | null; applied: boolean }> };
+    const row = r.rows?.[0];
+    return { tenantId: row?.tenant_id ?? null, applied: row?.applied ?? false };
+  }
+
+  /** Reverses `applyGraceOnPaymentFailure` once an `invoice.paid` event clears the grace period. */
+  async clearGraceOnPaymentSuccess(tenantId: string): Promise<void> {
+    await this.db.query(
+      `UPDATE billing_customers SET status='active', grace_ends_at=NULL, updated_at=NOW() WHERE tenant_id=$1 AND status='past_due'`,
+      [tenantId],
+    );
+  }
+
   async recordEvent(input: {
     stripeEventId: string;
     type: string;
