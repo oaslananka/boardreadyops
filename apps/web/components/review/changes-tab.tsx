@@ -4,16 +4,12 @@ import { ReviewCanvas } from "./review-canvas.js";
 
 export function ChangesTab({ review }: { readonly review: DemoReview }) {
   const pcbs = review.changedFiles?.filter((f) => f.path.endsWith(".kicad_pcb")) ?? [];
-  const hasSchematicOrPcbChanges =
-    review.changedFiles?.some((f) => f.path.endsWith(".kicad_sch") || f.path.endsWith(".kicad_pcb")) ?? false;
 
   let canvasContent: React.ReactNode;
-  if (review.changedFiles === undefined) {
-    canvasContent = <p className="empty-notice">Canvas diff preview is not available for this persisted review.</p>;
-  } else if (!hasSchematicOrPcbChanges || !review.headSnapshots || review.headSnapshots.length === 0) {
-    canvasContent = <p className="empty-notice">No schematic or PCB files modified in this revision.</p>;
+  if (!review.headSnapshots || review.headSnapshots.length === 0) {
+    canvasContent = <p className="empty-notice">No schematic or PCB snapshot is available for this revision.</p>;
   } else {
-    canvasContent = <ReviewCanvas headSnapshots={review.headSnapshots} />;
+    canvasContent = <ReviewCanvas headSnapshots={review.headSnapshots} baseSnapshots={review.baseSnapshots} />;
   }
 
   let pcbContent: React.ReactNode;

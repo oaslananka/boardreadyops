@@ -56,6 +56,49 @@ describe("CLI->Cloud contract: POST /api/v1/runs (review publish)", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a review-canvas snapshot manifest produced by `boardreadyops review publish`", () => {
+    const result = ingestRunRequestSchema.safeParse({
+      ...minimalOldCliPayload,
+      snapshots: [
+        {
+          id: "snap_sch_board",
+          name: "schematic_board.svg",
+          kind: "schematic",
+          format: "svg",
+          sheetOrLayer: "board",
+          width: 1200,
+          height: 800,
+          content: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+          sha256: "f".repeat(64),
+          anchors: [],
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.snapshots).toHaveLength(1);
+    expect(result.success && result.data.snapshots[0]?.sheetOrLayer).toBe("board");
+  });
+
+  it("rejects a snapshot with an unrecognized kind", () => {
+    const result = ingestRunRequestSchema.safeParse({
+      ...minimalOldCliPayload,
+      snapshots: [
+        {
+          id: "snap_x",
+          name: "x.svg",
+          kind: "exploded_view",
+          format: "svg",
+          sheetOrLayer: "board",
+          width: 100,
+          height: 100,
+          sha256: "f".repeat(64),
+          anchors: [],
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("ignores (strips) an unrecognized top-level field a newer CLI might add, per docs/architecture/contract-versioning.md", () => {
     const result = ingestRunRequestSchema.safeParse({
       ...minimalOldCliPayload,

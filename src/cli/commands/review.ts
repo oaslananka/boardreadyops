@@ -1,10 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { computeEvidenceDigest } from "@boardreadyops/cloud-core";
-import type { UploadMode } from "@boardreadyops/contracts";
+import type { SnapshotArtifact, UploadMode } from "@boardreadyops/contracts";
 import { mapFindingsForCloud } from "../../core/cloud-findings.js";
 import { loadConfig } from "../../core/config.js";
 import { runPipeline } from "../../core/pipeline.js";
+import { generateSnapshots } from "../../kicad/snapshots.js";
 import { resolveGitExecutable } from "../../util/git-resolver.js";
 import type { CommonCliOptions } from "./run.js";
 
@@ -109,6 +111,17 @@ export async function reviewPublishCommand(
     return 1;
   }
 
+  const snapshots: SnapshotArtifact[] = await generateSnapshots({
+    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f))),
+    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f))),
+    findings: findings.map((f) => ({
+      fingerprint: f.fingerprint,
+      ruleId: f.ruleId,
+      severity: f.severity,
+      message: f.message,
+    })),
+  });
+
   streams.stdout.write(`🚀 Publishing review to ${server}...\n`);
 
   try {
@@ -127,6 +140,7 @@ export async function reviewPublishCommand(
         triggerKind: "manual",
         findings,
         artifacts: [],
+        snapshots,
         evidenceDigest,
         title: options.title ?? `Review for ${headSha.slice(0, 8)}`,
         ...(baseSha ? { baseCommitSha: baseSha } : {}),
