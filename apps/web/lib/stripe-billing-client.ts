@@ -25,8 +25,8 @@ export interface StripeBillingClient {
 
 /** The narrow slice of the Stripe SDK this client actually calls, so tests can inject a fake without mocking the "stripe" module. */
 export interface StripeSdkSubset {
-  checkout: { sessions: Pick<Stripe.Checkout.SessionsResource, "create"> };
-  billingPortal: { sessions: Pick<Stripe.BillingPortal.SessionsResource, "create"> };
+  checkout: { sessions: Pick<Stripe.Checkout.SessionResource, "create"> };
+  billingPortal: { sessions: Pick<Stripe.BillingPortal.SessionResource, "create"> };
 }
 
 /**

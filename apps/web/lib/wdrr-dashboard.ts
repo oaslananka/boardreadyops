@@ -112,7 +112,7 @@ export async function loadViewerWdrrWeekly(
         return {
           createdAt,
           wdrrReady: isWdrrReady({
-            baseRunId,
+            ...(baseRunId ? { baseRunId } : {}),
             headRunId,
             requiredChecksComplete: headRunStatus === "completed",
             blockerFindingsResolved: !readiness.blockers.some((b) => b.type === "unresolved_finding"),
