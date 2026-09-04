@@ -28,6 +28,16 @@ export function resolveIntervalFromPriceId(priceId: string, config: StripePriceC
   return null;
 }
 
+/** The configured Stripe price id for a tier/interval combination -- the forward direction of `resolveTierFromPriceId`/`resolveIntervalFromPriceId`, used when creating a checkout session. */
+export function priceIdForTier(
+  tier: "team" | "business",
+  interval: "month" | "year",
+  config: StripePriceConfig,
+): string {
+  if (tier === "team") return interval === "month" ? config.teamMonthlyPriceId : config.teamYearlyPriceId;
+  return interval === "month" ? config.businessMonthlyPriceId : config.businessYearlyPriceId;
+}
+
 export const handledStripeEventTypes = new Set([
   "checkout.session.completed",
   "customer.subscription.created",
