@@ -1175,19 +1175,25 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [],
       "evidence": {
-        "code": ["schemas/telemetry-event.schema.json"],
-        "tests": [],
+        "code": [
+          "schemas/telemetry-event.schema.json",
+          "apps/web/lib/webhook-intake-telemetry.ts",
+          "packages/cloud-core/src/wdrr-metrics.ts",
+          "apps/web/lib/wdrr-dashboard.ts",
+          "apps/web/app/insights/page.tsx"
+        ],
+        "tests": ["tests/unit/cloud-core/wdrr-metrics.test.ts", "tests/unit/web/wdrr-dashboard.test.ts"],
         "docs": ["docs/gtm/product-metrics-and-telemetry.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "repo-wide audit: grep for telemetry-emitting code in src/, apps/, packages/ (2026-09-01)",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "command": "corepack pnpm vitest run tests/unit/cloud-core/wdrr-metrics.test.ts tests/unit/web/wdrr-dashboard.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-04T23:35:29Z"
       },
-      "remaining": "No source code anywhere in src/, apps/, or packages/ emits or consumes telemetry events, and no test validates the schema — this is a schema-and-plan artifact; the doc itself frames most validation gates as 'External Validation Required.'"
+      "remaining": "Closed this pass: /insights no longer calls computeWdrrWeekly([]) on a hardcoded empty array. apps/web/lib/wdrr-dashboard.ts::loadViewerWdrrWeekly queries real reviews across the viewer's installations (bounded to the last 90 days / 200 reviews) and evaluates each through the same computeReviewReadiness the review detail page's own readiness gate uses, rather than reimplementing blocker/approval logic and risking the exact policy-divergence bug review-readiness.ts documents. Still genuinely open: (1) schemas/telemetry-event.schema.json's CLI-side event taxonomy has no emitter anywhere in src/ and no schema-validation test. (2) wdrr-metrics.ts's cloud-side allowedProductEvents/sanitizeProductEventPayload are defined but nothing calls them — no product-event ingestion route or store exists. (3) webhook-intake-telemetry.ts is real and already emits structured operational logs on webhook intake, but it is narrow (accept/duplicate/enqueue-failed counters), not the broader activation-funnel instrumentation this workstream's scope implies."
     },
     {
       "id": "W33",
