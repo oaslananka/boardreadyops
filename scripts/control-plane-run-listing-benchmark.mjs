@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { CONTROL_PLANE_LOAD_CONFIRMATION, percentile, summarizeDurations } from "./control-plane-load.mjs";
 import { boundedEnvironmentInteger } from "./lib/environment.mjs";
+import { runWithMkDocsWarningSuppressed } from "./lib/run-command.mjs";
 
 /**
  * Cloud run-list/query pagination benchmark.
@@ -44,6 +46,14 @@ export function parseRunListingBenchmarkConfiguration(environment = process.env)
   });
   if (pageSizes.length === 0) throw new Error("BOARDREADYOPS_RUN_LISTING_PAGE_SIZES must list at least one page size");
 
+  const depthDegradationRatioMax = boundedEnvironmentInteger(
+    environment,
+    "BOARDREADYOPS_RUN_LISTING_DEPTH_DEGRADATION_RATIO_MAX",
+    3,
+    1,
+    50,
+  );
+
   return {
     databaseUrl,
     smallDatasetRuns: boundedEnvironmentInteger(environment, "BOARDREADYOPS_RUN_LISTING_SMALL_DATASET", 200, 50, 2_000),
@@ -58,13 +68,7 @@ export function parseRunListingBenchmarkConfiguration(environment = process.env)
     pageDepth: boundedEnvironmentInteger(environment, "BOARDREADYOPS_RUN_LISTING_PAGE_DEPTH", 20, 5, 200),
     thresholds: {
       p95Ms: boundedEnvironmentInteger(environment, "BOARDREADYOPS_RUN_LISTING_P95_MS", 500, 10, 60_000),
-      depthDegradationRatioMax: boundedEnvironmentInteger(
-        environment,
-        "BOARDREADYOPS_RUN_LISTING_DEPTH_DEGRADATION_RATIO_MAX",
-        3,
-        1,
-        50,
-      ),
+      depthDegradationRatioMax,
     },
   };
 }
@@ -74,24 +78,15 @@ function rounded(value, digits = 3) {
   return Math.round(value * factor) / factor;
 }
 
-function databaseRows(result) {
-  return Array.isArray(result?.rows) ? result.rows : [];
-}
-
-function integerColumn(row, name) {
-  const value = row?.[name];
-  if (typeof value === "number" && Number.isSafeInteger(value)) return value;
-  if (typeof value === "string" && /^\d+$/u.test(value)) return Number(value);
-  return 0;
-}
-
 async function assertIsolatedDatabase(executor) {
-  const unions = isolatedTables.map(
-    (table) => `select '${table}' as table_name, count(*)::bigint as count from ${table}`,
-  );
-  const rows = databaseRows(await executor.query(unions.join(" union all ")));
-  const populated = rows.filter((row) => integerColumn(row, "count") > 0).map((row) => String(row.table_name));
-  if (populated.length > 0) throw new Error("run-listing benchmark database must be isolated and empty");
+  for (const table of isolatedTables) {
+    const result = await executor.query(`select count(*)::bigint as count from ${table}`);
+    const count = Number(result?.rows?.[0]?.count ?? 0);
+    if (!Number.isSafeInteger(count) || count < 0) {
+      throw new Error(`run-listing benchmark could not verify ${table} row count`);
+    }
+    if (count > 0) throw new Error("run-listing benchmark database must be isolated and empty");
+  }
 }
 
 /**
@@ -111,7 +106,7 @@ export function assertKeysetPagination(runListingSource) {
 }
 
 function loadPrefix() {
-  return `runlist-bench-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `runlist-bench-${Date.now()}-${randomUUID()}`;
 }
 
 async function seedTenant(executor, prefix) {
@@ -294,9 +289,8 @@ export async function runRunListingPaginationBenchmark(configuration, dependenci
 
 async function main() {
   parseRunListingBenchmarkConfiguration(process.env);
-  const { spawnSync } = await import("node:child_process");
   const vitestCli = fileURLToPath(new URL("../node_modules/vitest/vitest.mjs", import.meta.url));
-  const result = spawnSync(
+  await runWithMkDocsWarningSuppressed(
     process.execPath,
     [vitestCli, "run", "tests/integration/control-plane-run-listing-benchmark.test.ts", "--no-file-parallelism"],
     {
@@ -305,11 +299,8 @@ async function main() {
         BOARDREADYOPS_RUN_LISTING_BENCHMARK_TESTS: "true",
         BOARDREADYOPS_POSTGRES_TESTS: "true",
       },
-      stdio: "inherit",
     },
   );
-  if (result.error) throw new Error(`run-listing pagination benchmark could not start (${result.error.name})`);
-  if (result.status !== 0) process.exitCode = result.status ?? 1;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
