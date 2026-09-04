@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, refIgnored, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -12,10 +13,7 @@ export const missingMpnRule = rule(
     configKeys: ["rules.bom.missing-mpn.ignore-refs"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "mpn", "sourcing"],
-    category: "sourcing",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.sourcingPresence,
   },
   async (context) => {
     if (!shouldRun(context, "bom.missing-mpn")) {

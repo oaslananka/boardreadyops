@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { loadStm32CubeMxContract, stm32CubeMxAdapter } from "../../firmware/stm32cubemx.js";
 import { configFor, rule, shouldRun } from "../helpers.js";
 import { runFirmwareContractRule } from "./shared.js";
@@ -23,10 +24,7 @@ export const stm32CubeMxPinContractRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "stm32", "stm32cubemx", "contract"],
-    category: "electrical",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   async (context) => {
     if (!shouldRun(context, ruleId)) {

@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { isTestPoint, parsedBoards, positiveInteger } from "./shared.js";
 
@@ -12,10 +13,7 @@ export const testPointsRule = rule(
     configKeys: ["rules.manufacturing.test-points.enabled", "rules.manufacturing.test-points.minimum"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "manufacturing", "pcb", "test"],
-    category: "testability",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "profile-specific",
+    ...RULE_CLASSIFICATIONS.testabilityCapabilityThreshold,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.test-points")) {

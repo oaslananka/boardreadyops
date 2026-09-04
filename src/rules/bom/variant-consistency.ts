@@ -1,6 +1,7 @@
 import path from "node:path";
 import { loadBom } from "../../bom/loader.js";
 import type { ProjectContext, RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { readDesignFile } from "../../kicad/parsers/project-files.js";
 import { activeVariantDnpRefs, parseVariants } from "../../kicad/variants.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
@@ -16,10 +17,7 @@ export const variantConsistencyRule = rule(
     configKeys: ["projects.variants", "rules.bom.variant-consistency.enabled"],
     kicadVersions: ["10", "future"],
     tags: ["bom", "variant", "kicad"],
-    category: "assembly",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency,
   },
   async (context) => {
     if (!shouldRun(context, "bom.variant-consistency")) {

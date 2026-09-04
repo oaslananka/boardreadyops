@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { pathExists } from "../../util/fs.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -13,10 +14,7 @@ export const fabNotesRule = rule(
     configKeys: ["rules.manufacturing.fab-notes.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["documentation", "fabrication", "manufacturing"],
-    category: "manufacturability",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.fab-notes")) {

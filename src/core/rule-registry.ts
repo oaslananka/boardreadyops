@@ -72,6 +72,124 @@ export interface RuleMetadata {
   docUrl?: string;
 }
 
+export type RuleClassification = Pick<RuleMetadata, "category" | "evidenceType" | "fixability" | "vendorDependence">;
+
+/**
+ * Named (category, evidenceType, fixability, vendorDependence) presets for the built-in rules.
+ * Many rules genuinely share the same classification (e.g. every firmware pin-contract rule is
+ * an exact, manually-fixed electrical check with no vendor dependence), so rule definitions spread
+ * a preset (`...RULE_CLASSIFICATIONS.electricalContract`) instead of repeating the four field
+ * literals -- one place to read what each combination means, and no duplicated boilerplate across
+ * the 44 rule files that construct `RuleMetadata`.
+ */
+export const RULE_CLASSIFICATIONS = {
+  /** BOM field carries free-text that is pattern-matched for a specific risk signal. */
+  sourcingHeuristic: {
+    category: "sourcing",
+    evidenceType: "heuristic",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+  /** BOM field presence/equality check with a deterministic sourcing remedy. */
+  sourcingPresence: {
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+  /** A weighted aggregate score; fix the constituent per-row findings, not the score itself. */
+  sourcingAggregateHeuristic: {
+    category: "sourcing",
+    evidenceType: "heuristic",
+    fixability: "none",
+    vendorDependence: "none",
+  },
+  /** Absence-of-data is itself the signal; there is no local edit that resolves "unknown". */
+  sourcingAbsenceSignal: {
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "none",
+    vendorDependence: "none",
+  },
+  /** BOM/PCB/schematic identity or population-state consistency needed for correct assembly. */
+  assemblyDataConsistency: {
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+  /** Assembly coverage/count threshold that commonly varies by contract manufacturer. */
+  assemblyCapabilityThreshold: {
+    category: "assembly",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
+  },
+  /** Deterministic presence/format check on a fabrication-facing artifact. */
+  manufacturabilityPresence: {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+  /** Fabrication capability threshold that commonly varies by manufacturer/process. */
+  manufacturabilityCapabilityThreshold: {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
+  },
+  /** Resolves a named vendor profile (src/vendor/profiles.ts) rather than a generic threshold. */
+  manufacturabilityVendorProfile: {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "manufacturer-specific",
+  },
+  /** Naming/library-convention inference with a specific, actionable remedy. */
+  manufacturabilityHeuristic: {
+    category: "manufacturability",
+    evidenceType: "heuristic",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+  /** Density-based advisory reminder with no single identified defect to fix. */
+  manufacturabilityHeuristicAdvisory: {
+    category: "manufacturability",
+    evidenceType: "heuristic",
+    fixability: "none",
+    vendorDependence: "none",
+  },
+  /** In-circuit/functional test-access coverage threshold, commonly CM/test-house specific. */
+  testabilityCapabilityThreshold: {
+    category: "testability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "profile-specific",
+  },
+  /** KiCad DRC/ERC delegation: BoardReadyOps only normalizes the diagnostic, never edits files. */
+  electricalDelegatedTool: {
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "assisted",
+    vendorDependence: "none",
+  },
+  /** Pinmap/firmware-contract net or pin equality check with a directly editable remedy. */
+  electricalContract: {
+    category: "electrical",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+  /** Release/traceability metadata presence or format check. */
+  releasePresence: {
+    category: "release",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+} as const satisfies Record<string, RuleClassification>;
+
 interface RuleExplanationSection {
   title: string;
   lines: string[];

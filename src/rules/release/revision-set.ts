@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -13,10 +14,7 @@ export const revisionSetRule = rule(
     configKeys: ["rules.release.revision-set.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["pcb", "release", "revision"],
-    category: "release",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.releasePresence,
   },
   async (context) => {
     if (!shouldRun(context, "release.revision-set")) {

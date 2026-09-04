@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { readTextFile } from "../../util/fs.js";
 import { globFiles } from "../../util/glob.js";
@@ -15,10 +16,7 @@ export const drillCoverageRule = rule(
     configKeys: ["rules.manufacturing.drill-coverage.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["drill", "manufacturing", "pcb"],
-    category: "manufacturability",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "profile-specific",
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.drill-coverage")) {

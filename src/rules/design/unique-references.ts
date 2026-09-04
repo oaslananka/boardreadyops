@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, refIgnored, rule, shouldRun } from "../helpers.js";
 
@@ -14,10 +15,7 @@ export const uniqueReferencesRule = rule(
     configKeys: ["rules.design.unique-references.enabled", "rules.design.unique-references.ignore-refs"],
     kicadVersions: ["9", "10", "future"],
     tags: ["design", "dfm", "pcb"],
-    category: "assembly",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.assemblyDataConsistency,
   },
   async (context) => {
     if (!shouldRun(context, "design.unique-references")) {

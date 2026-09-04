@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -13,10 +14,7 @@ export const layerStackupRule = rule(
     configKeys: ["rules.manufacturing.layer-stackup.expected-layers"],
     kicadVersions: ["9", "10", "future"],
     tags: ["manufacturing", "pcb", "stackup"],
-    category: "manufacturability",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "profile-specific",
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.layer-stackup")) {

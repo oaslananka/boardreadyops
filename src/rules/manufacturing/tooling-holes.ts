@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { isToolingHole, parsedBoards, positiveInteger } from "./shared.js";
 
@@ -12,10 +13,7 @@ export const toolingHolesRule = rule(
     configKeys: ["rules.manufacturing.tooling-holes.minimum"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb"],
-    category: "assembly",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "profile-specific",
+    ...RULE_CLASSIFICATIONS.assemblyCapabilityThreshold,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.tooling-holes")) {

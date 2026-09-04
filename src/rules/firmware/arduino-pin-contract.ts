@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { arduinoAdapter } from "../../firmware/arduino.js";
 import { configFor, rule, shouldRun } from "../helpers.js";
 import { runFirmwareContractRule } from "./shared.js";
@@ -22,10 +23,7 @@ export const arduinoPinContractRule = rule(
     ],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "arduino", "contract"],
-    category: "electrical",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   async (context) => {
     if (!shouldRun(context, ruleId)) {

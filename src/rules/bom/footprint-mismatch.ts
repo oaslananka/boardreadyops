@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -12,10 +13,7 @@ export const footprintMismatchRule = rule(
     configKeys: ["rules.bom.footprint-mismatch.severity"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "footprint", "pcb"],
-    category: "manufacturability",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence,
   },
   async (context) => {
     if (!shouldRun(context, "bom.footprint-mismatch")) {

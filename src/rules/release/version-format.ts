@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { Finding } from "../../core/findings.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { readDesignFile } from "../../kicad/parsers/project-files.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
@@ -15,10 +16,7 @@ export const versionFormatRule = rule(
     configKeys: ["rules.release.version-format.pattern"],
     kicadVersions: ["9", "10", "future"],
     tags: ["release", "revision", "versioning"],
-    category: "release",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.releasePresence,
   },
   async (context) => {
     if (!shouldRun(context, "release.version-format")) {

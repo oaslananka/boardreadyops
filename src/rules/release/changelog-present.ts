@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parsePcb } from "../../kicad/pcb.js";
 import { pathExists, readTextFile } from "../../util/fs.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
@@ -14,10 +15,7 @@ export const changelogPresentRule = rule(
     configKeys: ["rules.release.changelog-present.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["changelog", "release", "traceability"],
-    category: "release",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.releasePresence,
   },
   async (context) => {
     if (!shouldRun(context, "release.changelog-present")) {

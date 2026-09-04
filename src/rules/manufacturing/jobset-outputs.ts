@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parseJobset } from "../../kicad/jobset.js";
 import { pathExists } from "../../util/fs.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
@@ -14,10 +15,7 @@ export const jobsetOutputsRule = rule(
     configKeys: ["rules.manufacturing.jobset-outputs.enabled"],
     kicadVersions: ["10", "future"],
     tags: ["jobset", "kicad", "manufacturing"],
-    category: "manufacturability",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.jobset-outputs")) {

@@ -1,4 +1,5 @@
 import { buildAlternatesMap, hasApprovedAlternates } from "../../bom/alternates.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { loadBomContext } from "./shared.js";
 
@@ -13,10 +14,7 @@ export const singleSourceRule = rule(
     configKeys: ["rules.bom.single-source.severity", "bom.alternates"],
     kicadVersions: ["9", "10", "future"],
     tags: ["bom", "sourcing", "supplier"],
-    category: "sourcing",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.sourcingPresence,
   },
   async (context) => {
     if (!shouldRun(context, "bom.single-source")) {

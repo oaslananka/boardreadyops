@@ -1,5 +1,6 @@
 import type { RuleContext } from "../../core/context.js";
 import { isSeverity } from "../../core/findings.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configuredSeverity, rule, shouldRun } from "../helpers.js";
 import { runKicadReportRule } from "../kicad-report.js";
 import type { kicadSeverityToFindingSeverity } from "./severity-map.js";
@@ -15,10 +16,7 @@ export const runDrcRule = rule(
     configKeys: ["kicad-cli", "require-kicad", "rules.drc"],
     kicadVersions: ["9", "10", "future"],
     tags: ["drc", "kicad", "pcb"],
-    category: "electrical",
-    evidenceType: "exact",
-    fixability: "assisted",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.electricalDelegatedTool,
   },
   async (context) => {
     if (!shouldRun(context, "drc.kicad")) {

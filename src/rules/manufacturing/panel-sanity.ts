@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
 export const panelSanityRule = rule(
@@ -11,10 +12,7 @@ export const panelSanityRule = rule(
     configKeys: ["rules.manufacturing.panel-sanity.panelized"],
     kicadVersions: ["9", "10", "future"],
     tags: ["manufacturing", "panel", "outputs"],
-    category: "manufacturability",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "profile-specific",
+    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.panel-sanity")) {

@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
 import type { RuleExplanation } from "../../core/rule-registry.js";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { fileMtimeMs } from "../../util/fs.js";
 import { globFiles } from "../../util/glob.js";
 import { normalizeRelative } from "../../util/path.js";
@@ -29,10 +30,7 @@ export const outputsPresentRule = {
       configKeys: ["rules.manufacturing.outputs-present.required", "rules.manufacturing.outputs-present.patterns"],
       kicadVersions: ["9", "10", "future"],
       tags: ["fabrication", "manufacturing", "outputs"],
-      category: "manufacturability",
-      evidenceType: "exact",
-      fixability: "manual",
-      vendorDependence: "manufacturer-specific",
+      ...RULE_CLASSIFICATIONS.manufacturabilityVendorProfile,
     },
     async (context) => {
       if (!shouldRun(context, "manufacturing.outputs-present")) {

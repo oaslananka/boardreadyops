@@ -1,3 +1,4 @@
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 import { assemblyFootprints, parsedBoards } from "./shared.js";
 
@@ -24,10 +25,7 @@ export const silkscreenOverPadRule = rule(
     configKeys: ["rules.manufacturing.dfm-silkscreen-over-pad.minimum-smd-count"],
     kicadVersions: ["9", "10", "future"],
     tags: ["assembly", "dfa", "dfm", "manufacturing", "pcb", "silkscreen"],
-    category: "manufacturability",
-    evidenceType: "heuristic",
-    fixability: "none",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.manufacturabilityHeuristicAdvisory,
   },
   async (context) => {
     if (!shouldRun(context, "manufacturing.dfm-silkscreen-over-pad")) {

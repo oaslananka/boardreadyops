@@ -1,4 +1,5 @@
 import path from "node:path";
+import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { parseSchematic } from "../../kicad/schematic.js";
 import { loadPinmap } from "../../pinmap/loader.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
@@ -15,10 +16,7 @@ export const pinmapVerifyRule = rule(
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "schematic"],
-    category: "electrical",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.verify")) {
@@ -95,10 +93,7 @@ export const pinmapCollisionRule = rule(
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "validation"],
-    category: "electrical",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.collision")) {
@@ -145,10 +140,7 @@ export const pinmapUnmappedPinRule = rule(
     configKeys: ["pinmap", "projects.pinmap"],
     kicadVersions: ["9", "10", "future"],
     tags: ["firmware", "pinmap", "schematic"],
-    category: "electrical",
-    evidenceType: "exact",
-    fixability: "manual",
-    vendorDependence: "none",
+    ...RULE_CLASSIFICATIONS.electricalContract,
   },
   async (context) => {
     if (!shouldRun(context, "pinmap.unmapped-pin")) {
