@@ -277,9 +277,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W32 — Product Analytics & Privacy-Safe Adoption Metrics
 - **Status:** `Partial`
-- **Remaining:** No source code anywhere in src/, apps/, or packages/ emits or consumes telemetry events, and no test validates the schema — this is a schema-and-plan artifact; the doc itself frames most validation gates as 'External Validation Required.'
-- **Scope:** Strictly privacy-safe telemetry event schema without source exfiltration, and webhook activation metrics.
-- **Code & Test Evidence:** `schemas/telemetry-event.schema.json`, `apps/web/lib/webhook-intake-telemetry.ts`.
+- **Remaining:** Closed this pass: `/insights` no longer calls `computeWdrrWeekly([])` on a hardcoded empty array. `apps/web/lib/wdrr-dashboard.ts`'s `loadViewerWdrrWeekly` queries real reviews across the viewer's installations (bounded to the last 90 days / 200 reviews) and evaluates each through the same `computeReviewReadiness` the review detail page's own readiness gate uses — deliberately not a lighter-weight reimplementation of blocker/approval logic, to avoid the exact policy-divergence bug `apps/web/lib/review-readiness.ts` documents. Still genuinely open: (1) the `schemas/telemetry-event.schema.json` CLI-side event taxonomy (`setup.completed`, `doctor.run`, `scan.completed`, ...) has no emitter anywhere in `src/` and no schema-validation test. (2) `wdrr-metrics.ts`'s cloud-side `allowedProductEvents`/`sanitizeProductEventPayload` are defined but nothing calls them — no product-event ingestion route or store exists. (3) `webhook-intake-telemetry.ts` is real and already emits structured operational logs on every webhook intake, but it is narrow (webhook accept/duplicate/enqueue-failed counters), not the broader activation-funnel instrumentation (install → first run → first finding → first visual diff → first waiver → first handoff) this workstream's scope implies.
+- **Scope:** Strictly privacy-safe telemetry event schema without source exfiltration, webhook activation metrics, and the WDRR north-star metric.
+- **Code & Test Evidence:** `schemas/telemetry-event.schema.json`, `apps/web/lib/webhook-intake-telemetry.ts`, `packages/cloud-core/src/wdrr-metrics.ts`, `apps/web/lib/wdrr-dashboard.ts`, `apps/web/app/insights/page.tsx`.
 
 ### W33 — Compliance & Audit Export
 - **Status:** `Partial`
