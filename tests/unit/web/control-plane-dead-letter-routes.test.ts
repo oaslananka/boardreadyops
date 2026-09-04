@@ -13,6 +13,7 @@ import {
   handleControlPlaneDeadLetterListRequest,
   handleControlPlaneDeadLetterReplayRequest,
 } from "../../../apps/web/lib/control-plane-dead-letter-routes.js";
+import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-rate-limit.js";
 import type { ControlPlaneOperationsStore } from "../../../packages/db/src/control-plane-operations-store.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
 
@@ -23,6 +24,7 @@ const operationId = "33333333-3333-4333-8333-333333333333";
 const executor = { query: vi.fn() } as unknown as SqlQueryExecutor;
 afterEach(() => {
   vi.unstubAllEnvs();
+  resetOperatorRateLimitForTests();
 });
 
 function request(
@@ -158,6 +160,31 @@ describe("control-plane dead-letter operator routes", () => {
     expect(unauthorizedResponse.status).toBe(401);
     expect(unauthorizedResponse.headers.get("www-authenticate")).toBe("Bearer");
     expect(unauthorized.queryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 with Retry-After after repeated operator authentication failures", async () => {
+    const deps = dependencies(operationsStore(), {
+      BOARDREADYOPS_OPERATOR_API_TOKEN: token,
+      BOARDREADYOPS_OPERATOR_ACTOR_ID: "operator.primary",
+      BOARDREADYOPS_OPERATOR_RATE_LIMIT_PER_MINUTE: "1",
+      DATABASE_URL: "postgresql://example.invalid/boardreadyops",
+    });
+    const path = `/api/v1/operator/installations/${installationId}/dead-letters`;
+
+    const first = await handleControlPlaneDeadLetterListRequest(
+      request(path, { authorization: "Bearer invalid" }),
+      installationId,
+      deps,
+    );
+    expect(first.status).toBe(401);
+    const limited = await handleControlPlaneDeadLetterListRequest(
+      request(path, { authorization: "Bearer invalid" }),
+      installationId,
+      deps,
+    );
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(deps.queryExecutor).not.toHaveBeenCalled();
   });
 
   it("rejects invalid installation identifiers and pagination", async () => {
