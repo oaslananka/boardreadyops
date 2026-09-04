@@ -23,6 +23,23 @@ export type ComponentQuery = {
   manufacturer?: string | undefined;
 };
 
+/**
+ * Whether a part was seen through an authorized distribution channel or a marketplace/broker
+ * listing, derived from a provider's own seller-authorization signal (e.g. Nexar's
+ * `Seller.isAuthorized`). `"unknown"` means the provider gave no such signal for this part —
+ * genuinely unclassifiable, not a guess.
+ */
+export type ComponentDistributorClassification = "authorized-distributor" | "marketplace" | "unknown";
+
+/** One quantity-price tier from a provider's offer data. */
+export type PriceBreak = {
+  /** Minimum order quantity this price applies at. */
+  quantity: number;
+  price: number;
+  /** ISO 4217 currency code the price is denominated in. */
+  currency: string;
+};
+
 export type ComponentObservation = {
   mpn: string;
   manufacturer?: string | undefined;
@@ -33,6 +50,14 @@ export type ComponentObservation = {
   observedAt: Date;
   /** When this observation should be refreshed. Absent means it never expires on its own. */
   expiresAt?: Date | undefined;
+  /**
+   * Absent when the provider carries no seller data at all (e.g. a provider that only answers
+   * lifecycle status). Present and possibly `"unknown"` when the provider does return seller
+   * data but it does not resolve to a clear authorized-vs-marketplace signal for this part.
+   */
+  distributorClassification?: ComponentDistributorClassification | undefined;
+  /** Quantity-price tiers the provider returned. Absent or empty when it returned none. */
+  priceBreaks?: readonly PriceBreak[] | undefined;
 };
 
 /**

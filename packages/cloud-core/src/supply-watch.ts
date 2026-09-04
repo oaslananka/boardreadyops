@@ -1,9 +1,11 @@
 import {
+  type ComponentDistributorClassification,
   type ComponentIntelligenceProvider,
   type ComponentLifecycleStatus,
   type ComponentQuery,
   componentKey,
   isRiskyLifecycleStatus,
+  type PriceBreak,
   queryablePartsOf,
   supplyFindingSeverity,
 } from "./component-intelligence.js";
@@ -40,7 +42,18 @@ export type SupplyWatchStore = {
   freshObservations(
     now: Date,
     keys: readonly { mpn: string; manufacturer?: string | undefined }[],
-  ): Promise<Map<string, { status: string; source: string; observedAt: string }>>;
+  ): Promise<
+    Map<
+      string,
+      {
+        status: string;
+        source: string;
+        observedAt: string;
+        distributorClassification?: ComponentDistributorClassification | undefined;
+        priceBreaks?: readonly PriceBreak[] | undefined;
+      }
+    >
+  >;
   recordObservations(
     observations: readonly {
       mpn: string;
@@ -50,6 +63,8 @@ export type SupplyWatchStore = {
       evidenceUrl?: string | undefined;
       observedAt: Date;
       expiresAt?: Date | undefined;
+      distributorClassification?: ComponentDistributorClassification | undefined;
+      priceBreaks?: readonly PriceBreak[] | undefined;
     }[],
   ): Promise<number>;
   reconcileFindings(

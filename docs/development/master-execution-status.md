@@ -151,9 +151,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W11 — BOM, Supply Chain & Cost Intelligence
 - **Status:** `Partial`
-- **Remaining:** No provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; fleet BOM exposure (which releases contain MPN X) is not queryable — board-bom-store.ts only exposes a write path. Matches open issue #449.
-- **Scope:** Component MPN normalization, lifecycle tracking (Active/NRND/EOL), CycloneDX HBOM generation, and provider abstraction (Nexar).
-- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/report/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`.
+- **Remaining:** Provider rate-limit/circuit-breaker, authorized-distributor-vs-marketplace classification, and cost/quantity-tier/currency snapshot metadata are now closed (see `master-execution-status.json` for detail). Distributor classification is limited to what Nexar's `Seller.isAuthorized` field actually signals — no other provider is implemented. HTTP surface for `findBoardsByMpn` and the new snapshot fields is still deliberately out of scope: no installation-level (cross-repository) API auth context exists yet, a separate access-control decision. Matches open issue #449.
+- **Scope:** Component MPN normalization, lifecycle tracking (Active/NRND/EOL), CycloneDX HBOM generation, and provider abstraction (Nexar) with a rate-limited, circuit-broken outbound path and distributor/pricing snapshot metadata.
+- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/report/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`, `packages/cloud-core/src/component-intelligence-resilience.ts`, `packages/cloud-core/src/nexar-component-intelligence.ts`, `packages/db/src/board-supply-watch-store.ts`.
 
 ### W12 — Firmware ↔ Hardware Contract
 - **Status:** `Partial`

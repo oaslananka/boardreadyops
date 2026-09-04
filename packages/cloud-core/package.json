@@ -39,6 +39,11 @@
       "import": "./src/component-intelligence.ts",
       "default": "./src/component-intelligence.ts"
     },
+    "./component-intelligence-resilience": {
+      "types": "./src/component-intelligence-resilience.ts",
+      "import": "./src/component-intelligence-resilience.ts",
+      "default": "./src/component-intelligence-resilience.ts"
+    },
     "./supply-watch": {
       "types": "./src/supply-watch.ts",
       "import": "./src/supply-watch.ts",

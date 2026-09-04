@@ -1,6 +1,6 @@
 // The evaluator looks these observations up by componentKey, so the store must key them
 // with the same function. Two spellings of "the same part" silently miss every cache hit.
-import { componentKey } from "@boardreadyops/cloud-core";
+import { type ComponentDistributorClassification, componentKey, type PriceBreak } from "@boardreadyops/cloud-core";
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 
 export type DueBoard = {
@@ -22,6 +22,8 @@ export type ObservationInput = {
   evidenceUrl?: string | undefined;
   observedAt: Date;
   expiresAt?: Date | undefined;
+  distributorClassification?: ComponentDistributorClassification | undefined;
+  priceBreaks?: readonly PriceBreak[] | undefined;
 };
 
 export type SupplyFindingInput = {
@@ -42,7 +44,18 @@ export type BoardSupplyWatchStore = {
   freshObservations(
     now: Date,
     keys: readonly { mpn: string; manufacturer?: string | undefined }[],
-  ): Promise<Map<string, { status: string; source: string; observedAt: string }>>;
+  ): Promise<
+    Map<
+      string,
+      {
+        status: string;
+        source: string;
+        observedAt: string;
+        distributorClassification?: ComponentDistributorClassification | undefined;
+        priceBreaks?: readonly PriceBreak[] | undefined;
+      }
+    >
+  >;
   recordObservations(observations: readonly ObservationInput[]): Promise<number>;
   /** Opens findings that are newly risky and resolves ones no longer risky. */
   reconcileFindings(
@@ -84,6 +97,28 @@ function timestampText(row: Record<string, unknown>, key: string): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === "string") return value;
   throw new Error(`expected timestamp column ${key}`);
+}
+
+function distributorClassification(
+  row: Record<string, unknown>,
+  key: string,
+): ComponentDistributorClassification | undefined {
+  const value = row[key];
+  return value === "authorized-distributor" || value === "marketplace" || value === "unknown" ? value : undefined;
+}
+
+/** node-postgres decodes `jsonb` to a native array; a mocked executor may hand back a JSON string instead. */
+function priceBreaks(row: Record<string, unknown>, key: string): readonly PriceBreak[] | undefined {
+  const raw = row[key];
+  const parsed = Array.isArray(raw) ? raw : typeof raw === "string" ? JSON.parse(raw) : undefined;
+  if (!Array.isArray(parsed) || parsed.length === 0) return undefined;
+  return (parsed as Record<string, unknown>[]).flatMap((entry): PriceBreak[] => {
+    const quantity = Number(entry.quantity);
+    const price = Number(entry.price);
+    const currency = entry.currency;
+    if (!Number.isFinite(quantity) || !Number.isFinite(price) || typeof currency !== "string" || !currency) return [];
+    return [{ quantity, price, currency }];
+  });
 }
 
 export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): BoardSupplyWatchStore {
@@ -156,20 +191,31 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
       if (keys.length === 0) return new Map();
       const mpns = [...new Set(keys.map((key) => key.mpn.trim().toLowerCase()))];
       const result = await executor.query(
-        `select mpn, manufacturer, status, source, observed_at
+        `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks
          from component_lifecycle_observations
          where lower(mpn) = any($1::text[])
            and (expires_at is null or expires_at > $2::timestamptz)`,
         [mpns, now.toISOString()],
       );
 
-      const fresh = new Map<string, { status: string; source: string; observedAt: string }>();
+      const fresh = new Map<
+        string,
+        {
+          status: string;
+          source: string;
+          observedAt: string;
+          distributorClassification?: ComponentDistributorClassification | undefined;
+          priceBreaks?: readonly PriceBreak[] | undefined;
+        }
+      >();
       for (const row of rows(result)) {
         const key = componentKey({ mpn: required(row, "mpn"), manufacturer: text(row, "manufacturer") });
         fresh.set(key, {
           status: required(row, "status"),
           source: required(row, "source"),
           observedAt: timestampText(row, "observed_at"),
+          distributorClassification: distributorClassification(row, "distributor_classification"),
+          priceBreaks: priceBreaks(row, "price_breaks"),
         });
       }
       return fresh;
@@ -186,24 +232,31 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           evidence_url: observation.evidenceUrl ?? null,
           observed_at: observation.observedAt.toISOString(),
           expires_at: observation.expiresAt?.toISOString() ?? null,
+          distributor_classification: observation.distributorClassification ?? null,
+          price_breaks: observation.priceBreaks ?? [],
         })),
       );
       const result = await executor.query(
         `insert into component_lifecycle_observations (
-           mpn, manufacturer, status, source, evidence_url, observed_at, expires_at
+           mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
+           distributor_classification, price_breaks
          )
          select entry.mpn, entry.manufacturer, entry.status, entry.source,
-                entry.evidence_url, entry.observed_at, entry.expires_at
+                entry.evidence_url, entry.observed_at, entry.expires_at,
+                entry.distributor_classification, entry.price_breaks
          from jsonb_to_recordset($1::jsonb) as entry(
            mpn text, manufacturer text, status text, source text,
-           evidence_url text, observed_at timestamptz, expires_at timestamptz
+           evidence_url text, observed_at timestamptz, expires_at timestamptz,
+           distributor_classification text, price_breaks jsonb
          )
          on conflict (lower(mpn), lower(coalesce(manufacturer, ''))) do update
            set status = excluded.status,
                source = excluded.source,
                evidence_url = excluded.evidence_url,
                observed_at = excluded.observed_at,
-               expires_at = excluded.expires_at
+               expires_at = excluded.expires_at,
+               distributor_classification = excluded.distributor_classification,
+               price_breaks = excluded.price_breaks
            where excluded.observed_at >= component_lifecycle_observations.observed_at
          returning id`,
         [payload],
