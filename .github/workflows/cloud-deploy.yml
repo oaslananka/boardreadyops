@@ -91,7 +91,40 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            "set -euo pipefail; cd /home/ubuntu/boardreadyops-cloud/repo && git fetch origin --prune && git checkout main && git merge --ff-only origin/main && cd /home/ubuntu/boardreadyops-cloud && ./deploy.sh ${DEPLOY_ARGS}"
+            "bash -s -- '${DEPLOY_ARGS}'" <<'REMOTE_DEPLOY'
+          set -euo pipefail
+          deploy_root=/home/ubuntu/boardreadyops-cloud
+          repo_dir="${deploy_root}/repo"
+          deploy_args="$1"
+
+          test -d "${repo_dir}/.git" || {
+            printf '%s\n' 'cloud-deploy preflight: deployment checkout is not commissioned; follow docs/deployment/self-hosted.md before retrying' >&2
+            exit 78
+          }
+          test -x "${deploy_root}/deploy.sh" || {
+            printf '%s\n' 'cloud-deploy preflight: deployment runbook is not commissioned; follow docs/deployment/self-hosted.md before retrying' >&2
+            exit 78
+          }
+
+          cd "${repo_dir}"
+          git fetch origin --prune
+          git checkout main
+          git merge --ff-only origin/main
+          cd "${deploy_root}"
+
+          case "${deploy_args}" in
+            "build migrate web worker")
+              ./deploy.sh build migrate web worker
+              ;;
+            "up -d --build migrate web worker")
+              ./deploy.sh up -d --build migrate web worker
+              ;;
+            *)
+              printf '%s\n' 'cloud-deploy preflight: unexpected deploy argument set' >&2
+              exit 64
+              ;;
+          esac
+          REMOTE_DEPLOY
 
       - name: Remove temporary SSH key
         if: always()
