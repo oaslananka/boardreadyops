@@ -80128,6 +80128,32 @@ function registerRule(rule2) {
 function listRules() {
   return [...registry.values()].sort((a, b) => a.meta.id.localeCompare(b.meta.id));
 }
+var knownCategories = [
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release"
+];
+function emptyCategorySummary(category) {
+  return { category, total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+}
+function categorizeFindings(findings) {
+  const metaById = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta]));
+  const buckets = new Map(
+    knownCategories.map((category) => [category, emptyCategorySummary(category)])
+  );
+  for (const finding2 of findings) {
+    const category = metaById.get(finding2.ruleId)?.category ?? "unclassified";
+    const bucket = buckets.get(category) ?? emptyCategorySummary(category);
+    bucket.total += 1;
+    bucket[finding2.severity] += 1;
+    buckets.set(category, bucket);
+  }
+  const order = buckets.has("unclassified") ? [...knownCategories, "unclassified"] : knownCategories;
+  return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
+}
 
 // src/rules/helpers.ts
 var import_node_path5 = __toESM(require("node:path"), 1);
@@ -104407,6 +104433,7 @@ function assembleRunResult({
     },
     ...releaseMode ? { releaseMode } : {},
     summary: summary2,
+    categoryBreakdown: categorizeFindings(effectiveFindings),
     readiness,
     ...bomRisk ? { bomRisk } : {},
     ...policy ? { policy } : {},
@@ -106542,6 +106569,15 @@ var createReleaseRunRequestSchema = external_exports.object({
   pullRequestNumber: external_exports.number().int().positive().optional(),
   triggerKind: triggerKindSchema
 });
+var findingCategorySchema = external_exports.enum([
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release",
+  "unclassified"
+]);
 var findingSchema = external_exports.object({
   ruleId: external_exports.string().min(1).max(256),
   severity: findingSeveritySchema,
@@ -106549,6 +106585,10 @@ var findingSchema = external_exports.object({
   path: external_exports.string().min(1).max(1024).optional(),
   project: external_exports.string().trim().min(1).max(1024).optional(),
   fingerprint: findingFingerprintSchema.optional(),
+  // The rule's registered domain (src/core/rule-registry.ts's RuleCategory), so the run/review
+  // UI can group findings by domain without needing the CLI's rule registry itself. Optional --
+  // older CLI/Action versions never sent it.
+  category: findingCategorySchema.optional(),
   // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
   // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
   // can point at a specific line, and older CLI/Action versions never sent these at all.
@@ -106758,9 +106798,10 @@ function computeEvidenceDigest(input) {
 }
 
 // src/core/cloud-findings.ts
-function mapFindingForCloud(finding2) {
+function mapFindingForCloud(finding2, categoryByRuleId) {
   const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
   const endLine = finding2.location?.region?.endLine ?? startLine;
+  const category = categoryByRuleId.get(finding2.ruleId);
   return {
     ruleId: finding2.ruleId,
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
@@ -106771,11 +106812,13 @@ function mapFindingForCloud(finding2) {
     ...startLine !== void 0 ? { startLine } : {},
     ...endLine !== void 0 ? { endLine } : {},
     ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
-    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
+    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {},
+    ...category !== void 0 ? { category } : {}
   };
 }
 function mapFindingsForCloud(findings) {
-  return findings.map(mapFindingForCloud);
+  const categoryByRuleId = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta.category]));
+  return findings.map((finding2) => mapFindingForCloud(finding2, categoryByRuleId));
 }
 
 // src/action/cloud-publish.ts
@@ -110719,6 +110762,12 @@ function formatReviewComment(result, reports = [], locale = "en") {
     "",
     ...topFindings2(result, locale)
   ];
+  if (result.categoryBreakdown) {
+    const section = categoryBreakdownSection(result.categoryBreakdown);
+    if (section.length > 0) {
+      lines.push("", ...section);
+    }
+  }
   if (result.hardwareImpact) {
     lines.push("", ...hardwareImpactSection(result.hardwareImpact));
   }
@@ -110798,6 +110847,27 @@ function location(finding2) {
 }
 function severityLabel(severity, locale) {
   return t(`severity.${severity}`, {}, locale);
+}
+var CATEGORY_LABEL = {
+  electrical: "Electrical",
+  manufacturability: "Manufacturability (DFM)",
+  assembly: "Assembly (DFA)",
+  testability: "Testability (DFT)",
+  sourcing: "Sourcing / BOM",
+  release: "Release",
+  unclassified: "Other"
+};
+function categoryBreakdownSection(breakdown) {
+  const withFindings = breakdown.filter((category) => category.total > 0);
+  if (withFindings.length === 0) {
+    return [];
+  }
+  const lines = ["### By domain", "", "| Domain | Findings | Blocking |", "| --- | ---: | ---: |"];
+  for (const category of withFindings) {
+    const blocking = category.critical + category.high;
+    lines.push(`| ${CATEGORY_LABEL[category.category]} | ${category.total} | ${blocking} |`);
+  }
+  return lines;
 }
 function hardwareImpactSection(impact) {
   const lines = ["### Hardware impact"];

@@ -83,6 +83,10 @@ function sampleRun(): RunDetail {
       },
     ],
     findingsPage: { page: 1, pageSize: 25, total: 1, totalPages: 1 },
+    categoryBreakdown: [
+      { category: "sourcing", total: 1, critical: 0, high: 1, medium: 0, low: 0, info: 0 },
+      { category: "electrical", total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+    ],
     artifacts: [
       {
         id: "artifact-1",
@@ -204,6 +208,20 @@ describe("run investigation accessibility", () => {
     // The header states which run this is; the verdict states the outcome. Repeating the
     // outcome in both is what made the page read as a status dump.
     expect(markup).not.toContain("Decision: Pass");
+  });
+
+  it("renders a per-domain findings breakdown on the summary view, independent of the findings table", () => {
+    const markup = viewMarkup("summary");
+    expect(markup).toContain("Findings by domain");
+    expect(markup).toContain("Sourcing / BOM");
+    expect(markup).toContain("Electrical");
+  });
+
+  it("renders no domain breakdown section for a run with no recorded category data", () => {
+    const run = sampleRun();
+    run.categoryBreakdown = [];
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+    expect(markup).not.toContain("Findings by domain");
   });
 
   it("preserves bounded evidence controls while changing presentation", () => {

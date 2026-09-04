@@ -89,6 +89,8 @@ export interface DemoReview {
   bomChanges?: DemoBomChange[] | undefined;
   /** Populated server-side (see `getDemoReview`); absent on the static fixtures below. */
   headSnapshots?: SnapshotArtifact[] | undefined;
+  /** Snapshots for the revision's base commit, when a prior run recorded them; enables overlay/diff canvas modes. */
+  baseSnapshots?: SnapshotArtifact[] | undefined;
 }
 
 type DemoChangedFile = {

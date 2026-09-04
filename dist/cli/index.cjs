@@ -3524,8 +3524,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path66) {
-      let input = path66;
+    function removeDotSegments(path67) {
+      let input = path67;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3930,8 +3930,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path66 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path66 && path66 !== "/" ? path66 : void 0;
+        const path67 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path67 && path67 !== "/" ? path67 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -8278,7 +8278,7 @@ var require_dist = __commonJS({
 var require_resolve_from = __commonJS({
   "node_modules/resolve-from/index.js"(exports2, module2) {
     "use strict";
-    var path66 = require("path");
+    var path67 = require("path");
     var Module = require("module");
     var fs23 = require("fs");
     var resolveFrom = (fromDir, moduleId, silent) => {
@@ -8292,14 +8292,14 @@ var require_resolve_from = __commonJS({
         fromDir = fs23.realpathSync(fromDir);
       } catch (err) {
         if (err.code === "ENOENT") {
-          fromDir = path66.resolve(fromDir);
+          fromDir = path67.resolve(fromDir);
         } else if (silent) {
           return null;
         } else {
           throw err;
         }
       }
-      const fromFile = path66.join(fromDir, "noop.js");
+      const fromFile = path67.join(fromDir, "noop.js");
       const resolveFileName = () => Module._resolveFilename(moduleId, {
         id: fromFile,
         filename: fromFile,
@@ -8371,7 +8371,7 @@ var require_parent_module = __commonJS({
 var require_import_fresh = __commonJS({
   "node_modules/import-fresh/index.js"(exports2, module2) {
     "use strict";
-    var path66 = require("path");
+    var path67 = require("path");
     var resolveFrom = require_resolve_from();
     var parentModule = require_parent_module();
     module2.exports = (moduleId) => {
@@ -8379,7 +8379,7 @@ var require_import_fresh = __commonJS({
         throw new TypeError("Expected a string");
       }
       const parentPath = parentModule(__filename);
-      const cwd = parentPath ? path66.dirname(parentPath) : __dirname;
+      const cwd = parentPath ? path67.dirname(parentPath) : __dirname;
       const filePath = resolveFrom(cwd, moduleId);
       const oldModule = require.cache[filePath];
       if (oldModule && oldModule.parent) {
@@ -12379,7 +12379,7 @@ ${error51.message}`;
         return typescript.sys.fileExists(fileName);
       });
       if (filePath !== void 0) {
-        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path66) => typescript.sys.readFile(path66));
+        const { config: config2, error: error51 } = typescript.readConfigFile(filePath, (path67) => typescript.sys.readFile(path67));
         if (error51) {
           throw new Error(`Error in ${filePath}: ${error51.messageText.toString()}`);
         }
@@ -12502,42 +12502,42 @@ var require_defaults2 = __commonJS({
 var require_env_paths = __commonJS({
   "node_modules/env-paths/index.js"(exports2, module2) {
     "use strict";
-    var path66 = require("path");
+    var path67 = require("path");
     var os7 = require("os");
     var homedir = os7.homedir();
     var tmpdir = os7.tmpdir();
     var { env } = process;
     var macos = (name) => {
-      const library = path66.join(homedir, "Library");
+      const library = path67.join(homedir, "Library");
       return {
-        data: path66.join(library, "Application Support", name),
-        config: path66.join(library, "Preferences", name),
-        cache: path66.join(library, "Caches", name),
-        log: path66.join(library, "Logs", name),
-        temp: path66.join(tmpdir, name)
+        data: path67.join(library, "Application Support", name),
+        config: path67.join(library, "Preferences", name),
+        cache: path67.join(library, "Caches", name),
+        log: path67.join(library, "Logs", name),
+        temp: path67.join(tmpdir, name)
       };
     };
     var windows = (name) => {
-      const appData = env.APPDATA || path66.join(homedir, "AppData", "Roaming");
-      const localAppData = env.LOCALAPPDATA || path66.join(homedir, "AppData", "Local");
+      const appData = env.APPDATA || path67.join(homedir, "AppData", "Roaming");
+      const localAppData = env.LOCALAPPDATA || path67.join(homedir, "AppData", "Local");
       return {
         // Data/config/cache/log are invented by me as Windows isn't opinionated about this
-        data: path66.join(localAppData, name, "Data"),
-        config: path66.join(appData, name, "Config"),
-        cache: path66.join(localAppData, name, "Cache"),
-        log: path66.join(localAppData, name, "Log"),
-        temp: path66.join(tmpdir, name)
+        data: path67.join(localAppData, name, "Data"),
+        config: path67.join(appData, name, "Config"),
+        cache: path67.join(localAppData, name, "Cache"),
+        log: path67.join(localAppData, name, "Log"),
+        temp: path67.join(tmpdir, name)
       };
     };
     var linux = (name) => {
-      const username = path66.basename(homedir);
+      const username = path67.basename(homedir);
       return {
-        data: path66.join(env.XDG_DATA_HOME || path66.join(homedir, ".local", "share"), name),
-        config: path66.join(env.XDG_CONFIG_HOME || path66.join(homedir, ".config"), name),
-        cache: path66.join(env.XDG_CACHE_HOME || path66.join(homedir, ".cache"), name),
+        data: path67.join(env.XDG_DATA_HOME || path67.join(homedir, ".local", "share"), name),
+        config: path67.join(env.XDG_CONFIG_HOME || path67.join(homedir, ".config"), name),
+        cache: path67.join(env.XDG_CACHE_HOME || path67.join(homedir, ".cache"), name),
         // https://wiki.debian.org/XDGBaseDirectorySpecification#state
-        log: path66.join(env.XDG_STATE_HOME || path66.join(homedir, ".local", "state"), name),
-        temp: path66.join(tmpdir, username, name)
+        log: path67.join(env.XDG_STATE_HOME || path67.join(homedir, ".local", "state"), name),
+        temp: path67.join(tmpdir, username, name)
       };
     };
     var envPaths = (name, options) => {
@@ -12618,11 +12618,11 @@ var require_util2 = __commonJS({
       map2.set(key, result);
       return result;
     }
-    function getPropertyByPath(source, path66) {
-      if (typeof path66 === "string" && Object.prototype.hasOwnProperty.call(source, path66)) {
-        return source[path66];
+    function getPropertyByPath(source, path67) {
+      if (typeof path67 === "string" && Object.prototype.hasOwnProperty.call(source, path67)) {
+        return source[path67];
       }
-      const parsedPath = typeof path66 === "string" ? path66.split(".") : path66;
+      const parsedPath = typeof path67 === "string" ? path67.split(".") : path67;
       return parsedPath.reduce((previous, key) => {
         if (previous === void 0) {
           return previous;
@@ -12633,9 +12633,9 @@ var require_util2 = __commonJS({
     function removeUndefinedValuesFromObject(options) {
       return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== void 0));
     }
-    async function isDirectory(path66) {
+    async function isDirectory(path67) {
       try {
-        const stat3 = await fs_1.promises.stat(path66);
+        const stat3 = await fs_1.promises.stat(path67);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12644,9 +12644,9 @@ var require_util2 = __commonJS({
         throw e;
       }
     }
-    function isDirectorySync(path66) {
+    function isDirectorySync(path67) {
       try {
-        const stat3 = fs_1.default.statSync(path66);
+        const stat3 = fs_1.default.statSync(path67);
         return stat3.isDirectory();
       } catch (e) {
         if (e.code === "ENOENT") {
@@ -12744,7 +12744,7 @@ var require_ExplorerBase = __commonJS({
           const idx = importStack.indexOf(fullPath);
           if (idx !== -1) {
             throw new Error(`Circular import detected:
-${[...importStack, fullPath].map((path66, i) => `${i + 1}. ${path66}`).join("\n")} (same as ${idx + 1}.)`);
+${[...importStack, fullPath].map((path67, i) => `${i + 1}. ${path67}`).join("\n")} (same as ${idx + 1}.)`);
           }
         }
       }
@@ -12931,9 +12931,9 @@ var require_Explorer = __commonJS({
           throw error51;
         }
       }
-      async #fileExists(path66) {
+      async #fileExists(path67) {
         try {
-          await promises_1.default.stat(path66);
+          await promises_1.default.stat(path67);
           return true;
         } catch (e) {
           return false;
@@ -13093,9 +13093,9 @@ var require_ExplorerSync = __commonJS({
           throw error51;
         }
       }
-      #fileExists(path66) {
+      #fileExists(path67) {
         try {
-          fs_1.default.statSync(path66);
+          fs_1.default.statSync(path67);
           return true;
         } catch (e) {
           return false;
@@ -13221,7 +13221,7 @@ var require_dist2 = __commonJS({
       };
     }
     function getResolvedSearchPlaces(moduleName, toolDefinedSearchPlaces, userConfiguredOptions) {
-      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path66) => path66.replace("{name}", moduleName));
+      const userConfiguredSearchPlaces = userConfiguredOptions.searchPlaces?.map((path67) => path67.replace("{name}", moduleName));
       if (userConfiguredOptions.mergeSearchPlaces) {
         return [...userConfiguredSearchPlaces ?? [], ...toolDefinedSearchPlaces];
       }
@@ -13449,7 +13449,7 @@ var require_path = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.convertPosixPathToPattern = exports2.convertWindowsPathToPattern = exports2.convertPathToPattern = exports2.escapePosixPath = exports2.escapeWindowsPath = exports2.escape = exports2.removeLeadingDotSegment = exports2.makeAbsolute = exports2.unixify = void 0;
     var os7 = require("os");
-    var path66 = require("path");
+    var path67 = require("path");
     var IS_WINDOWS_PLATFORM = os7.platform() === "win32";
     var LEADING_DOT_SEGMENT_CHARACTERS_COUNT = 2;
     var POSIX_UNESCAPED_GLOB_SYMBOLS_RE = /(\\?)([()*?[\]{|}]|^!|[!+@](?=\()|\\(?![!()*+?@[\]{|}]))/g;
@@ -13461,7 +13461,7 @@ var require_path = __commonJS({
     }
     exports2.unixify = unixify;
     function makeAbsolute(cwd, filepath) {
-      return path66.resolve(cwd, filepath);
+      return path67.resolve(cwd, filepath);
     }
     exports2.makeAbsolute = makeAbsolute;
     function removeLeadingDotSegment(entry) {
@@ -14758,7 +14758,7 @@ var require_braces = __commonJS({
 var require_constants2 = __commonJS({
   "node_modules/picomatch/lib/constants.js"(exports2, module2) {
     "use strict";
-    var path66 = require("path");
+    var path67 = require("path");
     var WIN_SLASH = "\\\\/";
     var WIN_NO_SLASH = `[^${WIN_SLASH}]`;
     var DEFAULT_MAX_EXTGLOB_RECURSION = 0;
@@ -14932,7 +14932,7 @@ var require_constants2 = __commonJS({
       /* | */
       CHAR_ZERO_WIDTH_NOBREAK_SPACE: 65279,
       /* \uFEFF */
-      SEP: path66.sep,
+      SEP: path67.sep,
       /**
        * Create EXTGLOB_CHARS
        */
@@ -14959,7 +14959,7 @@ var require_constants2 = __commonJS({
 var require_utils3 = __commonJS({
   "node_modules/picomatch/lib/utils.js"(exports2) {
     "use strict";
-    var path66 = require("path");
+    var path67 = require("path");
     var win32 = process.platform === "win32";
     var {
       REGEX_BACKSLASH,
@@ -14988,7 +14988,7 @@ var require_utils3 = __commonJS({
       if (options && typeof options.windows === "boolean") {
         return options.windows;
       }
-      return win32 === true || path66.sep === "\\";
+      return win32 === true || path67.sep === "\\";
     };
     exports2.escapeLast = (input, char, lastIdx) => {
       const idx = input.lastIndexOf(char, lastIdx);
@@ -16352,7 +16352,7 @@ var require_parse2 = __commonJS({
 var require_picomatch = __commonJS({
   "node_modules/picomatch/lib/picomatch.js"(exports2, module2) {
     "use strict";
-    var path66 = require("path");
+    var path67 = require("path");
     var scan2 = require_scan();
     var parse5 = require_parse2();
     var utils = require_utils3();
@@ -16437,7 +16437,7 @@ var require_picomatch = __commonJS({
     };
     picomatch.matchBase = (input, glob, options, posix = utils.isWindows(options)) => {
       const regex = glob instanceof RegExp ? glob : picomatch.makeRe(glob, options);
-      return regex.test(path66.basename(input));
+      return regex.test(path67.basename(input));
     };
     picomatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
     picomatch.parse = (pattern, options) => {
@@ -16664,7 +16664,7 @@ var require_pattern2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.isAbsolute = exports2.partitionAbsoluteAndRelative = exports2.removeDuplicateSlashes = exports2.matchAny = exports2.convertPatternsToRe = exports2.makeRe = exports2.getPatternParts = exports2.expandBraceExpansion = exports2.expandPatternsWithBraceExpansion = exports2.isAffectDepthOfReadingPattern = exports2.endsWithSlashGlobStar = exports2.hasGlobStar = exports2.getBaseDirectory = exports2.isPatternRelatedToParentDirectory = exports2.getPatternsOutsideCurrentDirectory = exports2.getPatternsInsideCurrentDirectory = exports2.getPositivePatterns = exports2.getNegativePatterns = exports2.isPositivePattern = exports2.isNegativePattern = exports2.convertToNegativePattern = exports2.convertToPositivePattern = exports2.isDynamicPattern = exports2.isStaticPattern = void 0;
-    var path66 = require("path");
+    var path67 = require("path");
     var globParent = require_glob_parent();
     var micromatch = require_micromatch();
     var GLOBSTAR = "**";
@@ -16759,7 +16759,7 @@ var require_pattern2 = __commonJS({
     }
     exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
     function isAffectDepthOfReadingPattern(pattern) {
-      const basename = path66.basename(pattern);
+      const basename = path67.basename(pattern);
       return endsWithSlashGlobStar(pattern) || isStaticPattern(basename);
     }
     exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
@@ -16817,7 +16817,7 @@ var require_pattern2 = __commonJS({
     }
     exports2.partitionAbsoluteAndRelative = partitionAbsoluteAndRelative;
     function isAbsolute2(pattern) {
-      return path66.isAbsolute(pattern);
+      return path67.isAbsolute(pattern);
     }
     exports2.isAbsolute = isAbsolute2;
   }
@@ -16994,8 +16994,8 @@ var require_utils4 = __commonJS({
     exports2.errno = errno;
     var fs23 = require_fs();
     exports2.fs = fs23;
-    var path66 = require_path();
-    exports2.path = path66;
+    var path67 = require_path();
+    exports2.path = path67;
     var pattern = require_pattern2();
     exports2.pattern = pattern;
     var stream = require_stream();
@@ -17107,8 +17107,8 @@ var require_async = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
-    function read(path66, settings, callback) {
-      settings.fs.lstat(path66, (lstatError, lstat3) => {
+    function read(path67, settings, callback) {
+      settings.fs.lstat(path67, (lstatError, lstat3) => {
         if (lstatError !== null) {
           callFailureCallback(callback, lstatError);
           return;
@@ -17117,7 +17117,7 @@ var require_async = __commonJS({
           callSuccessCallback(callback, lstat3);
           return;
         }
-        settings.fs.stat(path66, (statError, stat3) => {
+        settings.fs.stat(path67, (statError, stat3) => {
           if (statError !== null) {
             if (settings.throwErrorOnBrokenSymbolicLink) {
               callFailureCallback(callback, statError);
@@ -17149,13 +17149,13 @@ var require_sync = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
-    function read(path66, settings) {
-      const lstat3 = settings.fs.lstatSync(path66);
+    function read(path67, settings) {
+      const lstat3 = settings.fs.lstatSync(path67);
       if (!lstat3.isSymbolicLink() || !settings.followSymbolicLink) {
         return lstat3;
       }
       try {
-        const stat3 = settings.fs.statSync(path66);
+        const stat3 = settings.fs.statSync(path67);
         if (settings.markSymbolicLink) {
           stat3.isSymbolicLink = () => true;
         }
@@ -17226,17 +17226,17 @@ var require_out = __commonJS({
     var sync = require_sync();
     var settings_1 = require_settings();
     exports2.Settings = settings_1.default;
-    function stat3(path66, optionsOrSettingsOrCallback, callback) {
+    function stat3(path67, optionsOrSettingsOrCallback, callback) {
       if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path66, getSettings(), optionsOrSettingsOrCallback);
+        async.read(path67, getSettings(), optionsOrSettingsOrCallback);
         return;
       }
-      async.read(path66, getSettings(optionsOrSettingsOrCallback), callback);
+      async.read(path67, getSettings(optionsOrSettingsOrCallback), callback);
     }
     exports2.stat = stat3;
-    function statSync2(path66, optionsOrSettings) {
+    function statSync2(path67, optionsOrSettings) {
       const settings = getSettings(optionsOrSettings);
-      return sync.read(path66, settings);
+      return sync.read(path67, settings);
     }
     exports2.statSync = statSync2;
     function getSettings(settingsOrOptions = {}) {
@@ -17452,16 +17452,16 @@ var require_async2 = __commonJS({
           return;
         }
         const tasks = names.map((name) => {
-          const path66 = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
+          const path67 = common.joinPathSegments(directory, name, settings.pathSegmentSeparator);
           return (done) => {
-            fsStat.stat(path66, settings.fsStatSettings, (error51, stats) => {
+            fsStat.stat(path67, settings.fsStatSettings, (error51, stats) => {
               if (error51 !== null) {
                 done(error51);
                 return;
               }
               const entry = {
                 name,
-                path: path66,
+                path: path67,
                 dirent: utils.fs.createDirentFromStats(name, stats)
               };
               if (settings.stats) {
@@ -17579,7 +17579,7 @@ var require_settings2 = __commonJS({
   "node_modules/@nodelib/fs.scandir/out/settings.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path66 = require("path");
+    var path67 = require("path");
     var fsStat = require_out();
     var fs23 = require_fs4();
     var Settings = class {
@@ -17587,7 +17587,7 @@ var require_settings2 = __commonJS({
         this._options = _options;
         this.followSymbolicLinks = this._getValue(this._options.followSymbolicLinks, false);
         this.fs = fs23.createFileSystemAdapter(this._options.fs);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path66.sep);
+        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path67.sep);
         this.stats = this._getValue(this._options.stats, false);
         this.throwErrorOnBrokenSymbolicLink = this._getValue(this._options.throwErrorOnBrokenSymbolicLink, true);
         this.fsStatSettings = new fsStat.Settings({
@@ -17614,17 +17614,17 @@ var require_out2 = __commonJS({
     var sync = require_sync2();
     var settings_1 = require_settings2();
     exports2.Settings = settings_1.default;
-    function scandir(path66, optionsOrSettingsOrCallback, callback) {
+    function scandir(path67, optionsOrSettingsOrCallback, callback) {
       if (typeof optionsOrSettingsOrCallback === "function") {
-        async.read(path66, getSettings(), optionsOrSettingsOrCallback);
+        async.read(path67, getSettings(), optionsOrSettingsOrCallback);
         return;
       }
-      async.read(path66, getSettings(optionsOrSettingsOrCallback), callback);
+      async.read(path67, getSettings(optionsOrSettingsOrCallback), callback);
     }
     exports2.scandir = scandir;
-    function scandirSync(path66, optionsOrSettings) {
+    function scandirSync(path67, optionsOrSettings) {
       const settings = getSettings(optionsOrSettings);
-      return sync.read(path66, settings);
+      return sync.read(path67, settings);
     }
     exports2.scandirSync = scandirSync;
     function getSettings(settingsOrOptions = {}) {
@@ -18271,7 +18271,7 @@ var require_settings3 = __commonJS({
   "node_modules/@nodelib/fs.walk/out/settings.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path66 = require("path");
+    var path67 = require("path");
     var fsScandir = require_out2();
     var Settings = class {
       constructor(_options = {}) {
@@ -18281,7 +18281,7 @@ var require_settings3 = __commonJS({
         this.deepFilter = this._getValue(this._options.deepFilter, null);
         this.entryFilter = this._getValue(this._options.entryFilter, null);
         this.errorFilter = this._getValue(this._options.errorFilter, null);
-        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path66.sep);
+        this.pathSegmentSeparator = this._getValue(this._options.pathSegmentSeparator, path67.sep);
         this.fsScandirSettings = new fsScandir.Settings({
           followSymbolicLinks: this._options.followSymbolicLinks,
           fs: this._options.fs,
@@ -18343,7 +18343,7 @@ var require_reader2 = __commonJS({
   "node_modules/fast-glob/out/readers/reader.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path66 = require("path");
+    var path67 = require("path");
     var fsStat = require_out();
     var utils = require_utils4();
     var Reader = class {
@@ -18356,7 +18356,7 @@ var require_reader2 = __commonJS({
         });
       }
       _getFullEntryPath(filepath) {
-        return path66.resolve(this._settings.cwd, filepath);
+        return path67.resolve(this._settings.cwd, filepath);
       }
       _makeEntry(stats, pattern) {
         const entry = {
@@ -18772,7 +18772,7 @@ var require_provider = __commonJS({
   "node_modules/fast-glob/out/providers/provider.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    var path66 = require("path");
+    var path67 = require("path");
     var deep_1 = require_deep();
     var entry_1 = require_entry();
     var error_1 = require_error();
@@ -18786,7 +18786,7 @@ var require_provider = __commonJS({
         this.entryTransformer = new entry_2.default(this._settings);
       }
       _getRootDirectory(task) {
-        return path66.resolve(this._settings.cwd, task.base);
+        return path67.resolve(this._settings.cwd, task.base);
       }
       _getReaderOptions(task) {
         const basePath = task.base === "." ? "" : task.base;
@@ -19369,10 +19369,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path66) {
-  if (!path66)
+function getElementAtPath(obj, path67) {
+  if (!path67)
     return obj;
-  return path66.reduce((acc, key) => acc?.[key], obj);
+  return path67.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -19700,11 +19700,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path66, issues) {
+function prefixIssues(path67, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path66);
+    iss.path.unshift(path67);
     return iss;
   });
 }
@@ -19921,16 +19921,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError2(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path66 = []) => {
+  const processError = (error52, path67 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path66, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path67, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path67, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path67, ...issue2.path]);
       } else {
-        const fullpath = [...path66, ...issue2.path];
+        const fullpath = [...path67, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -19957,17 +19957,17 @@ function formatError2(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path66 = []) => {
+  const processError = (error52, path67 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path66, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path67, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path67, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path66, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path67, ...issue2.path]);
       } else {
-        const fullpath = [...path66, ...issue2.path];
+        const fullpath = [...path67, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -19999,8 +19999,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path66 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path66) {
+  const path67 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path67) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -33430,13 +33430,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path66 = ref.slice(1).split("/").filter(Boolean);
-  if (path66.length === 0) {
+  const path67 = ref.slice(1).split("/").filter(Boolean);
+  if (path67.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path66[0] === defsKey) {
-    const key = path66[1];
+  if (path67[0] === defsKey) {
+    const key = path67[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -35582,6 +35582,159 @@ var init_policy = __esm({
 });
 
 // packages/contracts/src/snapshots.ts
+function escapeXml(value) {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+function createSchematicSvg(sheetName, components, nets) {
+  const width = 1200;
+  const height = 800;
+  const anchors = [];
+  const cols = 4;
+  const compWidth = 200;
+  const compHeight = 100;
+  const paddingX = 60;
+  const paddingY = 80;
+  let elementsSvg = "";
+  components.forEach((comp, idx) => {
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const x = paddingX + col * (compWidth + 70);
+    const y = paddingY + row * (compHeight + 50);
+    const anchorId = `anchor_comp_${comp.reference}`;
+    anchors.push({
+      id: anchorId,
+      kind: "component",
+      targetRef: comp.reference,
+      x: (x + compWidth / 2) / width,
+      y: (y + compHeight / 2) / height,
+      width: compWidth / width,
+      height: compHeight / height,
+      sheet: sheetName,
+      metadata: {
+        value: comp.value ?? "",
+        footprint: comp.footprint ?? ""
+      }
+    });
+    elementsSvg += `
+      <g id="comp-${escapeXml(comp.reference)}" class="schematic-symbol" transform="translate(${x}, ${y})">
+        <rect width="${compWidth}" height="${compHeight}" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+        <text x="12" y="30" fill="#f8fafc" font-family="monospace" font-size="16" font-weight="bold">${escapeXml(comp.reference)}</text>
+        <text x="12" y="55" fill="#94a3b8" font-family="sans-serif" font-size="13">${escapeXml(comp.value ?? "")}</text>
+        <text x="12" y="80" fill="#64748b" font-family="monospace" font-size="11">${escapeXml(comp.footprint ?? "")}</text>
+        <circle cx="0" cy="50" r="4" fill="#38bdf8" />
+        <circle cx="${compWidth}" cy="50" r="4" fill="#38bdf8" />
+      </g>
+    `;
+  });
+  if (nets.length > 0) {
+    const netList = escapeXml(nets.slice(0, 12).join(" \u2022 "));
+    elementsSvg += `
+      <g transform="translate(${paddingX}, ${height - 40})">
+        <text x="0" y="0" fill="#38bdf8" font-family="monospace" font-size="12">NETS: ${netList}</text>
+      </g>
+    `;
+  }
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="background-color: #0f172a;">
+      <defs>
+        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="1" fill="#334155" />
+        </pattern>
+      </defs>
+      <rect width="${width}" height="${height}" fill="url(#grid)" />
+      <text x="${paddingX}" y="40" fill="#f8fafc" font-family="sans-serif" font-size="20" font-weight="bold">Sheet: ${escapeXml(sheetName)}</text>
+      ${elementsSvg}
+    </svg>
+  `.trim();
+  return { svg, anchors };
+}
+function createPcbLayerSvg(layerName2, footprints2) {
+  const width = 1e3;
+  const height = 800;
+  const anchors = [];
+  const boardX = 100;
+  const boardY = 100;
+  const boardW = 800;
+  const boardH = 600;
+  let fpSvg = "";
+  const isTop = layerName2.startsWith("F.");
+  const layerColor = isTop ? "#ef4444" : "#3b82f6";
+  footprints2.forEach((fp, idx) => {
+    const rawX = fp.at?.x ?? 50 + idx % 6 * 120;
+    const rawY = fp.at?.y ?? 50 + Math.floor(idx / 6) * 100;
+    const x = boardX + rawX % (boardW - 100);
+    const y = boardY + rawY % (boardH - 100);
+    const w = 60;
+    const h = 40;
+    anchors.push({
+      id: `anchor_pcb_${fp.reference}`,
+      kind: "component",
+      targetRef: fp.reference,
+      x: (x + w / 2) / width,
+      y: (y + h / 2) / height,
+      width: w / width,
+      height: h / height,
+      layer: layerName2,
+      metadata: {
+        footprint: fp.footprint
+      }
+    });
+    fpSvg += `
+      <g id="pcb-fp-${escapeXml(fp.reference)}" transform="translate(${x}, ${y})">
+        <rect width="${w}" height="${h}" rx="2" fill="none" stroke="${layerColor}" stroke-width="2" />
+        <rect x="5" y="5" width="8" height="8" fill="${layerColor}" />
+        <rect x="${w - 13}" y="5" width="8" height="8" fill="${layerColor}" />
+        <rect x="5" y="${h - 13}" width="8" height="8" fill="${layerColor}" />
+        <rect x="${w - 13}" y="${h - 13}" width="8" height="8" fill="${layerColor}" />
+        <text x="${w / 2}" y="${h / 2 + 4}" fill="#f8fafc" font-family="monospace" font-size="10" text-anchor="middle">${escapeXml(fp.reference)}</text>
+      </g>
+    `;
+  });
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="background-color: #022c22;">
+      <!-- Board Edge.Cuts -->
+      <rect x="${boardX}" y="${boardY}" width="${boardW}" height="${boardH}" rx="8" fill="#064e3b" stroke="#eab308" stroke-width="3" />
+      <text x="${boardX + 20}" y="${boardY + 40}" fill="#f8fafc" font-family="sans-serif" font-size="18" font-weight="bold">Layer: ${escapeXml(layerName2)}</text>
+      ${fpSvg}
+    </svg>
+  `.trim();
+  return { svg, anchors };
+}
+function extractComponentReference(finding2) {
+  if (finding2.details && typeof finding2.details === "object") {
+    const d = finding2.details;
+    const comp = d.component ?? d.reference ?? d.designator ?? d.symbol;
+    if (typeof comp === "string") return comp;
+  }
+  const match = /\b([A-Z]{1,3}\d{1,4})\b/.exec(finding2.message);
+  return match ? match[1] : void 0;
+}
+function linkFindingAnchors(anchors, findings) {
+  const result = [...anchors];
+  findings.forEach((finding2) => {
+    const compRef = extractComponentReference(finding2);
+    if (!compRef) return;
+    const targetComp = result.find((a) => a.kind === "component" && a.targetRef === compRef);
+    if (targetComp) {
+      result.push({
+        id: `anchor_finding_${finding2.fingerprint}`,
+        kind: "finding",
+        targetRef: compRef,
+        x: targetComp.x,
+        y: targetComp.y,
+        sheet: targetComp.sheet,
+        layer: targetComp.layer,
+        metadata: {
+          fingerprint: finding2.fingerprint,
+          ruleId: finding2.ruleId,
+          severity: finding2.severity,
+          message: finding2.message
+        }
+      });
+    }
+  });
+  return result;
+}
 var snapshotFormatSchema, snapshotKindSchema, canvasAnchorKindSchema, canvasAnchorSchema, snapshotArtifactSchema, snapshotManifestSchema;
 var init_snapshots = __esm({
   "packages/contracts/src/snapshots.ts"() {
@@ -35692,7 +35845,7 @@ function inferredConclusion(input) {
   }
   return "neutral";
 }
-var releaseRunStatusSchema, releaseDecisionSchema, releaseRunConclusionSchema, triggerKindSchema, findingSeveritySchema, findingFingerprintSchema, createReleaseRunRequestSchema, findingSchema, artifactStoragePathSchema, releaseRunArtifactSchema, releaseRunBomComponentSchema, releaseRunBoardBomSchema, releaseRunReportLinkSchema, releaseRunMetricsSchema, releaseRunReadinessSchema, releaseRunWaiverSchema, releaseRunWaiversSchema, hardwareImpactDomainSchema, hardwareImpactRiskDirectionSchema, hardwareImpactBaselineReasonSchema, hardwareImpactShaSchema, hardwareImpactCountSchema, hardwareImpactReadinessStatusSchema, hardwareImpactEvidenceSeveritySchema, hardwareImpactAvailableBaselineSchema, hardwareImpactUnavailableBaselineSchema, hardwareImpactEvidenceRefSchema, hardwareImpactV1Schema, releaseRunResultBaseSchema, releaseRunResultSchema, runnerTerminalResultRequestSchema;
+var releaseRunStatusSchema, releaseDecisionSchema, releaseRunConclusionSchema, triggerKindSchema, findingSeveritySchema, findingFingerprintSchema, createReleaseRunRequestSchema, findingCategorySchema, findingSchema, artifactStoragePathSchema, releaseRunArtifactSchema, releaseRunBomComponentSchema, releaseRunBoardBomSchema, releaseRunReportLinkSchema, releaseRunMetricsSchema, releaseRunReadinessSchema, releaseRunWaiverSchema, releaseRunWaiversSchema, hardwareImpactDomainSchema, hardwareImpactRiskDirectionSchema, hardwareImpactBaselineReasonSchema, hardwareImpactShaSchema, hardwareImpactCountSchema, hardwareImpactReadinessStatusSchema, hardwareImpactEvidenceSeveritySchema, hardwareImpactAvailableBaselineSchema, hardwareImpactUnavailableBaselineSchema, hardwareImpactEvidenceRefSchema, hardwareImpactV1Schema, releaseRunResultBaseSchema, releaseRunResultSchema, runnerTerminalResultRequestSchema;
 var init_src = __esm({
   "packages/contracts/src/index.ts"() {
     "use strict";
@@ -35719,6 +35872,15 @@ var init_src = __esm({
       pullRequestNumber: external_exports.number().int().positive().optional(),
       triggerKind: triggerKindSchema
     });
+    findingCategorySchema = external_exports.enum([
+      "electrical",
+      "manufacturability",
+      "assembly",
+      "testability",
+      "sourcing",
+      "release",
+      "unclassified"
+    ]);
     findingSchema = external_exports.object({
       ruleId: external_exports.string().min(1).max(256),
       severity: findingSeveritySchema,
@@ -35726,6 +35888,10 @@ var init_src = __esm({
       path: external_exports.string().min(1).max(1024).optional(),
       project: external_exports.string().trim().min(1).max(1024).optional(),
       fingerprint: findingFingerprintSchema.optional(),
+      // The rule's registered domain (src/core/rule-registry.ts's RuleCategory), so the run/review
+      // UI can group findings by domain without needing the CLI's rule registry itself. Optional --
+      // older CLI/Action versions never sent it.
+      category: findingCategorySchema.optional(),
       // Flat, not the CLI's nested Finding.location.region shape: this is the wire format, and
       // CloudFinding (src/core/cloud-findings.ts) is already flat too. Optional -- not every rule
       // can point at a specific line, and older CLI/Action versions never sent these at all.
@@ -36317,7 +36483,7 @@ __export(index_exports, {
   runCli: () => runCli
 });
 module.exports = __toCommonJS(index_exports);
-var import_node_path67 = __toESM(require("node:path"), 1);
+var import_node_path68 = __toESM(require("node:path"), 1);
 
 // node_modules/commander/lib/error.js
 var CommanderError = class extends Error {
@@ -39430,9 +39596,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
    * @param {string} [path]
    * @return {(string|null|Command)}
    */
-  executableDir(path66) {
-    if (path66 === void 0) return this._executableDir;
-    this._executableDir = path66;
+  executableDir(path67) {
+    if (path67 === void 0) return this._executableDir;
+    this._executableDir = path67;
     return this;
   }
   /**
@@ -43612,6 +43778,32 @@ function registerRule(rule2) {
 }
 function listRules() {
   return [...registry.values()].sort((a, b) => a.meta.id.localeCompare(b.meta.id));
+}
+var knownCategories = [
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release"
+];
+function emptyCategorySummary(category) {
+  return { category, total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+}
+function categorizeFindings(findings) {
+  const metaById = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta]));
+  const buckets = new Map(
+    knownCategories.map((category) => [category, emptyCategorySummary(category)])
+  );
+  for (const finding2 of findings) {
+    const category = metaById.get(finding2.ruleId)?.category ?? "unclassified";
+    const bucket = buckets.get(category) ?? emptyCategorySummary(category);
+    bucket.total += 1;
+    bucket[finding2.severity] += 1;
+    buckets.set(category, bucket);
+  }
+  const order = buckets.has("unclassified") ? [...knownCategories, "unclassified"] : knownCategories;
+  return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
 }
 
 // src/rules/helpers.ts
@@ -50368,6 +50560,7 @@ function assembleRunResult({
     },
     ...releaseMode ? { releaseMode } : {},
     summary,
+    categoryBreakdown: categorizeFindings(effectiveFindings),
     readiness,
     ...bomRisk ? { bomRisk } : {},
     ...policy ? { policy } : {},
@@ -56021,7 +56214,8 @@ async function gitState2(root) {
 
 // src/cli/commands/review.ts
 var import_node_child_process4 = require("node:child_process");
-var import_node_crypto12 = require("node:crypto");
+var import_node_crypto13 = require("node:crypto");
+var import_node_path60 = __toESM(require("node:path"), 1);
 
 // packages/cloud-core/src/evidence-ledger.ts
 init_src();
@@ -56093,11 +56287,11 @@ function assertNonce(value) {
 function runnerRequestBodyDigest(body) {
   return (0, import_node_crypto11.createHash)("sha256").update(body).digest("hex");
 }
-function normalizeRunnerRequestPath(path66) {
-  if (!path66.startsWith("/") || path66.startsWith("//") || path66.includes("#") || path66.includes("\\")) {
+function normalizeRunnerRequestPath(path67) {
+  if (!path67.startsWith("/") || path67.startsWith("//") || path67.includes("#") || path67.includes("\\")) {
     throw new Error("runner request path must be an absolute application path without a fragment");
   }
-  const rawPath = path66.split("?", 1)[0] ?? path66;
+  const rawPath = path67.split("?", 1)[0] ?? path67;
   if (/%2f|%5c/iu.test(rawPath)) {
     throw new Error("runner request path cannot contain encoded path separators");
   }
@@ -56112,7 +56306,7 @@ function normalizeRunnerRequestPath(path66) {
       throw new Error("runner request path cannot contain dot segments");
     }
   }
-  const url2 = new URL(path66, canonicalBaseUrl);
+  const url2 = new URL(path67, canonicalBaseUrl);
   if (url2.origin !== canonicalBaseUrl) {
     throw new Error("runner request path must remain within the application origin");
   }
@@ -56156,9 +56350,10 @@ function signRunnerRequest(input) {
 }
 
 // src/core/cloud-findings.ts
-function mapFindingForCloud(finding2) {
+function mapFindingForCloud(finding2, categoryByRuleId) {
   const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
   const endLine = finding2.location?.region?.endLine ?? startLine;
+  const category = categoryByRuleId.get(finding2.ruleId);
   return {
     ruleId: finding2.ruleId,
     severity: finding2.severity === "critical" ? "error" : finding2.severity,
@@ -56169,11 +56364,85 @@ function mapFindingForCloud(finding2) {
     ...startLine !== void 0 ? { startLine } : {},
     ...endLine !== void 0 ? { endLine } : {},
     ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
-    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
+    ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {},
+    ...category !== void 0 ? { category } : {}
   };
 }
 function mapFindingsForCloud(findings) {
-  return findings.map(mapFindingForCloud);
+  const categoryByRuleId = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta.category]));
+  return findings.map((finding2) => mapFindingForCloud(finding2, categoryByRuleId));
+}
+
+// src/kicad/snapshots.ts
+var import_node_crypto12 = require("node:crypto");
+init_src();
+async function renderSchematicFile(file2, findings) {
+  try {
+    const parsed = await parseSchematic(file2);
+    const sheetName = file2.split(/[/\\]/).pop()?.replace(/\.kicad_sch$/i, "") ?? "Main";
+    const { svg, anchors } = createSchematicSvg(
+      sheetName,
+      parsed.components.map((c) => ({ reference: c.reference, value: c.value, footprint: c.footprint })),
+      Array.from(parsed.netLabels)
+    );
+    const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
+    const sha256 = (0, import_node_crypto12.createHash)("sha256").update(svg).digest("hex");
+    return {
+      id: `snap_sch_${sheetName}`,
+      name: `schematic_${sheetName}.svg`,
+      kind: "schematic",
+      format: "svg",
+      sheetOrLayer: sheetName,
+      width: 1200,
+      height: 800,
+      content: svg,
+      sha256,
+      anchors: linkedAnchors
+    };
+  } catch {
+    return void 0;
+  }
+}
+async function renderPcbFile(file2, findings) {
+  const artifacts = [];
+  try {
+    const parsed = await parsePcb(file2);
+    const layersToRender = parsed.copperLayers.length > 0 ? parsed.copperLayers : ["F.Cu", "B.Cu"];
+    for (const layer of layersToRender) {
+      const { svg, anchors } = createPcbLayerSvg(
+        layer,
+        parsed.footprints.map((fp) => ({ reference: fp.reference, footprint: fp.footprint, at: fp.at }))
+      );
+      const linkedAnchors = findings ? linkFindingAnchors(anchors, findings) : anchors;
+      const sha256 = (0, import_node_crypto12.createHash)("sha256").update(svg).digest("hex");
+      artifacts.push({
+        id: `snap_pcb_${layer.replaceAll(".", "_")}`,
+        name: `pcb_${layer.replaceAll(".", "_")}.svg`,
+        kind: "pcb_layer",
+        format: "svg",
+        sheetOrLayer: layer,
+        width: 1e3,
+        height: 800,
+        content: svg,
+        sha256,
+        anchors: linkedAnchors
+      });
+    }
+  } catch {
+  }
+  return artifacts;
+}
+async function generateSnapshots(options) {
+  const artifacts = [];
+  for (const file2 of options.schematicFiles ?? []) {
+    const artifact = await renderSchematicFile(file2, options.findings);
+    if (artifact) artifacts.push(artifact);
+  }
+  for (const file2 of options.pcbFiles ?? []) {
+    const pcbArtifacts = await renderPcbFile(file2, options.findings);
+    artifacts.push(...pcbArtifacts);
+  }
+  return artifacts;
 }
 
 // src/cli/commands/review.ts
@@ -56224,8 +56493,8 @@ async function reviewPublishCommand(target, options, streams) {
     failOn: "never"
   });
   const findings = mapFindingsForCloud(result.findings);
-  const rulePackDigest = (0, import_node_crypto12.createHash)("sha256").update("boardreadyops-v1").digest("hex");
-  const configDigest = (0, import_node_crypto12.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
+  const rulePackDigest = (0, import_node_crypto13.createHash)("sha256").update("boardreadyops-v1").digest("hex");
+  const configDigest = (0, import_node_crypto13.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
   const evidenceDigest = computeEvidenceDigest({
     toolVersion: "1.34.0",
     rulePackDigest,
@@ -56264,6 +56533,16 @@ async function reviewPublishCommand(target, options, streams) {
     );
     return 1;
   }
+  const snapshots = await generateSnapshots({
+    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => import_node_path60.default.resolve(root, f))),
+    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => import_node_path60.default.resolve(root, f))),
+    findings: findings.map((f) => ({
+      fingerprint: f.fingerprint,
+      ruleId: f.ruleId,
+      severity: f.severity,
+      message: f.message
+    }))
+  });
   streams.stdout.write(`\u{1F680} Publishing review to ${server}...
 `);
   try {
@@ -56282,6 +56561,7 @@ async function reviewPublishCommand(target, options, streams) {
         triggerKind: "manual",
         findings,
         artifacts: [],
+        snapshots,
         evidenceDigest,
         title: options.title ?? `Review for ${headSha.slice(0, 8)}`,
         ...baseSha ? { baseCommitSha: baseSha } : {}
@@ -56405,17 +56685,17 @@ async function reviewVerifyCommand(target, options, streams) {
 }
 
 // src/cli/commands/runner.ts
-var import_node_path65 = __toESM(require("node:path"), 1);
+var import_node_path66 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-enrollment-admin.ts
 var import_node_child_process5 = require("node:child_process");
-var import_node_crypto14 = require("node:crypto");
+var import_node_crypto15 = require("node:crypto");
 var import_promises22 = require("node:fs/promises");
 var import_node_os4 = __toESM(require("node:os"), 1);
-var import_node_path60 = __toESM(require("node:path"), 1);
+var import_node_path61 = __toESM(require("node:path"), 1);
 
 // packages/db/src/runner-registration-enrollment-store.ts
-var import_node_crypto13 = require("node:crypto");
+var import_node_crypto14 = require("node:crypto");
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern3 = /^[A-Za-z0-9_-]+$/u;
 var repositoryPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
@@ -56443,7 +56723,7 @@ function isoColumn(row, key) {
   return Number.isNaN(parsed.valueOf()) ? void 0 : parsed.toISOString();
 }
 function digest(value) {
-  return (0, import_node_crypto13.createHash)("sha256").update(value, "utf8").digest("hex");
+  return (0, import_node_crypto14.createHash)("sha256").update(value, "utf8").digest("hex");
 }
 function positiveInteger3(value, fallback, name, maximum) {
   const selected = value ?? fallback;
@@ -56477,8 +56757,8 @@ function validActorId(value) {
 }
 function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
   const now = options.now ?? (() => /* @__PURE__ */ new Date());
-  const id = options.id ?? import_node_crypto13.randomUUID;
-  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto13.randomBytes)(32).toString("base64url"));
+  const id = options.id ?? import_node_crypto14.randomUUID;
+  const enrollmentToken = options.enrollmentToken ?? (() => (0, import_node_crypto14.randomBytes)(32).toString("base64url"));
   const enrollmentTtlSeconds = positiveInteger3(options.enrollmentTtlSeconds, 15 * 60, "enrollmentTtlSeconds", 60 * 60);
   return {
     async issueEnrollment(input) {
@@ -56608,12 +56888,12 @@ function createSqlRunnerRegistrationEnrollmentStore(executor, options = {}) {
 var maximumPsqlOutputBytes = 1024 * 1024;
 var defaultDependencies = {
   query: executePsqlQuery,
-  token: () => (0, import_node_crypto14.randomBytes)(32).toString("base64url")
+  token: () => (0, import_node_crypto15.randomBytes)(32).toString("base64url")
 };
 async function issueRunnerEnrollment(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path60.default.resolve(options.databaseUrlFile);
-  const tokenOutputFile = import_node_path60.default.resolve(options.tokenOutputFile);
+  const databaseUrlFile = import_node_path61.default.resolve(options.databaseUrlFile);
+  const tokenOutputFile = import_node_path61.default.resolve(options.tokenOutputFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
   await prepareTokenOutput(tokenOutputFile);
   const databaseUrl = (await (0, import_promises22.readFile)(databaseUrlFile, "utf8")).trim();
@@ -56658,7 +56938,7 @@ async function issueRunnerEnrollment(options, overrides = {}) {
 }
 async function revokeRunnerRegistration(options, overrides = {}) {
   const dependencies = { ...defaultDependencies, ...overrides };
-  const databaseUrlFile = import_node_path60.default.resolve(options.databaseUrlFile);
+  const databaseUrlFile = import_node_path61.default.resolve(options.databaseUrlFile);
   await assertPrivateFile(databaseUrlFile, "database URL file");
   const databaseUrl = (await (0, import_promises22.readFile)(databaseUrlFile, "utf8")).trim();
   validateDatabaseUrl(databaseUrl);
@@ -56679,8 +56959,8 @@ async function revokeRunnerRegistration(options, overrides = {}) {
 async function executePsqlQuery(databaseUrl, sql, params) {
   const invocation = psqlInvocation(sql, params);
   const connection = parseDatabaseConnection(databaseUrl);
-  const secretDirectory = await (0, import_promises22.mkdtemp)(import_node_path60.default.join(import_node_os4.default.tmpdir(), "boardreadyops-psql-"));
-  const passwordFile = import_node_path60.default.join(secretDirectory, "pgpass");
+  const secretDirectory = await (0, import_promises22.mkdtemp)(import_node_path61.default.join(import_node_os4.default.tmpdir(), "boardreadyops-psql-"));
+  const passwordFile = import_node_path61.default.join(secretDirectory, "pgpass");
   try {
     if (process.platform !== "win32") await (0, import_promises22.chmod)(secretDirectory, 448);
     await (0, import_promises22.writeFile)(
@@ -56924,7 +57204,7 @@ async function prepareTokenOutput(filePath) {
   if (await (0, import_promises22.stat)(filePath).catch(() => void 0)) {
     throw new Error(`refusing to overwrite an existing enrollment token file: ${filePath}`);
   }
-  const directory = import_node_path60.default.dirname(filePath);
+  const directory = import_node_path61.default.dirname(filePath);
   const existing = await (0, import_promises22.stat)(directory).catch(() => void 0);
   if (existing && !existing.isDirectory()) {
     throw new Error(`enrollment token output parent is not a directory: ${directory}`);
@@ -56953,14 +57233,14 @@ async function assertPrivateFile(filePath, label) {
 init_version();
 
 // src/runner/identity.ts
-var import_node_crypto16 = require("node:crypto");
+var import_node_crypto17 = require("node:crypto");
 var import_promises24 = require("node:fs/promises");
 var import_node_os5 = __toESM(require("node:os"), 1);
-var import_node_path61 = __toESM(require("node:path"), 1);
+var import_node_path62 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/client.ts
-var import_node_crypto15 = require("node:crypto");
+var import_node_crypto16 = require("node:crypto");
 var import_promises23 = require("node:fs/promises");
 init_src();
 var responseBodyLimitBytes = 1024 * 1024;
@@ -57001,7 +57281,7 @@ var RunnerControlPlaneClient = class {
     this.privateKey = options.privateKey;
     this.fetchImpl = options.fetch ?? fetch;
     this.now = options.now ?? (() => /* @__PURE__ */ new Date());
-    this.nonce = options.nonce ?? (() => (0, import_node_crypto15.randomBytes)(24).toString("base64url"));
+    this.nonce = options.nonce ?? (() => (0, import_node_crypto16.randomBytes)(24).toString("base64url"));
     this.requestTimeoutMs = positiveInteger4(options.requestTimeoutMs ?? 3e4, "requestTimeoutMs");
   }
   async claim(input) {
@@ -57046,8 +57326,8 @@ var RunnerControlPlaneClient = class {
       throw new RunnerControlPlaneError(`artifact upload failed with HTTP ${response.status}`, response.status, body);
     }
   }
-  async signedJson(path66, value, context = {}) {
-    const target = new URL(path66, this.baseUrl);
+  async signedJson(path67, value, context = {}) {
+    const target = new URL(path67, this.baseUrl);
     if (target.origin !== this.baseUrl.origin) {
       throw new Error("runner request path escaped the configured control-plane origin");
     }
@@ -57146,7 +57426,7 @@ async function activateRunner(input) {
   }
 }
 async function loadRunnerPrivateKey(filePath) {
-  return (0, import_node_crypto15.createPrivateKey)(await (0, import_promises23.readFile)(filePath, "utf8"));
+  return (0, import_node_crypto16.createPrivateKey)(await (0, import_promises23.readFile)(filePath, "utf8"));
 }
 function normalizeControlPlaneUrl(value) {
   let url2;
@@ -57212,11 +57492,11 @@ var privateKeyName = "runner-private-key.pem";
 var publicKeyName = "runner-public-key.pem";
 var identityFileName = "runner.json";
 function defaultRunnerIdentityDirectory() {
-  return import_node_path61.default.join(import_node_os5.default.homedir(), ".config", "boardreadyops", "runner");
+  return import_node_path62.default.join(import_node_os5.default.homedir(), ".config", "boardreadyops", "runner");
 }
 async function activateRunnerIdentity(options) {
   const controlPlaneUrl = normalizeControlPlaneUrl(options.controlPlaneUrl).origin;
-  const enrollmentTokenFile = import_node_path61.default.resolve(options.enrollmentTokenFile);
+  const enrollmentTokenFile = import_node_path62.default.resolve(options.enrollmentTokenFile);
   await assertPrivateFile2(enrollmentTokenFile, "runner enrollment token file");
   const enrollmentToken = (await (0, import_promises24.readFile)(enrollmentTokenFile, "utf8")).trim();
   if (enrollmentToken.length < 43 || enrollmentToken.length > 256 || !/^[A-Za-z0-9_-]+$/u.test(enrollmentToken)) {
@@ -57224,13 +57504,13 @@ async function activateRunnerIdentity(options) {
   }
   const capabilities = normalizeCapabilities(options.capabilities ?? []);
   const labels = normalizeCapabilities(options.labels ?? []);
-  const identityDirectory = import_node_path61.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
+  const identityDirectory = import_node_path62.default.resolve(options.identityDirectory ?? defaultRunnerIdentityDirectory());
   await prepareIdentityDirectory(identityDirectory);
-  const identityFile = import_node_path61.default.join(identityDirectory, identityFileName);
-  const privateKeyFile = import_node_path61.default.join(identityDirectory, privateKeyName);
-  const publicKeyFile = import_node_path61.default.join(identityDirectory, publicKeyName);
+  const identityFile = import_node_path62.default.join(identityDirectory, identityFileName);
+  const privateKeyFile = import_node_path62.default.join(identityDirectory, privateKeyName);
+  const publicKeyFile = import_node_path62.default.join(identityDirectory, publicKeyName);
   await assertTargetsDoNotExist([identityFile, privateKeyFile, publicKeyFile]);
-  const generated = (0, import_node_crypto16.generateKeyPairSync)("ed25519");
+  const generated = (0, import_node_crypto17.generateKeyPairSync)("ed25519");
   const privateKey = generated.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
   const publicKey = generated.publicKey.export({ type: "spki", format: "pem" }).toString();
   const activated = await activateRunner({
@@ -57274,8 +57554,8 @@ async function activateRunnerIdentity(options) {
   };
 }
 async function loadRunnerIdentity(identityFileInput) {
-  const identityFile = import_node_path61.default.resolve(identityFileInput);
-  await assertPrivateDirectory(import_node_path61.default.dirname(identityFile), "runner identity directory");
+  const identityFile = import_node_path62.default.resolve(identityFileInput);
+  await assertPrivateDirectory(import_node_path62.default.dirname(identityFile), "runner identity directory");
   await assertPrivateFile2(identityFile, "runner identity file");
   let value;
   try {
@@ -57284,7 +57564,7 @@ async function loadRunnerIdentity(identityFileInput) {
     throw new Error("runner identity file is not valid JSON");
   }
   const identity = parseIdentity(value);
-  const directory = import_node_path61.default.dirname(identityFile);
+  const directory = import_node_path62.default.dirname(identityFile);
   const privateKeyPath = resolveIdentityChild(directory, identity.privateKeyFile, "privateKeyFile");
   const publicKeyPath = resolveIdentityChild(directory, identity.publicKeyFile, "publicKeyFile");
   await assertPrivateFile2(privateKeyPath, "runner private key file");
@@ -57342,14 +57622,14 @@ function normalizeCapabilities(values) {
   return normalized;
 }
 function relativeFile(value, name) {
-  if (typeof value !== "string" || value.length < 1 || import_node_path61.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
+  if (typeof value !== "string" || value.length < 1 || import_node_path62.default.isAbsolute(value) || value.split(/[\\/]/u).includes("..")) {
     throw new Error(`runner identity ${name} must be a relative file within the identity directory`);
   }
   return value;
 }
 function resolveIdentityChild(directory, relative, name) {
-  const resolved = import_node_path61.default.resolve(directory, relative);
-  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path61.default.sep}`)) {
+  const resolved = import_node_path62.default.resolve(directory, relative);
+  if (resolved !== directory && !resolved.startsWith(`${directory}${import_node_path62.default.sep}`)) {
     throw new Error(`runner identity ${name} escapes the identity directory`);
   }
   return resolved;
@@ -57395,22 +57675,22 @@ async function writeExclusive(filePath, content, mode) {
 // src/runner/worker.ts
 var import_promises26 = require("node:fs/promises");
 var import_node_os6 = __toESM(require("node:os"), 1);
-var import_node_path63 = __toESM(require("node:path"), 1);
+var import_node_path64 = __toESM(require("node:path"), 1);
 init_src();
 
 // src/runner/source.ts
 var import_node_child_process6 = require("node:child_process");
 var import_promises25 = require("node:fs/promises");
-var import_node_path62 = __toESM(require("node:path"), 1);
+var import_node_path63 = __toESM(require("node:path"), 1);
 var maximumCommandOutputBytes = 1024 * 1024;
 async function checkoutRunnerSource(options) {
   if (options.job.sourceMode !== "customer_checkout") {
     throw new Error("self-hosted runners accept only customer_checkout source assignments");
   }
-  const workspaceRoot = import_node_path62.default.resolve(options.workspaceRoot);
+  const workspaceRoot = import_node_path63.default.resolve(options.workspaceRoot);
   await (0, import_promises25.mkdir)(workspaceRoot, { recursive: true, mode: 448 });
   if (process.platform !== "win32") await (0, import_promises25.chmod)(workspaceRoot, 448);
-  const workspace = await (0, import_promises25.mkdtemp)(import_node_path62.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
+  const workspace = await (0, import_promises25.mkdtemp)(import_node_path63.default.join(workspaceRoot, `${options.job.runId}-${options.job.executionAttemptId}-`));
   if (process.platform !== "win32") await (0, import_promises25.chmod)(workspace, 448);
   const execute = options.execute ?? executeRunnerCommand;
   const environment = sanitizedGitEnvironment(process.env);
@@ -57486,9 +57766,9 @@ function repositoryRemote(job, repositoryMirrorRoot) {
   if (!repositoryMirrorRoot) {
     return `https://github.com/${job.repository.owner}/${job.repository.name}.git`;
   }
-  const root = import_node_path62.default.resolve(repositoryMirrorRoot);
-  const candidate = import_node_path62.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
-  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path62.default.sep}`)) {
+  const root = import_node_path63.default.resolve(repositoryMirrorRoot);
+  const candidate = import_node_path63.default.resolve(root, job.repository.owner, `${job.repository.name}.git`);
+  if (candidate !== root && !candidate.startsWith(`${root}${import_node_path63.default.sep}`)) {
     throw new Error("repository mirror path escaped the configured mirror root");
   }
   return candidate;
@@ -57528,7 +57808,7 @@ var defaultDependencies2 = {
   log: () => void 0
 };
 function defaultRunnerWorkspaceRoot() {
-  return import_node_path63.default.join(import_node_os6.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
+  return import_node_path64.default.join(import_node_os6.default.homedir(), ".cache", "boardreadyops", "runner-workspaces");
 }
 async function runRunnerWorkerOnce(options, overrides = {}) {
   const dependencies = { ...defaultDependencies2, ...overrides };
@@ -57537,7 +57817,7 @@ async function runRunnerWorkerOnce(options, overrides = {}) {
   const client = dependencies.createClient(identity, privateKey, options.runnerVersion);
   const heartbeatSeconds = boundedSeconds(options.heartbeatSeconds ?? 30, "heartbeatSeconds", 5, 300);
   const workspaceRoot = runnerActiveWorkspaceRoot(
-    import_node_path63.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path64.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   const claim = await client.claim({
@@ -57681,7 +57961,7 @@ async function serveRunnerWorker(options, overrides = {}) {
   const identity = await dependencies.loadIdentity(options.identityFile);
   if (options.signal?.aborted) return;
   const recovered = await dependencies.recoverCrashWorkspaces(
-    import_node_path63.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
+    import_node_path64.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot()),
     identity.runnerId
   );
   if (recovered > 0) {
@@ -57867,11 +58147,11 @@ async function bestEffortRelinquish(client, job, reason, message) {
   }).catch(() => void 0);
 }
 function runnerActiveWorkspaceRoot(workspaceRoot, runnerId) {
-  return import_node_path63.default.join(import_node_path63.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
+  return import_node_path64.default.join(import_node_path64.default.resolve(workspaceRoot), ".boardreadyops-active", runnerId);
 }
 async function recoverRunnerCrashWorkspaces(workspaceRoot, runnerId) {
-  const root = import_node_path63.default.resolve(workspaceRoot);
-  const namespace = import_node_path63.default.join(root, ".boardreadyops-active");
+  const root = import_node_path64.default.resolve(workspaceRoot);
+  const namespace = import_node_path64.default.join(root, ".boardreadyops-active");
   const namespaceInfo = await (0, import_promises26.lstat)(namespace).catch((error51) => {
     if (error51.code === "ENOENT") return void 0;
     throw error51;
@@ -57936,33 +58216,33 @@ var RunnerShutdownError = class extends Error {
 };
 
 // src/cli/runner-pipeline.ts
-var import_node_crypto17 = require("node:crypto");
+var import_node_crypto18 = require("node:crypto");
 var import_promises27 = require("node:fs/promises");
-var import_node_path64 = __toESM(require("node:path"), 1);
+var import_node_path65 = __toESM(require("node:path"), 1);
 var import_node_stream = require("node:stream");
 async function executeRunnerPipeline(workspace, job, options) {
   options.signal?.throwIfAborted();
-  const relativeOutputDirectory = import_node_path64.default.join(".boardreadyops-runner", job.executionAttemptId);
-  const outputDirectory2 = import_node_path64.default.join(workspace, relativeOutputDirectory);
+  const relativeOutputDirectory = import_node_path65.default.join(".boardreadyops-runner", job.executionAttemptId);
+  const outputDirectory2 = import_node_path65.default.join(workspace, relativeOutputDirectory);
   await (0, import_promises27.mkdir)(outputDirectory2, { recursive: true, mode: 448 });
   const targets = [
     {
       kind: "report/json",
       name: "boardreadyops-result.json",
       role: "primary",
-      relative: import_node_path64.default.join(relativeOutputDirectory, "result.json")
+      relative: import_node_path65.default.join(relativeOutputDirectory, "result.json")
     },
     {
       kind: "report/sarif",
       name: "boardreadyops-result.sarif",
       role: "sarif",
-      relative: import_node_path64.default.join(relativeOutputDirectory, "result.sarif")
+      relative: import_node_path65.default.join(relativeOutputDirectory, "result.sarif")
     },
     {
       kind: "report/markdown",
       name: "boardreadyops-result.md",
       role: "summary",
-      relative: import_node_path64.default.join(relativeOutputDirectory, "result.md")
+      relative: import_node_path65.default.join(relativeOutputDirectory, "result.md")
     }
   ];
   const output = new import_node_stream.Writable({ write: (_chunk, _encoding, callback) => callback() });
@@ -57986,7 +58266,7 @@ async function executeRunnerPipeline(workspace, job, options) {
     options.signal ? { signal: options.signal } : {}
   );
   options.signal?.throwIfAborted();
-  const report = await readRunReport(import_node_path64.default.join(workspace, targets[0].relative));
+  const report = await readRunReport(import_node_path65.default.join(workspace, targets[0].relative));
   const runnerReport = report ? {
     summary: {
       total: report.summary.total,
@@ -58028,7 +58308,7 @@ async function executeRunnerPipeline(workspace, job, options) {
   } : void 0;
   const artifacts = [];
   for (const target of targets) {
-    const filePath = import_node_path64.default.join(workspace, target.relative);
+    const filePath = import_node_path65.default.join(workspace, target.relative);
     const artifact = await runnerArtifact(filePath, target.kind, target.name, target.role).catch(() => void 0);
     if (artifact) artifacts.push(artifact);
   }
@@ -58048,7 +58328,7 @@ async function runnerArtifact(filePath, kind, name, role) {
     role,
     filePath,
     bytes: content.byteLength,
-    sha256: (0, import_node_crypto17.createHash)("sha256").update(content).digest("hex")
+    sha256: (0, import_node_crypto18.createHash)("sha256").update(content).digest("hex")
   };
 }
 async function readRunReport(filePath) {
@@ -58064,12 +58344,12 @@ async function readRunReport(filePath) {
 async function runnerIssueEnrollmentCommand(options, streams) {
   try {
     const issued = await issueRunnerEnrollment({
-      databaseUrlFile: import_node_path65.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path66.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       name: options.name,
       scope: options.scope,
       allowedRepositories: options.repository ?? [],
-      tokenOutputFile: import_node_path65.default.resolve(options.tokenOutput),
+      tokenOutputFile: import_node_path66.default.resolve(options.tokenOutput),
       ...options.ttlSeconds === void 0 ? {} : { ttlSeconds: options.ttlSeconds }
     });
     writeRunnerOutput(
@@ -58093,7 +58373,7 @@ async function runnerIssueEnrollmentCommand(options, streams) {
 async function runnerRevokeRegistrationCommand(options, streams) {
   try {
     const revoked = await revokeRunnerRegistration({
-      databaseUrlFile: import_node_path65.default.resolve(options.databaseUrlFile),
+      databaseUrlFile: import_node_path66.default.resolve(options.databaseUrlFile),
       installationId: options.installationId,
       registrationId: options.registrationId,
       actorId: options.actorId,
@@ -58116,8 +58396,8 @@ async function runnerActivateCommand(options, streams) {
   try {
     const activated = await activateRunnerIdentity({
       controlPlaneUrl: options.url,
-      enrollmentTokenFile: import_node_path65.default.resolve(options.enrollmentTokenFile),
-      identityDirectory: import_node_path65.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
+      enrollmentTokenFile: import_node_path66.default.resolve(options.enrollmentTokenFile),
+      identityDirectory: import_node_path66.default.resolve(options.identityDir ?? defaultRunnerIdentityDirectory()),
       capabilities: options.capability ?? [],
       labels: options.label ?? []
     });
@@ -58197,7 +58477,7 @@ function workerOptions(options) {
     identityFile: identityPath(options),
     runnerVersion: boardReadyVersion,
     workspaceRoot: workspacePath(options),
-    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path65.default.resolve(options.repositoryMirrorRoot) },
+    ...options.repositoryMirrorRoot === void 0 ? {} : { repositoryMirrorRoot: import_node_path66.default.resolve(options.repositoryMirrorRoot) },
     ...options.heartbeatSeconds === void 0 ? {} : { heartbeatSeconds: options.heartbeatSeconds },
     ...options.pollSeconds === void 0 ? {} : { pollSeconds: options.pollSeconds },
     requireKicad: options.requireKicad ?? true,
@@ -58206,10 +58486,10 @@ function workerOptions(options) {
   };
 }
 function identityPath(options) {
-  return import_node_path65.default.resolve(options.identity ?? import_node_path65.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
+  return import_node_path66.default.resolve(options.identity ?? import_node_path66.default.join(defaultRunnerIdentityDirectory(), "runner.json"));
 }
 function workspacePath(options) {
-  return import_node_path65.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
+  return import_node_path66.default.resolve(options.workspaceRoot ?? defaultRunnerWorkspaceRoot());
 }
 function createRunnerLogger(stream, format) {
   return (event, fields = {}) => {
@@ -58237,7 +58517,7 @@ function safeMessage(error51) {
 }
 
 // src/cli/commands/sbom.ts
-var import_node_path66 = __toESM(require("node:path"), 1);
+var import_node_path67 = __toESM(require("node:path"), 1);
 init_t();
 
 // src/report/hbom.ts
@@ -58362,7 +58642,7 @@ async function sbomCommand(pathInput, options, streams) {
     return 2;
   }
   const locale = resolveLocale();
-  const root = await canonicalRoot(import_node_path66.default.resolve(normalizePathInput(pathInput ?? ".")));
+  const root = await canonicalRoot(import_node_path67.default.resolve(normalizePathInput(pathInput ?? ".")));
   const loaded = await loadConfig(root, options.config);
   if (loaded.errors.length > 0) {
     for (const error51 of loaded.errors) {
@@ -58396,7 +58676,7 @@ async function writeHbom(root, output, content, stdout) {
     stdout.write(content);
     return;
   }
-  await writeTextFile(import_node_path66.default.resolve(root, normalizePathInput(output)), content);
+  await writeTextFile(import_node_path67.default.resolve(root, normalizePathInput(output)), content);
 }
 
 // schemas/agent-plan.schema.json
@@ -58834,9 +59114,32 @@ var findings_schema_default = {
       type: "object",
       description: "Aggregate BOM supply-chain risk summary from the bom.risk-score rule.",
       additionalProperties: true
+    },
+    categoryBreakdown: {
+      type: "array",
+      description: "Per-domain (electrical/manufacturability/assembly/testability/sourcing/release) severity rollup of findings.",
+      items: {
+        $ref: "#/$defs/categoryBreakdownEntry"
+      }
     }
   },
   $defs: {
+    categoryBreakdownEntry: {
+      type: "object",
+      additionalProperties: false,
+      required: ["category", "total", "critical", "high", "medium", "low", "info"],
+      properties: {
+        category: {
+          enum: ["electrical", "manufacturability", "assembly", "testability", "sourcing", "release", "unclassified"]
+        },
+        total: { type: "integer", minimum: 0 },
+        critical: { type: "integer", minimum: 0 },
+        high: { type: "integer", minimum: 0 },
+        medium: { type: "integer", minimum: 0 },
+        low: { type: "integer", minimum: 0 },
+        info: { type: "integer", minimum: 0 }
+      }
+    },
     waivers: {
       type: "object",
       additionalProperties: false,
@@ -60160,7 +60463,7 @@ function isCommanderDisplay(error51) {
   return error51 instanceof Error && "code" in error51 && (error51.code === "commander.helpDisplayed" || error51.code === "commander.version");
 }
 var cliEntry = process.argv.at(1);
-var cliEntryName = cliEntry ? import_node_path67.default.basename(cliEntry) : "";
+var cliEntryName = cliEntry ? import_node_path68.default.basename(cliEntry) : "";
 if (cliEntry && !process.env.VITEST && (cliEntryName === "boardreadyops" || cliEntryName === "index.ts" || cliEntryName === "index.js" || cliEntryName === "index.cjs")) {
   void runCli(process.argv.slice(2)).then((code) => {
     process.exitCode = code;

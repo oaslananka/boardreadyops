@@ -348,6 +348,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `http-cache-semantics@4.2.0`
   - Description: Parses Cache-Control and other headers. Helps building correct HTTP caches and proxies
   - Homepage: https://github.com/kornelski/http-cache-semantics#readme
+- `json-schema-typed@8.0.2`
+  - Description: JSON Schema TypeScript definitions with complete inline documentation.
+  - Homepage: https://github.com/RemyRylan/json-schema-typed/tree/main/dist/node
 - `terser@5.49.0`
   - Description: JavaScript parser, mangler/compressor and beautifier toolkit for ES6+
   - Homepage: https://terser.org
@@ -530,6 +533,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mute-stream@3.0.0`
   - Description: Bytes go in, but they don't come out (when muted).
   - Homepage: https://github.com/npm/mute-stream#readme
+- `once@1.4.0`
+  - Description: Run a function exactly one time
+  - Homepage: https://github.com/isaacs/once#readme
 - `pg-int8@1.0.1`
   - Description: 64-bit big-endian signed integer-to-string conversion
   - Homepage: https://github.com/charmander/pg-int8#readme
@@ -539,6 +545,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `semver@6.3.1`, `semver@7.7.4`, `semver@7.8.5`
   - Description: The semantic version parser used by npm.
   - Homepage: https://github.com/npm/node-semver#readme
+- `setprototypeof@1.2.0`
+  - Description: A small polyfill for Object.setprototypeof
+  - Homepage: https://github.com/wesleytodd/setprototypeof
 - `siginfo@2.0.0`
   - Description: Utility module to print pretty messages on SIGINFO/SIGUSR1
   - Homepage: https://github.com/emilbayes/siginfo#readme
@@ -560,6 +569,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `which@2.0.2`
   - Description: Like which(1) unix command. Find the first instance of an executable in the PATH.
   - Homepage: https://github.com/isaacs/node-which#readme
+- `wrappy@1.0.2`
+  - Description: Callback wrapping utility
+  - Homepage: https://github.com/npm/wrappy
 - `y18n@5.0.8`
   - Description: the bare-bones internationalization library used by yargs
   - Homepage: https://github.com/yargs/y18n
@@ -572,6 +584,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `yargs-parser@21.1.1`, `yargs-parser@22.0.0`
   - Description: the mighty option parser used by yargs
   - Homepage: https://github.com/yargs/yargs-parser#readme
+- `zod-to-json-schema@3.25.2`
+  - Description: Converts Zod schemas to Json Schemas
+  - Homepage: https://github.com/StefanTerdell/zod-to-json-schema#readme
 
 ## LGPL-3.0-only
 
@@ -837,6 +852,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/formatjs/formatjs#readme
 - `@gerrit0/mini-shiki@3.23.0`
   - Homepage: https://github.com/Gerrit0/mini-shiki#readme
+- `@hono/node-server@2.0.12`
+  - Description: Node.js Adapter for Hono
+  - Homepage: https://github.com/honojs/node-server
 - `@html-validate/stylish@6.0.0`
   - Description: ESLint compatible stylish formatter
   - Homepage: https://gitlab.com/html-validate/stylish
@@ -919,6 +937,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@jridgewell/trace-mapping@0.3.31`
   - Description: Trace the original position through a source map
   - Homepage: https://github.com/jridgewell/sourcemaps/tree/main/packages/trace-mapping
+- `@modelcontextprotocol/sdk@1.30.0`
+  - Description: Model Context Protocol implementation for TypeScript
+  - Homepage: https://modelcontextprotocol.io
 - `@next/env@16.2.12`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
@@ -1493,6 +1514,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `abort-controller@3.0.0`
   - Description: An implementation of WHATWG AbortController interface.
   - Homepage: https://github.com/mysticatea/abort-controller#readme
+- `accepts@2.0.0`
+  - Description: Higher-level content negotiation
+  - Homepage: https://github.com/jshttp/accepts#readme
 - `acorn@8.17.0`, `acorn@8.18.0`
   - Description: ECMAScript parser
   - Homepage: https://github.com/acornjs/acorn
@@ -1565,6 +1589,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `binary@0.3.0`
   - Description: Unpack multibyte binary values from buffers
   - Homepage: https://github.com/substack/node-binary#readme
+- `body-parser@2.3.0`
+  - Description: Node.js body parsing middleware
+  - Homepage: https://github.com/expressjs/body-parser#readme
 - `bottleneck@2.19.5`
   - Description: Distributed task scheduler and rate limiter
   - Homepage: https://github.com/SGrondin/bottleneck#readme
@@ -1588,6 +1615,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `buffer-image-size@0.6.4`
   - Description: get dimensions of any image buffer
   - Homepage: https://github.com/evidentpoint/buffer-image-size#readme
+- `bytes@3.1.2`
+  - Description: Utility to parse a string bytes to bytes and vice-versa
+  - Homepage: https://github.com/visionmedia/bytes.js#readme
 - `c12@3.3.4`
   - Description: Smart Config Loader
   - Homepage: https://github.com/unjs/c12#readme
@@ -1657,7 +1687,10 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `consola@3.4.2`
   - Description: Elegant Console Wrapper
   - Homepage: https://github.com/unjs/consola#readme
-- `content-type@2.0.0`
+- `content-disposition@1.1.0`
+  - Description: Create and parse Content-Disposition header
+  - Homepage: https://github.com/jshttp/content-disposition#readme
+- `content-type@1.0.5`, `content-type@2.0.0`, `content-type@2.1.0`
   - Description: Create and parse HTTP Content-Type header
   - Homepage: https://github.com/jshttp/content-type#readme
 - `conventional-commits-parser@7.1.2`
@@ -1666,11 +1699,20 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `convert-source-map@2.0.0`
   - Description: Converts a source-map from/to  different formats and allows adding/changing properties.
   - Homepage: https://github.com/thlorenz/convert-source-map
+- `cookie@0.7.2`
+  - Description: HTTP server cookie parsing and serialization
+  - Homepage: https://github.com/jshttp/cookie#readme
 - `cookie-es@1.2.3`
   - Homepage: https://github.com/unjs/cookie-es#readme
+- `cookie-signature@1.2.2`
+  - Description: Sign and unsign cookies
+  - Homepage: https://github.com/visionmedia/node-cookie-signature#readme
 - `core-util-is@1.0.3`
   - Description: The `util.is*` functions introduced in Node v0.12.
   - Homepage: https://github.com/isaacs/core-util-is#readme
+- `cors@2.8.6`
+  - Description: Node.js CORS middleware
+  - Homepage: https://github.com/expressjs/cors#readme
 - `cosmiconfig@9.0.2`
   - Description: Find and load configuration from a package.json property, rc file, TypeScript module, and more!
   - Homepage: https://github.com/cosmiconfig/cosmiconfig#readme
@@ -1710,6 +1752,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `defu@6.1.7`
   - Description: Recursively assign default properties. Lightweight and Fast!
   - Homepage: https://github.com/unjs/defu#readme
+- `depd@2.0.0`
+  - Description: Deprecate all the things
+  - Homepage: https://github.com/dougwilson/nodejs-depd#readme
 - `des.js@1.1.0`
   - Description: DES implementation
   - Homepage: https://github.com/indutny/des.js#readme
@@ -1722,6 +1767,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `dunder-proto@1.0.1`
   - Description: If available, the `Object.prototype.__proto__` accessor and mutator, call-bound
   - Homepage: https://github.com/es-shims/dunder-proto#readme
+- `ee-first@1.1.1`
+  - Description: return the first event in a set of ee/event pairs
+  - Homepage: https://github.com/jonathanong/ee-first#readme
 - `effect@3.20.0`
   - Description: The missing standard library for TypeScript, for writing production-grade software.
   - Homepage: https://effect.website
@@ -1758,6 +1806,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `empathic@2.0.0`
   - Description: A set of small and fast Node.js utilities to understand your pathing needs.
   - Homepage: https://github.com/lukeed/empathic#readme
+- `encodeurl@2.0.0`
+  - Description: Encode a URL to a percent-encoded form, excluding already-encoded sequences
+  - Homepage: https://github.com/pillarjs/encodeurl#readme
 - `enhanced-resolve@5.24.5`
   - Description: Offers a async require.resolve function. It's highly configurable.
   - Homepage: https://github.com/webpack/enhanced-resolve#readme
@@ -1797,21 +1848,39 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `escalade@3.2.0`
   - Description: A tiny (183B to 210B) and fast utility to ascend parent directories
   - Homepage: https://github.com/lukeed/escalade#readme
+- `escape-html@1.0.3`
+  - Description: Escape string for use in HTML
+  - Homepage: https://github.com/component/escape-html#readme
 - `escape-string-regexp@4.0.0`, `escape-string-regexp@5.0.0`
   - Description: Escape RegExp special characters
   - Homepage: https://github.com/sindresorhus/escape-string-regexp#readme
 - `estree-walker@2.0.2`, `estree-walker@3.0.3`
   - Description: Traverse an ESTree-compliant AST
   - Homepage: https://github.com/Rich-Harris/estree-walker#readme
+- `etag@1.8.1`
+  - Description: Create simple HTTP ETags
+  - Homepage: https://github.com/jshttp/etag#readme
 - `event-target-shim@5.0.1`
   - Description: An implementation of WHATWG EventTarget interface.
   - Homepage: https://github.com/mysticatea/event-target-shim
 - `events@3.3.0`
   - Description: Node's event emitter for all engines.
   - Homepage: https://github.com/Gozala/events#readme
+- `eventsource@3.0.7`
+  - Description: WhatWG/W3C compliant EventSource client for Node.js and browsers
+  - Homepage: https://github.com/EventSource/eventsource#readme
+- `eventsource-parser@3.1.1`
+  - Description: Streaming, source-agnostic EventSource/Server-Sent Events parser
+  - Homepage: https://github.com/rexxars/eventsource-parser#readme
 - `execa@8.0.1`, `execa@9.6.1`
   - Description: Process execution for humans
   - Homepage: https://github.com/sindresorhus/execa#readme
+- `express@5.2.1`
+  - Description: Fast, unopinionated, minimalist web framework
+  - Homepage: https://expressjs.com/
+- `express-rate-limit@8.6.2`
+  - Description: Basic IP rate-limiting middleware for Express. Use to limit repeated requests to public APIs and/or endpoints such as password reset.
+  - Homepage: https://github.com/express-rate-limit/express-rate-limit
 - `exsolve@1.1.0`, `exsolve@1.1.1`
   - Description: Module resolution utilities based on Node.js upstream implementation.
   - Homepage: https://github.com/unjs/exsolve#readme
@@ -1865,6 +1934,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `fill-range@7.1.1`
   - Description: Fill in a range of numbers or letters, optionally passing an increment or `step` to use, or create a regex-compatible range with `options.toRegex`
   - Homepage: https://github.com/jonschlinkert/fill-range
+- `finalhandler@2.1.1`
+  - Description: Node.js final http responder
+  - Homepage: https://github.com/pillarjs/finalhandler#readme
 - `find-my-way@9.7.0`
   - Description: Crazy fast http radix based router
   - Homepage: https://github.com/delvedor/find-my-way#readme
@@ -1886,9 +1958,15 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `formatly@0.3.0`
   - Description: Formats your code with whatever formatter your project is already using. 🧼
   - Homepage: https://github.com/JoshuaKGoldberg/formatly#readme
+- `forwarded@0.2.0`
+  - Description: Parse HTTP X-Forwarded-For header
+  - Homepage: https://github.com/jshttp/forwarded#readme
 - `framer-motion@13.1.1`
   - Description: A simple and powerful JavaScript animation library
   - Homepage: https://github.com/motiondivision/motion#readme
+- `fresh@2.0.0`
+  - Description: HTTP response freshness testing
+  - Homepage: https://github.com/jshttp/fresh#readme
 - `function-bind@1.1.2`
   - Description: Implementation of Function.prototype.bind
   - Homepage: https://github.com/Raynos/function-bind
@@ -1952,6 +2030,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `hey-listen@1.0.8`
   - Description: Warning and invariant dev-ex messaging.
   - Homepage: https://github.com/Popmotion/hey-listen#readme
+- `hono@4.13.3`
+  - Description: Web framework built on Web Standards
+  - Homepage: https://hono.dev
 - `hookable@6.1.1`
   - Description: Awaitable hook system
   - Homepage: https://github.com/unjs/hookable#readme
@@ -1964,6 +2045,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `html-validate@11.8.0`
   - Description: Offline HTML5 validator and linter
   - Homepage: https://html-validate.org
+- `http-errors@2.0.1`
+  - Description: Create HTTP error objects
+  - Homepage: https://github.com/jshttp/http-errors#readme
 - `http-link-header@1.1.4`
   - Description: Parse & format HTTP link headers according to RFC 8288
   - Homepage: https://codeberg.org/jhermsmeier/node-http-link-header
@@ -1994,6 +2078,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `import-meta-resolve@4.2.0`
   - Description: Resolve things like Node.js — ponyfill for `import.meta.resolve`
   - Homepage: https://github.com/wooorm/import-meta-resolve#readme
+- `ip-address@10.3.1`
+  - Description: A library for parsing IPv4 and IPv6 IP addresses in node and the browser.
+  - Homepage: https://github.com/beaugunderson/ip-address#readme
+- `ipaddr.js@1.9.1`
+  - Description: A library for manipulating IPv4 and IPv6 addresses in JavaScript.
+  - Homepage: https://github.com/whitequark/ipaddr.js#readme
 - `iron-webcrypto@1.2.1`
   - Description: a cryptographic utility for sealing-unsealing a JSON object using symmetric key encryption with message integrity verification
   - Homepage: https://github.com/brc-dd/iron-webcrypto#readme
@@ -2021,6 +2111,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `is-plain-obj@4.1.0`
   - Description: Check if a value is a plain object
   - Homepage: https://github.com/sindresorhus/is-plain-obj#readme
+- `is-promise@4.0.0`
+  - Description: Test whether an object looks like a promises-a+ promise
+  - Homepage: https://github.com/then/is-promise#readme
 - `is-property@1.0.2`
   - Description: Tests if a JSON property can be accessed using . syntax
   - Homepage: https://github.com/mikolalysenko/is-property#readme
@@ -2047,6 +2140,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `jiti@2.6.1`, `jiti@2.7.0`
   - Description: Runtime typescript and ESM support for Node.js
   - Homepage: https://github.com/unjs/jiti#readme
+- `jose@6.2.10`
+  - Description: JWA, JWS, JWE, JWT, JWK, JWKS for Node.js, Browser, Cloudflare Workers, Deno, Bun, and other Web-interoperable runtimes
+  - Homepage: https://github.com/panva/jose
 - `js-library-detector@6.7.0`
   - Description: Detects the JavaScript libraries running on a page
   - Homepage: https://github.com/johnmichel/Library-Detector-for-Chrome#readme
@@ -2169,6 +2265,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mdurl@2.0.0`
   - Description: URL utilities for markdown-it
   - Homepage: https://github.com/markdown-it/mdurl#readme
+- `media-typer@1.1.1`
+  - Description: Simple RFC 6838 media type parser and formatter
+  - Homepage: https://github.com/jshttp/media-typer#readme
+- `merge-descriptors@2.0.0`
+  - Description: Merge objects using their property descriptors
+  - Homepage: https://github.com/sindresorhus/merge-descriptors#readme
 - `merge-stream@2.0.0`
   - Description: Create a stream that emits events from multiple other streams
   - Homepage: https://github.com/grncdr/merge-stream#readme
@@ -2181,6 +2283,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `mime-db@1.54.0`
   - Description: Media Type Database
   - Homepage: https://github.com/jshttp/mime-db#readme
+- `mime-types@3.0.2`
+  - Description: The ultimate javascript content-type utility.
+  - Homepage: https://github.com/jshttp/mime-types#readme
 - `mimic-fn@4.0.0`
   - Description: Make a function mimic another one
   - Homepage: https://github.com/sindresorhus/mimic-fn#readme
@@ -2232,6 +2337,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `nanoid@3.3.18`
   - Description: A tiny (116 bytes), secure URL-friendly unique string ID generator
   - Homepage: https://github.com/ai/nanoid#readme
+- `negotiator@1.1.0`
+  - Description: HTTP content negotiation
+  - Homepage: https://github.com/jshttp/negotiator#readme
 - `neo-async@2.6.2`
   - Description: Neo-Async is a drop-in replacement for Async, it almost fully covers its functionality and runs faster
   - Homepage: https://github.com/suguru03/neo-async
@@ -2261,6 +2369,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `npm-run-path@5.3.0`, `npm-run-path@6.0.0`
   - Description: Get your PATH prepended with locally installed binaries
   - Homepage: https://github.com/sindresorhus/npm-run-path#readme
+- `object-assign@4.1.1`
+  - Description: ES2015 `Object.assign()` ponyfill
+  - Homepage: https://github.com/sindresorhus/object-assign#readme
 - `object-inspect@1.13.4`
   - Description: string representations of objects in node and the browser
   - Homepage: https://github.com/inspect-js/object-inspect
@@ -2273,6 +2384,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `ohash@2.0.11`, `ohash@2.0.12`
   - Description: Simple object hashing, serialization and comparison utils.
   - Homepage: https://github.com/unjs/ohash#readme
+- `on-finished@2.4.1`
+  - Description: Execute a callback when a request closes, finishes, or errors
+  - Homepage: https://github.com/jshttp/on-finished#readme
 - `onetime@6.0.0`
   - Description: Ensure a function is only called once
   - Homepage: https://github.com/sindresorhus/onetime#readme
@@ -2311,6 +2425,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `parse-ms@4.0.0`
   - Description: Parse milliseconds into an object
   - Homepage: https://github.com/sindresorhus/parse-ms#readme
+- `parseurl@1.3.3`
+  - Description: parse a url with memoization
+  - Homepage: https://github.com/pillarjs/parseurl#readme
 - `path-exists@4.0.0`
   - Description: Check if a path exists
   - Homepage: https://github.com/sindresorhus/path-exists#readme
@@ -2320,6 +2437,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `path-key@3.1.1`, `path-key@4.0.0`
   - Description: Get the PATH environment variable key cross-platform
   - Homepage: https://github.com/sindresorhus/path-key#readme
+- `path-to-regexp@8.4.2`
+  - Description: Express style path to RegExp utility
+  - Homepage: https://github.com/pillarjs/path-to-regexp#readme
 - `pathe@2.0.3`
   - Description: Universal filesystem path utils
   - Homepage: https://github.com/unjs/pathe#readme
@@ -2349,6 +2469,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `picomatch@2.3.2`, `picomatch@4.0.5`
   - Description: Blazing fast and accurate glob matcher written in JavaScript, with no dependencies and full support for standard and extended Bash glob features, including braces, extglobs, POSIX brackets, and regular expressions.
   - Homepage: https://github.com/micromatch/picomatch
+- `pkce-challenge@5.0.1`
+  - Description: Generate or verify a Proof Key for Code Exchange (PKCE) challenge pair
+  - Homepage: https://github.com/crouchcd/pkce-challenge#readme
 - `pkg-types@1.3.1`, `pkg-types@2.3.1`
   - Description: Node.js utilities and TypeScript definitions for `package.json` and `tsconfig.json`
   - Homepage: https://github.com/unjs/pkg-types#readme
@@ -2419,6 +2542,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
   - Homepage: https://github.com/prosemirror/prosemirror-transform#readme
 - `prosemirror-view@1.42.3`
   - Description: ProseMirror's view component
+- `proxy-addr@2.0.7`
+  - Description: Determine address of proxied request
+  - Homepage: https://github.com/jshttp/proxy-addr#readme
 - `proxy-from-env@1.1.0`
   - Description: Offers getProxyForUrl to get the proxy URL for a URL, respecting the *_PROXY (e.g. HTTP_PROXY) and NO_PROXY environment variables.
   - Homepage: https://github.com/Rob--W/proxy-from-env#readme
@@ -2443,6 +2569,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `radix3@1.1.2`
   - Description: Lightweight and fast router for JavaScript based on Radix Tree
   - Homepage: https://github.com/unjs/radix3#readme
+- `range-parser@1.3.0`
+  - Description: Range header field string parser
+  - Homepage: https://github.com/jshttp/range-parser#readme
+- `raw-body@3.0.2`
+  - Description: Get and validate the raw body of a readable stream.
+  - Homepage: https://github.com/stream-utils/raw-body#readme
 - `rc9@3.0.1`
   - Description: Read/Write config couldn't be easier!
   - Homepage: https://github.com/unjs/rc9#readme
@@ -2512,6 +2644,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `rope-sequence@1.3.4`
   - Description: Rope-based persistent sequence type
   - Homepage: https://github.com/marijnh/rope-sequence#readme
+- `router@2.2.0`
+  - Description: Simple middleware-style router
+  - Homepage: https://github.com/pillarjs/router#readme
 - `run-parallel@1.2.0`
   - Description: Run an array of functions in parallel
   - Homepage: https://github.com/feross/run-parallel
@@ -2533,6 +2668,12 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `scule@1.3.0`
   - Description: String case utils
   - Homepage: https://github.com/unjs/scule#readme
+- `send@1.2.1`
+  - Description: Better streaming static file server with Range and conditional-GET support
+  - Homepage: https://github.com/pillarjs/send#readme
+- `serve-static@2.2.1`
+  - Description: Serve static files
+  - Homepage: https://github.com/expressjs/serve-static#readme
 - `shebang-command@2.0.0`
   - Description: Get the command from a shebang
   - Homepage: https://github.com/kevva/shebang-command#readme
@@ -2581,6 +2722,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `stacktrace-parser@0.1.11`
   - Description: Parses every stack trace into a nicely formatted array of hashes.
   - Homepage: https://github.com/errwischt/stacktrace-parser
+- `statuses@2.0.2`
+  - Description: HTTP status utility
+  - Homepage: https://github.com/jshttp/statuses#readme
 - `std-env@3.10.0`, `std-env@4.1.0`, `std-env@4.2.0`
   - Description: Runtime agnostic JS utils
   - Homepage: https://github.com/unjs/std-env#readme
@@ -2608,6 +2752,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `strip-literal@4.0.0`
   - Description: Strip comments and string literals from JavaScript code
   - Homepage: https://github.com/antfu/strip-literal#readme
+- `stripe@22.6.0`
+  - Description: Stripe API wrapper
+  - Homepage: https://github.com/stripe/stripe-node
 - `strnum@2.2.3`
   - Description: Parse String to Number based on configuration
   - Homepage: https://github.com/NaturalIntelligence/strnum#readme
@@ -2670,6 +2817,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `toad-cache@3.7.4`
   - Description: LRU and FIFO caches for Client or Server
   - Homepage: https://github.com/kibertoad/toad-cache
+- `toidentifier@1.0.1`
+  - Description: Convert a string of words to a JavaScript identifier
+  - Homepage: https://github.com/component/toidentifier#readme
 - `totalist@3.0.1`
   - Description: A tiny (195B to 220B) utility to recursively list all (total) files in a directory
   - Homepage: https://github.com/lukeed/totalist#readme
@@ -2685,6 +2835,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `tunnel@0.0.6`
   - Description: Node HTTP/HTTPS Agents for tunneling proxies
   - Homepage: https://github.com/koichik/node-tunnel/
+- `type-is@2.1.0`
+  - Description: Infer the content-type of a request.
+  - Homepage: https://github.com/jshttp/type-is#readme
 - `type-level-regexp@0.1.17`
   - Description: Type-Level RegExp parser, matcher and permutation resolver
   - Homepage: https://github.com/didavid61202/type-level-regexp#readme
@@ -2735,6 +2888,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `universal-github-app-jwt@2.2.2`
   - Description: Calculate GitHub App bearer tokens for Node & modern browsers
   - Homepage: https://github.com/gr2m/universal-github-app-jwt#readme
+- `unpipe@1.0.0`
+  - Description: Unpipe a stream from all destinations
+  - Homepage: https://github.com/stream-utils/unpipe#readme
 - `unplugin@2.3.11`, `unplugin@3.3.0`
   - Description: Unified plugin system for build tools
   - Homepage: https://unplugin.unjs.io
@@ -2764,6 +2920,9 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `valibot@1.4.2`
   - Description: The modular and type safe schema library for validating structural data
   - Homepage: https://valibot.dev
+- `vary@1.1.2`
+  - Description: Manipulate the HTTP Vary header
+  - Homepage: https://github.com/jshttp/vary#readme
 - `verkit@0.3.2`
   - Description: Fast, zero-dependency SemVer for ESM and TypeScript, with functional, tree-shakeable APIs.
   - Homepage: https://github.com/sxzz/verkit#readme

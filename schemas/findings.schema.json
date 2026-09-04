@@ -75,9 +75,32 @@
       "type": "object",
       "description": "Aggregate BOM supply-chain risk summary from the bom.risk-score rule.",
       "additionalProperties": true
+    },
+    "categoryBreakdown": {
+      "type": "array",
+      "description": "Per-domain (electrical/manufacturability/assembly/testability/sourcing/release) severity rollup of findings.",
+      "items": {
+        "$ref": "#/$defs/categoryBreakdownEntry"
+      }
     }
   },
   "$defs": {
+    "categoryBreakdownEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "total", "critical", "high", "medium", "low", "info"],
+      "properties": {
+        "category": {
+          "enum": ["electrical", "manufacturability", "assembly", "testability", "sourcing", "release", "unclassified"]
+        },
+        "total": { "type": "integer", "minimum": 0 },
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 },
+        "info": { "type": "integer", "minimum": 0 }
+      }
+    },
     "waivers": {
       "type": "object",
       "additionalProperties": false,

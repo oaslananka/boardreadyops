@@ -87,6 +87,36 @@ describe("formatReviewComment", () => {
     expect(body).toContain("[JSON report](https://example/run)");
   });
 
+  it("renders a by-domain breakdown table when the run result carries one", () => {
+    const findings = [
+      finding("drc.clearance", "critical", "Clearance violation.", "board.kicad_pcb"),
+      finding("bom.missing-mpn", "medium", "R1 is missing an MPN.", "bom.csv"),
+    ];
+    const withCategoryBreakdown: RunResult = {
+      ...result(findings),
+      categoryBreakdown: [
+        { category: "electrical", total: 1, critical: 1, high: 0, medium: 0, low: 0, info: 0 },
+        { category: "manufacturability", total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        { category: "assembly", total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        { category: "testability", total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+        { category: "sourcing", total: 1, critical: 0, high: 0, medium: 1, low: 0, info: 0 },
+        { category: "release", total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      ],
+    };
+
+    const body = formatReviewComment(withCategoryBreakdown);
+
+    expect(body).toContain("### By domain");
+    expect(body).toContain("| Electrical | 1 | 1 |");
+    expect(body).toContain("| Sourcing / BOM | 1 | 0 |");
+    expect(body).not.toContain("| Assembly (DFA) | 0 |");
+  });
+
+  it("omits the by-domain section when no category breakdown is present (older/legacy run results)", () => {
+    const body = formatReviewComment(result([finding("design.board-outline", "high", "x", "y.kicad_pcb")]));
+    expect(body).not.toContain("### By domain");
+  });
+
   it("renders a PASS decision with no findings", () => {
     const body = formatReviewComment(result([]));
     expect(body).toContain("Decision: ✅ PASS");

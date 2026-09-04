@@ -29,7 +29,7 @@ import { loadPlugins } from "./plugin-loader.js";
 import { evaluatePolicy } from "./policy.js";
 import { computeReadiness, type ReadinessScore } from "./readiness.js";
 import { type ProjectBom, projectBomComponent, type RunResult } from "./result.js";
-import { listRules } from "./rule-registry.js";
+import { categorizeFindings, listRules } from "./rule-registry.js";
 import { applySuppressions } from "./suppressions.js";
 import { applyWaivers, type FalsePositiveSignal } from "./waivers.js";
 
@@ -416,6 +416,7 @@ function assembleRunResult({
     },
     ...(releaseMode ? { releaseMode } : {}),
     summary,
+    categoryBreakdown: categorizeFindings(effectiveFindings),
     readiness,
     ...(bomRisk ? { bomRisk } : {}),
     ...(policy ? { policy } : {}),

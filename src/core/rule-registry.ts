@@ -226,3 +226,52 @@ export function listRules(): Rule[] {
 export function clearRulesForTests(): void {
   registry.clear();
 }
+
+export interface RuleCategorySummary {
+  category: RuleCategory;
+  total: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+}
+
+const knownCategories: Exclude<RuleCategory, "unclassified">[] = [
+  "electrical",
+  "manufacturability",
+  "assembly",
+  "testability",
+  "sourcing",
+  "release",
+];
+
+function emptyCategorySummary(category: RuleCategory): RuleCategorySummary {
+  return { category, total: 0, critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+}
+
+/**
+ * Groups findings by their rule's registered `category` and rolls up severity counts per
+ * category -- the data behind per-domain readiness score cards (run page, PR comment). Every
+ * known category is always present, zeroed when it has no findings, so a clean domain reads as
+ * "checked and clean" rather than silently missing. `unclassified` (a finding whose rule id
+ * isn't in the registry, e.g. a stale fingerprint from a since-removed plugin rule) only appears
+ * when it actually has findings.
+ */
+export function categorizeFindings(findings: readonly Finding[]): RuleCategorySummary[] {
+  const metaById = new Map(listRules().map((rule) => [rule.meta.id, rule.meta]));
+  const buckets = new Map<RuleCategory, RuleCategorySummary>(
+    knownCategories.map((category) => [category, emptyCategorySummary(category)]),
+  );
+
+  for (const finding of findings) {
+    const category = metaById.get(finding.ruleId)?.category ?? "unclassified";
+    const bucket = buckets.get(category) ?? emptyCategorySummary(category);
+    bucket.total += 1;
+    bucket[finding.severity] += 1;
+    buckets.set(category, bucket);
+  }
+
+  const order = buckets.has("unclassified") ? [...knownCategories, "unclassified" as const] : knownCategories;
+  return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
+}

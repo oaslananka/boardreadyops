@@ -740,7 +740,11 @@
           "packages/db/src/billing-store.ts",
           "packages/db/migrations/0060_stripe_subscription_event_ordering.sql",
           "apps/web/app/api/v1/billing/webhook/route.ts",
-          "apps/web/lib/marketplace-free-billing.ts"
+          "apps/web/app/api/v1/billing/checkout/route.ts",
+          "apps/web/app/api/v1/billing/portal/route.ts",
+          "apps/web/lib/marketplace-free-billing.ts",
+          "apps/web/lib/billing-mode.ts",
+          "apps/web/lib/stripe-billing-client.ts"
         ],
         "tests": [
           "tests/unit/cloud-core/billing-transitions.test.ts",
@@ -748,6 +752,11 @@
           "tests/unit/cloud-core/stripe-service.test.ts",
           "tests/unit/web/billing-routes.test.ts",
           "tests/unit/web/billing-webhook-stripe-projection.test.ts",
+          "tests/unit/web/billing-mode.test.ts",
+          "tests/unit/web/stripe-billing-client.test.ts",
+          "tests/unit/web/billing-checkout-route.test.ts",
+          "tests/unit/web/billing-portal-route.test.ts",
+          "tests/unit/web/marketplace-free-billing-routes.test.ts",
           "tests/unit/db/billing-store-stripe.test.ts",
           "tests/unit/db/marketplace-billing-atomic.test.ts"
         ],
@@ -760,11 +769,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/cloud-core/billing-transitions.test.ts tests/unit/cloud-core/entitlements.test.ts tests/unit/cloud-core/stripe-service.test.ts tests/unit/web/billing-routes.test.ts tests/unit/web/billing-webhook-stripe-projection.test.ts tests/unit/db/billing-store-stripe.test.ts tests/unit/db/marketplace-billing-atomic.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/cloud-core/billing-transitions.test.ts tests/unit/cloud-core/entitlements.test.ts tests/unit/cloud-core/stripe-service.test.ts tests/unit/web/billing-routes.test.ts tests/unit/web/billing-webhook-stripe-projection.test.ts tests/unit/web/billing-mode.test.ts tests/unit/web/stripe-billing-client.test.ts tests/unit/web/billing-checkout-route.test.ts tests/unit/web/billing-portal-route.test.ts tests/unit/web/marketplace-free-billing-routes.test.ts tests/unit/db/billing-store-stripe.test.ts tests/unit/db/marketplace-billing-atomic.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-03T23:33:36Z"
+        "checkedAt": "2026-09-04T23:24:00Z"
       },
-      "remaining": "Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are now implemented and unit-tested: packages/db/src/billing-store.ts gained linkStripeCustomer (links a Stripe customer id to a tenant via checkout.session.completed's client_reference_id), applyStripeSubscriptionEvent (projects customer.subscription.created|updated|deleted onto billing_subscriptions + billing_customers + installations.plan_tier, guarded against out-of-order/redelivered events via a new last_event_created_at column added in migration 0060), and clearGraceOnPaymentSuccess (invoice.paid reverses the pre-existing applyGraceOnPaymentFailure, reused as-is for invoice.payment_failed). Idempotency is unchanged and reused as-is (recordEvent's ON CONFLICT (stripe_event_id) DO NOTHING). Price→tier mapping reuses the pre-existing STRIPE_*_PRICE_ID env-driven table in stripe-service.ts rather than inventing a second one — those price ids are illustrative and must be confirmed against the real Stripe dashboard before production use. What is honestly still open: (1) /api/v1/billing/checkout remains guarded with HTTP 410 'marketplace_free_only' per the Marketplace Free-Only Guardrail (docs/product/current-state-matrix.md §9), so in production checkout.session.completed — the only handled event carrying both a Stripe customer id and this repo's tenant id — never fires; the new projection code is real and tested but dormant until that guard is deliberately lifted. (2) Test coverage added here is unit-level only (mocked SqlQueryExecutor / mocked pg-executor at the route boundary); there is no live-Postgres integration test analogous to tests/integration/marketplace-billing-postgres.test.ts for the Stripe path. (3) A tier change does not itself invoke packages/db/src/entitlement-store.ts's applyWatchAllowance to re-enforce watched-board limits immediately — this mirrors the pre-existing GitHub Marketplace path's behavior and is not a new gap introduced here."
+      "remaining": "Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are implemented and unit-tested (unchanged from the prior pass: linkStripeCustomer, applyStripeSubscriptionEvent guarded via last_event_created_at, clearGraceOnPaymentSuccess). Newly closed this pass: /api/v1/billing/checkout and /portal now create real Stripe Checkout/Billing Portal sessions (apps/web/lib/stripe-billing-client.ts, official stripe SDK) instead of unconditionally returning HTTP 410. A new BILLING_MODE environment switch (apps/web/lib/billing-mode.ts) gates this — it defaults to 'marketplace_free', reproducing today's 410 behavior exactly, so production is unaffected until an operator deliberately sets BILLING_MODE=stripe or 'both' and configures STRIPE_SECRET_KEY. Once flipped, checkout.session.completed can fire for the first time, activating the previously-dormant projection code. Tenant identity for the Stripe path reuses the pre-existing convention (viewer.session.login, matching BillingStore.forecastContributors's usage on the read-only Marketplace billing page) rather than inventing a new one; a forward priceIdForTier helper was added to stripe-service.ts as the missing inverse of the pre-existing resolveTierFromPriceId/resolveIntervalFromPriceId. Both routes are built with injected-dependency handlers (handleCheckoutRequest/handlePortalRequest) so unit tests exercise real request/response logic without mocking the 'stripe' package itself. What is honestly still open: (1) Test coverage is unit-level only (mocked DB, injected fake Stripe client); there is no live-Postgres integration test analogous to tests/integration/marketplace-billing-postgres.test.ts for the Stripe path, and no real Stripe test-mode account has exercised the new routes end-to-end. (2) A tier change does not itself invoke packages/db/src/entitlement-store.ts's applyWatchAllowance — billing_customers.tenant_id has no established mapping back to installations.id (a bare, unconstrained text column; the new routes populate it with the GitHub login), so this is a real, undesigned access-control decision rather than a one-line call, and mirrors the pre-existing GitHub Marketplace path's same gap."
     },
     {
       "id": "W20",
@@ -781,13 +790,20 @@
           "apps/web/lib/run-verdict.ts",
           "apps/web/components/review/overview-tab.tsx",
           "apps/web/components/run-investigation.tsx",
-          "apps/web/lib/run-dashboard.ts"
+          "apps/web/lib/run-dashboard.ts",
+          "src/core/rule-registry.ts",
+          "src/report/review-comment.ts",
+          "packages/db/migrations/0062_finding_category.sql"
         ],
         "tests": [
           "tests/e2e/qa-audit.spec.ts",
           "tests/e2e/visual.spec.ts",
           "tests/unit/web/run-investigation-accessibility.test.ts",
-          "tests/unit/web/review-canvas.test.ts"
+          "tests/unit/web/review-canvas.test.ts",
+          "tests/unit/core/rule-registry-category-breakdown.test.ts",
+          "tests/unit/core/pipeline-category-breakdown.test.ts",
+          "tests/unit/report/review-comment.test.ts",
+          "tests/unit/web/run-dashboard.test.ts"
         ],
         "docs": ["docs/superpowers/specs/2026-08-28-foundry-editorial-product-ui-design.md"],
         "deployed": [],
@@ -795,11 +811,11 @@
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/web/run-investigation-accessibility.test.ts tests/unit/web/review-canvas.test.ts && corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts",
+        "command": "corepack pnpm vitest run tests/unit/web/run-investigation-accessibility.test.ts tests/unit/web/review-canvas.test.ts tests/unit/web/run-dashboard.test.ts && corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts",
         "result": "pass",
-        "checkedAt": "2026-09-02T23:05:00Z"
+        "checkedAt": "2026-09-05T00:56:12Z"
       },
-      "remaining": "Running the full stated command surfaced and fixed two real bugs, not just confirmed existing behavior. (1) /reviews/rev_edge_ble_09 -- a deliberate known-bug regression id (qa/audit/routes.ts's brokenDemoReviewId, asserted to 404 by tests/e2e/regression-audit-findings.spec.ts) -- was 500ing instead: loadServerReview only demo-fixture-short-circuited rev_gateway_* ids, so any other id fell through to resolveCloudPersistenceConfiguration(), which throws uncaught when DATABASE_URL is unset. Fixed in apps/web/lib/server-review-loader.ts by catching the missing-database-url case and returning null (-> notFound()) instead of letting it propagate as an unhandled 500. (2) Even after that fix, the qa-audit crawler's checkInternalLinks flagged the (now-correct) 404 as a P0 broken-internal-link finding, because it never excluded the known-bug id; added that exclusion in tests/e2e/qa-audit.spec.ts. Both confirmed via the repo's real nightly CI history (run 33605754839, 2026-09-02): 'ci / qa-audit gate' and 'qa-nightly / full-audit' were already failing on main with this exact P0 finding, so this was a genuine pre-existing defect, not a local artifact. verification.command above deliberately excludes tests/e2e/visual.spec.ts: that suite fails independently and unrelated to this fix -- no Linux screenshot baselines have ever been committed (only *-win32.png), so 'qa-nightly / visual-regression' has been failing on main from its first run with 'snapshot doesn't exist' for all 5 routes, on every browser. That is a separate CI/tooling gap (baseline generation), out of scope here. Still separately true: no per-domain score cards (Design/DFM/DFA/DFT/BOM/Supply/Firmware/Manufacturer/Policy) were found — findings appear as a flat/tabbed list; no 'Open in KiCad' deep link (only GitHub Actions deep links)."
+      "remaining": "Running the full stated command surfaced and fixed two real bugs, not just confirmed existing behavior. (1) /reviews/rev_edge_ble_09 -- a deliberate known-bug regression id (qa/audit/routes.ts's brokenDemoReviewId, asserted to 404 by tests/e2e/regression-audit-findings.spec.ts) -- was 500ing instead: loadServerReview only demo-fixture-short-circuited rev_gateway_* ids, so any other id fell through to resolveCloudPersistenceConfiguration(), which throws uncaught when DATABASE_URL is unset. Fixed in apps/web/lib/server-review-loader.ts by catching the missing-database-url case and returning null (-> notFound()) instead of letting it propagate as an unhandled 500. (2) Even after that fix, the qa-audit crawler's checkInternalLinks flagged the (now-correct) 404 as a P0 broken-internal-link finding, because it never excluded the known-bug id; added that exclusion in tests/e2e/qa-audit.spec.ts. Both confirmed via the repo's real nightly CI history (run 33605754839, 2026-09-02): 'ci / qa-audit gate' and 'qa-nightly / full-audit' were already failing on main with this exact P0 finding, so this was a genuine pre-existing defect, not a local artifact. verification.command above deliberately excludes tests/e2e/visual.spec.ts: that suite fails independently and unrelated to this fix -- no Linux screenshot baselines have ever been committed (only *-win32.png), so 'qa-nightly / visual-regression' has been failing on main from its first run with 'snapshot doesn't exist' for all 5 routes, on every browser. That is a separate CI/tooling gap (baseline generation), out of scope here. Since then: per-domain score cards now render in both the local CLI/Action PR comment ('### By domain' table, src/report/review-comment.ts) and the web run dashboard (CategoryBreakdownPanel in apps/web/components/run-investigation.tsx, fed by a new aggregate query in apps/web/lib/run-dashboard.ts's lookupRunDashboard), both backed by the same real per-domain finding breakdown (src/core/rule-registry.ts's categorizeFindings, and the findings.category column persisted via migration 0062) rather than two divergent classifications. Still open: no 'Open in KiCad' deep link (only GitHub Actions deep links)."
     },
     {
       "id": "W21",
@@ -985,23 +1001,37 @@
       "milestone": "v2.7 — Marketplace, Ecosystem & AI Reviewer",
       "issues": [],
       "evidence": {
-        "code": ["packages/plugin-sdk/src/index.ts", "src/core/plugin-loader.ts", "src/core/plugin-permissions.ts"],
-        "tests": ["tests/unit/core/plugin-loader.test.ts", "tests/integration/plugin-sdk-contract.test.ts"],
+        "code": [
+          "packages/plugin-sdk/src/index.ts",
+          "src/core/plugin-loader.ts",
+          "src/core/plugin-permissions.ts",
+          "packages/mcp-server/src/cli-runner.ts",
+          "packages/mcp-server/src/tools.ts",
+          "packages/mcp-server/src/server.ts",
+          "packages/mcp-server/bin/boardreadyops-mcp.js"
+        ],
+        "tests": [
+          "tests/unit/core/plugin-loader.test.ts",
+          "tests/integration/plugin-sdk-contract.test.ts",
+          "tests/unit/mcp-server/tools.test.ts",
+          "tests/unit/mcp-server/server.test.ts"
+        ],
         "docs": [
           "docs/plugin-sdk.md",
           "docs/architecture/adr/0009-plugin-sandboxing.md",
-          "docs/integrations/boardreadyops-mcp.md"
+          "docs/integrations/boardreadyops-mcp.md",
+          "packages/mcp-server/README.md"
         ],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/core/plugin-loader.test.ts tests/integration/plugin-sdk-contract.test.ts",
+        "command": "corepack pnpm vitest run tests/unit/core/plugin-loader.test.ts tests/integration/plugin-sdk-contract.test.ts tests/unit/mcp-server/tools.test.ts tests/unit/mcp-server/server.test.ts",
         "result": "pass",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "checkedAt": "2026-09-05T00:17:56Z"
       },
-      "remaining": "No actual MCP server implementation exists (no @modelcontextprotocol/sdk dependency anywhere) — docs/integrations/boardreadyops-mcp.md only documents a proposed tool contract. The Plugin SDK half is genuinely strong (real capability manifest, pre-import permission checks, honest ADR-0009 rejecting a false node:vm sandbox claim)."
+      "remaining": "A real MCP server now exists: packages/mcp-server (@boardreadyops/mcp-server, using the official @modelcontextprotocol/sdk) implements boardreadyops_check, boardreadyops_plan, and boardreadyops_verify_bundle. Each tool spawns the real boardreadyops CLI binary as a child process (resolved via the installed boardreadyops package's own bin field, not a monorepo-relative path) and returns its parsed JSON output -- no reimplementation of check/plan/verify logic, so results are guaranteed identical to running the CLI by hand. Verified end-to-end, not just against fakes: a real smoke test resolved the CLI entrypoint, spawned it, and ran a real check against tests/fixtures/projects/safe-basic. Still open: (1) boardreadyops_explain and boardreadyops_vendor_score from docs/integrations/boardreadyops-mcp.md are not implemented -- the doc's findingId param doesn't match reality (the CLI only explains a rule id, not a finding fingerprint), and vendor scoring (src/core/readiness.ts::computeReadiness) only exists inside a full pipeline run today, not as a standalone (path, profile) call. (2) The two mutating tools (boardreadyops_generate, boardreadyops_release_prepare) are not implemented -- the documented 'explicit capability elevation' safety mechanism needs its own design rather than a default-on switch added alongside the read-only tools. The Plugin SDK half is unchanged and remains genuinely strong (real capability manifest, pre-import permission checks, honest ADR-0009 rejecting a false node:vm sandbox claim)."
     },
     {
       "id": "W28",
@@ -1166,19 +1196,25 @@
       "milestone": "v2.3 — Release Dashboard, Evidence & Artifact UX",
       "issues": [],
       "evidence": {
-        "code": ["schemas/telemetry-event.schema.json"],
-        "tests": [],
+        "code": [
+          "schemas/telemetry-event.schema.json",
+          "apps/web/lib/webhook-intake-telemetry.ts",
+          "packages/cloud-core/src/wdrr-metrics.ts",
+          "apps/web/lib/wdrr-dashboard.ts",
+          "apps/web/app/insights/page.tsx"
+        ],
+        "tests": ["tests/unit/cloud-core/wdrr-metrics.test.ts", "tests/unit/web/wdrr-dashboard.test.ts"],
         "docs": ["docs/gtm/product-metrics-and-telemetry.md"],
         "deployed": [],
         "commits": [],
         "pullRequests": []
       },
       "verification": {
-        "command": "repo-wide audit: grep for telemetry-emitting code in src/, apps/, packages/ (2026-09-01)",
-        "result": "not_run",
-        "checkedAt": "2026-09-01T17:57:55Z"
+        "command": "corepack pnpm vitest run tests/unit/cloud-core/wdrr-metrics.test.ts tests/unit/web/wdrr-dashboard.test.ts",
+        "result": "pass",
+        "checkedAt": "2026-09-04T23:35:29Z"
       },
-      "remaining": "No source code anywhere in src/, apps/, or packages/ emits or consumes telemetry events, and no test validates the schema — this is a schema-and-plan artifact; the doc itself frames most validation gates as 'External Validation Required.'"
+      "remaining": "Closed this pass: /insights no longer calls computeWdrrWeekly([]) on a hardcoded empty array. apps/web/lib/wdrr-dashboard.ts::loadViewerWdrrWeekly queries real reviews across the viewer's installations (bounded to the last 90 days / 200 reviews) and evaluates each through the same computeReviewReadiness the review detail page's own readiness gate uses, rather than reimplementing blocker/approval logic and risking the exact policy-divergence bug review-readiness.ts documents. Still genuinely open: (1) schemas/telemetry-event.schema.json's CLI-side event taxonomy has no emitter anywhere in src/ and no schema-validation test. (2) wdrr-metrics.ts's cloud-side allowedProductEvents/sanitizeProductEventPayload are defined but nothing calls them — no product-event ingestion route or store exists. (3) webhook-intake-telemetry.ts is real and already emits structured operational logs on webhook intake, but it is narrow (accept/duplicate/enqueue-failed counters), not the broader activation-funnel instrumentation this workstream's scope implies."
     },
     {
       "id": "W33",

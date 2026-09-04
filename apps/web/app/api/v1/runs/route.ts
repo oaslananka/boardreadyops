@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { findingSchema, releaseRunArtifactSchema, triggerKindSchema } from "@boardreadyops/contracts";
+import {
+  findingSchema,
+  releaseRunArtifactSchema,
+  snapshotArtifactSchema,
+  triggerKindSchema,
+} from "@boardreadyops/contracts";
 import { ReviewStore } from "@boardreadyops/db";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
@@ -21,6 +26,10 @@ export const ingestRunRequestSchema = z.object({
   title: z.string().max(256).optional(),
   findings: z.array(findingSchema).default([]),
   artifacts: z.array(releaseRunArtifactSchema).default([]),
+  // Review-canvas snapshots (rendered SVG + finding anchors) from `boardreadyops review publish`;
+  // see src/kicad/snapshots.ts::generateSnapshots. Content is inline SVG text, so these ride the
+  // same JSON payload as findings rather than going through the binary artifact upload protocol.
+  snapshots: z.array(snapshotArtifactSchema).max(64).default([]),
   evidenceDigest: z
     .string()
     .regex(/^[0-9a-f]{64}$/u)
@@ -114,9 +123,9 @@ async function insertRunEntities(
     const findingId = randomUUID();
     await executor.query(
       `insert into findings (
-        id, run_id, rule_id, severity, message, path, fingerprint
-      ) values ($1, $2, $3, $4, $5, $6, $7)`,
-      [findingId, runId, f.ruleId, f.severity, f.message, f.path ?? null, f.fingerprint ?? null],
+        id, run_id, rule_id, severity, message, path, fingerprint, category
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [findingId, runId, f.ruleId, f.severity, f.message, f.path ?? null, f.fingerprint ?? null, f.category ?? null],
     );
   }
 
@@ -127,6 +136,29 @@ async function insertRunEntities(
         id, run_id, kind, name, storage_path, sha256, bytes, role
       ) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [artifactId, runId, a.kind, a.name, a.storagePath, a.sha256, a.bytes, a.role],
+    );
+  }
+
+  for (const s of payload.snapshots) {
+    const rowId = randomUUID();
+    await executor.query(
+      `insert into run_snapshots (
+        id, run_id, snapshot_id, name, kind, format, sheet_or_layer, width, height, content, sha256, anchors
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)`,
+      [
+        rowId,
+        runId,
+        s.id,
+        s.name,
+        s.kind,
+        s.format,
+        s.sheetOrLayer,
+        s.width,
+        s.height,
+        s.content ?? "",
+        s.sha256,
+        JSON.stringify(s.anchors),
+      ],
     );
   }
 }

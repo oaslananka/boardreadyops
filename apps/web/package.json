@@ -18,7 +18,8 @@
     "@sentry/nextjs": "^10.71.0",
     "next": "16.2.12",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "stripe": "22.6.0"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
