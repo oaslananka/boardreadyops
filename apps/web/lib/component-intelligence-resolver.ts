@@ -2,6 +2,13 @@ import {
   type ComponentIntelligenceProvider,
   createNullComponentIntelligenceProvider,
 } from "@boardreadyops/cloud-core/component-intelligence";
+import {
+  type CircuitBreaker,
+  createCircuitBreaker,
+  createFixedWindowRateLimiter,
+  type RateLimiter,
+  withResilientProviderCalls,
+} from "@boardreadyops/cloud-core/component-intelligence-resilience";
 import type { CredentialCipher } from "@boardreadyops/cloud-core/credential-encryption";
 import {
   ComponentIntelligenceCredentialError,
@@ -9,6 +16,30 @@ import {
 } from "@boardreadyops/cloud-core/nexar-component-intelligence";
 import type { ComponentIntelligenceResolver } from "@boardreadyops/cloud-core/supply-watch";
 import type { InstallationCredentialStore } from "@boardreadyops/db/installation-credential-store";
+
+/**
+ * Outbound-call limits for provider lookups, keyed per installation (below) so one customer's
+ * exhausted quota or broken credential cannot throttle or trip the breaker for anyone else.
+ * Configurable because the right limit depends on the provider's own published rate limits,
+ * which this codebase does not have a live account to observe.
+ */
+const defaultRateLimitPerMinute = 30;
+const defaultCircuitBreakerFailureThreshold = 5;
+const defaultCircuitBreakerCooldownMs = 5 * 60 * 1000;
+
+function configuredPositiveInteger(
+  environment: NodeJS.ProcessEnv,
+  name: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const raw = environment[name]?.trim();
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) return fallback;
+  return parsed;
+}
 
 /**
  * Builds the provider an installation's lookups run under.
@@ -59,6 +90,11 @@ export type ComponentIntelligenceResolverDependencies = {
   /** Injected so the credential-rejection path can be exercised without network access. */
   fetch?: typeof globalThis.fetch;
   onDiagnostic?: (event: string, detail: Record<string, unknown>) => void;
+  /** Defaults to `process.env`; override in tests to exercise non-default rate/breaker config. */
+  environment?: NodeJS.ProcessEnv;
+  /** Injected so tests can assert rate-limit/circuit-breaker behaviour deterministically. */
+  rateLimiter?: RateLimiter;
+  circuitBreaker?: CircuitBreaker;
 };
 
 /**
@@ -102,6 +138,37 @@ export function createComponentIntelligenceResolver(
   const nullProvider = createNullComponentIntelligenceProvider();
   const cache = new Map<string, { provider: ComponentIntelligenceProvider; expiresAt: number }>();
   const diagnostic = dependencies.onDiagnostic ?? (() => {});
+  const environment = dependencies.environment ?? process.env;
+  const rateLimiter =
+    dependencies.rateLimiter ??
+    createFixedWindowRateLimiter({
+      limit: configuredPositiveInteger(
+        environment,
+        "BOARDREADYOPS_COMPONENT_INTELLIGENCE_RATE_LIMIT_PER_MINUTE",
+        defaultRateLimitPerMinute,
+        1,
+        100_000,
+      ),
+      windowMs: 60_000,
+    });
+  const circuitBreaker =
+    dependencies.circuitBreaker ??
+    createCircuitBreaker({
+      failureThreshold: configuredPositiveInteger(
+        environment,
+        "BOARDREADYOPS_COMPONENT_INTELLIGENCE_CIRCUIT_BREAKER_THRESHOLD",
+        defaultCircuitBreakerFailureThreshold,
+        1,
+        1_000,
+      ),
+      cooldownMs: configuredPositiveInteger(
+        environment,
+        "BOARDREADYOPS_COMPONENT_INTELLIGENCE_CIRCUIT_BREAKER_COOLDOWN_MS",
+        defaultCircuitBreakerCooldownMs,
+        1_000,
+        3_600_000,
+      ),
+    });
 
   return async (installationId) => {
     if (!dependencies.cipher) return nullProvider;
@@ -143,7 +210,12 @@ export function createComponentIntelligenceResolver(
       return nullProvider;
     }
 
-    const wrapped = recordingCredentialState(provider, installationId, dependencies, stored.rejectedAt !== undefined);
+    // Rate limiter and circuit breaker sit between the raw provider and the credential-state
+    // wrapper: a rejected-credential error still needs to reach recordingCredentialState
+    // unwrapped so it can be told apart from an outage, while a tripped limiter/breaker throws
+    // before either the network or that bookkeeping is reached.
+    const resilient = withResilientProviderCalls(provider, installationId, { rateLimiter, circuitBreaker, now });
+    const wrapped = recordingCredentialState(resilient, installationId, dependencies, stored.rejectedAt !== undefined);
     cache.set(installationId, { provider: wrapped, expiresAt: current + providerCacheTtlMs });
     return wrapped;
   };

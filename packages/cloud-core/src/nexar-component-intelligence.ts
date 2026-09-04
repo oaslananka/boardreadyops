@@ -1,8 +1,10 @@
 import type {
+  ComponentDistributorClassification,
   ComponentIntelligenceProvider,
   ComponentLifecycleStatus,
   ComponentObservation,
   ComponentQuery,
+  PriceBreak,
   ProviderCachePolicy,
 } from "./component-intelligence.js";
 
@@ -81,14 +83,74 @@ export function nexarLifecycleStatus(value: string | undefined): ComponentLifecy
   }
 }
 
+type NexarOffer = {
+  prices?: { quantity?: number; price?: number; currency?: string }[];
+};
+
+type NexarSeller = {
+  isAuthorized?: boolean;
+  offers?: NexarOffer[];
+};
+
 type NexarPart = {
   mpn?: string;
   manufacturer?: { name?: string };
   specs?: { attribute?: { shortname?: string }; displayValue?: string }[];
+  sellers?: NexarSeller[];
 };
 
 function specValue(part: NexarPart, shortname: string): string | undefined {
   return part.specs?.find((spec) => spec.attribute?.shortname === shortname)?.displayValue;
+}
+
+/**
+ * Authorized-distributor-vs-marketplace classification, from Nexar's own `Seller.isAuthorized`
+ * signal (queried across every seller, not just authorized ones, so both sides of the signal
+ * are visible).
+ *
+ * A part can carry several sellers, mixing authorized and marketplace/broker listings. Any
+ * authorized seller means the part is available through an authorized channel, which is the
+ * fact this classification exists to answer -- a design guided by it isn't limited to the grey
+ * market even if other listings are. Only when nothing authorized turns up, and at least one
+ * seller (all of them unauthorized) is present, is it reported as marketplace. `isAuthorized`
+ * absent on every seller (Nexar returned seller data but not this specific field) or no seller
+ * data at all both mean the provider gave no usable signal -- reported honestly as `"unknown"`
+ * rather than guessed at.
+ */
+function nexarDistributorClassification(
+  sellers: readonly NexarSeller[] | undefined,
+): ComponentDistributorClassification {
+  if (!sellers || sellers.length === 0) return "unknown";
+  if (sellers.some((seller) => seller.isAuthorized === true)) return "authorized-distributor";
+  if (sellers.some((seller) => seller.isAuthorized === false)) return "marketplace";
+  return "unknown";
+}
+
+/**
+ * Quantity-price tiers from the first seller that actually carries priced offers, preferring an
+ * authorized seller's pricing when one is available -- mixing tiers from multiple sellers into
+ * one list would present a marketplace listing's price as if it were the authorized channel's.
+ */
+function nexarPriceBreaks(sellers: readonly NexarSeller[] | undefined): PriceBreak[] {
+  if (!sellers) return [];
+  const ordered = [...sellers].sort((a, b) => Number(b.isAuthorized === true) - Number(a.isAuthorized === true));
+  for (const seller of ordered) {
+    const breaks = (seller.offers ?? [])
+      .flatMap((offer) => offer.prices ?? [])
+      .flatMap((price): PriceBreak[] => {
+        if (
+          typeof price.quantity !== "number" ||
+          typeof price.price !== "number" ||
+          typeof price.currency !== "string" ||
+          !price.currency.trim()
+        ) {
+          return [];
+        }
+        return [{ quantity: price.quantity, price: price.price, currency: price.currency }];
+      });
+    if (breaks.length > 0) return breaks;
+  }
+  return [];
 }
 
 function chunked<T>(items: readonly T[], size: number): T[][] {
@@ -104,6 +166,12 @@ const lifecycleQuery = `query BoardReadyOpsLifecycle($queries: [SupPartMatchQuer
       mpn
       manufacturer { name }
       specs { attribute { shortname } displayValue }
+      sellers {
+        isAuthorized
+        offers {
+          prices { quantity price currency }
+        }
+      }
     }
   }
 }`;
@@ -121,12 +189,15 @@ function parseNexarMatches(
     if (!part) continue;
     const status = nexarLifecycleStatus(specValue(part, "lifecyclestatus"));
     if (status === "unknown") continue;
+    const priceBreaks = nexarPriceBreaks(part.sellers);
     observations.push({
       mpn: query.mpn,
       ...(query.manufacturer === undefined ? {} : { manufacturer: query.manufacturer }),
       status,
       source: "nexar",
       observedAt,
+      distributorClassification: nexarDistributorClassification(part.sellers),
+      ...(priceBreaks.length > 0 ? { priceBreaks } : {}),
     });
   }
   return observations;

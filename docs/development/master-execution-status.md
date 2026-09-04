@@ -151,9 +151,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W11 — BOM, Supply Chain & Cost Intelligence
 - **Status:** `Partial`
-- **Remaining:** No provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; fleet BOM exposure (which releases contain MPN X) is not queryable — board-bom-store.ts only exposes a write path. Matches open issue #449.
-- **Scope:** Component MPN normalization, lifecycle tracking (Active/NRND/EOL), CycloneDX HBOM generation, and provider abstraction (Nexar).
-- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/report/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`.
+- **Remaining:** Provider rate-limit/circuit-breaker, authorized-distributor-vs-marketplace classification, and cost/quantity-tier/currency snapshot metadata are now closed (see `master-execution-status.json` for detail). Distributor classification is limited to what Nexar's `Seller.isAuthorized` field actually signals — no other provider is implemented. HTTP surface for `findBoardsByMpn` and the new snapshot fields is still deliberately out of scope: no installation-level (cross-repository) API auth context exists yet, a separate access-control decision. Matches open issue #449.
+- **Scope:** Component MPN normalization, lifecycle tracking (Active/NRND/EOL), CycloneDX HBOM generation, and provider abstraction (Nexar) with a rate-limited, circuit-broken outbound path and distributor/pricing snapshot metadata.
+- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/report/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`, `packages/cloud-core/src/component-intelligence-resilience.ts`, `packages/cloud-core/src/nexar-component-intelligence.ts`, `packages/db/src/board-supply-watch-store.ts`.
 
 ### W12 — Firmware ↔ Hardware Contract
 - **Status:** `Partial`
@@ -201,7 +201,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 - **Status:** `Partial`
 - **Remaining:** Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are now implemented and unit-tested (`billing-store.ts`: `linkStripeCustomer`, `applyStripeSubscriptionEvent` guarded against out-of-order/redelivered events via a new `last_event_created_at` column, `clearGraceOnPaymentSuccess`; reuses the pre-existing `applyGraceOnPaymentFailure` and the pre-existing `recordEvent` idempotency). Price→tier mapping reuses the pre-existing `STRIPE_*_PRICE_ID` env-driven table — those price ids are illustrative and must be confirmed against the real Stripe dashboard before production use. Still open: (1) `/api/v1/billing/checkout` stays guarded HTTP 410 `marketplace_free_only`, so `checkout.session.completed` — the only event linking a Stripe customer id to a tenant — never fires in production today; the new code is real but dormant until that guard is lifted. (2) Coverage is unit-level only (mocked DB/executor); no live-Postgres integration test exists for the Stripe path, unlike the Marketplace path's `tests/integration/marketplace-billing-postgres.test.ts`. (3) A tier change does not itself call `entitlement-store.ts`'s `applyWatchAllowance`, mirroring the pre-existing Marketplace path's behavior.
 - **Scope:** Tiered plan entitlements (Free / Team / Business / Enterprise), Stripe signature verification, and marketplace billing models.
-- **Code & Test Evidence:** `ADR-0014`, `packages/cloud-core/src/stripe-service.ts`, `packages/db/src/billing-store.ts`, `packages/db/migrations/0059_stripe_subscription_event_ordering.sql`, `apps/web/app/api/v1/billing/webhook/route.ts`.
+- **Code & Test Evidence:** `ADR-0014`, `packages/cloud-core/src/stripe-service.ts`, `packages/db/src/billing-store.ts`, `packages/db/migrations/0060_stripe_subscription_event_ordering.sql`, `apps/web/app/api/v1/billing/webhook/route.ts`.
 
 ### W20 — Release Command Center & Cloud UX
 - **Status:** `Partial`
