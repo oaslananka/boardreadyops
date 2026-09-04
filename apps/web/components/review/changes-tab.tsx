@@ -9,7 +9,12 @@ export function ChangesTab({ review }: { readonly review: DemoReview }) {
   if (!review.headSnapshots || review.headSnapshots.length === 0) {
     canvasContent = <p className="empty-notice">No schematic or PCB snapshot is available for this revision.</p>;
   } else {
-    canvasContent = <ReviewCanvas headSnapshots={review.headSnapshots} baseSnapshots={review.baseSnapshots} />;
+    canvasContent = (
+      <ReviewCanvas
+        headSnapshots={review.headSnapshots}
+        {...(review.baseSnapshots ? { baseSnapshots: review.baseSnapshots } : {})}
+      />
+    );
   }
 
   let pcbContent: React.ReactNode;
