@@ -97,7 +97,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W02 — Schema & Contract Governance
 - **Status:** `Partial`
-- **Remaining:** The schema-shape drift guard (tests/snapshot/schemas.snapshot.test.ts, PR #568) and RFC 8785 canonicalization (src/util/json.ts) now close two acceptance items. Remaining: consumer-driven contract tests spanning CLI→Cloud/Action→Cloud/Runner→Control-Plane boundaries specifically, and explicit unknown-enum-value forward-compatibility tests.
+- **Remaining:** The schema-shape drift guard (tests/snapshot/schemas.snapshot.test.ts, PR #568), RFC 8785 canonicalization (src/util/json.ts), the Runner↔Control-Plane .strict()/.strip() security triage, and explicit unknown-enum-value forward-compatibility tests are all resolved. Consumer-driven contract tests now also span the CLI→Cloud and Action→Cloud boundaries specifically: `tests/unit/contracts/cli-cloud-forward-compat.test.ts` (`review publish` → `POST /api/v1/runs`, `ingestRunRequestSchema`) and `tests/unit/contracts/action-cloud-forward-compat.test.ts` (the Action's two wire paths — OIDC `POST /api/v1/runs/github-actions-result` via `releaseRunResultSchema`, and the bearer-token `POST /api/v1/runs` quick cloud upload). No further gaps are tracked against this workstream's evidence at this time.
 - **Scope:** 11 versioned public JSON schemas in `schemas/` and shared TypeScript contracts in `packages/contracts/`.
 - **Code & Test Evidence:** `schemas/agent-plan.schema.json`, `findings.schema.json`, `release-manifest.schema.json`, `tests/unit/contracts/`.
 
@@ -151,9 +151,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W11 — BOM, Supply Chain & Cost Intelligence
 - **Status:** `Partial`
-- **Remaining:** No provider TTL/rate-limit/circuit-breaker beyond a freshness age-check; no authorized-distributor-vs-marketplace classification; no cost/quantity-tier or currency snapshot metadata; fleet BOM exposure (which releases contain MPN X) is not queryable — board-bom-store.ts only exposes a write path. Matches open issue #449.
-- **Scope:** Component MPN normalization, lifecycle tracking (Active/NRND/EOL), CycloneDX HBOM generation, and provider abstraction (Nexar).
-- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/report/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`.
+- **Remaining:** Provider rate-limit/circuit-breaker, authorized-distributor-vs-marketplace classification, and cost/quantity-tier/currency snapshot metadata are now closed (see `master-execution-status.json` for detail). Distributor classification is limited to what Nexar's `Seller.isAuthorized` field actually signals — no other provider is implemented. HTTP surface for `findBoardsByMpn` and the new snapshot fields is still deliberately out of scope: no installation-level (cross-repository) API auth context exists yet, a separate access-control decision. Matches open issue #449.
+- **Scope:** Component MPN normalization, lifecycle tracking (Active/NRND/EOL), CycloneDX HBOM generation, and provider abstraction (Nexar) with a rate-limited, circuit-broken outbound path and distributor/pricing snapshot metadata.
+- **Code & Test Evidence:** `src/bom/identity.ts`, `src/bom/lifecycle.ts`, `src/report/hbom.ts`, `packages/cloud-core/src/supply-watch.ts`, `packages/cloud-core/src/component-intelligence-resilience.ts`, `packages/cloud-core/src/nexar-component-intelligence.ts`, `packages/db/src/board-supply-watch-store.ts`.
 
 ### W12 — Firmware ↔ Hardware Contract
 - **Status:** `Partial`
@@ -199,9 +199,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W19 — Billing, Entitlements & Metering
 - **Status:** `Partial`
-- **Remaining:** Stripe webhook signature verification and idempotent event recording are real, but the route's own comments admit subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are unimplemented stubs on that path; the GitHub Marketplace billing path is materially more complete.
+- **Remaining:** Subscription/customer/price→entitlement projection and trial/grace-period downgrade logic are now implemented and unit-tested (`billing-store.ts`: `linkStripeCustomer`, `applyStripeSubscriptionEvent` guarded against out-of-order/redelivered events via a new `last_event_created_at` column, `clearGraceOnPaymentSuccess`; reuses the pre-existing `applyGraceOnPaymentFailure` and the pre-existing `recordEvent` idempotency). Price→tier mapping reuses the pre-existing `STRIPE_*_PRICE_ID` env-driven table — those price ids are illustrative and must be confirmed against the real Stripe dashboard before production use. Still open: (1) `/api/v1/billing/checkout` stays guarded HTTP 410 `marketplace_free_only`, so `checkout.session.completed` — the only event linking a Stripe customer id to a tenant — never fires in production today; the new code is real but dormant until that guard is lifted. (2) Coverage is unit-level only (mocked DB/executor); no live-Postgres integration test exists for the Stripe path, unlike the Marketplace path's `tests/integration/marketplace-billing-postgres.test.ts`. (3) A tier change does not itself call `entitlement-store.ts`'s `applyWatchAllowance`, mirroring the pre-existing Marketplace path's behavior.
 - **Scope:** Tiered plan entitlements (Free / Team / Business / Enterprise), Stripe signature verification, and marketplace billing models.
-- **Code & Test Evidence:** `ADR-0014`, `packages/cloud-core/src/stripe-service.ts`, `packages/db/src/billing-store.ts`.
+- **Code & Test Evidence:** `ADR-0014`, `packages/cloud-core/src/stripe-service.ts`, `packages/db/src/billing-store.ts`, `packages/db/migrations/0060_stripe_subscription_event_ordering.sql`, `apps/web/app/api/v1/billing/webhook/route.ts`.
 
 ### W20 — Release Command Center & Cloud UX
 - **Status:** `Partial`
@@ -259,9 +259,9 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W29 — Observability, SLOs & Operations
 - **Status:** `Partial`
-- **Remaining:** No distributed tracing implementation exists (no OpenTelemetry dependency; webhook→job→dispatch→ingestion→decision trace propagation is unbuilt); no visual admin dashboard UI for dead-letters (only operator API routes); no explicit correlation-id field threading requests/webhooks/jobs/runs.
-- **Scope:** Structured logging with correlation IDs, control-plane SLO tracking, Sentry integration, and automated health checks.
-- **Code & Test Evidence:** `src/core/logger.ts`, `tests/unit/web/control-plane-slo.test.ts`.
+- **Remaining:** No distributed tracing implementation exists (no OpenTelemetry dependency; the broader webhook→job→dispatch→ingestion→decision trace propagation is unbuilt — only the webhook→release_run edge is traceable via `release_runs.delivery_id`). The dead-letter admin dashboard UI gap is closed (`apps/web/app/ops/dead-letters/`) and correlation-id threading is closed for the webhook→release-run path (DB-only, migration 0058) — distributed tracing is the only gap left open.
+- **Scope:** Structured logging with correlation IDs, control-plane SLO tracking, Sentry integration, automated health checks, and an operator dashboard for dead-lettered jobs.
+- **Code & Test Evidence:** `src/core/logger.ts`, `tests/unit/web/control-plane-slo.test.ts`, `apps/web/app/ops/dead-letters/`, `tests/unit/web/dead-letters-page.test.ts`.
 
 ### W30 — Performance, Scalability & Cost Controls
 - **Status:** `Partial`

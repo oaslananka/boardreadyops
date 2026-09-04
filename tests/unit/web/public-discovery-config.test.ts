@@ -82,6 +82,7 @@ describe("public discovery Next.js routing", () => {
       "/reviews/:path*",
       "/runs/:path*",
       "/settings/:path*",
+      "/ops/:path*",
     ]);
     expect(noindexSources).not.toContain("/");
     expect(noindexSources).not.toContain("/llms.txt");
@@ -104,6 +105,7 @@ describe("public discovery Next.js routing", () => {
       "/reviews/",
       "/runs/",
       "/settings/",
+      "/ops/",
     ]);
     expect(result.sitemap).toContain("https://boardreadyops.com/sitemap.xml");
   });
