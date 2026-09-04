@@ -75,6 +75,13 @@ function authentication(
 ): { actorId: string } | Response {
   const result = authenticateControlPlaneOperator(request, dependencies.environment);
   if (result.status === "disabled") return controlPlaneJsonError("operator API is not configured", 503);
+  if (result.status === "rate_limited") {
+    return controlPlaneJsonError(
+      `Too many failed authentication attempts, retry after ${result.retryAfterSeconds}s`,
+      429,
+      { "retry-after": String(result.retryAfterSeconds) },
+    );
+  }
   if (result.status === "unauthorized") {
     return controlPlaneJsonError("operator authentication is required", 401, { "www-authenticate": "Bearer" });
   }
