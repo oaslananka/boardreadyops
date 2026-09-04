@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-rate-limit.js";
 import {
   handleRepositorySetupGet,
   handleRepositorySetupPost,
@@ -38,6 +39,10 @@ const context = {
   current,
 };
 
+afterEach(() => {
+  resetOperatorRateLimitForTests();
+});
+
 function store(overrides: Partial<RepositorySetupStore> = {}): RepositorySetupStore {
   return {
     getContext: vi.fn(async () => context),
@@ -63,12 +68,14 @@ function store(overrides: Partial<RepositorySetupStore> = {}): RepositorySetupSt
 function dependencies(
   setupStore = store(),
   githubOverrides: Record<string, unknown> = {},
+  environmentOverrides: Readonly<Record<string, string | undefined>> = {},
 ): RepositorySetupRouteDependencies {
   return {
     environment: {
       BOARDREADYOPS_OPERATOR_API_TOKEN: token,
       BOARDREADYOPS_OPERATOR_ACTOR_ID: "operator.primary",
       DATABASE_URL: "postgresql://example.invalid/database",
+      ...environmentOverrides,
     },
     queryExecutor: vi.fn(() => executor),
     createStore: vi.fn(() => setupStore),
@@ -268,6 +275,27 @@ describe("repository setup operator routes", () => {
     expect(failed.status).toBe(502);
     expect(failedStore.failProbe).toHaveBeenCalledWith(expect.objectContaining({ failureCode: "dispatch_failed" }));
     expect(JSON.stringify(await failed.json())).not.toContain("authorization");
+  });
+
+  it("returns 429 with Retry-After after repeated operator authentication failures", async () => {
+    const deps = dependencies(store(), {}, { BOARDREADYOPS_OPERATOR_RATE_LIMIT_PER_MINUTE: "1" });
+
+    const first = await handleRepositorySetupGet(
+      request("GET", undefined, "Bearer invalid"),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(first.status).toBe(401);
+    const limited = await handleRepositorySetupGet(
+      request("GET", undefined, "Bearer invalid"),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(deps.queryExecutor).not.toHaveBeenCalled();
   });
 
   it("rejects oversized setup bodies before database access", async () => {
