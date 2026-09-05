@@ -9,7 +9,7 @@ export interface DeliveryPageProps {
   params: Promise<{ token: string }>;
 }
 
-export default async function DeliveryPage({ params }: DeliveryPageProps) {
+export default async function DeliveryPage({ params }: Readonly<DeliveryPageProps>) {
   const { token } = await params;
   const config = resolveCloudPersistenceConfiguration();
 

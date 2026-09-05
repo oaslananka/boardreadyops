@@ -27,7 +27,7 @@ export interface ManufacturerIntakeWidgetProps {
   partnerName: string;
 }
 
-export function ManufacturerIntakeWidget({ partnerSlug, partnerName }: ManufacturerIntakeWidgetProps) {
+export function ManufacturerIntakeWidget({ partnerSlug, partnerName }: Readonly<ManufacturerIntakeWidgetProps>) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [summary, setSummary] = useState<PreFlightSummary | null>(null);

@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: ManufacturerIntakePageProps):
   };
 }
 
-export default async function ManufacturerIntakePage({ params }: ManufacturerIntakePageProps) {
+export default async function ManufacturerIntakePage({ params }: Readonly<ManufacturerIntakePageProps>) {
   const { slug } = await params;
   const partnerName = PARTNER_DIRECTORY[slug.toLowerCase()] || `${slug.toUpperCase()} Fabrication`;
 
