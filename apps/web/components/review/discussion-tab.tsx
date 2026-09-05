@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import type { DemoComment } from "../../lib/demo-data.js";
+import { Button } from "../ui/button.js";
 import { Panel } from "../ui.js";
 
 export function DiscussionTab({
@@ -27,40 +28,54 @@ export function DiscussionTab({
   }
 
   return (
-    <div className="discussion-tab-content">
+    <div className="flex flex-col gap-4">
       <Panel title="Review Discussion & Threads" tone="raised">
-        <div className="engineering-thread comment-timeline">
+        {/* `engineering-thread` carries no styling any more (its styles.css rule is gone) --
+            it is kept as a stable selector hook for tests/unit/web/keyboard-triage.test.ts. */}
+        <div className="engineering-thread flex flex-col gap-3">
           {comments.length === 0 ? (
-            <p className="empty-notice">No comments posted yet. Start the conversation below.</p>
+            <p className="text-sm text-muted-foreground">No comments posted yet. Start the conversation below.</p>
           ) : (
             comments.map((cmt) => (
-              <div key={cmt.id} className={`comment-card panel surface-default ${cmt.status}`}>
-                <header className="comment-header">
-                  <div className="comment-author-info">
-                    <span className="author-name">{cmt.authorId}</span>
-                    <span className={`author-badge ${cmt.authorType}`}>{cmt.authorType}</span>
-                    <span className="comment-time">{new Date(cmt.createdAt).toLocaleString()}</span>
+              <div
+                key={cmt.id}
+                className={`rounded-md border border-border bg-card p-3 ${cmt.status === "outdated" ? "opacity-60" : ""}`}
+              >
+                <header className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-foreground">{cmt.authorId}</span>
+                    <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs uppercase text-muted-foreground">
+                      {cmt.authorType}
+                    </span>
+                    {/* `comment-time` carries no styling any more -- kept as a stable selector
+                        hook (Playwright visual-snapshot mask) for tests/e2e/visual.spec.ts. */}
+                    <span className="comment-time text-xs text-muted-foreground">
+                      {new Date(cmt.createdAt).toLocaleString()}
+                    </span>
                   </div>
-                  <div className="comment-status-action">
-                    <button
-                      type="button"
-                      className={`button button-small ${cmt.status === "resolved" ? "button-secondary" : "button-ghost"}`}
-                      onClick={() => onToggleStatus?.(cmt.id, cmt.status === "resolved" ? "open" : "resolved")}
-                      disabled={cmt.status === "outdated"}
-                    >
-                      {cmt.status === "resolved" ? "✓ Resolved" : "Mark Resolved"}
-                    </button>
-                  </div>
+                  {/* `button-small` carries no styling any more -- kept as a stable selector hook
+                      for tests/unit/web/discussion-tab.test.ts and
+                      tests/e2e/regression-audit-findings.spec.ts. */}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={cmt.status === "resolved" ? "secondary" : "ghost"}
+                    className="button-small"
+                    onClick={() => onToggleStatus?.(cmt.id, cmt.status === "resolved" ? "open" : "resolved")}
+                    disabled={cmt.status === "outdated"}
+                  >
+                    {cmt.status === "resolved" ? "✓ Resolved" : "Mark Resolved"}
+                  </Button>
                 </header>
 
-                <div className="comment-body">
+                <div className="mt-2 text-sm text-foreground">
                   <p>{cmt.content}</p>
                 </div>
 
                 {cmt.findingFingerprint ? (
-                  <footer className="comment-anchor-footer">
-                    <span className="anchor-label">Anchored to Finding:</span>
-                    <code className="anchor-fingerprint">{cmt.findingFingerprint}</code>
+                  <footer className="mt-2 text-xs text-muted-foreground">
+                    <span>Anchored to Finding: </span>
+                    <code>{cmt.findingFingerprint}</code>
                   </footer>
                 ) : null}
               </div>
@@ -68,23 +83,23 @@ export function DiscussionTab({
           )}
         </div>
 
-        <form onSubmit={handlePost} className="new-comment-form panel">
-          <h4>Add to Discussion</h4>
-          <label htmlFor={commentFieldId}>Comment</label>
+        <form onSubmit={handlePost} className="mt-4 rounded-md border border-border bg-card p-3">
+          <h4 className="text-sm font-bold text-foreground">Add to Discussion</h4>
+          <label htmlFor={commentFieldId} className="sr-only">
+            Comment
+          </label>
           <textarea
             id={commentFieldId}
             rows={3}
             value={newContent}
             onChange={(e) => setNewContent(e.currentTarget.value)}
             placeholder="Leave an engineering review note or question..."
-            className="form-textarea"
+            className="mt-2 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             required
           />
-          <footer className="comment-form-footer">
-            <span className="comment-author-identity">Commenting as {viewerLogin ?? "you"}</span>
-            <button type="submit" className="button button-primary">
-              Post Comment
-            </button>
+          <footer className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Commenting as {viewerLogin ?? "you"}</span>
+            <Button type="submit">Post Comment</Button>
           </footer>
         </form>
       </Panel>

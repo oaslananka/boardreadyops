@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { viewerAuthorization } from "../lib/viewer-authorization.js";
+import { buttonVariants } from "./ui/button.js";
 import { ViewerControls } from "./viewer-controls.js";
 
 /**
@@ -16,6 +17,10 @@ import { ViewerControls } from "./viewer-controls.js";
 
 export const installUrl = "https://github.com/apps/boardreadyops/installations/new";
 
+const navCtaClass = buttonVariants({ variant: "default", size: "sm" });
+const primaryClass = `${buttonVariants({ variant: "default", size: "lg" })} gap-2`;
+const secondaryClass = buttonVariants({ variant: "secondary", size: "lg" });
+
 export async function LandingNavActions() {
   const session = (await viewerAuthorization()).session;
 
@@ -23,7 +28,7 @@ export async function LandingNavActions() {
     return (
       <>
         <ViewerControls login={undefined} />
-        <a className="landing-nav-cta" href={installUrl}>
+        <a className={navCtaClass} href={installUrl}>
           Install on GitHub
         </a>
       </>
@@ -35,7 +40,7 @@ export async function LandingNavActions() {
       <ViewerControls login={session.login} />
       {/* The dashboard is the primary action for somebody who has already installed, so it is
           the button rather than another link competing with the marketing anchors. */}
-      <Link className="landing-nav-cta" href="/dashboard">
+      <Link className={navCtaClass} href="/dashboard">
         Open dashboard
       </Link>
     </>
@@ -48,11 +53,11 @@ export async function LandingHeroActions() {
   if (!session) {
     return (
       <>
-        <a className="landing-button-primary" href={installUrl}>
+        <a className={primaryClass} href={installUrl}>
           <span>Install on GitHub</span>
           <span aria-hidden="true">↗</span>
         </a>
-        <Link className="landing-button-secondary" href="/setup">
+        <Link className={secondaryClass} href="/setup">
           Preview repository setup
         </Link>
       </>
@@ -61,11 +66,11 @@ export async function LandingHeroActions() {
 
   return (
     <>
-      <Link className="landing-button-primary" href="/dashboard">
+      <Link className={primaryClass} href="/dashboard">
         <span>Open dashboard</span>
         <span aria-hidden="true">→</span>
       </Link>
-      <a className="landing-button-secondary" href={installUrl}>
+      <a className={secondaryClass} href={installUrl}>
         Add another repository
       </a>
     </>

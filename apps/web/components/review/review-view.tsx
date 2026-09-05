@@ -64,7 +64,7 @@ function ReviewNavigationTabs({
   }
 
   return (
-    <div className="review-workspace-nav review-tabs-navigation" aria-label="Review workspace" role="tablist">
+    <div className="flex flex-wrap gap-1 border-b border-border" aria-label="Review workspace" role="tablist">
       <button
         id="tab-overview"
         role="tab"
@@ -72,7 +72,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-overview"
         tabIndex={activeTab === "overview" ? 0 : -1}
         type="button"
-        className={`review-tab-link ${activeTab === "overview" ? "active" : ""}`}
+        className={`border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "overview" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("overview")}
         onKeyDown={(e) => handleTabKeyDown(e, "overview")}
       >
@@ -85,7 +85,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-changes"
         tabIndex={activeTab === "changes" ? 0 : -1}
         type="button"
-        className={`review-tab-link ${activeTab === "changes" ? "active" : ""}`}
+        className={`border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "changes" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("changes")}
         onKeyDown={(e) => handleTabKeyDown(e, "changes")}
       >
@@ -98,13 +98,13 @@ function ReviewNavigationTabs({
         aria-controls="panel-findings"
         tabIndex={activeTab === "findings" ? 0 : -1}
         type="button"
-        className={`review-tab-link ${activeTab === "findings" ? "active" : ""}`}
+        className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "findings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("findings")}
         onKeyDown={(e) => handleTabKeyDown(e, "findings")}
       >
         Findings ({findingsCount})
         {blockingCount > 0 ? (
-          <span className="tab-pill danger" aria-hidden="true">
+          <span className="rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white" aria-hidden="true">
             {blockingCount}
           </span>
         ) : null}
@@ -117,7 +117,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-discussion"
         tabIndex={activeTab === "discussion" ? 0 : -1}
         type="button"
-        className={`review-tab-link ${activeTab === "discussion" ? "active" : ""}`}
+        className={`border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "discussion" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("discussion")}
         onKeyDown={(e) => handleTabKeyDown(e, "discussion")}
       >
@@ -130,13 +130,13 @@ function ReviewNavigationTabs({
         aria-controls="panel-checklist"
         tabIndex={activeTab === "checklist" ? 0 : -1}
         type="button"
-        className={`review-tab-link ${activeTab === "checklist" ? "active" : ""}`}
+        className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "checklist" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("checklist")}
         onKeyDown={(e) => handleTabKeyDown(e, "checklist")}
       >
         Checklist & Approvals
         {incompleteChecklistCount > 0 ? (
-          <span className="tab-pill warning" aria-hidden="true">
+          <span className="rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-bold text-white" aria-hidden="true">
             {incompleteChecklistCount}
           </span>
         ) : null}
@@ -149,7 +149,7 @@ function ReviewNavigationTabs({
         aria-controls="panel-evidence"
         tabIndex={activeTab === "evidence" ? 0 : -1}
         type="button"
-        className={`review-tab-link ${activeTab === "evidence" ? "active" : ""}`}
+        className={`border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "evidence" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         onClick={() => onSelectTab("evidence")}
         onKeyDown={(e) => handleTabKeyDown(e, "evidence")}
       >
@@ -529,7 +529,7 @@ export function ReviewView({
   }
 
   return (
-    <div className="review-view-container">
+    <div className="flex flex-col gap-4">
       <ReviewHeader
         reviewId={review.id}
         title={review.title}
@@ -547,13 +547,16 @@ export function ReviewView({
       />
 
       {mutationError ? (
-        <div className="alert-banner error" role="alert" style={{ margin: "var(--space-3) 0" }}>
+        <div
+          className="rounded-md border border-danger/40 bg-danger-surface px-4 py-3 text-sm text-danger"
+          role="alert"
+        >
           {mutationError}
         </div>
       ) : null}
 
       {mutationSuccess ? (
-        <output className="alert-banner success" style={{ margin: "var(--space-3) 0" }}>
+        <output className="rounded-md border border-success/40 bg-success-surface px-4 py-3 text-sm text-success">
           ✓ {mutationSuccess}
         </output>
       ) : null}
@@ -568,12 +571,7 @@ export function ReviewView({
         onSelectTab={setActiveTab}
       />
 
-      <main
-        id={`panel-${rawActiveTab}`}
-        role="tabpanel"
-        aria-labelledby={`tab-${rawActiveTab}`}
-        className="review-tab-body"
-      >
+      <main id={`panel-${rawActiveTab}`} role="tabpanel" aria-labelledby={`tab-${rawActiveTab}`} className="pt-4">
         {rawActiveTab === "overview" ? <OverviewTab review={review} /> : null}
         {rawActiveTab === "changes" ? <ChangesTab review={review} /> : null}
         {rawActiveTab === "findings" ? (

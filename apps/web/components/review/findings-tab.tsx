@@ -140,16 +140,18 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
   }, [findings]);
 
   return (
-    <div className="findings-tab-content">
-      <div className="findings-triage-toolbar panel">
-        <div className="diff-state-tabs" role="tablist" aria-label="Filter findings by diff state">
+    <div className="flex flex-col gap-4">
+      {/* `findings-triage-toolbar` carries no styling any more (its styles.css rule is gone) --
+          it is kept as a stable selector hook for tests/unit/web/keyboard-triage.test.ts. */}
+      <div className="findings-triage-toolbar flex flex-col gap-3 rounded-md border border-border bg-card p-4">
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Filter findings by diff state">
           <button
             id="diff-state-tab-all"
             type="button"
             role="tab"
             aria-selected={selectedDiffState === "all"}
             tabIndex={selectedDiffState === "all" ? 0 : -1}
-            className={`tab-btn ${selectedDiffState === "all" ? "active" : ""}`}
+            className={`rounded-sm px-3 py-1.5 text-sm ${selectedDiffState === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => {
               setSelectedDiffState("all");
               setSelectedIndex(0);
@@ -164,7 +166,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
             role="tab"
             aria-selected={selectedDiffState === "new"}
             tabIndex={selectedDiffState === "new" ? 0 : -1}
-            className={`tab-btn new-state ${selectedDiffState === "new" ? "active" : ""}`}
+            className={`rounded-sm px-3 py-1.5 text-sm ${selectedDiffState === "new" ? "bg-info-surface text-info" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => {
               setSelectedDiffState("new");
               setSelectedIndex(0);
@@ -179,7 +181,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
             role="tab"
             aria-selected={selectedDiffState === "persistent"}
             tabIndex={selectedDiffState === "persistent" ? 0 : -1}
-            className={`tab-btn persistent-state ${selectedDiffState === "persistent" ? "active" : ""}`}
+            className={`rounded-sm px-3 py-1.5 text-sm ${selectedDiffState === "persistent" ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => {
               setSelectedDiffState("persistent");
               setSelectedIndex(0);
@@ -194,7 +196,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
             role="tab"
             aria-selected={selectedDiffState === "regressed"}
             tabIndex={selectedDiffState === "regressed" ? 0 : -1}
-            className={`tab-btn regressed-state ${selectedDiffState === "regressed" ? "active" : ""}`}
+            className={`rounded-sm px-3 py-1.5 text-sm ${selectedDiffState === "regressed" ? "bg-danger-surface text-danger" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => {
               setSelectedDiffState("regressed");
               setSelectedIndex(0);
@@ -209,7 +211,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
             role="tab"
             aria-selected={selectedDiffState === "resolved"}
             tabIndex={selectedDiffState === "resolved" ? 0 : -1}
-            className={`tab-btn resolved-state ${selectedDiffState === "resolved" ? "active" : ""}`}
+            className={`rounded-sm px-3 py-1.5 text-sm ${selectedDiffState === "resolved" ? "bg-success-surface text-success" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => {
               setSelectedDiffState("resolved");
               setSelectedIndex(0);
@@ -220,7 +222,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
           </button>
         </div>
 
-        <div className="triage-filter-row">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             type="search"
             aria-label="Search findings"
@@ -230,9 +232,11 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
               setSearchQuery(e.currentTarget.value);
               setSelectedIndex(0);
             }}
-            className="form-input triage-search"
+            className="min-w-48 flex-1 rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
 
+          {/* `triage-severity-select` carries no styling any more -- kept as a stable selector
+              hook for tests/unit/web/findings-tab.test.ts. */}
           <select
             aria-label="Filter by severity"
             value={selectedSeverity}
@@ -240,7 +244,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
               setSelectedSeverity(e.currentTarget.value);
               setSelectedIndex(0);
             }}
-            className="form-select triage-severity-select"
+            className="triage-severity-select rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <option value="all">All Severities</option>
             <option value="critical">Critical</option>
@@ -249,15 +253,16 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
             <option value="info">Info</option>
           </select>
 
-          <div className="keyboard-shortcuts-hint">
+          <div className="text-xs text-muted-foreground">
             <span>Shortcuts: </span>
-            <kbd>j</kbd>/<kbd>k</kbd>
+            <kbd className="rounded-sm border border-border bg-muted px-1">j</kbd>/
+            <kbd className="rounded-sm border border-border bg-muted px-1">k</kbd>
             {" navigate "}
-            <kbd>e</kbd>
+            <kbd className="rounded-sm border border-border bg-muted px-1">e</kbd>
             {" accept risk "}
-            <kbd>f</kbd>
+            <kbd className="rounded-sm border border-border bg-muted px-1">f</kbd>
             {" false positive "}
-            <kbd>o</kbd>
+            <kbd className="rounded-sm border border-border bg-muted px-1">o</kbd>
             {" open"}
           </div>
         </div>
@@ -265,10 +270,10 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
 
       {/* Renders every filtered finding; not actually windowed yet, so a 10k-finding
           review will mount 10k DOM nodes. Needs real windowing before that scale is safe. */}
-      <div className="findings-virtual-list">
+      <div className="flex flex-col gap-2">
         {filteredFindings.length === 0 ? (
-          <div className="panel empty-findings">
-            <p>No findings match the current filter criteria.</p>
+          <div className="rounded-md border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            No findings match the current filter criteria.
           </div>
         ) : (
           filteredFindings.map((finding, idx) => {
@@ -276,9 +281,13 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
             const isWaived = finding.disposition === "accepted_risk" || finding.disposition === "false_positive";
 
             return (
+              // `finding-scan-row` and `finding-triage-card` carry no styling any more --
+              // kept as stable selector hooks for tests/unit/web/keyboard-triage.test.ts,
+              // tests/e2e/review-lifecycle.spec.ts, and tests/e2e/modal-contract.spec.ts.
+              // `selected-row` is kept alongside them for the same reason.
               <article
                 key={finding.fingerprint}
-                className={`finding-scan-row finding-triage-card panel ${isSelected ? "selected-row" : ""} ${isWaived ? "waived-card" : ""}`}
+                className={`finding-scan-row finding-triage-card rounded-md border p-3 ${isSelected ? "selected-row border-primary" : "border-border"} ${isWaived ? "opacity-60" : ""} bg-card`}
                 data-selected={isSelected}
                 onClick={() => setSelectedIndex(idx)}
                 onFocus={() => setSelectedIndex(idx)}
@@ -288,61 +297,78 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                   }
                 }}
               >
-                <div className="finding-card-header">
-                  <div className="finding-header-left">
-                    <span className={`severity-pill ${finding.severity}`}>{finding.severity}</span>
-                    <span className={`diff-pill ${finding.diffState}`}>{finding.diffState}</span>
-                    <code className="finding-rule-id">{finding.ruleId}</code>
-                    {finding.component ? <span className="finding-comp-badge">{finding.component}</span> : null}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-sm px-1.5 py-0.5 text-xs uppercase ${finding.severity === "error" || finding.severity === "critical" ? "bg-danger-surface text-danger" : finding.severity === "warning" ? "bg-warning-surface text-warning" : "bg-info-surface text-info"}`}
+                    >
+                      {finding.severity}
+                    </span>
+                    <span
+                      className={`rounded-sm px-1.5 py-0.5 text-xs ${finding.diffState === "new" ? "bg-info-surface text-info" : finding.diffState === "regressed" ? "bg-danger-surface text-danger" : finding.diffState === "resolved" ? "bg-success-surface text-success" : "bg-secondary text-secondary-foreground"}`}
+                    >
+                      {finding.diffState}
+                    </span>
+                    <code className="text-xs">{finding.ruleId}</code>
+                    {finding.component ? (
+                      <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                        {finding.component}
+                      </span>
+                    ) : null}
                   </div>
 
-                  <div className="finding-header-right">
-                    <select
-                      aria-label={`Disposition for finding ${finding.ruleId}`}
-                      value={finding.disposition}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        const newDisp = e.currentTarget.value as FindingDisposition;
-                        if (newDisp === "accepted_risk" || newDisp === "false_positive") {
-                          setModalFinding({ finding, targetDisposition: newDisp });
-                        } else {
-                          handleDirectDisposition(finding.fingerprint, newDisp);
-                        }
-                      }}
-                      className={`disposition-select ${finding.disposition}`}
-                    >
-                      <option value="open">Open (Fix Required)</option>
-                      <option value="fixed">Fixed</option>
-                      <option value="accepted_risk">Accepted Risk (Waived)</option>
-                      <option value="false_positive">False Positive</option>
-                      <option value="not_applicable">Not Applicable</option>
-                    </select>
-                  </div>
+                  {/* `disposition-select` carries no styling any more -- kept as a stable
+                      selector hook for tests/unit/web/findings-tab.test.ts,
+                      tests/e2e/review-lifecycle.spec.ts, and tests/e2e/modal-contract.spec.ts. */}
+                  <select
+                    aria-label={`Disposition for finding ${finding.ruleId}`}
+                    value={finding.disposition}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const newDisp = e.currentTarget.value as FindingDisposition;
+                      if (newDisp === "accepted_risk" || newDisp === "false_positive") {
+                        setModalFinding({ finding, targetDisposition: newDisp });
+                      } else {
+                        handleDirectDisposition(finding.fingerprint, newDisp);
+                      }
+                    }}
+                    className="disposition-select rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground"
+                  >
+                    <option value="open">Open (Fix Required)</option>
+                    <option value="fixed">Fixed</option>
+                    <option value="accepted_risk">Accepted Risk (Waived)</option>
+                    <option value="false_positive">False Positive</option>
+                    <option value="not_applicable">Not Applicable</option>
+                  </select>
                 </div>
 
-                <p className="finding-card-message">{finding.message}</p>
+                <p className="mt-2 text-sm text-foreground">{finding.message}</p>
 
-                <div className="finding-detail-grid finding-card-footer">
-                  <span className="finding-path">
+                {/* `finding-detail-grid` carries no styling any more -- kept as a stable
+                    selector hook for tests/unit/web/keyboard-triage.test.ts. */}
+                <div className="finding-detail-grid mt-2 flex flex-col gap-1.5 text-xs text-muted-foreground">
+                  <span>
                     📄 {finding.path} {finding.sheet ? `• Sheet: ${finding.sheet}` : ""}
                   </span>
 
                   {finding.decisionReason ? (
-                    <div className="decision-note">
-                      <span className="decision-note-label">Decision ({finding.decisionOwner}):</span>
-                      <span className="decision-note-text">{finding.decisionReason}</span>
+                    <div>
+                      <span className="font-medium text-foreground">Decision ({finding.decisionOwner}):</span>{" "}
+                      {finding.decisionReason}
                     </div>
                   ) : null}
 
-                  <div className="finding-assignee-strip">
-                    <span className="assignee-label">Assignee:</span>
-                    <span className="assignee-val">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>Assignee:</span>
+                    <span className="text-foreground">
                       {finding.assignees.length > 0 ? finding.assignees.join(", ") : "Unassigned"}
                     </span>
+                    {/* `assignee-input` and `assignee-add-btn` carry no styling any more --
+                        kept as stable selector hooks for tests/unit/web/findings-tab.test.ts
+                        and tests/e2e/review-lifecycle.spec.ts. */}
                     <input
                       type="text"
                       aria-label={`Add assignee for finding ${finding.ruleId}`}
-                      className="assignee-input"
                       placeholder="Add assignee…"
                       value={assigneeDraft[finding.fingerprint] ?? ""}
                       onClick={(e) => e.stopPropagation()}
@@ -356,10 +382,11 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                           handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");
                         }
                       }}
+                      className="assignee-input rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground"
                     />
                     <button
                       type="button"
-                      className="assignee-add-btn"
+                      className="assignee-add-btn rounded-sm border border-border px-2 py-1 text-xs hover:bg-accent"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleAssign(finding.fingerprint, assigneeDraft[finding.fingerprint] ?? "");

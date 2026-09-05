@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "../../../components/ui/button.js";
 import { Alert, EmptyState, StatusBadge } from "../../../components/ui.js";
 import { type DeadLetterListItem, formatFailureReason, formatTimestamp } from "./dead-letter-view-model.js";
 
@@ -43,8 +44,8 @@ export function DeadLettersPanel({
 
   if (state === "loading") {
     return (
-      <div className="panel surface-inset" aria-live="polite">
-        <p>Loading dead letters…</p>
+      <div className="rounded-md border border-border bg-muted p-4 text-sm text-muted-foreground" aria-live="polite">
+        Loading dead letters…
       </div>
     );
   }
@@ -67,18 +68,34 @@ export function DeadLettersPanel({
 
   return (
     <>
-      <section className="table-scroll" aria-labelledby="dead-letters-table-caption">
-        <table>
-          <caption id="dead-letters-table-caption">Dead-lettered jobs and outbox records</caption>
+      <section className="overflow-x-auto" aria-labelledby="dead-letters-table-caption">
+        <table className="w-full text-left text-sm">
+          <caption id="dead-letters-table-caption" className="sr-only">
+            Dead-lettered jobs and outbox records
+          </caption>
           <thead>
-            <tr>
-              <th scope="col">Item</th>
-              <th scope="col">Run</th>
-              <th scope="col">Installation / Repository</th>
-              <th scope="col">Failure reason</th>
-              <th scope="col">Attempts</th>
-              <th scope="col">Failed at</th>
-              <th scope="col">Action</th>
+            <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+              <th scope="col" className="py-2 pr-3">
+                Item
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Run
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Installation / Repository
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Failure reason
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Attempts
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Failed at
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Action
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -86,34 +103,37 @@ export function DeadLettersPanel({
               const key = rowKey(item);
               const replay = replayState[key];
               return (
-                <tr key={key}>
-                  <th scope="row">
+                <tr key={key} className="border-b border-border last:border-b-0">
+                  <th scope="row" className="py-2 pr-3 text-left font-normal">
                     <StatusBadge value="dead_letter" label={item.itemType} />
-                    <div>
-                      <code>{item.itemId}</code>
+                    <div className="mt-1">
+                      <code className="text-xs">{item.itemId}</code>
                     </div>
                   </th>
-                  <td>{item.releaseRunId ?? "—"}</td>
-                  <td>
+                  <td className="py-2 pr-3">{item.releaseRunId ?? "—"}</td>
+                  <td className="py-2 pr-3">
                     <div>{item.installationId}</div>
-                    {item.repositoryFullName ? <div className="cell-note">{item.repositoryFullName}</div> : null}
+                    {item.repositoryFullName ? (
+                      <div className="text-xs text-muted-foreground">{item.repositoryFullName}</div>
+                    ) : null}
                   </td>
-                  <td>{formatFailureReason(item)}</td>
-                  <td>{item.attemptCount}</td>
-                  <td>{formatTimestamp(item.failedAt)}</td>
-                  <td>
+                  <td className="py-2 pr-3">{formatFailureReason(item)}</td>
+                  <td className="py-2 pr-3">{item.attemptCount}</td>
+                  <td className="py-2 pr-3">{formatTimestamp(item.failedAt)}</td>
+                  <td className="py-2 pr-3">
                     {item.replaySafe ? (
                       <>
-                        <button
+                        <Button
                           type="button"
-                          className="button button-secondary button-small"
+                          variant="secondary"
+                          size="sm"
                           disabled={replay?.status === "pending"}
                           onClick={() => onReplay(item)}
                         >
                           {replay?.status === "pending" ? "Replaying…" : "Replay"}
-                        </button>
+                        </Button>
                         {replay && replay.status !== "pending" ? (
-                          <div className="cell-note">{replay.message}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{replay.message}</div>
                         ) : null}
                       </>
                     ) : (
@@ -127,9 +147,9 @@ export function DeadLettersPanel({
         </table>
       </section>
       {hasMore ? (
-        <button type="button" className="button button-secondary" onClick={onLoadMore}>
+        <Button type="button" variant="secondary" className="mt-3" onClick={onLoadMore}>
           Load older dead letters
-        </button>
+        </Button>
       ) : null}
     </>
   );

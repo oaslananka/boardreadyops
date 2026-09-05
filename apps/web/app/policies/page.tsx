@@ -10,11 +10,11 @@ export const metadata = {
 export default function PoliciesPage() {
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame operational-page policies-page-frame" id="main-content">
+      <main className="policies-page-frame mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Policies" }]} />
-        <header className="page-intro">
-          <h1>Organization Governance & Release Policies</h1>
-          <p>
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">Organization Governance & Release Policies</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Release gates and verification rules bound to SHA-256 evidence digests. Inheritance: Organization → Team →
             Repository → Review exception.
           </p>

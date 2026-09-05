@@ -39,7 +39,7 @@ describe("settings pages and operational layout", () => {
         children: React.createElement("div", { id: "test-child" }, "Child Content"),
       }),
     );
-    const navStart = html.indexOf('class="settings-nav-list"');
+    const navStart = html.indexOf('data-testid="settings-nav-list"');
     const navSection = html.slice(navStart, html.indexOf("</ul>", navStart));
     const ariaCurrentMatches = navSection.match(/aria-current="page"/g) ?? [];
     expect(ariaCurrentMatches).toHaveLength(1);
@@ -47,10 +47,8 @@ describe("settings pages and operational layout", () => {
     expect(navSection).not.toContain('aria-current="page" href="/settings/security"');
   });
 
-  it("contains setup progress index and operational styles", async () => {
+  it("contains setup progress index", async () => {
     const setupPage = await readFile("apps/web/app/setup/page.tsx", "utf8");
     expect(setupPage).toContain("setup-progress-index");
-    const runStyles = await readFile("apps/web/app/styles.css", "utf8");
-    expect(runStyles).toContain("operational-page");
   });
 });

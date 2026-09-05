@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "../../../components/ui/button.js";
 import { Alert, Panel } from "../../../components/ui.js";
 import {
   buildDeadLetterListUrl,
@@ -93,26 +94,30 @@ export function DeadLettersClient() {
   }
 
   return (
-    <div className="dead-letters-workspace">
+    <div className="flex flex-col gap-4">
       <Panel title="Connect to an installation" description="Credentials are kept in memory for this page load only.">
-        <form onSubmit={handleSubmit} className="policy-builder-form">
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label htmlFor="dead-letters-installation-id">Installation ID</label>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="dead-letters-installation-id" className="text-sm font-medium text-foreground">
+                Installation ID
+              </label>
               <input
                 id="dead-letters-installation-id"
-                className="form-input"
+                className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 value={installationId}
                 onChange={(event) => setInstallationId(event.currentTarget.value)}
                 placeholder="ins_..."
                 required
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="dead-letters-operator-token">Operator bearer token</label>
+            <div>
+              <label htmlFor="dead-letters-operator-token" className="text-sm font-medium text-foreground">
+                Operator bearer token
+              </label>
               <input
                 id="dead-letters-operator-token"
-                className="form-input"
+                className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 type="password"
                 autoComplete="off"
                 value={token}
@@ -122,10 +127,10 @@ export function DeadLettersClient() {
               />
             </div>
           </div>
-          <footer className="modal-footer">
-            <button type="submit" className="button button-primary" disabled={state === "loading"}>
+          <footer className="flex justify-end border-t border-border pt-3">
+            <Button type="submit" disabled={state === "loading"}>
               {state === "loading" ? "Loading…" : "Load dead letters"}
-            </button>
+            </Button>
           </footer>
         </form>
       </Panel>

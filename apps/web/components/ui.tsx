@@ -1,5 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AlertDescription, AlertRoot, AlertTitle } from "./ui/alert.js";
+import { Badge } from "./ui/badge.js";
+import { Button } from "./ui/button.js";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card.js";
 
 export { AppShell } from "./app-shell.js";
 
@@ -57,38 +61,20 @@ export function statusTone(value: string | undefined): StatusTone {
   return "neutral";
 }
 
-function statusIconPath(tone: StatusTone): string {
-  switch (tone) {
-    case "success":
-      return "M5 12.5 9.5 17 19 7.5";
-    case "danger":
-      return "M12 7v6m0 4h.01";
-    case "warning":
-      return "M12 8v5m0 3h.01";
-    case "info":
-      return "M12 8h.01M11 12h1v5h1";
-    default:
-      return "M7 12h10";
-  }
-}
-
-function StatusIcon({ tone }: Readonly<{ tone: StatusTone }>) {
-  const path = statusIconPath(tone);
-  return (
-    <svg aria-hidden="true" className="status-icon" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="9" />
-      <path d={path} />
-    </svg>
-  );
-}
+const badgeVariantByTone: Record<StatusTone, "danger" | "success" | "warning" | "info" | "secondary"> = {
+  danger: "danger",
+  success: "success",
+  warning: "warning",
+  info: "info",
+  neutral: "secondary",
+};
 
 export function StatusBadge({ value, label }: Readonly<{ value: string | undefined; label?: string }>) {
   const tone = statusTone(value);
   return (
-    <span className="status-badge" data-tone={tone}>
-      <StatusIcon tone={tone} />
-      <span>{label ?? humanize(value)}</span>
-    </span>
+    <Badge variant={badgeVariantByTone[tone]} className={`text-${tone === "neutral" ? "muted-foreground" : tone}`}>
+      {label ?? humanize(value)}
+    </Badge>
   );
 }
 
@@ -96,11 +82,20 @@ export type BreadcrumbItem = { href?: string; label: string };
 
 export function Breadcrumbs({ items }: Readonly<{ items: BreadcrumbItem[] }>) {
   return (
-    <nav className="breadcrumbs" aria-label="Breadcrumb">
-      <ol>
-        {items.map((item) => (
-          <li key={`${item.href ?? "current"}:${item.label}`}>
-            {item.href ? <Link href={item.href}>{item.label}</Link> : <span aria-current="page">{item.label}</span>}
+    <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
+      <ol className="flex flex-wrap items-center gap-1.5">
+        {items.map((item, index) => (
+          <li key={`${item.href ?? "current"}:${item.label}`} className="flex items-center gap-1.5">
+            {index > 0 ? <span aria-hidden="true">/</span> : null}
+            {item.href ? (
+              <Link href={item.href} className="hover:text-foreground hover:underline">
+                {item.label}
+              </Link>
+            ) : (
+              <span aria-current="page" className="font-medium text-foreground">
+                {item.label}
+              </span>
+            )}
           </li>
         ))}
       </ol>
@@ -119,34 +114,50 @@ export type PanelProps = {
   tone?: PanelTone;
 };
 
+const panelToneClass: Record<PanelTone, string> = {
+  default: "",
+  raised: "shadow-lg",
+  inset: "bg-muted",
+  critical: "border-danger/50",
+  section: "border-dashed",
+};
+
 export function Panel({ children, title, description, actions, id, tone = "default" }: Readonly<PanelProps>) {
   const headingId = id ? `${id}-heading` : undefined;
   return (
-    <section className={`panel surface-${tone}`} id={id} aria-labelledby={headingId}>
-      <header className="panel-header">
+    <Card id={id} className={panelToneClass[tone]} aria-labelledby={headingId}>
+      <CardHeader>
         <div>
-          <h2 id={headingId}>{title}</h2>
-          {description ? <p>{description}</p> : null}
+          <CardTitle id={headingId}>{title}</CardTitle>
+          {description ? <CardDescription>{description}</CardDescription> : null}
         </div>
-        {actions ? <div className="panel-actions">{actions}</div> : null}
-      </header>
-      {children}
-    </section>
+        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 
 export function DefinitionGrid({ children }: Readonly<{ children: ReactNode }>) {
-  return <dl className="definition-grid">{children}</dl>;
+  return <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">{children}</dl>;
 }
 
 export function Definition({ label, children }: Readonly<{ label: string; children: ReactNode }>) {
   return (
     <div>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm text-foreground">{children}</dd>
     </div>
   );
 }
+
+const alertVariantByTone: Record<StatusTone, "default" | "danger" | "success" | "warning" | "info"> = {
+  danger: "danger",
+  success: "success",
+  warning: "warning",
+  info: "info",
+  neutral: "default",
+};
 
 export function Alert({
   children,
@@ -154,18 +165,14 @@ export function Alert({
   tone = "info",
 }: Readonly<{ children: ReactNode; title: string; tone?: StatusTone }>) {
   return (
-    <section
-      className="alert"
-      data-tone={tone}
+    <AlertRoot
+      variant={alertVariantByTone[tone]}
       role={tone === "danger" ? "alert" : undefined}
       aria-live={tone === "danger" ? undefined : "polite"}
     >
-      <StatusIcon tone={tone} />
-      <div>
-        <h2>{title}</h2>
-        <div>{children}</div>
-      </div>
-    </section>
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{children}</AlertDescription>
+    </AlertRoot>
   );
 }
 
@@ -175,14 +182,11 @@ export function EmptyState({
   action,
 }: Readonly<{ title: string; children: ReactNode; action?: ReactNode }>) {
   return (
-    <div className="empty-state">
-      <svg aria-hidden="true" viewBox="0 0 48 48">
-        <path d="M10 13h28v25H10zM16 8h16v5H16zM17 21h14M17 28h10" />
-      </svg>
-      <h3>{title}</h3>
-      <div>{children}</div>
-      {action ? <div className="empty-state-action">{action}</div> : null}
-    </div>
+    <Card className="flex flex-col items-center gap-3 border-dashed px-6 py-10 text-center">
+      <h3 className="text-base font-bold text-foreground">{title}</h3>
+      <div className="text-sm text-muted-foreground">{children}</div>
+      {action ? <div className="mt-2">{action}</div> : null}
+    </Card>
   );
 }
 
@@ -211,27 +215,32 @@ export function Pagination({
   }
 
   return (
-    <nav className="pagination" aria-label="Pagination">
+    <nav aria-label="Pagination" className="flex items-center justify-between gap-4">
       {page > 1 ? (
-        <Link className="button button-secondary" href={href(page - 1)} rel="prev">
-          Previous
-        </Link>
+        <Button asChild variant="outline" size="sm">
+          <Link href={href(page - 1)} rel="prev">
+            Previous
+          </Link>
+        </Button>
       ) : (
-        <span className="button button-secondary" aria-disabled="true">
+        <Button variant="outline" size="sm" disabled aria-disabled="true">
           Previous
-        </span>
+        </Button>
       )}
-      <span aria-live="polite">
-        Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+      <span aria-live="polite" className="text-sm text-muted-foreground">
+        Page <strong className="text-foreground">{page}</strong> of{" "}
+        <strong className="text-foreground">{totalPages}</strong>
       </span>
       {page < totalPages ? (
-        <Link className="button button-secondary" href={href(page + 1)} rel="next">
-          Next
-        </Link>
+        <Button asChild variant="outline" size="sm">
+          <Link href={href(page + 1)} rel="next">
+            Next
+          </Link>
+        </Button>
       ) : (
-        <span className="button button-secondary" aria-disabled="true">
+        <Button variant="outline" size="sm" disabled aria-disabled="true">
           Next
-        </span>
+        </Button>
       )}
     </nav>
   );

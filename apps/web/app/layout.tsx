@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import "./styles.css";
+import "./globals.css";
 
 const body = Inter({
   subsets: ["latin"],
@@ -19,11 +19,11 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://boardreadyops.com"),
   title: { default: "BoardReadyOps Cloud", template: "%s · BoardReadyOps" },
-  description: "Checks whether a KiCad board is ready to fabricate, on every pull request.",
+  description: "Checks whether a hardware board is ready to fabricate, on every pull request.",
   openGraph: {
     title: "BoardReadyOps — Know what stands between your board and production.",
     description:
-      "KiCad's checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
+      "Design, BOM, and manufacturing checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
     url: "https://boardreadyops.com",
     siteName: "BoardReadyOps",
     type: "website",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "BoardReadyOps — Know what stands between your board and production.",
     description:
-      "KiCad's checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
+      "Design, BOM, and manufacturing checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
   },
 };
 

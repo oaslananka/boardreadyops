@@ -28,12 +28,12 @@ describe("ReviewCanvas", () => {
     const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots, findings: [], comments: [] }));
     const findingAnchorCount = headSnapshots[0]?.anchors.filter((a) => a.kind === "finding").length ?? 0;
     if (findingAnchorCount > 0) {
-      expect(markup).toContain("finding-marker");
+      expect(markup).toContain(headSnapshots[0]?.anchors.find((a) => a.kind === "finding")?.targetRef);
     }
   });
 
   it("shows an empty-pane message instead of a broken image when no snapshot exists for a mode", () => {
     const markup = renderToStaticMarkup(createElement(ReviewCanvas, { headSnapshots: [], findings: [], comments: [] }));
-    expect(markup).toContain("canvas-viewport");
+    expect(markup).toContain('aria-label="Schematic and PCB Review Canvas"');
   });
 });

@@ -14,11 +14,13 @@ export default async function InsightsPage() {
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame operational-page" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Insights" }]} />
-        <header className="page-intro">
-          <h1>Insights</h1>
-          <p>Weekly Decision-Ready Reviews (WDRR) and content-free product analytics.</p>
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">Insights</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Weekly Decision-Ready Reviews (WDRR) and content-free product analytics.
+          </p>
         </header>
 
         {!viewer.session ? (
@@ -31,20 +33,20 @@ export default async function InsightsPage() {
             </EmptyState>
           </Panel>
         ) : (
-          <div className="panel surface-raised">
-            <p>
+          <div className="rounded-md border border-border bg-card p-4 shadow-lg">
+            <p className="text-sm text-foreground">
               WDRR requires: base/head revision, required checks complete, blockers dispositioned, required approval,
               evidence record.
             </p>
-            <p>
+            <p className="mt-2 text-sm text-foreground">
               Weekly buckets:{" "}
               {weekly.length === 0
                 ? "No data yet — run your first cloud review"
                 : weekly.map((b) => `${b.weekStart}: ${b.count}`).join(", ")}
             </p>
-            <p className="cell-note">
-              Telemetry is content-free: no KiCad content, finding messages, comment bodies, source paths, secrets or
-              emails.
+            <p className="mt-2 text-xs text-muted-foreground">
+              Telemetry is content-free: no CAD design content, finding messages, comment bodies, source paths, secrets
+              or emails.
             </p>
           </div>
         )}

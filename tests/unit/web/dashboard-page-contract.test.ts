@@ -1,36 +1,62 @@
-import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
 
-const source = readFileSync("apps/web/app/dashboard/page.tsx", "utf8");
-const css = readFileSync("apps/web/app/styles.css", "utf8");
+vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
+  viewerAuthorization: vi.fn(async () => ({ session: { login: "octocat" } })),
+}));
+vi.mock("../../../apps/web/lib/repository-dashboard.js", () => ({
+  loadViewerRepositories: vi.fn(async () => [
+    {
+      accountLogin: "octocat",
+      repositories: [
+        {
+          id: "repo-1",
+          owner: "octocat",
+          name: "widgets",
+          private: false,
+          latestRunId: "run-1",
+          latestRunDecision: "pass",
+          latestRunStatus: "completed",
+          latestRunAt: "2026-09-05T00:00:00.000Z",
+          openFindings: 2,
+          watchedBoards: 3,
+          openSupplyFindings: 0,
+        },
+      ],
+    },
+  ]),
+  summarizeViewerRepositories: vi.fn(() => ({
+    repositories: 1,
+    repositoriesWithOpenFindings: 1,
+    supplyAlerts: 0,
+    repositoriesWithoutRuns: 0,
+    watchedBoards: 3,
+  })),
+}));
+
+const { default: DashboardPage } = await import("../../../apps/web/app/dashboard/page.js");
 
 describe("dashboard operational hierarchy", () => {
-  it("derives a compact summary from the loaded repository groups", () => {
-    expect(source).toContain("summarizeViewerRepositories");
-    expect(source).toContain('className="operational-summary"');
-    expect(source).toContain("Repositories with findings");
-    expect(source).toContain("Supply alerts");
-    expect(source).toContain("No run yet");
-    expect(source).toContain("Boards watched");
-    expect(source).not.toContain("this week");
-    expect(source).not.toContain("trend");
+  it("derives a compact summary from the loaded repository groups", async () => {
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Engineering status");
+    expect(markup).toContain("Repositories with findings");
+    expect(markup).toContain("Supply alerts");
+    expect(markup).toContain("No run yet");
+    expect(markup).toContain("Boards watched");
+    expect(markup).not.toContain("this week");
+    expect(markup).not.toContain("trend");
   });
 
-  it("renders repository account groups as sections rather than repeated cards", () => {
-    expect(source).toContain('tone="section"');
-    expect(source.indexOf('className="operational-summary"')).toBeLessThan(source.indexOf("repository-table-wrap"));
-    expect(css).toContain(".operational-summary");
+  it("renders repository account groups as sections with a wide, scrollable table", async () => {
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("octocat/widgets");
+    expect(markup).toContain("overflow-x-auto");
   });
 
-  it("contains wide repository tables inside the mobile page frame", () => {
-    expect(css).toMatch(/\.repository-sections\s*>\s*\.panel\s*\{[^}]*min-width:\s*0/su);
-    expect(css).toMatch(/\.repository-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/su);
-  });
-
-  it("renders an attention-required next-action hierarchy and actionable empty state", () => {
-    expect(source).toContain("dashboard-attention");
-    expect(source).toContain("Next action");
-    expect(source).toContain("/setup");
-    expect(css).toContain(".dashboard-attention");
+  it("renders an attention banner with a next-action hint when findings are open", async () => {
+    const markup = renderToStaticMarkup(await DashboardPage());
+    expect(markup).toContain("Attention required");
+    expect(markup).toContain("Next action");
   });
 });

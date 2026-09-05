@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { GuidedChecklist } from "../../../components/guided-checklist.js";
 import {
   AppShell,
   Breadcrumbs,
@@ -49,7 +50,7 @@ export default async function RepositoryPage({ params }: PageProps) {
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="shell" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs
           items={[
             { href: "/", label: "Home" },
@@ -57,11 +58,13 @@ export default async function RepositoryPage({ params }: PageProps) {
             { label: `${repository.owner}/${repository.name}` },
           ]}
         />
-        <header className="page-heading">
-          <h1>
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">
             {repository.owner}/{repository.name}
           </h1>
-          <p>Release readiness history and open supply findings for this repository.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Release readiness history and open supply findings for this repository.
+          </p>
         </header>
 
         <Panel title="Current state">
@@ -81,38 +84,62 @@ export default async function RepositoryPage({ params }: PageProps) {
 
         <Panel title="Recent runs">
           {runs.length === 0 ? (
-            <EmptyState title="No runs yet">
-              <p>Open a pull request touching the hardware project to produce the first run.</p>
-            </EmptyState>
+            <GuidedChecklist
+              heading="Trigger your first run on this repository"
+              steps={[
+                {
+                  id: "connected",
+                  label: `Repository ${repository.owner}/${repository.name} connected`,
+                  status: "done",
+                },
+                {
+                  id: "pr",
+                  label: "Open a pull request touching the hardware project to produce the first run",
+                  status: "current",
+                },
+              ]}
+            />
           ) : (
-            <div className="repository-table-wrap">
-              <table className="repository-table">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
                 <thead>
-                  <tr>
-                    <th scope="col">Run</th>
-                    <th scope="col">Outcome</th>
-                    <th scope="col">Ref</th>
-                    <th scope="col">Findings</th>
-                    <th scope="col">Started</th>
+                  <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                    <th scope="col" className="py-2 pr-3">
+                      Run
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Outcome
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Ref
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Findings
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Started
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {runs.map((run) => (
-                    <tr key={run.id}>
-                      <th scope="row">
-                        <Link href={`/runs/${run.id}`}>{run.commitSha.slice(0, 8) || run.id.slice(0, 8)}</Link>
+                    <tr key={run.id} className="border-b border-border last:border-b-0">
+                      <th scope="row" className="py-2 pr-3 text-left font-normal">
+                        <Link href={`/runs/${run.id}`} className="text-primary hover:underline">
+                          {run.commitSha.slice(0, 8) || run.id.slice(0, 8)}
+                        </Link>
                       </th>
-                      <td>
+                      <td className="py-2 pr-3">
                         <StatusBadge value={run.decision ?? run.status} />
                       </td>
-                      <td>
+                      <td className="py-2 pr-3">
                         {run.pullRequestNumber !== undefined
                           ? `#${run.pullRequestNumber}`
                           : run.ref.replace(/^refs\/heads\//u, "")}
                       </td>
-                      <td>{run.findingCount}</td>
-                      <td>
-                        <span className="repository-when">{when(run.startedAt)}</span>
+                      <td className="py-2 pr-3">{run.findingCount}</td>
+                      <td className="py-2 pr-3">
+                        <span className="text-muted-foreground">{when(run.startedAt)}</span>
                       </td>
                     </tr>
                   ))}
@@ -131,33 +158,46 @@ export default async function RepositoryPage({ params }: PageProps) {
               </p>
             </EmptyState>
           ) : (
-            <div className="repository-table-wrap">
-              <table className="repository-table">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
                 <thead>
-                  <tr>
-                    <th scope="col">Part</th>
-                    <th scope="col">Board</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Reference</th>
-                    <th scope="col">Detected</th>
+                  <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                    <th scope="col" className="py-2 pr-3">
+                      Part
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Board
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Status
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Reference
+                    </th>
+                    <th scope="col" className="py-2 pr-3">
+                      Detected
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {supplyFindings.map((finding) => (
-                    <tr key={`${finding.boardPath}:${finding.mpn}:${finding.reference ?? ""}`}>
-                      <th scope="row">
+                    <tr
+                      key={`${finding.boardPath}:${finding.mpn}:${finding.reference ?? ""}`}
+                      className="border-b border-border last:border-b-0"
+                    >
+                      <th scope="row" className="py-2 pr-3 text-left font-normal">
                         {finding.mpn}
                         {finding.manufacturer ? (
-                          <span className="repository-when">{finding.manufacturer}</span>
+                          <span className="ml-2 text-muted-foreground">{finding.manufacturer}</span>
                         ) : undefined}
                       </th>
-                      <td>{finding.boardPath}</td>
-                      <td>
+                      <td className="py-2 pr-3">{finding.boardPath}</td>
+                      <td className="py-2 pr-3">
                         <StatusBadge value={finding.status} />
                       </td>
-                      <td>{finding.reference ?? "—"}</td>
-                      <td>
-                        <span className="repository-when">{when(finding.detectedAt)}</span>
+                      <td className="py-2 pr-3">{finding.reference ?? "—"}</td>
+                      <td className="py-2 pr-3">
+                        <span className="text-muted-foreground">{when(finding.detectedAt)}</span>
                       </td>
                     </tr>
                   ))}

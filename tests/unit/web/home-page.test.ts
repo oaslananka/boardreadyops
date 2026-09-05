@@ -117,13 +117,11 @@ describe("HomePage", () => {
     expect(links).toContain("https://docs.boardreadyops.com/security/assurance-case/");
   });
 
-  it("uses Foundry tokens in landing styles and defines landing-product-proof", async () => {
-    const { readFile } = await import("node:fs/promises");
-    const landingCss = await readFile("apps/web/app/landing.css", "utf8");
-    expect(landingCss).toContain("var(--foundry-canvas)");
-    expect(landingCss).toContain("var(--foundry-copper)");
+  it("no longer ships a separate landing.css and uses the shared design tokens instead", async () => {
+    const { access, readFile } = await import("node:fs/promises");
+    await expect(access("apps/web/app/landing.css")).rejects.toThrow();
     const page = await readFile("apps/web/app/page.tsx", "utf8");
-    expect(page).toContain("landing-product-proof");
+    expect(page).not.toContain("landing.css");
     expect(page).not.toMatch(/trusted by|customers|teams worldwide/i);
   });
 });

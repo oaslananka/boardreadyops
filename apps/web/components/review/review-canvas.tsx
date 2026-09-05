@@ -25,6 +25,14 @@ function toImageSrc(content?: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(content)}`;
 }
 
+const markerBase =
+  "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background px-1.5 py-0.5 text-[10px] font-medium shadow";
+
+function markerSeverityClass(severity: string): string {
+  if (severity === "error" || severity === "critical") return "bg-danger text-white";
+  return "bg-warning text-white";
+}
+
 interface CanvasMarkersProps {
   sheetAnchors: CanvasAnchor[];
   relevantFindings: DemoFinding[];
@@ -43,7 +51,7 @@ function CanvasMarkersLayer({
   onSelectComment,
 }: Readonly<CanvasMarkersProps>) {
   return (
-    <div className="canvas-markers-layer">
+    <div className="pointer-events-none absolute inset-0">
       {sheetAnchors.map((anchor) => {
         if (anchor.kind === "finding" && anchor.metadata?.fingerprint) {
           const fp = String(anchor.metadata.fingerprint);
@@ -54,19 +62,15 @@ function CanvasMarkersLayer({
             <button
               type="button"
               key={anchor.id}
-              className={`canvas-marker finding-marker severity-${sev} ${isSelected ? "selected" : ""}`}
-              style={{
-                left: `${anchor.x * 100}%`,
-                top: `${anchor.y * 100}%`,
-              }}
+              className={`${markerBase} ${markerSeverityClass(sev)} pointer-events-auto ${isSelected ? "ring-2 ring-primary" : ""}`}
+              style={{ left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectFinding?.(fp);
               }}
               title={`Finding: ${anchor.metadata.ruleId}\n${anchor.metadata.message}`}
             >
-              <span className="marker-dot" />
-              <span className="marker-label">{anchor.targetRef}</span>
+              {anchor.targetRef}
             </button>
           );
         }
@@ -79,19 +83,15 @@ function CanvasMarkersLayer({
               <button
                 type="button"
                 key={anchor.id}
-                className={`canvas-marker finding-marker severity-${compFinding.severity} ${isSelected ? "selected" : ""}`}
-                style={{
-                  left: `${anchor.x * 100}%`,
-                  top: `${anchor.y * 100}%`,
-                }}
+                className={`${markerBase} ${markerSeverityClass(compFinding.severity)} pointer-events-auto ${isSelected ? "ring-2 ring-primary" : ""}`}
+                style={{ left: `${anchor.x * 100}%`, top: `${anchor.y * 100}%` }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelectFinding?.(compFinding.fingerprint);
                 }}
                 title={`Finding on ${anchor.targetRef}: ${compFinding.ruleId}`}
               >
-                <span className="marker-dot" />
-                <span className="marker-label">{anchor.targetRef}</span>
+                {anchor.targetRef}
               </button>
             );
           }
@@ -106,7 +106,7 @@ function CanvasMarkersLayer({
           <button
             type="button"
             key={comment.id}
-            className="canvas-marker comment-marker"
+            className="pointer-events-auto absolute rounded-full bg-card px-1 text-sm shadow"
             onClick={(e) => {
               e.stopPropagation();
               onSelectComment?.(comment.id);
@@ -122,24 +122,28 @@ function CanvasMarkersLayer({
 
 function SplitViewport({ baseSrc, headSrc }: Readonly<{ baseSrc: string; headSrc: string }>) {
   return (
-    <div className="split-viewport-grid">
-      <div className="split-pane base-pane">
-        <span className="pane-tag">Base Revision</span>
+    <div className="grid h-full grid-cols-2 gap-2">
+      <div className="relative overflow-hidden rounded-md border border-border bg-muted">
+        <span className="absolute left-2 top-2 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
+          Base Revision
+        </span>
         {baseSrc ? (
           // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-          <img src={baseSrc} alt="Base Revision Snapshot" className="svg-render-img" />
+          <img src={baseSrc} alt="Base Revision Snapshot" className="size-full object-contain" />
         ) : (
-          <div className="empty-pane-msg">No base snapshot</div>
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No base snapshot</div>
         )}
       </div>
 
-      <div className="split-pane head-pane">
-        <span className="pane-tag">Head Revision</span>
+      <div className="relative overflow-hidden rounded-md border border-border bg-muted">
+        <span className="absolute left-2 top-2 rounded-sm bg-card px-1.5 py-0.5 text-xs text-muted-foreground">
+          Head Revision
+        </span>
         {headSrc ? (
           // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
-          <img src={headSrc} alt="Head Revision Snapshot" className="svg-render-img" />
+          <img src={headSrc} alt="Head Revision Snapshot" className="size-full object-contain" />
         ) : (
-          <div className="empty-pane-msg">No head snapshot</div>
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No head snapshot</div>
         )}
       </div>
     </div>
@@ -170,13 +174,13 @@ function StackedLayersView({
   onSelectComment?: ((commentId: string) => void) | undefined;
 }>) {
   return (
-    <div className="canvas-layers-stack">
+    <div className="relative h-full w-full">
       {(viewMode === "overlay" || viewMode === "base" || viewMode === "diff") && baseSrc ? (
         // biome-ignore lint/performance/noImgElement: dynamic svg data-uri rasterization
         <img
           src={baseSrc}
           alt="Base Revision Snapshot Layer"
-          className="canvas-layer base-layer"
+          className="absolute inset-0 size-full object-contain"
           style={{
             opacity: viewMode === "overlay" ? 1 - opacity : 1,
             filter: viewMode === "diff" ? "invert(1) grayscale(1)" : "none",
@@ -189,7 +193,7 @@ function StackedLayersView({
         <img
           src={headSrc}
           alt="Head Revision Snapshot Layer"
-          className="canvas-layer head-layer"
+          className="absolute inset-0 size-full object-contain"
           style={{
             opacity: viewMode === "overlay" ? opacity : 1,
             mixBlendMode: viewMode === "diff" ? "difference" : "normal",
@@ -307,18 +311,21 @@ export function ReviewCanvas({
   const baseSrc = toImageSrc(currentBaseSnapshot?.content);
   const headSrc = toImageSrc(currentHeadSnapshot?.content);
 
+  const modeButtonClass = (active: boolean) =>
+    `rounded-sm px-3 py-1.5 text-sm ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`;
+
   return (
-    <div className="review-canvas-container panel">
-      <section className="canvas-toolbar" aria-label="Canvas instruments">
-        <div className="toolbar-left">
-          <label htmlFor="sheet-select" className="toolbar-label">
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
+      <section className="flex flex-wrap items-center justify-between gap-3" aria-label="Canvas instruments">
+        <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor="sheet-select" className="text-xs text-muted-foreground">
             Layer / Sheet:
           </label>
           <select
             id="sheet-select"
             value={selectedSheetOrLayer}
             onChange={(e) => setSelectedSheetOrLayer(e.currentTarget.value)}
-            className="form-select canvas-sheet-select"
+            className="rounded-sm border border-border bg-background px-2 py-1 text-sm text-foreground"
           >
             {availableSheets.map((name) => (
               <option key={name} value={name}>
@@ -327,10 +334,10 @@ export function ReviewCanvas({
             ))}
           </select>
 
-          <div className="view-mode-tabs">
+          <div className="flex flex-wrap gap-1">
             <button
               type="button"
-              className={`mode-btn ${viewMode === "overlay" ? "active" : ""}`}
+              className={modeButtonClass(viewMode === "overlay")}
               onClick={() => setViewMode("overlay")}
               title="Overlay with opacity slider"
             >
@@ -338,7 +345,7 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={`mode-btn ${viewMode === "split" ? "active" : ""}`}
+              className={modeButtonClass(viewMode === "split")}
               onClick={() => setViewMode("split")}
               title="Side-by-side comparison"
             >
@@ -346,7 +353,7 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={`mode-btn ${viewMode === "diff" ? "active" : ""}`}
+              className={modeButtonClass(viewMode === "diff")}
               onClick={() => setViewMode("diff")}
               title="Difference highlight"
             >
@@ -354,7 +361,7 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={`mode-btn ${viewMode === "head" ? "active" : ""}`}
+              className={modeButtonClass(viewMode === "head")}
               onClick={() => setViewMode("head")}
               title="Head revision only"
             >
@@ -362,7 +369,7 @@ export function ReviewCanvas({
             </button>
             <button
               type="button"
-              className={`mode-btn ${viewMode === "base" ? "active" : ""}`}
+              className={modeButtonClass(viewMode === "base")}
               onClick={() => setViewMode("base")}
               title="Base revision only"
             >
@@ -371,10 +378,10 @@ export function ReviewCanvas({
           </div>
         </div>
 
-        <div className="toolbar-right">
+        <div className="flex flex-wrap items-center gap-3">
           {viewMode === "overlay" ? (
-            <div className="opacity-slider-wrap">
-              <span className="slider-label">Base</span>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Base</span>
               <input
                 type="range"
                 min="0"
@@ -382,32 +389,37 @@ export function ReviewCanvas({
                 step="0.05"
                 value={opacity}
                 onChange={(e) => setOpacity(Number.parseFloat(e.currentTarget.value))}
-                className="opacity-slider"
                 aria-label="Overlay blend: base vs. head snapshot opacity"
                 title={`Head Opacity: ${Math.round(opacity * 100)}%`}
               />
-              <span className="slider-label">Head ({Math.round(opacity * 100)}%)</span>
+              <span>Head ({Math.round(opacity * 100)}%)</span>
             </div>
           ) : null}
 
-          <div className="zoom-controls">
+          <div className="flex items-center gap-1 text-sm">
             <button
               type="button"
               onClick={handleZoomOut}
-              className="zoom-btn"
+              className="rounded-sm border border-border px-2 py-1 hover:bg-accent"
               aria-label="Zoom out"
               title="Zoom Out (-)"
             >
               −
             </button>
-            <span className="zoom-level">{Math.round(zoom * 100)}%</span>
-            <button type="button" onClick={handleZoomIn} className="zoom-btn" aria-label="Zoom in" title="Zoom In (+)">
+            <span className="w-12 text-center text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              className="rounded-sm border border-border px-2 py-1 hover:bg-accent"
+              aria-label="Zoom in"
+              title="Zoom In (+)"
+            >
               +
             </button>
             <button
               type="button"
               onClick={handleReset}
-              className="zoom-btn reset-btn"
+              className="rounded-sm border border-border px-2 py-1 text-xs hover:bg-accent"
               aria-label="Reset zoom and pan"
               title="Reset View (0)"
             >
@@ -420,14 +432,13 @@ export function ReviewCanvas({
       <section
         ref={containerRef}
         aria-label="Schematic and PCB Review Canvas"
-        className={`canvas-viewport ${isDragging ? "dragging" : ""}`}
+        className={`relative h-96 overflow-hidden rounded-md border border-border bg-muted ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        style={{ cursor: isDragging ? "grabbing" : "grab" }}
       >
         <div
-          className="canvas-transform-wrapper"
+          className="h-full w-full"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: "0 0",

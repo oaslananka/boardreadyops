@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "./ui/button.js";
 
 type CopyButtonProps = Readonly<{
   label: string;
@@ -55,10 +56,10 @@ export function CopyButton({ label, value }: CopyButtonProps) {
   else if (status === "failed") buttonLabel = "Copy failed";
 
   return (
-    <span className="copy-control">
-      <button className="button button-secondary button-compact" type="button" onClick={copy}>
+    <span className="inline-flex items-center gap-2">
+      <Button type="button" variant="secondary" size="sm" onClick={copy}>
         {buttonLabel}
-      </button>
+      </Button>
       <span className="sr-only" aria-live="polite">
         {copyStatusMessage(status)}
       </span>

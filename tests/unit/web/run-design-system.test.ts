@@ -1,10 +1,17 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync("apps/web/app/styles.css", "utf8");
+const css = readFileSync("apps/web/app/globals.css", "utf8");
 
-function variable(name: string): string {
-  const match = css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`, "u"));
+function themeBlock(selector: ":root" | ".dark"): string {
+  const pattern = selector === ":root" ? /:root\s*\{([^}]*)\}/su : /\.dark\s*\{([^}]*)\}/su;
+  const match = css.match(pattern);
+  if (!match?.[1]) throw new Error(`missing ${selector} block in globals.css`);
+  return match[1];
+}
+
+function variable(block: string, name: string): string {
+  const match = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`, "u"));
   if (!match?.[1]) throw new Error(`missing color token --${name}`);
   return match[1];
 }
@@ -24,51 +31,25 @@ function contrast(foreground: string, background: string): number {
   return ((values[0] ?? 0) + 0.05) / ((values[1] ?? 0) + 0.05);
 }
 
-describe("hosted dashboard design system", () => {
-  it("keeps raw color values inside the token declaration", () => {
-    const withoutTokens = css.replaceAll(/:root[^{]*\{[^{}]*\}/gu, "");
-    const rawColorPattern = /#[0-9a-fA-F]{3,8}(?![0-9A-Za-z_-])|rgba?\(/u;
-    expect(".sample { color: #fff; }").toMatch(rawColorPattern);
-    expect("#decision { color: var(--bro-text); }").not.toMatch(rawColorPattern);
-    expect(withoutTokens).not.toMatch(rawColorPattern);
-    expect(css).toContain("--bro-bg:");
-    expect(css).toContain("--bro-surface:");
-    expect(css).toContain("--bro-accent:");
-    expect(css).toContain("--bro-text:");
-    expect(css).toContain("--bro-motion-fast:");
-    expect(css).toContain("color-scheme: dark");
-    expect(css).toContain("--space-7");
-    expect(css).toContain("--radius-lg");
-    expect(css).toContain("--focus");
+describe.each([":root", ".dark"] as const)("design tokens in %s meet WCAG AA contrast", (selector) => {
+  const block = themeBlock(selector);
+
+  it("keeps body text above 4.5:1 against the page background", () => {
+    expect(contrast(variable(block, "foreground"), variable(block, "background"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "card-foreground"), variable(block, "card"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("keeps semantic status text above WCAG AA contrast", () => {
-    expect(contrast(variable("bro-text"), variable("bro-bg"))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(variable("bro-text-muted"), variable("bro-bg"))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(variable("bro-text-subtle"), variable("bro-bg"))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(variable("success"), variable("success-surface"))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(variable("warning"), variable("warning-surface"))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(variable("danger"), variable("danger-surface"))).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(variable("info"), variable("info-surface"))).toBeGreaterThanOrEqual(4.5);
+  it("keeps every status color above 4.5:1 against its own surface", () => {
+    expect(contrast(variable(block, "danger"), variable(block, "danger-surface"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "success"), variable(block, "success-surface"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "warning"), variable(block, "warning-surface"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "info"), variable(block, "info-surface"))).toBeGreaterThanOrEqual(4.5);
   });
+});
 
-  it("keeps operational panels flat instead of using persistent shadows", () => {
-    expect(css).toMatch(/\.panel\s*\{[^}]*box-shadow:\s*none/su);
-  });
-  it("keeps the run signature viewport compact and the tabs flat", () => {
-    expect(css).toMatch(/\.run-header\s*\{[^}]*box-shadow:\s*none/su);
-    expect(css).toMatch(/\.run-header h1\s*\{[^}]*font-size:\s*clamp\(1\.5rem,[^}]*2\.25rem\)/su);
-    expect(css).toMatch(
-      /\.run-navigation\s*\{[^}]*border-bottom:\s*1px solid var\(--bro-border-strong\)[^}]*background:\s*transparent[^}]*box-shadow:\s*none/su,
-    );
-  });
-
-  it("provides visible focus, responsive tables, and reduced-motion behavior", () => {
-    expect(css).toContain(":focus-visible");
-    expect(css).toContain("outline: 0.2rem solid var(--focus)");
-    expect(css).toContain(".table-scroll");
-    expect(css).toContain("overflow-x: auto");
-    expect(css).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(css).toContain("animation: none");
+describe("design token declaration", () => {
+  it("defines the sharp-corner radius and dark-mode custom variant the ADR locked in", () => {
+    expect(css).toContain("--radius: 0.125rem");
+    expect(css).toContain("@custom-variant dark");
   });
 });

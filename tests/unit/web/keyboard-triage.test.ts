@@ -42,6 +42,6 @@ describe("Interactive Review Components", () => {
     );
     expect(markup).toContain("Hardware Verification Checklist");
     expect(markup).toContain("Formal Approvals");
-    expect(markup).toContain("signoff-ledger");
+    expect(markup).toContain("Approver");
   });
 });

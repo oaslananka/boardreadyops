@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Dialog } from "../dialog.js";
+import { Button } from "../ui/button.js";
 
 export interface ApprovalModalProps {
   readonly type: "approve" | "request_changes";
@@ -52,11 +53,13 @@ export function ApprovalModal({
 
   return (
     <Dialog titleId="approval-modal-title" onClose={onClose}>
-      <header className="modal-header">
-        <h2 id="approval-modal-title">{title}</h2>
+      <header className="flex items-center justify-between border-b border-border p-4">
+        <h2 id="approval-modal-title" className="text-base font-bold text-foreground">
+          {title}
+        </h2>
         <button
           type="button"
-          className="modal-close-button"
+          className="text-muted-foreground hover:text-foreground"
           onClick={onClose}
           aria-label="Close modal"
           disabled={isSubmitting}
@@ -65,14 +68,16 @@ export function ApprovalModal({
         </button>
       </header>
 
-      <form onSubmit={handleSubmit} className="modal-body">
-        <div className="approval-digest-badge">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
           <span>Bound to Evidence Digest:</span>
           <code>{evidenceDigest.slice(0, 16)}...</code>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="approval-reason">{reasonLabel}</label>
+        <div>
+          <label htmlFor="approval-reason" className="text-sm font-medium text-foreground">
+            {reasonLabel}
+          </label>
           <textarea
             id="approval-reason"
             rows={3}
@@ -83,14 +88,14 @@ export function ApprovalModal({
               setError(null);
             }}
             placeholder={reasonPlaceholder}
-            className="form-textarea"
+            className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             required={!isApprove}
           />
         </div>
 
         {isApprove ? (
-          <div className="form-group break-glass-toggle">
-            <label className="checkbox-label">
+          <div>
+            <label className="flex items-center gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
                 checked={isBreakGlass}
@@ -102,19 +107,19 @@ export function ApprovalModal({
           </div>
         ) : null}
 
-        {displayError ? <div className="form-error-alert">{displayError}</div> : null}
+        {displayError ? (
+          <div className="rounded-md border border-danger/40 bg-danger-surface px-3 py-2 text-sm text-danger">
+            {displayError}
+          </div>
+        ) : null}
 
-        <footer className="modal-footer">
-          <button type="button" className="button button-secondary" onClick={onClose} disabled={isSubmitting}>
+        <footer className="flex items-center justify-end gap-2 border-t border-border pt-3">
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            className={`button ${isApprove ? "button-primary" : "button-danger"}`}
-            disabled={isSubmitting}
-          >
+          </Button>
+          <Button type="submit" variant={isApprove ? "default" : "destructive"} disabled={isSubmitting}>
             {submitLabel}
-          </button>
+          </Button>
         </footer>
       </form>
     </Dialog>

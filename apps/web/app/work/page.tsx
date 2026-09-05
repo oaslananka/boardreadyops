@@ -11,43 +11,40 @@ export const metadata = {
 export default function MyWorkPage() {
   const reviews = DEMO_REVIEWS;
 
-  // Flatten assigned findings across reviews
   const assignedFindings = reviews.flatMap((r) =>
     r.findings.filter((f) => f.assignees.length > 0 && f.disposition === "open").map((f) => ({ ...f, review: r })),
   );
 
-  // Reviews awaiting review/decision
   const awaitingReviews = reviews.filter((r) => r.decision === "pending");
 
-  // Reviews where changes are requested
   const changesRequested = reviews.filter((r) => r.decision === "changes_requested");
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame" id="main-content">
+      <main className="flex flex-col gap-5 px-6 py-6" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "My Work" }]} />
 
-        <header className="page-intro">
-          <h1>My Work</h1>
-          <p>Active items requiring your attention, triage, engineering decisions, or review sign-off.</p>
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">My Work</h1>
+          <p className="text-sm text-muted-foreground">
+            Active items requiring your attention, triage, engineering decisions, or review sign-off.
+          </p>
         </header>
 
-        <section className="work-queue-summary decision-band" aria-label="Queue summary">
-          <div className="metric-strip">
-            <span className="metric-pill">
-              <strong>{assignedFindings.length}</strong> assigned findings
-            </span>
-            <span className="metric-pill">
-              <strong>{awaitingReviews.length}</strong> awaiting review
-            </span>
-            <span className="metric-pill">
-              <strong>{changesRequested.length}</strong> changes requested
-            </span>
-          </div>
+        <section aria-label="Queue summary" className="flex flex-wrap gap-3">
+          <span className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground">
+            <strong className="text-foreground">{assignedFindings.length}</strong> assigned findings
+          </span>
+          <span className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground">
+            <strong className="text-foreground">{awaitingReviews.length}</strong> awaiting review
+          </span>
+          <span className="rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground">
+            <strong className="text-foreground">{changesRequested.length}</strong> changes requested
+          </span>
         </section>
 
-        <div className="work-workspace-grid">
-          <section className="work-primary-queue">
+        <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
+          <section>
             <Panel
               title="Assigned Findings"
               description="DRC, clearance, and BOM findings assigned to you for disposition."
@@ -58,28 +55,25 @@ export default function MyWorkPage() {
                   <p>You have no open assigned findings.</p>
                 </EmptyState>
               ) : (
-                <div className="work-findings-list">
+                <div className="flex flex-col gap-3">
                   {assignedFindings.map((finding) => (
-                    <article key={finding.fingerprint} className="work-finding-row panel surface-default">
-                      <div className="finding-row-lead">
-                        <div className="finding-meta">
-                          <StatusBadge
-                            value={
-                              finding.severity === "critical" || finding.severity === "error" ? "danger" : "warning"
-                            }
-                            label={finding.severity}
-                          />
-                          <code className="rule-id">{finding.ruleId}</code>
-                          <span className="repo-tag">{finding.review.repositoryName}</span>
-                          <span className="pr-tag">PR #{finding.review.pullRequestNumber}</span>
-                        </div>
-                        <p className="finding-message">{finding.message}</p>
-                        <span className="finding-path">
-                          <code>{finding.path}</code>
-                        </span>
+                    <article key={finding.fingerprint} className="rounded-md border border-border p-4">
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                        <StatusBadge
+                          value={finding.severity === "critical" || finding.severity === "error" ? "danger" : "warning"}
+                          label={finding.severity}
+                        />
+                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{finding.ruleId}</code>
+                        <span className="text-muted-foreground">{finding.review.repositoryName}</span>
+                        <span className="text-muted-foreground">PR #{finding.review.pullRequestNumber}</span>
                       </div>
-                      <div className="finding-row-action">
-                        <Link href={`/reviews/${finding.review.id}?tab=findings`} className="button button-secondary">
+                      <p className="text-sm text-foreground">{finding.message}</p>
+                      <code className="mt-1 block font-mono text-xs text-muted-foreground">{finding.path}</code>
+                      <div className="mt-3">
+                        <Link
+                          href={`/reviews/${finding.review.id}?tab=findings`}
+                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent/10"
+                        >
                           Triage in PR #{finding.review.pullRequestNumber} →
                         </Link>
                       </div>
@@ -90,28 +84,30 @@ export default function MyWorkPage() {
             </Panel>
           </section>
 
-          <aside className="work-secondary-queues">
+          <aside className="flex flex-col gap-5">
             <Panel
               title="Awaiting Your Review"
               description="Hardware pull requests waiting for engineering review or sign-off."
-              tone="default"
             >
               {awaitingReviews.length === 0 ? (
                 <EmptyState title="No pending reviews">
                   <p>You are all caught up on review requests.</p>
                 </EmptyState>
               ) : (
-                <div className="work-reviews-list">
+                <div className="flex flex-col gap-3">
                   {awaitingReviews.map((r) => (
-                    <article key={r.id} className="work-review-card panel surface-inset">
-                      <div className="card-top">
-                        <span className="repo-title">{r.repositoryName}</span>
-                        <span className="pr-tag">PR #{r.pullRequestNumber}</span>
+                    <article key={r.id} className="rounded-md bg-muted p-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{r.repositoryName}</span>
+                        <span>PR #{r.pullRequestNumber}</span>
                       </div>
-                      <h4>{r.title}</h4>
-                      <div className="card-bot">
-                        <span className="author">Author: {r.createdBy}</span>
-                        <Link href={`/reviews/${r.id}`} className="button button-primary button-small">
+                      <h4 className="mt-1 text-sm font-semibold text-foreground">{r.title}</h4>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">Author: {r.createdBy}</span>
+                        <Link
+                          href={`/reviews/${r.id}`}
+                          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                        >
                           Open Review →
                         </Link>
                       </div>
@@ -127,16 +123,19 @@ export default function MyWorkPage() {
                 description="Revisions requiring design updates before fabrication."
                 tone="critical"
               >
-                <div className="work-reviews-list">
+                <div className="flex flex-col gap-3">
                   {changesRequested.map((r) => (
-                    <article key={r.id} className="work-review-card panel surface-inset">
-                      <div className="card-top">
-                        <span className="repo-title">{r.repositoryName}</span>
-                        <span className="pr-tag">PR #{r.pullRequestNumber}</span>
+                    <article key={r.id} className="rounded-md bg-muted p-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{r.repositoryName}</span>
+                        <span>PR #{r.pullRequestNumber}</span>
                       </div>
-                      <h4>{r.title}</h4>
-                      <div className="card-bot">
-                        <Link href={`/reviews/${r.id}?tab=discussion`} className="button button-secondary button-small">
+                      <h4 className="mt-1 text-sm font-semibold text-foreground">{r.title}</h4>
+                      <div className="mt-2">
+                        <Link
+                          href={`/reviews/${r.id}?tab=discussion`}
+                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent/10"
+                        >
                           View Required Changes →
                         </Link>
                       </div>

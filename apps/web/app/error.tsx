@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "../components/ui/button.js";
 import { Alert, AppShell, Breadcrumbs } from "../components/ui.js";
 
 export default function GlobalError({
@@ -8,7 +9,7 @@ export default function GlobalError({
 }: Readonly<{ error: Error & { digest?: string }; reset: () => void }>) {
   return (
     <AppShell>
-      <main className="shell compact-shell" id="main-content">
+      <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Application error" }]} />
         <section className="run-state-surface">
           <Alert title="Something went wrong" tone="danger">
@@ -21,9 +22,9 @@ export default function GlobalError({
                 Diagnostic reference: <code>{error.digest}</code>
               </p>
             ) : null}
-            <button className="button button-primary" type="button" onClick={reset}>
+            <Button type="button" onClick={reset} className="mt-2">
               Retry
-            </button>
+            </Button>
           </Alert>
         </section>
       </main>
