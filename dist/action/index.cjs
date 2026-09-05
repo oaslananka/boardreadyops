@@ -106934,6 +106934,9 @@ function computeEvidenceDigest(input) {
   return (0, import_node_crypto5.createHash)("sha256").update(canonicalPayload).digest("hex");
 }
 
+// packages/cloud-core/src/xml-sanitizer.ts
+var ATTRIBUTE_NAME_CHARS = new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-".split(""));
+
 // src/core/cloud-findings.ts
 function mapFindingForCloud(finding2, categoryByRuleId) {
   const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;

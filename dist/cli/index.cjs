@@ -56494,6 +56494,9 @@ function signRunnerRequest(input) {
   return (0, import_node_crypto11.sign)(null, Buffer.from(canonicalRunnerRequest(input), "utf8"), input.privateKey).toString("base64url");
 }
 
+// packages/cloud-core/src/xml-sanitizer.ts
+var ATTRIBUTE_NAME_CHARS = new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-".split(""));
+
 // src/core/cloud-findings.ts
 function mapFindingForCloud(finding2, categoryByRuleId) {
   const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;

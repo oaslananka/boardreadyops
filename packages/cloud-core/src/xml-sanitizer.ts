@@ -15,6 +15,26 @@ export class XmlSanitizerError extends Error {
 }
 
 /**
+ * True if any `<!ENTITY ...>` declaration's body references another entity (`&name;`).
+ * Scans one declaration at a time (bounded by its own `>`) rather than matching the whole
+ * document with a single regex, so an unterminated/adversarial declaration only costs a scan
+ * of its own length instead of backtracking across the rest of the document.
+ */
+function hasInternalEntityReference(xml: string): boolean {
+  const upper = xml.toUpperCase();
+  let i = 0;
+  while (i < xml.length) {
+    const start = upper.indexOf("<!ENTITY", i);
+    if (start === -1) return false;
+    const end = xml.indexOf(">", start);
+    const declaration = xml.slice(start, end === -1 ? xml.length : end);
+    if (/&[\w.-]+;/.test(declaration)) return true;
+    i = end === -1 ? xml.length : end + 1;
+  }
+  return false;
+}
+
+/**
  * Validates XML payloads (such as IPC-2581 CAD files) against XXE (XML External Entity)
  * injection and Billion Laughs / quadratic entity expansion attacks.
  */
@@ -31,12 +51,8 @@ export function assertSafeXml(xmlContent: string): void {
   // Check for recursive entity expansion (Billion Laughs)
   if (upper.includes("<!ENTITY")) {
     const entityCount = (upper.match(/<!ENTITY/g) || []).length;
-    // A single unbounded run followed by a fixed anchor -- not two unbounded runs
-    // sandwiching it -- so this can't backtrack catastrophically the way the
-    // original quote-delimited version did.
-    const hasInternalEntityRef = /<!ENTITY\s+[\w.-]+[^>]*&[\w.-]+;/i.test(xmlContent);
 
-    if (entityCount > 2 || hasInternalEntityRef) {
+    if (entityCount > 2 || hasInternalEntityReference(xmlContent)) {
       throw new XmlSanitizerError(
         "ENTITY_EXPANSION_DETECTED",
         "XML contains nested or recursive entity definitions (Billion Laughs / expansion attack)",
@@ -157,7 +173,6 @@ function stripElement(input: string, tagName: string): string {
     result += input.slice(i, start);
     const tagEnd = upper.indexOf(">", start);
     if (tagEnd === -1) {
-      i = input.length;
       break;
     }
     if (input[tagEnd - 1] === "/") {
@@ -166,7 +181,6 @@ function stripElement(input: string, tagName: string): string {
     }
     const closeStart = upper.indexOf(closeMarker, tagEnd);
     if (closeStart === -1) {
-      i = input.length;
       break;
     }
     const closeEnd = upper.indexOf(">", closeStart);
@@ -176,19 +190,126 @@ function stripElement(input: string, tagName: string): string {
 }
 
 /**
- * Removes every `on*` event-handler attribute (onload, onerror, onclick, ...).
+ * Runs `stripFn` against the inside of each `<...>` tag individually, rather than the whole
+ * document in one regex pass. A crafted multi-megabyte document with many "on...=" near-misses
+ * spread across it is what makes a whole-document regex scan super-linear; a single real tag's
+ * attribute list is never more than a few hundred bytes, so the same regex applied per-tag has
+ * no adversarially-large haystack to backtrack across.
  */
-function stripEventHandlerAttributes(input: string): string {
-  return input.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+function stripWithinTags(input: string, stripFn: (tagContent: string) => string): string {
+  let result = "";
+  let i = 0;
+  while (i < input.length) {
+    const start = input.indexOf("<", i);
+    if (start === -1) {
+      result += input.slice(i);
+      break;
+    }
+    const end = input.indexOf(">", start);
+    if (end === -1) {
+      result += input.slice(i);
+      break;
+    }
+    result += input.slice(i, start);
+    result += stripFn(input.slice(start, end + 1));
+    i = end + 1;
+  }
+  return result;
+}
+
+function isEventHandlerAttributeName(name: string): boolean {
+  return name.length > 2 && name.toLowerCase().startsWith("on");
+}
+
+function isDangerousHrefAttribute(name: string, value: string): boolean {
+  const lowerName = name.toLowerCase();
+  if (lowerName !== "href" && lowerName !== "xlink:href") return false;
+  const lowerValue = value.trimStart().toLowerCase();
+  return (
+    lowerValue.startsWith("javascript:") ||
+    lowerValue.startsWith("vbscript:") ||
+    lowerValue.startsWith("data:text/html")
+  );
+}
+
+const ATTRIBUTE_NAME_CHARS = new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-".split(""));
+const WHITESPACE_CHARS = new Set([" ", "\t", "\n", "\r", "\f", "\v"]);
+
+function parseAttributeValue(tagContent: string, start: number): { value: string; end: number } {
+  const quote = tagContent[start];
+  if (quote === '"' || quote === "'") {
+    const closing = tagContent.indexOf(quote, start + 1);
+    const end = closing === -1 ? tagContent.length : closing + 1;
+    return { value: tagContent.slice(start + 1, closing === -1 ? tagContent.length : closing), end };
+  }
+
+  let end = start;
+  while (end < tagContent.length) {
+    const ch = tagContent[end];
+    if (ch === undefined || ch === ">" || WHITESPACE_CHARS.has(ch)) break;
+    end += 1;
+  }
+  return { value: tagContent.slice(start, end), end };
+}
+
+interface ParsedAttribute {
+  name: string;
+  value: string;
+  end: number;
+}
+
+/** Parses one `name="value"` (or unquoted) attribute starting right after `whitespaceIndex`. */
+function parseAttributeAt(tagContent: string, whitespaceIndex: number): ParsedAttribute | null {
+  const nameStart = whitespaceIndex + 1;
+  let nameEnd = nameStart;
+  while (nameEnd < tagContent.length && ATTRIBUTE_NAME_CHARS.has(tagContent[nameEnd] ?? "")) nameEnd += 1;
+  if (nameEnd === nameStart || tagContent[nameEnd] !== "=") return null;
+
+  const { value, end } = parseAttributeValue(tagContent, nameEnd + 1);
+  return { name: tagContent.slice(nameStart, nameEnd), value, end };
 }
 
 /**
- * Removes `href`/`xlink:href` attributes whose value uses a dangerous URI scheme
- * (javascript:, vbscript:, data:text/html). A single backreference for the quote
- * character replaces what was two near-duplicate alternation branches.
+ * Removes every attribute in a single tag's markup for which `isDangerous` returns true.
+ * Scans character-by-character instead of matching name+value with a regex -- the same
+ * reasoning as stripElement/stripSpans above: no unbounded-quantifier regex here for a static
+ * analyzer to flag as super-linear, and an unterminated/adversarial value is naturally bounded
+ * to one linear scan of the tag's own length rather than needing lookahead or backtracking.
  */
-function stripDangerousHrefAttributes(input: string): string {
-  return input.replace(/\s+(?:xlink:)?href\s*=\s*(["'])\s*(?:javascript|vbscript|data:text\/html)[^"']*\1/gi, "");
+function stripAttributesWhere(tagContent: string, isDangerous: (name: string, value: string) => boolean): string {
+  let result = "";
+  let i = 0;
+  while (i < tagContent.length) {
+    const ch = tagContent[i];
+    if (ch === undefined || !WHITESPACE_CHARS.has(ch)) {
+      result += ch ?? "";
+      i += 1;
+      continue;
+    }
+
+    const attribute = parseAttributeAt(tagContent, i);
+    if (!attribute) {
+      result += ch;
+      i += 1;
+      continue;
+    }
+
+    if (isDangerous(attribute.name, attribute.value)) {
+      i = attribute.end;
+      continue;
+    }
+
+    result += tagContent.slice(i, attribute.end);
+    i = attribute.end;
+  }
+  return result;
+}
+
+function stripUnsafeAttributes(tagContent: string): string {
+  return stripAttributesWhere(
+    tagContent,
+    (name, value) => isEventHandlerAttributeName(name) || isDangerousHrefAttribute(name, value),
+  );
 }
 
 /**
@@ -218,9 +339,20 @@ export function sanitizeSvg(svgContent: string): string {
   cleaned = applyUntilStable(cleaned, (s) => stripSpans(s, "<!--", "-->"));
   cleaned = applyUntilStable(cleaned, (s) => stripElement(s, "script"));
   cleaned = applyUntilStable(cleaned, (s) => stripElement(s, "foreignObject"));
-  cleaned = applyUntilStable(cleaned, stripEventHandlerAttributes);
-  cleaned = applyUntilStable(cleaned, stripDangerousHrefAttributes);
+  cleaned = applyUntilStable(cleaned, (s) => stripWithinTags(s, stripUnsafeAttributes));
   return cleaned.trim();
+}
+
+function hasUnsafeAttribute(svgContent: string): boolean {
+  let found = false;
+  stripWithinTags(svgContent, (tagContent) => {
+    stripAttributesWhere(tagContent, (name, value) => {
+      if (isEventHandlerAttributeName(name) || isDangerousHrefAttribute(name, value)) found = true;
+      return false;
+    });
+    return tagContent;
+  });
+  return found;
 }
 
 /**
@@ -236,11 +368,10 @@ export function assertSafeSvg(svgContent: string): void {
     );
   }
 
-  if (/\s+on[a-zA-Z]+\s*=/i.test(svgContent)) {
-    throw new XmlSanitizerError("UNSAFE_SVG_CONTENT", "SVG contains inline event handler attributes");
-  }
-
-  if (/(?:href|xlink:href)\s*=\s*(["'])\s*(?:javascript|vbscript|data:text\/html)/i.test(svgContent)) {
-    throw new XmlSanitizerError("UNSAFE_SVG_CONTENT", "SVG contains dangerous URI scheme in link attribute");
+  if (hasUnsafeAttribute(svgContent)) {
+    throw new XmlSanitizerError(
+      "UNSAFE_SVG_CONTENT",
+      "SVG contains an inline event handler or a dangerous URI scheme in a link attribute",
+    );
   }
 }

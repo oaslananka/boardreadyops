@@ -51,12 +51,12 @@ export default async function DeliveryPage({ params }: DeliveryPageProps) {
         </AppShell>
       );
     }
-    notFound();
+    return notFound();
   }
 
   const delivery = authResult.delivery;
   if (!delivery) {
-    notFound();
+    return notFound();
   }
 
   return (
