@@ -21,6 +21,20 @@ export interface VerifyBundleToolInput {
 
 export type ToolResult = { ok: true; result: unknown } | { ok: false; error: string; exitCode: number };
 
+/**
+ * `runCli` spawns without a shell (see cli-runner.ts), so this is not shell-metacharacter
+ * injection -- it is CLI *flag* injection: an MCP client value like `--public-key=/tmp/evil.pem`
+ * would otherwise ride into `spawn`'s argv as a real flag, not a literal path, and commander
+ * would parse it as one. Rejecting anything flag-shaped keeps every tool argument that must be a
+ * plain value a plain value.
+ */
+function rejectFlagLike(value: string, label: string): ToolResult | undefined {
+  if (value.startsWith("-")) {
+    return { ok: false, error: `${label} must not start with '-' (looked like a CLI flag: ${value})`, exitCode: 1 };
+  }
+  return undefined;
+}
+
 function parseCliJsonOutput(run: CliRunResult, commandLabel: string): ToolResult {
   const trimmed = run.stdout.trim();
   if (trimmed) {
@@ -40,10 +54,14 @@ function parseCliJsonOutput(run: CliRunResult, commandLabel: string): ToolResult
 
 /** Runs the full hardware validation pipeline and returns structured findings. Read-only. */
 export async function runCheckTool(input: CheckToolInput, runCli: CliRunner): Promise<ToolResult> {
+  const path = input.path ?? ".";
+  const rejected = rejectFlagLike(path, "path") ?? (input.config ? rejectFlagLike(input.config, "config") : undefined);
+  if (rejected) return rejected;
+
   const args = ["check", "--format", "json"];
   if (input.config) args.push("--config", input.config);
   if (input.failOn) args.push("--fail-on", input.failOn);
-  args.push(input.path ?? ".");
+  args.push(path);
   const run = await runCli(args);
   return parseCliJsonOutput(run, "boardreadyops check");
 }
@@ -53,10 +71,14 @@ export async function runCheckTool(input: CheckToolInput, runCli: CliRunner): Pr
  * verification commands. Read-only -- `boardreadyops plan` never modifies the project.
  */
 export async function runPlanTool(input: PlanToolInput, runCli: CliRunner): Promise<ToolResult> {
+  const path = input.path ?? ".";
+  const rejected = rejectFlagLike(path, "path") ?? (input.config ? rejectFlagLike(input.config, "config") : undefined);
+  if (rejected) return rejected;
+
   const args = ["plan"];
   if (input.config) args.push("--config", input.config);
   if (input.failOn) args.push("--fail-on", input.failOn);
-  args.push(input.path ?? ".");
+  args.push(path);
   const run = await runCli(args);
   return parseCliJsonOutput(run, "boardreadyops plan");
 }
@@ -66,6 +88,11 @@ export async function runPlanTool(input: PlanToolInput, runCli: CliRunner): Prom
  * trusted public key is supplied) of an offline evidence bundle. Read-only.
  */
 export async function runVerifyBundleTool(input: VerifyBundleToolInput, runCli: CliRunner): Promise<ToolResult> {
+  const rejected =
+    rejectFlagLike(input.bundleDir, "bundleDir") ??
+    (input.trustedKey ? rejectFlagLike(input.trustedKey, "trustedKey") : undefined);
+  if (rejected) return rejected;
+
   const args = ["release", "verify", "--format", "json"];
   if (input.trustedKey) args.push("--public-key", input.trustedKey);
   args.push(input.bundleDir);

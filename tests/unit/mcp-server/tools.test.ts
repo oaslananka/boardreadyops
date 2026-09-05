@@ -70,6 +70,24 @@ describe("runCheckTool", () => {
       exitCode: 2,
     });
   });
+
+  it("rejects a path that looks like a CLI flag instead of forwarding it to the spawned process", async () => {
+    const runner = fakeRunner({ stdout: "{}\n" });
+
+    const result = await runCheckTool({ path: "--fail-on=never" }, runner);
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("must not start with '-'"), exitCode: 1 });
+    expect(runner).not.toHaveBeenCalled();
+  });
+
+  it("rejects a config value that looks like a CLI flag", async () => {
+    const runner = fakeRunner({ stdout: "{}\n" });
+
+    const result = await runCheckTool({ path: "/board", config: "--config=/etc/passwd" }, runner);
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("must not start with '-'"), exitCode: 1 });
+    expect(runner).not.toHaveBeenCalled();
+  });
 });
 
 describe("runPlanTool", () => {
@@ -109,5 +127,14 @@ describe("runVerifyBundleTool", () => {
     await runVerifyBundleTool({ bundleDir: "/build/release" }, runner);
 
     expect(runner).toHaveBeenCalledWith(["release", "verify", "--format", "json", "/build/release"]);
+  });
+
+  it("rejects a bundleDir that looks like a CLI flag instead of forwarding it to the spawned process", async () => {
+    const runner = fakeRunner({ stdout: "{}\n" });
+
+    const result = await runVerifyBundleTool({ bundleDir: "--public-key=/tmp/attacker.pem" }, runner);
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("must not start with '-'"), exitCode: 1 });
+    expect(runner).not.toHaveBeenCalled();
   });
 });
