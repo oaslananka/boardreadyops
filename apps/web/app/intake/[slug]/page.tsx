@@ -30,7 +30,7 @@ export default async function ManufacturerIntakePage({ params }: ManufacturerInt
 
   return (
     <AppShell>
-      <main className="shell" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs
           items={[
             { href: "/", label: "Home" },

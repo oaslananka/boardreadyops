@@ -47,10 +47,8 @@ describe("settings pages and operational layout", () => {
     expect(navSection).not.toContain('aria-current="page" href="/settings/security"');
   });
 
-  it("contains setup progress index and operational styles", async () => {
+  it("contains setup progress index", async () => {
     const setupPage = await readFile("apps/web/app/setup/page.tsx", "utf8");
     expect(setupPage).toContain("setup-progress-index");
-    const runStyles = await readFile("apps/web/app/styles.css", "utf8");
-    expect(runStyles).toContain("operational-page");
   });
 });

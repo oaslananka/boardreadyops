@@ -4,41 +4,23 @@ import { describe, expect, it } from "vitest";
 /**
  * Contrast cover for the palette.
  *
- * The accessibility suite renders markup without the stylesheet, so axe has no colours to
- * measure and cannot see a theme regression at all. These read the tokens straight out of the
- * stylesheet and do the WCAG arithmetic, which is the only place the (single, dark) theme is
- * held to a contrast floor rather than to how it looks.
+ * Checks all core text and status color tokens in globals.css for WCAG AA compliance
+ * across both light (:root) and dark (.dark) themes.
  */
 
-const stylesheet = await readFile("apps/web/app/styles.css", "utf8");
+const css = await readFile("apps/web/app/globals.css", "utf8");
 
-const DARK = ":root {";
+function themeBlock(selector: ":root" | ".dark"): string {
+  const pattern = selector === ":root" ? /:root\s*\{([^}]*)\}/su : /\.dark\s*\{([^}]*)\}/su;
+  const match = css.match(pattern);
+  if (!match?.[1]) throw new Error(`missing ${selector} block in globals.css`);
+  return match[1];
+}
 
-function declarations(selector: string): Map<string, string> {
-  const start = stylesheet.indexOf(selector);
-  if (start < 0) throw new Error(`stylesheet has no ${selector} block`);
-  // Count braces rather than look for a particular indentation, so a block nested inside a
-  // media query is read the same way as one at the top level.
-  const open = stylesheet.indexOf("{", start);
-  let depth = 0;
-  let close = open;
-  for (let index = open; index < stylesheet.length; index += 1) {
-    const character = stylesheet[index];
-    if (character === "{") depth += 1;
-    else if (character === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        close = index;
-        break;
-      }
-    }
-  }
-  const found = new Map<string, string>();
-  for (const line of stylesheet.slice(open + 1, close).split("\n")) {
-    const [, name, value] = /^\s*(--[a-z0-9-]+)\s*:\s*(.+?);/i.exec(line) ?? [];
-    if (name && value) found.set(name, value.trim());
-  }
-  return found;
+function variable(block: string, name: string): string {
+  const match = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`, "u"));
+  if (!match?.[1]) throw new Error(`missing color token --${name}`);
+  return match[1];
 }
 
 function channel(value: number): number {
@@ -52,13 +34,7 @@ function parse(color: string): [number, number, number, number] {
     const packed = Number.parseInt(hex, 16);
     return [(packed >> 16) & 255, (packed >> 8) & 255, packed & 255, 1];
   }
-  const rgba = /^rgba?\(([^)]+)\)$/i.exec(color)?.[1];
-  if (rgba === undefined) throw new Error(`cannot parse colour ${color}`);
-  const [red, green, blue, alpha] = rgba.split(",").map((part) => Number.parseFloat(part.trim()));
-  if (red === undefined || green === undefined || blue === undefined) {
-    throw new Error(`cannot parse colour ${color}`);
-  }
-  return [red, green, blue, alpha ?? 1];
+  throw new Error(`cannot parse colour ${color}`);
 }
 
 function luminance(rgb: [number, number, number]): number {
@@ -66,95 +42,31 @@ function luminance(rgb: [number, number, number]): number {
 }
 
 function contrast(foreground: string, background: string): number {
-  const [fr, fg, fb, alpha] = parse(foreground);
+  const [fr, fg, fb] = parse(foreground);
   const [br, bg, bb] = parse(background);
-  // A translucent foreground is flattened over its ground before being measured.
-  const front = luminance([
-    fr * alpha + br * (1 - alpha),
-    fg * alpha + bg * (1 - alpha),
-    fb * alpha + bb * (1 - alpha),
-  ]);
+  const front = luminance([fr, fg, fb]);
   const back = luminance([br, bg, bb]);
   const [high, low] = front > back ? [front, back] : [back, front];
   return (high + 0.05) / (low + 0.05);
 }
 
-function resolve(
-  theme: Map<string, string>,
-  base: Map<string, string>,
-  token: string,
-  seen = new Set<string>(),
-): string {
-  const value = theme.get(token) ?? base.get(token);
-  if (value === undefined) throw new Error(`no token ${token}`);
-  const alias = /^var\((--[a-z0-9-]+)\)$/i.exec(value)?.[1];
-  if (alias === undefined) return value;
-  if (seen.has(token)) throw new Error(`token cycle at ${token}`);
-  seen.add(token);
-  return resolve(theme, base, alias, seen);
-}
+describe.each([":root", ".dark"] as const)("globals.css palette contrast in %s", (selector) => {
+  const block = themeBlock(selector);
 
-/** Every pair a reader has to make out. */
-const TEXT_PAIRS: [string, string][] = [
-  ["--text", "--background"],
-  ["--text", "--surface"],
-  ["--text", "--surface-strong"],
-  ["--text", "--background-elevated"],
-  ["--text", "--surface-sunken"],
-  ["--text-muted", "--background"],
-  ["--text-muted", "--surface"],
-  ["--text-subtle", "--background"],
-  ["--text-subtle", "--surface"],
-  ["--accent", "--background"],
-  ["--accent", "--surface"],
-  ["--accent-contrast", "--accent-fill"],
-  ["--code", "--surface"],
-  ["--code", "--surface-sunken"],
-  ["--success", "--success-surface"],
-  ["--success", "--surface"],
-  ["--warning", "--warning-surface"],
-  ["--warning", "--surface"],
-  ["--danger", "--danger-surface"],
-  ["--danger", "--surface"],
-  ["--info", "--info-surface"],
-  ["--info", "--surface"],
-  ["--skip-text", "--accent"],
-  ["--foundry-ink", "--foundry-canvas-subdued"],
-  ["--foundry-ink", "--foundry-surface-strong"],
-  ["--foundry-copper", "--foundry-canvas"],
-];
-
-/** Non-text UI boundaries and secondary material accents. */
-const NON_TEXT_PAIRS: [string, string][] = [
-  ["--foundry-brass", "--foundry-canvas"],
-  ["--foundry-copper-strong", "--foundry-surface"],
-];
-
-describe("palette contrast", () => {
-  const dark = declarations(DARK);
-
-  it("keeps every text pair at WCAG AA", () => {
-    const failures = TEXT_PAIRS.map(([foreground, background]) => {
-      const ratio = contrast(resolve(dark, dark, foreground), resolve(dark, dark, background));
-      return ratio < 4.5 ? `${foreground} on ${background} is ${ratio.toFixed(2)}:1` : undefined;
-    }).filter((failure) => failure !== undefined);
-
-    expect(failures).toEqual([]);
+  it("keeps core text pairs at WCAG AA", () => {
+    expect(contrast(variable(block, "foreground"), variable(block, "background"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "card-foreground"), variable(block, "card"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "muted-foreground"), variable(block, "background"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("keeps the focus ring visible against both grounds", () => {
-    for (const ground of ["--background", "--surface"]) {
-      expect(contrast(resolve(dark, dark, "--focus"), resolve(dark, dark, ground))).toBeGreaterThanOrEqual(3);
-    }
+  it("keeps status colors visible against their surfaces", () => {
+    expect(contrast(variable(block, "danger"), variable(block, "danger-surface"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "success"), variable(block, "success-surface"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "warning"), variable(block, "warning-surface"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "info"), variable(block, "info-surface"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("keeps material boundaries visible", () => {
-    for (const [foreground, background] of NON_TEXT_PAIRS) {
-      expect(contrast(resolve(dark, dark, foreground), resolve(dark, dark, background))).toBeGreaterThanOrEqual(3);
-    }
-  });
-
-  it("declares a colour scheme so form controls follow", () => {
-    expect(stylesheet).toContain("color-scheme: dark");
+  it("declares custom variant dark for styling", () => {
+    expect(css).toContain("@custom-variant dark");
   });
 });

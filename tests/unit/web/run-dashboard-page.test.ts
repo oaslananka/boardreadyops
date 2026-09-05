@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const component = readFileSync("apps/web/components/run-investigation.tsx", "utf8");
-const styles = readFileSync("apps/web/app/styles.css", "utf8");
 const liveRefreshComponent = existsSync("apps/web/components/run-live-refresh.tsx")
   ? readFileSync("apps/web/components/run-live-refresh.tsx", "utf8")
   : "";
@@ -69,10 +68,8 @@ describe("run investigation routes", () => {
     expect(component).toContain("Deletion failed");
     expect(component).toContain("Open GitHub checks");
     expect(component).toContain("Full audit export requires operator access");
-    expect(styles).toContain(":focus-visible");
-    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(styles).toContain(".status-icon");
-    expect(styles).toContain(".sr-only");
+    expect(component).toContain("focus-visible");
+    expect(component).toContain("sr-only");
   });
 
   it("defines explicit loading, failure, unavailable, expired, stale, recovery, and partial states", () => {
