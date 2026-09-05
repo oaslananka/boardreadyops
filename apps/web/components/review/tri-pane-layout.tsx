@@ -2,9 +2,9 @@
 
 import { type FormEvent, useState } from "react";
 
-export type ReviewFindingSeverity = "error" | "warning" | "info";
+type ReviewFindingSeverity = "error" | "warning" | "info";
 
-export type ReviewFinding = {
+type ReviewFinding = {
   id: string;
   ruleId: string;
   message: string;
@@ -18,14 +18,14 @@ export type ReviewFinding = {
   waiverReason?: string;
 };
 
-export type ReviewLayer = {
+type ReviewLayer = {
   name: string;
   fileRole: string;
   color?: string | undefined;
   visible?: boolean | undefined;
 };
 
-export type DrillHole = {
+type DrillHole = {
   x: number;
   y: number;
   diameter: number;

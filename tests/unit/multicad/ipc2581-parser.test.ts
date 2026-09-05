@@ -121,4 +121,25 @@ describe("IPC-2581 XML Ingestion & Normalization", () => {
 
     expect(() => parseIpc2581Package(maliciousXml)).toThrow(/security|entity|malformed|doctype/i);
   });
+
+  it("stays roughly linear time on many unclosed <Layer>/<Component> tags (ReDoS guard)", () => {
+    const hostileOfSize = (n: number) =>
+      `<IPC-2581 revision="B"><Content units="MILLIMETER"/><Ecad name="hostile"><CadData><Step name="PRIMARY">${"<Layer name=".repeat(
+        n,
+      )}${"<Component refDes=".repeat(n)}</Step></CadData></Ecad></IPC-2581>`;
+
+    const time = (n: number) => {
+      const start = performance.now();
+      parseIpc2581Package(hostileOfSize(n));
+      return performance.now() - start;
+    };
+
+    time(5_000); // warm up the JIT before timing
+    const small = time(20_000);
+    const large = time(80_000); // 4x the input
+
+    // Quadratic backtracking would show up as ~16x, not ~4x; allow generous slack for
+    // machine noise while still catching a real regression back to super-linear behavior.
+    expect(large / small).toBeLessThan(8);
+  });
 });

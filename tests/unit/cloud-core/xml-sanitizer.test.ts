@@ -152,4 +152,20 @@ describe("SVG Script Sanitization & Defense Guard", () => {
     const rawMalicious = `<svg onload="alert(1)"><circle cx="5" cy="5" r="5"/></svg>`;
     expect(() => assertSafeSvg(rawMalicious)).toThrowError(XmlSanitizerError);
   });
+
+  it("does not let a stripped tag's own fragments recombine into a live one", () => {
+    // Removing the inner "<script>...</script>" from "<scr" + "<script>" + "ipt>...</scr" +
+    // "</script>" + "ipt>" naively leaves "<scr" + "ipt>", which reads back as "<script>".
+    const nested = `<svg><scr<script>ipt>alert(1)</scr</script>ipt></svg>`;
+    const sanitized = sanitizeSvg(nested);
+    expect(sanitized).not.toContain("<script");
+    expect(sanitized).not.toContain("alert(1)");
+  });
+
+  it("stays linear time on adversarial unterminated tags (ReDoS guard)", () => {
+    const hostile = `<svg>${"<!-- ".repeat(50_000)}${"<script>".repeat(50_000)}`;
+    const start = performance.now();
+    sanitizeSvg(hostile);
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
 });

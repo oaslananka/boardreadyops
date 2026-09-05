@@ -21,11 +21,16 @@ export interface NormalizedStackupResult {
   warnings: ParserWarning[];
 }
 
-export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStackupResult {
-  const layers: NormalizedLayer[] = [];
-  const drillHoles: NormalizedDrillHole[] = [];
-  const warnings: ParserWarning[] = [];
+interface LayerAccumulation {
+  layers: NormalizedLayer[];
+  outlineContent: string | undefined;
+  hasPth: boolean;
+  hasNpth: boolean;
+  copperLayerCount: number;
+}
 
+function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
+  const layers: NormalizedLayer[] = [];
   let outlineContent: string | undefined;
   let hasPth = false;
   let hasNpth = false;
@@ -34,51 +39,51 @@ export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStac
   for (const entry of files) {
     const cleanName = entry.filename.replace(/\\/g, "/");
     const classification = classifyLayer(cleanName);
+    if (!classification) continue;
 
-    if (classification) {
-      layers.push({
-        name: classification.name,
-        role: classification.role,
-        side: classification.side,
-        index: classification.index,
-        filename: entry.filename,
-      });
+    layers.push({
+      name: classification.name,
+      role: classification.role,
+      side: classification.side,
+      index: classification.index,
+      filename: entry.filename,
+    });
 
-      if (classification.role === "copper") {
-        copperLayerCount++;
-      } else if (classification.role === "outline") {
-        if (entry.content) {
-          outlineContent = entry.content;
-        }
-      } else if (classification.role === "drill") {
-        if (/-NPTH/i.test(cleanName)) {
-          hasNpth = true;
-        } else {
-          hasPth = true;
-        }
-      }
+    if (classification.role === "copper") {
+      copperLayerCount++;
+    } else if (classification.role === "outline" && entry.content) {
+      outlineContent = entry.content;
+    } else if (classification.role === "drill") {
+      if (/-NPTH/i.test(cleanName)) hasNpth = true;
+      else hasPth = true;
     }
   }
 
-  // Check drill existence
-  const hasAnyDrill = layers.some((l) => l.role === "drill");
+  return { layers, outlineContent, hasPth, hasNpth, copperLayerCount };
+}
+
+function buildStackupWarnings(hasAnyDrill: boolean, hasOutlines: boolean): ParserWarning[] {
+  const warnings: ParserWarning[] = [];
   if (!hasAnyDrill) {
     warnings.push({
       code: "MISSING_DRILL",
       message: "No NC drill (.drl, .txt, .xln) files were detected in the package.",
     });
-  } else if (!hasNpth && hasPth) {
-    // Many CAD packages combine PTH and NPTH into a single drill file
-    hasNpth = false;
   }
-
-  const hasOutlines = layers.some((l) => l.role === "outline");
   if (!hasOutlines) {
     warnings.push({
       code: "MISSING_OUTLINE",
       message: "No board outline (.gko, .gm1, Edge_Cuts) layer was detected in the package.",
     });
   }
+  return warnings;
+}
+
+export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStackupResult {
+  const { layers, outlineContent, hasPth, hasNpth, copperLayerCount } = accumulateLayers(files);
+  const hasAnyDrill = layers.some((l) => l.role === "drill");
+  const hasOutlines = layers.some((l) => l.role === "outline");
+  const warnings = buildStackupWarnings(hasAnyDrill, hasOutlines);
 
   // Extract board dimensions if outline content is present
   const boardDims = outlineContent ? extractDimensionsFromGerber(outlineContent) : {};
@@ -103,7 +108,7 @@ export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStac
   return {
     board,
     layers,
-    drillHoles,
+    drillHoles: [],
     capabilities,
     warnings,
   };
@@ -190,53 +195,63 @@ function classifyLayer(filename: string): LayerClassification | null {
   return null;
 }
 
-function extractDimensionsFromGerber(content: string): { widthMm?: number; heightMm?: number } {
-  // Format extraction
+function gerberCoordinateScale(content: string): number {
+  const isInch = /%MOIN\*%/.test(content) && !/%MOMM\*%/.test(content);
+
   let divisor = 100000;
-  let isMm = true;
-
-  if (/%MOIN\*%/.test(content)) {
-    isMm = false;
-  } else if (/%MOMM\*%/.test(content)) {
-    isMm = true;
-  }
-
-  const formatMatch = content.match(/%FSLAX(\d)(\d)Y(\d)(\d)\*%/);
-  const decimalsStr = formatMatch?.[2];
+  const decimalsStr = content.match(/%FSLAX(\d)(\d)Y(\d)(\d)\*%/)?.[2];
   if (decimalsStr) {
-    const decimals = Number.parseInt(decimalsStr, 10);
-    divisor = 10 ** decimals;
+    divisor = 10 ** Number.parseInt(decimalsStr, 10);
   }
 
-  const scale = isMm ? 1 / divisor : 25.4 / divisor;
+  return isInch ? 25.4 / divisor : 1 / divisor;
+}
 
+interface GerberBoundingBox {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  count: number;
+}
+
+function gerberCoordinateBoundingBox(content: string): GerberBoundingBox {
   const coordRegex = /X(-?\d+)Y(-?\d+)/g;
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  let matches = 0;
+  const box: GerberBoundingBox = {
+    minX: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+    count: 0,
+  };
 
   let match = coordRegex.exec(content);
   while (match !== null) {
-    const xStr = match[1];
-    const yStr = match[2];
+    const [, xStr, yStr] = match;
     if (xStr !== undefined && yStr !== undefined) {
       const x = Number.parseInt(xStr, 10);
       const y = Number.parseInt(yStr, 10);
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-      matches++;
+      box.minX = Math.min(box.minX, x);
+      box.maxX = Math.max(box.maxX, x);
+      box.minY = Math.min(box.minY, y);
+      box.maxY = Math.max(box.maxY, y);
+      box.count += 1;
     }
     match = coordRegex.exec(content);
   }
 
-  if (matches >= 2 && Number.isFinite(minX) && Number.isFinite(maxX)) {
-    const widthMm = (maxX - minX) * scale;
-    const heightMm = (maxY - minY) * scale;
-    return { widthMm, heightMm };
+  return box;
+}
+
+function extractDimensionsFromGerber(content: string): { widthMm?: number; heightMm?: number } {
+  const scale = gerberCoordinateScale(content);
+  const box = gerberCoordinateBoundingBox(content);
+
+  if (box.count >= 2 && Number.isFinite(box.minX) && Number.isFinite(box.maxX)) {
+    return {
+      widthMm: (box.maxX - box.minX) * scale,
+      heightMm: (box.maxY - box.minY) * scale,
+    };
   }
 
   return {};

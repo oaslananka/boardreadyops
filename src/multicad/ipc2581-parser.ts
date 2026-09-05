@@ -91,35 +91,47 @@ function extractUnitFactor(xml: string): number {
   return 1.0; // MILLIMETER
 }
 
-function extractBoardProfile(xml: string, unitFactor: number): NormalizedBoardMetadata {
-  const ecadMatch = xml.match(/<Ecad\s+name=["']([^"']+)["']/i);
-  const name = ecadMatch?.[1] || "IPC-2581 Board";
+interface ProfileBoundingBox {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  count: number;
+}
 
-  // Find all coordinates in profile / polygon
+function profileBoundingBox(xml: string): ProfileBoundingBox {
   const coordsRegex = /<Poly(?:Begin|StepSegment)\s+x=["']([\d.-]+)["']\s+y=["']([\d.-]+)["']/gi;
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
+  const box: ProfileBoundingBox = {
+    minX: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+    count: 0,
+  };
 
-  let match: RegExpExecArray | null = coordsRegex.exec(xml);
-  let pointCount = 0;
-
+  let match = coordsRegex.exec(xml);
   while (match !== null) {
     const x = Number.parseFloat(match[1] || "0");
     const y = Number.parseFloat(match[2] || "0");
     if (!Number.isNaN(x) && !Number.isNaN(y)) {
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-      pointCount++;
+      box.minX = Math.min(box.minX, x);
+      box.maxX = Math.max(box.maxX, x);
+      box.minY = Math.min(box.minY, y);
+      box.maxY = Math.max(box.maxY, y);
+      box.count += 1;
     }
     match = coordsRegex.exec(xml);
   }
 
-  const widthMm = pointCount >= 2 ? (maxX - minX) * unitFactor : undefined;
-  const heightMm = pointCount >= 2 ? (maxY - minY) * unitFactor : undefined;
+  return box;
+}
+
+function extractBoardProfile(xml: string, unitFactor: number): NormalizedBoardMetadata {
+  const name = /<Ecad\s+name=["']([^"']+)["']/i.exec(xml)?.[1] || "IPC-2581 Board";
+  const box = profileBoundingBox(xml);
+
+  const widthMm = box.count >= 2 ? (box.maxX - box.minX) * unitFactor : undefined;
+  const heightMm = box.count >= 2 ? (box.maxY - box.minY) * unitFactor : undefined;
 
   return {
     name,
@@ -130,7 +142,9 @@ function extractBoardProfile(xml: string, unitFactor: number): NormalizedBoardMe
 
 function extractLayers(xml: string, filename: string): NormalizedLayer[] {
   const layers: NormalizedLayer[] = [];
-  const layerRegex = /<Layer\s+([^>]+)>/gi;
+  // Attribute run is bounded (real IPC-2581 <Layer> tags never approach this) so a crafted
+  // file with many unclosed "<Layer " occurrences can't force quadratic backtracking.
+  const layerRegex = /<Layer\s+([^>]{1,4096})>/gi;
   let match: RegExpExecArray | null = layerRegex.exec(xml);
 
   while (match !== null) {
@@ -210,6 +224,63 @@ function extractBomCharacteristics(xml: string): Map<string, BomCharInfo> {
   return bomMap;
 }
 
+interface XformPlacement {
+  xMm: number | undefined;
+  yMm: number | undefined;
+  rotationDegrees: number | undefined;
+}
+
+function extractXform(body: string, unitFactor: number): XformPlacement {
+  const placement: XformPlacement = { xMm: undefined, yMm: undefined, rotationDegrees: undefined };
+  const xformAttrs = /<Xform\s+([^>]{1,4096})\/?>/i.exec(body)?.[1];
+  if (!xformAttrs) return placement;
+
+  const xMatch = /\bx=["']([\d.-]+)["']/i.exec(xformAttrs)?.[1];
+  const yMatch = /\by=["']([\d.-]+)["']/i.exec(xformAttrs)?.[1];
+  const rotMatch = /\brotation=["']([\d.-]+)["']/i.exec(xformAttrs)?.[1];
+
+  if (xMatch) placement.xMm = Number.parseFloat(xMatch) * unitFactor;
+  if (yMatch) placement.yMm = Number.parseFloat(yMatch) * unitFactor;
+  if (rotMatch) placement.rotationDegrees = Number.parseFloat(rotMatch);
+  return placement;
+}
+
+function buildComponent(
+  attrs: string,
+  body: string,
+  bomMap: Map<string, BomCharInfo>,
+  unitFactor: number,
+  sourceFile: string,
+): NormalizedComponent | null {
+  const refDes = /\brefDes=["']([^"']+)["']/i.exec(attrs)?.[1]?.trim();
+  if (!refDes) return null;
+
+  const pkgMatch = /\bpackageRef=["']([^"']+)["']/i.exec(attrs)?.[1];
+  const sideMatch = /\bside=["']([^"']+)["']/i.exec(attrs)?.[1];
+
+  const bomInfo = bomMap.get(refDes.toUpperCase());
+  const footprint = bomInfo?.footprint || pkgMatch?.trim() || "";
+  const value = bomInfo?.value || "";
+  const mpn = bomInfo?.mpn;
+  const side: ComponentSide = sideMatch?.toUpperCase() === "BOTTOM" ? "bottom" : "top";
+
+  const { xMm, yMm, rotationDegrees } = extractXform(body, unitFactor);
+  const isDnp = /DNP/i.test(value) || (mpn ? /DNP/i.test(mpn) : false);
+
+  return {
+    refDes,
+    value,
+    footprint,
+    ...(mpn ? { mpn } : {}),
+    side,
+    ...(xMm !== undefined && !Number.isNaN(xMm) ? { xMm } : {}),
+    ...(yMm !== undefined && !Number.isNaN(yMm) ? { yMm } : {}),
+    ...(rotationDegrees !== undefined && !Number.isNaN(rotationDegrees) ? { rotationDegrees } : {}),
+    dnp: isDnp,
+    sourceFile,
+  };
+}
+
 function extractComponents(
   xml: string,
   bomMap: Map<string, BomCharInfo>,
@@ -217,61 +288,17 @@ function extractComponents(
   sourceFile: string,
 ): NormalizedComponent[] {
   const components: NormalizedComponent[] = [];
-  const compRegex = /<Component\s+([^>]+)(?:\/>|>([\s\S]*?)<\/Component>)/gi;
+  // The attribute run is bounded for the same reason as extractLayers's layerRegex above: on
+  // a crafted file with many unclosed "<Component " occurrences, an unbounded attribute group
+  // makes every failed attempt scan to end-of-string, which is quadratic under the global exec
+  // loop. Bounding it makes a failed attempt fail fast instead, without limiting how large a
+  // real (well-formed) component's own body content can be -- that group stays unbounded.
+  const compRegex = /<Component\s+([^>]{1,4096})(?:\/>|>([\s\S]*?)<\/Component>)/gi;
 
-  let match: RegExpExecArray | null = compRegex.exec(xml);
+  let match = compRegex.exec(xml);
   while (match !== null) {
-    const attrs = match[1] || "";
-    const body = match[2] || "";
-
-    const refMatch = attrs.match(/\brefDes=["']([^"']+)["']/i);
-    if (!refMatch?.[1]) {
-      match = compRegex.exec(xml);
-      continue;
-    }
-
-    const refDes = refMatch[1].trim();
-    const pkgMatch = attrs.match(/\bpackageRef=["']([^"']+)["']/i);
-    const sideMatch = attrs.match(/\bside=["']([^"']+)["']/i);
-
-    const bomInfo = bomMap.get(refDes.toUpperCase());
-    const footprint = bomInfo?.footprint || pkgMatch?.[1]?.trim() || "";
-    const value = bomInfo?.value || "";
-    const mpn = bomInfo?.mpn;
-    const side: ComponentSide = sideMatch?.[1]?.toUpperCase() === "BOTTOM" ? "bottom" : "top";
-
-    // Extract Xform (placement coordinates)
-    const xformMatch = body.match(/<Xform\s+([^>]+)\/?>/i);
-    let xMm: number | undefined;
-    let yMm: number | undefined;
-    let rotationDegrees: number | undefined;
-
-    if (xformMatch?.[1]) {
-      const xAttrs = xformMatch[1];
-      const xMatch = xAttrs.match(/\bx=["']([\d.-]+)["']/i);
-      const yMatch = xAttrs.match(/\by=["']([\d.-]+)["']/i);
-      const rotMatch = xAttrs.match(/\brotation=["']([\d.-]+)["']/i);
-
-      if (xMatch?.[1]) xMm = Number.parseFloat(xMatch[1]) * unitFactor;
-      if (yMatch?.[1]) yMm = Number.parseFloat(yMatch[1]) * unitFactor;
-      if (rotMatch?.[1]) rotationDegrees = Number.parseFloat(rotMatch[1]);
-    }
-
-    const isDnp = /DNP/i.test(value) || (mpn ? /DNP/i.test(mpn) : false);
-
-    components.push({
-      refDes,
-      value,
-      footprint,
-      ...(mpn ? { mpn } : {}),
-      side,
-      ...(xMm !== undefined && !Number.isNaN(xMm) ? { xMm } : {}),
-      ...(yMm !== undefined && !Number.isNaN(yMm) ? { yMm } : {}),
-      ...(rotationDegrees !== undefined && !Number.isNaN(rotationDegrees) ? { rotationDegrees } : {}),
-      dnp: isDnp,
-      sourceFile,
-    });
-
+    const component = buildComponent(match[1] || "", match[2] || "", bomMap, unitFactor, sourceFile);
+    if (component) components.push(component);
     match = compRegex.exec(xml);
   }
 

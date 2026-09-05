@@ -9,6 +9,136 @@ interface CentroidRecord {
   side: ComponentSide;
 }
 
+interface BomColumnIndices {
+  refIdx: number;
+  valIdx: number;
+  fpIdx: number;
+  mpnIdx: number;
+  dnpIdx: number;
+}
+
+function resolveBomColumns(header: string[]): BomColumnIndices {
+  return {
+    refIdx: findColumnIndex(header, ["designator", "reference", "ref", "refdes", "component", "part"]),
+    valIdx: findColumnIndex(header, ["comment", "value", "val", "description"]),
+    fpIdx: findColumnIndex(header, ["footprint", "package", "pattern"]),
+    mpnIdx: findColumnIndex(header, [
+      "manufacturer part number",
+      "mfr part #",
+      "mfr part",
+      "mpn",
+      "part number",
+      "part #",
+      "lcsc part #",
+      "jlcpcb part #",
+      "lcsc part",
+    ]),
+    dnpIdx: findColumnIndex(header, ["dnp", "do not populate", "no_fit"]),
+  };
+}
+
+interface CentroidColumnIndices {
+  refIdx: number;
+  xIdx: number;
+  yIdx: number;
+  rotIdx: number;
+  layerIdx: number;
+}
+
+function resolveCentroidColumns(header: string[]): CentroidColumnIndices {
+  return {
+    refIdx: findColumnIndex(header, ["designator", "ref", "refdes", "component", "name", "part"]),
+    xIdx: findColumnIndex(header, ["mid x", "posx", "x(mm)", "x", "ref x"]),
+    yIdx: findColumnIndex(header, ["mid y", "posy", "y(mm)", "y", "ref y"]),
+    rotIdx: findColumnIndex(header, ["rotation", "rot", "angle"]),
+    layerIdx: findColumnIndex(header, ["layer", "side"]),
+  };
+}
+
+function buildCentroidRecord(row: string[], columns: CentroidColumnIndices): CentroidRecord | null {
+  const ref = row[columns.refIdx]?.trim();
+  if (!ref) return null;
+
+  const xMm = columns.xIdx !== -1 ? parseDimensionMm(row[columns.xIdx]) : undefined;
+  const yMm = columns.yIdx !== -1 ? parseDimensionMm(row[columns.yIdx]) : undefined;
+  const rotationDegrees = columns.rotIdx !== -1 ? parseRotation(row[columns.rotIdx]) : undefined;
+  const side = columns.layerIdx !== -1 ? parseSide(row[columns.layerIdx]) : "top";
+
+  return {
+    refDes: ref,
+    ...(xMm !== undefined ? { xMm } : {}),
+    ...(yMm !== undefined ? { yMm } : {}),
+    ...(rotationDegrees !== undefined ? { rotationDegrees } : {}),
+    side,
+  };
+}
+
+function parseCentroidMap(centroidContent: string | undefined): Map<string, CentroidRecord> {
+  const centroidMap = new Map<string, CentroidRecord>();
+  if (!centroidContent) return centroidMap;
+
+  const centroidRows = parseRows(centroidContent);
+  const firstCentroidRow = centroidRows[0];
+  if (centroidRows.length < 2 || !firstCentroidRow) return centroidMap;
+
+  const columns = resolveCentroidColumns(firstCentroidRow.map((h) => h.trim().toLowerCase()));
+  if (columns.refIdx === -1) return centroidMap;
+
+  for (let i = 1; i < centroidRows.length; i++) {
+    const row = centroidRows[i];
+    if (!row) continue;
+    const record = buildCentroidRecord(row, columns);
+    if (record) centroidMap.set(record.refDes.toUpperCase(), record);
+  }
+
+  return centroidMap;
+}
+
+function isDnpRow(dnpRaw: string, value: string, mpn: string | undefined): boolean {
+  return (
+    dnpRaw === "1" ||
+    dnpRaw === "true" ||
+    dnpRaw === "dnp" ||
+    dnpRaw === "no_fit" ||
+    /DNP/i.test(value) ||
+    (mpn ? /DNP/i.test(mpn) : false)
+  );
+}
+
+function componentsFromBomRow(
+  row: string[],
+  columns: BomColumnIndices,
+  centroidMap: Map<string, CentroidRecord>,
+  sourceFileName: string,
+): NormalizedComponent[] {
+  const rawRef = (columns.refIdx !== -1 ? row[columns.refIdx] : undefined)?.trim();
+  if (!rawRef) return [];
+
+  const value = (columns.valIdx !== -1 ? row[columns.valIdx]?.trim() : "") || "";
+  const footprint = (columns.fpIdx !== -1 ? row[columns.fpIdx]?.trim() : "") || "";
+  const rawMpn = columns.mpnIdx !== -1 ? row[columns.mpnIdx]?.trim() : undefined;
+  const mpn = rawMpn && rawMpn.length > 0 ? rawMpn : undefined;
+  const dnpRaw = (columns.dnpIdx !== -1 ? row[columns.dnpIdx]?.trim().toLowerCase() : "") || "";
+  const isDnp = isDnpRow(dnpRaw, value, mpn);
+
+  // Expand multiple designators: "C1, C2" -> ["C1", "C2"]
+  return splitDesignators(rawRef).map((ref) => {
+    const placement = centroidMap.get(ref.toUpperCase());
+    return {
+      refDes: ref,
+      value,
+      footprint,
+      ...(mpn ? { mpn } : {}),
+      side: placement?.side || "top",
+      ...(placement?.xMm !== undefined ? { xMm: placement.xMm } : {}),
+      ...(placement?.yMm !== undefined ? { yMm: placement.yMm } : {}),
+      ...(placement?.rotationDegrees !== undefined ? { rotationDegrees: placement.rotationDegrees } : {}),
+      dnp: isDnp,
+      sourceFile: sourceFileName,
+    };
+  });
+}
+
 export function parseBomAndCentroid(
   bomContent: string,
   centroidContent?: string,
@@ -21,101 +151,16 @@ export function parseBomAndCentroid(
   if (!firstBomRow) return [];
 
   const header = firstBomRow.map((h) => h.trim().toLowerCase());
-  const refIdx = findColumnIndex(header, ["designator", "reference", "ref", "refdes", "component", "part"]);
-  const valIdx = findColumnIndex(header, ["comment", "value", "val", "description"]);
-  const fpIdx = findColumnIndex(header, ["footprint", "package", "pattern"]);
-  const mpnIdx = findColumnIndex(header, [
-    "manufacturer part number",
-    "mfr part #",
-    "mfr part",
-    "mpn",
-    "part number",
-    "part #",
-    "lcsc part #",
-    "jlcpcb part #",
-    "lcsc part",
-  ]);
-  const dnpIdx = findColumnIndex(header, ["dnp", "do not populate", "no_fit"]);
+  const columns = resolveBomColumns(header);
+  if (columns.refIdx === -1) return [];
 
-  if (refIdx === -1) return [];
-
-  // Parse centroid records if available
-  const centroidMap = new Map<string, CentroidRecord>();
-  if (centroidContent) {
-    const centroidRows = parseRows(centroidContent);
-    const firstCentroidRow = centroidRows[0];
-    if (centroidRows.length >= 2 && firstCentroidRow) {
-      const cHeader = firstCentroidRow.map((h) => h.trim().toLowerCase());
-      const cRefIdx = findColumnIndex(cHeader, ["designator", "ref", "refdes", "component", "name", "part"]);
-      const cXIdx = findColumnIndex(cHeader, ["mid x", "posx", "x(mm)", "x", "ref x"]);
-      const cYIdx = findColumnIndex(cHeader, ["mid y", "posy", "y(mm)", "y", "ref y"]);
-      const cRotIdx = findColumnIndex(cHeader, ["rotation", "rot", "angle"]);
-      const cLayerIdx = findColumnIndex(cHeader, ["layer", "side"]);
-
-      if (cRefIdx !== -1) {
-        for (let i = 1; i < centroidRows.length; i++) {
-          const row = centroidRows[i];
-          if (!row) continue;
-          const ref = (cRefIdx !== -1 ? row[cRefIdx] : undefined)?.trim();
-          if (!ref) continue;
-
-          const xMm = cXIdx !== -1 ? parseDimensionMm(row[cXIdx]) : undefined;
-          const yMm = cYIdx !== -1 ? parseDimensionMm(row[cYIdx]) : undefined;
-          const rotationDegrees = cRotIdx !== -1 ? parseRotation(row[cRotIdx]) : undefined;
-          const side = cLayerIdx !== -1 ? parseSide(row[cLayerIdx]) : "top";
-
-          centroidMap.set(ref.toUpperCase(), {
-            refDes: ref,
-            ...(xMm !== undefined ? { xMm } : {}),
-            ...(yMm !== undefined ? { yMm } : {}),
-            ...(rotationDegrees !== undefined ? { rotationDegrees } : {}),
-            side,
-          });
-        }
-      }
-    }
-  }
-
+  const centroidMap = parseCentroidMap(centroidContent);
   const components: NormalizedComponent[] = [];
 
   for (let r = 1; r < bomRows.length; r++) {
     const row = bomRows[r];
     if (!row) continue;
-    const rawRef = (refIdx !== -1 ? row[refIdx] : undefined)?.trim();
-    if (!rawRef) continue;
-
-    const value = (valIdx !== -1 ? row[valIdx]?.trim() : "") || "";
-    const footprint = (fpIdx !== -1 ? row[fpIdx]?.trim() : "") || "";
-    const rawMpn = mpnIdx !== -1 ? row[mpnIdx]?.trim() : undefined;
-    const mpn = rawMpn && rawMpn.length > 0 ? rawMpn : undefined;
-
-    const dnpRaw = (dnpIdx !== -1 ? row[dnpIdx]?.trim().toLowerCase() : "") || "";
-    const isDnp =
-      dnpRaw === "1" ||
-      dnpRaw === "true" ||
-      dnpRaw === "dnp" ||
-      dnpRaw === "no_fit" ||
-      /DNP/i.test(value) ||
-      (mpn ? /DNP/i.test(mpn) : false);
-
-    // Expand multiple designators: "C1, C2" -> ["C1", "C2"]
-    const refList = splitDesignators(rawRef);
-
-    for (const ref of refList) {
-      const placement = centroidMap.get(ref.toUpperCase());
-      components.push({
-        refDes: ref,
-        value,
-        footprint,
-        ...(mpn ? { mpn } : {}),
-        side: placement?.side || "top",
-        ...(placement?.xMm !== undefined ? { xMm: placement.xMm } : {}),
-        ...(placement?.yMm !== undefined ? { yMm: placement.yMm } : {}),
-        ...(placement?.rotationDegrees !== undefined ? { rotationDegrees: placement.rotationDegrees } : {}),
-        dnp: isDnp,
-        sourceFile: sourceFileName,
-      });
-    }
+    components.push(...componentsFromBomRow(row, columns, centroidMap, sourceFileName));
   }
 
   return components;

@@ -56,7 +56,7 @@ export type RuleFixability = "manual" | "assisted" | "none" | "unclassified";
  */
 export type RuleVendorDependence = "manufacturer-specific" | "profile-specific" | "none" | "unclassified";
 
-export type RequiredCapability = keyof IngestionCapabilities;
+type RequiredCapability = keyof IngestionCapabilities;
 
 export interface RuleMetadata {
   id: string;

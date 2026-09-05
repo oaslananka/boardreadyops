@@ -57,6 +57,9 @@ importers:
       '@boardreadyops/contracts':
         specifier: workspace:*
         version: link:packages/contracts
+      '@boardreadyops/db':
+        specifier: workspace:*
+        version: link:packages/db
       '@codecov/bundle-analyzer':
         specifier: 2.0.1
         version: 2.0.1
