@@ -15,7 +15,16 @@
     },
     "apps/web": {
       "entry": ["worker.ts"],
-      "project": ["lib/**/*.{ts,js}", "app/api/github/webhook/**/*.{ts,js}", "components/review/**/*.{ts,tsx}"]
+      "project": ["lib/**/*.{ts,js}", "app/api/github/webhook/**/*.{ts,js}", "components/review/**/*.{ts,tsx}"],
+      "ignoreDependencies": [
+        "class-variance-authority",
+        "lucide-react",
+        "next-themes",
+        "radix-ui",
+        "tailwindcss",
+        "tw-animate-css"
+      ],
+      "ignore": ["lib/utils.ts"]
     }
   },
   "ignoreBinaries": ["psql"]
