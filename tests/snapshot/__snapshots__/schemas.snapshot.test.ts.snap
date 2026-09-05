@@ -1740,6 +1740,53 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         },
         "type": "array",
       },
+      "categoryBreakdown": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "category": {
+              "enum": [
+                "assembly",
+                "electrical",
+                "manufacturability",
+                "release",
+                "sourcing",
+                "testability",
+                "unclassified",
+              ],
+            },
+            "critical": {
+              "type": "integer",
+            },
+            "high": {
+              "type": "integer",
+            },
+            "info": {
+              "type": "integer",
+            },
+            "low": {
+              "type": "integer",
+            },
+            "medium": {
+              "type": "integer",
+            },
+            "total": {
+              "type": "integer",
+            },
+          },
+          "required": [
+            "category",
+            "critical",
+            "high",
+            "info",
+            "low",
+            "medium",
+            "total",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
       "exitCode": {
         "type": "integer",
       },
