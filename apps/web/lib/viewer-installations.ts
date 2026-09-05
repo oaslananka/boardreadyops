@@ -89,7 +89,11 @@ export async function viewerInstallations(
         {
           id,
           githubInstallationId,
-          accountLogin: text(row, "account_login") || String(githubInstallationId),
+          // Some webhook deliveries (e.g. installation_repositories) never carry account info,
+          // so a freshly-created installation row can briefly have an empty account_login until
+          // a later delivery fills it in. A bare numeric ID reads as a rendering bug to a viewer;
+          // label it instead of hiding what it is.
+          accountLogin: text(row, "account_login") || `Installation #${githubInstallationId}`,
           planTier: text(row, "plan_tier") ?? "free",
           hasComponentCredential: row.has_credential === true,
           componentCredentialRejectedAt: text(row, "last_rejected_at"),

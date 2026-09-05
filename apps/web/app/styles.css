@@ -3500,7 +3500,7 @@ code {
 }
 
 .diff-pill.persistent {
-  background: var(--bro-text-muted);
+  background: var(--bro-surface-strong);
   color: var(--bro-text-muted);
 }
 
