@@ -16,7 +16,7 @@ export default async function DeliveryPage({ params }: DeliveryPageProps) {
   if (config.mode !== "postgres") {
     return (
       <AppShell>
-        <main className="shell compact-shell" id="main-content">
+        <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
           <EmptyState title="Service Unavailable">
             <p>Delivery storage is currently unavailable.</p>
           </EmptyState>
@@ -37,16 +37,14 @@ export default async function DeliveryPage({ params }: DeliveryPageProps) {
     if (authResult.status === 410) {
       return (
         <AppShell>
-          <main className="shell compact-shell" id="main-content">
+          <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
             <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Expired Delivery" }]} />
-            <section className="run-state-surface">
-              <EmptyState title="Delivery link has expired">
-                <p>
-                  This secure delivery package was time-limited and has expired. Contact the sender to request a renewed
-                  link.
-                </p>
-              </EmptyState>
-            </section>
+            <EmptyState title="Delivery link has expired">
+              <p>
+                This secure delivery package was time-limited and has expired. Contact the sender to request a renewed
+                link.
+              </p>
+            </EmptyState>
           </main>
         </AppShell>
       );
@@ -61,16 +59,14 @@ export default async function DeliveryPage({ params }: DeliveryPageProps) {
 
   return (
     <AppShell>
-      <main className="shell compact-shell" id="main-content">
+      <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Secure Hardware Package Delivery" }]} />
-        <section className="run-state-surface">
-          <DeliverySignoffCard
-            revisionId={delivery.revisionId}
-            signedArchiveUrl={delivery.signedArchiveUrl}
-            recipientNotes={delivery.recipientNotes ?? undefined}
-            expiresAt={new Date(delivery.expiresAt).toISOString()}
-          />
-        </section>
+        <DeliverySignoffCard
+          revisionId={delivery.revisionId}
+          signedArchiveUrl={delivery.signedArchiveUrl}
+          recipientNotes={delivery.recipientNotes ?? undefined}
+          expiresAt={new Date(delivery.expiresAt).toISOString()}
+        />
       </main>
     </AppShell>
   );

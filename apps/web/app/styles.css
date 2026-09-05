@@ -3757,18 +3757,6 @@ summary.spec-label {
   gap: 2px;
 }
 
-.meta-label {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.meta-value {
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
 .corrective-guidance-box {
   background: var(--surface-sunken);
   border-left: 3px solid var(--bro-accent);
