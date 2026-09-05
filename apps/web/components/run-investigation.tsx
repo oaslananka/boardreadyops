@@ -267,41 +267,41 @@ function BoardsPanel({ run }: Readonly<{ run: RunDetail }>) {
         run.boards.length === 1 ? "this board" : "these boards"
       } shipped with.`}
     >
-      <ul className="compact-list">
+      <ul className="flex flex-col gap-3">
         {run.boards.map((board) => (
-          <li key={board.boardId}>
-            <div>
-              <strong>{board.displayName}</strong>
+          <li key={board.boardId} className="rounded-md border border-border bg-card p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <strong className="text-sm text-foreground">{board.displayName}</strong>
               {board.riskyLifecycleCount > 0 ? (
                 <StatusBadge value="warning" label={`${board.riskyLifecycleCount} at lifecycle risk`} />
               ) : null}
             </div>
-            <p>
+            <p className="mt-1 text-xs">
               <code>{board.project}</code>
             </p>
-            <dl className="inline-definitions">
+            <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
               <div>
-                <dt>Components</dt>
-                <dd>{board.componentCount}</dd>
+                <dt className="text-xs uppercase text-muted-foreground">Components</dt>
+                <dd className="text-sm text-foreground">{board.componentCount}</dd>
               </div>
               <div>
-                <dt>With part number</dt>
-                <dd>{board.identifiedComponentCount}</dd>
+                <dt className="text-xs uppercase text-muted-foreground">With part number</dt>
+                <dd className="text-sm text-foreground">{board.identifiedComponentCount}</dd>
               </div>
               <div>
-                <dt>Without part number</dt>
-                <dd>{board.unidentifiedComponentCount}</dd>
+                <dt className="text-xs uppercase text-muted-foreground">Without part number</dt>
+                <dd className="text-sm text-foreground">{board.unidentifiedComponentCount}</dd>
               </div>
               <div>
-                <dt>Captured</dt>
-                <dd>{formatRunDate(board.capturedAt)}</dd>
+                <dt className="text-xs uppercase text-muted-foreground">Captured</dt>
+                <dd className="text-sm text-foreground">{formatRunDate(board.capturedAt)}</dd>
               </div>
             </dl>
           </li>
         ))}
       </ul>
       {totalComponents === 0 ? (
-        <p className="cell-note">
+        <p className="mt-2 text-xs text-muted-foreground">
           No components were captured. Add a BOM to each board so its parts can be tracked between releases.
         </p>
       ) : null}
@@ -340,27 +340,39 @@ function CategoryBreakdownPanel({ run }: Readonly<{ run: RunDetail }>) {
       id="category-breakdown"
       tone="section"
     >
-      <section className="table-scroll" aria-label="Findings by domain table">
-        <table className="artifact-table">
+      <section className="overflow-x-auto" aria-label="Findings by domain table">
+        <table className="w-full text-left text-sm">
           <thead>
-            <tr>
-              <th scope="col">Domain</th>
-              <th scope="col">Findings</th>
-              <th scope="col">Critical</th>
-              <th scope="col">High</th>
-              <th scope="col">Medium</th>
-              <th scope="col">Low</th>
+            <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+              <th scope="col" className="py-2 pr-3">
+                Domain
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Findings
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Critical
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                High
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Medium
+              </th>
+              <th scope="col" className="py-2 pr-3">
+                Low
+              </th>
             </tr>
           </thead>
           <tbody>
             {run.categoryBreakdown.map((entry) => (
-              <tr key={entry.category}>
-                <td>{categoryLabel(entry.category)}</td>
-                <td>{entry.total}</td>
-                <td>{entry.critical}</td>
-                <td>{entry.high}</td>
-                <td>{entry.medium}</td>
-                <td>{entry.low}</td>
+              <tr key={entry.category} className="border-b border-border last:border-b-0">
+                <td className="py-2 pr-3">{categoryLabel(entry.category)}</td>
+                <td className="py-2 pr-3">{entry.total}</td>
+                <td className="py-2 pr-3">{entry.critical}</td>
+                <td className="py-2 pr-3">{entry.high}</td>
+                <td className="py-2 pr-3">{entry.medium}</td>
+                <td className="py-2 pr-3">{entry.low}</td>
               </tr>
             ))}
           </tbody>
@@ -438,39 +450,58 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
             {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
           </Definition>
         </DefinitionGrid>
-        <nav className="source-links" aria-label="Open this run in GitHub">
-          <a href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}`}>Open source commit</a>
-          <a href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}/checks`}>
+        <nav className="mt-3 flex flex-wrap gap-4 text-sm" aria-label="Open this run in GitHub">
+          <a
+            href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}`}
+            className="text-primary hover:underline"
+          >
+            Open source commit
+          </a>
+          <a
+            href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}/checks`}
+            className="text-primary hover:underline"
+          >
             Open GitHub checks
           </a>
-          {latestWorkflowRunUrl ? <a href={latestWorkflowRunUrl}>Open GitHub Actions run</a> : null}
+          {latestWorkflowRunUrl ? (
+            <a href={latestWorkflowRunUrl} className="text-primary hover:underline">
+              Open GitHub Actions run
+            </a>
+          ) : null}
           {run.pullRequestNumber ? (
-            <a href={`${githubRepositoryBaseUrl(run)}/pull/${run.pullRequestNumber}`}>
+            <a
+              href={`${githubRepositoryBaseUrl(run)}/pull/${run.pullRequestNumber}`}
+              className="text-primary hover:underline"
+            >
               Open pull request #{run.pullRequestNumber}
             </a>
           ) : null}
         </nav>
       </Panel>
 
-      <div className="summary-grid">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel
           title="Findings"
           description={`${run.findingsPage.total} matching finding${run.findingsPage.total === 1 ? "" : "s"}.`}
-          actions={<Link href={`/runs/${run.id}/findings`}>View all</Link>}
+          actions={
+            <Link href={`/runs/${run.id}/findings`} className="text-sm text-primary hover:underline">
+              View all
+            </Link>
+          }
         >
           {run.findings.length === 0 ? (
             <EmptyState title="No findings">
               <p>The current result contains no matching findings.</p>
             </EmptyState>
           ) : (
-            <ul className="compact-list">
+            <ul className="flex flex-col gap-2">
               {run.findings.slice(0, 5).map((finding) => (
-                <li key={finding.id}>
-                  <div>
-                    <strong>{finding.ruleId}</strong>
+                <li key={finding.id} className="rounded-md border border-border bg-card p-3">
+                  <div className="flex items-center gap-2">
+                    <strong className="text-sm text-foreground">{finding.ruleId}</strong>
                     <StatusBadge value={finding.severity} />
                   </div>
-                  <p>{finding.message}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{finding.message}</p>
                 </li>
               ))}
             </ul>
@@ -479,21 +510,25 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
         <Panel
           title="Artifacts"
           description={`${run.artifactsPage.total} matching artifact${run.artifactsPage.total === 1 ? "" : "s"}.`}
-          actions={<Link href={`/runs/${run.id}/artifacts`}>View all</Link>}
+          actions={
+            <Link href={`/runs/${run.id}/artifacts`} className="text-sm text-primary hover:underline">
+              View all
+            </Link>
+          }
         >
           {run.artifacts.length === 0 ? (
             <EmptyState title="No artifacts">
               <p>No managed artifact metadata is attached to this run.</p>
             </EmptyState>
           ) : (
-            <ul className="compact-list">
+            <ul className="flex flex-col gap-2">
               {run.artifacts.slice(0, 5).map((artifact) => (
-                <li key={artifact.id}>
-                  <div>
-                    <strong>{artifact.name}</strong>
+                <li key={artifact.id} className="rounded-md border border-border bg-card p-3">
+                  <div className="flex items-center gap-2">
+                    <strong className="text-sm text-foreground">{artifact.name}</strong>
                     <StatusBadge value={artifact.availability} />
                   </div>
-                  <p>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {artifact.kind} · {formatArtifactBytes(artifact.bytes)}
                   </p>
                 </li>
@@ -515,38 +550,44 @@ export function AttemptTimeline({ attempts }: Readonly<{ attempts: AttemptDetail
     );
   }
   return (
-    <ol className="timeline">
+    <ol className="flex flex-col gap-3">
       {attempts.map((attempt) => (
-        <li key={attempt.id}>
-          <div className="timeline-marker" aria-hidden="true" />
-          <article>
-            <header>
-              <h3>Attempt {attempt.attemptNumber}</h3>
+        <li key={attempt.id} className="flex gap-3">
+          <div className="mt-1.5 size-2 shrink-0 rounded-full bg-border" aria-hidden="true" />
+          <article className="flex-1 rounded-md border border-border bg-card p-3">
+            <header className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground">Attempt {attempt.attemptNumber}</h3>
               <StatusBadge value={attempt.status} />
             </header>
-            <DefinitionGrid>
-              <Definition label="Created">{formatRunDate(attempt.createdAt)}</Definition>
-              <Definition label="Dispatched">{formatRunDate(attempt.dispatchedAt)}</Definition>
-              <Definition label="Started">{formatRunDate(attempt.startedAt)}</Definition>
-              <Definition label="Heartbeat">{formatRunDate(attempt.heartbeatAt)}</Definition>
-              <Definition label="Completed">{formatRunDate(attempt.completedAt)}</Definition>
-              <Definition label="Retry after">{formatRunDate(attempt.retryAfterAt)}</Definition>
-            </DefinitionGrid>
+            <div className="mt-2">
+              <DefinitionGrid>
+                <Definition label="Created">{formatRunDate(attempt.createdAt)}</Definition>
+                <Definition label="Dispatched">{formatRunDate(attempt.dispatchedAt)}</Definition>
+                <Definition label="Started">{formatRunDate(attempt.startedAt)}</Definition>
+                <Definition label="Heartbeat">{formatRunDate(attempt.heartbeatAt)}</Definition>
+                <Definition label="Completed">{formatRunDate(attempt.completedAt)}</Definition>
+                <Definition label="Retry after">{formatRunDate(attempt.retryAfterAt)}</Definition>
+              </DefinitionGrid>
+            </div>
             {attempt.workflowDispatchId ? (
-              <p>
+              <p className="mt-2 text-sm text-foreground">
                 Workflow run: <code>{attempt.workflowDispatchId}</code>
                 {attempt.workflowRunUrl ? (
                   <>
                     {" · "}
-                    <a href={attempt.workflowRunUrl}>Open workflow logs and artifacts</a>
+                    <a href={attempt.workflowRunUrl} className="text-primary hover:underline">
+                      Open workflow logs and artifacts
+                    </a>
                   </>
                 ) : null}
               </p>
             ) : null}
             {attempt.failureClass || attempt.failureMessage ? (
-              <Alert title={attempt.failureClass ? humanize(attempt.failureClass) : "Attempt failed"} tone="danger">
-                <p>{attempt.failureMessage ?? "The attempt reached a failed terminal state."}</p>
-              </Alert>
+              <div className="mt-2">
+                <Alert title={attempt.failureClass ? humanize(attempt.failureClass) : "Attempt failed"} tone="danger">
+                  <p>{attempt.failureMessage ?? "The attempt reached a failed terminal state."}</p>
+                </Alert>
+              </div>
             ) : null}
           </article>
         </li>
@@ -572,25 +613,30 @@ export function AttemptsView({ run }: Readonly<{ run: RunDetail }>) {
             <p>Older runs may not have versioned transition evidence.</p>
           </EmptyState>
         ) : (
-          <ol className="transition-list">
+          <ol className="flex flex-col gap-2">
             {run.transitions.map((transition) => (
               <li
                 key={`${transition.entityType}:${transition.executionAttemptId ?? "run"}:${transition.toVersion}:${transition.occurredAt}`}
+                className="rounded-md border border-border bg-card p-3"
               >
-                <div>
-                  <strong>{transition.entityType === "release_run" ? "Logical run" : "Execution attempt"}</strong>
+                <div className="flex items-center gap-2">
+                  <strong className="text-sm text-foreground">
+                    {transition.entityType === "release_run" ? "Logical run" : "Execution attempt"}
+                  </strong>
                   <StatusBadge value={transition.reasonCode} />
                 </div>
-                <p>
+                <p className="mt-1 text-sm text-muted-foreground">
                   <code>{transition.fromStatus}</code> to <code>{transition.toStatus}</code> · version{" "}
                   {transition.fromVersion} to {transition.toVersion}
                 </p>
                 {transition.executionAttemptId ? (
-                  <p>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Attempt <code>{transition.executionAttemptId}</code>
                   </p>
                 ) : null}
-                <time dateTime={transition.occurredAt}>{formatRunDate(transition.occurredAt)}</time>
+                <time dateTime={transition.occurredAt} className="mt-1 block text-xs text-muted-foreground">
+                  {formatRunDate(transition.occurredAt)}
+                </time>
               </li>
             ))}
           </ol>
