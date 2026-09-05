@@ -24,7 +24,7 @@ describe("BrandMarkLockup", () => {
     expect((icon as { type: unknown }).type).toBe(BrandMarkIcon);
     expect((icon as { props: { size: number } }).props.size).toBe(24);
     expect(wordmark.props.children).toBe("BoardReadyOps");
-    expect((wordmark as { props: { className?: string } }).props.className).toBe("brand-mark-wordmark");
+    expect((wordmark as { props: { className?: string } }).props.className).toBe("text-sm font-bold text-foreground");
   });
 
   it("defaults to size 24 when no size is given", () => {

@@ -14,7 +14,7 @@ export default function OpengraphImage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0b0e13",
+        background: "#0d1117",
         padding: 80,
       }}
     >
@@ -24,8 +24,8 @@ export default function OpengraphImage() {
       <div style={{ fontSize: 56, fontWeight: 700, color: "#ece5d3", textAlign: "center", lineHeight: 1.2 }}>
         Release evidence that leads to a decision.
       </div>
-      <div style={{ fontSize: 26, color: "#c69a3e", marginTop: 24, textAlign: "center" }}>
-        BoardReadyOps — release readiness for KiCad hardware
+      <div style={{ fontSize: 26, color: "#58a6ff", marginTop: 24, textAlign: "center" }}>
+        BoardReadyOps — release readiness for hardware teams
       </div>
     </div>,
     { ...size },

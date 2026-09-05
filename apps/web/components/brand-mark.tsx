@@ -6,8 +6,8 @@ export type BrandMarkProps = {
 export function BrandMarkIcon({ size = 32, className }: BrandMarkProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 104 104" role="img" aria-label="BoardReadyOps" className={className}>
-      <rect x="4" y="4" width="96" height="96" rx="20" fill="#10141b" stroke="#232a38" />
-      <g stroke="var(--identity-brass, #c69a3e)" strokeWidth="3" strokeLinecap="round">
+      <rect x="4" y="4" width="96" height="96" rx="20" fill="#0d1117" stroke="#232a38" />
+      <g stroke="var(--color-primary, #58a6ff)" strokeWidth="3" strokeLinecap="round">
         <line x1="36" y1="22" x2="36" y2="30" />
         <line x1="46" y1="22" x2="46" y2="30" />
         <line x1="58" y1="22" x2="58" y2="30" />
@@ -32,10 +32,10 @@ export function BrandMarkIcon({ size = 32, className }: BrandMarkProps) {
         height="44"
         rx="4"
         fill="#080b10"
-        stroke="var(--identity-brass, #c69a3e)"
+        stroke="var(--color-primary, #58a6ff)"
         strokeWidth="2.25"
       />
-      <circle cx="36" cy="36" r="2.2" fill="var(--identity-brass, #c69a3e)" />
+      <circle cx="36" cy="36" r="2.2" fill="var(--color-primary, #58a6ff)" />
       <path
         d="M40 52 L47 59 L64 42"
         stroke="#ece5d3"
@@ -50,9 +50,9 @@ export function BrandMarkIcon({ size = 32, className }: BrandMarkProps) {
 
 export function BrandMarkLockup({ size = 24, className }: BrandMarkProps) {
   return (
-    <span className={className ?? "brand-lockup"}>
+    <span className={className ?? "flex items-center gap-2"}>
       <BrandMarkIcon size={size} />
-      <span className="brand-mark-wordmark">BoardReadyOps</span>
+      <span className="text-sm font-bold text-foreground">BoardReadyOps</span>
     </span>
   );
 }

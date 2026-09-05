@@ -7,17 +7,23 @@
 export function ViewerControls({ login }: Readonly<{ login: string | undefined }>) {
   if (!login) {
     return (
-      <a className="viewer-signin" href="/api/auth/github/login">
+      <a
+        className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-accent"
+        href="/api/auth/github/login"
+      >
         Sign in with GitHub
       </a>
     );
   }
 
   return (
-    <span className="viewer-identity">
-      <span className="viewer-login">{login}</span>
+    <span className="flex items-center gap-3 text-sm">
+      <span className="text-foreground">{login}</span>
       <form action="/api/auth/logout" method="post">
-        <button className="viewer-signout" type="submit">
+        <button
+          className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+          type="submit"
+        >
           Sign out
         </button>
       </form>

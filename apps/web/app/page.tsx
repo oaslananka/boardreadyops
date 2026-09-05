@@ -4,11 +4,11 @@ import { Suspense } from "react";
 import { BrandMarkIcon } from "../components/brand-mark.js";
 import { installUrl, LandingHeroActions, LandingNavActions } from "../components/landing-actions.js";
 import { PublicStructuredData } from "../components/public-structured-data.js";
-import "./landing.css";
+import { buttonVariants } from "../components/ui/button.js";
 
 export const metadata: Metadata = {
   title: { absolute: "BoardReadyOps — Know what stands between your board and production." },
-  description: "Checks whether a KiCad board is ready to fabricate, on every pull request.",
+  description: "Checks whether a hardware board is ready to fabricate, on every pull request.",
   alternates: {
     canonical: "/",
     types: {
@@ -199,23 +199,43 @@ const capabilities = [
 
 export default function HomePage() {
   return (
-    <div className="landing">
+    <div className="bg-background text-foreground">
       <PublicStructuredData />
-      <a className="skip-link" href="#main-content">
+      <a
+        className="absolute left-2 top-2 z-50 -translate-y-16 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus:translate-y-0"
+        href="#main-content"
+      >
         Skip to main content
       </a>
 
-      <header className="landing-nav">
-        <Link href="/" className="landing-brand" aria-label="BoardReadyOps home">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-6 py-4 backdrop-blur">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm font-bold text-foreground"
+          aria-label="BoardReadyOps home"
+        >
           <BrandMarkIcon size={24} />
-          <span className="landing-brand-name">BoardReadyOps</span>
+          <span>BoardReadyOps</span>
         </Link>
-        <nav aria-label="Global navigation" className="landing-nav-links">
-          <a href="#product">Product</a>
-          <a href="#how-it-works">How it works</a>
-          <a href="#glossary">Glossary</a>
-          <a href="https://docs.boardreadyops.com/security/assurance-case/">Trust</a>
-          <a href="https://docs.boardreadyops.com">Docs</a>
+        <nav aria-label="Global navigation" className="flex items-center gap-6 text-sm">
+          <a href="#product" className="text-muted-foreground hover:text-foreground">
+            Product
+          </a>
+          <a href="#how-it-works" className="text-muted-foreground hover:text-foreground">
+            How it works
+          </a>
+          <a href="#glossary" className="text-muted-foreground hover:text-foreground">
+            Glossary
+          </a>
+          <a
+            href="https://docs.boardreadyops.com/security/assurance-case/"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Trust
+          </a>
+          <a href="https://docs.boardreadyops.com" className="text-muted-foreground hover:text-foreground">
+            Docs
+          </a>
           {/* Suspended so reading the session never delays the landing navigation. */}
           <Suspense fallback={null}>
             <LandingNavActions />
@@ -224,19 +244,21 @@ export default function HomePage() {
       </header>
 
       <main id="main-content">
-        <section className="landing-hero" aria-labelledby="landing-heading">
-          <div className="landing-shell landing-hero-layout">
-            <div className="landing-hero-copy">
-              <p className="landing-kicker">Hardware release intelligence for KiCad</p>
-              <h1 id="landing-heading">Know what stands between your board and production.</h1>
-              <p className="landing-hero-lede">
-                BoardReadyOps checks whether your KiCad board is ready to fabricate on every pull request — or right
-                from your local terminal. One verdict, clear blockers, and verifiable release evidence.
+        <section className="border-b border-border py-20" aria-labelledby="landing-heading">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 lg:grid-cols-[3fr_2fr] lg:items-center">
+            <div>
+              <p className="text-sm font-medium text-primary">Hardware release intelligence for every CAD workflow</p>
+              <h1 id="landing-heading" className="mt-3 text-4xl font-bold leading-tight text-foreground sm:text-5xl">
+                Know what stands between your board and production.
+              </h1>
+              <p className="mt-4 text-lg text-muted-foreground">
+                BoardReadyOps checks whether your board is ready to fabricate on every pull request — or right from your
+                local terminal. One verdict, clear blockers, and verifiable release evidence.
               </p>
-              <div className="landing-cta-row">
+              <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Suspense
                   fallback={
-                    <a className="landing-button-primary" href={installUrl}>
+                    <a className={`${buttonVariants({ variant: "default", size: "lg" })} gap-2`} href={installUrl}>
                       <span>Install on GitHub</span>
                       <span aria-hidden="true">↗</span>
                     </a>
@@ -245,96 +267,111 @@ export default function HomePage() {
                   <LandingHeroActions />
                 </Suspense>
               </div>
-              <ul className="landing-hero-notes" aria-label="What BoardReadyOps does">
+              <ul
+                className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground"
+                aria-label="What BoardReadyOps does"
+              >
                 <li>Local CLI or GitHub Actions</li>
                 <li>Clear blockers before you order</li>
                 <li>Your repository stays in charge</li>
               </ul>
             </div>
 
-            <aside className="landing-evidence-stack" aria-label="What a run looks like">
-              <div className="landing-evidence-header">
-                <span className="landing-live-dot" aria-hidden="true" />
+            <aside className="rounded-md border border-border bg-card p-5 shadow-lg" aria-label="What a run looks like">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="size-2 rounded-full bg-success" aria-hidden="true" />
                 <span>Sample review · USB-C Sensor Node v2.1</span>
-                <code>sample-pull-request</code>
+                <code className="ml-auto rounded-sm bg-muted px-1.5 py-0.5">sample-pull-request</code>
               </div>
-              <div className="landing-evidence-decision">
+              <div className="mt-4 flex items-center justify-between gap-3">
                 <div>
-                  <span className="landing-evidence-label">The verdict</span>
-                  <strong>Ready to fabricate</strong>
+                  <span className="block text-xs uppercase text-muted-foreground">The verdict</span>
+                  <strong className="text-base text-foreground">Ready to fabricate</strong>
                 </div>
-                <span className="landing-state-pill">Resolved after rerun</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">Resolved after rerun</span>
               </div>
-              <ol className="landing-evidence-rows">
-                <li>
-                  <span className="landing-evidence-index">01</span>
-                  <div>
-                    <strong>Inspect release decision</strong>
-                    <span className="landing-evidence-description">Exact revision, branch, and Check Run</span>
+              <ol className="mt-4 flex flex-col gap-3">
+                <li className="flex items-center gap-3">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
+                    01
+                  </span>
+                  <div className="flex-1">
+                    <strong className="block text-sm text-foreground">Inspect release decision</strong>
+                    <span className="text-xs text-muted-foreground">Exact revision, branch, and Check Run</span>
                   </div>
-                  <span className="landing-row-state">Pinned</span>
+                  <span className="text-xs text-muted-foreground">Pinned</span>
                 </li>
-                <li>
-                  <span className="landing-evidence-index">02</span>
-                  <div>
-                    <strong>What it found</strong>
-                    <span className="landing-evidence-description">
+                <li className="flex items-center gap-3">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
+                    02
+                  </span>
+                  <div className="flex-1">
+                    <strong className="block text-sm text-foreground">What it found</strong>
+                    <span className="text-xs text-muted-foreground">
                       Layout, schematic, BOM, and manufacturing checks
                     </span>
                   </div>
-                  <span className="landing-row-state">Explained</span>
+                  <span className="text-xs text-muted-foreground">Explained</span>
                 </li>
-                <li>
-                  <span className="landing-evidence-index">03</span>
-                  <div>
-                    <strong>The files it produced</strong>
-                    <span className="landing-evidence-description">Reports and outputs, each with a checksum</span>
+                <li className="flex items-center gap-3">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
+                    03
+                  </span>
+                  <div className="flex-1">
+                    <strong className="block text-sm text-foreground">The files it produced</strong>
+                    <span className="text-xs text-muted-foreground">Reports and outputs, each with a checksum</span>
                   </div>
-                  <span className="landing-row-state">Downloadable</span>
+                  <span className="text-xs text-muted-foreground">Downloadable</span>
                 </li>
               </ol>
-              <p className="landing-evidence-footnote">
+              <p className="mt-4 text-xs text-muted-foreground">
                 Illustrative sample. Your repository and its workflow logs stay the source of truth.
               </p>
             </aside>
           </div>
         </section>
 
-        <section className="landing-proof landing-product-proof" aria-labelledby="proof-heading">
-          <div className="landing-shell landing-proof-layout">
-            <div className="landing-section-heading">
-              <p className="landing-section-kicker">Pull request evidence</p>
-              <h2 id="proof-heading">Every pull request, reviewed like a design review.</h2>
-              <p>
+        <section className="border-b border-border py-16" aria-labelledby="proof-heading">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 lg:grid-cols-[1fr_1fr] lg:items-start">
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium text-primary">Pull request evidence</p>
+              <h2 id="proof-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                Every pull request, reviewed like a design review.
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 DRC, ERC, BOM and manufacturing checks arrive as one answer instead of several logs, and every part of
                 it links back to the GitHub run it came from.
               </p>
             </div>
-            <ul className="landing-proof-list">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {proofItems.map((item, index) => (
-                <li key={item}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <strong>{item}</strong>
+                <li key={item} className="flex items-start gap-3">
+                  <span className="text-2xl font-bold text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
+                  <strong className="pt-1 text-sm text-foreground">{item}</strong>
                 </li>
               ))}
             </ul>
           </div>
         </section>
 
-        <section className="landing-workflow" id="how-it-works" aria-labelledby="workflow-heading">
-          <div className="landing-shell">
-            <div className="landing-section-heading landing-section-heading-wide">
-              <p className="landing-section-kicker">Release workflow</p>
-              <h2 id="workflow-heading">From design change to release decision.</h2>
-              <p>Keep the engineering path short: connect, evaluate, investigate.</p>
+        <section className="border-b border-border py-16" id="how-it-works" aria-labelledby="workflow-heading">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex max-w-2xl flex-col gap-2">
+              <p className="text-sm font-medium text-primary">Release workflow</p>
+              <h2 id="workflow-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                From design change to release decision.
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Keep the engineering path short: connect, evaluate, investigate.
+              </p>
             </div>
-            <ol className="landing-workflow-grid">
+            <ol className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
               {workflowSteps.map((step) => (
-                <li key={step.number}>
-                  <span className="landing-step-number">{step.number}</span>
+                <li key={step.number} className="flex flex-col gap-2">
+                  <span className="text-3xl font-bold text-muted-foreground">{step.number}</span>
                   <div>
-                    <h3>{step.title}</h3>
-                    <p>{step.body}</p>
+                    <h3 className="text-base font-bold text-foreground">{step.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{step.body}</p>
                   </div>
                 </li>
               ))}
@@ -342,190 +379,239 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="landing-control-room" id="product" aria-labelledby="control-room-heading">
-          <div className="landing-shell">
-            <div className="landing-section-heading landing-section-heading-wide">
-              <p className="landing-section-kicker">What you see</p>
-              <h2 id="control-room-heading">The answer first. The reasons underneath.</h2>
-              <p>
+        <section className="border-b border-border py-16" id="product" aria-labelledby="control-room-heading">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex max-w-2xl flex-col gap-2">
+              <p className="text-sm font-medium text-primary">What you see</p>
+              <h2 id="control-room-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                The answer first. The reasons underneath.
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 Open a run and the verdict is the first thing on the page. Everything below it is there to explain that
                 verdict, or to let you argue with it.
               </p>
             </div>
 
-            <div className="landing-control-room-frame">
-              <header className="landing-control-room-header">
+            <div className="mt-8 rounded-md border border-border bg-card p-6">
+              <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
                 <div>
-                  <span className="landing-evidence-label">Investigation</span>
-                  <strong>repository / release revision</strong>
+                  <span className="block text-xs uppercase text-muted-foreground">Investigation</span>
+                  <strong className="text-sm text-foreground">repository / release revision</strong>
                 </div>
-                <ul className="landing-control-room-statuses">
-                  <li className="landing-state-pill">Decision first</li>
-                  <li className="landing-state-pill landing-state-pill-muted">Loads fast</li>
+                <ul className="flex gap-2">
+                  <li className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">Decision first</li>
+                  <li className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Loads fast</li>
                 </ul>
               </header>
-              <div className="landing-control-room-grid">
-                <article className="landing-control-room-primary">
-                  <span className="landing-card-kicker">Decision first</span>
-                  <h3>Shortest next action before low-level evidence.</h3>
-                  <p>
+              <div className="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-3">
+                <article className="rounded-md border border-primary/40 bg-accent/30 p-4">
+                  <span className="text-xs uppercase text-muted-foreground">Decision first</span>
+                  <h3 className="mt-1 text-base font-bold text-foreground">
+                    Shortest next action before low-level evidence.
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     See the stable readiness result, blocking state, and direct path to the evidence that can change the
                     release decision.
                   </p>
-                  <div className="landing-control-actions" aria-hidden="true">
-                    <span className="landing-control-action">Review blocking findings</span>
-                    <span className="landing-control-action">Verify release evidence</span>
+                  <div className="mt-3 flex flex-col gap-2" aria-hidden="true">
+                    <span className="w-fit rounded-sm bg-muted px-2 py-1 text-xs text-foreground">
+                      Review blocking findings
+                    </span>
+                    <span className="w-fit rounded-sm bg-muted px-2 py-1 text-xs text-foreground">
+                      Verify release evidence
+                    </span>
                   </div>
                 </article>
-                <article>
-                  <span className="landing-card-kicker">Finding things</span>
-                  <h3>Search what matters, not everything you have ever run.</h3>
-                  <p>Filter findings and files without pulling your whole history down the wire.</p>
+                <article className="rounded-md border border-border p-4">
+                  <span className="text-xs uppercase text-muted-foreground">Finding things</span>
+                  <h3 className="mt-1 text-base font-bold text-foreground">
+                    Search what matters, not everything you have ever run.
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Filter findings and files without pulling your whole history down the wire.
+                  </p>
                 </article>
-                <article>
-                  <span className="landing-card-kicker">Back to the source</span>
-                  <h3>Every answer links back to where it came from.</h3>
-                  <p>One click to the commit, the Check Run, the workflow run, the pull request, or the file itself.</p>
+                <article className="rounded-md border border-border p-4">
+                  <span className="text-xs uppercase text-muted-foreground">Back to the source</span>
+                  <h3 className="mt-1 text-base font-bold text-foreground">
+                    Every answer links back to where it came from.
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    One click to the commit, the Check Run, the workflow run, the pull request, or the file itself.
+                  </p>
                 </article>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="landing-capabilities" aria-labelledby="capabilities-heading">
-          <div className="landing-shell">
-            <div className="landing-section-heading landing-section-heading-wide">
-              <p className="landing-section-kicker">Engineering coverage</p>
-              <h2 id="capabilities-heading">Every check stays tied to the commit it ran on.</h2>
-              <p>Layout, supply chain and manufacturing all reported the same way, so nothing needs translating.</p>
+        <section className="border-b border-border py-16" aria-labelledby="capabilities-heading">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex max-w-2xl flex-col gap-2">
+              <p className="text-sm font-medium text-primary">Engineering coverage</p>
+              <h2 id="capabilities-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                Every check stays tied to the commit it ran on.
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Layout, supply chain and manufacturing all reported the same way, so nothing needs translating.
+              </p>
             </div>
-            <div className="landing-capability-grid">
+            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {capabilities.map((capability) => (
-                <article key={capability.title}>
-                  <span className="landing-card-kicker">{capability.eyebrow}</span>
-                  <h3>{capability.title}</h3>
-                  <p>{capability.body}</p>
+                <article key={capability.title} className="rounded-md border border-border bg-card p-4">
+                  <span className="text-xs uppercase text-muted-foreground">{capability.eyebrow}</span>
+                  <h3 className="mt-1 text-base font-bold text-foreground">{capability.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{capability.body}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="landing-trust-boundary" aria-labelledby="trust-heading">
-          <div className="landing-shell landing-trust-layout">
-            <div className="landing-section-heading">
-              <p className="landing-section-kicker">Trust boundary</p>
-              <h2 id="trust-heading">Your repository stays the source of truth.</h2>
-              <p>
+        <section className="border-b border-border py-16" aria-labelledby="trust-heading">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 lg:grid-cols-[3fr_2fr] lg:items-start">
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium text-primary">Trust boundary</p>
+              <h2 id="trust-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                Your repository stays the source of truth.
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 BoardReadyOps reads and reports; it does not take custody of anything. Your source, branch protections,
                 pull requests, checks and full workflow logs stay in the repository you already run.
               </p>
             </div>
-            <dl className="landing-trust-grid">
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <dt>Source of truth</dt>
-                <dd>Repository commit and protected GitHub workflow evidence</dd>
+                <dt className="text-xs uppercase text-muted-foreground">Source of truth</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  Repository commit and protected GitHub workflow evidence
+                </dd>
               </div>
               <div>
-                <dt>Investigation</dt>
-                <dd>Findings and file details only — never your board design itself</dd>
+                <dt className="text-xs uppercase text-muted-foreground">Investigation</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  Findings and file details only — never your board design itself
+                </dd>
               </div>
               <div>
-                <dt>Decision trail</dt>
-                <dd>Check Run, publication state, attempts, checksums, and audit boundary</dd>
+                <dt className="text-xs uppercase text-muted-foreground">Decision trail</dt>
+                <dd className="mt-1 text-sm text-foreground">
+                  Check Run, publication state, attempts, checksums, and audit boundary
+                </dd>
               </div>
             </dl>
           </div>
         </section>
 
-        <section className="landing-release-guide" aria-labelledby="release-guide-heading">
-          <div className="landing-shell">
-            <div className="landing-section-heading landing-section-heading-wide">
-              <p className="landing-section-kicker">How to read a release decision</p>
-              <h2 id="release-guide-heading">Evidence is useful when another engineer can reproduce the reasoning.</h2>
-              <p>
+        <section className="border-b border-border py-16" aria-labelledby="release-guide-heading">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex max-w-2xl flex-col gap-2">
+              <p className="text-sm font-medium text-primary">How to read a release decision</p>
+              <h2 id="release-guide-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                Evidence is useful when another engineer can reproduce the reasoning.
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 BoardReadyOps is built around a small set of release principles that make hardware evidence easier to
                 review now and easier to audit later.
               </p>
             </div>
-            <div className="landing-guide-grid">
+            <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
               {releaseGuides.map((guide) => (
                 <article key={guide.title}>
-                  <h3>{guide.title}</h3>
-                  <p>{guide.body}</p>
+                  <h3 className="text-base font-bold text-foreground">{guide.title}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{guide.body}</p>
                 </article>
               ))}
             </div>
-            <section className="landing-evidence-checklist" aria-labelledby="evidence-checklist-heading">
-              <h3 id="evidence-checklist-heading">A reviewable release-evidence checklist</h3>
-              <p>
+            <section
+              className="mt-10 rounded-md border border-border bg-card p-6"
+              aria-labelledby="evidence-checklist-heading"
+            >
+              <h3 id="evidence-checklist-heading" className="text-base font-bold text-foreground">
+                A reviewable release-evidence checklist
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
                 A green verdict should be explainable without access to the original engineer's workstation. These are
                 the evidence categories a reviewer should expect to trace.
               </p>
-              <ol>
+              <ol className="mt-4 flex list-decimal flex-col gap-2 pl-5 text-sm">
                 {releaseEvidenceChecklist.map((entry) => (
                   <li key={entry.title}>
-                    <strong>{entry.title}</strong>
-                    <span>{entry.body}</span>
+                    <strong className="text-foreground">{entry.title}</strong>{" "}
+                    <span className="text-muted-foreground">{entry.body}</span>
                   </li>
                 ))}
               </ol>
             </section>
 
-            <div className="landing-faq-heading">
-              <h3>Release-readiness questions</h3>
-              <p>Practical boundaries that keep the verdict understandable instead of turning it into a black box.</p>
+            <div className="mt-10">
+              <h3 className="text-base font-bold text-foreground">Release-readiness questions</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Practical boundaries that keep the verdict understandable instead of turning it into a black box.
+              </p>
             </div>
-            <div className="landing-faq-grid">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {releaseFaq.map((entry) => (
                 <article key={entry.question}>
-                  <h3>{entry.question}</h3>
-                  <p>{entry.answer}</p>
+                  <h3 className="text-sm font-bold text-foreground">{entry.question}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{entry.answer}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="landing-glossary" id="glossary" aria-labelledby="glossary-heading">
-          <div className="landing-shell">
-            <div className="landing-section-heading landing-section-heading-wide">
-              <p className="landing-section-kicker">Glossary</p>
-              <h2 id="glossary-heading">The hardware-release terms behind the verdict.</h2>
-              <p>
+        <section className="border-b border-border py-16" id="glossary" aria-labelledby="glossary-heading">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex max-w-2xl flex-col gap-2">
+              <p className="text-sm font-medium text-primary">Glossary</p>
+              <h2 id="glossary-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                The hardware-release terms behind the verdict.
+              </h2>
+              <p className="text-sm text-muted-foreground">
                 These definitions describe the evidence BoardReadyOps reports. For implementation details, continue to
                 the canonical documentation; for the public machine-readable service contract, see OpenAPI.
               </p>
             </div>
-            <dl className="landing-glossary-grid">
+            <dl className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
               {glossaryTerms.map((entry) => (
                 <div key={entry.term}>
-                  <dt>{entry.term}</dt>
-                  <dd>{entry.definition}</dd>
+                  <dt className="text-sm font-bold text-foreground">{entry.term}</dt>
+                  <dd className="mt-1 text-sm text-muted-foreground">{entry.definition}</dd>
                 </div>
               ))}
             </dl>
-            <nav className="landing-technical-links" aria-label="Technical discovery references">
-              <a href="https://docs.boardreadyops.com">Read the documentation</a>
-              <a href="/openapi.json">OpenAPI</a>
-              <a href="/llms.txt">LLM discovery</a>
-              <a href="/sitemap.md">Markdown sitemap</a>
+            <nav className="mt-8 flex flex-wrap gap-4 text-sm" aria-label="Technical discovery references">
+              <a href="https://docs.boardreadyops.com" className="text-primary hover:underline">
+                Read the documentation
+              </a>
+              <a href="/openapi.json" className="text-primary hover:underline">
+                OpenAPI
+              </a>
+              <a href="/llms.txt" className="text-primary hover:underline">
+                LLM discovery
+              </a>
+              <a href="/sitemap.md" className="text-primary hover:underline">
+                Markdown sitemap
+              </a>
             </nav>
           </div>
         </section>
 
-        <section className="landing-footer-cta" aria-labelledby="landing-cta-heading">
-          <div className="landing-shell landing-footer-cta-inner">
+        <section className="border-b border-border bg-muted py-16" aria-labelledby="landing-cta-heading">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="landing-section-kicker">Next release</p>
-              <h2 id="landing-cta-heading">Check your next board before you order it.</h2>
+              <p className="text-sm font-medium text-primary">Next release</p>
+              <h2 id="landing-cta-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                Check your next board before you order it.
+              </h2>
             </div>
-            <div className="landing-cta-row">
-              <a className="landing-button-primary" href={installUrl}>
+            <div className="flex flex-wrap items-center gap-3">
+              <a className={`${buttonVariants({ variant: "default", size: "lg" })} gap-2`} href={installUrl}>
                 <span>Install on GitHub</span>
                 <span aria-hidden="true">↗</span>
               </a>
-              <Link className="landing-button-secondary" href="/setup">
+              <Link className={buttonVariants({ variant: "secondary", size: "lg" })} href="/setup">
                 Review setup first
               </Link>
             </div>
@@ -533,17 +619,19 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="landing-site-footer">
-        <div className="landing-shell landing-footer-inner">
-          <span className="landing-footer-brand">
+      <footer className="py-10">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-6 text-center sm:flex-row sm:justify-between sm:text-left">
+          <span className="flex items-center gap-2 text-sm font-bold text-foreground">
             <BrandMarkIcon size={20} />
             BoardReadyOps
           </span>
-          <p>
+          <p className="text-sm text-muted-foreground">
             Release readiness checks for hardware teams. Your repository and its full workflow logs stay the source of
             truth.
           </p>
-          <a href="https://docs.boardreadyops.com">Documentation</a>
+          <a href="https://docs.boardreadyops.com" className="text-sm text-primary hover:underline">
+            Documentation
+          </a>
         </div>
       </footer>
     </div>
