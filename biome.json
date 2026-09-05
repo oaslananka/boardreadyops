@@ -5,6 +5,7 @@
     "includes": [
       "**",
       "!.boardreadyops",
+      "!.superpowers",
       "!dist",
       "!coverage",
       "!coverage-report",

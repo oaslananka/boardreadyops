@@ -42,5 +42,6 @@ TEMP/
 
 # Private agent planning artifacts
 /docs/superpowers/
+/.superpowers/
 /task_tracker.md
 /walkthrough.md

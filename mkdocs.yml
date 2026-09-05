@@ -206,3 +206,4 @@ nav:
               - "0013: Finding Fingerprint Wire Contract": architecture/adr/0013-finding-fingerprint-wire-contract.md
               - "0014: Seat-Based Entitlement Tier Rename": architecture/adr/0014-seat-based-entitlement-tier-rename.md
               - "0015: Enterprise Governance SSO SCIM": architecture/adr/0015-enterprise-governance-sso-scim.md
+              - "0016: UI/UX Design System Migration": architecture/adr/0016-ui-ux-design-system-migration.md
