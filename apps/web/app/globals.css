@@ -104,3 +104,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+.setup-code-preview {
+  width: 100%;
+  font-family: var(--font-mono-loaded), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  tab-size: 2;
+  white-space: pre;
+}

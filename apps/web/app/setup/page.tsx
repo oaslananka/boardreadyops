@@ -6,8 +6,8 @@ import {
   repositorySetupWorkflowContractVersion,
   repositorySetupWorkflowPath,
 } from "@boardreadyops/cloud-core/repository-setup";
-import Link from "next/link";
-import { Alert, AppShell, Breadcrumbs, Definition, DefinitionGrid, Panel, StatusBadge } from "../../components/ui.js";
+import { RepositorySetupInteractive } from "../../components/repository-setup-interactive.js";
+import { Alert, AppShell, Breadcrumbs, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 
 export const metadata = {
@@ -62,30 +62,36 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
         <nav className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Repository setup steps">
           <a
             href="#policy-preset"
-            className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:border-primary/50"
+            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
           >
-            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-bold transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
               01
             </span>
-            <strong className="text-sm text-foreground">1. Choose a release policy</strong>
+            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
+              1. Choose a release policy
+            </strong>
           </a>
           <a
             href="#proposed-files"
-            className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:border-primary/50"
+            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
           >
-            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground border border-border text-sm font-bold transition-colors group-hover:border-primary/40 group-hover:text-foreground">
               02
             </span>
-            <strong className="text-sm text-foreground">2. Review repository-owned files</strong>
+            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
+              2. Review repository-owned files
+            </strong>
           </a>
           <a
             href="#readiness"
-            className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:border-primary/50"
+            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
           >
-            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground border border-border text-sm font-bold transition-colors group-hover:border-primary/40 group-hover:text-foreground">
               03
             </span>
-            <strong className="text-sm text-foreground">3. Validate readiness in GitHub Actions</strong>
+            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
+              3. Validate readiness in GitHub Actions
+            </strong>
           </a>
         </nav>
 
@@ -113,103 +119,14 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           </p>
         </Alert>
 
-        <Panel
-          id="policy-preset"
-          title="1. Choose a release policy"
-          description={`Preset v${repositorySetupPresetVersion}. Switching presets starts a new revision; runs you have already done keep the policy they were checked against.`}
-        >
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {repositorySetupPresets.map((preset) => (
-              <article
-                className={`flex flex-col gap-2 rounded-md border p-4 ${preset.id === selected.id ? "border-primary" : "border-border"} bg-card`}
-                data-selected={preset.id === selected.id || undefined}
-                key={preset.id}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-base font-bold text-foreground">{preset.name}</h3>
-                  {preset.id === selected.id ? <StatusBadge value="selected" label="Selected" /> : null}
-                </div>
-                <p className="text-xs uppercase text-muted-foreground">
-                  {preset.id === selected.id ? "Current preview" : "Available release policy"}
-                </p>
-                <p className="text-sm text-muted-foreground">{preset.description}</p>
-                <DefinitionGrid>
-                  <Definition label="Release mode">{preset.releaseMode}</Definition>
-                  <Definition label="Fail threshold">{preset.failOn}</Definition>
-                </DefinitionGrid>
-                <Link
-                  className="mt-2 inline-flex w-fit items-center justify-center rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
-                  href={`/setup?preset=${preset.id}`}
-                  aria-current={preset.id === selected.id ? "page" : undefined}
-                >
-                  Preview {preset.name}
-                </Link>
-              </article>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel
-          id="proposed-files"
-          title="2. Review repository-owned files"
-          description="These are the only repository-owned files required for the setup flow. Commit them through a reviewed pull request."
-        >
-          <div className="flex flex-col gap-4">
-            <article className="rounded-md border border-border bg-card p-4">
-              <header className="flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">boardreadyops.yml</h3>
-                  <p className="text-xs text-muted-foreground">Selected preset: {selected.name}</p>
-                </div>
-                <StatusBadge value="new" label="New or replace intentionally" />
-              </header>
-              <div className="mt-3">
-                <DefinitionGrid>
-                  <Definition label="Blocks">Enabled findings at {selected.failOn} severity or above</Definition>
-                  <Definition label="Warns">Enabled findings below {selected.failOn} severity</Definition>
-                  <Definition label="Ignores">Rules explicitly set to false in the preview</Definition>
-                </DefinitionGrid>
-              </div>
-              <figure className="mt-3">
-                <figcaption id="setup-config-preview-caption" className="text-xs text-muted-foreground">
-                  {selected.name} boardreadyops.yml preview
-                </figcaption>
-                <textarea
-                  className="setup-code-preview"
-                  aria-labelledby="setup-config-preview-caption"
-                  readOnly
-                  rows={Math.min(selected.config.split("\n").length, 28)}
-                  spellCheck={false}
-                  value={selected.config}
-                />
-              </figure>
-            </article>
-            <article className="rounded-md border border-border bg-card p-4">
-              <header className="flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">.github/workflows/{repositorySetupWorkflowPath}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Canonical v1 runner workflow, contract v{repositorySetupWorkflowContractVersion}
-                  </p>
-                </div>
-                <StatusBadge value="review" label="Review before copying" />
-              </header>
-              <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
-                <li>
-                  Open the{" "}
-                  <a href={workflowSource} className="text-primary hover:underline">
-                    canonical v1 workflow source
-                  </a>{" "}
-                  and review its pinned actions, permissions, inputs, and timeouts.
-                </li>
-                <li>
-                  Copy it unchanged to <code>.github/workflows/{repositorySetupWorkflowPath}</code> on a feature branch.
-                </li>
-                <li>Open a pull request and let your repository ruleset and required checks approve the change.</li>
-              </ol>
-            </article>
-          </div>
-        </Panel>
+        <RepositorySetupInteractive
+          presets={repositorySetupPresets}
+          initialPresetId={selected.id}
+          presetVersion={repositorySetupPresetVersion}
+          workflowPath={repositorySetupWorkflowPath}
+          workflowContractVersion={repositorySetupWorkflowContractVersion}
+          workflowSource={workflowSource}
+        />
 
         <Panel
           id="readiness"

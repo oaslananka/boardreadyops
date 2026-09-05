@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BrandMarkIcon } from "../components/brand-mark.js";
 import { installUrl, LandingHeroActions, LandingNavActions } from "../components/landing-actions.js";
 import { PublicStructuredData } from "../components/public-structured-data.js";
+import { ThemeToggle } from "../components/theme-toggle.js";
 import { buttonVariants } from "../components/ui/button.js";
 
 export const metadata: Metadata = {
@@ -270,6 +271,7 @@ export default function HomePage() {
           <a href="https://docs.boardreadyops.com" className="text-muted-foreground hover:text-foreground">
             Docs
           </a>
+          <ThemeToggle variant="button" />
           {/* Suspended so reading the session never delays the landing navigation. */}
           <Suspense fallback={null}>
             <LandingNavActions />
