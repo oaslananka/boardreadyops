@@ -85,7 +85,7 @@ describe("repository setup preview page", () => {
 
   it("keeps the scrollable configuration preview natively keyboard focusable", async () => {
     const markup = await render({ preset: "production" });
-    expect(markup).toContain('class="setup-code-preview"');
+    expect(markup).toContain("setup-code-preview");
     expect(markup).toContain('aria-labelledby="setup-config-preview-caption"');
     expect(markup).toContain('readOnly=""');
   });

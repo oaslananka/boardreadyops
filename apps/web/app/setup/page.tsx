@@ -35,13 +35,15 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame operational-page setup-page" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Repository setup" }]} />
-        <header className="page-intro setup-hero">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="eyebrow">Repository setup preview</p>
-            <h1>Choose a policy, review every file, then validate the default branch.</h1>
-            <p>
+            <p className="text-xs uppercase text-muted-foreground">Repository setup preview</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              Choose a policy, review every file, then validate the default branch.
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               BoardReadyOps never writes repository contents with the production GitHub App. Review the exact
               configuration below, commit it through your normal branch protections, and run an OIDC-bound readiness
               probe.
@@ -57,18 +59,33 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           </p>
         </Alert>
 
-        <nav className="setup-journey" aria-label="Repository setup steps">
-          <a href="#policy-preset">
-            <span className="setup-progress-index setup-journey-index">01</span>
-            <strong>1. Choose a release policy</strong>
+        <nav className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Repository setup steps">
+          <a
+            href="#policy-preset"
+            className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:border-primary/50"
+          >
+            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+              01
+            </span>
+            <strong className="text-sm text-foreground">1. Choose a release policy</strong>
           </a>
-          <a href="#proposed-files">
-            <span className="setup-progress-index setup-journey-index">02</span>
-            <strong>2. Review repository-owned files</strong>
+          <a
+            href="#proposed-files"
+            className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:border-primary/50"
+          >
+            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+              02
+            </span>
+            <strong className="text-sm text-foreground">2. Review repository-owned files</strong>
           </a>
-          <a href="#readiness">
-            <span className="setup-progress-index setup-journey-index">03</span>
-            <strong>3. Validate readiness in GitHub Actions</strong>
+          <a
+            href="#readiness"
+            className="flex items-center gap-3 rounded-md border border-border bg-card p-3 hover:border-primary/50"
+          >
+            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+              03
+            </span>
+            <strong className="text-sm text-foreground">3. Validate readiness in GitHub Actions</strong>
           </a>
         </nav>
 
@@ -80,8 +97,10 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
               access from it, and does not load tenant data without authenticated control-plane access.
             </p>
             <p>
-              <a href="#policy-preset">Continue with repository setup</a> by choosing a preset and reviewing the two
-              repository-owned files below.
+              <a href="#policy-preset" className="text-primary hover:underline">
+                Continue with repository setup
+              </a>{" "}
+              by choosing a preset and reviewing the two repository-owned files below.
             </p>
           </Alert>
         ) : null}
@@ -99,27 +118,27 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           title="1. Choose a release policy"
           description={`Preset v${repositorySetupPresetVersion}. Switching presets starts a new revision; runs you have already done keep the policy they were checked against.`}
         >
-          <div className="setup-preset-grid">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {repositorySetupPresets.map((preset) => (
               <article
-                className="setup-preset-card"
+                className={`flex flex-col gap-2 rounded-md border p-4 ${preset.id === selected.id ? "border-primary" : "border-border"} bg-card`}
                 data-selected={preset.id === selected.id || undefined}
                 key={preset.id}
               >
-                <div className="setup-preset-card-heading">
-                  <h3>{preset.name}</h3>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-base font-bold text-foreground">{preset.name}</h3>
                   {preset.id === selected.id ? <StatusBadge value="selected" label="Selected" /> : null}
                 </div>
-                <p className="setup-preset-state">
+                <p className="text-xs uppercase text-muted-foreground">
                   {preset.id === selected.id ? "Current preview" : "Available release policy"}
                 </p>
-                <p>{preset.description}</p>
+                <p className="text-sm text-muted-foreground">{preset.description}</p>
                 <DefinitionGrid>
                   <Definition label="Release mode">{preset.releaseMode}</Definition>
                   <Definition label="Fail threshold">{preset.failOn}</Definition>
                 </DefinitionGrid>
                 <Link
-                  className="button button-secondary"
+                  className="mt-2 inline-flex w-fit items-center justify-center rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
                   href={`/setup?preset=${preset.id}`}
                   aria-current={preset.id === selected.id ? "page" : undefined}
                 >
@@ -135,22 +154,26 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           title="2. Review repository-owned files"
           description="These are the only repository-owned files required for the setup flow. Commit them through a reviewed pull request."
         >
-          <div className="setup-file-list">
-            <article className="setup-file-preview">
-              <header>
+          <div className="flex flex-col gap-4">
+            <article className="rounded-md border border-border bg-card p-4">
+              <header className="flex items-center justify-between gap-2">
                 <div>
-                  <h3>boardreadyops.yml</h3>
-                  <p>Selected preset: {selected.name}</p>
+                  <h3 className="text-sm font-bold text-foreground">boardreadyops.yml</h3>
+                  <p className="text-xs text-muted-foreground">Selected preset: {selected.name}</p>
                 </div>
                 <StatusBadge value="new" label="New or replace intentionally" />
               </header>
-              <DefinitionGrid>
-                <Definition label="Blocks">Enabled findings at {selected.failOn} severity or above</Definition>
-                <Definition label="Warns">Enabled findings below {selected.failOn} severity</Definition>
-                <Definition label="Ignores">Rules explicitly set to false in the preview</Definition>
-              </DefinitionGrid>
-              <figure className="setup-code-figure">
-                <figcaption id="setup-config-preview-caption">{selected.name} boardreadyops.yml preview</figcaption>
+              <div className="mt-3">
+                <DefinitionGrid>
+                  <Definition label="Blocks">Enabled findings at {selected.failOn} severity or above</Definition>
+                  <Definition label="Warns">Enabled findings below {selected.failOn} severity</Definition>
+                  <Definition label="Ignores">Rules explicitly set to false in the preview</Definition>
+                </DefinitionGrid>
+              </div>
+              <figure className="mt-3">
+                <figcaption id="setup-config-preview-caption" className="text-xs text-muted-foreground">
+                  {selected.name} boardreadyops.yml preview
+                </figcaption>
                 <textarea
                   className="setup-code-preview"
                   aria-labelledby="setup-config-preview-caption"
@@ -161,18 +184,23 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                 />
               </figure>
             </article>
-            <article className="setup-file-preview">
-              <header>
+            <article className="rounded-md border border-border bg-card p-4">
+              <header className="flex items-center justify-between gap-2">
                 <div>
-                  <h3>.github/workflows/{repositorySetupWorkflowPath}</h3>
-                  <p>Canonical v1 runner workflow, contract v{repositorySetupWorkflowContractVersion}</p>
+                  <h3 className="text-sm font-bold text-foreground">.github/workflows/{repositorySetupWorkflowPath}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Canonical v1 runner workflow, contract v{repositorySetupWorkflowContractVersion}
+                  </p>
                 </div>
                 <StatusBadge value="review" label="Review before copying" />
               </header>
-              <ol className="setup-steps">
+              <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
                 <li>
-                  Open the <a href={workflowSource}>canonical v1 workflow source</a> and review its pinned actions,
-                  permissions, inputs, and timeouts.
+                  Open the{" "}
+                  <a href={workflowSource} className="text-primary hover:underline">
+                    canonical v1 workflow source
+                  </a>{" "}
+                  and review its pinned actions, permissions, inputs, and timeouts.
                 </li>
                 <li>
                   Copy it unchanged to <code>.github/workflows/{repositorySetupWorkflowPath}</code> on a feature branch.
@@ -188,7 +216,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           title="3. Validate readiness in GitHub Actions"
           description="The control plane first inspects Actions and workflow metadata, then dispatches a short-lived probe owned by the target repository."
         >
-          <ol className="setup-steps">
+          <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
             <li>Confirm GitHub Actions is enabled and the workflow is active on the default branch.</li>
             <li>Dispatch the setup probe with a 15-minute persisted deadline and idempotency key.</li>
             <li>
@@ -202,28 +230,30 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
             </li>
             <li>The verified preset revision is snapshotted onto every newly accepted run and shown in run history.</li>
           </ol>
-          <Alert title="Recovery and troubleshooting" tone="warning">
-            <p>
-              Missing workflow, disabled Actions, incompatible workflow metadata, missing configuration, invalid
-              configuration, expired probe, stale probe, and dispatch failure are distinct persisted states with stable
-              operator responses.
-            </p>
-            <p>If your initial readiness probe does not appear or reports an error, verify:</p>
-            <ul>
-              <li>
-                <strong>Actions permissions:</strong> Confirm GitHub Actions is enabled under Repository Settings &gt;
-                Actions &gt; General.
-              </li>
-              <li>
-                <strong>Local validation:</strong> Run <code>boardreadyops scan</code> locally before committing to
-                verify <code>boardreadyops.yml</code> syntax.
-              </li>
-              <li>
-                <strong>OIDC configuration:</strong> Verify your workflow includes{" "}
-                <code>permissions: id-token: write</code> without manual credential overrides.
-              </li>
-            </ul>
-          </Alert>
+          <div className="mt-4">
+            <Alert title="Recovery and troubleshooting" tone="warning">
+              <p>
+                Missing workflow, disabled Actions, incompatible workflow metadata, missing configuration, invalid
+                configuration, expired probe, stale probe, and dispatch failure are distinct persisted states with
+                stable operator responses.
+              </p>
+              <p>If your initial readiness probe does not appear or reports an error, verify:</p>
+              <ul className="flex list-disc flex-col gap-1 pl-5">
+                <li>
+                  <strong>Actions permissions:</strong> Confirm GitHub Actions is enabled under Repository Settings &gt;
+                  Actions &gt; General.
+                </li>
+                <li>
+                  <strong>Local validation:</strong> Run <code>boardreadyops scan</code> locally before committing to
+                  verify <code>boardreadyops.yml</code> syntax.
+                </li>
+                <li>
+                  <strong>OIDC configuration:</strong> Verify your workflow includes{" "}
+                  <code>permissions: id-token: write</code> without manual credential overrides.
+                </li>
+              </ul>
+            </Alert>
+          </div>
         </Panel>
 
         <Panel
@@ -232,46 +262,70 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           description="No hidden organization or account access is requested."
         >
           {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable overflow-x region needs tabIndex so keyboard users can scroll it (WCAG 2.1.1, axe scrollable-region-focusable). */}
-          <section className="table-scroll" aria-labelledby="permission-table-caption" tabIndex={0}>
-            <table>
-              <caption id="permission-table-caption">Required GitHub App permissions and purposes</caption>
+          <section className="overflow-x-auto" aria-labelledby="permission-table-caption" tabIndex={0}>
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only" id="permission-table-caption">
+                Required GitHub App permissions and purposes
+              </caption>
               <thead>
-                <tr>
-                  <th scope="col">Scope</th>
-                  <th scope="col">Permission</th>
-                  <th scope="col">Purpose</th>
+                <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                  <th scope="col" className="py-2 pr-3">
+                    Scope
+                  </th>
+                  <th scope="col" className="py-2 pr-3">
+                    Permission
+                  </th>
+                  <th scope="col" className="py-2 pr-3">
+                    Purpose
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <th scope="row">Repository</th>
-                  <td>Metadata: read</td>
-                  <td>Bind the installation to the intended repository.</td>
+                <tr className="border-b border-border">
+                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
+                    Repository
+                  </th>
+                  <td className="py-2 pr-3">Metadata: read</td>
+                  <td className="py-2 pr-3 text-muted-foreground">Bind the installation to the intended repository.</td>
+                </tr>
+                <tr className="border-b border-border">
+                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
+                    Repository
+                  </th>
+                  <td className="py-2 pr-3">Pull requests: read</td>
+                  <td className="py-2 pr-3 text-muted-foreground">
+                    Attach each run to the pull request it belongs to.
+                  </td>
+                </tr>
+                <tr className="border-b border-border">
+                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
+                    Repository
+                  </th>
+                  <td className="py-2 pr-3">Checks: write</td>
+                  <td className="py-2 pr-3 text-muted-foreground">Publish verified readiness conclusions.</td>
+                </tr>
+                <tr className="border-b border-border">
+                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
+                    Repository
+                  </th>
+                  <td className="py-2 pr-3">Actions: write</td>
+                  <td className="py-2 pr-3 text-muted-foreground">Dispatch the repository-owned readiness workflow.</td>
+                </tr>
+                <tr className="border-b border-border">
+                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
+                    Repository
+                  </th>
+                  <td className="py-2 pr-3">Contents: none</td>
+                  <td className="py-2 pr-3 text-muted-foreground">
+                    Repository files stay under contributor-controlled pull requests.
+                  </td>
                 </tr>
                 <tr>
-                  <th scope="row">Repository</th>
-                  <td>Pull requests: read</td>
-                  <td>Attach each run to the pull request it belongs to.</td>
-                </tr>
-                <tr>
-                  <th scope="row">Repository</th>
-                  <td>Checks: write</td>
-                  <td>Publish verified readiness conclusions.</td>
-                </tr>
-                <tr>
-                  <th scope="row">Repository</th>
-                  <td>Actions: write</td>
-                  <td>Dispatch the repository-owned readiness workflow.</td>
-                </tr>
-                <tr>
-                  <th scope="row">Repository</th>
-                  <td>Contents: none</td>
-                  <td>Repository files stay under contributor-controlled pull requests.</td>
-                </tr>
-                <tr>
-                  <th scope="row">Organization / account</th>
-                  <td>None</td>
-                  <td>No organization-wide or user-account authority.</td>
+                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
+                    Organization / account
+                  </th>
+                  <td className="py-2 pr-3">None</td>
+                  <td className="py-2 pr-3 text-muted-foreground">No organization-wide or user-account authority.</td>
                 </tr>
               </tbody>
             </table>
