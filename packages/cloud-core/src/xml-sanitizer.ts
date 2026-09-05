@@ -225,11 +225,7 @@ function isDangerousHrefAttribute(name: string, value: string): boolean {
   const lowerName = name.toLowerCase();
   if (lowerName !== "href" && lowerName !== "xlink:href") return false;
   const lowerValue = value.trimStart().toLowerCase();
-  return (
-    lowerValue.startsWith("javascript:") ||
-    lowerValue.startsWith("vbscript:") ||
-    lowerValue.startsWith("data:")
-  );
+  return lowerValue.startsWith("javascript:") || lowerValue.startsWith("vbscript:") || lowerValue.startsWith("data:");
 }
 
 const ATTRIBUTE_NAME_CHARS = new Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:_-".split(""));
