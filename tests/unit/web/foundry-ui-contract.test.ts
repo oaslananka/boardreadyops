@@ -49,7 +49,7 @@ describe("Technical Premium UI contract", () => {
     const markup = renderToStaticMarkup(
       createElement(Panel, { title: "Gate Check", id: "gate", tone: "section" }, "content"),
     );
-    expect(markup).toContain("surface-section");
+    expect(markup).toContain("border-dashed");
     expect(markup).toContain('id="gate"');
     expect(markup).toContain('aria-labelledby="gate-heading"');
   });
