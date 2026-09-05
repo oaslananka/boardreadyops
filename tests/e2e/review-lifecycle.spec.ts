@@ -7,9 +7,8 @@ import { expect, type Page, test } from "@playwright/test";
  * production GitHub App / Stripe test-mode credential available in this environment.
  * Flows that genuinely require those (live GitHub OAuth session, live Stripe Checkout)
  * are marked below and verified only at the level that's actually reachable here
- * (page renders, webhook endpoint rejects bad input) — see
- * docs/superpowers/specs/2026-08-27-review-evidence-os-design.md for what full coverage
- * of those needs in a real staging environment.
+ * (page renders, webhook endpoint rejects bad input) — full coverage of those needs a
+ * real staging environment.
  */
 
 const REVIEW_PATH = "/reviews/rev_gateway_42";

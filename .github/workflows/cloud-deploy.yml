@@ -109,7 +109,7 @@ jobs:
           cd "${repo_dir}"
           git fetch origin --prune
           git checkout main
-          git merge --ff-only origin/main
+          git reset --hard origin/main
           cd "${deploy_root}"
 
           case "${deploy_args}" in
