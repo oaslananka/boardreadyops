@@ -1998,61 +1998,6 @@ code {
   background: var(--bro-surface-sunken);
 }
 
-/* Repository listings. Native tables rather than a grid of cards: these are rows of
-   comparable facts, and a table gives screen readers the row and column relationships for
-   free. Numerals are tabular so counts line up down a column instead of drifting. */
-.repository-table-wrap {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.repository-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.95rem;
-}
-
-.repository-table th,
-.repository-table td {
-  text-align: left;
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-
-.repository-table td {
-  font-variant-numeric: tabular-nums;
-}
-
-.repository-table thead th {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-  color: var(--text-subtle);
-  border-bottom-color: var(--border-strong);
-}
-
-.repository-table tbody tr {
-  transition: background var(--bro-motion-fast) var(--bro-ease);
-}
-
-.repository-table tbody tr:hover {
-  background: var(--surface-strong);
-}
-
-.repository-table tbody tr:last-child th,
-.repository-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.repository-when {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--text-subtle);
-  font-variant-numeric: tabular-nums;
-}
-
 /* The run verdict.
 
    Sized to be read from across a desk, because that is how somebody uses it: they open the
