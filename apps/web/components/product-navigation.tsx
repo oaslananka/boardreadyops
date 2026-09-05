@@ -152,7 +152,9 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
       <aside
         id="product-navigation-drawer"
         className={cn(
-          "fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform md:sticky md:top-0 md:h-dvh md:translate-x-0",
+          // `product-rail` carries no styling any more (its styles.css rules are gone) -- it is kept
+          // as a stable selector hook for tests/e2e/regression-audit-findings.spec.ts.
+          "product-rail fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform md:sticky md:top-0 md:h-dvh md:translate-x-0",
           compact && "md:w-16",
           !mobileOpen && "-translate-x-full md:translate-x-0",
         )}
@@ -236,7 +238,8 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
             aria-label={compact ? "Expand navigation" : "Collapse navigation"}
             title={compact ? "Expand navigation" : "Collapse navigation"}
             onClick={toggleCompact}
-            className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent/10"
+            // `product-compact-toggle` is an unstyled selector hook for the e2e regression spec.
+            className="product-compact-toggle flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent/10"
           >
             <ProductIcon name="menu" />
             {!compact && <span>Collapse</span>}
