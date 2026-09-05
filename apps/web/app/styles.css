@@ -3573,81 +3573,9 @@ code {
   max-width: 250px;
 }
 
-/* My Work & Reviews Queue Styles */
-.work-workspace-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-
-@media (max-width: 960px) {
-  .work-workspace-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.work-findings-list,
-.work-reviews-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.work-finding-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 1rem 1.25rem;
-}
-
-.finding-row-lead {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.finding-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.finding-message {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--text);
-}
-
 .finding-path {
   font-size: 0.8rem;
   color: var(--text-muted);
-}
-
-.finding-row-action {
-  flex: 0 0 auto;
-}
-
-.work-review-card {
-  padding: var(--space-3);
-}
-
-.card-top,
-.card-bot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.work-review-card h4 {
-  margin: 0 0 var(--space-2);
-  font-size: 0.95rem;
 }
 
 /* Reviews Registry */
@@ -3740,20 +3668,6 @@ code {
 
   .row-lifecycle-counts {
     justify-content: flex-start;
-  }
-
-  .work-finding-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .finding-row-action {
-    width: 100%;
-  }
-
-  .finding-row-action .button {
-    width: 100%;
-    justify-content: center;
   }
 }
 
