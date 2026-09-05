@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default function NewProjectPage() {
   return (
     <AppShell>
-      <main id="main-content" className="page-shell">
+      <main id="main-content" className="flex flex-col gap-5 px-6 py-6">
         <Breadcrumbs
           items={[
             { href: "/dashboard", label: "Dashboard" },
