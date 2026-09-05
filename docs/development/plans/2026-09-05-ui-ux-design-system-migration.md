@@ -6,7 +6,7 @@
 
 **Architecture:** Tailwind v4's CSS-first `@theme` config defines design tokens once (`apps/web/app/globals.css`), consumed by shadcn/ui primitives under `apps/web/components/ui/`. The existing shared component layer (`apps/web/components/ui.tsx`) is rebuilt on top of those primitives with its **external API unchanged** (same exported function names, same props) so most page files need zero changes — only pages with bespoke markup outside that shared layer need page-level edits. `next-themes` drives the dark/light toggle via a `class` strategy Tailwind's `@custom-variant dark` reads.
 
-**Tech Stack:** Tailwind CSS 4.3.3, `@tailwindcss/postcss` 4.3.3, `radix-ui` 1.6.7 (unified package — shadcn's current components import primitives from this single package, not individual `@radix-ui/react-*` packages), `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.6.0, `lucide-react` 1.41.0, `tw-animate-css` 1.4.0, `next-themes` 0.4.6. Existing stack unchanged: Next.js 16.2.12 (App Router), React 19.2.8, TypeScript 6.0.3.
+**Tech Stack:** Tailwind CSS 4.3.3, `@tailwindcss/postcss` 4.3.3, `radix-ui` 1.6.7 (unified package — shadcn's current components import primitives from this single package, not individual `@radix-ui/react-*` packages), `class-variance-authority` 0.7.1, `clsx` 2.1.1, `tailwind-merge` 3.6.0, `lucide-react` 1.35.0, `tw-animate-css` 1.4.0, `next-themes` 0.4.6. Existing stack unchanged: Next.js 16.2.12 (App Router), React 19.2.8, TypeScript 6.0.3.
 
 **Spec:** [docs/architecture/adr/0016-ui-ux-design-system-migration.md](../../architecture/adr/0016-ui-ux-design-system-migration.md)
 
@@ -41,7 +41,7 @@
 
 ```bash
 cd apps/web
-corepack pnpm add -E tailwindcss@4.3.3 @tailwindcss/postcss@4.3.3 radix-ui@1.6.7 class-variance-authority@0.7.1 clsx@2.1.1 tailwind-merge@3.6.0 lucide-react@1.41.0 tw-animate-css@1.4.0 next-themes@0.4.6
+corepack pnpm add -E tailwindcss@4.3.3 @tailwindcss/postcss@4.3.3 radix-ui@1.6.7 class-variance-authority@0.7.1 clsx@2.1.1 tailwind-merge@3.6.0 lucide-react@1.35.0 tw-animate-css@1.4.0 next-themes@0.4.6
 cd ../..
 ```
 
