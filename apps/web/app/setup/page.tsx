@@ -261,8 +261,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           title="Permission review"
           description="No hidden organization or account access is requested."
         >
-          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable overflow-x region needs tabIndex so keyboard users can scroll it (WCAG 2.1.1, axe scrollable-region-focusable). */}
-          <section className="overflow-x-auto" aria-labelledby="permission-table-caption" tabIndex={0}>
+          <section className="overflow-x-auto" aria-labelledby="permission-table-caption">
             <table className="w-full text-left text-sm">
               <caption className="sr-only" id="permission-table-caption">
                 Required GitHub App permissions and purposes
