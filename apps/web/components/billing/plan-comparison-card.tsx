@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Badge } from "../ui/badge.js";
+import { Button } from "../ui/button.js";
 
 export type CommercialTierKey = "community" | "team" | "business" | "pilot" | "enterprise";
 
@@ -139,55 +141,62 @@ export function PlanComparisonCard({
   }
 
   return (
-    <div className="plan-comparison-container">
+    <div className="plan-comparison-container flex flex-col gap-4">
       {hasStripeCustomer && (
-        <div className="portal-action-banner">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted p-3">
           <div>
-            <strong>Billing Subscription Managed via Stripe</strong>
-            <p>Update payment methods, view invoices, or modify seats.</p>
+            <strong className="text-sm font-medium text-foreground">Billing Subscription Managed via Stripe</strong>
+            <p className="text-xs text-muted-foreground">Update payment methods, view invoices, or modify seats.</p>
           </div>
-          <button
+          <Button
             type="button"
-            className="manage-portal-button button button-secondary"
+            variant="secondary"
+            className="manage-portal-button"
             disabled={portalLoading}
             onClick={handlePortal}
           >
             {portalLoading ? "Opening..." : "Manage Subscription"}
-          </button>
+          </Button>
         </div>
       )}
 
       {errorMessage && (
-        <div className="form-error-alert" role="alert">
+        <div
+          className="rounded-md border border-danger/40 bg-danger-surface px-4 py-3 text-sm text-danger"
+          role="alert"
+        >
           {errorMessage}
         </div>
       )}
 
-      <div className="plan-tier-grid">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {PLANS.map((plan) => {
           const isCurrent = plan.key === currentTier;
           const canUpgrade = !isCurrent && (plan.key === "team" || plan.key === "business");
 
           return (
-            <div key={plan.key} className={`plan-tier-card ${isCurrent ? "current-tier" : ""}`}>
-              <div className="tier-header">
-                <div className="tier-title-row">
-                  <h3>{plan.name}</h3>
-                  {isCurrent && <span className="current-plan-badge">Current Plan</span>}
+            <div
+              key={plan.key}
+              className={`plan-tier-card flex flex-col gap-3 rounded-md border p-4 ${isCurrent ? "border-primary" : "border-border"} bg-card`}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-base font-bold text-foreground">{plan.name}</h3>
+                  {isCurrent && <Badge className="current-plan-badge">Current Plan</Badge>}
                 </div>
-                <div className="tier-price-row">
-                  <span className="tier-price">{plan.price}</span>
-                  <span className="tier-cadence">{plan.cadence}</span>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-2xl font-bold text-foreground">{plan.price}</span>
+                  <span className="text-xs text-muted-foreground">{plan.cadence}</span>
                 </div>
-                <p className="tier-tagline">{plan.tagline}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
               </div>
 
-              <ul className="tier-features-list">
+              <ul className="flex flex-1 flex-col gap-1.5 text-sm text-foreground">
                 {plan.features.map((feat) => (
-                  <li key={feat}>
+                  <li key={feat} className="flex items-start gap-2">
                     <svg
                       aria-hidden="true"
-                      className="check-icon"
+                      className="mt-0.5 shrink-0 text-success"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       width="16"
@@ -204,24 +213,28 @@ export function PlanComparisonCard({
                 ))}
               </ul>
 
-              <div className="tier-action-footer">
-                {isCurrent && <span className="button button-disabled">Active Plan</span>}
+              <div>
+                {isCurrent && (
+                  <span className="inline-flex w-full items-center justify-center rounded-md border border-border px-4 py-2 text-sm text-muted-foreground">
+                    Active Plan
+                  </span>
+                )}
 
                 {canUpgrade && (
-                  <button
+                  <Button
                     type="button"
-                    className="upgrade-checkout-button button button-primary"
+                    className="upgrade-checkout-button w-full"
                     disabled={loadingTier === plan.key}
                     onClick={() => handleUpgrade(plan.key as "team" | "business")}
                   >
                     {loadingTier === plan.key ? "Opening Stripe..." : `Upgrade to ${plan.name}`}
-                  </button>
+                  </Button>
                 )}
 
                 {!isCurrent && !canUpgrade && (
                   <a
                     href="mailto:pilot@boardreadyops.com?subject=Paid%20Pilot%20Inquiry"
-                    className="button button-secondary"
+                    className="inline-flex w-full items-center justify-center rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
                   >
                     Apply for Pilot
                   </a>

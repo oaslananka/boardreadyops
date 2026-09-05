@@ -39,7 +39,7 @@ describe("settings pages and operational layout", () => {
         children: React.createElement("div", { id: "test-child" }, "Child Content"),
       }),
     );
-    const navStart = html.indexOf('class="settings-nav-list"');
+    const navStart = html.indexOf('data-testid="settings-nav-list"');
     const navSection = html.slice(navStart, html.indexOf("</ul>", navStart));
     const ariaCurrentMatches = navSection.match(/aria-current="page"/g) ?? [];
     expect(ariaCurrentMatches).toHaveLength(1);
