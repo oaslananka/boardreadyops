@@ -90,7 +90,7 @@ export async function handlePortalRequest(
     return jsonError("Database not configured", 503);
   }
 
-  const tenantId = viewer.login;
+  const tenantId = parsed.data.workspaceId ?? viewer.login;
   const existing = await dependencies.getExistingCustomer(tenantId, databaseUrl);
   if (!existing?.stripeCustomerId) {
     return jsonError("No Stripe customer is linked for this account yet; complete checkout first", 409);

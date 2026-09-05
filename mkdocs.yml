@@ -93,6 +93,10 @@ nav:
       - API Tokens: api-tokens.md
       - How-to Guides:
           - CI Quality Gates: how-to/ci-quality-gates.md
+          - Altium Package Export: guides/export-altium.md
+          - EasyEDA Package Export: guides/export-easyeda.md
+          - Autodesk Fusion Export: guides/export-fusion.md
+          - Private Runner Quickstart: guides/self-hosted-runner-quickstart.md
   - Hardware Gates:
       - Rules:
           - Overview: rules/index.md

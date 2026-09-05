@@ -26,4 +26,11 @@ describe("dashboard operational hierarchy", () => {
     expect(css).toMatch(/\.repository-sections\s*>\s*\.panel\s*\{[^}]*min-width:\s*0/su);
     expect(css).toMatch(/\.repository-table-wrap\s*\{[^}]*max-width:\s*100%[^}]*overflow-x:\s*auto/su);
   });
+
+  it("renders an attention-required next-action hierarchy and actionable empty state", () => {
+    expect(source).toContain("dashboard-attention");
+    expect(source).toContain("Next action");
+    expect(source).toContain("/setup");
+    expect(css).toContain(".dashboard-attention");
+  });
 });

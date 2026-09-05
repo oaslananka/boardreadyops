@@ -102,7 +102,8 @@ export async function handleCheckoutRequest(
     return jsonError("successUrl and cancelUrl are required (no default app URL configured)", 400);
   }
 
-  const tenantId = viewer.login;
+  const workspaceId = parsed.data.workspaceId;
+  const tenantId = workspaceId ?? viewer.login;
   const existing = await dependencies.getExistingCustomer(tenantId, databaseUrl);
   const priceId = priceIdForTier(parsed.data.tier, parsed.data.interval, priceConfig);
   const client = dependencies.createBillingClient(secretKey);
@@ -112,6 +113,7 @@ export async function handleCheckoutRequest(
     priceId,
     successUrl,
     cancelUrl,
+    ...(workspaceId ? { metadata: { workspace_id: workspaceId, creator_login: viewer.login } } : {}),
   });
 
   return Response.json({ ok: true, url: session.url }, { status: 200, headers: noStoreHeaders });

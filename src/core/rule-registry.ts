@@ -1,3 +1,4 @@
+import type { IngestionCapabilities } from "@boardreadyops/contracts";
 import type { RuleContext } from "./context.js";
 import type { Finding, Severity } from "./findings.js";
 
@@ -55,6 +56,8 @@ export type RuleFixability = "manual" | "assisted" | "none" | "unclassified";
  */
 export type RuleVendorDependence = "manufacturer-specific" | "profile-specific" | "none" | "unclassified";
 
+export type RequiredCapability = keyof IngestionCapabilities;
+
 export interface RuleMetadata {
   id: string;
   title: string;
@@ -70,6 +73,8 @@ export interface RuleMetadata {
   fixability: RuleFixability;
   vendorDependence: RuleVendorDependence;
   docUrl?: string;
+  requiresNetlist?: boolean | undefined;
+  requiredCapabilities?: RequiredCapability[] | undefined;
 }
 
 export type RuleClassification = Pick<RuleMetadata, "category" | "evidenceType" | "fixability" | "vendorDependence">;
@@ -274,4 +279,43 @@ export function categorizeFindings(findings: readonly Finding[]): RuleCategorySu
 
   const order = buckets.has("unclassified") ? [...knownCategories, "unclassified" as const] : knownCategories;
   return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
+}
+
+const CAPABILITY_REASONS: Record<keyof IngestionCapabilities, string> = {
+  hasNetlistConnectivity: "Input package does not include electrical netlist connectivity.",
+  hasBomMapping: "Input package does not include BOM mapping.",
+  hasPlatedHoles: "Input package does not include plated hole drill data.",
+  hasNonPlatedHoles: "Input package does not include non-plated hole drill data.",
+  hasGerberOutlines: "Input package does not include Gerber layer outline data.",
+  hasCentroidPlacement: "Input package does not include centroid placement data.",
+  hasSchematicHierarchies: "Input package does not include schematic hierarchies.",
+};
+
+export function checkRuleCapabilities(
+  rule: Rule,
+  capabilities?: IngestionCapabilities | undefined,
+): { allowed: true } | { allowed: false; reason: string } {
+  if (!capabilities) {
+    return { allowed: true };
+  }
+
+  if (rule.meta.requiresNetlist && !capabilities.hasNetlistConnectivity) {
+    return {
+      allowed: false,
+      reason: CAPABILITY_REASONS.hasNetlistConnectivity,
+    };
+  }
+
+  if (rule.meta.requiredCapabilities) {
+    for (const cap of rule.meta.requiredCapabilities) {
+      if (!capabilities[cap]) {
+        return {
+          allowed: false,
+          reason: CAPABILITY_REASONS[cap],
+        };
+      }
+    }
+  }
+
+  return { allowed: true };
 }

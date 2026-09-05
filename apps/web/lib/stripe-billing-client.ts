@@ -6,6 +6,7 @@ interface StripeCheckoutSessionInput {
   priceId: string;
   successUrl: string;
   cancelUrl: string;
+  metadata?: Record<string, string> | undefined;
 }
 
 interface StripePortalSessionInput {
@@ -46,6 +47,7 @@ export function createStripeBillingClient(
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
         ...(input.customerId ? { customer: input.customerId } : {}),
+        ...(input.metadata ? { metadata: input.metadata } : {}),
         client_reference_id: input.clientReferenceId,
         line_items: [{ price: input.priceId, quantity: 1 }],
         success_url: input.successUrl,

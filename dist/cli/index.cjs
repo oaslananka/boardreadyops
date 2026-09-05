@@ -35185,10 +35185,12 @@ var init_billing = __esm({
     checkoutRequestSchema = external_exports.object({
       tier: external_exports.enum(["team", "business"]),
       interval: billingIntervalSchema.default("month"),
+      workspaceId: external_exports.string().optional(),
       successUrl: external_exports.string().url().optional(),
       cancelUrl: external_exports.string().url().optional()
     });
     portalRequestSchema = external_exports.object({
+      workspaceId: external_exports.string().optional(),
       returnUrl: external_exports.string().url().optional()
     });
     billingPriceConfigSchema = external_exports.object({
@@ -35534,6 +35536,91 @@ var init_external_review = __esm({
   }
 });
 
+// packages/contracts/src/multicad.ts
+var cadFormatSchema, packageSourceTypeSchema, ingestionCapabilitiesSchema, normalizedBoardMetadataSchema, layerRoleSchema, layerSideSchema, normalizedLayerSchema, componentSideSchema, normalizedComponentSchema, normalizedDrillHoleSchema, parserWarningSchema, netConnectionSchema, netlistSchema, normalizedPcbPackageSchema;
+var init_multicad = __esm({
+  "packages/contracts/src/multicad.ts"() {
+    "use strict";
+    init_zod();
+    cadFormatSchema = external_exports.enum(["kicad", "altium", "easyeda", "fusion360", "ipc2581", "generic_gerber"]);
+    packageSourceTypeSchema = external_exports.enum(["git_checkout", "upload_bundle", "native_export"]);
+    ingestionCapabilitiesSchema = external_exports.object({
+      hasGerberOutlines: external_exports.boolean(),
+      hasPlatedHoles: external_exports.boolean(),
+      hasNonPlatedHoles: external_exports.boolean(),
+      hasBomMapping: external_exports.boolean(),
+      hasCentroidPlacement: external_exports.boolean(),
+      hasNetlistConnectivity: external_exports.boolean(),
+      hasSchematicHierarchies: external_exports.boolean()
+    });
+    normalizedBoardMetadataSchema = external_exports.object({
+      name: external_exports.string().min(1).max(256),
+      widthMm: external_exports.number().positive().optional(),
+      heightMm: external_exports.number().positive().optional(),
+      layerCount: external_exports.number().int().positive().optional()
+    });
+    layerRoleSchema = external_exports.enum([
+      "copper",
+      "soldermask",
+      "silkscreen",
+      "solderpaste",
+      "drill",
+      "outline",
+      "other"
+    ]);
+    layerSideSchema = external_exports.enum(["top", "bottom", "inner", "both", "none"]);
+    normalizedLayerSchema = external_exports.object({
+      name: external_exports.string().min(1),
+      role: layerRoleSchema,
+      side: layerSideSchema,
+      index: external_exports.number().int().positive().optional(),
+      filename: external_exports.string().min(1)
+    });
+    componentSideSchema = external_exports.enum(["top", "bottom"]);
+    normalizedComponentSchema = external_exports.object({
+      refDes: external_exports.string().min(1),
+      value: external_exports.string(),
+      footprint: external_exports.string(),
+      mpn: external_exports.string().optional(),
+      manufacturer: external_exports.string().optional(),
+      side: componentSideSchema,
+      xMm: external_exports.number().optional(),
+      yMm: external_exports.number().optional(),
+      rotationDegrees: external_exports.number().optional(),
+      dnp: external_exports.boolean(),
+      sourceFile: external_exports.string().min(1)
+    });
+    normalizedDrillHoleSchema = external_exports.object({
+      xMm: external_exports.number(),
+      yMm: external_exports.number(),
+      diameterMm: external_exports.number().positive(),
+      plated: external_exports.boolean()
+    });
+    parserWarningSchema = external_exports.object({
+      code: external_exports.string().min(1),
+      message: external_exports.string().min(1),
+      path: external_exports.string().optional()
+    });
+    netConnectionSchema = external_exports.object({
+      componentRef: external_exports.string().min(1),
+      pin: external_exports.string().min(1)
+    });
+    netlistSchema = external_exports.record(external_exports.string(), external_exports.array(netConnectionSchema));
+    normalizedPcbPackageSchema = external_exports.object({
+      format: cadFormatSchema,
+      formatVersion: external_exports.string().optional(),
+      sourceType: packageSourceTypeSchema,
+      capabilities: ingestionCapabilitiesSchema,
+      board: normalizedBoardMetadataSchema,
+      layers: external_exports.array(normalizedLayerSchema),
+      components: external_exports.array(normalizedComponentSchema),
+      drillHoles: external_exports.array(normalizedDrillHoleSchema),
+      netlist: netlistSchema.optional(),
+      parserWarnings: external_exports.array(parserWarningSchema)
+    });
+  }
+});
+
 // packages/contracts/src/policy.ts
 var policySeverityGateSchema, reviewPolicySchema, createPolicyInputSchema, effectivePolicySchema, policyDryRunResultSchema;
 var init_policy = __esm({
@@ -35854,6 +35941,7 @@ var init_src = __esm({
     init_billing();
     init_evidence_ledger();
     init_external_review();
+    init_multicad();
     init_policy();
     init_review();
     init_runner_protocol();
@@ -43805,6 +43893,37 @@ function categorizeFindings(findings) {
   const order = buckets.has("unclassified") ? [...knownCategories, "unclassified"] : knownCategories;
   return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
 }
+var CAPABILITY_REASONS = {
+  hasNetlistConnectivity: "Input package does not include electrical netlist connectivity.",
+  hasBomMapping: "Input package does not include BOM mapping.",
+  hasPlatedHoles: "Input package does not include plated hole drill data.",
+  hasNonPlatedHoles: "Input package does not include non-plated hole drill data.",
+  hasGerberOutlines: "Input package does not include Gerber layer outline data.",
+  hasCentroidPlacement: "Input package does not include centroid placement data.",
+  hasSchematicHierarchies: "Input package does not include schematic hierarchies."
+};
+function checkRuleCapabilities(rule2, capabilities) {
+  if (!capabilities) {
+    return { allowed: true };
+  }
+  if (rule2.meta.requiresNetlist && !capabilities.hasNetlistConnectivity) {
+    return {
+      allowed: false,
+      reason: CAPABILITY_REASONS.hasNetlistConnectivity
+    };
+  }
+  if (rule2.meta.requiredCapabilities) {
+    for (const cap of rule2.meta.requiredCapabilities) {
+      if (!capabilities[cap]) {
+        return {
+          allowed: false,
+          reason: CAPABILITY_REASONS[cap]
+        };
+      }
+    }
+  }
+  return { allowed: true };
+}
 
 // src/rules/helpers.ts
 var import_node_path6 = __toESM(require("node:path"), 1);
@@ -50403,6 +50522,27 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
     const output = [];
     for (const rule2 of activeRules) {
       ctx.options.signal?.throwIfAborted();
+      const capCheck = checkRuleCapabilities(rule2, project.capabilities);
+      if (!capCheck.allowed) {
+        output.push(
+          createFinding({
+            ruleId: rule2.meta.id,
+            severity: "info",
+            project: project.projectFile,
+            message: `Status: Unchecked \xB7 Reason: ${capCheck.reason}`,
+            resource: {
+              path: project.projectFile,
+              kind: "project"
+            },
+            details: {
+              status: "Unchecked",
+              reason: capCheck.reason,
+              skipped: true
+            }
+          })
+        );
+        continue;
+      }
       const startedAt = performance.now();
       ctx.logger.debug("pipeline.rule.start", {
         rule: rule2.meta.id,
@@ -56216,6 +56356,11 @@ async function gitState2(root) {
 var import_node_child_process4 = require("node:child_process");
 var import_node_crypto13 = require("node:crypto");
 var import_node_path60 = __toESM(require("node:path"), 1);
+
+// packages/cloud-core/src/archive-sanitizer.ts
+var DEFAULT_MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
+var DEFAULT_MAX_TOTAL_EXTRACTED_BYTES = 250 * 1024 * 1024;
+var DEFAULT_MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024;
 
 // packages/cloud-core/src/evidence-ledger.ts
 init_src();

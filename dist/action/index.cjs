@@ -80154,6 +80154,37 @@ function categorizeFindings(findings) {
   const order = buckets.has("unclassified") ? [...knownCategories, "unclassified"] : knownCategories;
   return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
 }
+var CAPABILITY_REASONS = {
+  hasNetlistConnectivity: "Input package does not include electrical netlist connectivity.",
+  hasBomMapping: "Input package does not include BOM mapping.",
+  hasPlatedHoles: "Input package does not include plated hole drill data.",
+  hasNonPlatedHoles: "Input package does not include non-plated hole drill data.",
+  hasGerberOutlines: "Input package does not include Gerber layer outline data.",
+  hasCentroidPlacement: "Input package does not include centroid placement data.",
+  hasSchematicHierarchies: "Input package does not include schematic hierarchies."
+};
+function checkRuleCapabilities(rule2, capabilities) {
+  if (!capabilities) {
+    return { allowed: true };
+  }
+  if (rule2.meta.requiresNetlist && !capabilities.hasNetlistConnectivity) {
+    return {
+      allowed: false,
+      reason: CAPABILITY_REASONS.hasNetlistConnectivity
+    };
+  }
+  if (rule2.meta.requiredCapabilities) {
+    for (const cap of rule2.meta.requiredCapabilities) {
+      if (!capabilities[cap]) {
+        return {
+          allowed: false,
+          reason: CAPABILITY_REASONS[cap]
+        };
+      }
+    }
+  }
+  return { allowed: true };
+}
 
 // src/rules/helpers.ts
 var import_node_path5 = __toESM(require("node:path"), 1);
@@ -104276,6 +104307,27 @@ async function validatePhase(ctx, loadedWithPluginErrors, projects) {
     const output = [];
     for (const rule2 of activeRules) {
       ctx.options.signal?.throwIfAborted();
+      const capCheck = checkRuleCapabilities(rule2, project.capabilities);
+      if (!capCheck.allowed) {
+        output.push(
+          createFinding({
+            ruleId: rule2.meta.id,
+            severity: "info",
+            project: project.projectFile,
+            message: `Status: Unchecked \xB7 Reason: ${capCheck.reason}`,
+            resource: {
+              path: project.projectFile,
+              kind: "project"
+            },
+            details: {
+              status: "Unchecked",
+              reason: capCheck.reason,
+              skipped: true
+            }
+          })
+        );
+        continue;
+      }
       const startedAt = performance.now();
       ctx.logger.debug("pipeline.rule.start", {
         rule: rule2.meta.id,
@@ -105901,6 +105953,11 @@ function sarifPositiveInteger(value) {
 // src/action/cloud-publish.ts
 var import_node_crypto6 = require("node:crypto");
 
+// packages/cloud-core/src/archive-sanitizer.ts
+var DEFAULT_MAX_COMPRESSED_SIZE = 50 * 1024 * 1024;
+var DEFAULT_MAX_TOTAL_EXTRACTED_BYTES = 250 * 1024 * 1024;
+var DEFAULT_MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024;
+
 // packages/contracts/src/runner-protocol.ts
 var lowercaseUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 var base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
@@ -106160,10 +106217,12 @@ var billingActivitySchema = external_exports.object({
 var checkoutRequestSchema = external_exports.object({
   tier: external_exports.enum(["team", "business"]),
   interval: billingIntervalSchema.default("month"),
+  workspaceId: external_exports.string().optional(),
   successUrl: external_exports.string().url().optional(),
   cancelUrl: external_exports.string().url().optional()
 });
 var portalRequestSchema = external_exports.object({
+  workspaceId: external_exports.string().optional(),
   returnUrl: external_exports.string().url().optional()
 });
 var billingPriceConfigSchema = external_exports.object({
@@ -106429,6 +106488,84 @@ var createExternalReviewRequestSchema = external_exports.object({
   recipientName: external_exports.string().min(1),
   scope: externalReviewScopeSchema,
   expiresInDays: external_exports.number().int().min(1).max(90).default(14)
+});
+
+// packages/contracts/src/multicad.ts
+var cadFormatSchema = external_exports.enum(["kicad", "altium", "easyeda", "fusion360", "ipc2581", "generic_gerber"]);
+var packageSourceTypeSchema = external_exports.enum(["git_checkout", "upload_bundle", "native_export"]);
+var ingestionCapabilitiesSchema = external_exports.object({
+  hasGerberOutlines: external_exports.boolean(),
+  hasPlatedHoles: external_exports.boolean(),
+  hasNonPlatedHoles: external_exports.boolean(),
+  hasBomMapping: external_exports.boolean(),
+  hasCentroidPlacement: external_exports.boolean(),
+  hasNetlistConnectivity: external_exports.boolean(),
+  hasSchematicHierarchies: external_exports.boolean()
+});
+var normalizedBoardMetadataSchema = external_exports.object({
+  name: external_exports.string().min(1).max(256),
+  widthMm: external_exports.number().positive().optional(),
+  heightMm: external_exports.number().positive().optional(),
+  layerCount: external_exports.number().int().positive().optional()
+});
+var layerRoleSchema = external_exports.enum([
+  "copper",
+  "soldermask",
+  "silkscreen",
+  "solderpaste",
+  "drill",
+  "outline",
+  "other"
+]);
+var layerSideSchema = external_exports.enum(["top", "bottom", "inner", "both", "none"]);
+var normalizedLayerSchema = external_exports.object({
+  name: external_exports.string().min(1),
+  role: layerRoleSchema,
+  side: layerSideSchema,
+  index: external_exports.number().int().positive().optional(),
+  filename: external_exports.string().min(1)
+});
+var componentSideSchema = external_exports.enum(["top", "bottom"]);
+var normalizedComponentSchema = external_exports.object({
+  refDes: external_exports.string().min(1),
+  value: external_exports.string(),
+  footprint: external_exports.string(),
+  mpn: external_exports.string().optional(),
+  manufacturer: external_exports.string().optional(),
+  side: componentSideSchema,
+  xMm: external_exports.number().optional(),
+  yMm: external_exports.number().optional(),
+  rotationDegrees: external_exports.number().optional(),
+  dnp: external_exports.boolean(),
+  sourceFile: external_exports.string().min(1)
+});
+var normalizedDrillHoleSchema = external_exports.object({
+  xMm: external_exports.number(),
+  yMm: external_exports.number(),
+  diameterMm: external_exports.number().positive(),
+  plated: external_exports.boolean()
+});
+var parserWarningSchema = external_exports.object({
+  code: external_exports.string().min(1),
+  message: external_exports.string().min(1),
+  path: external_exports.string().optional()
+});
+var netConnectionSchema = external_exports.object({
+  componentRef: external_exports.string().min(1),
+  pin: external_exports.string().min(1)
+});
+var netlistSchema = external_exports.record(external_exports.string(), external_exports.array(netConnectionSchema));
+var normalizedPcbPackageSchema = external_exports.object({
+  format: cadFormatSchema,
+  formatVersion: external_exports.string().optional(),
+  sourceType: packageSourceTypeSchema,
+  capabilities: ingestionCapabilitiesSchema,
+  board: normalizedBoardMetadataSchema,
+  layers: external_exports.array(normalizedLayerSchema),
+  components: external_exports.array(normalizedComponentSchema),
+  drillHoles: external_exports.array(normalizedDrillHoleSchema),
+  netlist: netlistSchema.optional(),
+  parserWarnings: external_exports.array(parserWarningSchema)
 });
 
 // packages/contracts/src/policy.ts

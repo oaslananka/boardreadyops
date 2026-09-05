@@ -46,6 +46,11 @@ export default async function DashboardPage() {
                 Install the BoardReadyOps GitHub App on a repository with a KiCad project, then open a pull request. The
                 first run appears here.
               </p>
+              <div>
+                <Link className="button button-primary" href="/setup">
+                  Open repository setup preview
+                </Link>
+              </div>
             </EmptyState>
           </Panel>
         ) : (
@@ -78,6 +83,37 @@ export default async function DashboardPage() {
                 </div>
               </dl>
             </section>
+            {summary.repositoriesWithOpenFindings > 0 || summary.supplyAlerts > 0 ? (
+              <div className="dashboard-attention" role="status">
+                <div>
+                  <p className="context-kicker">Attention required</p>
+                  <strong>
+                    {summary.repositoriesWithOpenFindings}{" "}
+                    {summary.repositoriesWithOpenFindings === 1 ? "repository has" : "repositories have"} open findings
+                    {summary.supplyAlerts > 0 ? ` and ${summary.supplyAlerts} supply alerts` : ""} before fabrication.
+                  </strong>
+                </div>
+                <div className="dashboard-attention-action">
+                  <span className="dashboard-attention-tag">Next action</span>
+                  <span>Inspect findings below and resolve blocking design violations.</span>
+                </div>
+              </div>
+            ) : summary.repositoriesWithoutRuns > 0 ? (
+              <div className="dashboard-attention" role="status">
+                <div>
+                  <p className="context-kicker">Setup in progress</p>
+                  <strong>
+                    {summary.repositoriesWithoutRuns}{" "}
+                    {summary.repositoriesWithoutRuns === 1 ? "repository is" : "repositories are"} waiting for an
+                    initial release check.
+                  </strong>
+                </div>
+                <div className="dashboard-attention-action">
+                  <span className="dashboard-attention-tag">Next action</span>
+                  <Link href="/setup">Review setup workflow and dispatch probe →</Link>
+                </div>
+              </div>
+            ) : null}
             <div className="repository-sections">
               {groups.map((group) => (
                 <Panel key={group.accountLogin} title={group.accountLogin} tone="section">
@@ -108,7 +144,9 @@ export default async function DashboardPage() {
                                   <span className="repository-when">{when(repository.latestRunAt)}</span>
                                 </>
                               ) : (
-                                <span className="repository-when">no runs yet</span>
+                                <span className="repository-when">
+                                  no runs yet · <Link href="/setup">setup</Link>
+                                </span>
                               )}
                             </td>
                             <td>{repository.latestRunId ? repository.openFindings : "—"}</td>

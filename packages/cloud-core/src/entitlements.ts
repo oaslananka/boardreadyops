@@ -108,3 +108,23 @@ export function evidenceVisibleFrom(tier: PlanTier, now: Date): Date | undefined
   if (days === null) return undefined;
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 }
+
+export type WorkspaceEntitlement =
+  | "canCreateDeliveryLink"
+  | "canAccessRevisionDiff"
+  | "canConfigureCustomRules"
+  | "canExportTraceableHandoff";
+
+export function hasWorkspaceEntitlement(tier: string | null | undefined, entitlement: WorkspaceEntitlement): boolean {
+  const norm = (tier ?? "community").toLowerCase();
+  if (norm === "community" || norm === "free") {
+    return false;
+  }
+  if (norm === "team") {
+    return entitlement === "canCreateDeliveryLink" || entitlement === "canAccessRevisionDiff";
+  }
+  if (norm === "business" || norm === "pilot" || norm === "enterprise") {
+    return true;
+  }
+  return false;
+}

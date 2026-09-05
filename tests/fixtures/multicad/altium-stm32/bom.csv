@@ -1,0 +1,4 @@
+Designator,Description,Footprint,Manufacturer Part Number,Quantity
+U1,MCU Cortex-M4 32-bit,LQFP-64,STM32F401RET6,1
+C1,Capacitor 0.1uF 50V,0603,CC0603KRX7R9BB104,1
+R1,Resistor 10k 1%,0603,RC0603FR-0710KL,1

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   title: { default: "BoardReadyOps Cloud", template: "%s · BoardReadyOps" },
   description: "Checks whether a KiCad board is ready to fabricate, on every pull request.",
   openGraph: {
-    title: "BoardReadyOps — Catch board mistakes before the fab does.",
+    title: "BoardReadyOps — Know what stands between your board and production.",
     description:
       "KiCad's checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
     url: "https://boardreadyops.com",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "BoardReadyOps — Catch board mistakes before the fab does.",
+    title: "BoardReadyOps — Know what stands between your board and production.",
     description:
       "KiCad's checks run on every pull request and tell you in one line whether the board is ready to fabricate.",
   },

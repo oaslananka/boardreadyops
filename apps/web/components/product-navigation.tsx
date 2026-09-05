@@ -17,12 +17,17 @@ const groups: ReadonlyArray<Readonly<{ label: string; items: readonly Navigation
     label: "Overview",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: "projects" },
+      { label: "Projects", href: "/projects", icon: "projects" },
       { label: "My Work", href: "/work", icon: "work" },
     ],
   },
   {
     label: "Engineering",
-    items: [{ label: "Reviews", href: "/reviews", icon: "reviews" }],
+    items: [
+      { label: "Reviews", href: "/reviews", icon: "reviews" },
+      { label: "Deliveries", href: "/deliveries", icon: "deliveries" },
+      { label: "Parts", href: "/parts", icon: "parts" },
+    ],
   },
   {
     label: "Governance",

@@ -785,6 +785,24 @@ function FindingRow({ finding }: Readonly<{ finding: FindingDetail }>) {
           <dd>{formatRunDate(finding.waivedAt)}</dd>
         </div>
       </dl>
+      <div className="finding-action-guidance">
+        <p className="finding-corrective-action">
+          <strong>Corrective action:</strong> Update source file
+          {finding.path ? (
+            <>
+              {" ("}
+              <code>{finding.path}</code>
+              {")"}
+            </>
+          ) : (
+            ""
+          )}{" "}
+          in KiCad to resolve {finding.ruleId}.
+        </p>
+        <p className="finding-verification-note">
+          <small>Rerun required to verify: Push updated commit to trigger re-analysis in GitHub Actions.</small>
+        </p>
+      </div>
     </li>
   );
 }

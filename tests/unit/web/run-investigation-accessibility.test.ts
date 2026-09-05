@@ -234,6 +234,12 @@ describe("run investigation accessibility", () => {
     expect(artifacts).toContain("Download signed copy");
   });
 
+  it("provides clear corrective action and verification note for findings", () => {
+    const markup = viewMarkup("findings");
+    expect(markup).toContain("Corrective action");
+    expect(markup).toContain("Rerun required to verify");
+  });
+
   it("renders stable investigation flow snapshots", () => {
     expect({
       summary: viewMarkup("summary"),

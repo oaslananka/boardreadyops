@@ -77,6 +77,12 @@ describe("repository setup preview page", () => {
     expect(markup).toContain('href="#readiness"');
   });
 
+  it("emphasizes configuration preview honesty and explicit recovery actions", async () => {
+    const markup = await render({ preset: "prototype" });
+    expect(markup).toContain("Configuration preview only");
+    expect(markup).toContain("Recovery and troubleshooting");
+  });
+
   it("keeps the scrollable configuration preview natively keyboard focusable", async () => {
     const markup = await render({ preset: "production" });
     expect(markup).toContain('class="setup-code-preview"');

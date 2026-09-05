@@ -1,0 +1,4 @@
+"Designator","Footprint","Mid X","Mid Y","Rotation","Layer"
+"U1","LQFP-64","25.40mm","20.00mm","0.00","TopLayer"
+"C1","0603","12.50mm","15.00mm","90.00","TopLayer"
+"R1","0603","14.00mm","15.00mm","0.00","TopLayer"
