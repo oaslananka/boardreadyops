@@ -56,11 +56,7 @@
           "tests/unit/scripts/master-execution-status.test.ts",
           "tests/unit/docs/master-execution-status-docs.test.ts"
         ],
-        "docs": [
-          "docs/development/master-execution-status.md",
-          "docs/superpowers/specs/2026-09-01-master-execution-ledger-design.md",
-          "docs/superpowers/plans/2026-09-01-master-execution-ledger.md"
-        ],
+        "docs": ["docs/development/master-execution-status.md"],
         "deployed": ["not-applicable: repository audit tooling runs in local and CI verification"],
         "commits": ["4310ad9", "28cbc94", "375ecf1", "a214d2a", "5545810"],
         "pullRequests": []
@@ -808,7 +804,7 @@
           "tests/unit/report/review-comment.test.ts",
           "tests/unit/web/run-dashboard.test.ts"
         ],
-        "docs": ["docs/superpowers/specs/2026-08-28-foundry-editorial-product-ui-design.md"],
+        "docs": [],
         "deployed": [],
         "commits": [],
         "pullRequests": []

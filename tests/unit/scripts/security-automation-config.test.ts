@@ -499,7 +499,6 @@ describe("dependency and security automation configuration", () => {
     );
     const candidatePaths = [
       ...workflowNames.map((name) => `.github/workflows/${name}`),
-      "docs/superpowers/plans/2026-08-04-windows-standalone-portable-copy.md",
       "tests/unit/scripts/verify-clean-tree.test.ts",
     ];
     const guardedFiles: string[] = [];
