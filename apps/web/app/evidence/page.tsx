@@ -9,20 +9,22 @@ export const metadata = {
 export default function EvidencePage() {
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame operational-page" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Evidence" }]} />
-        <header className="page-intro">
-          <h1>Releases & Evidence</h1>
-          <p>Signed evidence packs bound to review decisions, approvals and artifact digests.</p>
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">Releases & Evidence</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Signed evidence packs bound to review decisions, approvals and artifact digests.
+          </p>
         </header>
 
-        <div className="panel surface-raised">
-          <p>
+        <div className="rounded-md border border-border bg-card p-4 shadow-lg">
+          <p className="text-sm text-foreground">
             Evidence packs are deterministic, offline-verifiable, and include base/head SHAs, tool versions, digests and
             decision history.
           </p>
           {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable overflow-x region needs tabIndex so keyboard users can scroll it (WCAG 2.1.1, axe scrollable-region-focusable). */}
-          <pre className="setup-code-preview" tabIndex={0}>
+          <pre className="mt-3 overflow-x-auto rounded-md bg-muted p-3 text-sm" tabIndex={0}>
             boardreadyops release verify --ledger ./evidence-ledger.json
           </pre>
         </div>
