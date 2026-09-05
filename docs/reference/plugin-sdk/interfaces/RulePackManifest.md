@@ -76,7 +76,7 @@ Human-readable display name.
 
 ### releaseMode?
 
-> `optional` **releaseMode?**: `"prototype"` \| `"pilot"` \| `"production"`
+> `optional` **releaseMode?**: `"pilot"` \| `"prototype"` \| `"production"`
 
 Release mode to enforce when this pack is active.
 Overrides the project-level releaseMode.

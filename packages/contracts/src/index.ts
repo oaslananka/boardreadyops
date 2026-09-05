@@ -4,6 +4,7 @@ import { artifactContentTypeSchema, runnerLeaseContextSchema } from "./runner-pr
 export * from "./billing.js";
 export * from "./evidence-ledger.js";
 export * from "./external-review.js";
+export * from "./multicad.js";
 export * from "./policy.js";
 export * from "./review.js";
 export * from "./runner-protocol.js";

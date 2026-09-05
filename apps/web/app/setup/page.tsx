@@ -50,6 +50,13 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           <StatusBadge value="preview" label="No repository changes are made here" />
         </header>
 
+        <Alert title="Configuration preview only" tone="info">
+          <p>
+            No files are written to your repository automatically. Review the exact configuration below, commit it
+            through your normal pull request process, and trigger your first run to establish the baseline.
+          </p>
+        </Alert>
+
         <nav className="setup-journey" aria-label="Repository setup steps">
           <a href="#policy-preset">
             <span className="setup-progress-index setup-journey-index">01</span>
@@ -195,12 +202,27 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
             </li>
             <li>The verified preset revision is snapshotted onto every newly accepted run and shown in run history.</li>
           </ol>
-          <Alert title="Troubleshooting remains explicit" tone="warning">
+          <Alert title="Recovery and troubleshooting" tone="warning">
             <p>
               Missing workflow, disabled Actions, incompatible workflow metadata, missing configuration, invalid
               configuration, expired probe, stale probe, and dispatch failure are distinct persisted states with stable
               operator responses.
             </p>
+            <p>If your initial readiness probe does not appear or reports an error, verify:</p>
+            <ul>
+              <li>
+                <strong>Actions permissions:</strong> Confirm GitHub Actions is enabled under Repository Settings &gt;
+                Actions &gt; General.
+              </li>
+              <li>
+                <strong>Local validation:</strong> Run <code>boardreadyops scan</code> locally before committing to
+                verify <code>boardreadyops.yml</code> syntax.
+              </li>
+              <li>
+                <strong>OIDC configuration:</strong> Verify your workflow includes{" "}
+                <code>permissions: id-token: write</code> without manual credential overrides.
+              </li>
+            </ul>
           </Alert>
         </Panel>
 

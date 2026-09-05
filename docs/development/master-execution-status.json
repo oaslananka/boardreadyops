@@ -792,7 +792,11 @@
           "apps/web/lib/run-dashboard.ts",
           "src/core/rule-registry.ts",
           "src/report/review-comment.ts",
-          "packages/db/migrations/0062_finding_category.sql"
+          "packages/db/migrations/0062_finding_category.sql",
+          "apps/web/app/page.tsx",
+          "apps/web/app/setup/page.tsx",
+          "apps/web/app/dashboard/page.tsx",
+          "apps/web/app/styles.css"
         ],
         "tests": [
           "tests/e2e/qa-audit.spec.ts",
@@ -802,17 +806,20 @@
           "tests/unit/core/rule-registry-category-breakdown.test.ts",
           "tests/unit/core/pipeline-category-breakdown.test.ts",
           "tests/unit/report/review-comment.test.ts",
-          "tests/unit/web/run-dashboard.test.ts"
+          "tests/unit/web/run-dashboard.test.ts",
+          "tests/unit/web/home-page.test.ts",
+          "tests/unit/web/repository-setup-page.test.ts",
+          "tests/unit/web/dashboard-page-contract.test.ts"
         ],
         "docs": [],
         "deployed": [],
-        "commits": [],
+        "commits": ["8a2559e", "0bbe002", "f444723", "a52f5e7", "b088ac8", "58f760a"],
         "pullRequests": []
       },
       "verification": {
-        "command": "corepack pnpm vitest run tests/unit/web/run-investigation-accessibility.test.ts tests/unit/web/review-canvas.test.ts tests/unit/web/run-dashboard.test.ts && corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts",
+        "command": "corepack pnpm vitest run tests/unit/web/run-investigation-accessibility.test.ts tests/unit/web/review-canvas.test.ts tests/unit/web/run-dashboard.test.ts tests/unit/web/home-page.test.ts tests/unit/web/repository-setup-page.test.ts tests/unit/web/dashboard-page-contract.test.ts && corepack pnpm exec playwright test tests/e2e/qa-audit.spec.ts",
         "result": "pass",
-        "checkedAt": "2026-09-05T00:56:12Z"
+        "checkedAt": "2026-09-05T02:37:00Z"
       },
       "remaining": "Running the full stated command surfaced and fixed two real bugs, not just confirmed existing behavior. (1) /reviews/rev_edge_ble_09 -- a deliberate known-bug regression id (qa/audit/routes.ts's brokenDemoReviewId, asserted to 404 by tests/e2e/regression-audit-findings.spec.ts) -- was 500ing instead: loadServerReview only demo-fixture-short-circuited rev_gateway_* ids, so any other id fell through to resolveCloudPersistenceConfiguration(), which throws uncaught when DATABASE_URL is unset. Fixed in apps/web/lib/server-review-loader.ts by catching the missing-database-url case and returning null (-> notFound()) instead of letting it propagate as an unhandled 500. (2) Even after that fix, the qa-audit crawler's checkInternalLinks flagged the (now-correct) 404 as a P0 broken-internal-link finding, because it never excluded the known-bug id; added that exclusion in tests/e2e/qa-audit.spec.ts. Both confirmed via the repo's real nightly CI history (run 33605754839, 2026-09-02): 'ci / qa-audit gate' and 'qa-nightly / full-audit' were already failing on main with this exact P0 finding, so this was a genuine pre-existing defect, not a local artifact. verification.command above deliberately excludes tests/e2e/visual.spec.ts: that suite fails independently and unrelated to this fix -- no Linux screenshot baselines have ever been committed (only *-win32.png), so 'qa-nightly / visual-regression' has been failing on main from its first run with 'snapshot doesn't exist' for all 5 routes, on every browser. That is a separate CI/tooling gap (baseline generation), out of scope here. Since then: per-domain score cards now render in both the local CLI/Action PR comment ('### By domain' table, src/report/review-comment.ts) and the web run dashboard (CategoryBreakdownPanel in apps/web/components/run-investigation.tsx, fed by a new aggregate query in apps/web/lib/run-dashboard.ts's lookupRunDashboard), both backed by the same real per-domain finding breakdown (src/core/rule-registry.ts's categorizeFindings, and the findings.category column persisted via migration 0062) rather than two divergent classifications. Still open: no 'Open in KiCad' deep link (only GitHub Actions deep links)."
     },

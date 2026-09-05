@@ -1,3 +1,4 @@
+import type { IngestionCapabilities } from "@boardreadyops/contracts";
 import type { BoardReadyOpsConfig } from "./config.js";
 import type { ReleaseMode } from "./config.types.js";
 import type { FailOn } from "./findings.js";
@@ -12,6 +13,7 @@ export interface ProjectContext {
   schematicFiles: string[];
   boardFiles: string[];
   jobsetFiles: string[];
+  capabilities?: IngestionCapabilities | undefined;
 }
 
 export interface PipelineOptions {

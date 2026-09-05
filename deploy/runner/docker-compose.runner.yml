@@ -1,0 +1,37 @@
+# BoardReadyOps Customer-Hosted Private Runner Cluster
+# Deploys isolated worker agents within a customer VPC or on-prem hardware.
+
+services:
+  boardreadyops-runner:
+    image: ghcr.io/oaslananka/boardreadyops:latest
+    restart: unless-stopped
+    environment:
+      # Control Plane Connection
+      RUNNER_CONTROL_PLANE_URL: ${RUNNER_CONTROL_PLANE_URL:?set RUNNER_CONTROL_PLANE_URL}
+      RUNNER_ENROLLMENT_TOKEN: ${RUNNER_ENROLLMENT_TOKEN:?set RUNNER_ENROLLMENT_TOKEN}
+      RUNNER_ID: ${RUNNER_ID:-vpc-worker-01}
+      RUNNER_CAPABILITIES: "kicad,altium_headless,cadence_headless,multicad_ingest"
+      # Security & Isolation
+      RUNNER_JOB_TIMEOUT_SECONDS: "600"
+      RUNNER_MAX_CONCURRENT_JOBS: "2"
+      RUNNER_PERSISTENCE_MODE: "ephemeral"
+    volumes:
+      # Ephemeral build directory mounted in memory or local scratch
+      - runner_workspace:/tmp/boardreadyops-jobs
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8192M
+        reservations:
+          cpus: "1.0"
+          memory: 2048M
+    healthcheck:
+      test: ["CMD-SHELL", "boardreadyops --version || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  runner_workspace:

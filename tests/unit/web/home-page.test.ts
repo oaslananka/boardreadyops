@@ -51,7 +51,7 @@ describe("HomePage", () => {
     expect(graph.map((item) => item["@type"])).toEqual(["WebSite", "SoftwareApplication", "WebPage", "BreadcrumbList"]);
     const webPage = graph.find((item) => item["@type"] === "WebPage");
     expect(webPage).toMatchObject({
-      headline: "Catch board mistakes before the fab does.",
+      headline: "Know what stands between your board and production.",
       description: expect.any(String),
       url: "https://boardreadyops.com/",
       dateModified: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
@@ -62,7 +62,18 @@ describe("HomePage", () => {
   });
   it("shows the primary headline", () => {
     const text = collectText(HomePage());
-    expect(text).toContain("Catch board mistakes before the fab does.");
+    expect(text).toContain("Know what stands between your board and production.");
+  });
+
+  it("visibly labels the hero evidence stack as an illustrative sample review", () => {
+    const text = collectText(HomePage());
+    expect(text).toContain("Sample review · USB-C Sensor Node v2.1");
+    expect(text).toContain("Illustrative sample");
+  });
+
+  it("reconciles manufacturing generation and validation in the release FAQ", () => {
+    const text = collectText(HomePage());
+    expect(text).toContain("boardreadyops generate");
   });
 
   it("shows the three feature-grid headings", () => {

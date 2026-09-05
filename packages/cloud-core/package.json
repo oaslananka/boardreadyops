@@ -9,6 +9,16 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./archive-sanitizer": {
+      "types": "./src/archive-sanitizer.ts",
+      "import": "./src/archive-sanitizer.ts",
+      "default": "./src/archive-sanitizer.ts"
+    },
+    "./xml-sanitizer": {
+      "types": "./src/xml-sanitizer.ts",
+      "import": "./src/xml-sanitizer.ts",
+      "default": "./src/xml-sanitizer.ts"
+    },
     "./lifecycle": {
       "types": "./src/lifecycle.ts",
       "import": "./src/lifecycle.ts",

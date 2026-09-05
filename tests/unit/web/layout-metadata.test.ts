@@ -27,7 +27,7 @@ describe("root layout metadata", () => {
   });
 
   it("sets Open Graph fields for social sharing", () => {
-    expect(metadata.openGraph?.title).toBe("BoardReadyOps — Catch board mistakes before the fab does.");
+    expect(metadata.openGraph?.title).toBe("BoardReadyOps — Know what stands between your board and production.");
     expect(metadata.openGraph?.url).toBe("https://boardreadyops.com");
     expect((metadata.openGraph as { type?: string })?.type).toBe("website");
   });

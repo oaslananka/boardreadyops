@@ -25,7 +25,7 @@ export const PUBLIC_STRUCTURED_DATA = {
     {
       "@type": "WebPage",
       "@id": `${PUBLIC_SITE_ORIGIN}/#webpage`,
-      headline: "Catch board mistakes before the fab does.",
+      headline: "Know what stands between your board and production.",
       description: productDescription,
       url: homepageUrl,
       dateModified: PUBLIC_CONTENT_LAST_UPDATED,

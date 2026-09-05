@@ -35,6 +35,10 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("ControlPlaneOutbox");
     expect(cloudDatabaseModels).toContain("ControlPlaneReconciliationItem");
     expect(cloudDatabaseModels).toContain("ControlPlaneReplayOperation");
+    expect(cloudDatabaseModels).toContain("Workspace");
+    expect(cloudDatabaseModels).toContain("Project");
+    expect(cloudDatabaseModels).toContain("Revision");
+    expect(cloudDatabaseModels).toContain("Delivery");
   });
 
   it("discovers SQL migrations in deterministic order", async () => {
@@ -103,6 +107,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0060_stripe_subscription_event_ordering.sql",
       "0061_run_snapshots.sql",
       "0062_finding_category.sql",
+      "0063_workspace_project_model.sql",
     ]);
   });
 
@@ -116,6 +121,19 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain(
       "'electrical', 'manufacturability', 'assembly', 'testability', 'sourcing', 'release', 'unclassified'",
     );
+  });
+
+  it("creates workspace, project, revision, and delivery tables in schema v63", async () => {
+    const sql = (await readFile(join(migrationsDir, "0063_workspace_project_model.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("create table if not exists workspaces");
+    expect(sql).toContain("create table if not exists workspace_memberships");
+    expect(sql).toContain("create table if not exists projects");
+    expect(sql).toContain("create table if not exists revisions");
+    expect(sql).toContain("create table if not exists deliveries");
+    expect(sql).toContain("references workspaces(id) on delete cascade");
+    expect(sql).toContain("references projects(id) on delete cascade");
+    expect(sql).toContain("references revisions(id) on delete cascade");
   });
 
   it("stores review-canvas snapshot manifests per release run in schema v61", async () => {

@@ -29,7 +29,7 @@ import { loadPlugins } from "./plugin-loader.js";
 import { evaluatePolicy } from "./policy.js";
 import { computeReadiness, type ReadinessScore } from "./readiness.js";
 import { type ProjectBom, projectBomComponent, type RunResult } from "./result.js";
-import { categorizeFindings, listRules } from "./rule-registry.js";
+import { categorizeFindings, checkRuleCapabilities, listRules } from "./rule-registry.js";
 import { applySuppressions } from "./suppressions.js";
 import { applyWaivers, type FalsePositiveSignal } from "./waivers.js";
 
@@ -198,6 +198,28 @@ async function validatePhase(
     const output: Finding[] = [];
     for (const rule of activeRules) {
       ctx.options.signal?.throwIfAborted();
+      const capCheck = checkRuleCapabilities(rule, project.capabilities);
+      if (!capCheck.allowed) {
+        output.push(
+          createFinding({
+            ruleId: rule.meta.id,
+            severity: "info",
+            project: project.projectFile,
+            message: `Status: Unchecked · Reason: ${capCheck.reason}`,
+            resource: {
+              path: project.projectFile,
+              kind: "project",
+            },
+            details: {
+              status: "Unchecked",
+              reason: capCheck.reason,
+              skipped: true,
+            },
+          }),
+        );
+        continue;
+      }
+
       const startedAt = performance.now();
       ctx.logger.debug("pipeline.rule.start", {
         rule: rule.meta.id,

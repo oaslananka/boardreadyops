@@ -1,0 +1,4 @@
+Designator,Footprint,Mid X,Mid Y,Layer,Rotation
+U1,QFN-56,20.0,15.0,Top,0
+U2,SOIC-8,30.0,15.0,Top,90
+C1,0402,15.0,12.0,Top,0

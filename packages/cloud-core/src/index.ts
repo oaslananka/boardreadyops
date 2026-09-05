@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve, sep } from "node:path";
 
+export * from "./archive-sanitizer.js";
 export * from "./component-intelligence.js";
 export * from "./decision-engine.js";
 export * from "./entitlements.js";
@@ -12,6 +13,7 @@ export * from "./runner-request-signature.js";
 export * from "./storage.js";
 export * from "./stripe-service.js";
 export * from "./wdrr-metrics.js";
+export * from "./xml-sanitizer.js";
 
 export interface VerifyGitHubWebhookOptions {
   payload: string | Buffer;

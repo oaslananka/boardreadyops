@@ -88,12 +88,14 @@ export type BillingActivity = z.infer<typeof billingActivitySchema>;
 export const checkoutRequestSchema = z.object({
   tier: z.enum(["team", "business"]),
   interval: billingIntervalSchema.default("month"),
+  workspaceId: z.string().optional(),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
 });
 export type CheckoutRequest = z.infer<typeof checkoutRequestSchema>;
 
 export const portalRequestSchema = z.object({
+  workspaceId: z.string().optional(),
   returnUrl: z.string().url().optional(),
 });
 export type PortalRequest = z.infer<typeof portalRequestSchema>;

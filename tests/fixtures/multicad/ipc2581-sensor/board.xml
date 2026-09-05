@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<IPC-2581 revision="B" xmlns="http://webstds.ipc.org/2581">
+  <Content units="MILLIMETER" cadSystem="Altium Designer" version="22.0">
+    <Function mode="DESIGN"/>
+    <StepRef name="PRIMARY"/>
+  </Content>
+  <LogisticHeader>
+    <Enterprise codename="BOARDREADYOPS"/>
+  </LogisticHeader>
+  <Bom>
+    <BomItem item="1" count="1">
+      <ComponentRef componentRef="U1"/>
+      <Characteristics>
+        <Characteristic category="ELECTRICAL" name="VALUE" value="STM32G030K6T6"/>
+        <Characteristic category="PACKAGE" name="PACKAGE" value="LQFP32"/>
+        <Characteristic category="PROCUREMENT" name="MPN" value="STM32G030K6T6"/>
+      </Characteristics>
+    </BomItem>
+    <BomItem item="2" count="1">
+      <ComponentRef componentRef="C1"/>
+      <Characteristics>
+        <Characteristic category="ELECTRICAL" name="VALUE" value="100nF"/>
+        <Characteristic category="PACKAGE" name="PACKAGE" value="0402"/>
+        <Characteristic category="PROCUREMENT" name="MPN" value="CL05B104KO5NNNC"/>
+      </Characteristics>
+    </BomItem>
+  </Bom>
+  <Ecad name="IPC2581_SENSOR">
+    <CadHeader>
+      <Units units="MILLIMETER"/>
+    </CadHeader>
+    <CadData>
+      <Stackup name="STANDARD_4_LAYER" totalThickness="1.6">
+        <StackupGroup name="PRIMARY">
+          <StackupLayer layerName="TOP_COPPER" thickness="0.035" sequence="1"/>
+          <StackupLayer layerName="BOTTOM_COPPER" thickness="0.035" sequence="2"/>
+        </StackupGroup>
+      </Stackup>
+      <Layer name="TOP_COPPER" layerFunction="CONDUCTOR" side="TOP" sequence="1"/>
+      <Layer name="TOP_SOLDERMASK" layerFunction="SOLDERMASK" side="TOP"/>
+      <Layer name="TOP_SILKSCREEN" layerFunction="LEGEND" side="TOP"/>
+      <Layer name="BOTTOM_COPPER" layerFunction="CONDUCTOR" side="BOTTOM" sequence="2"/>
+      <Layer name="BOTTOM_SOLDERMASK" layerFunction="SOLDERMASK" side="BOTTOM"/>
+      <Layer name="BOARD_OUTLINE" layerFunction="DOCUMENT" side="NONE"/>
+      <Step name="PRIMARY">
+        <Profile>
+          <Polygon>
+            <PolyBegin x="0.0" y="0.0"/>
+            <PolyStepSegment x="50.0" y="0.0"/>
+            <PolyStepSegment x="50.0" y="40.0"/>
+            <PolyStepSegment x="0.0" y="40.0"/>
+            <PolyStepSegment x="0.0" y="0.0"/>
+          </Polygon>
+        </Profile>
+        <Component refDes="U1" packageRef="LQFP32" layerRef="TOP_COPPER" side="TOP">
+          <Xform x="25.0" y="20.0" rotation="0.0"/>
+        </Component>
+        <Component refDes="C1" packageRef="0402" layerRef="TOP_COPPER" side="TOP">
+          <Xform x="20.0" y="15.0" rotation="90.0"/>
+        </Component>
+        <LogicalNetlist name="CAD_NETLIST">
+          <Net name="GND">
+            <Node componentRef="U1" pin="16"/>
+            <Node componentRef="C1" pin="2"/>
+          </Net>
+          <Net name="+3V3">
+            <Node componentRef="U1" pin="1"/>
+            <Node componentRef="C1" pin="1"/>
+          </Net>
+        </LogicalNetlist>
+      </Step>
+    </CadData>
+  </Ecad>
+</IPC-2581>

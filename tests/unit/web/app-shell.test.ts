@@ -13,6 +13,11 @@ describe("AppShell", () => {
 
     expect(markup).toContain("BoardReadyOps");
     expect(markup).toContain('href="/"');
+    expect(markup).toContain('href="/dashboard"');
+    expect(markup).toContain('href="/projects"');
+    expect(markup).toContain('href="/reviews"');
+    expect(markup).toContain('href="/deliveries"');
+    expect(markup).toContain('href="/parts"');
     expect(markup).toContain('href="/setup"');
     expect(markup).toContain('href="https://docs.boardreadyops.com"');
     expect(markup).toContain('href="#main-content"');

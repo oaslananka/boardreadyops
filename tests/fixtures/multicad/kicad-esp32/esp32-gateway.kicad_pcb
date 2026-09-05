@@ -1,0 +1,14 @@
+(kicad_pcb (version 20240108) (generator kicad-cli)
+  (general
+    (thickness 1.6)
+  )
+  (layers
+    (0 "F.Cu" signal)
+    (31 "B.Cu" signal)
+    (44 "Edge.Cuts" user)
+  )
+  (gr_line (start 0 0) (end 50 0) (layer "Edge.Cuts") (width 0.1))
+  (gr_line (start 50 0) (end 50 40) (layer "Edge.Cuts") (width 0.1))
+  (gr_line (start 50 40) (end 0 40) (layer "Edge.Cuts") (width 0.1))
+  (gr_line (start 0 40) (end 0 0) (layer "Edge.Cuts") (width 0.1))
+)

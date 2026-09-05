@@ -39,3 +39,8 @@ TEMP/
 # Authenticated Unlighthouse audit output
 /.unlighthouse/
 /control-plane-run-listing-benchmark-report.json
+
+# Private agent planning artifacts
+/docs/superpowers/
+/task_tracker.md
+/walkthrough.md
