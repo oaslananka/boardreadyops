@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Dialog } from "../../components/dialog.js";
+import { Button } from "../../components/ui/button.js";
 import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 
 export interface PolicyRecord {
@@ -78,49 +79,55 @@ function PolicyCard({ policy, onDelete }: PolicyCardProps) {
   const scopeLabel = formatScopeLabel(policy.scope);
 
   return (
-    <article className="policy-card panel surface-raised">
-      <header className="policy-card-header">
-        <div className="policy-card-scope-bar">
-          <span className={`policy-scope-chip ${policy.scope}`}>{scopeLabel}</span>
-          {policy.scopeId ? <code className="policy-scope-id">{policy.scopeId}</code> : null}
+    <article className="flex flex-col gap-3 rounded-md border border-border bg-card p-4 shadow-lg">
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs uppercase text-muted-foreground">
+            {scopeLabel}
+          </span>
+          {policy.scopeId ? <code className="text-xs">{policy.scopeId}</code> : null}
         </div>
-        <button
+        <Button
           type="button"
-          className="button button-secondary button-small button-delete"
+          variant="secondary"
+          size="sm"
+          className="button-delete"
           onClick={() => onDelete(policy.id, policy.name)}
           aria-label={`Delete policy ${policy.name}`}
         >
           Delete
-        </button>
+        </Button>
       </header>
 
-      <div className="policy-card-main">
-        <h3 className="policy-title">{policy.name}</h3>
-        {policy.description ? <p className="policy-description">{policy.description}</p> : null}
+      <div>
+        <h3 className="text-base font-bold text-foreground">{policy.name}</h3>
+        {policy.description ? <p className="mt-1 text-sm text-muted-foreground">{policy.description}</p> : null}
 
-        <div className="policy-gates-cluster">
-          <div className="gate-item">
-            <span className="gate-label">Severity Gate:</span>
-            {policy.severityGate ? (
-              <StatusBadge value={mapGateTone(policy.severityGate)} label={`Block on ${policy.severityGate}`} />
-            ) : (
-              <span className="advisory-pill">Advisory Only</span>
-            )}
-          </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Severity Gate:</span>
+          {policy.severityGate ? (
+            <StatusBadge value={mapGateTone(policy.severityGate)} label={`Block on ${policy.severityGate}`} />
+          ) : (
+            <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">Advisory Only</span>
+          )}
 
-          {policy.requireEvidencePack ? <span className="compliance-pill evidence">Evidence Pack Enforced</span> : null}
+          {policy.requireEvidencePack ? (
+            <span className="rounded-sm bg-info-surface px-1.5 py-0.5 text-xs text-info">Evidence Pack Enforced</span>
+          ) : null}
 
           {policy.requireExternalReview ? (
-            <span className="compliance-pill external">External Sign-Off Required</span>
+            <span className="rounded-sm bg-warning-surface px-1.5 py-0.5 text-xs text-warning">
+              External Sign-Off Required
+            </span>
           ) : null}
         </div>
 
         {policy.requiredRoles.length > 0 ? (
-          <div className="policy-spec-row">
-            <span className="spec-label">Required Roles:</span>
-            <div className="spec-tags">
+          <div className="mt-3">
+            <span className="text-xs text-muted-foreground">Required Roles:</span>
+            <div className="mt-1 flex flex-wrap gap-1.5">
               {policy.requiredRoles.map((role) => (
-                <span key={role} className="policy-tag role">
+                <span key={role} className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                   Role: {role}
                 </span>
               ))}
@@ -129,12 +136,14 @@ function PolicyCard({ policy, onDelete }: PolicyCardProps) {
         ) : null}
 
         {policy.requiredChecklist.length > 0 ? (
-          <details className="policy-spec-row">
-            <summary className="spec-label">Verification Checklist ({policy.requiredChecklist.length} items)</summary>
-            <ul className="policy-checklist-preview">
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs text-muted-foreground">
+              Verification Checklist ({policy.requiredChecklist.length} items)
+            </summary>
+            <ul className="mt-2 flex flex-col gap-1 text-sm">
               {policy.requiredChecklist.map((chk) => (
-                <li key={chk}>
-                  <span className="check-icon">✓</span>
+                <li key={chk} className="flex items-center gap-2">
+                  <span className="text-success">✓</span>
                   <span>{chk}</span>
                 </li>
               ))}
@@ -165,23 +174,29 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const inputClass =
+    "mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  const labelClass = "text-sm font-medium text-foreground";
+
   return (
     <Panel
       title="Create Governance Policy"
       description="Define release blocking criteria, required approvers, and verification checks."
       tone="raised"
     >
-      <form onSubmit={onSubmit} className="policy-builder-form">
-        <div className="policy-form-grid">
-          <fieldset className="form-section-card panel surface-default">
-            <legend className="section-title">1. Scope & Identity</legend>
-            <div className="form-group">
-              <label htmlFor="policy-scope">Governance Scope *</label>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <fieldset className="flex flex-col gap-3 rounded-md border border-border p-3">
+            <legend className="px-1 text-xs font-bold uppercase text-muted-foreground">1. Scope & Identity</legend>
+            <div>
+              <label htmlFor="policy-scope" className={labelClass}>
+                Governance Scope *
+              </label>
               <select
                 id="policy-scope"
                 value={draft.scope}
                 onChange={(e) => onChange({ ...draft, scope: e.target.value as PolicyRecord["scope"] })}
-                className="form-select"
+                className={inputClass}
               >
                 <option value="organization">Organization (Global baseline for all repositories)</option>
                 <option value="team">Team (Applies to all repositories owned by a team)</option>
@@ -190,8 +205,8 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
             </div>
 
             {draft.scope !== "organization" ? (
-              <div className="form-group">
-                <label htmlFor="policy-scope-id">
+              <div>
+                <label htmlFor="policy-scope-id" className={labelClass}>
                   {draft.scope === "team" ? "Team Identifier *" : "Repository Path / ID *"}
                 </label>
                 <input
@@ -199,10 +214,10 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
                   value={draft.scopeId}
                   onChange={(e) => onChange({ ...draft, scopeId: e.target.value })}
                   placeholder={draft.scope === "team" ? "e.g. rf-engineering" : "e.g. acme/power-distribution"}
-                  className="form-input"
+                  className={inputClass}
                   required
                 />
-                <span className="field-help">
+                <span className="mt-1 block text-xs text-muted-foreground">
                   {draft.scope === "team"
                     ? "Slug or name of the engineering team"
                     : "Full repository name or identifier"}
@@ -210,35 +225,43 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               </div>
             ) : null}
 
-            <div className="form-group">
-              <label htmlFor="policy-name">Policy Name *</label>
+            <div>
+              <label htmlFor="policy-name" className={labelClass}>
+                Policy Name *
+              </label>
               <input
                 id="policy-name"
                 value={draft.name}
                 onChange={(e) => onChange({ ...draft, name: e.target.value })}
                 placeholder="e.g. High-Voltage Creepage & Clearance Gate"
-                className="form-input"
+                className={inputClass}
                 required
               />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="policy-desc">Policy Description</label>
+            <div>
+              <label htmlFor="policy-desc" className={labelClass}>
+                Policy Description
+              </label>
               <textarea
                 id="policy-desc"
                 value={draft.description}
                 onChange={(e) => onChange({ ...draft, description: e.target.value })}
                 placeholder="Describe the safety, fabrication, or quality purpose of this policy..."
-                className="form-textarea"
+                className={inputClass}
                 rows={2}
               />
             </div>
           </fieldset>
 
-          <fieldset className="form-section-card panel surface-default">
-            <legend className="section-title">2. Severity Gate & Approvers</legend>
-            <div className="form-group">
-              <label htmlFor="policy-gate">Minimum Severity Gate (Blocks Release)</label>
+          <fieldset className="flex flex-col gap-3 rounded-md border border-border p-3">
+            <legend className="px-1 text-xs font-bold uppercase text-muted-foreground">
+              2. Severity Gate & Approvers
+            </legend>
+            <div>
+              <label htmlFor="policy-gate" className={labelClass}>
+                Minimum Severity Gate (Blocks Release)
+              </label>
               <select
                 id="policy-gate"
                 value={draft.severityGate}
@@ -248,7 +271,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
                     severityGate: (e.target.value || "") as DraftPolicyState["severityGate"],
                   })
                 }
-                className="form-select"
+                className={inputClass}
               >
                 <option value="">None (Advisory only)</option>
                 <option value="error">Block on Critical & Error findings (Recommended)</option>
@@ -257,92 +280,111 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               </select>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="policy-roles">Required Approver Roles (Comma-separated)</label>
+            <div>
+              <label htmlFor="policy-roles" className={labelClass}>
+                Required Approver Roles (Comma-separated)
+              </label>
               <input
                 id="policy-roles"
                 value={draft.requiredRoles}
                 onChange={(e) => onChange({ ...draft, requiredRoles: e.target.value })}
                 placeholder="e.g. hardware-lead, compliance, rf-specialist"
-                className="form-input"
+                className={inputClass}
               />
               {roleTags.length > 0 ? (
-                <div className="form-tag-preview">
+                <div className="mt-1 flex flex-wrap gap-1.5">
                   {roleTags.map((r) => (
-                    <span key={r} className="policy-tag role">
+                    <span key={r} className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                       Role: {r}
                     </span>
                   ))}
                 </div>
               ) : (
-                <span className="field-help">Design sign-offs require approval from designated roles.</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Design sign-offs require approval from designated roles.
+                </span>
               )}
             </div>
 
-            <div className="form-group">
-              <label htmlFor="policy-checklist">Required Verification Checklist Items (Comma-separated)</label>
+            <div>
+              <label htmlFor="policy-checklist" className={labelClass}>
+                Required Verification Checklist Items (Comma-separated)
+              </label>
               <input
                 id="policy-checklist"
                 value={draft.requiredChecklist}
                 onChange={(e) => onChange({ ...draft, requiredChecklist: e.target.value })}
                 placeholder="e.g. DFM review confirmed, High-voltage clearance >= 1.5mm"
-                className="form-input"
+                className={inputClass}
               />
               {checklistTags.length > 0 ? (
-                <div className="form-tag-preview">
+                <div className="mt-1 flex flex-wrap gap-1.5">
                   {checklistTags.map((c) => (
-                    <span key={c} className="policy-tag check">
+                    <span key={c} className="rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                       Check: {c}
                     </span>
                   ))}
                 </div>
               ) : (
-                <span className="field-help">Reviewers must check off these items before sign-off passes.</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Reviewers must check off these items before sign-off passes.
+                </span>
               )}
             </div>
           </fieldset>
 
-          <fieldset className="form-section-card panel surface-default">
-            <legend className="section-title">3. Compliance & Evidence Pack</legend>
-            <div className="checkbox-cards-group">
-              <div className={`checkbox-card panel surface-sunken ${draft.requireEvidencePack ? "selected" : ""}`}>
+          <fieldset className="flex flex-col gap-3 rounded-md border border-border p-3">
+            <legend className="px-1 text-xs font-bold uppercase text-muted-foreground">
+              3. Compliance & Evidence Pack
+            </legend>
+            <div className="flex flex-col gap-2">
+              <div
+                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireEvidencePack ? "border-primary bg-accent" : "border-border"}`}
+              >
                 <input
                   id="chk-require-evidence-pack"
                   type="checkbox"
                   checked={draft.requireEvidencePack}
                   onChange={(e) => onChange({ ...draft, requireEvidencePack: e.target.checked })}
+                  className="mt-0.5"
                 />
-                <label htmlFor="chk-require-evidence-pack" className="checkbox-card-content">
-                  <strong>Require Verified Evidence Pack</strong>
-                  <p>
-                    Mandates verified evidence digests bound to KiCad DRC reports, BOM snapshots, and release manifests.
+                <label htmlFor="chk-require-evidence-pack" className="text-sm">
+                  <strong className="font-medium text-foreground">Require Verified Evidence Pack</strong>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Mandates verified evidence digests bound to CAD DRC/ERC reports, BOM snapshots, and release
+                    manifests.
                   </p>
                 </label>
               </div>
 
-              <div className={`checkbox-card panel surface-sunken ${draft.requireExternalReview ? "selected" : ""}`}>
+              <div
+                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireExternalReview ? "border-primary bg-accent" : "border-border"}`}
+              >
                 <input
                   id="chk-require-external-review"
                   type="checkbox"
                   checked={draft.requireExternalReview}
                   onChange={(e) => onChange({ ...draft, requireExternalReview: e.target.checked })}
+                  className="mt-0.5"
                 />
-                <label htmlFor="chk-require-external-review" className="checkbox-card-content">
-                  <strong>Require External / Third-Party Review</strong>
-                  <p>Mandates external partner, lab, or customer sign-off before manufacturing gate is unlocked.</p>
+                <label htmlFor="chk-require-external-review" className="text-sm">
+                  <strong className="font-medium text-foreground">Require External / Third-Party Review</strong>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Mandates external partner, lab, or customer sign-off before manufacturing gate is unlocked.
+                  </p>
                 </label>
               </div>
             </div>
           </fieldset>
         </div>
 
-        <footer className="policy-builder-footer">
-          <button type="button" className="button button-secondary" onClick={onClose}>
+        <footer className="policy-builder-footer flex items-center justify-end gap-2 border-t border-border pt-3">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button type="submit" disabled={submitting} className="button button-primary">
+          </Button>
+          <Button type="submit" disabled={submitting}>
             {submitting ? "Saving Policy…" : "Save Policy"}
-          </button>
+          </Button>
         </footer>
       </form>
     </Panel>
@@ -351,43 +393,49 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
 
 function PolicyInheritanceDiagram() {
   return (
-    <section className="policy-inheritance-diagram panel surface-inset" aria-label="Policy inheritance hierarchy">
-      <div className="inheritance-lead">
-        <h3>Policy Hierarchy & Scope Resolution</h3>
-        <p>
-          BoardReadyOps resolves governance rules top-down with strict inheritance. Repositories inherit organization
-          and team baselines. Stricter rules apply automatically; exceptions require formal review waivers.
-        </p>
-      </div>
-      <div className="inheritance-layers-grid">
-        <div className="inheritance-layer-card organization">
-          <div className="layer-badge">Level 1: Global</div>
-          <h4>Organization</h4>
-          <p>Baseline severity gates, mandatory DFM checks, and global sign-off requirements.</p>
+    <section className="rounded-md border border-border bg-muted p-4" aria-label="Policy inheritance hierarchy">
+      <h3 className="text-base font-bold text-foreground">Policy Hierarchy & Scope Resolution</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        BoardReadyOps resolves governance rules top-down with strict inheritance. Repositories inherit organization and
+        team baselines. Stricter rules apply automatically; exceptions require formal review waivers.
+      </p>
+      <div className="mt-4 grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="text-xs uppercase text-muted-foreground">Level 1: Global</div>
+          <h4 className="text-sm font-bold text-foreground">Organization</h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Baseline severity gates, mandatory DFM checks, and global sign-off requirements.
+          </p>
         </div>
-        <div className="inheritance-arrow" aria-hidden="true">
+        <div className="hidden text-center text-muted-foreground sm:block" aria-hidden="true">
           →
         </div>
-        <div className="inheritance-layer-card team">
-          <div className="layer-badge">Level 2: Domain</div>
-          <h4>Team Scope</h4>
-          <p>Domain-specific criteria (e.g. RF impedance, automotive isolation, power rail integrity).</p>
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="text-xs uppercase text-muted-foreground">Level 2: Domain</div>
+          <h4 className="text-sm font-bold text-foreground">Team Scope</h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Domain-specific criteria (e.g. RF impedance, automotive isolation, power rail integrity).
+          </p>
         </div>
-        <div className="inheritance-arrow" aria-hidden="true">
+        <div className="hidden text-center text-muted-foreground sm:block" aria-hidden="true">
           →
         </div>
-        <div className="inheritance-layer-card repository">
-          <div className="layer-badge">Level 3: Project</div>
-          <h4>Repository</h4>
-          <p>Per-board tighter tolerances, stackup layer count rules, and custom verification checklists.</p>
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="text-xs uppercase text-muted-foreground">Level 3: Project</div>
+          <h4 className="text-sm font-bold text-foreground">Repository</h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Per-board tighter tolerances, stackup layer count rules, and custom verification checklists.
+          </p>
         </div>
-        <div className="inheritance-arrow" aria-hidden="true">
+        <div className="hidden text-center text-muted-foreground sm:block" aria-hidden="true">
           →
         </div>
-        <div className="inheritance-layer-card exception">
-          <div className="layer-badge">Level 4: Waiver</div>
-          <h4>Review Exception</h4>
-          <p>Time-bound, break-glass sign-offs and auditable risk acceptances.</p>
+        <div className="rounded-md border border-border bg-card p-3">
+          <div className="text-xs uppercase text-muted-foreground">Level 4: Waiver</div>
+          <h4 className="text-sm font-bold text-foreground">Review Exception</h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Time-bound, break-glass sign-offs and auditable risk acceptances.
+          </p>
         </div>
       </div>
     </section>
@@ -522,47 +570,55 @@ export default function PoliciesClient() {
   const enforcementSummary = summarizeEnforcement(policies ?? []);
 
   return (
-    <div className="policies-workspace">
+    <div className="flex flex-col gap-5">
       <PolicyInheritanceDiagram />
 
-      <section className="policies-toolbar decision-band" aria-label="Policies summary and actions">
-        <div className="metric-strip">
-          <span className="metric-pill">
+      <section
+        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-3"
+        aria-label="Policies summary and actions"
+      >
+        <div className="flex flex-wrap gap-4 text-sm">
+          <span>
             <strong>{policies?.length ?? 0}</strong> Active Policies
           </span>
-          <span className="metric-pill">
+          <span>
             Scope: <strong>{scopeSummary}</strong>
           </span>
-          <span className="metric-pill">
+          <span>
             Enforcement: <strong>{enforcementSummary}</strong>
           </span>
         </div>
-        <div className="toolbar-actions">
-          <button
-            type="button"
-            className={`button ${showBuilder ? "button-secondary" : "button-primary"}`}
-            onClick={() => {
-              if (showBuilder) {
-                closeBuilder();
-              } else {
-                setShowBuilder(true);
-              }
-              setError(null);
-              setSuccessMessage(null);
-            }}
-          >
-            {showBuilder ? "✕ Close Policy Builder" : "+ New Governance Policy"}
-          </button>
-        </div>
+        <Button
+          type="button"
+          variant={showBuilder ? "secondary" : "default"}
+          onClick={() => {
+            if (showBuilder) {
+              closeBuilder();
+            } else {
+              setShowBuilder(true);
+            }
+            setError(null);
+            setSuccessMessage(null);
+          }}
+        >
+          {showBuilder ? "✕ Close Policy Builder" : "+ New Governance Policy"}
+        </Button>
       </section>
 
       {error ? (
-        <div className="alert-banner error" role="alert">
+        <div
+          className="rounded-md border border-danger/40 bg-danger-surface px-4 py-3 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </div>
       ) : null}
 
-      {successMessage ? <output className="alert-banner success">✓ {successMessage}</output> : null}
+      {successMessage ? (
+        <output className="rounded-md border border-success/40 bg-success-surface px-4 py-3 text-sm text-success">
+          ✓ {successMessage}
+        </output>
+      ) : null}
 
       {showBuilder ? (
         <PolicyBuilderForm
@@ -574,36 +630,38 @@ export default function PoliciesClient() {
         />
       ) : null}
 
-      <section className="active-policies-section" aria-label="Active governance policies">
-        <header className="section-header">
-          <div>
-            <h2>Active Governance Policies</h2>
-            <p>Rules currently enforced on all hardware pull requests and release sign-offs.</p>
-          </div>
+      <section aria-label="Active governance policies">
+        <header>
+          <h2 className="text-lg font-bold text-foreground">Active Governance Policies</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Rules currently enforced on all hardware pull requests and release sign-offs.
+          </p>
         </header>
 
         {policies === null ? (
-          <div className="loading-container panel surface-default">
-            <p>Loading governance policies…</p>
+          <div className="mt-3 rounded-md border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            Loading governance policies…
           </div>
         ) : policies.length === 0 ? (
-          <Panel title="No Policies Configured">
-            <EmptyState
-              title="No governance policies configured yet"
-              action={
-                <button type="button" className="button button-primary" onClick={() => setShowBuilder(true)}>
-                  + New Governance Policy
-                </button>
-              }
-            >
-              <p>
-                Hardware reviews currently use default open policy behavior. Creating a policy enables explicit release
-                gates, required approver roles, and mandatory verification checklists.
-              </p>
-            </EmptyState>
-          </Panel>
+          <div className="mt-3">
+            <Panel title="No Policies Configured">
+              <EmptyState
+                title="No governance policies configured yet"
+                action={
+                  <Button type="button" onClick={() => setShowBuilder(true)}>
+                    + New Governance Policy
+                  </Button>
+                }
+              >
+                <p>
+                  Hardware reviews currently use default open policy behavior. Creating a policy enables explicit
+                  release gates, required approver roles, and mandatory verification checklists.
+                </p>
+              </EmptyState>
+            </Panel>
+          </div>
         ) : (
-          <div className="policies-grid">
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
             {policies.map((policy) => (
               <PolicyCard key={policy.id} policy={policy} onDelete={(id, name) => setPendingDelete({ id, name })} />
             ))}
@@ -613,30 +671,32 @@ export default function PoliciesClient() {
 
       {pendingDelete ? (
         <Dialog titleId="delete-policy-title" onClose={() => setPendingDelete(null)}>
-          <header className="modal-header">
-            <h2 id="delete-policy-title">Delete Policy</h2>
+          <header className="flex items-center justify-between border-b border-border p-4">
+            <h2 id="delete-policy-title" className="text-base font-bold text-foreground">
+              Delete Policy
+            </h2>
             <button
               type="button"
-              className="modal-close-button"
+              className="text-muted-foreground hover:text-foreground"
               onClick={() => setPendingDelete(null)}
               aria-label="Close modal"
             >
               ✕
             </button>
           </header>
-          <div className="modal-body">
+          <div className="p-4 text-sm text-foreground">
             <p>
               Delete <strong>{pendingDelete.name}</strong>? This removes it from enforcement immediately — hardware
               reviews currently gated by this policy will no longer be blocked by it.
             </p>
           </div>
-          <footer className="modal-footer">
-            <button type="button" className="button button-secondary" onClick={() => setPendingDelete(null)}>
+          <footer className="modal-footer flex items-center justify-end gap-2 border-t border-border p-4">
+            <Button type="button" variant="secondary" onClick={() => setPendingDelete(null)}>
               Cancel
-            </button>
-            <button type="button" className="button button-danger" onClick={() => void confirmDelete()}>
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void confirmDelete()}>
               Delete Policy
-            </button>
+            </Button>
           </footer>
         </Dialog>
       ) : null}

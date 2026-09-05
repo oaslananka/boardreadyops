@@ -3473,14 +3473,6 @@ summary.spec-label {
   line-height: 1.4;
 }
 
-.policy-builder-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-
 .alert-banner {
   padding: 0.85rem 1.25rem;
   border-radius: var(--bro-radius-sm);
