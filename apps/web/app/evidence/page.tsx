@@ -23,8 +23,7 @@ export default function EvidencePage() {
             Evidence packs are deterministic, offline-verifiable, and include base/head SHAs, tool versions, digests and
             decision history.
           </p>
-          {/* biome-ignore lint/a11y/noNoninteractiveTabindex: scrollable overflow-x region needs tabIndex so keyboard users can scroll it (WCAG 2.1.1, axe scrollable-region-focusable). */}
-          <pre className="mt-3 overflow-x-auto rounded-md bg-muted p-3 text-sm" tabIndex={0}>
+          <pre className="mt-3 overflow-x-auto rounded-md bg-muted p-3 text-sm">
             boardreadyops release verify --ledger ./evidence-ledger.json
           </pre>
         </div>

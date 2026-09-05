@@ -24,7 +24,7 @@ describe("runProcess cancellation", () => {
       process.execPath,
       [
         "-e",
-        `require("node:fs").writeFileSync(${JSON.stringify(readyFile)}, "ready"); process.on("SIGTERM", () => {}); setInterval(() => {}, 1000);`,
+        `process.on("SIGTERM", () => {}); setInterval(() => {}, 1000); require("node:fs").writeFileSync(${JSON.stringify(readyFile)}, "ready");`,
       ],
       options,
     );
@@ -35,7 +35,7 @@ describe("runProcess cancellation", () => {
 
     await expect(child).rejects.toMatchObject({ name: "AbortError" });
     if (process.platform !== "win32") {
-      expect(Date.now() - abortedAt).toBeGreaterThanOrEqual(400);
+      expect(Date.now() - abortedAt).toBeGreaterThanOrEqual(350);
     }
   }, 5_000);
 

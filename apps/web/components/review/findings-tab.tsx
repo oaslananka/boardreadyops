@@ -14,6 +14,29 @@ export interface FindingsTabProps {
 
 const diffStateOrder = ["all", "new", "persistent", "regressed", "resolved"] as const;
 
+function getSeverityBadgeClass(severity: string): string {
+  if (severity === "error" || severity === "critical") {
+    return "bg-danger-surface text-danger";
+  }
+  if (severity === "warning") {
+    return "bg-warning-surface text-warning";
+  }
+  return "bg-info-surface text-info";
+}
+
+function getDiffStateBadgeClass(diffState: string): string {
+  switch (diffState) {
+    case "new":
+      return "bg-info-surface text-info";
+    case "regressed":
+      return "bg-danger-surface text-danger";
+    case "resolved":
+      return "bg-success-surface text-success";
+    default:
+      return "bg-secondary text-secondary-foreground";
+  }
+}
+
 export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonly<FindingsTabProps>) {
   const [selectedDiffState, setSelectedDiffState] = useState<string>("all");
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all");
@@ -300,13 +323,11 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`rounded-sm px-1.5 py-0.5 text-xs uppercase ${finding.severity === "error" || finding.severity === "critical" ? "bg-danger-surface text-danger" : finding.severity === "warning" ? "bg-warning-surface text-warning" : "bg-info-surface text-info"}`}
+                      className={`rounded-sm px-1.5 py-0.5 text-xs uppercase ${getSeverityBadgeClass(finding.severity)}`}
                     >
                       {finding.severity}
                     </span>
-                    <span
-                      className={`rounded-sm px-1.5 py-0.5 text-xs ${finding.diffState === "new" ? "bg-info-surface text-info" : finding.diffState === "regressed" ? "bg-danger-surface text-danger" : finding.diffState === "resolved" ? "bg-success-surface text-success" : "bg-secondary text-secondary-foreground"}`}
-                    >
+                    <span className={`rounded-sm px-1.5 py-0.5 text-xs ${getDiffStateBadgeClass(finding.diffState)}`}>
                       {finding.diffState}
                     </span>
                     <code className="text-xs">{finding.ruleId}</code>

@@ -17,7 +17,8 @@
       "!sbom.cyclonedx.json",
       "!apps/web/.next",
       "!playwright-report",
-      "!test-results"
+      "!test-results",
+      "!.worktrees"
     ]
   },
   "formatter": {

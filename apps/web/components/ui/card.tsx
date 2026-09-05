@@ -21,8 +21,12 @@ export function CardHeader({ className, ...props }: Readonly<ComponentProps<"div
   );
 }
 
-export function CardTitle({ className, ...props }: Readonly<ComponentProps<"h2">>) {
-  return <h2 data-slot="card-title" className={cn("text-base font-bold leading-none", className)} {...props} />;
+export function CardTitle({ className, children, ...props }: Readonly<ComponentProps<"h2">>) {
+  return (
+    <h2 data-slot="card-title" className={cn("text-base font-bold leading-none", className)} {...props}>
+      {children}
+    </h2>
+  );
 }
 
 export function CardDescription({ className, ...props }: Readonly<ComponentProps<"p">>) {

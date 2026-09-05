@@ -30,11 +30,21 @@ export function resolveCliEntrypoint(): string {
   return path.join(packageDir, binRelative);
 }
 
+function sanitizeCliArgs(args: string[]): string[] {
+  for (const arg of args) {
+    if (typeof arg !== "string" || /[\0\r\n]/.test(arg)) {
+      throw new Error(`Invalid CLI argument containing control characters: ${arg}`);
+    }
+  }
+  return args;
+}
+
 /** Runs the `boardreadyops` CLI as a child process, exactly as a human would from a terminal. */
 export function createCliRunner(entrypoint: string = resolveCliEntrypoint()): CliRunner {
   return (args, cwd) =>
     new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, [entrypoint, ...args], {
+      const sanitizedArgs = sanitizeCliArgs(args);
+      const child = spawn(process.execPath, [entrypoint, ...sanitizedArgs], {
         cwd,
         stdio: ["ignore", "pipe", "pipe"],
       });

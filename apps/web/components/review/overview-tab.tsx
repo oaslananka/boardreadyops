@@ -1,7 +1,9 @@
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
 
-function getReadinessTone(decision: string, isReadyForFab: boolean): "danger" | "success" | "warning" {
+type ReadinessTone = "danger" | "success" | "warning";
+
+function getReadinessTone(decision: string, isReadyForFab: boolean): ReadinessTone {
   if (decision === "changes_requested") return "danger";
   return isReadyForFab ? "success" : "warning";
 }
