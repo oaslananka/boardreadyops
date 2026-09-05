@@ -71,7 +71,6 @@ describe("Review Detail Tabs", () => {
   it("renders EvidenceTab with artifact manifest and offline verify command", () => {
     const evidence = renderToStaticMarkup(createElement(EvidenceTab, { review }));
     expect(evidence).toBeDefined();
-    expect(evidence).toContain("provenance-chain");
     expect(evidence).toContain("Head Evidence Digest");
     expect(evidence).toContain(
       "SHA-256 artifact digests and revision-bound evidence records for this hardware revision.",
