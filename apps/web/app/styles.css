@@ -2578,22 +2578,12 @@ code {
    Hardware Review & Evidence OS Styles (Phase 4)
    ========================================================================== */
 
-.review-page-shell,
 .my-work-shell {
   max-width: 1440px;
   margin: 0 auto;
   padding: var(--space-4);
 }
 
-.review-view-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-  max-width: 100%;
-}
-
-.review-command-header,
 .review-detail-header {
   position: sticky;
   top: 0;
@@ -2606,7 +2596,6 @@ code {
 }
 
 @media (max-width: 960px) {
-  .review-command-header,
   .review-detail-header {
     position: static;
     flex-direction: column;
@@ -2614,155 +2603,11 @@ code {
   }
 }
 
-.command-header-lead {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.review-meta-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.85rem;
-  flex-wrap: wrap;
-}
-
-.review-back-link {
-  /* var(--foundry-copper) is 3.99:1 against this dark background, short of the 4.5:1 WCAG AA
-     floor for normal text (found by qa:audit's axe-core pass) -- lightened just for this
-     usage rather than changing the shared token, which many other surfaces rely on. */
-  color: var(--foundry-copper-on-dark);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.review-meta-bar .separator {
-  color: var(--text-muted);
-}
-
-.repo-name {
-  font-weight: 600;
-}
-
-.pr-badge,
-.revision-pill {
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  font-family: var(--font-mono, monospace);
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-}
-
-.review-decision-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.command-header-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-2);
-  flex: 0 0 auto;
-}
-
-@media (max-width: 960px) {
-  .command-header-actions {
-    width: 100%;
-    align-items: flex-start;
-  }
-}
-
-.review-actions-bar {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.review-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  margin: 0.2rem 0;
-  line-height: 1.25;
-}
-
-.commit-comparison {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.85rem;
-}
-
-.commit-sha,
-.digest-sha {
+.commit-sha {
   font-family: var(--font-mono, monospace);
   padding: 2px 6px;
   background: var(--surface-muted);
   border-radius: var(--radius-sm);
-}
-
-.evidence-digest-pill {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.85rem;
-}
-
-.evidence-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-}
-
-.evidence-status-dot.stale {
-  background: var(--warning);
-}
-
-/* Tabs Navigation */
-.review-tabs-navigation {
-  display: flex;
-  gap: var(--space-2);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: var(--space-1);
-  overflow-x: auto;
-  /* Keep the nowrap tab row internally scrollable on mobile instead of forcing its flex parent
-     wider than the viewport. The tab buttons are also positioned containing blocks so their
-     absolute .sr-only labels stay inside this scroll region rather than extending root scrollWidth. */
-  min-width: 0;
-}
-
-.review-tab-link {
-  position: relative;
-  padding: var(--space-2) var(--space-3);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-muted);
-  font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-  transition:
-    color var(--bro-motion-fast) var(--bro-ease),
-    border-color var(--bro-motion-fast) var(--bro-ease);
-}
-
-.review-tab-link:hover {
-  color: var(--text);
-}
-
-.review-tab-link.active,
-.review-tab-link[aria-selected="true"] {
-  color: var(--foundry-copper);
-  border-bottom-color: var(--foundry-copper);
 }
 
 .readiness-band {
@@ -2783,23 +2628,6 @@ code {
   margin: 0;
   font-size: 0.9rem;
   color: var(--text-muted);
-}
-
-.tab-pill {
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.tab-pill.danger {
-  background: var(--danger-surface);
-  color: var(--danger);
-}
-
-.tab-pill.warning {
-  background: var(--warning-surface);
-  color: var(--warning);
 }
 
 /* Overview Tab */
@@ -3345,27 +3173,6 @@ code {
 }
 
 /* Modals */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--shadow-soft-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: var(--space-4);
-}
-
-.modal-panel {
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  max-width: 600px;
-  width: 100%;
-  padding: var(--space-4);
-  box-shadow: 0 8px 24px var(--shadow-soft-color);
-}
-
 .modal-header {
   display: flex;
   justify-content: space-between;

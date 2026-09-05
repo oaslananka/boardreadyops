@@ -35,8 +35,6 @@ describe("Review Detail Tabs", () => {
         evidenceState: review.evidenceState,
       }),
     );
-    expect(header).toContain("review-command-header");
-    expect(header).toContain("review-decision-summary");
     expect(header).toContain("Approve review");
     expect(header).toContain("Request changes");
   });
@@ -51,7 +49,9 @@ describe("Review Detail Tabs", () => {
 
   it("hides the tab count pill from assistive tech instead of gluing it onto the tab name", () => {
     const view = renderToStaticMarkup(createElement(ReviewView, { initialReview: review }));
-    expect(view).toContain('<span class="tab-pill danger" aria-hidden="true">');
+    expect(view).toContain(
+      '<span class="rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold text-white" aria-hidden="true">',
+    );
     expect(view).toContain('<span class="sr-only">, ');
     expect(view).toContain(" blocking</span>");
   });

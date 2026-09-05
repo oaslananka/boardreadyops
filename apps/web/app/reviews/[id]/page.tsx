@@ -26,7 +26,7 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ i
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="shell review-page-shell" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs
           items={[
             { href: "/", label: "Home" },

@@ -61,8 +61,20 @@ export function Dialog({
   // not worth the blast radius for a marginal gain over the already-correct
   // and fully-tested handling below.
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div ref={panelRef} className={panelClassName ?? "modal-panel panel surface-raised"} tabIndex={-1}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      <div
+        ref={panelRef}
+        className={
+          panelClassName ??
+          "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-md border border-border bg-card shadow-lg"
+        }
+        tabIndex={-1}
+      >
         {children}
       </div>
     </div>
