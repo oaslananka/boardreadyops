@@ -3,7 +3,7 @@ import { AppShell } from "../../components/app-shell.js";
 import { Breadcrumbs, EmptyState, Panel } from "../../components/ui.js";
 
 export const metadata: Metadata = {
-  title: "Component Sourcing & Parts Lifecycle",
+  title: "Component Intelligence & Parts",
   description: "Aggregated BOM component risk, distributor inventory, and lifecycle statuses.",
 };
 
