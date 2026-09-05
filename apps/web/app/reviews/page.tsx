@@ -5,7 +5,7 @@ import { DEMO_REVIEWS } from "../../lib/demo-data.js";
 
 export const metadata = {
   title: "Hardware Reviews",
-  description: "All active and completed KiCad hardware reviews and sign-offs.",
+  description: "All active and completed hardware reviews and sign-offs across every supported CAD format.",
 };
 
 export default function ReviewsListPage() {
@@ -14,40 +14,39 @@ export default function ReviewsListPage() {
 
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Reviews" }]} />
 
-        <header className="page-intro">
-          <h1>Hardware Reviews</h1>
-          <p>Decision-ready hardware design reviews across all repositories and pull requests.</p>
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">Hardware Reviews</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Decision-ready hardware design reviews across all repositories and pull requests.
+          </p>
         </header>
 
-        <section className="review-registry-toolbar decision-band" aria-label="Review registry summary">
-          <div className="metric-strip">
-            <span className="metric-pill">
-              Showing <strong>{reviews.length}</strong> review{reviews.length === 1 ? "" : "s"} (
-              <strong>{activeCount}</strong> awaiting a decision)
-            </span>
-          </div>
+        <section
+          className="rounded-md border border-border bg-card px-4 py-3 text-sm"
+          aria-label="Review registry summary"
+        >
+          Showing <strong>{reviews.length}</strong> review{reviews.length === 1 ? "" : "s"} (
+          <strong>{activeCount}</strong> awaiting a decision)
         </section>
 
-        <div className="reviews-list-container">
-          {reviews.length === 0 ? (
-            <Panel title="No Reviews">
-              <EmptyState title="No hardware reviews found">
-                <p>
-                  Publish a review via GitHub Action or CLI: <code>boardreadyops review publish</code>
-                </p>
-              </EmptyState>
-            </Panel>
-          ) : (
-            <div className="reviews-grid">
-              {reviews.map((rev) => (
-                <ReviewListItem key={rev.id} review={rev} context="registry" />
-              ))}
-            </div>
-          )}
-        </div>
+        {reviews.length === 0 ? (
+          <Panel title="No Reviews">
+            <EmptyState title="No hardware reviews found">
+              <p>
+                Publish a review via GitHub Action or CLI: <code>boardreadyops review publish</code>
+              </p>
+            </EmptyState>
+          </Panel>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {reviews.map((rev) => (
+              <ReviewListItem key={rev.id} review={rev} context="registry" />
+            ))}
+          </div>
+        )}
       </main>
     </AppShell>
   );

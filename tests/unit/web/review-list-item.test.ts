@@ -11,7 +11,6 @@ describe("ReviewListItem", () => {
     if (!review) return;
 
     const markup = renderToStaticMarkup(createElement(ReviewListItem, { review, context: "registry" }));
-    expect(markup).toContain("review-registry-row");
     expect(markup).toContain("Awaiting decision");
     expect(markup).toContain("3 blockers");
     expect(markup).toContain("PR #42");

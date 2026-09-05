@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { DemoReview } from "../../lib/demo-data.js";
+import { Badge } from "../ui/badge.js";
 import { StatusBadge } from "../ui.js";
 
 function getDecisionMeta(decision: DemoReview["decision"]): { label: string; tone: "passed" | "failed" | "warning" } {
@@ -16,7 +17,7 @@ function getBlockerLabel(count: number): string {
 
 export function ReviewListItem({
   review,
-  context = "registry",
+  context: _context = "registry",
 }: Readonly<{
   review: DemoReview;
   context?: "registry" | "work";
@@ -34,35 +35,33 @@ export function ReviewListItem({
   return (
     <Link
       href={`/reviews/${review.id}`}
-      className={`review-registry-row review-registry-row-${context} panel surface-raised`}
+      className="grid grid-cols-1 gap-3 rounded-md border border-border bg-card p-4 shadow-lg transition-colors hover:border-primary/50 sm:grid-cols-2 lg:grid-cols-4"
     >
-      <div className="row-lead">
-        <div className="row-meta">
-          <span className="repo-tag">{review.repositoryName}</span>
-          <span className="pr-tag">PR #{review.pullRequestNumber}</span>
-          <span className="revision-tag">Rev {review.currentRevisionSequence}</span>
+      <div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{review.repositoryName}</span>
+          <span>PR #{review.pullRequestNumber}</span>
+          <span>Rev {review.currentRevisionSequence}</span>
         </div>
-        <h3 className="row-title">{review.title}</h3>
+        <h3 className="mt-1 text-sm font-bold text-foreground">{review.title}</h3>
       </div>
 
-      <div className="row-decision-cell">
+      <div className="flex flex-col items-start gap-1.5">
         <StatusBadge value={decisionTone} label={decisionLabel} />
-        <span className={`blocker-indicator ${blockingCount > 0 ? "has-blockers" : "no-blockers"}`}>
-          {blockerLabel}
-        </span>
+        <span className={`text-xs ${blockingCount > 0 ? "text-danger" : "text-muted-foreground"}`}>{blockerLabel}</span>
       </div>
 
-      <div className="row-technical-detail">
-        <span className="commit-span">
+      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <span>
           <code>{review.baseCommitSha.slice(0, 7)}</code> → <code>{review.headCommitSha.slice(0, 7)}</code>
         </span>
-        <span className="author-tag">by {review.createdBy}</span>
+        <span>by {review.createdBy}</span>
       </div>
 
-      <div className="row-lifecycle-counts">
-        {newCount > 0 ? <span className="diff-pill new">+{newCount} new</span> : null}
-        {persistentCount > 0 ? <span className="diff-pill persistent">{persistentCount} persistent</span> : null}
-        {resolvedCount > 0 ? <span className="diff-pill resolved">✓ {resolvedCount} resolved</span> : null}
+      <div className="flex flex-wrap items-start gap-1.5">
+        {newCount > 0 ? <Badge variant="info">+{newCount} new</Badge> : null}
+        {persistentCount > 0 ? <Badge variant="secondary">{persistentCount} persistent</Badge> : null}
+        {resolvedCount > 0 ? <Badge variant="success">✓ {resolvedCount} resolved</Badge> : null}
       </div>
     </Link>
   );
