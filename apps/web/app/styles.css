@@ -1712,26 +1712,6 @@ code {
   outline-offset: 3px;
 }
 
-.live-refresh-status {
-  align-items: center;
-  display: flex;
-  gap: 0.65rem;
-  margin: 0.75rem 0 0;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  background: var(--surface-muted);
-  font-size: 0.9rem;
-}
-
-.live-refresh-indicator {
-  width: 0.6rem;
-  height: 0.6rem;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: currentColor;
-}
-
 /* Premium run evidence control room */
 
 /*

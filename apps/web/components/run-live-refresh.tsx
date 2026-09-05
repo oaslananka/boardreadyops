@@ -62,10 +62,11 @@ export function RunLiveRefresh({ enabled }: Readonly<{ enabled: boolean }>) {
 
   if (!enabled) return null;
   return (
-    <output className="live-refresh-status">
-      <span className="live-refresh-indicator" aria-hidden="true" />
+    <output className="live-refresh-status flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+      <span className="size-2 animate-pulse rounded-full bg-success" aria-hidden="true" />
       <span>
-        <strong>Live status updates</strong> refresh every five seconds and resume automatically after reconnect.
+        <strong className="text-foreground">Live status updates</strong> refresh every five seconds and resume
+        automatically after reconnect.
       </span>
     </output>
   );

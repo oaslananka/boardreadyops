@@ -37,11 +37,15 @@ const navigationItems: ReadonlyArray<{ view: RunView; label: string; suffix: str
 
 function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunView }>) {
   return (
-    <nav className="run-navigation" aria-label="Run investigation">
-      <ul>
+    <nav className="flex flex-wrap gap-1 border-b border-border" aria-label="Run investigation">
+      <ul className="flex flex-wrap gap-1">
         {navigationItems.map((item) => (
           <li key={item.view}>
-            <Link href={`/runs/${runId}${item.suffix}`} aria-current={active === item.view ? "page" : undefined}>
+            <Link
+              href={`/runs/${runId}${item.suffix}`}
+              aria-current={active === item.view ? "page" : undefined}
+              className={`block border-b-2 px-3 py-2 text-sm font-medium ${active === item.view ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
               {item.label}
             </Link>
           </li>
@@ -53,11 +57,11 @@ function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunV
 
 export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
   return (
-    <header className="run-header">
-      <div className="run-header-copy">
-        <p className="run-context">Release readiness</p>
-        <h1>{run.repository}</h1>
-        <p className="run-identity-meta">
+    <header className="flex flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-lg sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p className="text-sm font-medium text-primary">Release readiness</p>
+        <h1 className="text-xl font-bold text-foreground">{run.repository}</h1>
+        <p className="run-identity-meta mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>{run.repositoryPrivate ? "Private repository" : "Public repository"}</span>
           <span>
             Run <code>{run.id}</code>
@@ -70,11 +74,11 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
           </span>
         </p>
       </div>
-      <fieldset className="run-header-status">
+      <fieldset className="shrink-0">
         <legend className="sr-only">Readiness score</legend>
-        <div className="score run-readiness-signature">
-          <strong>{run.readinessScore ?? "—"}</strong>
-          <span>Readiness score</span>
+        <div className="run-readiness-signature flex flex-col items-center rounded-md border border-border bg-muted px-4 py-2">
+          <strong className="text-2xl font-bold text-foreground">{run.readinessScore ?? "—"}</strong>
+          <span className="text-xs text-muted-foreground">Readiness score</span>
           <span className="sr-only">
             {run.readinessScore === undefined
               ? "Readiness score unavailable"
@@ -95,7 +99,7 @@ export function RunPageFrame({
   const currentLabel = navigationItems.find((item) => item.view === active)?.label ?? "Run";
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="page-frame operational-page" id="main-content">
+      <main className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8" id="main-content">
         <Breadcrumbs
           items={[
             { href: "/", label: "Home" },
@@ -108,11 +112,25 @@ export function RunPageFrame({
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
         <RunNavigation runId={run.id} active={active} />
         <RunStateNotice run={run} />
-        <div className="page-content">{children}</div>
+        <div className="flex flex-col gap-4">{children}</div>
       </main>
     </AppShell>
   );
 }
+
+const verdictBandClass: Record<"success" | "danger" | "warning" | "info", string> = {
+  success: "border-success/40 bg-success-surface",
+  danger: "border-danger/40 bg-danger-surface",
+  warning: "border-warning/40 bg-warning-surface",
+  info: "border-info/40 bg-info-surface",
+};
+
+const verdictTextClass: Record<"success" | "danger" | "warning" | "info", string> = {
+  success: "text-success",
+  danger: "text-danger",
+  warning: "text-warning",
+  info: "text-info",
+};
 
 /**
  * The answer, before anything else on the page.
@@ -124,18 +142,26 @@ export function RunPageFrame({
 function RunVerdictBanner({ run }: Readonly<{ run: RunDetail }>) {
   const verdict = runVerdict(run);
   return (
-    <section className="run-verdict" data-tone={verdict.tone} aria-labelledby="run-verdict-headline">
-      <div className="run-verdict-copy">
-        <h2 className="run-verdict-headline" id="run-verdict-headline">
-          {verdict.headline}
-        </h2>
-        <p className="run-verdict-detail">{verdict.detail}</p>
+    <section
+      className={`rounded-md border p-5 ${verdictBandClass[verdict.tone]}`}
+      aria-labelledby="run-verdict-headline"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 id="run-verdict-headline" className={`text-xl font-bold ${verdictTextClass[verdict.tone]}`}>
+            {verdict.headline}
+          </h2>
+          <p className="mt-1 text-sm text-foreground">{verdict.detail}</p>
+        </div>
+        {verdict.action ? (
+          <Link
+            href={verdict.action.href}
+            className="w-fit rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            {verdict.action.label}
+          </Link>
+        ) : undefined}
       </div>
-      {verdict.action ? (
-        <Link className="run-verdict-action" href={verdict.action.href}>
-          {verdict.action.label}
-        </Link>
-      ) : undefined}
     </section>
   );
 }
@@ -143,7 +169,7 @@ function RunVerdictBanner({ run }: Readonly<{ run: RunDetail }>) {
 export function RunUnavailable({ runId }: Readonly<{ runId: string }>) {
   return (
     <AppShell viewerNav={<ViewerNav />}>
-      <main className="shell compact-shell" id="main-content">
+      <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
         <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]} />
         <h1 className="sr-only">Run details temporarily unavailable</h1>
         <Alert title="Run details temporarily unavailable" tone="warning">
@@ -217,7 +243,7 @@ export function RunStateNotice({ run }: Readonly<{ run: RunDetail }>) {
   }
   if (run.investigationState === "superseded") {
     return (
-      <Alert title="A newer run superseded this result" tone="neutral">
+      <Alert title="A newer run superseded this result" tone="info">
         <p>This page is kept for history. For the current answer, use the newest Check Run.</p>
       </Alert>
     );
