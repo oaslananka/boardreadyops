@@ -1,11 +1,29 @@
+import { handoffLinksEnabled, planTierOf } from "@boardreadyops/cloud-core/entitlements";
 import { createExternalReviewRequestSchema } from "@boardreadyops/contracts";
 import { ExternalReviewStore, ReviewStore } from "@boardreadyops/db";
-import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
+import { createPgQueryExecutor, type PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest, resolveRepositoryApiContext } from "../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 
 export const runtime = "nodejs";
+
+/**
+ * The plan tier gating this feature (`handoffLinksEnabled`) is unread until now: creating an
+ * external review link previously required no entitlement at all, on every plan.
+ */
+export async function repositoryPlanTier(executor: PgQueryExecutor, repositoryId: string) {
+  const result = await executor.query(
+    `select installations.plan_tier
+       from repositories
+       join installations on installations.id = repositories.installation_id
+      where repositories.id = $1`,
+    [repositoryId],
+  );
+  const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
+  const value = rows[0]?.plan_tier;
+  return planTierOf(typeof value === "string" ? value : undefined);
+}
 
 const createLinkSchema = createExternalReviewRequestSchema.extend({
   reviewId: z.string().min(1),
@@ -69,6 +87,14 @@ export async function POST(request: Request): Promise<Response> {
     const review = await reviewStore.getReviewById(repositoryId, parsed.data.reviewId);
     if (!review) {
       return Response.json({ ok: false, error: "Review not found" }, { status: 404 });
+    }
+
+    const tier = await repositoryPlanTier(executor, repositoryId);
+    if (!handoffLinksEnabled(tier)) {
+      return Response.json(
+        { ok: false, error: "External review links require the Team plan or higher." },
+        { status: 403 },
+      );
     }
 
     const store = new ExternalReviewStore(executor);
