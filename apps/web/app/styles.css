@@ -411,7 +411,6 @@ code {
   letter-spacing: -0.01em;
 }
 
-.context-kicker,
 .product-nav-group h2 {
   color: var(--text-subtle);
   font-family: var(--font-mono);
@@ -2380,116 +2379,6 @@ code {
   cursor: not-allowed;
 }
 
-.operational-summary {
-  display: grid;
-  padding: var(--space-4) 0;
-  border-block: 1px solid var(--border);
-  gap: var(--space-4);
-  grid-template-columns: minmax(12rem, 0.7fr) minmax(0, 2fr);
-}
-
-.operational-summary > header h2 {
-  margin: var(--space-1) 0 0;
-  font-size: 1rem;
-  font-weight: 650;
-}
-
-.operational-summary-grid {
-  display: grid;
-  padding: 0;
-  margin: 0;
-  gap: var(--space-3);
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.operational-summary-grid > div {
-  min-width: 0;
-  padding-left: var(--space-3);
-  border-left: 1px solid var(--border);
-}
-
-.operational-summary-grid dt {
-  color: var(--text-subtle);
-  font-size: 0.7rem;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  line-height: 1.35;
-}
-
-.operational-summary-grid dd {
-  margin: var(--space-2) 0 0;
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 1.45rem;
-  font-weight: 650;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.repository-sections {
-  display: grid;
-  gap: var(--space-6);
-}
-
-.repository-sections > .panel {
-  min-width: 0;
-}
-
-@media (max-width: 64rem) {
-  .operational-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .operational-summary-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 42rem) {
-  .operational-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.dashboard-attention {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3) var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--bro-accent);
-  border-radius: var(--radius-sm, 4px);
-  margin-bottom: var(--space-4);
-}
-
-.dashboard-attention strong {
-  font-size: 0.95rem;
-  color: var(--text);
-}
-
-.dashboard-attention-action {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.85rem;
-}
-
-.dashboard-attention-tag {
-  display: inline-block;
-  padding: 0.125rem 0.375rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs, 2px);
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-subtle);
-}
-
 /* Repository listings. Native tables rather than a grid of cards: these are rows of
    comparable facts, and a table gives screen readers the row and column relationships for
    free. Numerals are tabular so counts line up down a column instead of drifting. */
@@ -2536,19 +2425,6 @@ code {
 .repository-table tbody tr:last-child th,
 .repository-table tbody tr:last-child td {
   border-bottom: none;
-}
-
-.repository-private {
-  margin-left: var(--space-2);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 0.1em 0.45em;
-  font-weight: 600;
-  color: var(--text-subtle);
-  vertical-align: middle;
 }
 
 .repository-when {
