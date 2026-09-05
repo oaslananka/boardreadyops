@@ -58,9 +58,9 @@ const COMPACT_STORAGE_KEY = "boardreadyops.product-nav.compact";
 function slugify(label: string): string {
   return label
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .replace(/-+$/, "");
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .join("-");
 }
 
 function isCurrentRoute(pathname: string | null | undefined, href: string): boolean {
