@@ -1422,10 +1422,6 @@ code {
   white-space: nowrap;
 }
 
-.copy-control {
-  display: inline-flex;
-}
-
 .link-list {
   display: grid;
   gap: var(--space-3);
