@@ -228,7 +228,7 @@ function isDangerousHrefAttribute(name: string, value: string): boolean {
   return (
     lowerValue.startsWith("javascript:") ||
     lowerValue.startsWith("vbscript:") ||
-    lowerValue.startsWith("data:text/html")
+    lowerValue.startsWith("data:")
   );
 }
 
