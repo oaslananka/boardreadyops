@@ -4,6 +4,72 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.39.0](https://github.com/oaslananka/boardreadyops/compare/v1.38.0...v1.39.0) (2026-09-06)
+
+
+### Features
+
+* **billing:** implement Stripe subscription entitlement projection (W19) ([#638](https://github.com/oaslananka/boardreadyops/issues/638)) ([3e4513b](https://github.com/oaslananka/boardreadyops/commit/3e4513b42fafe5917a532019c4e520e6db6d73c3))
+* **bom:** supply-watch provider resilience and pricing snapshot (W11) ([#639](https://github.com/oaslananka/boardreadyops/issues/639)) ([12bc104](https://github.com/oaslananka/boardreadyops/commit/12bc10428f0221c40179308edde516a125c0b17a))
+* **cli:** render a human-readable release certificate on release verify ([#578](https://github.com/oaslananka/boardreadyops/issues/578)) ([5018566](https://github.com/oaslananka/boardreadyops/commit/501856615a323b163fd33d3a335af2b5e4040f1d))
+* **core:** map findings to GitHub Check Run annotations (W15) ([#604](https://github.com/oaslananka/boardreadyops/issues/604)) ([e19304e](https://github.com/oaslananka/boardreadyops/commit/e19304e100602007b679424761ae91b389c995a9))
+* **core:** show which release-diff items changed and fix an undercount bug ([#579](https://github.com/oaslananka/boardreadyops/issues/579)) ([1bbd169](https://github.com/oaslananka/boardreadyops/commit/1bbd1699fbc0ff7b0b4d8dc90b3f0202ccf6aae3))
+* **core:** wire GitHub Check Run annotations end to end from findings ([#623](https://github.com/oaslananka/boardreadyops/issues/623)) ([9608455](https://github.com/oaslananka/boardreadyops/commit/96084551f1baf1a79ab2ac9bfc1460a7a28ad6f1))
+* **db:** query which boards currently reference an MPN (W11) ([#611](https://github.com/oaslananka/boardreadyops/issues/611)) ([28c3931](https://github.com/oaslananka/boardreadyops/commit/28c393101e759eb2fd27410baba724ef85b0f811))
+* **db:** thread the GitHub webhook delivery id onto release_runs (W29) ([#615](https://github.com/oaslananka/boardreadyops/issues/615)) ([6a2ae84](https://github.com/oaslananka/boardreadyops/commit/6a2ae8404aefcb1ae94999f47f2ff1c26c41df03))
+* **governance:** add independent clean-room reproducible-build verification ([#593](https://github.com/oaslananka/boardreadyops/issues/593)) ([a3a0019](https://github.com/oaslananka/boardreadyops/commit/a3a0019e11c50f93ab3cbe5f2115f038617b4191))
+* **governance:** canonical PASS/FAIL/CONDITIONAL/UNKNOWN decision vocabulary (W06) ([#602](https://github.com/oaslananka/boardreadyops/issues/602)) ([b1bd928](https://github.com/oaslananka/boardreadyops/commit/b1bd9286b47bc39f0c314881ce7979dd648e9b37))
+* **kicad:** close W03 hostile-input size/DoS guard gap ([#625](https://github.com/oaslananka/boardreadyops/issues/625)) ([4df5df3](https://github.com/oaslananka/boardreadyops/commit/4df5df3650d0e0b9181549771c8774a21851cd50))
+* **release:** add provenance fields to the generation manifest (W04) ([#612](https://github.com/oaslananka/boardreadyops/issues/612)) ([1f541fb](https://github.com/oaslananka/boardreadyops/commit/1f541fbcc4ecee82482300abfe8f7760d7fa91ce))
+* **release:** classify worsened/improved findings in release diffs (W08) ([#608](https://github.com/oaslananka/boardreadyops/issues/608)) ([fd16684](https://github.com/oaslananka/boardreadyops/commit/fd16684380295d19005666f5088ea194ab92842e))
+* **release:** signing-key rotation, revocation & trust-store model (W07) ([#603](https://github.com/oaslananka/boardreadyops/issues/603)) ([4bee976](https://github.com/oaslananka/boardreadyops/commit/4bee9768cc8af1528e7af2500ea360b08f0d5416))
+* **release:** wire --trust-store into release verify CLI (W07) ([#605](https://github.com/oaslananka/boardreadyops/issues/605)) ([9bc607a](https://github.com/oaslananka/boardreadyops/commit/9bc607a9baa955549abc31134c2562d85b355645))
+* **web:** add authenticated Unlighthouse UI audits ([#629](https://github.com/oaslananka/boardreadyops/issues/629)) ([7cd6efe](https://github.com/oaslananka/boardreadyops/commit/7cd6efe9aa7af727e307cf4a9ca31c735da4e48b))
+* **web:** add CSV/JSONL audit export formats and tamper-evidence digest ([#622](https://github.com/oaslananka/boardreadyops/issues/622)) ([0f53357](https://github.com/oaslananka/boardreadyops/commit/0f53357a7f1ab90773e2d08369f236931f0309a4))
+* **web:** add dead-letter admin dashboard ([#635](https://github.com/oaslananka/boardreadyops/issues/635)) ([3016dee](https://github.com/oaslananka/boardreadyops/commit/3016deec7bff89aa221c2f28d1bf0da04247d6ff))
+* **web:** enforce separation of duties on review approvals (W14) ([#610](https://github.com/oaslananka/boardreadyops/issues/610)) ([c6a486a](https://github.com/oaslananka/boardreadyops/commit/c6a486ae1c166274b1dd72f09a533764e90ac564))
+* **web:** give the run readiness score its own copper accent ([#627](https://github.com/oaslananka/boardreadyops/issues/627)) ([49c28ec](https://github.com/oaslananka/boardreadyops/commit/49c28ec5fdce7d2ee7b6c711ed687575a85454af))
+* **web:** migrate UI to Tailwind and shadcn design system ([#654](https://github.com/oaslananka/boardreadyops/issues/654)) ([abe5f8e](https://github.com/oaslananka/boardreadyops/commit/abe5f8ea27569cb707e3ada886fc28d2654f0918))
+* **web:** premium UI — preset switcher, YAML highlighting, micro-interactions ([#656](https://github.com/oaslananka/boardreadyops/issues/656)) ([b7af0b2](https://github.com/oaslananka/boardreadyops/commit/b7af0b2ab6c58e926647627f2990167964c3015f))
+* **web:** rate-limit failed bearer-token authentication attempts ([#620](https://github.com/oaslananka/boardreadyops/issues/620)) ([2f69f61](https://github.com/oaslananka/boardreadyops/commit/2f69f61e198208509ce4d2bf5f72da8823d4e599))
+* **web:** refine premium product UI ([#633](https://github.com/oaslananka/boardreadyops/issues/633)) ([7b90cee](https://github.com/oaslananka/boardreadyops/commit/7b90ceea6263d9afad7fc2f48d4d193fce5911de))
+* **web:** support GitHub Check Run annotations with pagination (W15) ([#598](https://github.com/oaslananka/boardreadyops/issues/598)) ([5d014b4](https://github.com/oaslananka/boardreadyops/commit/5d014b488ab53d3bd5e7ed36b4a6ba0ce7268715))
+* **web:** systematize the brand mark's brass accent as a design token ([#626](https://github.com/oaslananka/boardreadyops/issues/626)) ([8a7d6b6](https://github.com/oaslananka/boardreadyops/commit/8a7d6b60e3da95bc3b272585385b691a15a46b19))
+
+
+### Bug Fixes
+
+* **ci:** fail closed on stale cloud deploy topology ([#645](https://github.com/oaslananka/boardreadyops/issues/645)) ([01783d9](https://github.com/oaslananka/boardreadyops/commit/01783d9061f45be9912e3a270b4734f40bf759c5))
+* **ci:** fix process cancellation test flakiness and resolve web code smells ([#655](https://github.com/oaslananka/boardreadyops/issues/655)) ([4ed1364](https://github.com/oaslananka/boardreadyops/commit/4ed1364093fb87c75328570fcfa277d580c43b77))
+* **ci:** reset cloud-deploy checkout to origin/main instead of ff-only merge ([#651](https://github.com/oaslananka/boardreadyops/issues/651)) ([064a96c](https://github.com/oaslananka/boardreadyops/commit/064a96c092e4be4e5a72d17337e3fab2108920a4))
+* **ci:** resolve remaining SonarQube regex-backtracking findings ([#583](https://github.com/oaslananka/boardreadyops/issues/583)) ([bf1ec3e](https://github.com/oaslananka/boardreadyops/commit/bf1ec3e8d17a292007c0c37ed2a4927f0ec2bdc7))
+* **ci:** restore QA nightly browser and visual checks ([#647](https://github.com/oaslananka/boardreadyops/issues/647)) ([1ba315a](https://github.com/oaslananka/boardreadyops/commit/1ba315a6e0685fca614da8ef1d2f0b60dbb4a237))
+* **contracts:** schema-by-schema security triage of runner-protocol .strict() (W02) ([#600](https://github.com/oaslananka/boardreadyops/issues/600)) ([f58cb50](https://github.com/oaslananka/boardreadyops/commit/f58cb5050bcf66769754cd6a24e11e350cdc025a))
+* **core:** address CI/SonarQube follow-ups for release-diff detail ([#580](https://github.com/oaslananka/boardreadyops/issues/580)) ([aa55c7d](https://github.com/oaslananka/boardreadyops/commit/aa55c7dea9635b92be63cf96fa5fdeb9998e4381))
+* **core:** combine sequential Array#push() calls and mark AuditReport fields readonly ([#585](https://github.com/oaslananka/boardreadyops/issues/585)) ([3d3e107](https://github.com/oaslananka/boardreadyops/commit/3d3e107fd087b80d5c95c9634a043ca05764ea6f))
+* **core:** reduce cognitive complexity below SonarQube's threshold of 15 ([#584](https://github.com/oaslananka/boardreadyops/issues/584)) ([c157a88](https://github.com/oaslananka/boardreadyops/commit/c157a881106049f76aac2b806ab934e2efb03cf3))
+* **core:** resolve SonarQube RELIABILITY findings (regex backtracking, Unicode APIs) ([#582](https://github.com/oaslananka/boardreadyops/issues/582)) ([4cd2c70](https://github.com/oaslananka/boardreadyops/commit/4cd2c70be10cd7df6b8ec4578f510c351524b23f))
+* **db:** clean up fixture rows in artifact-deletion-store-postgres.test.ts ([#613](https://github.com/oaslananka/boardreadyops/issues/613)) ([9d60028](https://github.com/oaslananka/boardreadyops/commit/9d60028172a3f27c6b616af5fd5953d8438de477))
+* **db:** resolve SonarCloud nested-ternary finding in priceBreaks parsing (W11) ([#642](https://github.com/oaslananka/boardreadyops/issues/642)) ([bb84613](https://github.com/oaslananka/boardreadyops/commit/bb846132cc3deaca121bb4e1df9a3e969d20ae97))
+* **deps:** patch full OSV scan vulnerabilities ([#632](https://github.com/oaslananka/boardreadyops/issues/632)) ([a767cd2](https://github.com/oaslananka/boardreadyops/commit/a767cd201dfc3bfffebf0981b642221b678b3884))
+* **docs:** correct 10 stale file references in the execution ledger, add a permanent guard ([#576](https://github.com/oaslananka/boardreadyops/issues/576)) ([bbd3f62](https://github.com/oaslananka/boardreadyops/commit/bbd3f6206b6d34c6aa231291e66042cf55b8df46))
+* **governance:** add missing trailing newline to .mergify.yml ([#591](https://github.com/oaslananka/boardreadyops/issues/591)) ([93c5f6b](https://github.com/oaslananka/boardreadyops/commit/93c5f6be6ff498387ee1f2bd4374df6d2c2d965c))
+* **governance:** harden Mergify ruleset integration ([#588](https://github.com/oaslananka/boardreadyops/issues/588)) ([2ffe792](https://github.com/oaslananka/boardreadyops/commit/2ffe792f1d93e6c935f2b8d04d3bc054062aa60f))
+* **governance:** honest master spec provenance + reconciled W00 baseline ([#590](https://github.com/oaslananka/boardreadyops/issues/590)) ([9cec676](https://github.com/oaslananka/boardreadyops/commit/9cec6763d9646a22fb417aa5b76ee7162d6aa724))
+* **governance:** regenerate NOTICE, correct false verify-baseline claim ([#592](https://github.com/oaslananka/boardreadyops/issues/592)) ([519896f](https://github.com/oaslananka/boardreadyops/commit/519896f61e790b9cb320e03d44d212e9a959375d))
+* **governance:** warn on unrecognized webhook env-var names (W28) ([#601](https://github.com/oaslananka/boardreadyops/issues/601)) ([85df05f](https://github.com/oaslananka/boardreadyops/commit/85df05f2c1f3864f7a06b2cda6faf881b4d95935))
+* **report:** show no-BOM-changes note when every BOM row is unchanged ([#581](https://github.com/oaslananka/boardreadyops/issues/581)) ([dac2411](https://github.com/oaslananka/boardreadyops/commit/dac241177042bec098e7f6d680af41ff979a68d0))
+* **web:** drop non-interactive tabIndex flagged by SonarCloud (S6845) ([#636](https://github.com/oaslananka/boardreadyops/issues/636)) ([f8bb770](https://github.com/oaslananka/boardreadyops/commit/f8bb77028090ee996fcf091b042603d5b16f5c8a))
+* **web:** give the selected PCB canvas marker a real visual state ([#628](https://github.com/oaslananka/boardreadyops/issues/628)) ([2665abd](https://github.com/oaslananka/boardreadyops/commit/2665abdc1f6a68f11c9c7bdb30f0d19eb8748d92))
+* **web:** rate limit operator token authentication ([#643](https://github.com/oaslananka/boardreadyops/issues/643)) ([6df0c1e](https://github.com/oaslananka/boardreadyops/commit/6df0c1e332df5424ee849790fe5359912baf7e7d))
+* **web:** repair invisible diff-pill text and unlabeled installation fallback ([#652](https://github.com/oaslananka/boardreadyops/issues/652)) ([d231437](https://github.com/oaslananka/boardreadyops/commit/d23143747756d856f42fb5884f05a094fc55912e))
+* **web:** return 404 not 500 for unresolvable review ids without a database ([#618](https://github.com/oaslananka/boardreadyops/issues/618)) ([17f720b](https://github.com/oaslananka/boardreadyops/commit/17f720ba75e7b82fb15df445e98fd79ac4370b9c))
+
+
+### Performance
+
+* **web:** benchmark run listing pagination ([#644](https://github.com/oaslananka/boardreadyops/issues/644)) ([bf95ebc](https://github.com/oaslananka/boardreadyops/commit/bf95ebc783c4ac056ebb6a08e5ee878cd787262c))
+
 ## [1.38.0](https://github.com/oaslananka/boardreadyops/compare/v1.37.0...v1.38.0) (2026-09-01)
 
 
