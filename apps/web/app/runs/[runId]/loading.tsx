@@ -1,10 +1,9 @@
-import { AppShell, Breadcrumbs, Panel } from "../../../components/ui.js";
+import { AppShell, Panel } from "../../../components/ui.js";
 
 export default function LoadingRun() {
   return (
-    <AppShell>
-      <main className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8" id="main-content" aria-busy="true">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Loading run" }]} />
+    <AppShell breadcrumbs={[{ href: "/", label: "Home" }, { label: "Loading run" }]}>
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-8" id="main-content" aria-busy="true">
         <section className="run-state-surface flex flex-col gap-4">
           <div className="h-24 animate-pulse rounded-md bg-muted" />
           <Panel title="Loading this run" description="Fetching the results.">

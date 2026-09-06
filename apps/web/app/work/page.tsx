@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AppShell, Breadcrumbs, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
+import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
 
@@ -20,10 +20,8 @@ export default function MyWorkPage() {
   const changesRequested = reviews.filter((r) => r.decision === "changes_requested");
 
   return (
-    <AppShell viewerNav={<ViewerNav />}>
-      <main className="flex flex-col gap-5 px-6 py-6" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "My Work" }]} />
-
+    <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "My Work" }]}>
+      <main className="flex w-full flex-col gap-5 px-6 py-6" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">My Work</h1>
           <p className="text-sm text-muted-foreground">
@@ -44,7 +42,7 @@ export default function MyWorkPage() {
         </section>
 
         <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-          <section>
+          <section className="min-w-0">
             <Panel
               title="Assigned Findings"
               description="DRC, clearance, and BOM findings assigned to you for disposition."
@@ -84,7 +82,7 @@ export default function MyWorkPage() {
             </Panel>
           </section>
 
-          <aside className="flex flex-col gap-5">
+          <aside className="flex min-w-0 flex-col gap-5">
             <Panel
               title="Awaiting Your Review"
               description="Hardware pull requests waiting for engineering review or sign-off."

@@ -13,7 +13,8 @@ describe("run investigation routes", () => {
       expect(readFileSync(`apps/web/app/runs/[runId]/${route}/page.tsx`, "utf8")).toContain(`active="${route}"`);
     }
     expect(component).toContain('aria-label="Run investigation"');
-    expect(component).toContain("Breadcrumbs");
+    // The trail now lives in the topbar, so the frame passes items up rather than rendering them.
+    expect(component).toContain("breadcrumbs={");
     for (const sharedComponent of ["RunHeader", "AttemptTimeline", "FindingList", "ArtifactTable"]) {
       expect(component).toContain(`export function ${sharedComponent}`);
     }
@@ -68,8 +69,10 @@ describe("run investigation routes", () => {
     expect(component).toContain("Deletion failed");
     expect(component).toContain("Open GitHub checks");
     expect(component).toContain("Full audit export requires operator access");
-    expect(component).toContain("focus-visible");
     expect(component).toContain("sr-only");
+    // The visible focus indicator moved into the shared control chrome when the filter form's
+    // hand-copied class string was replaced by the Input/NativeSelect primitives.
+    expect(readFileSync("apps/web/components/ui/field.ts", "utf8")).toContain("focus-visible");
   });
 
   it("defines explicit loading, failure, unavailable, expired, stale, recovery, and partial states", () => {

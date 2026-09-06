@@ -47,21 +47,21 @@ export function ReviewHeader({
   const isApproved = decision === "approved";
 
   return (
-    <header className="flex flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-lg sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex flex-col gap-2">
+    <header className="flex flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-e2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Link href="/reviews" className="hover:text-foreground hover:underline">
             ← Reviews
           </Link>
           <span aria-hidden="true">/</span>
-          <span>{repositoryName}</span>
+          <span className="break-all">{repositoryName}</span>
           <span aria-hidden="true">/</span>
           <span>PR #{pullRequestNumber}</span>
           <span className="rounded-full border border-border px-2 py-0.5 text-xs">Rev {currentRevisionSequence}</span>
           <StatusBadge value={status} />
         </div>
 
-        <h1 className="text-xl font-bold text-foreground">{title}</h1>
+        <h1 className="text-title font-bold text-balance text-foreground">{title}</h1>
 
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge value={decisionTone} label={decisionLabel} />

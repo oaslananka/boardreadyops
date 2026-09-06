@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
-import { AppShell, Breadcrumbs, Panel, StatusBadge } from "../../components/ui.js";
+import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
+import { AppShell, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import {
   type DashboardRepositorySummary,
@@ -129,72 +130,76 @@ function AttentionBanner({ summary }: Readonly<{ summary: DashboardRepositorySum
   return null;
 }
 
-function RepositoryRow({ repository }: Readonly<{ repository: RepositoryGroup["repositories"][number] }>) {
-  return (
-    <tr className="border-t border-border">
-      <th scope="row" className="px-3 py-2.5 text-left font-medium">
+type RepositoryRow = RepositoryGroup["repositories"][number];
+
+const repositoryColumns: readonly DataColumn<RepositoryRow>[] = [
+  {
+    id: "repository",
+    header: "Repository",
+    rowHeader: true,
+    cell: (repository) => (
+      <>
         <Link href={`/repositories/${repository.id}`} className="text-primary hover:underline">
           {repository.owner}/{repository.name}
         </Link>
         {repository.private ? (
-          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">private</span>
+          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-micro text-muted-foreground">private</span>
         ) : undefined}
-      </th>
-      <td className="px-3 py-2.5">
-        {repository.latestRunId ? (
-          <div className="flex items-center gap-2">
-            <StatusBadge value={repository.latestRunDecision ?? repository.latestRunStatus} />
-            <span className="text-xs text-muted-foreground">{when(repository.latestRunAt)}</span>
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            no runs yet ·{" "}
-            <Link href="/setup" className="text-primary hover:underline">
-              setup
-            </Link>
-          </span>
-        )}
-      </td>
-      <td className="px-3 py-2.5">{repository.latestRunId ? repository.openFindings : "—"}</td>
-      <td className="px-3 py-2.5">{repository.watchedBoards}</td>
-      <td className="px-3 py-2.5">{repository.openSupplyFindings}</td>
-    </tr>
-  );
-}
+      </>
+    ),
+  },
+  {
+    id: "latest-run",
+    header: "Latest run",
+    cell: (repository) =>
+      repository.latestRunId ? (
+        <div className="flex items-center gap-2">
+          <StatusBadge value={repository.latestRunDecision ?? repository.latestRunStatus} />
+          <span className="text-meta text-muted-foreground">{when(repository.latestRunAt)}</span>
+        </div>
+      ) : (
+        <span className="text-meta text-muted-foreground">
+          no runs yet ·{" "}
+          <Link href="/setup" className="text-primary hover:underline">
+            setup
+          </Link>
+        </span>
+      ),
+  },
+  {
+    id: "findings",
+    header: "Findings",
+    align: "end",
+    cell: (repository) => (
+      <span className="tabular-nums">{repository.latestRunId ? repository.openFindings : "—"}</span>
+    ),
+  },
+  {
+    id: "boards",
+    header: "Boards watched",
+    align: "end",
+    cell: (repository) => <span className="tabular-nums">{repository.watchedBoards}</span>,
+  },
+  {
+    id: "supply",
+    header: "Supply alerts",
+    align: "end",
+    cell: (repository) => <span className="tabular-nums">{repository.openSupplyFindings}</span>,
+  },
+];
 
 function RepositorySections({ groups }: Readonly<{ groups: RepositoryGroup[] }>) {
   return (
     <div className="flex flex-col gap-4">
       {groups.map((group) => (
         <Panel key={group.accountLogin} title={group.accountLogin} tone="section">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <th scope="col" className="px-3 py-2">
-                    Repository
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    Latest run
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    Findings
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    Boards watched
-                  </th>
-                  <th scope="col" className="px-3 py-2">
-                    Supply alerts
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.repositories.map((repository) => (
-                  <RepositoryRow key={repository.id} repository={repository} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            caption={`Repositories under ${group.accountLogin}`}
+            columns={repositoryColumns}
+            rows={group.repositories}
+            rowKey={(repository) => repository.id}
+            empty={<p className="text-sm text-muted-foreground">No repositories in this account yet.</p>}
+          />
         </Panel>
       ))}
     </div>
@@ -228,9 +233,8 @@ export default async function DashboardPage() {
   const summary = summarizeViewerRepositories(groups);
 
   return (
-    <AppShell viewerNav={<ViewerNav />}>
+    <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Dashboard" }]}>
       <main id="main-content" className="flex flex-col gap-5 px-6 py-6">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Dashboard" }]} />
         <header>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-sm text-muted-foreground">

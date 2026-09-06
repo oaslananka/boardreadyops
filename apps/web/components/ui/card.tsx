@@ -5,7 +5,7 @@ export function Card({ className, ...props }: Readonly<ComponentProps<"div">>) {
   return (
     <div
       data-slot="card"
-      className={cn("rounded-md border border-border bg-card text-card-foreground", className)}
+      className={cn("min-w-0 rounded-md border border-border bg-card text-card-foreground", className)}
       {...props}
     />
   );
@@ -15,7 +15,7 @@ export function CardHeader({ className, ...props }: Readonly<ComponentProps<"div
   return (
     <div
       data-slot="card-header"
-      className={cn("flex items-start justify-between gap-4 border-b border-border px-5 py-4", className)}
+      className={cn("flex min-w-0 items-start justify-between gap-4 border-b border-border px-5 py-4", className)}
       {...props}
     />
   );
@@ -38,7 +38,7 @@ export function CardAction({ className, ...props }: Readonly<ComponentProps<"div
 }
 
 export function CardContent({ className, ...props }: Readonly<ComponentProps<"div">>) {
-  return <div data-slot="card-content" className={cn("px-5 py-4", className)} {...props} />;
+  return <div data-slot="card-content" className={cn("min-w-0 px-5 py-4", className)} {...props} />;
 }
 
 export function CardFooter({ className, ...props }: Readonly<ComponentProps<"div">>) {

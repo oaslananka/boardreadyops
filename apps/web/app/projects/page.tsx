@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
-import { Breadcrumbs, Panel } from "../../components/ui.js";
+import { Panel } from "../../components/ui.js";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -11,10 +11,8 @@ export const metadata: Metadata = {
 
 export default function ProjectsPage() {
   return (
-    <AppShell>
+    <AppShell breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Projects" }]}>
       <main id="main-content" className="flex flex-col gap-5 px-6 py-6">
-        <Breadcrumbs items={[{ href: "/dashboard", label: "Dashboard" }, { label: "Projects" }]} />
-
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Hardware Projects</h1>

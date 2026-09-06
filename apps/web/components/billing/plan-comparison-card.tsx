@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
+import { useToast } from "../ui/toast.js";
 
 export type CommercialTierKey = "community" | "team" | "business" | "pilot" | "enterprise";
 
@@ -86,11 +87,10 @@ export function PlanComparisonCard({
 }: PlanComparisonCardProps) {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   async function handleUpgrade(tier: "team" | "business") {
     setLoadingTier(tier);
-    setErrorMessage(null);
 
     try {
       const response = await fetch("/api/v1/billing/checkout", {
@@ -111,14 +111,13 @@ export function PlanComparisonCard({
       const { url } = (await response.json()) as { url: string };
       window.location.href = url;
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Failed to open checkout");
+      toast.error("Could not open checkout", err instanceof Error ? err.message : undefined);
       setLoadingTier(null);
     }
   }
 
   async function handlePortal() {
     setPortalLoading(true);
-    setErrorMessage(null);
 
     try {
       const response = await fetch("/api/v1/billing/portal", {
@@ -135,7 +134,7 @@ export function PlanComparisonCard({
       const { url } = (await response.json()) as { url: string };
       window.location.href = url;
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Failed to open customer portal");
+      toast.error("Could not open the customer portal", err instanceof Error ? err.message : undefined);
       setPortalLoading(false);
     }
   }
@@ -157,15 +156,6 @@ export function PlanComparisonCard({
           >
             {portalLoading ? "Opening..." : "Manage Subscription"}
           </Button>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div
-          className="rounded-md border border-danger/40 bg-danger-surface px-4 py-3 text-sm text-danger"
-          role="alert"
-        >
-          {errorMessage}
         </div>
       )}
 

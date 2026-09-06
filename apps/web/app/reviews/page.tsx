@@ -1,5 +1,5 @@
 import { ReviewListItem } from "../../components/review/review-list-item.js";
-import { AppShell, Breadcrumbs, EmptyState, Panel } from "../../components/ui.js";
+import { AppShell, EmptyState, Panel } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
 
@@ -13,10 +13,8 @@ export default function ReviewsListPage() {
   const activeCount = reviews.filter((review) => review.decision === "pending").length;
 
   return (
-    <AppShell viewerNav={<ViewerNav />}>
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Reviews" }]} />
-
+    <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Reviews" }]}>
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Hardware Reviews</h1>
           <p className="mt-1 text-sm text-muted-foreground">

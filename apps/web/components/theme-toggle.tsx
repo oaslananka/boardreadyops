@@ -58,7 +58,7 @@ export function ThemeToggle({ variant = "switch", className }: Readonly<ThemeTog
         )}
       >
         {isDark ? (
-          <Sun className="size-4 text-warning transition-transform hover:rotate-45" />
+          <Sun className="size-4 text-foreground transition-transform hover:rotate-45" />
         ) : (
           <Moon className="size-4 text-foreground transition-transform hover:-rotate-12" />
         )}

@@ -7,7 +7,8 @@ import {
   repositorySetupWorkflowPath,
 } from "@boardreadyops/cloud-core/repository-setup";
 import { RepositorySetupInteractive } from "../../components/repository-setup-interactive.js";
-import { Alert, AppShell, Breadcrumbs, Panel, StatusBadge } from "../../components/ui.js";
+import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
+import { Alert, AppShell, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 
 export const metadata = {
@@ -23,6 +24,38 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** The exact GitHub App permission set, kept as data so the page cannot drift from the list. */
+const requestedPermissions = [
+  { scope: "Repository", permission: "Metadata: read", purpose: "Bind the installation to the intended repository." },
+  {
+    scope: "Repository",
+    permission: "Pull requests: read",
+    purpose: "Attach each run to the pull request it belongs to.",
+  },
+  { scope: "Repository", permission: "Checks: write", purpose: "Publish verified readiness conclusions." },
+  {
+    scope: "Repository",
+    permission: "Actions: write",
+    purpose: "Dispatch the repository-owned readiness workflow.",
+  },
+  {
+    scope: "Repository",
+    permission: "Contents: none",
+    purpose: "Repository files stay under contributor-controlled pull requests.",
+  },
+  {
+    scope: "Organization / account",
+    permission: "None",
+    purpose: "No organization-wide or user-account authority.",
+  },
+];
+
+const permissionColumns: readonly DataColumn<(typeof requestedPermissions)[number]>[] = [
+  { id: "scope", header: "Scope", rowHeader: true, cell: (row) => row.scope },
+  { id: "permission", header: "Permission", cell: (row) => row.permission },
+  { id: "purpose", header: "Purpose", cell: (row) => <span className="text-muted-foreground">{row.purpose}</span> },
+];
+
 export default async function SetupPage({ searchParams }: SetupPageProps) {
   const parameters = await searchParams;
   const selectedValue = first(parameters.preset);
@@ -34,9 +67,8 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   const workflowSource = `https://github.com/oaslananka/boardreadyops/blob/v1/.github/workflows/${repositorySetupWorkflowPath}`;
 
   return (
-    <AppShell viewerNav={<ViewerNav />}>
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Repository setup" }]} />
+    <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Repository setup" }]}>
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs uppercase text-muted-foreground">Repository setup preview</p>
@@ -103,7 +135,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
               access from it, and does not load tenant data without authenticated control-plane access.
             </p>
             <p>
-              <a href="#policy-preset" className="text-primary hover:underline">
+              <a href="#policy-preset" className="text-primary underline underline-offset-2">
                 Continue with repository setup
               </a>{" "}
               by choosing a preset and reviewing the two repository-owned files below.
@@ -178,74 +210,13 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           title="Permission review"
           description="No hidden organization or account access is requested."
         >
-          <section className="overflow-x-auto" aria-labelledby="permission-table-caption">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only" id="permission-table-caption">
-                Required GitHub App permissions and purposes
-              </caption>
-              <thead>
-                <tr className="border-b border-border text-xs uppercase text-muted-foreground">
-                  <th scope="col" className="py-2 pr-3">
-                    Scope
-                  </th>
-                  <th scope="col" className="py-2 pr-3">
-                    Permission
-                  </th>
-                  <th scope="col" className="py-2 pr-3">
-                    Purpose
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-border">
-                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
-                    Repository
-                  </th>
-                  <td className="py-2 pr-3">Metadata: read</td>
-                  <td className="py-2 pr-3 text-muted-foreground">Bind the installation to the intended repository.</td>
-                </tr>
-                <tr className="border-b border-border">
-                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
-                    Repository
-                  </th>
-                  <td className="py-2 pr-3">Pull requests: read</td>
-                  <td className="py-2 pr-3 text-muted-foreground">
-                    Attach each run to the pull request it belongs to.
-                  </td>
-                </tr>
-                <tr className="border-b border-border">
-                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
-                    Repository
-                  </th>
-                  <td className="py-2 pr-3">Checks: write</td>
-                  <td className="py-2 pr-3 text-muted-foreground">Publish verified readiness conclusions.</td>
-                </tr>
-                <tr className="border-b border-border">
-                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
-                    Repository
-                  </th>
-                  <td className="py-2 pr-3">Actions: write</td>
-                  <td className="py-2 pr-3 text-muted-foreground">Dispatch the repository-owned readiness workflow.</td>
-                </tr>
-                <tr className="border-b border-border">
-                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
-                    Repository
-                  </th>
-                  <td className="py-2 pr-3">Contents: none</td>
-                  <td className="py-2 pr-3 text-muted-foreground">
-                    Repository files stay under contributor-controlled pull requests.
-                  </td>
-                </tr>
-                <tr>
-                  <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
-                    Organization / account
-                  </th>
-                  <td className="py-2 pr-3">None</td>
-                  <td className="py-2 pr-3 text-muted-foreground">No organization-wide or user-account authority.</td>
-                </tr>
-              </tbody>
-            </table>
-          </section>
+          <DataTable
+            caption="Required GitHub App permissions and purposes"
+            columns={permissionColumns}
+            rows={requestedPermissions}
+            rowKey={(row) => `${row.scope}:${row.permission}`}
+            empty={null}
+          />
         </Panel>
       </main>
     </AppShell>

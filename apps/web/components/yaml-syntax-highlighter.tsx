@@ -75,7 +75,7 @@ function tokenClass(type: YamlTokenType): string {
     case "string":
       return "text-emerald-600 dark:text-emerald-400";
     case "comment":
-      return "text-muted-foreground/70 italic";
+      return "text-muted-foreground italic";
     case "punctuation":
       return "text-muted-foreground";
     default:
@@ -118,7 +118,7 @@ export function YamlSyntaxHighlighter({ code, filename, presetName }: Readonly<Y
           <code>
             {lineTokens.map((item) => (
               <span key={item.id} className="table-row">
-                <span className="table-cell select-none pr-4 text-right font-mono text-[11px] text-muted-foreground/40">
+                <span className="table-cell select-none pr-4 text-right font-mono text-micro text-muted-foreground">
                   {item.lineNumber}
                 </span>
                 <span className="table-cell whitespace-pre">

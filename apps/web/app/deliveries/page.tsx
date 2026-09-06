@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "../../components/app-shell.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
-import { Breadcrumbs, Panel } from "../../components/ui.js";
+import { Panel } from "../../components/ui.js";
 
 export const metadata: Metadata = {
   title: "Release Deliveries & Fabrication Packages",
@@ -10,10 +10,8 @@ export const metadata: Metadata = {
 
 export default function DeliveriesListPage() {
   return (
-    <AppShell>
+    <AppShell breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Deliveries" }]}>
       <main id="main-content" className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-        <Breadcrumbs items={[{ href: "/dashboard", label: "Dashboard" }, { label: "Deliveries" }]} />
-
         <header>
           <h1 className="text-2xl font-bold text-foreground">Release Deliveries</h1>
           <p className="mt-1 text-sm text-muted-foreground">

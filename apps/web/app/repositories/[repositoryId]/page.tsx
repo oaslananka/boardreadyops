@@ -1,17 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuidedChecklist } from "../../../components/guided-checklist.js";
-import {
-  AppShell,
-  Breadcrumbs,
-  Definition,
-  DefinitionGrid,
-  EmptyState,
-  Panel,
-  StatusBadge,
-} from "../../../components/ui.js";
+import { type DataColumn, DataTable } from "../../../components/ui/data-table.js";
+import { AppShell, Definition, DefinitionGrid, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
 import { ViewerNav } from "../../../components/viewer-nav.js";
-import { loadRepositoryDetail } from "../../../lib/repository-dashboard.js";
+import { loadRepositoryDetail, type RepositoryDetail } from "../../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 
 type PageProps = {
@@ -34,6 +27,62 @@ function when(value: string | undefined): string {
   return Number.isNaN(parsed) ? "unknown" : new Date(parsed).toISOString().replace("T", " ").slice(0, 16);
 }
 
+type RunRow = RepositoryDetail["runs"][number];
+type SupplyRow = RepositoryDetail["supplyFindings"][number];
+
+const runColumns: readonly DataColumn<RunRow>[] = [
+  {
+    id: "run",
+    header: "Run",
+    rowHeader: true,
+    cell: (run) => (
+      <Link href={`/runs/${run.id}`} className="font-mono text-primary hover:underline">
+        {run.commitSha.slice(0, 8) || run.id.slice(0, 8)}
+      </Link>
+    ),
+  },
+  { id: "outcome", header: "Outcome", cell: (run) => <StatusBadge value={run.decision ?? run.status} /> },
+  {
+    id: "ref",
+    header: "Ref",
+    cell: (run) =>
+      run.pullRequestNumber !== undefined ? `#${run.pullRequestNumber}` : run.ref.replace(/^refs\/heads\//u, ""),
+  },
+  {
+    id: "findings",
+    header: "Findings",
+    align: "end",
+    cell: (run) => <span className="tabular-nums">{run.findingCount}</span>,
+  },
+  {
+    id: "started",
+    header: "Started",
+    cell: (run) => <span className="text-muted-foreground">{when(run.startedAt)}</span>,
+  },
+];
+
+const supplyColumns: readonly DataColumn<SupplyRow>[] = [
+  {
+    id: "part",
+    header: "Part",
+    rowHeader: true,
+    cell: (finding) => (
+      <>
+        <span className="font-mono">{finding.mpn}</span>
+        {finding.manufacturer ? <span className="ml-2 text-muted-foreground">{finding.manufacturer}</span> : undefined}
+      </>
+    ),
+  },
+  { id: "board", header: "Board", cell: (finding) => finding.boardPath },
+  { id: "status", header: "Status", cell: (finding) => <StatusBadge value={finding.status} /> },
+  { id: "reference", header: "Reference", cell: (finding) => finding.reference ?? "—" },
+  {
+    id: "detected",
+    header: "Detected",
+    cell: (finding) => <span className="text-muted-foreground">{when(finding.detectedAt)}</span>,
+  },
+];
+
 export default async function RepositoryPage({ params }: PageProps) {
   const { repositoryId } = await params;
   const viewer = await viewerAuthorization();
@@ -49,15 +98,15 @@ export default async function RepositoryPage({ params }: PageProps) {
   const { repository, runs, supplyFindings } = detail;
 
   return (
-    <AppShell viewerNav={<ViewerNav />}>
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
-        <Breadcrumbs
-          items={[
-            { href: "/", label: "Home" },
-            { href: "/dashboard", label: "Dashboard" },
-            { label: `${repository.owner}/${repository.name}` },
-          ]}
-        />
+    <AppShell
+      viewerNav={<ViewerNav />}
+      breadcrumbs={[
+        { href: "/", label: "Home" },
+        { href: "/dashboard", label: "Dashboard" },
+        { label: `${repository.owner}/${repository.name}` },
+      ]}
+    >
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">
             {repository.owner}/{repository.name}
@@ -100,52 +149,13 @@ export default async function RepositoryPage({ params }: PageProps) {
               ]}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs uppercase text-muted-foreground">
-                    <th scope="col" className="py-2 pr-3">
-                      Run
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Outcome
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Ref
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Findings
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Started
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.map((run) => (
-                    <tr key={run.id} className="border-b border-border last:border-b-0">
-                      <th scope="row" className="py-2 pr-3 text-left font-normal">
-                        <Link href={`/runs/${run.id}`} className="text-primary hover:underline">
-                          {run.commitSha.slice(0, 8) || run.id.slice(0, 8)}
-                        </Link>
-                      </th>
-                      <td className="py-2 pr-3">
-                        <StatusBadge value={run.decision ?? run.status} />
-                      </td>
-                      <td className="py-2 pr-3">
-                        {run.pullRequestNumber !== undefined
-                          ? `#${run.pullRequestNumber}`
-                          : run.ref.replace(/^refs\/heads\//u, "")}
-                      </td>
-                      <td className="py-2 pr-3">{run.findingCount}</td>
-                      <td className="py-2 pr-3">
-                        <span className="text-muted-foreground">{when(run.startedAt)}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              caption="Recent runs for this repository"
+              columns={runColumns}
+              rows={runs}
+              rowKey={(run) => run.id}
+              empty={null}
+            />
           )}
         </Panel>
 
@@ -158,52 +168,13 @@ export default async function RepositoryPage({ params }: PageProps) {
               </p>
             </EmptyState>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs uppercase text-muted-foreground">
-                    <th scope="col" className="py-2 pr-3">
-                      Part
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Board
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Status
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Reference
-                    </th>
-                    <th scope="col" className="py-2 pr-3">
-                      Detected
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {supplyFindings.map((finding) => (
-                    <tr
-                      key={`${finding.boardPath}:${finding.mpn}:${finding.reference ?? ""}`}
-                      className="border-b border-border last:border-b-0"
-                    >
-                      <th scope="row" className="py-2 pr-3 text-left font-normal">
-                        {finding.mpn}
-                        {finding.manufacturer ? (
-                          <span className="ml-2 text-muted-foreground">{finding.manufacturer}</span>
-                        ) : undefined}
-                      </th>
-                      <td className="py-2 pr-3">{finding.boardPath}</td>
-                      <td className="py-2 pr-3">
-                        <StatusBadge value={finding.status} />
-                      </td>
-                      <td className="py-2 pr-3">{finding.reference ?? "—"}</td>
-                      <td className="py-2 pr-3">
-                        <span className="text-muted-foreground">{when(finding.detectedAt)}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              caption="Open supply findings on watched boards"
+              columns={supplyColumns}
+              rows={supplyFindings}
+              rowKey={(finding) => `${finding.boardPath}:${finding.mpn}:${finding.reference ?? ""}`}
+              empty={null}
+            />
           )}
         </Panel>
       </main>

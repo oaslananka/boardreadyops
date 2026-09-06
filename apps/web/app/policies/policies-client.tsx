@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Dialog } from "../../components/dialog.js";
 import { Button } from "../../components/ui/button.js";
+import { Input } from "../../components/ui/input.js";
+import { NativeSelect } from "../../components/ui/native-select.js";
+import { Textarea } from "../../components/ui/textarea.js";
 import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 
 export interface PolicyRecord {
@@ -174,8 +177,6 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const inputClass =
-    "mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
   const labelClass = "text-sm font-medium text-foreground";
 
   return (
@@ -192,16 +193,16 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-scope" className={labelClass}>
                 Governance Scope *
               </label>
-              <select
+              <NativeSelect
                 id="policy-scope"
                 value={draft.scope}
                 onChange={(e) => onChange({ ...draft, scope: e.target.value as PolicyRecord["scope"] })}
-                className={inputClass}
+                className="mt-1"
               >
                 <option value="organization">Organization (Global baseline for all repositories)</option>
                 <option value="team">Team (Applies to all repositories owned by a team)</option>
                 <option value="repository">Repository (Specific hardware board repository)</option>
-              </select>
+              </NativeSelect>
             </div>
 
             {draft.scope !== "organization" ? (
@@ -209,12 +210,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
                 <label htmlFor="policy-scope-id" className={labelClass}>
                   {draft.scope === "team" ? "Team Identifier *" : "Repository Path / ID *"}
                 </label>
-                <input
+                <Input
                   id="policy-scope-id"
                   value={draft.scopeId}
                   onChange={(e) => onChange({ ...draft, scopeId: e.target.value })}
                   placeholder={draft.scope === "team" ? "e.g. rf-engineering" : "e.g. acme/power-distribution"}
-                  className={inputClass}
+                  className="mt-1"
                   required
                 />
                 <span className="mt-1 block text-xs text-muted-foreground">
@@ -229,12 +230,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-name" className={labelClass}>
                 Policy Name *
               </label>
-              <input
+              <Input
                 id="policy-name"
                 value={draft.name}
                 onChange={(e) => onChange({ ...draft, name: e.target.value })}
                 placeholder="e.g. High-Voltage Creepage & Clearance Gate"
-                className={inputClass}
+                className="mt-1"
                 required
               />
             </div>
@@ -243,12 +244,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-desc" className={labelClass}>
                 Policy Description
               </label>
-              <textarea
+              <Textarea
                 id="policy-desc"
                 value={draft.description}
                 onChange={(e) => onChange({ ...draft, description: e.target.value })}
                 placeholder="Describe the safety, fabrication, or quality purpose of this policy..."
-                className={inputClass}
+                className="mt-1"
                 rows={2}
               />
             </div>
@@ -262,7 +263,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-gate" className={labelClass}>
                 Minimum Severity Gate (Blocks Release)
               </label>
-              <select
+              <NativeSelect
                 id="policy-gate"
                 value={draft.severityGate}
                 onChange={(e) =>
@@ -271,25 +272,25 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
                     severityGate: (e.target.value || "") as DraftPolicyState["severityGate"],
                   })
                 }
-                className={inputClass}
+                className="mt-1"
               >
                 <option value="">None (Advisory only)</option>
                 <option value="error">Block on Critical & Error findings (Recommended)</option>
                 <option value="high">Block on High, Critical & Error findings</option>
                 <option value="medium">Block on Medium and higher findings</option>
-              </select>
+              </NativeSelect>
             </div>
 
             <div>
               <label htmlFor="policy-roles" className={labelClass}>
                 Required Approver Roles (Comma-separated)
               </label>
-              <input
+              <Input
                 id="policy-roles"
                 value={draft.requiredRoles}
                 onChange={(e) => onChange({ ...draft, requiredRoles: e.target.value })}
                 placeholder="e.g. hardware-lead, compliance, rf-specialist"
-                className={inputClass}
+                className="mt-1"
               />
               {roleTags.length > 0 ? (
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -310,12 +311,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-checklist" className={labelClass}>
                 Required Verification Checklist Items (Comma-separated)
               </label>
-              <input
+              <Input
                 id="policy-checklist"
                 value={draft.requiredChecklist}
                 onChange={(e) => onChange({ ...draft, requiredChecklist: e.target.value })}
                 placeholder="e.g. DFM review confirmed, High-voltage clearance >= 1.5mm"
-                className={inputClass}
+                className="mt-1"
               />
               {checklistTags.length > 0 ? (
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -341,7 +342,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <div
                 className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireEvidencePack ? "border-primary bg-primary/10" : "border-border"}`}
               >
-                <input
+                <Input
                   id="chk-require-evidence-pack"
                   type="checkbox"
                   checked={draft.requireEvidencePack}
@@ -360,7 +361,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <div
                 className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireExternalReview ? "border-primary bg-primary/10" : "border-border"}`}
               >
-                <input
+                <Input
                   id="chk-require-external-review"
                   type="checkbox"
                   checked={draft.requireExternalReview}

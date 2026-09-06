@@ -6,6 +6,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PlanComparisonCard } from "../../../apps/web/components/billing/plan-comparison-card.js";
+import { ToastProvider } from "../../../apps/web/components/ui/toast.js";
 
 describe("PlanComparisonCard", () => {
   type TestElement = {
@@ -42,10 +43,14 @@ describe("PlanComparisonCard", () => {
   it("renders all commercial tiers: Community, Team, Business, Paid Pilot", async () => {
     await act(async () => {
       root.render(
-        createElement(PlanComparisonCard, {
-          currentTier: "community",
-          workspaceId: "ws_maker_01",
-        }),
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "community",
+            workspaceId: "ws_maker_01",
+          }),
+        ),
       );
     });
 
@@ -64,10 +69,14 @@ describe("PlanComparisonCard", () => {
   it("indicates current active plan and shows upgrade buttons for higher tiers", async () => {
     await act(async () => {
       root.render(
-        createElement(PlanComparisonCard, {
-          currentTier: "team",
-          workspaceId: "ws_maker_01",
-        }),
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "team",
+            workspaceId: "ws_maker_01",
+          }),
+        ),
       );
     });
 
@@ -81,11 +90,15 @@ describe("PlanComparisonCard", () => {
   it("shows Manage Subscription portal button when on paid plan", async () => {
     await act(async () => {
       root.render(
-        createElement(PlanComparisonCard, {
-          currentTier: "team",
-          workspaceId: "ws_maker_01",
-          hasStripeCustomer: true,
-        }),
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "team",
+            workspaceId: "ws_maker_01",
+            hasStripeCustomer: true,
+          }),
+        ),
       );
     });
 

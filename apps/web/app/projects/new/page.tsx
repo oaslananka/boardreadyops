@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "../../../components/app-shell.js";
 import { ProjectUploadWizard } from "../../../components/project-upload-wizard.js";
-import { Breadcrumbs, Panel } from "../../../components/ui.js";
+import { Panel } from "../../../components/ui.js";
 
 export const metadata: Metadata = {
   title: "New Project & Package Upload",
@@ -10,16 +10,14 @@ export const metadata: Metadata = {
 
 export default function NewProjectPage() {
   return (
-    <AppShell>
+    <AppShell
+      breadcrumbs={[
+        { href: "/dashboard", label: "Dashboard" },
+        { href: "/projects", label: "Projects" },
+        { label: "New Project" },
+      ]}
+    >
       <main id="main-content" className="flex flex-col gap-5 px-6 py-6">
-        <Breadcrumbs
-          items={[
-            { href: "/dashboard", label: "Dashboard" },
-            { href: "/projects", label: "Projects" },
-            { label: "New Project" },
-          ]}
-        />
-
         <header>
           <h1 className="text-2xl font-bold text-foreground">New Project</h1>
           <p className="mt-1 text-sm text-muted-foreground">

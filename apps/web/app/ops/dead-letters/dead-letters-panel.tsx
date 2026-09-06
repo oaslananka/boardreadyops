@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "../../../components/ui/button.js";
+import { DataTable } from "../../../components/ui/data-table.js";
 import { Alert, EmptyState, StatusBadge } from "../../../components/ui.js";
 import { type DeadLetterListItem, formatFailureReason, formatTimestamp } from "./dead-letter-view-model.js";
 
@@ -68,84 +69,72 @@ export function DeadLettersPanel({
 
   return (
     <>
-      <section className="overflow-x-auto" aria-labelledby="dead-letters-table-caption">
-        <table className="w-full text-left text-sm">
-          <caption id="dead-letters-table-caption" className="sr-only">
-            Dead-lettered jobs and outbox records
-          </caption>
-          <thead>
-            <tr className="border-b border-border text-xs uppercase text-muted-foreground">
-              <th scope="col" className="py-2 pr-3">
-                Item
-              </th>
-              <th scope="col" className="py-2 pr-3">
-                Run
-              </th>
-              <th scope="col" className="py-2 pr-3">
-                Installation / Repository
-              </th>
-              <th scope="col" className="py-2 pr-3">
-                Failure reason
-              </th>
-              <th scope="col" className="py-2 pr-3">
-                Attempts
-              </th>
-              <th scope="col" className="py-2 pr-3">
-                Failed at
-              </th>
-              <th scope="col" className="py-2 pr-3">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => {
-              const key = rowKey(item);
-              const replay = replayState[key];
+      <DataTable
+        caption="Dead-lettered jobs and outbox records"
+        columns={[
+          {
+            id: "item",
+            header: "Item",
+            rowHeader: true,
+            cell: (item) => (
+              <>
+                <StatusBadge value="dead_letter" label={item.itemType} />
+                <div className="mt-1">
+                  <code className="font-mono text-meta">{item.itemId}</code>
+                </div>
+              </>
+            ),
+          },
+          { id: "run", header: "Run", cell: (item) => item.releaseRunId ?? "—" },
+          {
+            id: "scope",
+            header: "Installation / Repository",
+            cell: (item) => (
+              <>
+                <div>{item.installationId}</div>
+                {item.repositoryFullName ? (
+                  <div className="text-meta text-muted-foreground">{item.repositoryFullName}</div>
+                ) : null}
+              </>
+            ),
+          },
+          { id: "reason", header: "Failure reason", cell: (item) => formatFailureReason(item) },
+          {
+            id: "attempts",
+            header: "Attempts",
+            align: "end",
+            cell: (item) => <span className="tabular-nums">{item.attemptCount}</span>,
+          },
+          { id: "failed-at", header: "Failed at", cell: (item) => formatTimestamp(item.failedAt) },
+          {
+            id: "action",
+            header: "Action",
+            cell: (item) => {
+              const replay = replayState[rowKey(item)];
+              if (!item.replaySafe) return <StatusBadge value="blocked" label="Not replayable" />;
               return (
-                <tr key={key} className="border-b border-border last:border-b-0">
-                  <th scope="row" className="py-2 pr-3 text-left font-normal">
-                    <StatusBadge value="dead_letter" label={item.itemType} />
-                    <div className="mt-1">
-                      <code className="text-xs">{item.itemId}</code>
-                    </div>
-                  </th>
-                  <td className="py-2 pr-3">{item.releaseRunId ?? "—"}</td>
-                  <td className="py-2 pr-3">
-                    <div>{item.installationId}</div>
-                    {item.repositoryFullName ? (
-                      <div className="text-xs text-muted-foreground">{item.repositoryFullName}</div>
-                    ) : null}
-                  </td>
-                  <td className="py-2 pr-3">{formatFailureReason(item)}</td>
-                  <td className="py-2 pr-3">{item.attemptCount}</td>
-                  <td className="py-2 pr-3">{formatTimestamp(item.failedAt)}</td>
-                  <td className="py-2 pr-3">
-                    {item.replaySafe ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={replay?.status === "pending"}
-                          onClick={() => onReplay(item)}
-                        >
-                          {replay?.status === "pending" ? "Replaying…" : "Replay"}
-                        </Button>
-                        {replay && replay.status !== "pending" ? (
-                          <div className="mt-1 text-xs text-muted-foreground">{replay.message}</div>
-                        ) : null}
-                      </>
-                    ) : (
-                      <StatusBadge value="blocked" label="Not replayable" />
-                    )}
-                  </td>
-                </tr>
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={replay?.status === "pending"}
+                    onClick={() => onReplay(item)}
+                  >
+                    {replay?.status === "pending" ? "Replaying…" : "Replay"}
+                  </Button>
+                  {replay && replay.status !== "pending" ? (
+                    <div className="mt-1 text-meta text-muted-foreground">{replay.message}</div>
+                  ) : null}
+                </>
               );
-            })}
-          </tbody>
-        </table>
-      </section>
+            },
+          },
+        ]}
+        rows={items}
+        rowKey={rowKey}
+        empty={null}
+      />
       {hasMore ? (
         <Button type="button" variant="secondary" className="mt-3" onClick={onLoadMore}>
           Load older dead letters
