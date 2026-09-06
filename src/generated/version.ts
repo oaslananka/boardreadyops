@@ -1,1 +1,1 @@
-export const boardReadyVersion = "1.38.0"; // x-release-please-version
+export const boardReadyVersion = "1.39.0"; // x-release-please-version
