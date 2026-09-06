@@ -38,9 +38,15 @@ export default async function ManufacturerIntakePage({ params }: Readonly<Manufa
             { label: partnerName },
           ]}
         />
-        <div style={{ marginTop: "1rem" }}>
-          <ManufacturerIntakeWidget partnerSlug={slug} partnerName={partnerName} />
-        </div>
+
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">Manufacturer Intake — {partnerName}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Automated multi-CAD pre-flight review and Engineering Query triage before a fabrication order is placed.
+          </p>
+        </header>
+
+        <ManufacturerIntakeWidget partnerSlug={slug} partnerName={partnerName} />
       </main>
     </AppShell>
   );

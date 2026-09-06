@@ -6,8 +6,17 @@ export const contentType = "image/png";
 
 export default function Icon() {
   return new ImageResponse(
-    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <BrandMarkIcon size={64} />
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#0e0d0c",
+      }}
+    >
+      <BrandMarkIcon size={64} accentColor="#9e93ff" outlineColor="#f4f0e9" />
     </div>,
     { ...size },
   );

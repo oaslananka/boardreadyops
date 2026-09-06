@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "../components/theme-provider.js";
 import "./globals.css";
 
@@ -14,6 +14,14 @@ const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   variable: "--font-mono-loaded",
+  display: "swap",
+});
+
+/** Reserved for page titles and the wordmark — the one editorial note in an otherwise neutral scale. */
+const display = Instrument_Serif({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-display-loaded",
   display: "swap",
 });
 
@@ -39,9 +47,18 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`dark ${body.variable} ${mono.variable}`} suppressHydrationWarning>
+    // `dark` is on <html> deliberately: it is the SSR default matching `defaultTheme="dark"`, and
+    // it is what stops a light flash before the next-themes bootstrap script runs. next-themes
+    // replaces it on the client when the stored preference differs.
+    <html lang="en" className={`dark ${body.variable} ${mono.variable} ${display.variable}`} suppressHydrationWarning>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          storageKey="boardreadyops.theme"
+          disableTransitionOnChange
+        >
           {children}
         </ThemeProvider>
       </body>

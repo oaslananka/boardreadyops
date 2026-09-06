@@ -19,10 +19,15 @@ export default function NewProjectPage() {
             { label: "New Project" },
           ]}
         />
-        <Panel
-          title="New Project & Manufacturing Package Ingestion"
-          description="Directly ingest Gerber/drill zip packages, connect your repository, or run local CLI audits."
-        >
+
+        <header>
+          <h1 className="text-2xl font-bold text-foreground">New Project</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Directly ingest Gerber/drill zip packages, connect your repository, or run local CLI audits.
+          </p>
+        </header>
+
+        <Panel title="Manufacturing Package Ingestion">
           <ProjectUploadWizard />
         </Panel>
       </main>

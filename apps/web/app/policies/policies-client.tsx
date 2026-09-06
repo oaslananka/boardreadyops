@@ -339,7 +339,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
             </legend>
             <div className="flex flex-col gap-2">
               <div
-                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireEvidencePack ? "border-primary bg-accent" : "border-border"}`}
+                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireEvidencePack ? "border-primary bg-primary/10" : "border-border"}`}
               >
                 <input
                   id="chk-require-evidence-pack"
@@ -358,7 +358,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               </div>
 
               <div
-                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireExternalReview ? "border-primary bg-accent" : "border-border"}`}
+                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireExternalReview ? "border-primary bg-primary/10" : "border-border"}`}
               >
                 <input
                   id="chk-require-external-review"

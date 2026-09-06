@@ -4,6 +4,9 @@
 - **Date:** 2026-09-05
 - **Relates to:** [ADR-0015 — Enterprise governance, SSO, SCIM blueprint](0015-enterprise-governance-sso-scim.md)
 
+> **The *Visual direction* section below is superseded by [ADR-0017 — Brand Identity and Design Token System](0017-brand-and-design-token-system.md).** Every other decision in this ADR — colour discipline, dual-theme support, information architecture, and the guided empty-state pattern — remains in force.
+
+
 ---
 
 ## Context

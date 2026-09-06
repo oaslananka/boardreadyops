@@ -36,7 +36,9 @@ function actualPathToPattern(actualPath: string): string {
   return actualPath
     .replace(/\/rev_[a-z0-9_]+/, "/:id")
     .replace(/\/demo-1/, "/:runId")
-    .replace(/\/repo-does-not-exist/, "/:repositoryId");
+    .replace(/\/repo-does-not-exist/, "/:repositoryId")
+    .replace(/\/token-does-not-exist/, "/:token")
+    .replace(/\/intake\/demo$/, "/intake/:slug");
 }
 
 test("every apps/web/app page.tsx has a qa/audit/routes.ts entry", () => {

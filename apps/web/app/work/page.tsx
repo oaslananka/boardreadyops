@@ -72,7 +72,7 @@ export default function MyWorkPage() {
                       <div className="mt-3">
                         <Link
                           href={`/reviews/${finding.review.id}?tab=findings`}
-                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent/10"
+                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
                         >
                           Triage in PR #{finding.review.pullRequestNumber} →
                         </Link>
@@ -134,7 +134,7 @@ export default function MyWorkPage() {
                       <div className="mt-2">
                         <Link
                           href={`/reviews/${r.id}?tab=discussion`}
-                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent/10"
+                          className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
                         >
                           View Required Changes →
                         </Link>

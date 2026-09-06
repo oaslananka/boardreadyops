@@ -22,3 +22,4 @@ function loader(options: { variable?: string } = {}): LoadedFont {
 export const Inter = loader;
 export const JetBrains_Mono = loader;
 export const Newsreader = loader;
+export const Instrument_Serif = loader;

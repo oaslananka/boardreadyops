@@ -18,6 +18,9 @@
       "!apps/web/.next",
       "!playwright-report",
       "!test-results",
+      "!qa-audit-report.json",
+      "!qa-report.json",
+      "!tests/e2e/.auth",
       "!.worktrees"
     ]
   },

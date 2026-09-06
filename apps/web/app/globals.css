@@ -3,67 +3,126 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Graphite & Iris — the BoardReadyOps token system (ADR-0017).
+ *
+ * Two rules govern every value below, inherited from ADR-0016 and deliberately kept:
+ *   1. Exactly one accent (`--primary`) carries interaction. Nothing else is allowed to be it.
+ *   2. Saturated red / green / amber belong to status semantics only — finding severity,
+ *      approval state, blockers. Never decoration.
+ *
+ * `--accent` is NOT an alias of `--primary`: it is the subtle hover surface shadcn's variants
+ * expect. `--info` is NOT an alias of `--primary` either, so an info badge can never be mistaken
+ * for a primary control.
+ *
+ * Colour tokens must stay 6-digit hex. tests/unit/web/theme-contrast.test.ts and
+ * run-design-system.test.ts parse them with `--name:\s*(#[0-9a-fA-F]{6})` and read each theme
+ * block with `[^}]*`, so neither block may contain a nested rule.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #0d1117;
-  --card: #f6f8fa;
-  --card-foreground: #0d1117;
+  --background: #fbf9f6;
+  --foreground: #16130f;
+  --card: #ffffff;
+  --card-foreground: #16130f;
   --popover: #ffffff;
-  --popover-foreground: #0d1117;
-  --primary: #0969da;
+  --popover-foreground: #16130f;
+  --primary: #4a3fd4;
   --primary-foreground: #ffffff;
-  --secondary: #eaeef2;
-  --secondary-foreground: #0d1117;
-  --muted: #f6f8fa;
-  --muted-foreground: #59636e;
-  --accent: #0969da;
-  --accent-foreground: #ffffff;
-  --border: #d0d7de;
-  --input: #d0d7de;
-  --ring: #0969da;
+  --secondary: #efeae1;
+  --secondary-foreground: #16130f;
+  --muted: #f2eee7;
+  --muted-foreground: #6b6259;
+  --accent: #f2eee7;
+  --accent-foreground: #16130f;
+  --border: #ded6c9;
+  --border-strong: #c4b9a8;
+  --input: #ded6c9;
+  --ring: #4a3fd4;
 
-  --danger: #cf222e;
-  --danger-surface: #ffebe9;
-  --success: #1a7f37;
-  --success-surface: #dafbe1;
-  --warning: #9a6700;
-  --warning-surface: #fff8c5;
-  --info: #0969da;
-  --info-surface: #ddf4ff;
+  --danger: #b42318;
+  --danger-surface: #fdecea;
+  --danger-foreground: #ffffff;
+  --success: #12704a;
+  --success-surface: #e8f6ee;
+  --warning: #8a5a00;
+  --warning-surface: #fdf2d8;
+  --info: #0b5fa5;
+  --info-surface: #e4f1fc;
 
-  --radius: 0.125rem;
+  --radius: 0.25rem;
+
+  --elevation-1: 0 1px 2px 0 rgb(22 19 15 / 0.06);
+  --elevation-2: 0 4px 12px -2px rgb(22 19 15 / 0.1), 0 1px 3px rgb(22 19 15 / 0.06);
+  --elevation-3: 0 16px 40px -8px rgb(22 19 15 / 0.18);
 }
 
 .dark {
-  --background: #0d1117;
-  --foreground: #f0f6fc;
-  --card: #161b22;
-  --card-foreground: #f0f6fc;
-  --popover: #161b22;
-  --popover-foreground: #f0f6fc;
-  --primary: #58a6ff;
-  --primary-foreground: #0d1117;
-  --secondary: #21262d;
-  --secondary-foreground: #f0f6fc;
-  --muted: #161b22;
-  --muted-foreground: #7d8590;
-  --accent: #58a6ff;
-  --accent-foreground: #0d1117;
-  --border: #30363d;
-  --input: #21262d;
-  --ring: #58a6ff;
+  --background: #0e0d0c;
+  --foreground: #f4f0e9;
+  --card: #171614;
+  --card-foreground: #f4f0e9;
+  --popover: #1c1a17;
+  --popover-foreground: #f4f0e9;
+  --primary: #9e93ff;
+  --primary-foreground: #141021;
+  --secondary: #232019;
+  --secondary-foreground: #f4f0e9;
+  --muted: #171614;
+  --muted-foreground: #a9a096;
+  --accent: #232019;
+  --accent-foreground: #f4f0e9;
+  --border: #332f29;
+  --border-strong: #4a443c;
+  --input: #232019;
+  --ring: #9e93ff;
 
-  --danger: #ff6b5b;
-  --danger-surface: #3d1f1c;
-  --success: #3fb950;
-  --success-surface: #1c2e1f;
-  --warning: #d29922;
-  --warning-surface: #3b2f14;
-  --info: #58a6ff;
-  --info-surface: #14243d;
+  --danger: #ff8a7a;
+  --danger-surface: #2a1613;
+  --danger-foreground: #2a1613;
+  --success: #5dd98a;
+  --success-surface: #10241a;
+  --warning: #e8b44a;
+  --warning-surface: #2a2010;
+  --info: #7cc4ff;
+  --info-surface: #10202e;
+
+  --elevation-1: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --elevation-2: 0 4px 14px -2px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --elevation-3: 0 24px 56px -12px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(255 255 255 / 0.06);
 }
 
 @theme inline {
+  /*
+   * Fonts. next/font declares --font-ui-loaded / --font-mono-loaded / --font-display-loaded in
+   * app/layout.tsx; without these three lines nothing in the app ever reached them and every
+   * `font-sans` / `font-mono` utility silently fell back to the Tailwind default stack.
+   */
+  --font-sans: var(--font-ui-loaded), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-loaded), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-display: var(--font-display-loaded), var(--font-ui-loaded), ui-serif, Georgia, serif;
+
+  /*
+   * Semantic type scale. Additive on purpose: overriding --text-sm would silently restyle the
+   * 279 existing `text-sm` call sites in one change. New surfaces adopt these; old ones migrate
+   * opportunistically.
+   */
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.08;
+  --text-display--letter-spacing: -0.02em;
+  --text-title: 1.5rem;
+  --text-title--line-height: 1.2;
+  --text-title--letter-spacing: -0.015em;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.35;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.55;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.4;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.35;
+  --text-micro--letter-spacing: 0.04em;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -79,11 +138,13 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
   --color-danger: var(--danger);
   --color-danger-surface: var(--danger-surface);
+  --color-danger-foreground: var(--danger-foreground);
   --color-success: var(--success);
   --color-success-surface: var(--success-surface);
   --color-warning: var(--warning);
@@ -91,9 +152,19 @@
   --color-info: var(--info);
   --color-info-surface: var(--info-surface);
 
-  --radius-sm: calc(var(--radius) - 1px);
+  --shadow-e1: var(--elevation-1);
+  --shadow-e2: var(--elevation-2);
+  --shadow-e3: var(--elevation-3);
+
+  --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-emphasis: cubic-bezier(0.65, 0, 0.35, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @layer base {
@@ -101,7 +172,26 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
+  }
+  /*
+   * Honour the OS reduced-motion setting globally (WCAG 2.1 SC 2.3.3). This also makes
+   * visual.spec.ts deterministic without it having to inject its own animation-killing style tag.
+   *
+   * `!important` is load-bearing here and cannot be dropped: this rule has specificity (0,0,0) and
+   * has to beat Tailwind utility classes at (0,1,0) that set animation and transition durations.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    /* biome-ignore-start lint/complexity/noImportantStyles: a reduced-motion reset must outrank utility classes */
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    /* biome-ignore-end lint/complexity/noImportantStyles: end of the reduced-motion reset */
   }
 }
 

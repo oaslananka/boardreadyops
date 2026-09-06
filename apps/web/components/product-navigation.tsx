@@ -179,7 +179,7 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
             onClick={() => setMobileOpen(false)}
             className={cn(
               "mb-3 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-bold",
-              dashboardCurrent ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/10",
+              dashboardCurrent ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent",
             )}
           >
             <ProductIcon name="projects" />
@@ -208,7 +208,7 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
                         onClick={() => setMobileOpen(false)}
                         className={cn(
                           "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm",
-                          current ? "bg-primary/10 font-medium text-primary" : "text-foreground hover:bg-accent/10",
+                          current ? "bg-primary/10 font-medium text-primary" : "text-foreground hover:bg-accent",
                         )}
                       >
                         <ProductIcon name={item.icon} />
@@ -227,7 +227,7 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
             href="https://docs.boardreadyops.com"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-accent/10"
+            className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-accent"
           >
             <ProductIcon name="docs" />
             {!compact && <span>Docs</span>}
@@ -240,7 +240,7 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
             title={compact ? "Expand navigation" : "Collapse navigation"}
             onClick={toggleCompact}
             // `product-compact-toggle` is an unstyled selector hook for the e2e regression spec.
-            className="product-compact-toggle flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent/10"
+            className="product-compact-toggle flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent"
           >
             <ProductIcon name="menu" />
             {!compact && <span>Collapse</span>}

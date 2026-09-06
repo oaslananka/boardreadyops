@@ -39,6 +39,10 @@ export const demoReviewId = "rev_gateway_42";
 export const brokenDemoReviewId = "rev_edge_ble_09";
 export const demoRunId = "demo-1";
 export const missingRunId = "run-does-not-exist";
+/** No delivery ever mints this token, so the guest route reliably renders its expired/404 state. */
+export const missingDeliveryToken = "token-does-not-exist";
+/** `/intake/[slug]` falls back to "<SLUG> Fabrication" for unknown slugs, so any value renders. */
+export const demoIntakeSlug = "demo";
 
 export const routes: readonly QaRoute[] = [
   { id: "home", path: "/", label: "Landing", auth: "public", requiresDb: false },
@@ -133,6 +137,39 @@ export const routes: readonly QaRoute[] = [
     id: "settings-component-intelligence",
     path: "/settings/component-intelligence",
     label: "Settings: Component Intelligence",
+    auth: "authenticated",
+    requiresDb: false,
+  },
+  {
+    id: "projects",
+    path: "/projects",
+    label: "Projects",
+    auth: "authenticated",
+    requiresDb: false,
+    expectedLinkPrefixes: ["/projects/new"],
+  },
+  { id: "projects-new", path: "/projects/new", label: "New project wizard", auth: "authenticated", requiresDb: false },
+  { id: "parts", path: "/parts", label: "Component intelligence", auth: "authenticated", requiresDb: false },
+  { id: "deliveries", path: "/deliveries", label: "Deliveries", auth: "authenticated", requiresDb: false },
+  {
+    id: "delivery-guest",
+    path: `/deliveries/${missingDeliveryToken}`,
+    label: "Delivery guest link (invalid token)",
+    auth: "public",
+    requiresDb: true,
+    skipWithoutDb: true,
+  },
+  {
+    id: "intake",
+    path: `/intake/${demoIntakeSlug}`,
+    label: "Manufacturer intake",
+    auth: "public",
+    requiresDb: false,
+  },
+  {
+    id: "ops-dead-letters",
+    path: "/ops/dead-letters",
+    label: "Ops: dead letters",
     auth: "authenticated",
     requiresDb: false,
   },
