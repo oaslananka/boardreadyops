@@ -59,6 +59,7 @@ describe("Action cloud outputs and publishing", () => {
         dummyResult,
         {
           outputs: {},
+          githubToken: "",
           uploadSarif: false,
           uploadArtifacts: false,
           commentPr: false,

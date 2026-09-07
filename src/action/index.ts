@@ -22,6 +22,14 @@ export async function runAction(): Promise<void> {
   await ensureRunnerFile(process.env.GITHUB_OUTPUT);
   await ensureRunnerFile(process.env.GITHUB_STEP_SUMMARY);
   const inputs = readActionInputs(workspace);
+  // `comment-pr` and `upload-sarif` default to true, and every consumer of the token reads
+  // `GITHUB_TOKEN` from the environment -- which Actions does not export. Without a workflow that
+  // happens to set `env: GITHUB_TOKEN`, all three silently did nothing and said nothing. The
+  // `github-token` input defaults to the workflow's own token, so the default configuration now
+  // works; a workflow that already sets the variable still wins.
+  if (!process.env.GITHUB_TOKEN && inputs.githubToken) {
+    process.env.GITHUB_TOKEN = inputs.githubToken;
+  }
   const logger = createLogger({
     level: inputs.logLevel,
     format: inputs.logFormat,
