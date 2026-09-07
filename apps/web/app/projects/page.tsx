@@ -1,4 +1,4 @@
-import type { ProjectRecord, WorkspaceMembershipRecord } from "@boardreadyops/db";
+import type { ProjectRecord } from "@boardreadyops/db";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
+import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { loadWorkspaceProjects } from "../../lib/project-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import { createProjectAction, createWorkspaceAction } from "./actions.js";
@@ -114,9 +115,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
           <>
             {/* Only shown when there is a choice to make. A switcher over one workspace is an
                 affordance that does nothing. */}
-            {result.workspaces.length > 1 ? (
-              <WorkspaceSwitcher workspaces={result.workspaces} selectedId={result.selected.id} />
-            ) : null}
+            <WorkspaceSwitcher workspaces={result.workspaces} selectedId={result.selected.id} basePath="/projects" />
 
             <Panel
               title={result.selected.name}
@@ -146,37 +145,6 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
         )}
       </main>
     </AppShell>
-  );
-}
-
-/**
- * Plain links rather than a select-and-submit: each workspace has a real URL, which is the thing
- * someone pastes to a colleague, and it works with no JavaScript.
- */
-function WorkspaceSwitcher({
-  workspaces,
-  selectedId,
-}: Readonly<{ workspaces: readonly WorkspaceMembershipRecord[]; selectedId: string }>) {
-  return (
-    <nav aria-label="Workspace" className="flex flex-wrap gap-2">
-      {workspaces.map((workspace) => {
-        const current = workspace.id === selectedId;
-        return (
-          <Link
-            key={workspace.id}
-            href={`/projects?workspace=${encodeURIComponent(workspace.id)}`}
-            aria-current={current ? "page" : undefined}
-            className={`flex min-h-11 items-center rounded-md border px-3 py-2 text-sm md:min-h-9 ${
-              current
-                ? "border-primary bg-primary/10 text-foreground"
-                : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground"
-            }`}
-          >
-            {workspace.name}
-          </Link>
-        );
-      })}
-    </nav>
   );
 }
 
