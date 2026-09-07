@@ -5,9 +5,25 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import DeliveriesListPage from "../../../apps/web/app/deliveries/page.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeliverySignoffCard } from "../../../apps/web/components/delivery-signoff-card.js";
+
+vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
+  viewerAuthorization: vi.fn(async () => ({ session: { login: "octocat", installationIds: [] } })),
+}));
+
+// The page reads the request origin so the copied guest link is a URL, not a bare path.
+vi.mock("next/headers", () => ({
+  headers: vi.fn(async () => new Map([["host", "boardreadyops.test"]])),
+}));
+
+const loadWorkspaceDeliveries = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/web/lib/delivery-listing.js", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  loadWorkspaceDeliveries,
+}));
+
+const { default: DeliveriesListPage } = await import("../../../apps/web/app/deliveries/page.js");
 
 describe("DeliverySignoffCard", () => {
   type TestElement = {
@@ -102,10 +118,117 @@ describe("DeliverySignoffCard", () => {
   });
 });
 
+/**
+ * The page is an async server component now, so it is awaited rather than rendered synchronously.
+ * What is worth asserting is the shape of each state: a guest link is a public URL, so "there are
+ * none" and "you cannot see any" must never be the same screen.
+ */
 describe("DeliveriesListPage", () => {
-  it("renders Deliveries overview page", () => {
-    const markup = renderToStaticMarkup(createElement(DeliveriesListPage));
+  async function render(): Promise<string> {
+    return renderToStaticMarkup(await DeliveriesListPage({ searchParams: Promise.resolve({}) }));
+  }
+
+  const workspace = {
+    id: "ws_a",
+    name: "Acme Hardware",
+    slug: "acme",
+    planTier: "team" as const,
+    createdAt: "2026-09-01T00:00:00.000Z",
+    role: "owner" as const,
+  };
+
+  it("lists a live link with what it points at", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisions: [{ id: "rev_a", projectName: "Gateway board", revisionLabel: "rev C" }],
+      deliveries: [
+        {
+          id: "del_a",
+          revisionId: "rev_a",
+          revisionLabel: "rev C",
+          projectId: "prj_a",
+          projectName: "Gateway board",
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+          signedArchiveUrl: "https://storage.example.com/gateway.zip",
+          recipientNotes: "Panelised, 2oz copper",
+          createdAt: "2026-09-07T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const markup = await render();
     expect(markup).toContain("Release Deliveries");
-    expect(markup).toContain("Fabrication Handoff");
+    expect(markup).toContain("gateway.zip");
+    expect(markup).toContain("Panelised, 2oz copper");
+    expect(markup).toContain("Live");
+  });
+
+  it("marks a link whose window has closed rather than showing it as live", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisions: [],
+      deliveries: [
+        {
+          id: "del_old",
+          revisionId: "rev_a",
+          revisionLabel: "rev C",
+          projectId: "prj_a",
+          projectName: "Gateway board",
+          expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
+          signedArchiveUrl: "https://storage.example.com/old.zip",
+          createdAt: "2026-09-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const markup = await render();
+    expect(markup).toContain("Expired");
+  });
+
+  it("says why there is nothing to share instead of offering an empty picker", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [workspace],
+      selected: workspace,
+      revisions: [],
+      deliveries: [],
+    });
+
+    const markup = await render();
+    expect(markup).toContain("No revisions to share yet");
+    // The form would be a control that cannot succeed, so it is absent rather than disabled.
+    expect(markup).not.toContain("Create guest link");
+  });
+
+  it("offers no create form to a viewer, who is refused server-side anyway", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({
+      state: "ok",
+      workspaces: [{ ...workspace, role: "viewer" as const }],
+      selected: { ...workspace, role: "viewer" as const },
+      revisions: [{ id: "rev_a", projectName: "Gateway board", revisionLabel: "rev C" }],
+      deliveries: [],
+    });
+
+    const markup = await render();
+    expect(markup).not.toContain("Share a package");
+  });
+
+  it("distinguishes signed out from empty", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({ state: "signed-out" });
+    const markup = await render();
+
+    expect(markup).toContain("Sign in to see your delivery links");
+    expect(markup).not.toContain("No guest links yet");
+  });
+
+  it("says the deployment has no database rather than implying nothing was shared", async () => {
+    loadWorkspaceDeliveries.mockResolvedValue({ state: "not-configured" });
+    const markup = await render();
+
+    expect(markup).toContain("Deliveries are not configured");
   });
 });
