@@ -106,6 +106,46 @@ jobs:
             exit 78
           }
 
+          # Disk preflight. Building the runtime image needs room for the new layers and for
+          # exporting them, and every deploy leaves another `boardreadyops-web-runtime:<sha>`
+          # behind. When the host fills up, `docker compose build` fails only after the image is
+          # already built -- the run reads as a build failure ("no space left on device" writing a
+          # metadata file) minutes in, with nothing about disk in the workflow to point at.
+          #
+          # So: report the space, reclaim only what is safe to reclaim, and fail early and
+          # specifically if it is still not enough.
+          docker_root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || printf '/var/lib/docker')"
+          free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
+          required_mib=12288
+
+          available_mib="$(free_mib "${docker_root}")"
+          printf 'cloud-deploy preflight: %s MiB free on %s (want >= %s MiB)\n' \
+            "${available_mib}" "${docker_root}" "${required_mib}"
+
+          if [ "${available_mib}" -lt "${required_mib}" ]; then
+            # Build cache unused for a week, and dangling layers from previous builds. Neither is
+            # referenced by a running container, and neither is a rollback target: tagged
+            # `boardreadyops-web-runtime:<sha>` images are left alone, because the rollback
+            # procedure in docs/deployment/self-hosted.md depends on the previous one still
+            # existing. Reclaiming those is an operator decision, not something a deploy should
+            # do on its own.
+            printf '%s\n' 'cloud-deploy preflight: below threshold, reclaiming build cache and dangling layers'
+            docker builder prune --force --filter until=168h || true
+            docker image prune --force || true
+            available_mib="$(free_mib "${docker_root}")"
+            printf 'cloud-deploy preflight: %s MiB free after reclaim\n' "${available_mib}"
+          fi
+
+          if [ "${available_mib}" -lt "${required_mib}" ]; then
+            printf '%s\n' \
+              "cloud-deploy preflight: only ${available_mib} MiB free on ${docker_root}, need ${required_mib} MiB." \
+              'Build cache and dangling layers have already been reclaimed, so the space is held by' \
+              'tagged images, volumes or logs. Retiring superseded runtime images is an operator' \
+              'decision because they are the rollback targets -- see the disk section of' \
+              'docs/deployment/self-hosted.md -- so this run stops here rather than choosing for you.' >&2
+            exit 78
+          fi
+
           cd "${repo_dir}"
           git fetch origin --prune
           git checkout main

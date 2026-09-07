@@ -249,6 +249,43 @@ One-time setup before the workflow can be used:
 
 To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to run `./deploy.sh build migrate web worker` — this builds the image from the fast-forwarded checkout and exercises the Doppler/SSH/Tailscale path without touching the running containers. Set it to `false` to run `./deploy.sh up -d --build migrate web worker`, the real deploy. `deploy.sh` has no canary or automatic rollback of its own: a failed build fails the workflow before anything is replaced, but a failed `up` can leave the stack partially replaced — check `docker compose -p boardreadyops-cloud ps` on the host afterward if a real-deploy run fails.
 
+## Disk on the build host
+
+Every deploy builds a new `boardreadyops-web-runtime:<commit-sha>` image on the host and leaves
+the previous ones in place, because the rollback procedure below depends on the previous image
+still existing. Build cache accumulates alongside them. Left alone, the host eventually fills up
+and `docker compose build` fails part-way through the export with `no space left on device` —
+which reads as a build failure rather than a capacity problem, minutes into the run.
+
+The `cloud-deploy` workflow now checks free space before it builds. Below 12 GiB it reclaims what
+is unambiguously safe:
+
+```bash
+docker builder prune --force --filter until=168h   # build cache unused for a week
+docker image prune --force                         # dangling layers from previous builds
+```
+
+Neither is referenced by a running container and neither is a rollback target, so a deploy can do
+this on its own. If the host is still short afterwards, the run stops with exit 78 and does not
+build: the remaining space is held by tagged images, volumes or logs, and choosing which of those
+to retire is an operator decision.
+
+To see what is holding the space:
+
+```bash
+docker system df -v
+docker image ls boardreadyops-web-runtime --format '{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}'
+```
+
+Keep the running image and at least one previous image as a rollback target. Retire the rest:
+
+```bash
+docker image rm boardreadyops-web-runtime:<superseded-sha>
+```
+
+Check which one is live first — `docker compose -p boardreadyops-cloud images` — so a rollback
+target is never the thing removed.
+
 ## Independent worker scaling
 
 The lifecycle and outbox batch limits are independent from the web process. Scale worker replicas only after accounting for database connections and GitHub API throughput:
