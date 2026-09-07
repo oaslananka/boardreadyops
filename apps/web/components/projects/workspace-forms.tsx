@@ -17,9 +17,12 @@ export function suggestSlug(name: string): string {
     name
       .toLowerCase()
       .replaceAll(/[^a-z0-9]+/gu, "-")
-      // A single `-`, not `-+`: the collapse above already guarantees no runs, so the quantifier
-      // could only ever match one character while giving the engine something to backtrack over.
-      .replaceAll(/^-|-$/gu, "")
+      // Two single-character replaces rather than `/^-+|-+$/`: the collapse above already
+      // guarantees at most one hyphen at each end, so there is nothing for a quantifier to match
+      // and nothing to backtrack over -- and an anchor inside an alternation reads like a bug
+      // even when it is not.
+      .replace(/^-/u, "")
+      .replace(/-$/u, "")
       .slice(0, 64)
   );
 }
