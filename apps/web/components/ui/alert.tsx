@@ -3,7 +3,10 @@ import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.js";
 
 const alertVariants = cva(
-  "relative grid grid-cols-[0_1fr] gap-1 rounded-md border px-4 py-3 has-[svg]:grid-cols-[1.25rem_1fr] has-[svg]:gap-x-3 [&>svg]:size-5 [&>svg]:translate-y-0.5",
+  // `1fr` is `minmax(auto, 1fr)`, so the text track refuses to shrink below its content's
+  // min-content width and one long unbroken token -- an MPN, a digest, a credential id -- widens
+  // the whole page. `minmax(0, 1fr)` lets it shrink; the children wrap instead.
+  "relative grid grid-cols-[0_minmax(0,1fr)] gap-1 rounded-md border px-4 py-3 has-[svg]:grid-cols-[1.25rem_minmax(0,1fr)] has-[svg]:gap-x-3 [&>svg]:size-5 [&>svg]:translate-y-0.5",
   {
     variants: {
       variant: {
@@ -32,7 +35,7 @@ export function AlertTitle({ className, ...props }: Readonly<ComponentProps<"div
   return (
     <div
       data-slot="alert-title"
-      className={cn("col-start-2 font-medium leading-none tracking-tight", className)}
+      className={cn("col-start-2 min-w-0 break-words font-medium leading-none tracking-tight", className)}
       {...props}
     />
   );
@@ -42,7 +45,7 @@ export function AlertDescription({ className, ...props }: Readonly<ComponentProp
   return (
     <div
       data-slot="alert-description"
-      className={cn("col-start-2 text-sm text-muted-foreground", className)}
+      className={cn("col-start-2 min-w-0 break-words text-sm text-muted-foreground", className)}
       {...props}
     />
   );
