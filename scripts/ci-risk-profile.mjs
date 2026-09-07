@@ -85,6 +85,7 @@ const PATH_PATTERNS = [
   /^tests\/integration\/cross-platform-paths\.test\.ts$/,
 ];
 const REPORT_PATTERNS = [/^src\/report\//, /^tests\/unit\/report\//, /^docs\//, /^mkdocs\.yml$/];
+const WEB_UI_PATTERNS = [/^apps\/web\/(?:app|components)\//, /^tests\/e2e\//];
 // Mirrors the vitest coverage `include` set so the coverage gate runs whenever a
 // measured source file (or any test/config that affects it) changes.
 const COVERAGE_PATTERNS = [
@@ -130,6 +131,7 @@ export function classifyChangedFiles(files, options = {}) {
   const packageChanged = forceFull || changedFiles.some((file) => matchesAny(file, PACKAGE_PATTERNS));
   const pathSensitiveChanged = forceFull || changedFiles.some((file) => matchesAny(file, PATH_PATTERNS));
   const reportChanged = forceFull || changedFiles.some((file) => matchesAny(file, REPORT_PATTERNS));
+  const webUiChanged = forceFull || changedFiles.some((file) => matchesAny(file, WEB_UI_PATTERNS));
 
   const docsOnly = hasChanges && !forceFull && changedFiles.every(isDocsOnlyFile);
   const codeChanged =
@@ -165,7 +167,7 @@ export function classifyChangedFiles(files, options = {}) {
     needs_integration: forceFull || integrationChanged || kicadChanged || dependencyChanged,
     needs_cross_platform: forceFull || pathSensitiveChanged || dependencyChanged,
     needs_action_smoke: forceFull || actionChanged || packageChanged,
-    needs_accessibility: forceFull || reportChanged || docsChanged,
+    needs_accessibility: forceFull || reportChanged || docsChanged || webUiChanged,
     needs_build: buildChanged || dependencyChanged || packageChanged,
     needs_dist: packageChanged || actionChanged || buildChanged,
     needs_coverage: coverageCritical,

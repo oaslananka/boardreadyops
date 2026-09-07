@@ -85,6 +85,16 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("runs browser and accessibility gates for web UI and e2e changes", () => {
+    for (const file of [
+      "apps/web/app/setup/page.tsx",
+      "apps/web/components/yaml-syntax-highlighter.tsx",
+      "tests/e2e/repository-setup-preview.spec.ts",
+    ]) {
+      expect(classifyChangedFiles([file], { eventName: "pull_request" }).needs_accessibility, file).toBe(true);
+    }
+  });
+
   it("runs cloud coverage for changed cloud paths", () => {
     for (const file of [
       "apps/web/lib/cloud-readiness.ts",
