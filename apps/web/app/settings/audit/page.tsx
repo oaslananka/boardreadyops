@@ -110,6 +110,77 @@ const columns: readonly DataColumn<AuditLogEntry>[] = [
   },
 ];
 
+type AuditListing = Awaited<ReturnType<typeof loadAuditLog>>;
+
+function AuditLogContent({ listing, eventType }: { listing: AuditListing; eventType: string | undefined }) {
+  if (listing.state === "not-configured") {
+    return (
+      <EmptyState title="Audit events are not stored">
+        <p>This deployment has no control-plane database, so there is nothing to record against.</p>
+      </EmptyState>
+    );
+  }
+
+  if (listing.state === "signed-out") {
+    return (
+      <EmptyState title="Sign in to read your audit log">
+        <p>Events are scoped to the installations your GitHub account can see.</p>
+        <Button asChild className="mt-3">
+          <a href="/api/auth/github/login">Sign in with GitHub</a>
+        </Button>
+      </EmptyState>
+    );
+  }
+
+  const emptyTitle = eventType ? "No events of that type" : "No events recorded yet";
+  const emptyDescription = eventType
+    ? "Nothing matched that event type. Clear the filter to see everything."
+    : "Events appear here as soon as something happens: a run finishes, a review is decided, an installation changes.";
+
+  return (
+    <>
+      <form method="get" className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <label className="text-meta font-medium text-foreground" htmlFor="audit-event-type">
+            Event type
+          </label>
+          <Input
+            id="audit-event-type"
+            name="event"
+            defaultValue={eventType ?? ""}
+            placeholder="github_app.installation.suspended"
+            maxLength={160}
+            aria-describedby="audit-event-type-hint"
+          />
+          <p id="audit-event-type-hint" className="text-meta text-muted-foreground">
+            An exact event type. Copy one from a row you are interested in.
+          </p>
+        </div>
+        <Button type="submit" variant="outline">
+          Filter
+        </Button>
+        {eventType ? (
+          <Button asChild variant="ghost">
+            <Link href="/settings/audit">Clear</Link>
+          </Button>
+        ) : null}
+      </form>
+
+      <DataTable
+        caption="Audit events across every visible installation"
+        columns={columns}
+        rows={listing.events}
+        rowKey={(event) => event.id}
+        empty={
+          <EmptyState title={emptyTitle}>
+            <p>{emptyDescription}</p>
+          </EmptyState>
+        }
+      />
+    </>
+  );
+}
+
 export default async function AuditPage({ searchParams }: Readonly<AuditPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
@@ -123,7 +194,6 @@ export default async function AuditPage({ searchParams }: Readonly<AuditPageProp
     limit,
   });
 
-  const events = listing.state === "ok" ? listing.events : [];
   const next = listing.state === "ok" ? listing.next : undefined;
 
   return (
@@ -133,63 +203,7 @@ export default async function AuditPage({ searchParams }: Readonly<AuditPageProp
         title="Audit log"
         description="Every consequential action recorded against the installations your account can see, newest first. Entries are append-only — the database refuses to update or delete one."
       >
-        {listing.state === "not-configured" ? (
-          <EmptyState title="Audit events are not stored">
-            <p>This deployment has no control-plane database, so there is nothing to record against.</p>
-          </EmptyState>
-        ) : listing.state === "signed-out" ? (
-          <EmptyState title="Sign in to read your audit log">
-            <p>Events are scoped to the installations your GitHub account can see.</p>
-            <Button asChild className="mt-3">
-              <a href="/api/auth/github/login">Sign in with GitHub</a>
-            </Button>
-          </EmptyState>
-        ) : (
-          <>
-            <form method="get" className="mb-4 flex flex-wrap items-end gap-3">
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <label className="text-meta font-medium text-foreground" htmlFor="audit-event-type">
-                  Event type
-                </label>
-                <Input
-                  id="audit-event-type"
-                  name="event"
-                  defaultValue={eventType ?? ""}
-                  placeholder="github_app.installation.suspended"
-                  maxLength={160}
-                  aria-describedby="audit-event-type-hint"
-                />
-                <p id="audit-event-type-hint" className="text-meta text-muted-foreground">
-                  An exact event type. Copy one from a row you are interested in.
-                </p>
-              </div>
-              <Button type="submit" variant="outline">
-                Filter
-              </Button>
-              {eventType ? (
-                <Button asChild variant="ghost">
-                  <Link href="/settings/audit">Clear</Link>
-                </Button>
-              ) : null}
-            </form>
-
-            <DataTable
-              caption="Audit events across every visible installation"
-              columns={columns}
-              rows={events}
-              rowKey={(event) => event.id}
-              empty={
-                <EmptyState title={eventType ? "No events of that type" : "No events recorded yet"}>
-                  <p>
-                    {eventType
-                      ? "Nothing matched that event type. Clear the filter to see everything."
-                      : "Events appear here as soon as something happens: a run finishes, a review is decided, an installation changes."}
-                  </p>
-                </EmptyState>
-              }
-            />
-          </>
-        )}
+        <AuditLogContent listing={listing} eventType={eventType} />
       </Panel>
 
       <CursorPagination
