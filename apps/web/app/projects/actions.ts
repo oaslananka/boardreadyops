@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, ok } from "../../lib/action-result.js";
 import { defineAction } from "../../lib/server-action.js";
+import { openWorkspaceStore } from "../../lib/workspace-store-access.js";
 
 /**
  * Both actions are top-level exports capturing nothing from an enclosing scope — every value
@@ -32,20 +33,11 @@ const createProjectSchema = z.object({
   defaultCadFormat: z.enum(["kicad", "altium", "easyeda", "fusion360", "ipc2581", "generic_gerber"]).default("kicad"),
 });
 
-async function openStore(connectionString: string) {
-  const [{ WorkspaceStore }, { createPgQueryExecutor }] = await Promise.all([
-    import("@boardreadyops/db"),
-    import("@boardreadyops/db/pg-executor"),
-  ]);
-  const executor = createPgQueryExecutor({ connectionString, max: 1 });
-  return { store: new WorkspaceStore(executor), executor };
-}
-
 export const createWorkspaceAction = defineAction(createWorkspaceSchema, async (input, { session }) => {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return fail("This deployment has no database configured.");
 
-  const { store, executor } = await openStore(connectionString);
+  const { store, executor } = await openWorkspaceStore(connectionString);
   try {
     const existing = await store.getWorkspaceBySlug(input.slug);
     if (existing) return fail("That slug is already taken.");
@@ -68,7 +60,7 @@ export const createProjectAction = defineAction(createProjectSchema, async (inpu
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return fail("This deployment has no database configured.");
 
-  const { store, executor } = await openStore(connectionString);
+  const { store, executor } = await openWorkspaceStore(connectionString);
   try {
     // Re-authorized here rather than trusted from the form: the workspace id is a hidden input,
     // and a hidden input is a suggestion. Same answer for "not a member" and "does not exist",
