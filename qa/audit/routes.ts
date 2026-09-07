@@ -60,6 +60,7 @@ export const routes: readonly QaRoute[] = [
     auth: "public",
     requiresDb: false,
   },
+  { id: "rules", path: "/rules", label: "Rule catalogue", auth: "public", requiresDb: false },
   { id: "policies", path: "/policies", label: "Governance policies", auth: "authenticated", requiresDb: false },
   { id: "evidence", path: "/evidence", label: "Evidence", auth: "public", requiresDb: false },
   { id: "insights", path: "/insights", label: "Insights", auth: "public", requiresDb: false },

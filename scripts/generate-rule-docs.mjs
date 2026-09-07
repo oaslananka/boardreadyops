@@ -305,6 +305,43 @@ for (const rule of rules) {
   await writeFile(`docs/rules/${rule.id}.md`, renderRule(rule), "utf8");
 }
 
+// The same registry, in the shape a page can render.
+//
+// `apps/web` does not depend on the rule engine -- its workspace dependencies are the cloud
+// packages only -- so importing the registry there would pull the whole engine into the Next
+// bundle and cross a boundary the workspace deliberately does not declare. A generated file is
+// the bridge, and generating it here rather than in a second script keeps one source and one
+// run: the markdown and the catalogue can never describe different rule sets.
+//
+// `rule-catalog.test.ts` fails when this file and the registry disagree.
+await writeFile(
+  "apps/web/lib/rule-catalog.json",
+  `${JSON.stringify(
+    {
+      generatedBy: "scripts/generate-rule-docs.mjs",
+      rules: registered
+        .map((rule) => ({
+          id: rule.id,
+          title: rule.title,
+          description: rule.description,
+          rationale: rule.rationale,
+          defaultSeverity: rule.defaultSeverity,
+          category: rule.category,
+          appliesTo: rule.appliesTo,
+          configKeys: rule.configKeys,
+          tags: rule.tags,
+          evidenceType: rule.evidenceType,
+          fixability: rule.fixability,
+          vendorDependence: rule.vendorDependence,
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id)),
+    },
+    null,
+    2,
+  )}\n`,
+  "utf8",
+);
+
 function renderRule(rule) {
   return `---
 id: ${rule.id}
