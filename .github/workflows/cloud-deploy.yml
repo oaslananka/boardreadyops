@@ -158,6 +158,44 @@ jobs:
               ;;
             "up -d --build migrate web worker")
               ./deploy.sh up -d --build migrate web worker
+
+              # Retention, and only after a real deploy succeeded. Every deploy leaves another
+              # `boardreadyops-web-runtime:<sha>` behind. The preflight above reclaims build cache
+              # and dangling layers, which is why the host still grew: the tagged images are what
+              # accumulates, and they are exactly what a rollback needs, so they cannot simply be
+              # pruned. Keep the newest few and retire the rest.
+              #
+              # Never a candidate: whatever the stack is running right now, whatever its age.
+              # Ordering is by image creation time; two images built in the same second fall back
+              # to tag order, which for commit SHAs is arbitrary -- harmless here, because the
+              # running image is excluded outright and three are kept either way.
+              retain=3
+              docker compose -p boardreadyops-cloud images --format '{{.Repository}}:{{.Tag}}' \
+                2>/dev/null > /tmp/boardreadyops-running-images || : > /tmp/boardreadyops-running-images
+
+              superseded="$(
+                docker image ls 'boardreadyops-web-runtime:*' \
+                  --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' 2>/dev/null \
+                  | sort -r \
+                  | cut -f2 \
+                  | grep -vxF -f /tmp/boardreadyops-running-images \
+                  | tail -n +$((retain + 1)) || true
+              )"
+              rm -f /tmp/boardreadyops-running-images
+
+              if [ -n "${superseded}" ]; then
+                printf 'cloud-deploy retention: retiring %s superseded runtime image(s), keeping the newest %s as rollback targets\n' \
+                  "$(printf '%s\n' "${superseded}" | wc -l | tr -d ' ')" "${retain}"
+                # A loop rather than `xargs`, so one image that cannot be removed -- a stopped
+                # container still references it -- does not decide the fate of the rest.
+                printf '%s\n' "${superseded}" | while IFS= read -r image; do
+                  [ -n "${image}" ] || continue
+                  docker image rm "${image}" >/dev/null 2>&1 || printf '  kept (still referenced): %s\n' "${image}"
+                done
+                printf 'cloud-deploy retention: %s MiB free after retiring\n' "$(free_mib "${docker_root}")"
+              else
+                printf '%s\n' 'cloud-deploy retention: nothing superseded to retire'
+              fi
               ;;
             *)
               printf '%s\n' 'cloud-deploy preflight: unexpected deploy argument set' >&2
