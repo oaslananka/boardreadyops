@@ -15,6 +15,14 @@ export interface WorkspaceRecord {
   createdAt: string;
 }
 
+/** One person's membership of a workspace. `userId` is a GitHub login, the membership key. */
+export interface WorkspaceMemberRecord {
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+  createdAt: string;
+}
+
 export interface WorkspaceMembershipRecord extends WorkspaceRecord {
   role: WorkspaceRole;
 }
@@ -257,6 +265,92 @@ export class WorkspaceStore {
 
     const row = result?.rows?.[0];
     return row ? mapWorkspace(row) : null;
+  }
+
+  async listWorkspaceMembers(workspaceId: string): Promise<readonly WorkspaceMemberRecord[]> {
+    const result = (await this.executor.query(
+      `select workspace_id, user_id, role, created_at
+         from workspace_members
+        where workspace_id = $1
+        order by case role
+                   when 'owner' then 0
+                   when 'admin' then 1
+                   when 'member' then 2
+                   else 3
+                 end,
+                 user_id`,
+      [workspaceId],
+    )) as { rows?: { workspace_id: string; user_id: string; role: string; created_at: string | Date }[] };
+
+    return (result?.rows ?? []).map((row) => ({
+      workspaceId: row.workspace_id,
+      userId: row.user_id,
+      role: (row.role === "owner" || row.role === "admin" || row.role === "member"
+        ? row.role
+        : "viewer") as WorkspaceRole,
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
+  }
+
+  /**
+   * Grants or changes access. Idempotent on the primary key, so re-adding someone updates their
+   * role rather than failing -- which is what "add them as an admin" means when they are already
+   * a member.
+   *
+   * There is no invitation step: `workspace_members.user_id` is a GitHub login, and the row takes
+   * effect the moment that person signs in. Callers must say so.
+   */
+  async upsertWorkspaceMember(input: {
+    workspaceId: string;
+    userId: string;
+    role: WorkspaceRole;
+  }): Promise<WorkspaceMemberRecord> {
+    const result = (await this.executor.query(
+      `insert into workspace_members (workspace_id, user_id, role)
+       values ($1, $2, $3)
+       on conflict (workspace_id, user_id) do update set role = excluded.role
+       returning workspace_id, user_id, role, created_at`,
+      [input.workspaceId, input.userId, input.role],
+    )) as { rows?: { workspace_id: string; user_id: string; role: string; created_at: string | Date }[] };
+
+    const row = result?.rows?.[0];
+    if (!row) throw new Error("Failed to upsert workspace member");
+    return {
+      workspaceId: row.workspace_id,
+      userId: row.user_id,
+      role: input.role,
+      createdAt: new Date(row.created_at).toISOString(),
+    };
+  }
+
+  /**
+   * Removes a member, refusing to remove the last owner.
+   *
+   * A workspace with no owner cannot be administered by anyone: only owners and admins may manage
+   * members, and an admin cannot promote themselves. The delete and the count are one statement so
+   * two concurrent removals cannot each see the other's owner and both succeed.
+   *
+   * Returns whether a row was removed; `false` means either no such member or the last owner.
+   */
+  async removeWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
+    const result = (await this.executor.query(
+      `delete from workspace_members
+        where workspace_id = $1
+          and user_id = $2
+          and (
+            role <> 'owner'
+            or exists (
+              select 1 from workspace_members as others
+               where others.workspace_id = $1
+                 and others.user_id <> $2
+                 and others.role = 'owner'
+            )
+          )
+       returning user_id`,
+      [workspaceId, userId],
+    )) as { rows?: unknown[] };
+
+    return (result?.rows ?? []).length > 0;
   }
 
   /** The workspace a project belongs to, for authorizing a request that names only the project. */
