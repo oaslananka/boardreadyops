@@ -1,7 +1,7 @@
 import { type ReviewPolicyRecord, ReviewPolicyStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
+import { optionalCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
 import { viewerAuthorization } from "../../../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
@@ -48,8 +48,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     return Response.json({ ok: false, error: "Invalid policy payload", issues: parsed.error.issues }, { status: 400 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
+  const config = optionalCloudPersistenceConfiguration();
+  if (config?.mode !== "postgres") {
     return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
   }
 
@@ -73,8 +73,8 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
 
   const { id } = await props.params;
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
+  const config = optionalCloudPersistenceConfiguration();
+  if (config?.mode !== "postgres") {
     return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
   }
 

@@ -33,6 +33,26 @@ type QueueReview = {
   createdBy: string;
 };
 
+/**
+ * Both branches carry the fields a queue card needs, so one mapper serves the demo fixtures and
+ * the database rows alike.
+ */
+function asQueueReview(review: {
+  id: string;
+  repositoryName: string;
+  pullRequestNumber: number | undefined;
+  title: string;
+  createdBy: string;
+}): QueueReview {
+  return {
+    id: review.id,
+    repositoryName: review.repositoryName,
+    pullRequestNumber: review.pullRequestNumber,
+    title: review.title,
+    createdBy: review.createdBy,
+  };
+}
+
 function prLabel(pullRequestNumber: number | undefined): string {
   return pullRequestNumber === undefined ? "" : `PR #${pullRequestNumber}`;
 }
@@ -60,13 +80,6 @@ export default async function MyWorkPage() {
           pullRequestNumber: review.pullRequestNumber,
         })),
     );
-    const asQueueReview = (review: (typeof listing.reviews)[number]): QueueReview => ({
-      id: review.id,
-      repositoryName: review.repositoryName,
-      pullRequestNumber: review.pullRequestNumber,
-      title: review.title,
-      createdBy: review.createdBy,
-    });
     awaitingReviews = listing.reviews.filter((review) => review.decision === "pending").map(asQueueReview);
     changesRequested = listing.reviews.filter((review) => review.decision === "changes_requested").map(asQueueReview);
   } else if (listing.state === "ok") {
@@ -84,13 +97,6 @@ export default async function MyWorkPage() {
         reviewLabel: review?.repositoryName ?? finding.repositoryId,
         pullRequestNumber: review?.pullRequestNumber,
       };
-    });
-    const asQueueReview = (review: (typeof listing.reviews)[number]): QueueReview => ({
-      id: review.id,
-      repositoryName: review.repositoryName,
-      pullRequestNumber: review.pullRequestNumber,
-      title: review.title,
-      createdBy: review.createdBy,
     });
     awaitingReviews = listing.reviews.filter((review) => review.decision === "pending").map(asQueueReview);
     changesRequested = listing.reviews.filter((review) => review.decision === "changes_requested").map(asQueueReview);

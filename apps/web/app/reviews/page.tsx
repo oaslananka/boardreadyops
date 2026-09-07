@@ -89,6 +89,29 @@ export default async function ReviewsListPage() {
   const total = listing.reviews.length;
   const awaiting = listing.reviews.filter((review) => review.decision === "pending").length;
 
+  // The bundled demo reviews carry full finding detail, so they keep the richer card; database
+  // rows only have what the listing query selects, which is a table's worth.
+  let reviewsBody = <NoReviews />;
+  if (total > 0 && listing.state === "fixtures") {
+    reviewsBody = (
+      <div className="grid grid-cols-1 gap-4">
+        {listing.reviews.map((review) => (
+          <ReviewListItem key={review.id} review={review} context="registry" />
+        ))}
+      </div>
+    );
+  } else if (total > 0) {
+    reviewsBody = (
+      <DataTable
+        caption="Hardware reviews across every visible repository"
+        columns={columns}
+        rows={listing.reviews}
+        rowKey={(review) => review.id}
+        empty={<NoReviews />}
+      />
+    );
+  }
+
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Reviews" }]}>
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
@@ -107,24 +130,7 @@ export default async function ReviewsListPage() {
           decision)
         </section>
 
-        {total === 0 ? (
-          <NoReviews />
-        ) : listing.state === "fixtures" ? (
-          // The bundled demo reviews carry full finding detail, so they keep the richer card.
-          <div className="grid grid-cols-1 gap-4">
-            {listing.reviews.map((review) => (
-              <ReviewListItem key={review.id} review={review} context="registry" />
-            ))}
-          </div>
-        ) : (
-          <DataTable
-            caption="Hardware reviews across every visible repository"
-            columns={columns}
-            rows={listing.reviews}
-            rowKey={(review) => review.id}
-            empty={<NoReviews />}
-          />
-        )}
+        {reviewsBody}
       </main>
     </AppShell>
   );

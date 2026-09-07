@@ -79,7 +79,8 @@ export function DataTable<Row>({
           {columns.map((column) => {
             const active = sort?.column === column.id;
             const nextDirection: SortDirection = active && sort?.direction === "asc" ? "desc" : "asc";
-            const ariaSort = active ? (sort?.direction === "asc" ? "ascending" : "descending") : "none";
+            const currentOrder = sort?.direction === "asc" ? "ascending" : "descending";
+            const ariaSort = active ? currentOrder : "none";
             return (
               <TableHead
                 key={column.id}

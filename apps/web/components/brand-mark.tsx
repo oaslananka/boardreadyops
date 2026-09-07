@@ -50,7 +50,8 @@ export function BrandMarkIcon({
   );
 }
 
-export function BrandMarkLockup({ size = 24, className }: BrandMarkProps) {
+/** The lockup only sizes and positions the mark; colour comes from the surrounding text. */
+export function BrandMarkLockup({ size = 24, className }: Readonly<{ size?: number; className?: string }>) {
   return (
     <span className={className ?? "flex items-center gap-2"}>
       <BrandMarkIcon size={size} />
