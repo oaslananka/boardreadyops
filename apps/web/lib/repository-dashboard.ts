@@ -1,3 +1,4 @@
+import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
 /**
@@ -78,18 +79,7 @@ const repositorySummaryQuery = `
      where installations.github_installation_id = any($1::bigint[])
        and repositories.disabled_at is null
        and installations.suspended_at is null
-       and not exists (
-         select 1
-           from github_marketplace_subscriptions
-          where github_marketplace_subscriptions.status = 'canceled'
-            and (
-              github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
-              or (
-                github_marketplace_subscriptions.github_installation_id is null
-                and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
-              )
-            )
-       )
+       and ${notCancelledSubscription}
   ),
   latest as (
     select distinct on (release_runs.repository_id)

@@ -1,6 +1,7 @@
 import { computeWdrrWeekly, isWdrrReady, type WdrrWeeklyCount } from "@boardreadyops/cloud-core";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { computeReviewReadiness } from "./review-readiness.js";
+import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
 const windowDays = 90;
@@ -23,17 +24,7 @@ const reviewWindowQuery = `
      and repositories.disabled_at is null
      and installations.suspended_at is null
      and reviews.created_at >= $2
-     and not exists (
-       select 1 from github_marketplace_subscriptions
-        where github_marketplace_subscriptions.status = 'canceled'
-          and (
-            github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
-            or (
-              github_marketplace_subscriptions.github_installation_id is null
-              and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
-            )
-          )
-     )
+     and ${notCancelledSubscription}
    order by reviews.created_at desc
    limit $3`;
 

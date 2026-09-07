@@ -13,6 +13,7 @@ import {
 } from "./demo-data.js";
 import { buildDemoSnapshots } from "./demo-snapshots.js";
 import { reviewFixturesEnabled } from "./review-listing.js";
+import { cancelledSubscriptionProbe } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
 function mapCanonicalSeverity(raw: string): DemoFinding["severity"] {
@@ -164,16 +165,7 @@ async function verifyViewerAccess(
     return false;
   }
 
-  const subResult = await executor.query(
-    `SELECT 1 FROM github_marketplace_subscriptions
-     WHERE status = 'canceled'
-       AND (
-         github_installation_id = $1
-         OR (github_installation_id IS NULL AND lower(account_login) = lower($2))
-       )
-     LIMIT 1`,
-    [githubInstallationId, row.account_login],
-  );
+  const subResult = await executor.query(cancelledSubscriptionProbe, [githubInstallationId, row.account_login]);
   const subRows = (subResult as { rows?: unknown[] }).rows ?? [];
   if (subRows.length > 0) {
     return false;
