@@ -607,9 +607,8 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
       setShowBuilder(false);
       await loadPolicies();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : `Network error ${verb === "update" ? "updating" : "creating"} policy`,
-      );
+      const networkFailure = `Network error ${verb === "update" ? "updating" : "creating"} policy`;
+      setError(err instanceof Error ? err.message : networkFailure);
     } finally {
       setSubmitting(false);
     }

@@ -15,11 +15,15 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // Every size is at least 44px tall on touch and drops to its designed height from `md:` up.
+      // A finger is about 44px wide whatever the button is for, so the floor belongs here rather
+      // than at each call site -- the route audit was finding the same 32-36px shortfall on the
+      // intake page, the dead-letter form and the settings rail, all from these three lines.
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
+        default: "h-11 px-4 py-2 md:h-9 has-[>svg]:px-3",
+        sm: "h-11 gap-1.5 rounded-md px-3 md:h-8 has-[>svg]:px-2.5",
+        lg: "h-11 rounded-md px-6 md:h-10 has-[>svg]:px-4",
+        icon: "size-11 md:size-9",
       },
     },
     defaultVariants: {

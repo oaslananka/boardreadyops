@@ -185,7 +185,7 @@ export function ProductNavigation() {
             <ProductIcon name="docs" />
             {!compact && <span>Docs</span>}
           </a>
-          {!compact && <ThemeToggle />}
+          {!compact && <ThemeToggle variant="nav-row" />}
           <button
             type="button"
             aria-label={compact ? "Expand navigation" : "Collapse navigation"}
