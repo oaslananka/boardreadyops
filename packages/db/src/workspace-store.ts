@@ -3,6 +3,9 @@ import type { SqlQueryExecutor } from "./lifecycle-store.js";
 
 export type WorkspacePlanTier = "community" | "team" | "business" | "pilot";
 
+/** Matches the `workspace_members.role` check constraint in migration 0064. */
+export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+
 export interface WorkspaceRecord {
   id: string;
   name: string;
@@ -10,6 +13,10 @@ export interface WorkspaceRecord {
   planTier: WorkspacePlanTier;
   stripeCustomerId?: string | undefined;
   createdAt: string;
+}
+
+export interface WorkspaceMembershipRecord extends WorkspaceRecord {
+  role: WorkspaceRole;
 }
 
 export interface ProjectRecord {
@@ -136,20 +143,35 @@ function mapDelivery(row: DeliveryRow): DeliveryRecord {
 export class WorkspaceStore {
   constructor(private readonly executor: SqlQueryExecutor) {}
 
+  /**
+   * Creates a workspace and its owner in one statement.
+   *
+   * `ownerUserId` is required rather than optional: a workspace with no member cannot be
+   * authorized, and every caller that could see it would be equally entitled to it. Both rows are
+   * written by a single CTE so a workspace can never exist without an owner, which the executor
+   * cannot otherwise guarantee -- it exposes `query`, not a transaction.
+   */
   async createWorkspace(input: {
     id?: string | undefined;
     name: string;
     slug: string;
+    ownerUserId: string;
     planTier?: WorkspacePlanTier | undefined;
     stripeCustomerId?: string | undefined;
   }): Promise<WorkspaceRecord> {
     const id = input.id ?? `ws_${randomUUID()}`;
     const planTier = input.planTier ?? "community";
     const result = (await this.executor.query(
-      `insert into workspaces (id, name, slug, plan_tier, stripe_customer_id)
-       values ($1, $2, $3, $4, $5)
-       returning id, name, slug, plan_tier, stripe_customer_id, created_at`,
-      [id, input.name, input.slug, planTier, input.stripeCustomerId ?? null],
+      `with created as (
+         insert into workspaces (id, name, slug, plan_tier, stripe_customer_id)
+         values ($1, $2, $3, $4, $5)
+         returning id, name, slug, plan_tier, stripe_customer_id, created_at
+       ), owner_membership as (
+         insert into workspace_members (workspace_id, user_id, role)
+         select created.id, $6, 'owner' from created
+       )
+       select id, name, slug, plan_tier, stripe_customer_id, created_at from created`,
+      [id, input.name, input.slug, planTier, input.stripeCustomerId ?? null, input.ownerUserId],
     )) as { rows?: WorkspaceRow[] };
 
     const row = result?.rows?.[0];
@@ -157,6 +179,37 @@ export class WorkspaceStore {
       throw new Error("Failed to insert workspace");
     }
     return mapWorkspace(row);
+  }
+
+  /** The caller's role in a workspace, or `null` when they are not a member of it. */
+  async workspaceRoleFor(workspaceId: string, userId: string): Promise<WorkspaceRole | null> {
+    const result = (await this.executor.query(
+      `select role from workspace_members where workspace_id = $1 and user_id = $2`,
+      [workspaceId, userId],
+    )) as { rows?: { role: string }[] };
+
+    const role = result?.rows?.[0]?.role;
+    return role === "owner" || role === "admin" || role === "member" || role === "viewer" ? role : null;
+  }
+
+  /** Every workspace the user belongs to, newest first. */
+  async listWorkspacesForUser(userId: string): Promise<readonly WorkspaceMembershipRecord[]> {
+    const result = (await this.executor.query(
+      `select workspaces.id, workspaces.name, workspaces.slug, workspaces.plan_tier,
+              workspaces.stripe_customer_id, workspaces.created_at, workspace_members.role
+         from workspace_members
+         join workspaces on workspaces.id = workspace_members.workspace_id
+        where workspace_members.user_id = $1
+        order by workspaces.created_at desc, workspaces.id desc`,
+      [userId],
+    )) as { rows?: (WorkspaceRow & { role: string })[] };
+
+    return (result?.rows ?? []).map((row) => ({
+      ...mapWorkspace(row),
+      role: (row.role === "owner" || row.role === "admin" || row.role === "member"
+        ? row.role
+        : "viewer") as WorkspaceRole,
+    }));
   }
 
   async getWorkspaceBySlug(slug: string): Promise<WorkspaceRecord | null> {
@@ -181,6 +234,26 @@ export class WorkspaceStore {
 
     const row = result?.rows?.[0];
     return row ? mapWorkspace(row) : null;
+  }
+
+  /** The workspace a project belongs to, for authorizing a request that names only the project. */
+  async workspaceIdForProject(projectId: string): Promise<string | null> {
+    const result = (await this.executor.query(`select workspace_id from projects where id = $1`, [projectId])) as {
+      rows?: { workspace_id: string }[];
+    };
+    return result?.rows?.[0]?.workspace_id ?? null;
+  }
+
+  /** The workspace a revision belongs to, through its project. */
+  async workspaceIdForRevision(revisionId: string): Promise<string | null> {
+    const result = (await this.executor.query(
+      `select projects.workspace_id
+         from revisions
+         join projects on projects.id = revisions.project_id
+        where revisions.id = $1`,
+      [revisionId],
+    )) as { rows?: { workspace_id: string }[] };
+    return result?.rows?.[0]?.workspace_id ?? null;
   }
 
   async createProject(input: {
