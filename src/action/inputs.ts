@@ -12,6 +12,8 @@ export interface ActionInputs extends Partial<PipelineOptions> {
     markdown?: string | undefined;
     hbom?: string | undefined;
   };
+  /** Empty when a workflow explicitly clears it, which disables the writes that need a token. */
+  githubToken: string;
   uploadSarif: boolean;
   uploadArtifacts: boolean;
   commentPr: boolean;
@@ -59,6 +61,7 @@ export function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? pro
     },
     uploadSarif: boolInput("upload-sarif", true),
     uploadArtifacts: boolInput("upload-artifacts", true),
+    githubToken: core.getInput("github-token").trim(),
     commentPr: boolInput("comment-pr", true),
     commentFormat: commentFormatInput(core.getInput("comment-format") || "report"),
     artifactName: artifactName(core.getInput("artifact-name") || "boardreadyops"),

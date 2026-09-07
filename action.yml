@@ -82,6 +82,13 @@ inputs:
     description: Upload reports as workflow artifacts.
     required: false
     default: "true"
+  github-token:
+    description: >-
+      Token used to comment on pull requests, upload SARIF, and read the base run for the
+      fabrication diff. Defaults to the workflow's own token; override only to post as a
+      different identity.
+    required: false
+    default: ${{ github.token }}
   comment-pr:
     description: Post a sticky Markdown comment on pull requests.
     required: false
