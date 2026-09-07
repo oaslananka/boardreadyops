@@ -9,12 +9,21 @@ import { resolveToolchainPaths } from "./toolchain.mjs";
 const toolchainPaths = resolveToolchainPaths(process.cwd());
 const pythonExecutable = existsSync(toolchainPaths.python) ? toolchainPaths.python : "python";
 
+// Catches a placeholder that was never rendered, which would otherwise ship to the docs site as
+// literal `{{ ... }}`. Note this also matches Go template syntax, so a `docker --format` or
+// `kubectl -o go-template` example has to be written without one -- the plain command output is
+// usually what the reader wants anyway.
+const templateTokenPattern = /{{[#/^]?[A-Za-z0-9_.-]+}}/g;
 const markdownFiles = [];
 await collect("docs");
 for (const file of markdownFiles) {
+  if (file.includes("templates")) continue;
   const text = await readFile(file, "utf8");
-  if (/{{[#/^]?[A-Za-z0-9_.-]+}}/.test(text) && !file.includes("templates")) {
-    throw new Error(`unresolved template token in ${file}`);
+  const tokens = [...new Set(text.match(templateTokenPattern) ?? [])];
+  if (tokens.length > 0) {
+    // Naming the tokens turns this from "something in this file" into a one-line fix; the file
+    // can be hundreds of lines and the pattern is not obvious from the message alone.
+    throw new Error(`unresolved template token in ${file}: ${tokens.join(", ")}`);
   }
 }
 
