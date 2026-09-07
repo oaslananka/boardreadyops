@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import type { Page } from "@playwright/test";
+import { type TouchTargetCandidate, touchTargetName } from "./touch-target-name.js";
 
 const require = createRequire(import.meta.url);
 
@@ -146,33 +147,7 @@ export async function checkInternalLinks(page: Page, originPrefix: string): Prom
 const touchTargetMinPx = 44;
 
 export type TouchTargetIssue = { selector: string; width: number; height: number };
-
-/** What the page can tell us about one candidate control. Facts only -- no verdict. */
-type TouchTargetCandidate = {
-  ariaLabel: string;
-  labelledByText: string;
-  text: string;
-  title: string;
-  tag: string;
-  width: number;
-  height: number;
-  /** Whether a tap anywhere in the required box is routed to this control. */
-  reachable: boolean;
-};
-
-/**
- * The accessible name as a checker would resolve it, so a finding names a real control rather
- * than falling back to its tag.
- *
- * Lives here rather than in the browser callback because everything in that callback is
- * serialized into the page: a helper cannot be shared with it, and defining one inside it is
- * both untestable and a nested function. The page reports what it can see; the verdict and the
- * wording are decided here.
- */
-export function touchTargetName(candidate: TouchTargetCandidate): string {
-  const name = candidate.ariaLabel || candidate.labelledByText || candidate.text || candidate.title || candidate.tag;
-  return name.slice(0, 40);
-}
+export type { TouchTargetCandidate } from "./touch-target-name.js";
 
 /**
  * Flags primary interactive controls whose tap target is under 44x44px. Deliberately scoped to
