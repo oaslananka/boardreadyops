@@ -6,6 +6,7 @@ import { Button } from "./ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card.js";
 
 export { AppShell } from "./app-shell.js";
+export { type BreadcrumbItem, Breadcrumbs } from "./breadcrumbs.js";
 
 export type StatusTone = "danger" | "info" | "neutral" | "success" | "warning";
 
@@ -78,31 +79,6 @@ export function StatusBadge({ value, label }: Readonly<{ value: string | undefin
   );
 }
 
-export type BreadcrumbItem = { href?: string; label: string };
-
-export function Breadcrumbs({ items }: Readonly<{ items: BreadcrumbItem[] }>) {
-  return (
-    <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
-      <ol className="flex flex-wrap items-center gap-1.5">
-        {items.map((item, index) => (
-          <li key={`${item.href ?? "current"}:${item.label}`} className="flex items-center gap-1.5">
-            {index > 0 ? <span aria-hidden="true">/</span> : null}
-            {item.href ? (
-              <Link href={item.href} className="hover:text-foreground hover:underline">
-                {item.label}
-              </Link>
-            ) : (
-              <span aria-current="page" className="font-medium text-foreground">
-                {item.label}
-              </span>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
-
 export type PanelTone = "default" | "raised" | "inset" | "critical" | "section";
 
 export type PanelProps = {
@@ -127,7 +103,7 @@ export function Panel({ children, title, description, actions, id, tone = "defau
   return (
     <Card id={id} className={panelToneClass[tone]} aria-labelledby={headingId}>
       <CardHeader>
-        <div>
+        <div className="min-w-0">
           <CardTitle id={headingId}>{title}</CardTitle>
           {description ? <CardDescription>{description}</CardDescription> : null}
         </div>

@@ -440,7 +440,7 @@ export default function HomePage() {
                 </ul>
               </header>
               <div className="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-3">
-                <article className="rounded-md border border-primary/40 bg-accent/30 p-4">
+                <article className="rounded-md border border-primary/40 bg-muted p-4">
                   <span className="text-xs uppercase text-muted-foreground">Decision first</span>
                   <h3 className="mt-1 text-base font-bold text-foreground">
                     Shortest next action before low-level evidence.

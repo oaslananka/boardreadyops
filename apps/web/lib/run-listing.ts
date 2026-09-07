@@ -13,9 +13,11 @@ import type { UserSession } from "./user-session.js";
  * well-formed, not signed.
  */
 
-type RunListingEntry = {
+export type RunListingEntry = {
   id: string;
   repositoryId: string;
+  /** "owner/name", so a cross-repository listing can say which board each run belongs to. */
+  repository: string;
   status: string;
   decision: string | undefined;
   commitSha: string;
@@ -72,6 +74,8 @@ export function normalizedRunListingLimit(value: number | undefined): number {
 const runListingQuery = `
   select release_runs.id,
          release_runs.repository_id,
+         repositories.owner,
+         repositories.name as repository_name,
          release_runs.status,
          release_runs.decision,
          release_runs.commit_sha,
@@ -138,6 +142,7 @@ export async function loadViewerRuns(
         {
           id,
           repositoryId,
+          repository: `${text(row, "owner") ?? ""}/${text(row, "repository_name") ?? ""}`,
           status: text(row, "status") ?? "unknown",
           decision: text(row, "decision"),
           commitSha: text(row, "commit_sha") ?? "",

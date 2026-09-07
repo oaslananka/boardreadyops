@@ -1,20 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
-
-type ArtifactDetail = RunDetail["artifacts"][number];
-type AttemptDetail = RunDetail["attempts"][number];
-type FindingDetail = RunDetail["findings"][number];
-
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
 import { runVerdict } from "../lib/run-verdict.js";
 import { CopyButton } from "./copy-button.js";
 import { RunLiveRefresh } from "./run-live-refresh.js";
 import { Button, buttonVariants } from "./ui/button.js";
+import { Input } from "./ui/input.js";
+import { NativeSelect } from "./ui/native-select.js";
 import {
   Alert,
   AppShell,
-  Breadcrumbs,
   Definition,
   DefinitionGrid,
   EmptyState,
@@ -24,6 +20,10 @@ import {
   StatusBadge,
 } from "./ui.js";
 import { ViewerNav } from "./viewer-nav.js";
+
+type ArtifactDetail = RunDetail["artifacts"][number];
+type AttemptDetail = RunDetail["attempts"][number];
+type FindingDetail = RunDetail["findings"][number];
 
 export type RunView = "artifacts" | "attempts" | "audit" | "findings" | "publication" | "summary";
 
@@ -99,15 +99,15 @@ export function RunPageFrame({
 }: Readonly<{ run: RunDetail; active: RunView; children: ReactNode; liveRefresh?: boolean }>) {
   const currentLabel = navigationItems.find((item) => item.view === active)?.label ?? "Run";
   return (
-    <AppShell viewerNav={<ViewerNav />}>
-      <main className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8" id="main-content">
-        <Breadcrumbs
-          items={[
-            { href: "/", label: "Home" },
-            { href: `/repositories/${run.repositoryId}`, label: run.repository },
-            { label: currentLabel },
-          ]}
-        />
+    <AppShell
+      viewerNav={<ViewerNav />}
+      breadcrumbs={[
+        { href: "/", label: "Home" },
+        { href: `/repositories/${run.repositoryId}`, label: run.repository },
+        { label: currentLabel },
+      ]}
+    >
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-8" id="main-content">
         <RunHeader run={run} />
         <RunVerdictBanner run={run} />
         {liveRefresh ? <RunLiveRefresh enabled /> : null}
@@ -169,9 +169,8 @@ function RunVerdictBanner({ run }: Readonly<{ run: RunDetail }>) {
 
 export function RunUnavailable({ runId }: Readonly<{ runId: string }>) {
   return (
-    <AppShell viewerNav={<ViewerNav />}>
-      <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]} />
+    <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]}>
+      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
         <h1 className="sr-only">Run details temporarily unavailable</h1>
         <Alert title="Run details temporarily unavailable" tone="warning">
           <p>
@@ -699,9 +698,6 @@ function findingGroupValue(finding: FindingDetail, group: FindingGroup): string 
   return "All findings";
 }
 
-const inputClass =
-  "rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
 export function FindingList({
   findings,
   group = "none",
@@ -769,51 +765,50 @@ export function FindingsView({
       <form className="flex flex-wrap items-end gap-3" method="get" action={`/runs/${run.id}/findings`}>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Search findings</span>
-          <input
+          <Input
             name="findingSearch"
             type="search"
             maxLength={128}
             defaultValue={current.findingSearch}
             placeholder="Rule, message, or path"
-            className={inputClass}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Severity</span>
-          <select name="findingSeverity" defaultValue={current.findingSeverity ?? ""} className={inputClass}>
+          <NativeSelect name="findingSeverity" defaultValue={current.findingSeverity ?? ""}>
             <option value="">All severities</option>
             {["critical", "error", "high", "medium", "warning", "low", "info"].map((severity) => (
               <option key={severity} value={severity}>
                 {humanize(severity)}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Waiver state</span>
-          <select name="findingState" defaultValue={current.findingState ?? "all"} className={inputClass}>
+          <NativeSelect name="findingState" defaultValue={current.findingState ?? "all"}>
             <option value="all">All findings</option>
             <option value="active">Active only</option>
             <option value="waived">Waived only</option>
-          </select>
+          </NativeSelect>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Group</span>
-          <select name="findingGroup" defaultValue={current.findingGroup ?? "none"} className={inputClass}>
+          <NativeSelect name="findingGroup" defaultValue={current.findingGroup ?? "none"}>
             <option value="none">No grouping</option>
             <option value="severity">Severity</option>
             <option value="rule">Rule ID</option>
             <option value="kind">Kind</option>
             <option value="path">Path</option>
-          </select>
+          </NativeSelect>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Sort</span>
-          <select name="findingSort" defaultValue={current.findingSort ?? "severity"} className={inputClass}>
+          <NativeSelect name="findingSort" defaultValue={current.findingSort ?? "severity"}>
             <option value="severity">Severity</option>
             <option value="rule">Rule ID</option>
             <option value="path">Path</option>
-          </select>
+          </NativeSelect>
         </label>
         <div className="flex items-center gap-2">
           <Button type="submit">Apply filters</Button>
@@ -963,44 +958,41 @@ export function ArtifactsView({
       <form className="flex flex-wrap items-end gap-3" method="get" action={`/runs/${run.id}/artifacts`}>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Search artifacts</span>
-          <input
+          <Input
             name="artifactSearch"
             type="search"
             maxLength={128}
             defaultValue={current.artifactSearch}
             placeholder="Name, kind, or checksum"
-            className={inputClass}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Role</span>
-          <input
+          <Input
             name="artifactRole"
             maxLength={128}
             pattern="[A-Za-z0-9][A-Za-z0-9._:-]{0,127}"
             defaultValue={current.artifactRole}
             placeholder="manufacturing"
-            className={inputClass}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Type</span>
-          <input
+          <Input
             name="artifactKind"
             maxLength={128}
             pattern="[A-Za-z0-9][A-Za-z0-9._:-]{0,127}"
             defaultValue={current.artifactKind}
             placeholder="report"
-            className={inputClass}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-muted-foreground">Sort</span>
-          <select name="artifactSort" defaultValue={normalizedArtifactSort} className={inputClass}>
+          <NativeSelect name="artifactSort" defaultValue={normalizedArtifactSort}>
             <option value="newest">Newest first</option>
             <option value="name">Name</option>
             <option value="size">Largest first</option>
-          </select>
+          </NativeSelect>
         </label>
         <div className="flex items-center gap-2">
           <Button type="submit">Apply filters</Button>

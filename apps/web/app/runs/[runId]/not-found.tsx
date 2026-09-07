@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { buttonVariants } from "../../../components/ui/button.js";
-import { AppShell, Breadcrumbs, EmptyState } from "../../../components/ui.js";
+import { AppShell, EmptyState } from "../../../components/ui.js";
 
 export default function RunNotFound() {
   return (
-    <AppShell>
-      <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]} />
+    <AppShell breadcrumbs={[{ href: "/", label: "Home" }, { label: "Run unavailable" }]}>
+      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
         <h1 className="sr-only">Run unavailable</h1>
         <section className="run-state-surface">
           <EmptyState

@@ -24,6 +24,22 @@ export function Dialog({
     const firstFocusable = panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
     (firstFocusable ?? panel)?.focus();
 
+    // Lock the page behind the modal and take it out of the accessibility tree. Without this the
+    // background scrolls under the overlay and a screen reader can still walk into it -- the two
+    // real gaps in this component's otherwise complete WAI-ARIA handling.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // This dialog renders inline rather than through a portal, so "everything else" is every
+    // sibling on the path from the backdrop up to <body> -- not just the top-level children.
+    // Inerting an ancestor instead would inert the dialog with it.
+    const inerted: Element[] = [];
+    for (let node = panel?.parentElement; node && node !== document.body; node = node.parentElement) {
+      for (const sibling of node.parentElement?.children ?? []) {
+        if (sibling !== node && !sibling.hasAttribute("inert")) inerted.push(sibling);
+      }
+    }
+    for (const element of inerted) element.setAttribute("inert", "");
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -47,6 +63,8 @@ export function Dialog({
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      for (const element of inerted) element.removeAttribute("inert");
       previouslyFocused?.focus();
     };
   }, [onClose]);
@@ -62,7 +80,7 @@ export function Dialog({
   // and fully-tested handling below.
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -71,7 +89,7 @@ export function Dialog({
         ref={panelRef}
         className={
           panelClassName ??
-          "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-md border border-border bg-card shadow-lg"
+          "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-popover shadow-e3"
         }
         tabIndex={-1}
       >

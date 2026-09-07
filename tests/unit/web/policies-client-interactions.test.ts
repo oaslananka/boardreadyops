@@ -56,7 +56,7 @@ describe("PoliciesClient interactions (delete confirmation, cancel draft reset)"
         };
       }
       if (url.includes("/api/v1/policies/pol_1")) {
-        return { ok: true, json: async () => ({ ok: true }) };
+        return { ok: true, json: async () => ({ ok: true, policy: samplePolicy }) };
       }
       return { ok: true, json: async () => ({ ok: true, policies: [] }) };
     });
@@ -194,5 +194,49 @@ describe("PoliciesClient interactions (delete confirmation, cancel draft reset)"
     expect(container.textContent).toContain("Advisory Only");
     expect(container.textContent).not.toContain("Multi-Tenant Hierarchical");
     expect(container.textContent).not.toContain("Pre-Fabrication Gates Active");
+  });
+
+  it("prefills the builder from an existing policy and PATCHes it instead of creating a second one", async () => {
+    await act(async () => {
+      root.render(createElement(PoliciesClient));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const editButton = Array.from(container.querySelectorAll("button.button-small")).find(
+      (button) => button.textContent === "Edit",
+    );
+    if (!editButton) throw new Error("edit button not found");
+
+    await act(async () => {
+      editButton.click();
+    });
+
+    expect(container.textContent).toContain("Edit Governance Policy");
+    expect((container.querySelector("#policy-name") as { value?: string } | null)?.value).toBe(samplePolicy.name);
+
+    const submitButton = Array.from(container.querySelectorAll(".policy-builder-footer button")).find(
+      (button) => button.textContent === "Update Policy",
+    );
+    if (!submitButton) throw new Error("update button not found");
+
+    await act(async () => {
+      submitButton.click();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const patchCall = fetchMock.mock.calls.find(
+      (call) => (call[1] as { method?: string } | undefined)?.method === "PATCH",
+    );
+    expect(patchCall, "expected a PATCH to the policy's own endpoint").toBeDefined();
+    expect(patchCall?.[0]).toBe("/api/v1/policies/pol_1");
+    // Scope is immutable through PATCH, so an edit must not try to send it.
+    const body = JSON.parse(String((patchCall?.[1] as { body?: string } | undefined)?.body)) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("scope");
+    expect(body).not.toHaveProperty("scopeId");
+    expect(body.name).toBe(samplePolicy.name);
   });
 });

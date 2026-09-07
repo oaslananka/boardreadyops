@@ -1,6 +1,7 @@
 export type ProductIconName =
   | "work"
   | "reviews"
+  | "runs"
   | "projects"
   | "deliveries"
   | "parts"
@@ -16,6 +17,7 @@ export type ProductIconName =
 const paths: Record<ProductIconName, string> = {
   work: "M4 6.5h16v13H4zM8 6.5V4h8v2.5M8 12h8m-8 4h5",
   reviews: "M5 4h14v16H5zM8 8h8m-8 4h8m-8 4h5",
+  runs: "M4 6h4l2 6-2 6H4m6-12h10m-10 6h10m-10 6h10",
   projects: "M4 7h6l2 2h8v10H4z",
   deliveries: "M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 9l8-4.5M12 12v9M12 12L4 7.5",
   parts: "M9 9h6v6H9zM9 3v3m6-3v3M9 18v3m6-3v3M3 9h3m-3 6h3m12-6h3m-3 6h3M5 5h14v14H5z",

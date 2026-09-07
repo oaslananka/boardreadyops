@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Dialog } from "../../components/dialog.js";
 import { Button } from "../../components/ui/button.js";
+import { Input } from "../../components/ui/input.js";
+import { NativeSelect } from "../../components/ui/native-select.js";
+import { Textarea } from "../../components/ui/textarea.js";
 import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 
 export interface PolicyRecord {
@@ -72,10 +75,11 @@ function summarizeEnforcement(policies: readonly PolicyRecord[]): string {
 
 interface PolicyCardProps {
   readonly policy: PolicyRecord;
+  readonly onEdit: (policy: PolicyRecord) => void;
   readonly onDelete: (id: string, name: string) => void;
 }
 
-function PolicyCard({ policy, onDelete }: PolicyCardProps) {
+function PolicyCard({ policy, onEdit, onDelete }: PolicyCardProps) {
   const scopeLabel = formatScopeLabel(policy.scope);
 
   return (
@@ -87,16 +91,28 @@ function PolicyCard({ policy, onDelete }: PolicyCardProps) {
           </span>
           {policy.scopeId ? <code className="text-xs">{policy.scopeId}</code> : null}
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="button-delete"
-          onClick={() => onDelete(policy.id, policy.name)}
-          aria-label={`Delete policy ${policy.name}`}
-        >
-          Delete
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="button-small"
+            onClick={() => onEdit(policy)}
+            aria-label={`Edit policy ${policy.name}`}
+          >
+            Edit
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="button-delete"
+            onClick={() => onDelete(policy.id, policy.name)}
+            aria-label={`Delete policy ${policy.name}`}
+          >
+            Delete
+          </Button>
+        </div>
       </header>
 
       <div>
@@ -158,12 +174,14 @@ function PolicyCard({ policy, onDelete }: PolicyCardProps) {
 interface PolicyBuilderProps {
   readonly draft: DraftPolicyState;
   readonly submitting: boolean;
+  /** Set while editing an existing policy; scope is fixed then, because PATCH cannot move one. */
+  readonly editingId: string | null;
   readonly onChange: (next: DraftPolicyState) => void;
   readonly onSubmit: (event: React.FormEvent) => void;
   readonly onClose: () => void;
 }
 
-function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: PolicyBuilderProps) {
+function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, onClose }: PolicyBuilderProps) {
   const roleTags = draft.requiredRoles
     .split(",")
     .map((s) => s.trim())
@@ -174,13 +192,11 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const inputClass =
-    "mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
   const labelClass = "text-sm font-medium text-foreground";
 
   return (
     <Panel
-      title="Create Governance Policy"
+      title={editingId ? "Edit Governance Policy" : "Create Governance Policy"}
       description="Define release blocking criteria, required approvers, and verification checks."
       tone="raised"
     >
@@ -192,16 +208,16 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-scope" className={labelClass}>
                 Governance Scope *
               </label>
-              <select
+              <NativeSelect
                 id="policy-scope"
                 value={draft.scope}
                 onChange={(e) => onChange({ ...draft, scope: e.target.value as PolicyRecord["scope"] })}
-                className={inputClass}
+                className="mt-1"
               >
                 <option value="organization">Organization (Global baseline for all repositories)</option>
                 <option value="team">Team (Applies to all repositories owned by a team)</option>
                 <option value="repository">Repository (Specific hardware board repository)</option>
-              </select>
+              </NativeSelect>
             </div>
 
             {draft.scope !== "organization" ? (
@@ -209,12 +225,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
                 <label htmlFor="policy-scope-id" className={labelClass}>
                   {draft.scope === "team" ? "Team Identifier *" : "Repository Path / ID *"}
                 </label>
-                <input
+                <Input
                   id="policy-scope-id"
                   value={draft.scopeId}
                   onChange={(e) => onChange({ ...draft, scopeId: e.target.value })}
                   placeholder={draft.scope === "team" ? "e.g. rf-engineering" : "e.g. acme/power-distribution"}
-                  className={inputClass}
+                  className="mt-1"
                   required
                 />
                 <span className="mt-1 block text-xs text-muted-foreground">
@@ -229,12 +245,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-name" className={labelClass}>
                 Policy Name *
               </label>
-              <input
+              <Input
                 id="policy-name"
                 value={draft.name}
                 onChange={(e) => onChange({ ...draft, name: e.target.value })}
                 placeholder="e.g. High-Voltage Creepage & Clearance Gate"
-                className={inputClass}
+                className="mt-1"
                 required
               />
             </div>
@@ -243,12 +259,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-desc" className={labelClass}>
                 Policy Description
               </label>
-              <textarea
+              <Textarea
                 id="policy-desc"
                 value={draft.description}
                 onChange={(e) => onChange({ ...draft, description: e.target.value })}
                 placeholder="Describe the safety, fabrication, or quality purpose of this policy..."
-                className={inputClass}
+                className="mt-1"
                 rows={2}
               />
             </div>
@@ -262,7 +278,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-gate" className={labelClass}>
                 Minimum Severity Gate (Blocks Release)
               </label>
-              <select
+              <NativeSelect
                 id="policy-gate"
                 value={draft.severityGate}
                 onChange={(e) =>
@@ -271,25 +287,25 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
                     severityGate: (e.target.value || "") as DraftPolicyState["severityGate"],
                   })
                 }
-                className={inputClass}
+                className="mt-1"
               >
                 <option value="">None (Advisory only)</option>
                 <option value="error">Block on Critical & Error findings (Recommended)</option>
                 <option value="high">Block on High, Critical & Error findings</option>
                 <option value="medium">Block on Medium and higher findings</option>
-              </select>
+              </NativeSelect>
             </div>
 
             <div>
               <label htmlFor="policy-roles" className={labelClass}>
                 Required Approver Roles (Comma-separated)
               </label>
-              <input
+              <Input
                 id="policy-roles"
                 value={draft.requiredRoles}
                 onChange={(e) => onChange({ ...draft, requiredRoles: e.target.value })}
                 placeholder="e.g. hardware-lead, compliance, rf-specialist"
-                className={inputClass}
+                className="mt-1"
               />
               {roleTags.length > 0 ? (
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -310,12 +326,12 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               <label htmlFor="policy-checklist" className={labelClass}>
                 Required Verification Checklist Items (Comma-separated)
               </label>
-              <input
+              <Input
                 id="policy-checklist"
                 value={draft.requiredChecklist}
                 onChange={(e) => onChange({ ...draft, requiredChecklist: e.target.value })}
                 placeholder="e.g. DFM review confirmed, High-voltage clearance >= 1.5mm"
-                className={inputClass}
+                className="mt-1"
               />
               {checklistTags.length > 0 ? (
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -339,9 +355,9 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
             </legend>
             <div className="flex flex-col gap-2">
               <div
-                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireEvidencePack ? "border-primary bg-accent" : "border-border"}`}
+                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireEvidencePack ? "border-primary bg-primary/10" : "border-border"}`}
               >
-                <input
+                <Input
                   id="chk-require-evidence-pack"
                   type="checkbox"
                   checked={draft.requireEvidencePack}
@@ -358,9 +374,9 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
               </div>
 
               <div
-                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireExternalReview ? "border-primary bg-accent" : "border-border"}`}
+                className={`flex items-start gap-2 rounded-md border p-3 ${draft.requireExternalReview ? "border-primary bg-primary/10" : "border-border"}`}
               >
-                <input
+                <Input
                   id="chk-require-external-review"
                   type="checkbox"
                   checked={draft.requireExternalReview}
@@ -383,7 +399,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
             Cancel
           </Button>
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Saving Policy…" : "Save Policy"}
+            {submitting ? "Saving Policy…" : editingId ? "Update Policy" : "Save Policy"}
           </Button>
         </footer>
       </form>
@@ -449,6 +465,7 @@ export default function PoliciesClient() {
   const [draft, setDraft] = useState<DraftPolicyState>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadPolicies = useCallback(async () => {
@@ -478,7 +495,25 @@ export default function PoliciesClient() {
     void loadPolicies();
   }, [loadPolicies]);
 
-  async function handleCreate(event: React.FormEvent) {
+  function startEditing(policy: PolicyRecord) {
+    setEditingId(policy.id);
+    setShowBuilder(true);
+    setError(null);
+    setSuccessMessage(null);
+    setDraft({
+      scope: policy.scope,
+      scopeId: policy.scopeId ?? "",
+      name: policy.name,
+      description: policy.description ?? "",
+      requiredChecklist: policy.requiredChecklist.join(", "),
+      requiredRoles: policy.requiredRoles.join(", "),
+      severityGate: policy.severityGate ?? "",
+      requireEvidencePack: policy.requireEvidencePack,
+      requireExternalReview: policy.requireExternalReview,
+    });
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!draft.name.trim() || submitting) return;
 
@@ -509,29 +544,38 @@ export default function PoliciesClient() {
     };
 
     try {
-      const res = await fetch("/api/v1/policies", {
-        method: "POST",
+      // PATCH cannot move a policy between scopes, so an edit sends only the mutable fields.
+      const { scope: _scope, scopeId: _scopeId, ...updatable } = payload;
+      const res = await fetch(editingId ? `/api/v1/policies/${editingId}` : "/api/v1/policies", {
+        method: editingId ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          editingId
+            ? { ...updatable, description: updatable.description ?? null, severityGate: updatable.severityGate ?? null }
+            : payload,
+        ),
       });
       const body = (await res.json().catch(() => ({}))) as { ok: boolean; policy?: PolicyRecord; error?: string };
 
       if (!res.ok || !body.ok || !body.policy) {
-        setError(body.error || `Failed to create policy (${res.status})`);
+        setError(body.error || `Failed to ${editingId ? "update" : "create"} policy (${res.status})`);
         setSubmitting(false);
         return;
       }
 
       setSuccessMessage(
-        draft.severityGate
-          ? `Policy "${draft.name}" created and enforced.`
-          : `Policy "${draft.name}" created (advisory only — no severity gate configured).`,
+        editingId
+          ? `Policy "${draft.name}" updated.`
+          : draft.severityGate
+            ? `Policy "${draft.name}" created and enforced.`
+            : `Policy "${draft.name}" created (advisory only — no severity gate configured).`,
       );
       setDraft(emptyDraft);
+      setEditingId(null);
       setShowBuilder(false);
       await loadPolicies();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error creating policy");
+      setError(err instanceof Error ? err.message : `Network error ${editingId ? "updating" : "creating"} policy`);
     } finally {
       setSubmitting(false);
     }
@@ -563,6 +607,7 @@ export default function PoliciesClient() {
 
   function closeBuilder() {
     setShowBuilder(false);
+    setEditingId(null);
     setDraft(emptyDraft);
   }
 
@@ -624,8 +669,9 @@ export default function PoliciesClient() {
         <PolicyBuilderForm
           draft={draft}
           submitting={submitting}
+          editingId={editingId}
           onChange={setDraft}
-          onSubmit={handleCreate}
+          onSubmit={handleSubmit}
           onClose={closeBuilder}
         />
       ) : null}
@@ -663,7 +709,12 @@ export default function PoliciesClient() {
         ) : (
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
             {policies.map((policy) => (
-              <PolicyCard key={policy.id} policy={policy} onDelete={(id, name) => setPendingDelete({ id, name })} />
+              <PolicyCard
+                key={policy.id}
+                policy={policy}
+                onEdit={startEditing}
+                onDelete={(id, name) => setPendingDelete({ id, name })}
+              />
             ))}
           </div>
         )}

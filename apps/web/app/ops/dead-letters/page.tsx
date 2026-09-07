@@ -1,4 +1,4 @@
-import { AppShell, Breadcrumbs } from "../../../components/ui.js";
+import { AppShell } from "../../../components/ui.js";
 import { DeadLettersClient } from "./dead-letters-client.js";
 
 export const metadata = {
@@ -8,9 +8,8 @@ export const metadata = {
 
 export default function DeadLettersPage() {
   return (
-    <AppShell>
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Ops" }, { label: "Dead-Letter Queue" }]} />
+    <AppShell breadcrumbs={[{ href: "/", label: "Home" }, { label: "Ops" }, { label: "Dead-Letter Queue" }]}>
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Dead-Letter Queue</h1>
           <p className="mt-1 text-sm text-muted-foreground">

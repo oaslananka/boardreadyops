@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CloudRuntimeConfigurationError,
   compareStrictVersions,
+  optionalCloudPersistenceConfiguration,
   resolveArtifactCapabilityConfiguration,
   resolveCloudPersistenceConfiguration,
   resolveControlPlaneRetentionConfiguration,
@@ -197,4 +198,19 @@ describe("self-hosted runner minimum-version configuration", () => {
       ).toThrowError(expect.objectContaining({ code: "invalid-self-hosted-runner-minimum-version" }));
     },
   );
+
+  it("returns undefined instead of throwing when DATABASE_URL is simply unset", () => {
+    // Pages are reachable in that state -- it is what a self-hosted operator is in before they
+    // provision Postgres -- and a page that throws there returns a 500 instead of degrading.
+    expect(optionalCloudPersistenceConfiguration({} as NodeJS.ProcessEnv)).toBeUndefined();
+  });
+
+  it("still resolves a configured database, and still throws on a genuinely invalid mode", () => {
+    expect(optionalCloudPersistenceConfiguration({ DATABASE_URL: "postgres://u:p@h/db" } as NodeJS.ProcessEnv)).toEqual(
+      { mode: "postgres", databaseUrl: "postgres://u:p@h/db" },
+    );
+    expect(() =>
+      optionalCloudPersistenceConfiguration({ BOARDREADYOPS_PERSISTENCE_MODE: "sqlite" } as NodeJS.ProcessEnv),
+    ).toThrow();
+  });
 });

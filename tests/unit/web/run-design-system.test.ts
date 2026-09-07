@@ -48,8 +48,8 @@ describe.each([":root", ".dark"] as const)("design tokens in %s meet WCAG AA con
 });
 
 describe("design token declaration", () => {
-  it("defines the sharp-corner radius and dark-mode custom variant the ADR locked in", () => {
-    expect(css).toContain("--radius: 0.125rem");
+  it("defines the sharp-corner radius and dark-mode custom variant ADR-0017 locked in", () => {
+    expect(css).toContain("--radius: 0.25rem");
     expect(css).toContain("@custom-variant dark");
   });
 });

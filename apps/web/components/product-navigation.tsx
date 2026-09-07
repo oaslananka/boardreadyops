@@ -2,53 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils.js";
 import { BrandMarkLockup } from "./brand-mark.js";
-import { ProductIcon, type ProductIconName } from "./product-icons.js";
+import { dashboardItem, isCurrentRoute, navigationGroups } from "./navigation-model.js";
+import { ProductIcon } from "./product-icons.js";
 import { ThemeToggle } from "./theme-toggle.js";
-
-type NavigationItem = Readonly<{
-  href: string;
-  icon: ProductIconName;
-  label: string;
-}>;
-
-const groups: ReadonlyArray<Readonly<{ label: string; items: readonly NavigationItem[] }>> = [
-  {
-    label: "1. Get a board in",
-    items: [
-      { label: "Projects", href: "/projects", icon: "projects" },
-      { label: "Setup", href: "/setup", icon: "setup" },
-    ],
-  },
-  {
-    label: "2. Work the findings",
-    items: [
-      { label: "My Work", href: "/work", icon: "work" },
-      { label: "Reviews", href: "/reviews", icon: "reviews" },
-    ],
-  },
-  {
-    label: "3. Ship it",
-    items: [
-      { label: "Deliveries", href: "/deliveries", icon: "deliveries" },
-      { label: "Parts", href: "/parts", icon: "parts" },
-    ],
-  },
-  {
-    label: "Govern",
-    items: [
-      { label: "Policies", href: "/policies", icon: "policies" },
-      { label: "Evidence", href: "/evidence", icon: "evidence" },
-      { label: "Insights", href: "/insights", icon: "insights" },
-    ],
-  },
-  {
-    label: "Workspace",
-    items: [{ label: "Settings", href: "/settings/billing", icon: "settings" }],
-  },
-] as const;
 
 const COMPACT_STORAGE_KEY = "boardreadyops.product-nav.compact";
 
@@ -63,13 +22,7 @@ function slugify(label: string): string {
     .join("-");
 }
 
-function isCurrentRoute(pathname: string | null | undefined, href: string): boolean {
-  if (!pathname) return false;
-  if (href === "/settings/billing") return pathname.startsWith("/settings/");
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNode }>) {
+export function ProductNavigation() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compact, setCompact] = useState(false);
@@ -125,13 +78,13 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
     });
   }
 
-  const dashboardCurrent = isCurrentRoute(pathname, "/dashboard");
+  const dashboardCurrent = isCurrentRoute(pathname, dashboardItem.href);
 
   return (
     <>
       <button
         ref={menuButtonRef}
-        className="fixed left-4 top-4 z-40 flex size-10 items-center justify-center rounded-md border border-border bg-card md:hidden"
+        className="product-mobile-trigger fixed left-4 top-3 z-40 flex size-11 items-center justify-center rounded-md border border-border bg-card shadow-e1 md:hidden"
         type="button"
         aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
         aria-controls="product-navigation-drawer"
@@ -173,20 +126,20 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
         <nav aria-label="Product navigation" className="flex-1 overflow-y-auto px-2 py-3">
           <Link
             ref={firstLinkRef}
-            href="/dashboard"
+            href={dashboardItem.href}
             aria-current={dashboardCurrent ? "page" : undefined}
-            title={compact ? "Dashboard" : undefined}
+            title={compact ? dashboardItem.label : undefined}
             onClick={() => setMobileOpen(false)}
             className={cn(
-              "mb-3 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-bold",
-              dashboardCurrent ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/10",
+              "mb-3 flex min-h-11 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-bold md:min-h-9",
+              dashboardCurrent ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent",
             )}
           >
-            <ProductIcon name="projects" />
-            {!compact && <span>Dashboard</span>}
+            <ProductIcon name={dashboardItem.icon} />
+            {!compact && <span>{dashboardItem.label}</span>}
           </Link>
 
-          {groups.map((group) => (
+          {navigationGroups.map((group) => (
             <section key={group.label} aria-labelledby={`nav-${slugify(group.label)}`} className="mb-4">
               {!compact && (
                 <h2
@@ -207,8 +160,8 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
                         title={compact ? item.label : undefined}
                         onClick={() => setMobileOpen(false)}
                         className={cn(
-                          "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm",
-                          current ? "bg-primary/10 font-medium text-primary" : "text-foreground hover:bg-accent/10",
+                          "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm md:min-h-9",
+                          current ? "bg-primary/10 font-medium text-primary" : "text-foreground hover:bg-accent",
                         )}
                       >
                         <ProductIcon name={item.icon} />
@@ -227,20 +180,19 @@ export function ProductNavigation({ viewerNav }: Readonly<{ viewerNav?: ReactNod
             href="https://docs.boardreadyops.com"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-accent/10"
+            className="flex min-h-11 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-accent md:min-h-9"
           >
             <ProductIcon name="docs" />
             {!compact && <span>Docs</span>}
           </a>
           {!compact && <ThemeToggle />}
-          {viewerNav ? <Suspense fallback={null}>{viewerNav}</Suspense> : null}
           <button
             type="button"
             aria-label={compact ? "Expand navigation" : "Collapse navigation"}
             title={compact ? "Expand navigation" : "Collapse navigation"}
             onClick={toggleCompact}
             // `product-compact-toggle` is an unstyled selector hook for the e2e regression spec.
-            className="product-compact-toggle flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent/10"
+            className="product-compact-toggle flex min-h-11 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent md:min-h-9"
           >
             <ProductIcon name="menu" />
             {!compact && <span>Collapse</span>}

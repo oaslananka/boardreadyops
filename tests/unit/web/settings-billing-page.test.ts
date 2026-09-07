@@ -6,6 +6,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PlanComparisonCard } from "../../../apps/web/components/billing/plan-comparison-card.js";
+import { ToastProvider } from "../../../apps/web/components/ui/toast.js";
 
 describe("PlanComparisonCard", () => {
   type TestElement = {
@@ -42,10 +43,14 @@ describe("PlanComparisonCard", () => {
   it("renders all commercial tiers: Community, Team, Business, Paid Pilot", async () => {
     await act(async () => {
       root.render(
-        createElement(PlanComparisonCard, {
-          currentTier: "community",
-          workspaceId: "ws_maker_01",
-        }),
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "community",
+            workspaceId: "ws_maker_01",
+          }),
+        ),
       );
     });
 
@@ -64,10 +69,14 @@ describe("PlanComparisonCard", () => {
   it("indicates current active plan and shows upgrade buttons for higher tiers", async () => {
     await act(async () => {
       root.render(
-        createElement(PlanComparisonCard, {
-          currentTier: "team",
-          workspaceId: "ws_maker_01",
-        }),
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "team",
+            workspaceId: "ws_maker_01",
+          }),
+        ),
       );
     });
 
@@ -81,16 +90,44 @@ describe("PlanComparisonCard", () => {
   it("shows Manage Subscription portal button when on paid plan", async () => {
     await act(async () => {
       root.render(
-        createElement(PlanComparisonCard, {
-          currentTier: "team",
-          workspaceId: "ws_maker_01",
-          hasStripeCustomer: true,
-        }),
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "team",
+            workspaceId: "ws_maker_01",
+            hasStripeCustomer: true,
+          }),
+        ),
       );
     });
 
     const portalBtn = container.querySelector(".manage-portal-button");
     expect(portalBtn).not.toBeNull();
     expect(portalBtn?.textContent).toContain("Manage Subscription");
+  });
+
+  it("routes upgrades to GitHub Marketplace when self-serve checkout is not enabled", async () => {
+    // Under the default BILLING_MODE the checkout and portal endpoints return HTTP 410, so a
+    // checkout button could only ever fail. The tiers still render; only the CTA changes.
+    await act(async () => {
+      root.render(
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "community",
+            workspaceId: "ws_maker_01",
+            hasStripeCustomer: true,
+            billingMode: "marketplace_free",
+          }),
+        ),
+      );
+    });
+
+    expect(container.querySelectorAll(".plan-tier-card")).toHaveLength(4);
+    expect(container.querySelectorAll(".upgrade-checkout-button")).toHaveLength(0);
+    expect(container.querySelector(".manage-portal-button")).toBeNull();
+    expect(container.querySelector(".plan-comparison-container")?.textContent).toContain("GitHub Marketplace");
   });
 });

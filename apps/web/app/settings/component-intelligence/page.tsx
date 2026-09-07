@@ -2,6 +2,7 @@ import { configuredCredentialCipher } from "@boardreadyops/cloud-core/credential
 import { planLimits, planTierOf } from "@boardreadyops/cloud-core/entitlements";
 import Link from "next/link";
 import { Button } from "../../../components/ui/button.js";
+import { Input } from "../../../components/ui/input.js";
 import { Alert, Definition, DefinitionGrid, EmptyState, Panel, type StatusTone } from "../../../components/ui.js";
 import { nexarProviderName } from "../../../lib/component-intelligence-resolver.js";
 import { issueSettingsFormToken } from "../../../lib/settings-form-token.js";
@@ -50,9 +51,6 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
   const installations = await viewerInstallations(session, nexarProviderName);
   const secret = process.env.SESSION_SECRET?.trim();
   const now = new Date();
-
-  const inputClass =
-    "mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
   return (
     <div className="flex flex-col gap-4">
@@ -135,14 +133,14 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
                   <label htmlFor={`client-id-${installation.id}`} className="text-sm font-medium text-foreground">
                     Nexar client ID
                   </label>
-                  <input
+                  <Input
                     id={`client-id-${installation.id}`}
                     name="client_id"
                     type="text"
                     autoComplete="off"
                     maxLength={512}
                     required
-                    className={inputClass}
+                    className="mt-1"
                   />
                 </div>
 
@@ -151,14 +149,14 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
                     Nexar client secret
                   </label>
                   {/* Never rendered back: the stored value is write-only from this page. */}
-                  <input
+                  <Input
                     id={`client-secret-${installation.id}`}
                     name="client_secret"
                     type="password"
                     autoComplete="new-password"
                     maxLength={512}
                     required
-                    className={inputClass}
+                    className="mt-1"
                   />
                 </div>
 
@@ -166,14 +164,14 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
                   <label htmlFor={`scope-${installation.id}`} className="text-sm font-medium text-foreground">
                     OAuth scope (optional)
                   </label>
-                  <input
+                  <Input
                     id={`scope-${installation.id}`}
                     name="scope"
                     type="text"
                     autoComplete="off"
                     maxLength={512}
                     placeholder="supply.domain"
-                    className={inputClass}
+                    className="mt-1"
                   />
                 </div>
 
@@ -202,7 +200,7 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
           installation immediately; your recorded board evidence is untouched.
         </p>
         <p className="mt-2 text-sm">
-          <Link href="https://nexar.com/api" className="text-primary hover:underline">
+          <Link href="https://nexar.com/api" className="text-primary underline underline-offset-2">
             Nexar
           </Link>{" "}
           issues client credentials from its developer portal.

@@ -20,6 +20,7 @@ const nextConfig = {
         "/policies",
         "/repositories/:path*",
         "/reviews/:path*",
+        "/runs",
         "/runs/:path*",
         "/settings/:path*",
         "/ops/:path*",

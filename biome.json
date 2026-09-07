@@ -18,6 +18,9 @@
       "!apps/web/.next",
       "!playwright-report",
       "!test-results",
+      "!qa-audit-report.json",
+      "!qa-report.json",
+      "!tests/e2e/.auth",
       "!.worktrees"
     ]
   },
@@ -31,6 +34,14 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "a11y": {
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["Input", "NativeSelect", "Textarea"]
+          }
+        }
+      },
       "suspicious": {
         "noConsole": "error",
         "noExplicitAny": "error"

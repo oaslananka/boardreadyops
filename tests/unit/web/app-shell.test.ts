@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AppShell } from "../../../apps/web/components/ui.js";
+import { ViewerControls } from "../../../apps/web/components/viewer-controls.js";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/work" }));
 
@@ -32,7 +33,44 @@ describe("AppShell", () => {
     const markup = renderToStaticMarkup(
       createElement(AppShell, null, createElement("main", { id: "main-content" }, "content")),
     );
+    // The shortcut is real now, but the keycap is filled in client-side from the viewer's own
+    // platform -- so the server never claims a Mac chord, and the marker class of the old fake
+    // hint stays banned.
     expect(markup).not.toContain("command-hint");
     expect(markup).not.toContain("⌘");
+  });
+
+  it("offers a real, discoverable command trigger in the topbar", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AppShell, null, createElement("main", { id: "main-content" }, "content")),
+    );
+    expect(markup).toContain("data-command-trigger");
+    expect(markup).toContain('aria-keyshortcuts="Meta+K Control+K"');
+    expect(markup).toContain('aria-label="Search"');
+  });
+
+  it("renders the breadcrumb trail it is given, in the topbar rather than each page body", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        AppShell,
+        { breadcrumbs: [{ href: "/dashboard", label: "Dashboard" }, { label: "Policies" }] },
+        createElement("main", { id: "main-content" }, "content"),
+      ),
+    );
+    expect(markup).toContain('aria-label="Breadcrumb"');
+    expect(markup).toContain('aria-current="page"');
+    expect(markup.indexOf('aria-label="Breadcrumb"')).toBeLessThan(markup.indexOf("<main"));
+  });
+
+  it("puts the signed-in viewer behind an account menu instead of loose text", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        AppShell,
+        { viewerNav: createElement(ViewerControls, { login: "octocat" }) },
+        createElement("main", { id: "main-content" }, "content"),
+      ),
+    );
+    expect(markup).toContain('aria-label="Account menu for octocat"');
+    expect(markup).toContain('aria-haspopup="menu"');
   });
 });

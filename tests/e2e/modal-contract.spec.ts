@@ -8,6 +8,9 @@ import { demoReviewId } from "../../qa/audit/routes.js";
  * reach the page behind the modal, and closing never restored focus. Fixed by the shared
  * Dialog primitive in apps/web/components/dialog.tsx; this file is the black-box contract that
  * catches a regression in either that primitive or a modal that stops using it.
+ *
+ * The command palette is held to the same contract even though it is built on Radix rather than
+ * that primitive -- the contract is about behaviour, not implementation.
  */
 
 async function openReviewAndWaitForHydration(page: Page) {
@@ -31,6 +34,18 @@ test.describe("Dialog contract", () => {
       open: () => trigger.click(),
       triggerLocator: trigger,
       accessibleName: /Sign-Off|Approve|Approval/i,
+    });
+  });
+
+  test("CommandPalette satisfies the dialog contract", async ({ page }) => {
+    await page.goto("/policies");
+    const trigger = page.getByRole("button", { name: "Search" });
+    await trigger.waitFor({ state: "visible" });
+
+    await expectDialogContract(page, {
+      open: () => trigger.click(),
+      triggerLocator: trigger,
+      accessibleName: /Search and commands/i,
     });
   });
 

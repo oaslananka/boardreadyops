@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "../../../components/ui/button.js";
+import { Input } from "../../../components/ui/input.js";
 import { Alert, Panel } from "../../../components/ui.js";
 import {
   buildDeadLetterListUrl,
@@ -102,7 +103,7 @@ export function DeadLettersClient() {
               <label htmlFor="dead-letters-installation-id" className="text-sm font-medium text-foreground">
                 Installation ID
               </label>
-              <input
+              <Input
                 id="dead-letters-installation-id"
                 className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 value={installationId}
@@ -115,7 +116,7 @@ export function DeadLettersClient() {
               <label htmlFor="dead-letters-operator-token" className="text-sm font-medium text-foreground">
                 Operator bearer token
               </label>
-              <input
+              <Input
                 id="dead-letters-operator-token"
                 className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 type="password"

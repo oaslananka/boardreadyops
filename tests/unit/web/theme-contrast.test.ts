@@ -59,6 +59,13 @@ describe.each([":root", ".dark"] as const)("globals.css palette contrast in %s",
     expect(contrast(variable(block, "muted-foreground"), variable(block, "background"))).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("keeps solid status fills readable against their own ink", () => {
+    // `--danger` is tuned as text on `--danger-surface`; the destructive button inverts that and
+    // fills with it, so the fill needs a dedicated foreground rather than a hardcoded white.
+    expect(contrast(variable(block, "danger-foreground"), variable(block, "danger"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(variable(block, "primary-foreground"), variable(block, "primary"))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("keeps status colors visible against their surfaces", () => {
     expect(contrast(variable(block, "danger"), variable(block, "danger-surface"))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(variable(block, "success"), variable(block, "success-surface"))).toBeGreaterThanOrEqual(4.5);

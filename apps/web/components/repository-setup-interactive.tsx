@@ -132,7 +132,12 @@ export function RepositorySetupInteractive({
             <ol className="mt-3 flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
               <li>
                 Open the{" "}
-                <a href={workflowSource} className="text-primary hover:underline" target="_blank" rel="noreferrer">
+                <a
+                  href={workflowSource}
+                  className="text-primary underline underline-offset-2"
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   canonical v1 workflow source
                 </a>{" "}
                 and review its pinned actions, permissions, inputs, and timeouts.

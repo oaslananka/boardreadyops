@@ -1,8 +1,8 @@
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { notFound } from "next/navigation";
 import { DeliverySignoffCard } from "../../../components/delivery-signoff-card.js";
-import { AppShell, Breadcrumbs, EmptyState } from "../../../components/ui.js";
-import { resolveCloudPersistenceConfiguration } from "../../../lib/cloud-runtime-config.js";
+import { AppShell, EmptyState } from "../../../components/ui.js";
+import { optionalCloudPersistenceConfiguration } from "../../../lib/cloud-runtime-config.js";
 import { verifyDeliveryToken } from "../../../lib/delivery-auth.js";
 
 export interface DeliveryPageProps {
@@ -11,12 +11,14 @@ export interface DeliveryPageProps {
 
 export default async function DeliveryPage({ params }: Readonly<DeliveryPageProps>) {
   const { token } = await params;
-  const config = resolveCloudPersistenceConfiguration();
+  // Unset DATABASE_URL is a configuration state, not an exception: this public route should
+  // render its unavailable state rather than 500.
+  const config = optionalCloudPersistenceConfiguration();
 
-  if (config.mode !== "postgres") {
+  if (config?.mode !== "postgres") {
     return (
       <AppShell>
-        <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
+        <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
           <EmptyState title="Service Unavailable">
             <p>Delivery storage is currently unavailable.</p>
           </EmptyState>
@@ -36,9 +38,8 @@ export default async function DeliveryPage({ params }: Readonly<DeliveryPageProp
   if (!authResult.ok) {
     if (authResult.status === 410) {
       return (
-        <AppShell>
-          <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
-            <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Expired Delivery" }]} />
+        <AppShell breadcrumbs={[{ href: "/", label: "Home" }, { label: "Expired Delivery" }]}>
+          <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
             <EmptyState title="Delivery link has expired">
               <p>
                 This secure delivery package was time-limited and has expired. Contact the sender to request a renewed
@@ -58,9 +59,8 @@ export default async function DeliveryPage({ params }: Readonly<DeliveryPageProp
   }
 
   return (
-    <AppShell>
-      <main className="mx-auto flex max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
-        <Breadcrumbs items={[{ href: "/", label: "Home" }, { label: "Secure Hardware Package Delivery" }]} />
+    <AppShell breadcrumbs={[{ href: "/", label: "Home" }, { label: "Secure Hardware Package Delivery" }]}>
+      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">
         <DeliverySignoffCard
           revisionId={delivery.revisionId}
           signedArchiveUrl={delivery.signedArchiveUrl}

@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import type { BillingMode } from "../../lib/billing-mode.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
+import { useToast } from "../ui/toast.js";
 
 export type CommercialTierKey = "community" | "team" | "business" | "pilot" | "enterprise";
 
@@ -10,6 +12,13 @@ export type PlanComparisonCardProps = Readonly<{
   currentTier?: CommercialTierKey;
   workspaceId?: string;
   hasStripeCustomer?: boolean;
+  /**
+   * Which billing surface this deployment serves. Defaults to `"stripe"` so existing callers and
+   * tests are unaffected; the page passes the operator's real `BILLING_MODE`. Under
+   * `marketplace_free` the checkout and portal endpoints return HTTP 410, so the card must not
+   * offer a button that can only fail.
+   */
+  billingMode?: BillingMode;
 }>;
 
 interface PlanDefinition {
@@ -83,14 +92,15 @@ export function PlanComparisonCard({
   currentTier = "community",
   workspaceId,
   hasStripeCustomer = false,
+  billingMode = "stripe",
 }: PlanComparisonCardProps) {
+  const selfServeEnabled = billingMode !== "marketplace_free";
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   async function handleUpgrade(tier: "team" | "business") {
     setLoadingTier(tier);
-    setErrorMessage(null);
 
     try {
       const response = await fetch("/api/v1/billing/checkout", {
@@ -111,14 +121,13 @@ export function PlanComparisonCard({
       const { url } = (await response.json()) as { url: string };
       window.location.href = url;
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Failed to open checkout");
+      toast.error("Could not open checkout", err instanceof Error ? err.message : undefined);
       setLoadingTier(null);
     }
   }
 
   async function handlePortal() {
     setPortalLoading(true);
-    setErrorMessage(null);
 
     try {
       const response = await fetch("/api/v1/billing/portal", {
@@ -135,14 +144,14 @@ export function PlanComparisonCard({
       const { url } = (await response.json()) as { url: string };
       window.location.href = url;
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Failed to open customer portal");
+      toast.error("Could not open the customer portal", err instanceof Error ? err.message : undefined);
       setPortalLoading(false);
     }
   }
 
   return (
     <div className="plan-comparison-container flex flex-col gap-4">
-      {hasStripeCustomer && (
+      {hasStripeCustomer && selfServeEnabled && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted p-3">
           <div>
             <strong className="text-sm font-medium text-foreground">Billing Subscription Managed via Stripe</strong>
@@ -157,15 +166,6 @@ export function PlanComparisonCard({
           >
             {portalLoading ? "Opening..." : "Manage Subscription"}
           </Button>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div
-          className="rounded-md border border-danger/40 bg-danger-surface px-4 py-3 text-sm text-danger"
-          role="alert"
-        >
-          {errorMessage}
         </div>
       )}
 
@@ -220,16 +220,26 @@ export function PlanComparisonCard({
                   </span>
                 )}
 
-                {canUpgrade && (
-                  <Button
-                    type="button"
-                    className="upgrade-checkout-button w-full"
-                    disabled={loadingTier === plan.key}
-                    onClick={() => handleUpgrade(plan.key as "team" | "business")}
-                  >
-                    {loadingTier === plan.key ? "Opening Stripe..." : `Upgrade to ${plan.name}`}
-                  </Button>
-                )}
+                {canUpgrade &&
+                  (selfServeEnabled ? (
+                    <Button
+                      type="button"
+                      className="upgrade-checkout-button w-full"
+                      disabled={loadingTier === plan.key}
+                      onClick={() => handleUpgrade(plan.key as "team" | "business")}
+                    >
+                      {loadingTier === plan.key ? "Opening Stripe..." : `Upgrade to ${plan.name}`}
+                    </Button>
+                  ) : (
+                    <a
+                      href="https://github.com/marketplace/actions/boardreadyops"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex w-full items-center justify-center rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
+                    >
+                      Managed through GitHub Marketplace
+                    </a>
+                  ))}
 
                 {!isCurrent && !canUpgrade && (
                   <a
