@@ -115,13 +115,13 @@ export function YamlSyntaxHighlighter({ code, filename, presetName }: Readonly<Y
       </div>
       <div className="relative max-h-[580px] overflow-auto bg-muted/20">
         <pre className="p-4 font-mono text-xs leading-relaxed" aria-hidden="true">
-          <code>
+          <code className="block min-w-max">
             {lineTokens.map((item) => (
-              <span key={item.id} className="table-row">
-                <span className="table-cell select-none pr-4 text-right font-mono text-micro text-muted-foreground">
+              <span key={item.id} className="flex">
+                <span className="w-10 shrink-0 select-none pr-4 text-right font-mono text-micro text-muted-foreground">
                   {item.lineNumber}
                 </span>
-                <span className="table-cell whitespace-pre">
+                <span className="whitespace-pre">
                   {item.tokens.map((token) => (
                     <span key={token.id} className={tokenClass(token.type)}>
                       {token.text}
