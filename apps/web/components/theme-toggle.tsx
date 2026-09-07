@@ -27,67 +27,93 @@ export function ThemeToggle({ variant = "switch", className }: Readonly<ThemeTog
 
   useEffect(() => setMounted(true), []);
 
-  if (!mounted) {
-    if (variant === "button") {
-      return (
-        <button
-          type="button"
-          disabled
-          aria-label="Toggle theme"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "icon" }),
-            "size-9 border-border opacity-70 cursor-wait",
-            className,
-          )}
-        >
-          <Moon className="size-4 text-foreground" />
-        </button>
-      );
-    }
-    return null;
-  }
+  // The server cannot know the resolved theme, so until the effect runs there is nothing true to
+  // render. The icon button still reserves its space -- it sits in a header row that would
+  // otherwise shift when it appears -- while the other two variants are in columns that do not.
+  if (!mounted) return variant === "button" ? <ThemeButtonPlaceholder className={className} /> : null;
 
   const isDark = resolvedTheme === "dark";
+  const toggle = () => setTheme(isDark ? "light" : "dark");
+  const action = isDark ? "Switch to light theme" : "Switch to dark theme";
 
-  if (variant === "nav-row") {
-    return (
-      <button
-        type="button"
-        onClick={() => setTheme(isDark ? "light" : "dark")}
-        title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-        className={cn(
-          "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent md:min-h-9",
-          className,
-        )}
-      >
-        {isDark ? <Sun className="size-4 shrink-0" /> : <Moon className="size-4 shrink-0" />}
-        <span>{isDark ? "Switch to light" : "Switch to dark"}</span>
-      </button>
-    );
-  }
+  if (variant === "nav-row")
+    return <ThemeNavRow isDark={isDark} action={action} onToggle={toggle} className={className} />;
+  if (variant === "button")
+    return <ThemeIconButton isDark={isDark} action={action} onToggle={toggle} className={className} />;
+  return <ThemeSwitch isDark={isDark} setTheme={setTheme} className={className} />;
+}
 
-  if (variant === "button") {
-    return (
-      <button
-        type="button"
-        onClick={() => setTheme(isDark ? "light" : "dark")}
-        aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-        title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-        className={cn(
-          buttonVariants({ variant: "outline", size: "icon" }),
-          "size-9 border-border text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer",
-          className,
-        )}
-      >
-        {isDark ? (
-          <Sun className="size-4 text-foreground transition-transform hover:rotate-45" />
-        ) : (
-          <Moon className="size-4 text-foreground transition-transform hover:-rotate-12" />
-        )}
-      </button>
-    );
-  }
+function ThemeButtonPlaceholder({ className }: Readonly<{ className?: string | undefined }>) {
+  return (
+    <button
+      type="button"
+      disabled
+      aria-label="Toggle theme"
+      className={cn(
+        buttonVariants({ variant: "outline", size: "icon" }),
+        "size-9 border-border opacity-70 cursor-wait",
+        className,
+      )}
+    >
+      <Moon className="size-4 text-foreground" />
+    </button>
+  );
+}
 
+type VariantProps = Readonly<{
+  isDark: boolean;
+  action: string;
+  onToggle: () => void;
+  className?: string | undefined;
+}>;
+
+/** A full-width row that matches the links beside it in the product navigation. */
+function ThemeNavRow({ isDark, action, onToggle, className }: VariantProps) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={action}
+      className={cn(
+        "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent md:min-h-9",
+        className,
+      )}
+    >
+      {isDark ? <Sun className="size-4 shrink-0" /> : <Moon className="size-4 shrink-0" />}
+      <span>{isDark ? "Switch to light" : "Switch to dark"}</span>
+    </button>
+  );
+}
+
+/** Icon-only, for headers where a labelled row would not fit. */
+function ThemeIconButton({ isDark, action, onToggle, className }: VariantProps) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={action}
+      title={action}
+      className={cn(
+        buttonVariants({ variant: "outline", size: "icon" }),
+        "size-9 border-border text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer",
+        className,
+      )}
+    >
+      {isDark ? (
+        <Sun className="size-4 text-foreground transition-transform hover:rotate-45" />
+      ) : (
+        <Moon className="size-4 text-foreground transition-transform hover:-rotate-12" />
+      )}
+    </button>
+  );
+}
+
+/** Dense surfaces, where the visible state text doubles as the control's label. */
+function ThemeSwitch({
+  isDark,
+  setTheme,
+  className,
+}: Readonly<{ isDark: boolean; setTheme: (theme: string) => void; className?: string | undefined }>) {
   return (
     <span className={cn("flex items-center gap-2 text-sm text-muted-foreground", className)}>
       <span id="theme-toggle-label">{isDark ? "Dark" : "Light"}</span>
