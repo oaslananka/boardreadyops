@@ -75,10 +75,11 @@ function summarizeEnforcement(policies: readonly PolicyRecord[]): string {
 
 interface PolicyCardProps {
   readonly policy: PolicyRecord;
+  readonly onEdit: (policy: PolicyRecord) => void;
   readonly onDelete: (id: string, name: string) => void;
 }
 
-function PolicyCard({ policy, onDelete }: PolicyCardProps) {
+function PolicyCard({ policy, onEdit, onDelete }: PolicyCardProps) {
   const scopeLabel = formatScopeLabel(policy.scope);
 
   return (
@@ -90,16 +91,28 @@ function PolicyCard({ policy, onDelete }: PolicyCardProps) {
           </span>
           {policy.scopeId ? <code className="text-xs">{policy.scopeId}</code> : null}
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="button-delete"
-          onClick={() => onDelete(policy.id, policy.name)}
-          aria-label={`Delete policy ${policy.name}`}
-        >
-          Delete
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="button-small"
+            onClick={() => onEdit(policy)}
+            aria-label={`Edit policy ${policy.name}`}
+          >
+            Edit
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="button-delete"
+            onClick={() => onDelete(policy.id, policy.name)}
+            aria-label={`Delete policy ${policy.name}`}
+          >
+            Delete
+          </Button>
+        </div>
       </header>
 
       <div>
@@ -161,12 +174,14 @@ function PolicyCard({ policy, onDelete }: PolicyCardProps) {
 interface PolicyBuilderProps {
   readonly draft: DraftPolicyState;
   readonly submitting: boolean;
+  /** Set while editing an existing policy; scope is fixed then, because PATCH cannot move one. */
+  readonly editingId: string | null;
   readonly onChange: (next: DraftPolicyState) => void;
   readonly onSubmit: (event: React.FormEvent) => void;
   readonly onClose: () => void;
 }
 
-function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: PolicyBuilderProps) {
+function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, onClose }: PolicyBuilderProps) {
   const roleTags = draft.requiredRoles
     .split(",")
     .map((s) => s.trim())
@@ -181,7 +196,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
 
   return (
     <Panel
-      title="Create Governance Policy"
+      title={editingId ? "Edit Governance Policy" : "Create Governance Policy"}
       description="Define release blocking criteria, required approvers, and verification checks."
       tone="raised"
     >
@@ -384,7 +399,7 @@ function PolicyBuilderForm({ draft, submitting, onChange, onSubmit, onClose }: P
             Cancel
           </Button>
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Saving Policy…" : "Save Policy"}
+            {submitting ? "Saving Policy…" : editingId ? "Update Policy" : "Save Policy"}
           </Button>
         </footer>
       </form>
@@ -450,6 +465,7 @@ export default function PoliciesClient() {
   const [draft, setDraft] = useState<DraftPolicyState>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadPolicies = useCallback(async () => {
@@ -479,7 +495,25 @@ export default function PoliciesClient() {
     void loadPolicies();
   }, [loadPolicies]);
 
-  async function handleCreate(event: React.FormEvent) {
+  function startEditing(policy: PolicyRecord) {
+    setEditingId(policy.id);
+    setShowBuilder(true);
+    setError(null);
+    setSuccessMessage(null);
+    setDraft({
+      scope: policy.scope,
+      scopeId: policy.scopeId ?? "",
+      name: policy.name,
+      description: policy.description ?? "",
+      requiredChecklist: policy.requiredChecklist.join(", "),
+      requiredRoles: policy.requiredRoles.join(", "),
+      severityGate: policy.severityGate ?? "",
+      requireEvidencePack: policy.requireEvidencePack,
+      requireExternalReview: policy.requireExternalReview,
+    });
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!draft.name.trim() || submitting) return;
 
@@ -510,29 +544,38 @@ export default function PoliciesClient() {
     };
 
     try {
-      const res = await fetch("/api/v1/policies", {
-        method: "POST",
+      // PATCH cannot move a policy between scopes, so an edit sends only the mutable fields.
+      const { scope: _scope, scopeId: _scopeId, ...updatable } = payload;
+      const res = await fetch(editingId ? `/api/v1/policies/${editingId}` : "/api/v1/policies", {
+        method: editingId ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          editingId
+            ? { ...updatable, description: updatable.description ?? null, severityGate: updatable.severityGate ?? null }
+            : payload,
+        ),
       });
       const body = (await res.json().catch(() => ({}))) as { ok: boolean; policy?: PolicyRecord; error?: string };
 
       if (!res.ok || !body.ok || !body.policy) {
-        setError(body.error || `Failed to create policy (${res.status})`);
+        setError(body.error || `Failed to ${editingId ? "update" : "create"} policy (${res.status})`);
         setSubmitting(false);
         return;
       }
 
       setSuccessMessage(
-        draft.severityGate
-          ? `Policy "${draft.name}" created and enforced.`
-          : `Policy "${draft.name}" created (advisory only — no severity gate configured).`,
+        editingId
+          ? `Policy "${draft.name}" updated.`
+          : draft.severityGate
+            ? `Policy "${draft.name}" created and enforced.`
+            : `Policy "${draft.name}" created (advisory only — no severity gate configured).`,
       );
       setDraft(emptyDraft);
+      setEditingId(null);
       setShowBuilder(false);
       await loadPolicies();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error creating policy");
+      setError(err instanceof Error ? err.message : `Network error ${editingId ? "updating" : "creating"} policy`);
     } finally {
       setSubmitting(false);
     }
@@ -564,6 +607,7 @@ export default function PoliciesClient() {
 
   function closeBuilder() {
     setShowBuilder(false);
+    setEditingId(null);
     setDraft(emptyDraft);
   }
 
@@ -625,8 +669,9 @@ export default function PoliciesClient() {
         <PolicyBuilderForm
           draft={draft}
           submitting={submitting}
+          editingId={editingId}
           onChange={setDraft}
-          onSubmit={handleCreate}
+          onSubmit={handleSubmit}
           onClose={closeBuilder}
         />
       ) : null}
@@ -664,7 +709,12 @@ export default function PoliciesClient() {
         ) : (
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
             {policies.map((policy) => (
-              <PolicyCard key={policy.id} policy={policy} onDelete={(id, name) => setPendingDelete({ id, name })} />
+              <PolicyCard
+                key={policy.id}
+                policy={policy}
+                onEdit={startEditing}
+                onDelete={(id, name) => setPendingDelete({ id, name })}
+              />
             ))}
           </div>
         )}
