@@ -12,7 +12,7 @@ import type { UserSession } from "./user-session.js";
  * it is never selected.
  */
 
-type RepositorySummary = {
+export type RepositorySummary = {
   id: string;
   accountLogin: string;
   owner: string;

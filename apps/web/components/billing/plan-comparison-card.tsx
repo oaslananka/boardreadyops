@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { BillingMode } from "../../lib/billing-mode.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { useToast } from "../ui/toast.js";
@@ -11,6 +12,13 @@ export type PlanComparisonCardProps = Readonly<{
   currentTier?: CommercialTierKey;
   workspaceId?: string;
   hasStripeCustomer?: boolean;
+  /**
+   * Which billing surface this deployment serves. Defaults to `"stripe"` so existing callers and
+   * tests are unaffected; the page passes the operator's real `BILLING_MODE`. Under
+   * `marketplace_free` the checkout and portal endpoints return HTTP 410, so the card must not
+   * offer a button that can only fail.
+   */
+  billingMode?: BillingMode;
 }>;
 
 interface PlanDefinition {
@@ -84,7 +92,9 @@ export function PlanComparisonCard({
   currentTier = "community",
   workspaceId,
   hasStripeCustomer = false,
+  billingMode = "stripe",
 }: PlanComparisonCardProps) {
+  const selfServeEnabled = billingMode !== "marketplace_free";
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const toast = useToast();
@@ -141,7 +151,7 @@ export function PlanComparisonCard({
 
   return (
     <div className="plan-comparison-container flex flex-col gap-4">
-      {hasStripeCustomer && (
+      {hasStripeCustomer && selfServeEnabled && (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted p-3">
           <div>
             <strong className="text-sm font-medium text-foreground">Billing Subscription Managed via Stripe</strong>
@@ -210,16 +220,26 @@ export function PlanComparisonCard({
                   </span>
                 )}
 
-                {canUpgrade && (
-                  <Button
-                    type="button"
-                    className="upgrade-checkout-button w-full"
-                    disabled={loadingTier === plan.key}
-                    onClick={() => handleUpgrade(plan.key as "team" | "business")}
-                  >
-                    {loadingTier === plan.key ? "Opening Stripe..." : `Upgrade to ${plan.name}`}
-                  </Button>
-                )}
+                {canUpgrade &&
+                  (selfServeEnabled ? (
+                    <Button
+                      type="button"
+                      className="upgrade-checkout-button w-full"
+                      disabled={loadingTier === plan.key}
+                      onClick={() => handleUpgrade(plan.key as "team" | "business")}
+                    >
+                      {loadingTier === plan.key ? "Opening Stripe..." : `Upgrade to ${plan.name}`}
+                    </Button>
+                  ) : (
+                    <a
+                      href="https://github.com/marketplace/actions/boardreadyops"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex w-full items-center justify-center rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
+                    >
+                      Managed through GitHub Marketplace
+                    </a>
+                  ))}
 
                 {!isCurrent && !canUpgrade && (
                   <a

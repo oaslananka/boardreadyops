@@ -106,4 +106,28 @@ describe("PlanComparisonCard", () => {
     expect(portalBtn).not.toBeNull();
     expect(portalBtn?.textContent).toContain("Manage Subscription");
   });
+
+  it("routes upgrades to GitHub Marketplace when self-serve checkout is not enabled", async () => {
+    // Under the default BILLING_MODE the checkout and portal endpoints return HTTP 410, so a
+    // checkout button could only ever fail. The tiers still render; only the CTA changes.
+    await act(async () => {
+      root.render(
+        createElement(
+          ToastProvider,
+          null,
+          createElement(PlanComparisonCard, {
+            currentTier: "community",
+            workspaceId: "ws_maker_01",
+            hasStripeCustomer: true,
+            billingMode: "marketplace_free",
+          }),
+        ),
+      );
+    });
+
+    expect(container.querySelectorAll(".plan-tier-card")).toHaveLength(4);
+    expect(container.querySelectorAll(".upgrade-checkout-button")).toHaveLength(0);
+    expect(container.querySelector(".manage-portal-button")).toBeNull();
+    expect(container.querySelector(".plan-comparison-container")?.textContent).toContain("GitHub Marketplace");
+  });
 });
