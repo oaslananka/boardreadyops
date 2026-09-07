@@ -40,10 +40,15 @@ const defaultPageSize = 50;
  *
  * True whenever cloud persistence is not Postgres — an unconfigured local run, the E2E suite, or
  * a preview deployment. Exported so the detail loader and every listing share one answer.
+ *
+ * Takes `environment` for the same reason every loader in this directory does: so a caller (and
+ * a test) states the deployment it means instead of inheriting whatever `process.env` happens to
+ * hold. CI defines DATABASE_URL for the whole workflow, so a caller that reads the ambient
+ * environment answers differently there than on a developer's machine.
  */
-export function reviewFixturesEnabled(): boolean {
+export function reviewFixturesEnabled(environment: NodeJS.ProcessEnv = process.env): boolean {
   try {
-    return resolveCloudPersistenceConfiguration().mode !== "postgres";
+    return resolveCloudPersistenceConfiguration(environment).mode !== "postgres";
   } catch (error) {
     if (error instanceof CloudRuntimeConfigurationError && error.code === "missing-database-url") return true;
     throw error;
@@ -92,9 +97,9 @@ const reviewListingQuery = `
 export async function loadViewerReviews(
   session: UserSession | undefined,
   options: { limit?: number; fixtures?: readonly DemoReview[] } = {},
-  environment: Readonly<Record<string, string | undefined>> = process.env,
+  environment: NodeJS.ProcessEnv = process.env,
 ): Promise<ReviewListingResult> {
-  if (reviewFixturesEnabled()) {
+  if (reviewFixturesEnabled(environment)) {
     return { state: "fixtures", reviews: options.fixtures ?? [] };
   }
   if (!session || session.installationIds.length === 0) return { state: "signed-out" };
