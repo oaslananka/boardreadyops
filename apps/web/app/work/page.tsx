@@ -141,7 +141,7 @@ export default async function MyWorkPage() {
           </span>
         </section>
 
-        <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <section className="min-w-0">
             <Panel
               title="Assigned Findings"
@@ -166,7 +166,9 @@ export default async function MyWorkPage() {
                         <span className="text-muted-foreground">{prLabel(finding.pullRequestNumber)}</span>
                       </div>
                       <p className="text-sm text-foreground">{finding.message}</p>
-                      <code className="mt-1 block font-mono text-xs text-muted-foreground">{finding.path}</code>
+                      <code className="mt-1 block break-all font-mono text-xs text-muted-foreground">
+                        {finding.path}
+                      </code>
                       <div className="mt-3">
                         <Link
                           href={`/reviews/${finding.reviewId}?tab=findings`}
