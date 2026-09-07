@@ -4,7 +4,6 @@ severity-default: medium
 applies-to:
   - bom
 config-keys:
-  - rules.bom.single-source.enabled
   - rules.bom.single-source.severity
   - bom.alternates
 ---
@@ -13,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks supplier columns for parts that only list one source.
+Checks supplier metadata for BOM rows that only list one source.
 
 ## When It Fires
 

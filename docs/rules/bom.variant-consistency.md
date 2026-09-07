@@ -13,7 +13,7 @@ config-keys:
 
 ## What It Checks
 
-Checks KiCad 10 variant DNP overrides against each variant-specific BOM.
+Checks KiCad variant DNP overrides against each variant-specific BOM.
 
 ## When It Fires
 

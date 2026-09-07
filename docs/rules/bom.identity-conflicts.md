@@ -5,7 +5,6 @@ applies-to:
   - bom
   - schematic
 config-keys:
-  - rules.bom.identity-conflicts.enabled
   - rules.bom.identity-conflicts.severity
 ---
 
@@ -13,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks for components whose identity fields (MPN, manufacturer) differ between BOM and schematic sources, or appear multiple times within the same BOM with conflicting values.
+Detects components whose identity fields (MPN, manufacturer) differ between BOM and schematic sources, or appear multiple times within the same BOM with conflicting values.
 
 ## When It Fires
 

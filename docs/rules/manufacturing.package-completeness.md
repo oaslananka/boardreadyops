@@ -2,8 +2,8 @@
 id: manufacturing.package-completeness
 severity-default: high
 applies-to:
-  - manifest
   - pcb
+  - manifest
 config-keys:
   - rules.manufacturing.package-completeness.severity
 ---
@@ -12,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks that all required manufacturing output categories are present. Base categories (gerbers, drill, drill-report, BOM, CPL) are required for every release. Production categories (fab-notes, assembly-notes, board-pdf) are additionally required when releaseMode is production.
+Validates that the release package includes all required manufacturing output categories. Base categories (gerbers, drill, BOM, CPL) are required for every release. Production categories (fab notes, assembly notes, board PDF) are required when releaseMode is production.
 
 ## When It Fires
 

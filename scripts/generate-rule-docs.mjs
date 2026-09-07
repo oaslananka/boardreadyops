@@ -1,423 +1,273 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import os from "node:os";
+import path from "node:path";
+import { build } from "esbuild";
 
-const rules = [
-  {
-    id: "drc.kicad",
-    severity: "high",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.drc.kicad.enabled", "rules.drc.severity-overrides"],
-    checks: "Runs KiCad PCB DRC and normalizes KiCad diagnostics into BoardReadyOps findings.",
-    fires: "Fires for every KiCad DRC diagnostic in the JSON report.",
-    details: "{ source: 'kicad-cli', diagnostic: <KiCad diagnostic object> }",
-  },
-  {
-    id: "erc.kicad",
-    severity: "high",
-    appliesTo: ["schematic"],
-    configKeys: ["rules.erc.kicad.enabled", "rules.erc.severity-overrides"],
-    checks: "Runs KiCad schematic ERC and normalizes KiCad diagnostics into BoardReadyOps findings.",
-    fires: "Fires for every KiCad ERC diagnostic in the JSON report.",
-    details: "{ source: 'kicad-cli', diagnostic: <KiCad diagnostic object> }",
-  },
-  {
-    id: "bom.missing-mpn",
-    severity: "high",
-    appliesTo: ["bom"],
-    configKeys: ["rules.bom.missing-mpn.enabled", "rules.bom.missing-mpn.ignore-refs"],
-    checks: "Checks normalized BOM rows for missing manufacturer part numbers.",
-    fires: "Fires when a populated BOM row has no MPN and the reference is not ignored.",
-    details: "{ reference, value, footprint }",
-  },
-  {
-    id: "bom.single-source",
-    severity: "medium",
-    appliesTo: ["bom"],
-    configKeys: ["rules.bom.single-source.enabled", "rules.bom.single-source.severity", "bom.alternates"],
-    checks: "Checks supplier columns for parts that only list one source.",
+/**
+ * Rule pages are generated from the rule registry the engine actually runs, not from a copy.
+ *
+ * They used to be generated from a hand-maintained array here, and it drifted: four registered
+ * rules -- `bom.unknown-lifecycle` and the three `manufacturing.dfm-*` checks -- were never added
+ * to it, so `docs/rules.md` and the published rule pages simply did not mention checks the
+ * product performs. Nothing could notice, because the array was the only source.
+ *
+ * Now the facts come from the registry and only the prose lives here. A registered rule with no
+ * prose fails this script rather than being quietly skipped, which is the property the old shape
+ * could not have.
+ */
+
+/**
+ * What a rule's own metadata cannot carry: the precise firing condition and the shape of the
+ * `details` object in a JSON finding. Keyed by rule id.
+ */
+const narratives = {
+  "bom.compliance": {
     fires:
-      "Fires when supplier metadata is present and a row has a single supplier and no approved alternates are configured for its MPN.",
-    details: "{ reference, mpn, supplier }",
+      "Fires when a populated component is marked non-compliant, or (with require) when it has no compliance data.",
+    details: "{ reference, mpn, compliance? }",
   },
-  {
-    id: "bom.identity-conflicts",
-    severity: "high",
-    appliesTo: ["bom", "schematic"],
-    configKeys: ["rules.bom.identity-conflicts.enabled", "rules.bom.identity-conflicts.severity"],
-    checks:
-      "Checks for components whose identity fields (MPN, manufacturer) differ between BOM and schematic sources, or appear multiple times within the same BOM with conflicting values.",
+  "bom.dnp-consistency": {
+    fires: "Fires when BOM and PCB disagree on populated versus DNP state.",
+    details: "{ reference, bomDnp, pcbDnp }",
+  },
+  "bom.eol-detection": {
+    fires: "Fires when lifecycle text indicates obsolete, NRND, discontinued, or EOL status.",
+    details: "{ reference, mpn, lifecycle }",
+  },
+  "bom.footprint-mismatch": {
+    fires: "Fires when a reference appears in both sources with different footprints.",
+    details: "{ reference, bomFootprint, pcbFootprint }",
+  },
+  "bom.identity-conflicts": {
     fires:
       "Fires when the same reference designator has inconsistent MPNs across sources. Covers both within-BOM duplicate rows and BOM-vs-schematic conflicts.",
     details: "{ reference, conflictType, mpns } or { reference, conflictType, bomMpn, schematicMpn }",
   },
-  {
-    id: "bom.risk-score",
-    severity: "medium",
-    appliesTo: ["bom"],
-    configKeys: [
-      "rules.bom.risk-score.enabled",
-      "rules.bom.risk-score.severity",
-      "rules.bom.risk-score.critical-severity",
-      "rules.bom.risk-score.high-severity",
-      "rules.bom.risk-score.medium-severity",
-      "rules.bom.risk-score.low-severity",
-      "rules.bom.risk-score.weights.missing-mpn",
-      "rules.bom.risk-score.weights.missing-manufacturer",
-      "rules.bom.risk-score.weights.no-suppliers",
-      "rules.bom.risk-score.weights.single-source-no-alternates",
-      "bom.alternates",
-    ],
-    checks:
-      "Scores each populated BOM row on missing MPN, missing manufacturer, no suppliers, and single-source-without-alternates signals.",
+  "bom.lifecycle": {
+    fires: "Fires when a component lifecycle status carries release or sourcing risk.",
+    details: "{ reference, mpn, lifecycle }",
+  },
+  "bom.missing-mpn": {
+    fires: "Fires when a populated BOM row has no MPN and the reference is not ignored.",
+    details: "{ reference, value, footprint }",
+  },
+  "bom.risk-score": {
     fires:
       "Fires for each non-DNP row with a non-zero risk score. Severity is mapped from the component risk level (critical/high/medium/low) and is configurable per level.",
     details:
       "{ reference, mpn, manufacturer, riskScore, riskLevel, factors: { missingMpn, missingManufacturer, noSuppliers, singleSourceNoAlternates }, overallBomRiskScore, totalComponents }",
   },
-  {
-    id: "bom.eol-detection",
-    severity: "high",
-    appliesTo: ["bom"],
-    configKeys: ["rules.bom.eol-detection.enabled", "rules.bom.eol-detection.severity"],
-    checks: "Checks lifecycle-style columns for local end-of-life markers.",
-    fires: "Fires when lifecycle text indicates obsolete, NRND, discontinued, or EOL status.",
-    details: "{ reference, mpn, lifecycle }",
+  "bom.single-source": {
+    fires:
+      "Fires when supplier metadata is present and a row has a single supplier and no approved alternates are configured for its MPN.",
+    details: "{ reference, mpn, supplier }",
   },
-  {
-    id: "bom.lifecycle",
-    severity: "medium",
-    appliesTo: ["bom"],
-    configKeys: ["rules.bom.lifecycle.enabled", "rules.bom.lifecycle.db"],
-    checks:
-      "Checks BOM lifecycle columns or a local lifecycle database for EOL, NRND, preview, and discontinued markers.",
-    fires: "Fires when a component lifecycle status carries release or sourcing risk.",
-    details: "{ reference, mpn, lifecycle }",
+  "bom.unknown-lifecycle": {
+    fires:
+      "Fires for each populated BOM row whose lifecycle status cannot be resolved from the BOM field, the lifecycle cache, or a supplier plugin.",
+    details: "{ reference, mpn, manufacturer }",
   },
-  {
-    id: "bom.footprint-mismatch",
-    severity: "medium",
-    appliesTo: ["bom", "pcb"],
-    configKeys: ["rules.bom.footprint-mismatch.enabled", "rules.bom.footprint-mismatch.severity"],
-    checks: "Compares normalized BOM footprint strings with PCB footprint assignments.",
-    fires: "Fires when a reference appears in both sources with different footprints.",
-    details: "{ reference, bomFootprint, pcbFootprint }",
-  },
-  {
-    id: "bom.dnp-consistency",
-    severity: "medium",
-    appliesTo: ["bom", "pcb"],
-    configKeys: ["rules.bom.dnp-consistency.enabled", "rules.bom.dnp-consistency.severity"],
-    checks: "Compares BOM DNP flags with PCB footprint population attributes.",
-    fires: "Fires when BOM and PCB disagree on populated versus DNP state.",
-    details: "{ reference, bomDnp, pcbDnp }",
-  },
-  {
-    id: "bom.variant-consistency",
-    severity: "high",
-    appliesTo: ["bom", "project"],
-    configKeys: ["projects.variants", "rules.bom.variant-consistency.enabled"],
-    checks: "Checks KiCad 10 variant DNP overrides against each variant-specific BOM.",
+  "bom.variant-consistency": {
     fires: "Fires when a component disabled by the active variant still appears populated in that variant BOM.",
     details: "{ variant, reference }",
   },
-  {
-    id: "bom.compliance",
-    severity: "high",
-    appliesTo: ["bom"],
-    configKeys: ["rules.bom.compliance.enabled", "rules.bom.compliance.require", "rules.bom.compliance.severity"],
-    checks: "Checks populated BOM components for RoHS/REACH compliance metadata when explicitly enabled.",
-    fires:
-      "Fires when a populated component is marked non-compliant, or (with require) when it has no compliance data.",
-    details: "{ reference, mpn, compliance? }",
-  },
-  {
-    id: "design.copper-balance",
-    severity: "low",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.design.copper-balance.enabled", "rules.design.copper-balance.min-coverage-percent"],
-    checks: "Checks filled copper area per layer against board area to identify low copper coverage.",
-    fires: "Fires when a copper layer is below the configured minimum coverage percentage.",
-    details: "{ layer, coveragePercent, minimum }",
-  },
-  {
-    id: "design.board-outline",
-    severity: "high",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.design.board-outline.enabled"],
-    checks: "Checks that the PCB Edge.Cuts outline is present and closed.",
+  "design.board-outline": {
     fires: "Fires when Edge.Cuts segments do not form a closed outline.",
     details: "{ outlineClosed }",
   },
-  {
-    id: "design.unique-references",
-    severity: "high",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.design.unique-references.enabled", "rules.design.unique-references.ignore-refs"],
-    checks: "Checks board footprints for duplicate reference designators.",
+  "design.copper-balance": {
+    fires: "Fires when a copper layer is below the configured minimum coverage percentage.",
+    details: "{ layer, coveragePercent, minimum }",
+  },
+  "design.unique-references": {
     fires: "Fires when the rule is enabled and a reference designator is used by more than one footprint.",
     details: "{ reference, count }",
   },
-  {
-    id: "pinmap.verify",
-    severity: "high",
-    appliesTo: ["pinmap", "schematic"],
-    configKeys: ["rules.pinmap.verify.enabled", "rules.pinmap.verify.severity"],
-    checks: "Checks configured pinmap nets against schematic net labels.",
-    fires: "Fires when a pinmap entry points at a net not present in the schematic.",
-    details: "{ entry }",
+  "drc.kicad": {
+    fires: "Fires for every KiCad DRC diagnostic in the JSON report.",
+    details: "{ source: 'kicad-cli', diagnostic: <KiCad diagnostic object> }",
   },
-  {
-    id: "pinmap.unmapped-pin",
-    severity: "medium",
-    appliesTo: ["pinmap", "schematic"],
-    configKeys: ["rules.pinmap.unmapped-pin.enabled", "rules.pinmap.unmapped-pin.severity"],
-    checks: "Checks connected schematic pins against pinmap entries.",
-    fires: "Fires when a connected schematic pin has no matching pinmap entry.",
-    details: "{ designator, pin, net }",
+  "erc.kicad": {
+    fires: "Fires for every KiCad ERC diagnostic in the JSON report.",
+    details: "{ source: 'kicad-cli', diagnostic: <KiCad diagnostic object> }",
   },
-  {
-    id: "pinmap.collision",
-    severity: "high",
-    appliesTo: ["pinmap"],
-    configKeys: ["rules.pinmap.collision.enabled", "rules.pinmap.collision.severity"],
-    checks: "Checks pinmap files for duplicate pin or net assignments.",
-    fires: "Fires when a pin key or net key appears more than once.",
-    details: "{ key, kind }",
-  },
-  {
-    id: "pinmap.net-label",
-    severity: "medium",
-    appliesTo: ["pinmap", "schematic"],
-    configKeys: ["rules.pinmap.net-label.enabled", "pinmap", "projects.pinmap"],
-    checks: "Checks pinmap net names against schematic global, local, and hierarchical labels.",
-    fires: "Fires when a pinmap net has no matching schematic label.",
-    details: "{ net, entry }",
-  },
-  {
-    id: "firmware.platformio-pin-contract",
-    severity: "high",
-    appliesTo: ["firmware", "pinmap"],
-    configKeys: [
-      "firmware.platformio.pinAssignments",
-      "projects.firmware.platformio.pinAssignments",
-      "rules.firmware.platformio-pin-contract.file",
-    ],
-    checks: "Checks a PlatformIO-style firmware pin contract against BoardReadyOps pinmap firmware labels.",
+  "firmware.arduino-pin-contract": {
     fires:
       "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
     details: "{ firmware, hardware, sources }",
   },
-  {
-    id: "firmware.arduino-pin-contract",
-    severity: "high",
-    appliesTo: ["firmware", "pinmap"],
-    configKeys: [
-      "firmware.arduino.pinAssignments",
-      "projects.firmware.arduino.pinAssignments",
-      "rules.firmware.arduino-pin-contract.file",
-    ],
-    checks: "Checks an Arduino/C `#define` firmware pin header against BoardReadyOps pinmap firmware labels.",
+  "firmware.esp-idf-pin-contract": {
     fires:
       "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
     details: "{ firmware, hardware, sources }",
   },
-  {
-    id: "firmware.zephyr-pin-contract",
-    severity: "high",
-    appliesTo: ["firmware", "pinmap"],
-    configKeys: [
-      "firmware.zephyr.pinAssignments",
-      "projects.firmware.zephyr.pinAssignments",
-      "rules.firmware.zephyr-pin-contract.file",
-    ],
-    checks: "Checks a Zephyr firmware pin contract YAML against BoardReadyOps pinmap firmware labels.",
+  "firmware.platformio-pin-contract": {
     fires:
       "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
     details: "{ firmware, hardware, sources }",
   },
-  {
-    id: "firmware.esp-idf-pin-contract",
-    severity: "high",
-    appliesTo: ["firmware", "pinmap"],
-    configKeys: [
-      "firmware.esp-idf.pinAssignments",
-      "projects.firmware.esp-idf.pinAssignments",
-      "rules.firmware.esp-idf-pin-contract.file",
-    ],
-    checks: "Checks an ESP-IDF firmware pin contract YAML against BoardReadyOps pinmap firmware labels.",
-    fires:
-      "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
-    details: "{ firmware, hardware, sources }",
-  },
-  {
-    id: "firmware.stm32cubemx-pin-contract",
-    severity: "high",
-    appliesTo: ["firmware", "pinmap"],
-    configKeys: [
-      "firmware.stm32cubemx.project",
-      "projects.firmware.stm32cubemx.project",
-      "rules.firmware.stm32cubemx-pin-contract.file",
-      "rules.firmware.stm32cubemx-pin-contract.mcu-designator",
-    ],
-    checks:
-      "Parses a STM32CubeMX `.ioc` project file and checks GPIO labels against BoardReadyOps pinmap firmware labels.",
+  "firmware.stm32cubemx-pin-contract": {
     fires:
       "Fires when GPIO labels disagree with the hardware pinmap, when extra labels exist, or when hardware firmware signals are missing from the .ioc file.",
     details: "{ firmware, hardware, sources }",
   },
-  {
-    id: "manufacturing.package-completeness",
-    severity: "high",
-    appliesTo: ["manifest", "pcb"],
-    configKeys: ["rules.manufacturing.package-completeness.severity"],
-    checks:
-      "Checks that all required manufacturing output categories are present. " +
-      "Base categories (gerbers, drill, drill-report, BOM, CPL) are required for every release. " +
-      "Production categories (fab-notes, assembly-notes, board-pdf) are additionally required when releaseMode is production.",
-    fires: "Fires for each missing output category with a structured completeness breakdown.",
-    details: "{ missingCategory, requirementLevel, completenessScore, presentCategories, missingCategories }",
+  "firmware.zephyr-pin-contract": {
+    fires:
+      "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
+    details: "{ firmware, hardware, sources }",
   },
-  {
-    id: "manufacturing.outputs-present",
-    severity: "high",
-    appliesTo: ["manifest", "pcb"],
-    configKeys: [
-      "vendor.profile",
-      "vendor.service",
-      "vendor.required",
-      "rules.manufacturing.outputs-present.required",
-      "rules.manufacturing.outputs-present.patterns",
-    ],
-    checks: "Checks configured and vendor-profile fabrication output patterns and freshness against PCB source mtimes.",
-    fires: "Fires when a configured or vendor-profile required output is missing or older than the PCB.",
-    details: "{ required, vendorProfile?, vendorAssumptions? }",
-  },
-  {
-    id: "manufacturing.jobset-outputs",
-    severity: "medium",
-    appliesTo: ["manifest"],
-    configKeys: ["rules.manufacturing.jobset-outputs.enabled"],
-    checks: "Checks enabled KiCad 10 jobset entries for their expected output files.",
-    fires: "Fires when an enabled jobset output path does not exist.",
-    details: "{ type, outputPath }",
-  },
-  {
-    id: "manufacturing.panel-sanity",
-    severity: "medium",
-    appliesTo: ["manifest"],
-    configKeys: ["rules.manufacturing.panel-sanity.panelized"],
-    checks: "Checks that panelized builds include expected panel output files.",
-    fires: "Fires when panelization is enabled but no panel output is present.",
-    details: "{ panelized }",
-  },
-  {
-    id: "manufacturing.fab-notes",
-    severity: "medium",
-    appliesTo: ["manifest"],
-    configKeys: ["rules.manufacturing.fab-notes.enabled"],
-    checks: "Checks for fabrication notes in known project paths.",
-    fires: "Fires when no fabrication notes file is present.",
-    details: "{ expectedPaths }",
-  },
-  {
-    id: "manufacturing.drill-coverage",
-    severity: "high",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.manufacturing.drill-coverage.enabled"],
-    checks: "Checks parsed PCB drill sizes against generated Excellon drill files.",
-    fires: "Fires when a PCB drill size is absent from drill output.",
-    details: "{ missingDrills }",
-  },
-  {
-    id: "manufacturing.layer-stackup",
-    severity: "medium",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.manufacturing.layer-stackup.enabled", "rules.manufacturing.layer-stackup.expected-layers"],
-    checks: "Checks KiCad PCB stackup layer count against expected copper layers.",
-    fires: "Fires when the stackup block contains a different copper layer count than expected.",
-    details: "{ expectedLayers, stackupLayers }",
-  },
-  {
-    id: "manufacturing.fiducials",
-    severity: "medium",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.manufacturing.fiducials.enabled", "rules.manufacturing.fiducials.minimum"],
-    checks: "Checks explicitly enabled assembly jobs for minimum fiducial footprint coverage.",
-    fires: "Fires when the parsed PCB has fewer fiducial references than the configured minimum.",
-    details: "{ required, found }",
-  },
-  {
-    id: "manufacturing.test-points",
-    severity: "low",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.manufacturing.test-points.enabled", "rules.manufacturing.test-points.minimum"],
-    checks: "Checks explicitly enabled assembly jobs for minimum test point footprint coverage.",
-    fires: "Fires when the parsed PCB has fewer test point references than the configured minimum.",
-    details: "{ required, found }",
-  },
-  {
-    id: "manufacturing.assembly-sides",
-    severity: "low",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.manufacturing.assembly-sides.enabled", "rules.manufacturing.assembly-sides.allow-bottom-side"],
-    checks: "Checks explicitly enabled assembly jobs for components placed on the bottom copper layer.",
+  "manufacturing.assembly-sides": {
     fires: "Fires when assembly components are on the bottom side and bottom-side placement is not allowed.",
     details: "{ bottomSideCount, references }",
   },
-  {
-    id: "manufacturing.tooling-holes",
-    severity: "medium",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.manufacturing.tooling-holes.enabled", "rules.manufacturing.tooling-holes.minimum"],
-    checks: "Checks explicitly enabled manufacturing jobs for minimum tooling or mounting hole coverage.",
-    fires: "Fires when the parsed PCB has fewer tooling-hole candidates than the configured minimum.",
+  "manufacturing.dfm-pin1-markers": {
+    fires:
+      "Fires for each IC or polarised connector whose footprint is not a recognized library footprint carrying a standard pin-1 marker.",
+    details: "{ reference, footprint }",
+  },
+  "manufacturing.dfm-polarity-markers": {
+    fires:
+      "Fires for each polarized component -- diode, LED, or electrolytic capacitor -- whose footprint is not a recognized library footprint carrying a standard polarity marking.",
+    details: "{ reference, footprint }",
+  },
+  "manufacturing.dfm-silkscreen-over-pad": {
+    fires:
+      "Fires once per board when the SMD component count reaches the configured density threshold, as a reminder to enable KiCad DRC silkscreen clearance for production.",
+    details: "{ smdCount, minimumSmdCount }",
+  },
+  "manufacturing.drill-coverage": {
+    fires: "Fires when a PCB drill size is absent from drill output.",
+    details: "{ missingDrills }",
+  },
+  "manufacturing.fab-notes": {
+    fires: "Fires when no fabrication notes file is present.",
+    details: "{ expectedPaths }",
+  },
+  "manufacturing.fiducials": {
+    fires: "Fires when the parsed PCB has fewer fiducial references than the configured minimum.",
     details: "{ required, found }",
   },
-  {
-    id: "manufacturing.position-coverage",
-    severity: "medium",
-    appliesTo: ["pcb", "manifest"],
-    configKeys: ["rules.manufacturing.position-coverage.enabled", "rules.manufacturing.position-coverage.patterns"],
-    checks: "Checks explicitly enabled assembly jobs for populated reference coverage in position/CPL outputs.",
+  "manufacturing.jobset-outputs": {
+    fires: "Fires when an enabled jobset output path does not exist.",
+    details: "{ type, outputPath }",
+  },
+  "manufacturing.layer-stackup": {
+    fires: "Fires when the stackup block contains a different copper layer count than expected.",
+    details: "{ expectedLayers, stackupLayers }",
+  },
+  "manufacturing.outputs-present": {
+    fires: "Fires when a configured or vendor-profile required output is missing or older than the PCB.",
+    details: "{ required, vendorProfile?, vendorAssumptions? }",
+  },
+  "manufacturing.package-completeness": {
+    fires: "Fires for each missing output category with a structured completeness breakdown.",
+    details: "{ missingCategory, requirementLevel, completenessScore, presentCategories, missingCategories }",
+  },
+  "manufacturing.panel-sanity": {
+    fires: "Fires when panelization is enabled but no panel output is present.",
+    details: "{ panelized }",
+  },
+  "manufacturing.position-coverage": {
     fires: "Fires when no position output exists or populated references are missing from position/CPL output text.",
     details: "{ missingRefs, totalMissingRefs, positionFiles? }",
   },
-  {
-    id: "release.revision-set",
-    severity: "high",
-    appliesTo: ["pcb"],
-    configKeys: ["rules.release.revision-set.tag-pattern"],
-    checks: "Checks board title-block revisions against the configured release tag pattern.",
-    fires: "Fires when revision is empty or does not match the configured pattern.",
-    details: "{ revision, tagPattern }",
+  "manufacturing.test-points": {
+    fires: "Fires when the parsed PCB has fewer test point references than the configured minimum.",
+    details: "{ required, found }",
   },
-  {
-    id: "release.changelog-present",
-    severity: "medium",
-    appliesTo: ["manifest"],
-    configKeys: ["rules.release.changelog-present.enabled"],
-    checks: "Checks CHANGELOG.md for an entry matching the current board revision.",
+  "manufacturing.tooling-holes": {
+    fires: "Fires when the parsed PCB has fewer tooling-hole candidates than the configured minimum.",
+    details: "{ required, found }",
+  },
+  "pinmap.collision": {
+    fires: "Fires when a pin key or net key appears more than once.",
+    details: "{ key, kind }",
+  },
+  "pinmap.net-label": {
+    fires: "Fires when a pinmap net has no matching schematic label.",
+    details: "{ net, entry }",
+  },
+  "pinmap.unmapped-pin": {
+    fires: "Fires when a connected schematic pin has no matching pinmap entry.",
+    details: "{ designator, pin, net }",
+  },
+  "pinmap.verify": {
+    fires: "Fires when a pinmap entry points at a net not present in the schematic.",
+    details: "{ entry }",
+  },
+  "release.changelog-present": {
     fires: "Fires when CHANGELOG.md is missing or lacks the current revision entry.",
     details: "{ revision }",
   },
-  {
-    id: "release.tag-matches-revision",
-    severity: "high",
-    appliesTo: ["manifest", "pcb"],
-    configKeys: ["rules.release.tag-matches-revision.enabled"],
-    checks: "Checks tag CI context against board revision.",
+  "release.revision-set": {
+    fires: "Fires when revision is empty or does not match the configured pattern.",
+    details: "{ revision, tagPattern }",
+  },
+  "release.tag-matches-revision": {
     fires: "Fires when GITHUB_REF_TYPE=tag and GITHUB_REF_NAME does not match the revision.",
     details: "{ revision, tag }",
   },
-  {
-    id: "release.version-format",
-    severity: "low",
-    appliesTo: ["pcb", "schematic"],
-    configKeys: ["rules.release.version-format.enabled", "rules.release.version-format.pattern"],
-    checks: "Checks schematic and PCB revision strings against the configured release version pattern.",
+  "release.version-format": {
     fires: "Fires when a revision does not match vMAJOR.MINOR or rMAJOR.MINOR by default.",
     details: "{ revision, pattern }",
   },
-];
+};
+
+/** Bundles the registry so this plain-Node script can read the TypeScript source of truth. */
+async function loadRegisteredRules() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "boardreadyops-rule-docs-"));
+  const outfile = path.join(directory, "registry.cjs");
+  try {
+    await build({
+      entryPoints: ["scripts/rule-registry-entry.mjs"],
+      outfile,
+      bundle: true,
+      platform: "node",
+      target: "node24",
+      format: "cjs",
+      logLevel: "silent",
+    });
+    const require = createRequire(import.meta.url);
+    const { registerBuiltInRules, listRules } = require(outfile);
+    registerBuiltInRules();
+    return listRules().map((entry) => entry.meta);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+const registered = await loadRegisteredRules();
+
+const undocumented = registered.filter((rule) => !narratives[rule.id]).map((rule) => rule.id);
+if (undocumented.length > 0) {
+  throw new Error(
+    `these rules are registered but have no documentation prose in scripts/generate-rule-docs.mjs:\n  ${undocumented.join("\n  ")}\n` +
+      "Add a `fires` and `details` entry for each. Generated pages must cover every rule the engine runs.",
+  );
+}
+
+const orphaned = Object.keys(narratives).filter((id) => !registered.some((rule) => rule.id === id));
+if (orphaned.length > 0) {
+  throw new Error(
+    `these rules have documentation prose but are not registered:\n  ${orphaned.join("\n  ")}\n` +
+      "Remove the entry, or register the rule.",
+  );
+}
+
+// `checks` is the rule's own description -- the registry already states what it checks, so
+// restating it here is what let the two disagree.
+const rules = registered
+  .map((rule) => ({
+    id: rule.id,
+    severity: rule.defaultSeverity,
+    appliesTo: rule.appliesTo,
+    configKeys: rule.configKeys,
+    checks: rule.description,
+    fires: narratives[rule.id].fires,
+    details: narratives[rule.id].details,
+  }))
+  .sort((left, right) => left.id.localeCompare(right.id));
 
 const groups = new Map();
 for (const item of rules) {

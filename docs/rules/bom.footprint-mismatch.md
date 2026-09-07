@@ -5,7 +5,6 @@ applies-to:
   - bom
   - pcb
 config-keys:
-  - rules.bom.footprint-mismatch.enabled
   - rules.bom.footprint-mismatch.severity
 ---
 
@@ -13,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Compares normalized BOM footprint strings with PCB footprint assignments.
+Compares normalized BOM footprint values with PCB footprint assignments.
 
 ## When It Fires
 

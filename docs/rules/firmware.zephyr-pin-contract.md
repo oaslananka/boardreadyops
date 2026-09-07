@@ -14,7 +14,7 @@ config-keys:
 
 ## What It Checks
 
-Checks a Zephyr firmware pin contract YAML against BoardReadyOps pinmap firmware labels.
+Checks a Zephyr firmware pin contract YAML against the BoardReadyOps pinmap.
 
 ## When It Fires
 

@@ -11,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks for fabrication notes in known project paths.
+Checks known project paths for fabrication notes that travel with board outputs.
 
 ## When It Fires
 

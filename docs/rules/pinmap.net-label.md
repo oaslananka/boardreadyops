@@ -5,16 +5,16 @@ applies-to:
   - pinmap
   - schematic
 config-keys:
-  - rules.pinmap.net-label.enabled
   - pinmap
   - projects.pinmap
+  - rules.pinmap.net-label.enabled
 ---
 
 # pinmap.net-label
 
 ## What It Checks
 
-Checks pinmap net names against schematic global, local, and hierarchical labels.
+Checks pinmap net names against schematic labels visible to firmware integration.
 
 ## When It Fires
 

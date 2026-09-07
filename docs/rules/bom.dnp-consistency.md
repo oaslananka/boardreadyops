@@ -5,7 +5,6 @@ applies-to:
   - bom
   - pcb
 config-keys:
-  - rules.bom.dnp-consistency.enabled
   - rules.bom.dnp-consistency.severity
 ---
 
@@ -13,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Compares BOM DNP flags with PCB footprint population attributes.
+Compares BOM do-not-populate flags with PCB footprint population attributes.
 
 ## When It Fires
 

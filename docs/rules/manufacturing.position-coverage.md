@@ -5,7 +5,6 @@ applies-to:
   - pcb
   - manifest
 config-keys:
-  - rules.manufacturing.position-coverage.enabled
   - rules.manufacturing.position-coverage.patterns
 ---
 
@@ -13,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks explicitly enabled assembly jobs for populated reference coverage in position/CPL outputs.
+Checks configured assembly jobs for position/CPL output coverage of populated PCB references.
 
 ## When It Fires
 

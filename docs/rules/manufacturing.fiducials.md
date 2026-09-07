@@ -4,7 +4,6 @@ severity-default: medium
 applies-to:
   - pcb
 config-keys:
-  - rules.manufacturing.fiducials.enabled
   - rules.manufacturing.fiducials.minimum
 ---
 
@@ -12,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks explicitly enabled assembly jobs for minimum fiducial footprint coverage.
+Checks configured assembly jobs for a minimum number of fiducial footprints.
 
 ## When It Fires
 

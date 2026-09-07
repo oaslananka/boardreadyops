@@ -5,7 +5,6 @@ applies-to:
   - pcb
   - schematic
 config-keys:
-  - rules.release.version-format.enabled
   - rules.release.version-format.pattern
 ---
 
@@ -13,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks schematic and PCB revision strings against the configured release version pattern.
+Checks schematic and PCB revisions against the configured release version pattern.
 
 ## When It Fires
 

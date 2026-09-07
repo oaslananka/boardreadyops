@@ -12,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks board footprints for duplicate reference designators.
+Flags board footprints that share a reference designator.
 
 ## When It Fires
 

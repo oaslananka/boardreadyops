@@ -13,7 +13,7 @@ config-keys:
 
 ## What It Checks
 
-Checks populated BOM components for RoHS/REACH compliance metadata when explicitly enabled.
+Checks populated BOM components for RoHS/REACH compliance metadata. Runs only when explicitly enabled.
 
 ## When It Fires
 
