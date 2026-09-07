@@ -82,4 +82,35 @@ describeDatabase("audit export PostgreSQL store", () => {
     });
     expect(secondPage.map((item) => item.id)).toEqual([firstId]);
   });
+
+  it("scopes a multi-installation scan to exactly the ids it was given", async () => {
+    // The viewer-facing listing passes several installations at once. The whole tenancy boundary
+    // rests on that array, so this proves a third tenant's events cannot ride along -- and that
+    // asking about two really does return both, which a broken `any(...)` would also satisfy if
+    // it silently returned nothing.
+    const first = await createTenant("multi-a");
+    const second = await createTenant("multi-b");
+    const stranger = await createTenant("multi-c");
+
+    const ids = new Map([
+      [first, "cccccccc-cccc-4ccc-8ccc-cccccccccccc"],
+      [second, "dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
+      [stranger, "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"],
+    ]);
+    for (const [tenant, id] of ids) {
+      await database().query(
+        `insert into audit_events (id, installation_id, event_type, actor_type, subject_type, created_at)
+         values ($1, $2, 'runner.result.persisted', 'runner', 'release_run', now())`,
+        [id, tenant.installationId],
+      );
+    }
+
+    const store = createSqlAuditLogStore(database());
+    const visible = await store.listAuditEvents({
+      installationId: [first.installationId, second.installationId],
+    });
+
+    expect(new Set(visible.map((item) => item.id))).toEqual(new Set([ids.get(first), ids.get(second)]));
+    expect(visible.map((item) => item.installationId)).not.toContain(stranger.installationId);
+  });
 });

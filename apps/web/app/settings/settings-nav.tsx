@@ -7,6 +7,7 @@ const destinations = [
   { label: "Members", href: "/settings/workspace" },
   { label: "Billing & Seats", href: "/settings/billing" },
   { label: "Security & Access", href: "/settings/security" },
+  { label: "Audit Log", href: "/settings/audit" },
   { label: "Data & Retention", href: "/settings/data" },
   { label: "API Tokens", href: "/settings/tokens" },
   { label: "Component Intelligence", href: "/settings/component-intelligence" },

@@ -130,11 +130,11 @@ describe("audit log store", () => {
     const query = vi.mocked(queryExecutor.query);
     expect(query).toHaveBeenCalledTimes(1);
     const [sql, parameters] = query.mock.calls[0] ?? [];
-    expect(sql).toContain("where audit.installation_id = $1");
+    expect(sql).toContain("where audit.installation_id = any($1::text[])");
     expect(sql).toContain("(audit.created_at, audit.id) <");
     expect(sql).toContain("order by audit.created_at desc, audit.id desc");
     expect(parameters).toEqual([
-      installationId,
+      [installationId],
       repositoryId,
       runId,
       "runner.result.persisted",
@@ -190,7 +190,35 @@ describe("audit log store", () => {
     ]);
     const [sql, parameters] = vi.mocked(queryExecutor.query).mock.calls[0] ?? [];
     expect(sql).not.toContain("audit.repository_id = $2");
-    expect(parameters).toEqual([installationId, 50]);
+    expect(parameters).toEqual([[installationId], 50]);
+  });
+
+  it("accepts several installations in one scan", async () => {
+    // A signed-in viewer may belong to more than one installation, and paginating each
+    // separately then merging by hand is where a keyset listing goes wrong.
+    const queryExecutor = executor([]);
+    const other = "22222222-2222-4222-8222-222222222222";
+
+    await expect(
+      createSqlAuditLogStore(queryExecutor).listAuditEvents({
+        installationId: [installationId, other],
+      }),
+    ).resolves.toEqual([]);
+
+    const [sql, parameters] = vi.mocked(queryExecutor.query).mock.calls[0] ?? [];
+    expect(sql).toContain("where audit.installation_id = any($1::text[])");
+    expect(parameters).toEqual([[installationId, other], 50]);
+  });
+
+  it("refuses a bad id anywhere in the list, and asks nothing for an empty one", async () => {
+    const queryExecutor = executor([]);
+    const store = createSqlAuditLogStore(queryExecutor);
+
+    await expect(store.listAuditEvents({ installationId: [installationId, "bad installation"] })).rejects.toThrow(
+      "installationId is invalid",
+    );
+    await expect(store.listAuditEvents({ installationId: [] })).resolves.toEqual([]);
+    expect(queryExecutor.query).not.toHaveBeenCalled();
   });
 
   it("rejects invalid cursors and malformed database rows", async () => {
