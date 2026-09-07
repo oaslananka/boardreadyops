@@ -12,15 +12,12 @@ create table if not exists workspaces (
 
 create index if not exists workspaces_slug_idx on workspaces(slug);
 
-create table if not exists workspace_memberships (
-  workspace_id text not null references workspaces(id) on delete cascade,
-  user_id text not null,
-  role text not null default 'member' check (role in ('owner', 'admin', 'member', 'viewer')),
-  created_at timestamptz not null default now(),
-  primary key (workspace_id, user_id)
-);
-
-create index if not exists workspace_memberships_user_idx on workspace_memberships(user_id);
+-- A `workspace_memberships` table was declared here with a (workspace_id, user_id) key. It never
+-- existed: 0052_billing.sql already created that name for seat billing, so `if not exists` made
+-- this a silent no-op in every database. The membership model this file wanted lives in
+-- 0064_workspace_membership_authorization.sql as `workspace_members`. Removing the dead statement
+-- changes no schema anywhere -- 0052 always runs first -- and the runner tracks version names,
+-- not checksums.
 
 create table if not exists projects (
   id text primary key default gen_random_uuid()::text,

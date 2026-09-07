@@ -5,6 +5,7 @@ import { WorkspaceStore } from "../../../packages/db/src/workspace-store.js";
 
 class MockWorkspaceDb implements SqlQueryExecutor {
   workspaces: Record<string, unknown>[] = [];
+  members: Record<string, unknown>[] = [];
   projects: Record<string, unknown>[] = [];
   revisions: Record<string, unknown>[] = [];
   deliveries: Record<string, unknown>[] = [];
@@ -13,6 +14,8 @@ class MockWorkspaceDb implements SqlQueryExecutor {
     const s = sql.toLowerCase();
 
     // Workspaces
+    // One statement inserts the workspace and its owner membership together, so the mock records
+    // both -- a workspace with no member is exactly the state that made the v2 API unauthorizable.
     if (s.includes("insert into workspaces")) {
       const row = {
         id: params[0],
@@ -23,7 +26,25 @@ class MockWorkspaceDb implements SqlQueryExecutor {
         created_at: new Date().toISOString(),
       };
       this.workspaces.push(row);
+      if (s.includes("insert into workspace_members")) {
+        this.members.push({ workspace_id: params[0], user_id: params[5], role: "owner" });
+      }
       return { rows: [row] };
+    }
+
+    if (s.includes("from workspace_members") && s.includes("join workspaces")) {
+      const rows = this.members
+        .filter((m) => m.user_id === params[0])
+        .flatMap((m) => {
+          const workspace = this.workspaces.find((w) => w.id === m.workspace_id);
+          return workspace ? [{ ...workspace, role: m.role }] : [];
+        });
+      return { rows };
+    }
+
+    if (s.includes("from workspace_members")) {
+      const match = this.members.find((m) => m.workspace_id === params[0] && m.user_id === params[1]);
+      return { rows: match ? [{ role: match.role }] : [] };
     }
 
     if (s.includes("from workspaces") && s.includes("where slug = $1")) {
@@ -112,6 +133,7 @@ describe("WorkspaceStore", () => {
     const created = await store.createWorkspace({
       name: "Acme Hardware",
       slug: "acme-hardware",
+      ownerUserId: "acme-admin",
       planTier: "team",
     });
 
@@ -133,6 +155,7 @@ describe("WorkspaceStore", () => {
     const ws = await store.createWorkspace({
       name: "Robotics Co",
       slug: "robotics-co",
+      ownerUserId: "robotics-admin",
     });
 
     const prj1 = await store.createProject({
@@ -203,5 +226,42 @@ describe("WorkspaceStore", () => {
     // Invalid token returns null
     const invalid = await store.getDeliveryByToken("invalid_token_1234");
     expect(invalid).toBeNull();
+  });
+  it("makes the creator the owner, so the workspace can be authorized at all", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+
+    const ws = await store.createWorkspace({
+      name: "Acme Hardware",
+      slug: "acme-hardware",
+      ownerUserId: "acme-admin",
+    });
+
+    expect(await store.workspaceRoleFor(ws.id, "acme-admin")).toBe("owner");
+    expect(await store.workspaceRoleFor(ws.id, "someone-else")).toBeNull();
+  });
+
+  it("reads a role outside the check constraint as no membership at all", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "acme-admin" });
+    // The column is text with a check constraint, and a constraint can be dropped or predate a
+    // value. Narrowing here means callers get `WorkspaceRole | null` and never an unhandled role.
+    db.members.push({ workspace_id: ws.id, user_id: "ghost", role: "superuser" });
+
+    expect(await store.workspaceRoleFor(ws.id, "ghost")).toBeNull();
+  });
+
+  it("lists only the workspaces the user belongs to", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+
+    const mine = await store.createWorkspace({ name: "Mine", slug: "mine", ownerUserId: "me" });
+    await store.createWorkspace({ name: "Theirs", slug: "theirs", ownerUserId: "them" });
+
+    const listed = await store.listWorkspacesForUser("me");
+    expect(listed.map((workspace) => workspace.id)).toEqual([mine.id]);
+    expect(listed[0]?.role).toBe("owner");
+    expect(await store.listWorkspacesForUser("nobody")).toEqual([]);
   });
 });

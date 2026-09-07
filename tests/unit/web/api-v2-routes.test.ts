@@ -10,11 +10,24 @@ const mockQuery = vi.fn();
 const mockClose = vi.fn();
 const mockMembershipQuery = vi.fn();
 const mockProjectQuery = vi.fn();
+const mockRevisionWorkspaceQuery = vi.fn();
 
+/**
+ * The authorization lookups are routed to their own mocks so `mockQuery` keeps carrying only the
+ * store calls each test is about, and its positional `mockResolvedValueOnce` chains stay readable.
+ *
+ * The membership branch used to match `from workspace_memberships` and never fired: no route
+ * queried it, because migration 0063's table of that name was never created (0052 owned the name
+ * already). The mock made the suite look like it covered tenant scoping while the routes had
+ * none. It now matches `workspace_members`, the table 0064 adds, which the routes really read.
+ */
 vi.mock("../../../packages/db/src/pg-executor.js", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: (sql: string, params: readonly unknown[]) => {
-      if (sql.includes("from workspace_memberships")) return mockMembershipQuery(sql, params);
+      if (sql.includes("from workspace_members")) return mockMembershipQuery(sql, params);
+      if (sql.includes("from revisions") && sql.includes("join projects")) {
+        return mockRevisionWorkspaceQuery(sql, params);
+      }
       if (sql.includes("from projects") && sql.includes("where id = $1")) return mockProjectQuery(sql, params);
       return mockQuery(sql, params);
     },
@@ -27,6 +40,7 @@ describe("API v2 Routes", () => {
     mockQuery.mockReset();
     mockClose.mockReset();
     mockMembershipQuery.mockReset().mockResolvedValue({ rows: [{ role: "owner" }] });
+    mockRevisionWorkspaceQuery.mockReset().mockResolvedValue({ rows: [{ workspace_id: "ws_123" }] });
     mockProjectQuery.mockReset().mockResolvedValue({
       rows: [
         {
@@ -141,26 +155,22 @@ describe("API v2 Routes", () => {
 
   describe("projects", () => {
     it("creates project under existing workspace", async () => {
-      // First query finds workspace, second query inserts project
-      mockQuery
-        .mockResolvedValueOnce({
-          rows: [
-            { id: "ws_123", name: "Alpha Corp", slug: "alpha-corp", plan_tier: "community", created_at: new Date() },
-          ],
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: "prj_001",
-              workspace_id: "ws_123",
-              name: "Power Module",
-              description: "High voltage regulator",
-              default_cad_format: "altium",
-              github_repo_full_name: null,
-              created_at: new Date().toISOString(),
-            },
-          ],
-        });
+      // Membership answers the "may they?" question (its own mock), so the only store call left
+      // here is the insert. The route no longer loads the workspace first: a caller who is not a
+      // member must not learn whether the id exists.
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: "prj_001",
+            workspace_id: "ws_123",
+            name: "Power Module",
+            description: "High voltage regulator",
+            default_cad_format: "altium",
+            github_repo_full_name: null,
+            created_at: new Date().toISOString(),
+          },
+        ],
+      });
 
       const req = new Request("https://boardreadyops.test/api/v2/projects", {
         method: "POST",
@@ -324,6 +334,162 @@ describe("API v2 Routes", () => {
       expect(res.status).toBe(200);
       const data = (await res.json()) as { ok: boolean; delivery: { id: string } };
       expect(data.delivery.id).toBe("del_001");
+    });
+  });
+  /**
+   * Every v2 route reached the store straight from `authenticateApiRequest`, which proves who is
+   * calling and never what they may reach. Verified against a real database before this was
+   * written: one tenant's API token read another tenant's workspace and projects, wrote a project
+   * into it, and minted a public guest delivery link for its revision — all 200/201.
+   */
+  describe("workspace authorization", () => {
+    function sessionAs(login: string) {
+      vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+        ok: true,
+        actorId: login,
+        scopes: ["admin", "runs:write", "reviews:read", "reviews:write"],
+        authType: "session",
+      });
+    }
+
+    function bearerToken() {
+      vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
+        ok: true,
+        actorId: "tok_123",
+        repositoryId: "repo_1",
+        scopes: ["admin", "runs:write", "reviews:read", "reviews:write"],
+        authType: "bearer_token",
+      });
+    }
+
+    /** A non-member gets the same answer as for a workspace that does not exist. */
+    function notAMember() {
+      mockMembershipQuery.mockResolvedValue({ rows: [] });
+    }
+
+    it("hides another tenant's workspace behind the same 404 as a missing one", async () => {
+      sessionAs("alpha-admin");
+      notAMember();
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: "ws_beta",
+            name: "Beta Corp",
+            slug: "beta-corp",
+            plan_tier: "team",
+            stripe_customer_id: "cus_beta",
+            created_at: new Date().toISOString(),
+          },
+        ],
+      });
+
+      const res = await getWorkspaces(new Request("https://boardreadyops.test/api/v2/workspaces?slug=beta-corp"));
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain("cus_beta");
+    });
+
+    it("refuses to list projects in a workspace the caller does not belong to", async () => {
+      sessionAs("alpha-admin");
+      notAMember();
+
+      const res = await getProjects(new Request("https://boardreadyops.test/api/v2/projects?workspaceId=ws_beta"));
+      expect(res.status).toBe(404);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("refuses to create a project in a workspace the caller does not belong to", async () => {
+      sessionAs("alpha-admin");
+      notAMember();
+
+      const res = await createProject(
+        new Request("https://boardreadyops.test/api/v2/projects", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://boardreadyops.test" },
+          body: JSON.stringify({ workspaceId: "ws_beta", name: "Injected" }),
+        }),
+      );
+      expect(res.status).toBe(404);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("refuses to mint a guest delivery link for another tenant's revision", async () => {
+      sessionAs("alpha-admin");
+      notAMember();
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: "rev_beta",
+            project_id: "prj_beta",
+            revision_label: "B1",
+            source_kind: "direct_upload",
+            commit_sha: null,
+            bundle_sha256: "b".repeat(64),
+            normalized_summary: {},
+            created_at: new Date().toISOString(),
+          },
+        ],
+      });
+
+      const res = await createDelivery(
+        new Request("https://boardreadyops.test/api/v2/deliveries", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://boardreadyops.test" },
+          body: JSON.stringify({ revisionId: "rev_beta", signedArchiveUrl: "https://example.invalid/beta.zip" }),
+        }),
+      );
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain("rawToken");
+    });
+
+    it("refuses to upload a revision into another tenant's project", async () => {
+      sessionAs("alpha-admin");
+      notAMember();
+
+      const res = await createRevision(
+        new Request("https://boardreadyops.test/api/v2/revisions/upload", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://boardreadyops.test" },
+          body: JSON.stringify({
+            projectId: "prj_beta",
+            revisionLabel: "v1",
+            bundleSha256: "c".repeat(64),
+          }),
+        }),
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it("lets a member through to their own workspace", async () => {
+      sessionAs("alpha-admin");
+      mockMembershipQuery.mockResolvedValue({ rows: [{ role: "member" }] });
+      mockQuery.mockResolvedValueOnce({ rows: [] });
+
+      const res = await getProjects(new Request("https://boardreadyops.test/api/v2/projects?workspaceId=ws_alpha"));
+      expect(res.status).toBe(200);
+    });
+
+    it("stops a viewer from writing while still letting them read", async () => {
+      sessionAs("alpha-viewer");
+      mockMembershipQuery.mockResolvedValue({ rows: [{ role: "viewer" }] });
+
+      const res = await createProject(
+        new Request("https://boardreadyops.test/api/v2/projects", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://boardreadyops.test" },
+          body: JSON.stringify({ workspaceId: "ws_alpha", name: "Nope" }),
+        }),
+      );
+      expect(res.status).toBe(403);
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+
+    it("turns away a repository-scoped API token, which has no workspace identity", async () => {
+      bearerToken();
+
+      const res = await getProjects(new Request("https://boardreadyops.test/api/v2/projects?workspaceId=ws_alpha"));
+      expect(res.status).toBe(403);
+      expect(mockMembershipQuery).not.toHaveBeenCalled();
+      expect(mockQuery).not.toHaveBeenCalled();
     });
   });
 });
