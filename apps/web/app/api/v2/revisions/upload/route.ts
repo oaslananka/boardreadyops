@@ -3,6 +3,7 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
+import { authorizeWorkspace, canWriteWorkspace } from "../../../../../lib/workspace-authorization.js";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,14 @@ export async function POST(request: Request): Promise<Response> {
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
     const store = new WorkspaceStore(executor);
+    const access = await authorizeWorkspace(auth, store, await store.workspaceIdForProject(parsed.data.projectId));
+    if (!access.ok) {
+      return Response.json({ ok: false, error: access.error }, { status: access.status });
+    }
+    if (!canWriteWorkspace(access.role)) {
+      return Response.json({ ok: false, error: "Viewers cannot upload revisions" }, { status: 403 });
+    }
+
     const revision = await store.createRevisionFromUpload({
       projectId: parsed.data.projectId,
       revisionLabel: parsed.data.revisionLabel,
