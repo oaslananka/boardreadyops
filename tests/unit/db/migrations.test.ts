@@ -108,6 +108,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0061_run_snapshots.sql",
       "0062_finding_category.sql",
       "0063_workspace_project_model.sql",
+      "0064_workspace_membership_authorization.sql",
     ]);
   });
 
@@ -127,13 +128,27 @@ describe("BoardReadyOps Cloud migrations", () => {
     const sql = (await readFile(join(migrationsDir, "0063_workspace_project_model.sql"), "utf8")).toLowerCase();
 
     expect(sql).toContain("create table if not exists workspaces");
-    expect(sql).toContain("create table if not exists workspace_memberships");
     expect(sql).toContain("create table if not exists projects");
     expect(sql).toContain("create table if not exists revisions");
     expect(sql).toContain("create table if not exists deliveries");
     expect(sql).toContain("references workspaces(id) on delete cascade");
     expect(sql).toContain("references projects(id) on delete cascade");
     expect(sql).toContain("references revisions(id) on delete cascade");
+    // This file also declared `workspace_memberships`, which 0052_billing.sql had already created
+    // under a different shape, so the statement was a no-op in every database and the workspace
+    // tree had no owner to authorize against. It was removed; 0064 adds `workspace_members`.
+    expect(sql).not.toContain("create table if not exists workspace_memberships");
+  });
+
+  it("gives the workspace tree an owner to authorize against in schema v64", async () => {
+    const sql = (
+      await readFile(join(migrationsDir, "0064_workspace_membership_authorization.sql"), "utf8")
+    ).toLowerCase();
+
+    expect(sql).toContain("create table if not exists workspace_members");
+    expect(sql).toContain("references workspaces(id) on delete cascade");
+    expect(sql).toContain("primary key (workspace_id, user_id)");
+    expect(sql).toContain("check (role in ('owner', 'admin', 'member', 'viewer'))");
   });
 
   it("stores review-canvas snapshot manifests per release run in schema v61", async () => {

@@ -31,10 +31,16 @@ describeDatabase("WorkspaceStore (PostgreSQL Integration)", () => {
       id: workspaceId,
       name: "Integration Test Workspace",
       slug: "integration-test-ws",
+      ownerUserId: "integration-owner",
       planTier: "team",
     });
     expect(ws.id).toBe(workspaceId);
     expect(ws.name).toBe("Integration Test Workspace");
+    // The workspace and its owner are written by one statement, so a real Postgres is the only
+    // place this can be checked -- the mock cannot prove the CTE is atomic.
+    expect(await store.workspaceRoleFor(ws.id, "integration-owner")).toBe("owner");
+    expect(await store.workspaceRoleFor(ws.id, "an-outsider")).toBeNull();
+    expect((await store.listWorkspacesForUser("integration-owner")).map((w) => w.id)).toContain(workspaceId);
 
     const project = await store.createProject({
       id: projectId,

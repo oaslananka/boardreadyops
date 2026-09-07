@@ -3,6 +3,7 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
+import { authorizeWorkspace, canWriteWorkspace } from "../../../../lib/workspace-authorization.js";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,16 @@ export async function POST(request: Request): Promise<Response> {
     const revision = await store.getRevisionById(parsed.data.revisionId);
     if (!revision) {
       return Response.json({ ok: false, error: "Revision not found" }, { status: 404 });
+    }
+
+    // A delivery link is a public URL to a signed archive. Minting one against a revision the
+    // caller cannot reach published another tenant's hardware package to anyone holding the link.
+    const access = await authorizeWorkspace(auth, store, await store.workspaceIdForRevision(revision.id));
+    if (!access.ok) {
+      return Response.json({ ok: false, error: access.error }, { status: access.status });
+    }
+    if (!canWriteWorkspace(access.role)) {
+      return Response.json({ ok: false, error: "Viewers cannot create delivery links" }, { status: 403 });
     }
 
     const { delivery, rawToken } = await store.createDeliveryLink({

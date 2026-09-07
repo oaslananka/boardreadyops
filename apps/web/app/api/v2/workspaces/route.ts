@@ -3,6 +3,7 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
+import { authorizeWorkspace, workspaceUserIdFor } from "../../../../lib/workspace-authorization.js";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,16 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  // The creator becomes the workspace owner, so a workspace is never left with no member able
+  // to reach it -- and never reachable by everyone for want of one.
+  const ownerUserId = workspaceUserIdFor(auth);
+  if (!ownerUserId) {
+    return Response.json(
+      { ok: false, error: "API tokens are scoped to a repository and cannot create workspaces." },
+      { status: 403 },
+    );
+  }
+
   const config = resolveCloudPersistenceConfiguration();
   if (config.mode !== "postgres") {
     return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
@@ -60,6 +71,7 @@ export async function POST(request: Request): Promise<Response> {
     const workspace = await store.createWorkspace({
       name: parsed.data.name,
       slug: parsed.data.slug,
+      ownerUserId,
       planTier: parsed.data.planTier as WorkspacePlanTier | undefined,
     });
     return Response.json({ ok: true, workspace }, { status: 201 });
@@ -89,10 +101,13 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const store = new WorkspaceStore(executor);
     const workspace = await store.getWorkspaceBySlug(slug);
-    if (!workspace) {
-      return Response.json({ ok: false, error: "Workspace not found" }, { status: 404 });
+    // Authorize before answering: a slug is guessable, and an unscoped lookup told any caller a
+    // competitor's workspace name, plan tier and Stripe customer id.
+    const access = await authorizeWorkspace(auth, store, workspace?.id ?? null);
+    if (!access.ok) {
+      return Response.json({ ok: false, error: access.error }, { status: access.status });
     }
-    return Response.json({ ok: true, workspace });
+    return Response.json({ ok: true, workspace, role: access.role });
   } finally {
     await executor.close();
   }
