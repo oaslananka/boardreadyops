@@ -274,7 +274,7 @@ To see what is holding the space:
 
 ```bash
 docker system df -v
-docker image ls boardreadyops-web-runtime --format '{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}'
+docker image ls boardreadyops-web-runtime
 ```
 
 Keep the running image and at least one previous image as a rollback target. Retire the rest:
