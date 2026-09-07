@@ -4,7 +4,6 @@ severity-default: medium
 applies-to:
   - pcb
 config-keys:
-  - rules.manufacturing.tooling-holes.enabled
   - rules.manufacturing.tooling-holes.minimum
 ---
 
@@ -12,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks explicitly enabled manufacturing jobs for minimum tooling or mounting hole coverage.
+Checks configured fabrication/assembly jobs for a minimum number of tooling or mounting holes.
 
 ## When It Fires
 

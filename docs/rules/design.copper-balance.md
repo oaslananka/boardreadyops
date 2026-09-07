@@ -4,7 +4,6 @@ severity-default: low
 applies-to:
   - pcb
 config-keys:
-  - rules.design.copper-balance.enabled
   - rules.design.copper-balance.min-coverage-percent
 ---
 
@@ -12,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks filled copper area per layer against board area to identify low copper coverage.
+Checks filled copper coverage on PCB layers against the configured minimum.
 
 ## When It Fires
 

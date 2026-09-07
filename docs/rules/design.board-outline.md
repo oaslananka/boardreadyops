@@ -11,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks that the PCB Edge.Cuts outline is present and closed.
+Checks that the PCB Edge.Cuts outline is present and closes into a board boundary.
 
 ## When It Fires
 

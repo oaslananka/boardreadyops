@@ -14,7 +14,7 @@ config-keys:
 
 ## What It Checks
 
-Checks a PlatformIO-style firmware pin contract against BoardReadyOps pinmap firmware labels.
+Checks a PlatformIO-style firmware pin contract against the BoardReadyOps pinmap.
 
 ## When It Fires
 

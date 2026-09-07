@@ -12,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks explicitly enabled assembly jobs for components placed on the bottom copper layer.
+Reports assembly components placed on the bottom copper layer.
 
 ## When It Fires
 

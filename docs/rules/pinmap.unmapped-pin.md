@@ -5,15 +5,15 @@ applies-to:
   - pinmap
   - schematic
 config-keys:
-  - rules.pinmap.unmapped-pin.enabled
-  - rules.pinmap.unmapped-pin.severity
+  - pinmap
+  - projects.pinmap
 ---
 
 # pinmap.unmapped-pin
 
 ## What It Checks
 
-Checks connected schematic pins against pinmap entries.
+Checks connected schematic pins for matching pinmap entries.
 
 ## When It Fires
 

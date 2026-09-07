@@ -4,15 +4,16 @@ severity-default: high
 applies-to:
   - schematic
 config-keys:
-  - rules.erc.kicad.enabled
-  - rules.erc.severity-overrides
+  - kicad-cli
+  - require-kicad
+  - rules.erc
 ---
 
 # erc.kicad
 
 ## What It Checks
 
-Runs KiCad schematic ERC and normalizes KiCad diagnostics into BoardReadyOps findings.
+Runs KiCad schematic electrical-rule checks and normalizes their diagnostics into findings.
 
 ## When It Fires
 

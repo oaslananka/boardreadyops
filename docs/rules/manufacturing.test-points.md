@@ -12,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks explicitly enabled assembly jobs for minimum test point footprint coverage.
+Checks for a configured minimum number of test point footprints for in-circuit or functional test.
 
 ## When It Fires
 

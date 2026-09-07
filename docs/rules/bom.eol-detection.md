@@ -4,7 +4,6 @@ severity-default: high
 applies-to:
   - bom
 config-keys:
-  - rules.bom.eol-detection.enabled
   - rules.bom.eol-detection.severity
 ---
 
@@ -12,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks lifecycle-style columns for local end-of-life markers.
+Checks lifecycle-style BOM fields for end-of-life and not-recommended markers.
 
 ## When It Fires
 

@@ -14,7 +14,7 @@ config-keys:
 
 ## What It Checks
 
-Checks an ESP-IDF firmware pin contract YAML against BoardReadyOps pinmap firmware labels.
+Checks an ESP-IDF firmware pin contract YAML against the BoardReadyOps pinmap.
 
 ## When It Fires
 

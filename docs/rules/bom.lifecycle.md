@@ -4,7 +4,6 @@ severity-default: medium
 applies-to:
   - bom
 config-keys:
-  - rules.bom.lifecycle.enabled
   - rules.bom.lifecycle.db
 ---
 
@@ -12,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks BOM lifecycle columns or a local lifecycle database for EOL, NRND, preview, and discontinued markers.
+Checks BOM lifecycle fields and local lifecycle data for risky component states.
 
 ## When It Fires
 

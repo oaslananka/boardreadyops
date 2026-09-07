@@ -3,8 +3,8 @@ id: bom.missing-mpn
 severity-default: high
 applies-to:
   - bom
+  - schematic
 config-keys:
-  - rules.bom.missing-mpn.enabled
   - rules.bom.missing-mpn.ignore-refs
 ---
 
@@ -12,7 +12,7 @@ config-keys:
 
 ## What It Checks
 
-Checks normalized BOM rows for missing manufacturer part numbers.
+Checks populated BOM and schematic rows for missing manufacturer part numbers.
 
 ## When It Fires
 

@@ -11,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks CHANGELOG.md for an entry matching the current board revision.
+Checks CHANGELOG.md for an entry matching the board revision.
 
 ## When It Fires
 

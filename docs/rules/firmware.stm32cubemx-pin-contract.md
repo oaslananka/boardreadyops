@@ -15,7 +15,7 @@ config-keys:
 
 ## What It Checks
 
-Parses a STM32CubeMX `.ioc` project file and checks GPIO labels against BoardReadyOps pinmap firmware labels.
+Parses a STM32CubeMX `.ioc` project file and checks GPIO labels against the BoardReadyOps pinmap.
 
 ## When It Fires
 

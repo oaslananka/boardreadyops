@@ -11,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks that panelized builds include expected panel output files.
+Checks panelized manufacturing configurations for panel output files.
 
 ## When It Fires
 
