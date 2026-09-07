@@ -147,6 +147,33 @@ const touchTargetMinPx = 44;
 
 export type TouchTargetIssue = { selector: string; width: number; height: number };
 
+/** What the page can tell us about one candidate control. Facts only -- no verdict. */
+type TouchTargetCandidate = {
+  ariaLabel: string;
+  labelledByText: string;
+  text: string;
+  title: string;
+  tag: string;
+  width: number;
+  height: number;
+  /** Whether a tap anywhere in the required box is routed to this control. */
+  reachable: boolean;
+};
+
+/**
+ * The accessible name as a checker would resolve it, so a finding names a real control rather
+ * than falling back to its tag.
+ *
+ * Lives here rather than in the browser callback because everything in that callback is
+ * serialized into the page: a helper cannot be shared with it, and defining one inside it is
+ * both untestable and a nested function. The page reports what it can see; the verdict and the
+ * wording are decided here.
+ */
+export function touchTargetName(candidate: TouchTargetCandidate): string {
+  const name = candidate.ariaLabel || candidate.labelledByText || candidate.text || candidate.title || candidate.tag;
+  return name.slice(0, 40);
+}
+
 /**
  * Flags primary interactive controls whose tap target is under 44x44px. Deliberately scoped to
  * buttons and role="button"/"tab" elements plus nav links, not every inline text link -- per the
@@ -163,9 +190,9 @@ export type TouchTargetIssue = { selector: string; width: number; height: number
  * lands on the control (or inside it), the target is big enough however it was built.
  */
 export async function checkPrimaryTouchTargets(page: Page): Promise<TouchTargetIssue[]> {
-  return page.evaluate((minSize) => {
+  const candidates = await page.evaluate((minSize) => {
     const selector = 'button, [role="button"], [role="tab"], nav a, .product-mobile-trigger';
-    const issues: { selector: string; width: number; height: number }[] = [];
+    const found: TouchTargetCandidate[] = [];
 
     for (const el of document.querySelectorAll<HTMLElement>(selector)) {
       const style = window.getComputedStyle(el);
@@ -174,49 +201,50 @@ export async function checkPrimaryTouchTargets(page: Page): Promise<TouchTargetI
       if (rect.width === 0 && rect.height === 0) continue;
       if (rect.width >= minSize && rect.height >= minSize) continue;
 
-      // A control scrolled out of view cannot be probed by point; fall back to its own box.
       const centreX = rect.left + rect.width / 2;
       const centreY = rect.top + rect.height / 2;
-      const offScreen = centreX < 0 || centreY < 0 || centreX > window.innerWidth || centreY > window.innerHeight;
-
-      if (!offScreen) {
-        const reach = minSize / 2 - 1;
-        const probes: [number, number][] = [
-          [centreX, centreY],
-          [centreX - reach, centreY - reach],
-          [centreX + reach, centreY - reach],
-          [centreX - reach, centreY + reach],
-          [centreX + reach, centreY + reach],
-        ];
-        // A tap at every probe point must be routed to this control, or to something inside it.
-        const reachable = probes.every(([x, y]) => {
-          const atPoint = document.elementFromPoint(x, y);
-          return atPoint !== null && (atPoint === el || el.contains(atPoint));
-        });
-        if (reachable) continue;
-      }
-
-      // The accessible name as a checker would resolve it, so a finding names a real control
-      // instead of falling back to the tag. Written inline rather than extracted: this whole
-      // callback is serialized into the page, so a helper cannot live outside it -- and a nested
-      // one is exactly what `typescript:S7721` objects to.
+      // A control scrolled out of view cannot be probed by point, so it is judged on its own box.
+      const onScreen = centreX >= 0 && centreY >= 0 && centreX <= window.innerWidth && centreY <= window.innerHeight;
+      const reach = minSize / 2 - 1;
+      const offsets: [number, number][] = [
+        [0, 0],
+        [-reach, -reach],
+        [reach, -reach],
+        [-reach, reach],
+        [reach, reach],
+      ];
       const labelledBy = el.getAttribute("aria-labelledby");
-      const labelledByText = labelledBy
-        ? labelledBy
-            .split(/\s+/u)
-            .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
-            .filter(Boolean)
-            .join(" ")
-        : "";
-      const name =
-        el.getAttribute("aria-label")?.trim() ||
-        labelledByText ||
-        el.textContent?.trim() ||
-        el.getAttribute("title")?.trim() ||
-        el.tagName;
 
-      issues.push({ selector: name.slice(0, 40), width: Math.round(rect.width), height: Math.round(rect.height) });
+      found.push({
+        ariaLabel: el.getAttribute("aria-label")?.trim() ?? "",
+        labelledByText: labelledBy
+          ? labelledBy
+              .split(/\s+/u)
+              .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+              .filter(Boolean)
+              .join(" ")
+          : "",
+        text: el.textContent?.trim() ?? "",
+        title: el.getAttribute("title")?.trim() ?? "",
+        tag: el.tagName,
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        reachable:
+          onScreen &&
+          offsets.every(([dx, dy]) => {
+            const atPoint = document.elementFromPoint(centreX + dx, centreY + dy);
+            return atPoint !== null && (atPoint === el || el.contains(atPoint));
+          }),
+      });
     }
-    return issues;
+    return found;
   }, touchTargetMinPx);
+
+  return candidates
+    .filter((candidate) => !candidate.reachable)
+    .map((candidate) => ({
+      selector: touchTargetName(candidate),
+      width: candidate.width,
+      height: candidate.height,
+    }));
 }
