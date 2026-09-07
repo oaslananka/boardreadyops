@@ -40,6 +40,29 @@ export interface RevisionRecord {
   createdAt: string;
 }
 
+/** A revision with the project it belongs to, for surfaces that list across a workspace. */
+export interface WorkspaceRevisionRecord extends RevisionRecord {
+  projectName: string;
+}
+
+/**
+ * A delivery with the revision and project it points at.
+ *
+ * `accessTokenHash` is deliberately absent: a listing has no use for it, and the hash is the one
+ * stored value from which a guest URL could be checked against a guess.
+ */
+export interface WorkspaceDeliveryRecord {
+  id: string;
+  revisionId: string;
+  revisionLabel: string;
+  projectId: string;
+  projectName: string;
+  expiresAt: string;
+  signedArchiveUrl: string;
+  recipientNotes?: string | undefined;
+  createdAt: string;
+}
+
 export interface DeliveryRecord {
   id: string;
   revisionId: string;
@@ -329,6 +352,63 @@ export class WorkspaceStore {
 
     const row = result?.rows?.[0];
     return row ? mapRevision(row) : null;
+  }
+
+  /** Every revision in a workspace, newest first, with the project each belongs to. */
+  async listRevisionsByWorkspace(workspaceId: string, limit = 200): Promise<readonly WorkspaceRevisionRecord[]> {
+    const result = (await this.executor.query(
+      `select revisions.id, revisions.project_id, revisions.revision_label, revisions.source_kind,
+              revisions.commit_sha, revisions.bundle_sha256, revisions.normalized_summary,
+              revisions.created_at, projects.name as project_name
+         from revisions
+         join projects on projects.id = revisions.project_id
+        where projects.workspace_id = $1
+        order by revisions.created_at desc, revisions.id desc
+        limit $2`,
+      [workspaceId, limit],
+    )) as { rows?: (RevisionRow & { project_name: string })[] };
+
+    return (result?.rows ?? []).map((row) => ({ ...mapRevision(row), projectName: row.project_name }));
+  }
+
+  /** Every delivery link in a workspace, newest first. Excludes the token hash by construction. */
+  async listDeliveriesByWorkspace(workspaceId: string, limit = 200): Promise<readonly WorkspaceDeliveryRecord[]> {
+    const result = (await this.executor.query(
+      `select deliveries.id, deliveries.revision_id, deliveries.expires_at,
+              deliveries.signed_archive_url, deliveries.recipient_notes, deliveries.created_at,
+              revisions.revision_label, projects.id as project_id, projects.name as project_name
+         from deliveries
+         join revisions on revisions.id = deliveries.revision_id
+         join projects on projects.id = revisions.project_id
+        where projects.workspace_id = $1
+        order by deliveries.created_at desc, deliveries.id desc
+        limit $2`,
+      [workspaceId, limit],
+    )) as {
+      rows?: {
+        id: string;
+        revision_id: string;
+        expires_at: string | Date;
+        signed_archive_url: string;
+        recipient_notes: string | null;
+        created_at: string | Date;
+        revision_label: string;
+        project_id: string;
+        project_name: string;
+      }[];
+    };
+
+    return (result?.rows ?? []).map((row) => ({
+      id: row.id,
+      revisionId: row.revision_id,
+      revisionLabel: row.revision_label,
+      projectId: row.project_id,
+      projectName: row.project_name,
+      expiresAt: new Date(row.expires_at).toISOString(),
+      signedArchiveUrl: row.signed_archive_url,
+      ...(row.recipient_notes !== null ? { recipientNotes: row.recipient_notes } : {}),
+      createdAt: new Date(row.created_at).toISOString(),
+    }));
   }
 
   async createDeliveryLink(input: {
