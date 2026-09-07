@@ -1,6 +1,7 @@
 import type { ProjectRecord, WorkspaceMembershipRecord } from "@boardreadyops/db";
 import { reviewFixturesEnabled } from "./review-listing.js";
 import type { UserSession } from "./user-session.js";
+import { openWorkspaceStore } from "./workspace-store-access.js";
 
 /**
  * Workspaces the viewer belongs to, and the projects inside whichever one they are looking at.
@@ -28,15 +29,6 @@ export type WorkspaceProjectsResult =
       projects: readonly ProjectRecord[];
     };
 
-async function openStore(connectionString: string) {
-  const [{ WorkspaceStore }, { createPgQueryExecutor }] = await Promise.all([
-    import("@boardreadyops/db"),
-    import("@boardreadyops/db/pg-executor"),
-  ]);
-  const executor = createPgQueryExecutor({ connectionString, max: 1 });
-  return { store: new WorkspaceStore(executor), executor };
-}
-
 /**
  * Every workspace the viewer is a member of, newest first.
  *
@@ -51,7 +43,7 @@ export async function loadViewerWorkspaces(
   const connectionString = environment.DATABASE_URL;
   if (!connectionString || reviewFixturesEnabled(environment)) return [];
 
-  const { store, executor } = await openStore(connectionString);
+  const { store, executor } = await openWorkspaceStore(connectionString);
   try {
     return await store.listWorkspacesForUser(session.login);
   } finally {
@@ -70,7 +62,7 @@ export async function loadWorkspaceProjects(
   const connectionString = environment.DATABASE_URL;
   if (!connectionString) return { state: "not-configured" };
 
-  const { store, executor } = await openStore(connectionString);
+  const { store, executor } = await openWorkspaceStore(connectionString);
   try {
     const workspaces = await store.listWorkspacesForUser(session.login);
     if (workspaces.length === 0) return { state: "no-workspaces" };
