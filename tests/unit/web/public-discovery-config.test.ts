@@ -80,6 +80,8 @@ describe("public discovery Next.js routing", () => {
       "/policies",
       "/repositories/:path*",
       "/reviews/:path*",
+      // "/runs/:path*" does not match the bare index, so the listing needs its own entry.
+      "/runs",
       "/runs/:path*",
       "/settings/:path*",
       "/ops/:path*",

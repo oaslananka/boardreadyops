@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { brokenDemoReviewId, demoReviewId } from "../../qa/audit/routes.js";
+import { demoReviewId } from "../../qa/audit/routes.js";
 import { authenticatedStorageState } from "./fixtures/auth.js";
 
 /**
@@ -35,19 +35,21 @@ test.describe("P0 fixes", () => {
     expect(isResolvedAfterReload).toBe(!wasResolved);
   });
 
-  test("P0-03 (known, unresolved): a second demo review id still 404s outside the rev_gateway_ prefix", async ({
-    page,
-  }) => {
-    // apps/web/lib/server-review-loader.ts only demo-fixture-falls-back for `rev_gateway_*` ids
-    // unconditionally; any other DEMO_REVIEWS id (like this one) only resolves in non-Postgres
-    // mode. In a Postgres-configured deployment it 404s despite being listed on /reviews --
-    // exactly what the audit found in production. Documented here rather than silently fixed,
-    // per this task's "report real bugs, don't quietly patch product behavior" instruction; the
-    // actual fix (making /reviews and the detail loader agree on what's real) is the larger,
-    // already-deferred P0-01/02/03 work.
-    test.skip(!process.env.DATABASE_URL, "Only reproduces the reported bug when DATABASE_URL is configured");
-    const response = await page.goto(`/reviews/${brokenDemoReviewId}`);
-    expect(response?.status(), `/reviews/${brokenDemoReviewId} unexpectedly resolved`).toBe(404);
+  test("P0-03 (fixed): every review the registry lists also resolves when opened", async ({ page }) => {
+    // The listing and the detail loader now share one predicate for whether this deployment
+    // serves fixtures, so a Postgres deployment can no longer list a demo review that then 404s.
+    // Previously `rev_gateway_*` fell back to a fixture unconditionally while every other demo id
+    // only did so outside Postgres -- the split the 2026-09-01 audit found in production.
+    await page.goto("/reviews");
+    const links = await page
+      .locator('a[href^="/reviews/rev_"]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href") ?? ""));
+    expect(links.length, "expected the registry to list at least one review").toBeGreaterThan(0);
+
+    for (const href of new Set(links)) {
+      const response = await page.goto(href);
+      expect(response?.status(), `${href} is listed on /reviews but does not resolve`).toBeLessThan(400);
+    }
   });
 });
 

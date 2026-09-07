@@ -35,8 +35,6 @@ export type QaRoute = {
 };
 
 export const demoReviewId = "rev_gateway_42";
-/** Confirmed broken in production by the 2026-09-01 UI/UX audit (P0-03) — kept as a known-bug regression id. */
-export const brokenDemoReviewId = "rev_edge_ble_09";
 export const demoRunId = "demo-1";
 export const missingRunId = "run-does-not-exist";
 /** No delivery ever mints this token, so the guest route reliably renders its expired/404 state. */
@@ -139,6 +137,14 @@ export const routes: readonly QaRoute[] = [
     label: "Settings: Component Intelligence",
     auth: "authenticated",
     requiresDb: false,
+  },
+  {
+    id: "runs-list",
+    path: "/runs",
+    label: "Runs listing",
+    auth: "authenticated",
+    requiresDb: false,
+    expectedLinkPrefixes: ["/runs/"],
   },
   {
     id: "projects",

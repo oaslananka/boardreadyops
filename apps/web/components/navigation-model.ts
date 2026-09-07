@@ -28,6 +28,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
     items: [
       { label: "My Work", href: "/work", icon: "work" },
       { label: "Reviews", href: "/reviews", icon: "reviews" },
+      { label: "Runs", href: "/runs", icon: "runs" },
     ],
   },
   {

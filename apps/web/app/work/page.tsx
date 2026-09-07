@@ -2,22 +2,116 @@ import Link from "next/link";
 import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
+import { loadViewerReviews } from "../../lib/review-listing.js";
+import { viewerAuthorization } from "../../lib/viewer-authorization.js";
+import { loadViewerWorkQueue } from "../../lib/work-queue.js";
 
 export const metadata = {
   title: "My Work",
   description: "Your assigned findings, pending reviews, and change requests.",
 };
 
-export default function MyWorkPage() {
-  const reviews = DEMO_REVIEWS;
+export const dynamic = "force-dynamic";
 
-  const assignedFindings = reviews.flatMap((r) =>
-    r.findings.filter((f) => f.assignees.length > 0 && f.disposition === "open").map((f) => ({ ...f, review: r })),
-  );
+/** One shape for both branches, so the markup does not fork with the data source. */
+type QueueFinding = {
+  fingerprint: string;
+  severity: string;
+  ruleId: string;
+  message: string;
+  path: string | null;
+  reviewId: string;
+  reviewLabel: string;
+  pullRequestNumber: number | undefined;
+};
 
-  const awaitingReviews = reviews.filter((r) => r.decision === "pending");
+type QueueReview = {
+  id: string;
+  repositoryName: string;
+  pullRequestNumber: number | undefined;
+  title: string;
+  createdBy: string;
+};
 
-  const changesRequested = reviews.filter((r) => r.decision === "changes_requested");
+function prLabel(pullRequestNumber: number | undefined): string {
+  return pullRequestNumber === undefined ? "" : `PR #${pullRequestNumber}`;
+}
+
+export default async function MyWorkPage() {
+  const viewer = await viewerAuthorization();
+  const listing = await loadViewerReviews(viewer.session, { fixtures: DEMO_REVIEWS });
+
+  let assignedFindings: QueueFinding[] = [];
+  let awaitingReviews: QueueReview[] = [];
+  let changesRequested: QueueReview[] = [];
+
+  if (listing.state === "fixtures") {
+    assignedFindings = listing.reviews.flatMap((review) =>
+      review.findings
+        .filter((finding) => finding.assignees.length > 0 && finding.disposition === "open")
+        .map((finding) => ({
+          fingerprint: finding.fingerprint,
+          severity: finding.severity,
+          ruleId: finding.ruleId,
+          message: finding.message,
+          path: finding.path ?? null,
+          reviewId: review.id,
+          reviewLabel: review.repositoryName,
+          pullRequestNumber: review.pullRequestNumber,
+        })),
+    );
+    const asQueueReview = (review: (typeof listing.reviews)[number]): QueueReview => ({
+      id: review.id,
+      repositoryName: review.repositoryName,
+      pullRequestNumber: review.pullRequestNumber,
+      title: review.title,
+      createdBy: review.createdBy,
+    });
+    awaitingReviews = listing.reviews.filter((review) => review.decision === "pending").map(asQueueReview);
+    changesRequested = listing.reviews.filter((review) => review.decision === "changes_requested").map(asQueueReview);
+  } else if (listing.state === "ok") {
+    const queue = await loadViewerWorkQueue(viewer.session);
+    const byId = new Map(listing.reviews.map((review) => [review.id, review]));
+    assignedFindings = queue.assignedFindings.map((finding) => {
+      const review = byId.get(finding.reviewId);
+      return {
+        fingerprint: finding.fingerprint,
+        severity: finding.severity,
+        ruleId: finding.ruleId,
+        message: finding.message,
+        path: finding.path,
+        reviewId: finding.reviewId,
+        reviewLabel: review?.repositoryName ?? finding.repositoryId,
+        pullRequestNumber: review?.pullRequestNumber,
+      };
+    });
+    const asQueueReview = (review: (typeof listing.reviews)[number]): QueueReview => ({
+      id: review.id,
+      repositoryName: review.repositoryName,
+      pullRequestNumber: review.pullRequestNumber,
+      title: review.title,
+      createdBy: review.createdBy,
+    });
+    awaitingReviews = listing.reviews.filter((review) => review.decision === "pending").map(asQueueReview);
+    changesRequested = listing.reviews.filter((review) => review.decision === "changes_requested").map(asQueueReview);
+  }
+
+  if (listing.state === "signed-out") {
+    return (
+      <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "My Work" }]}>
+        <main className="flex w-full flex-col gap-5 px-6 py-6" id="main-content">
+          <header>
+            <h1 className="text-2xl font-bold text-foreground">My Work</h1>
+          </header>
+          <Panel title="Sign in required">
+            <EmptyState title="Your queue is scoped to your installations">
+              <p>Sign in with GitHub so BoardReadyOps knows which findings are assigned to you.</p>
+            </EmptyState>
+          </Panel>
+        </main>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "My Work" }]}>
@@ -62,17 +156,17 @@ export default function MyWorkPage() {
                           label={finding.severity}
                         />
                         <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{finding.ruleId}</code>
-                        <span className="text-muted-foreground">{finding.review.repositoryName}</span>
-                        <span className="text-muted-foreground">PR #{finding.review.pullRequestNumber}</span>
+                        <span className="text-muted-foreground">{finding.reviewLabel}</span>
+                        <span className="text-muted-foreground">{prLabel(finding.pullRequestNumber)}</span>
                       </div>
                       <p className="text-sm text-foreground">{finding.message}</p>
                       <code className="mt-1 block font-mono text-xs text-muted-foreground">{finding.path}</code>
                       <div className="mt-3">
                         <Link
-                          href={`/reviews/${finding.review.id}?tab=findings`}
+                          href={`/reviews/${finding.reviewId}?tab=findings`}
                           className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
                         >
-                          Triage in PR #{finding.review.pullRequestNumber} →
+                          Triage in {prLabel(finding.pullRequestNumber) || "this review"} →
                         </Link>
                       </div>
                     </article>
@@ -93,17 +187,17 @@ export default function MyWorkPage() {
                 </EmptyState>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {awaitingReviews.map((r) => (
-                    <article key={r.id} className="rounded-md bg-muted p-3">
+                  {awaitingReviews.map((review) => (
+                    <article key={review.id} className="rounded-md bg-muted p-3">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{r.repositoryName}</span>
-                        <span>PR #{r.pullRequestNumber}</span>
+                        <span>{review.repositoryName}</span>
+                        <span>{prLabel(review.pullRequestNumber)}</span>
                       </div>
-                      <h4 className="mt-1 text-sm font-semibold text-foreground">{r.title}</h4>
+                      <h4 className="mt-1 text-sm font-semibold text-foreground">{review.title}</h4>
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted-foreground">Author: {r.createdBy}</span>
+                        <span className="text-xs text-muted-foreground">Author: {review.createdBy}</span>
                         <Link
-                          href={`/reviews/${r.id}`}
+                          href={`/reviews/${review.id}`}
                           className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                         >
                           Open Review →
@@ -122,16 +216,16 @@ export default function MyWorkPage() {
                 tone="critical"
               >
                 <div className="flex flex-col gap-3">
-                  {changesRequested.map((r) => (
-                    <article key={r.id} className="rounded-md bg-muted p-3">
+                  {changesRequested.map((review) => (
+                    <article key={review.id} className="rounded-md bg-muted p-3">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{r.repositoryName}</span>
-                        <span>PR #{r.pullRequestNumber}</span>
+                        <span>{review.repositoryName}</span>
+                        <span>{prLabel(review.pullRequestNumber)}</span>
                       </div>
-                      <h4 className="mt-1 text-sm font-semibold text-foreground">{r.title}</h4>
+                      <h4 className="mt-1 text-sm font-semibold text-foreground">{review.title}</h4>
                       <div className="mt-2">
                         <Link
-                          href={`/reviews/${r.id}?tab=discussion`}
+                          href={`/reviews/${review.id}?tab=discussion`}
                           className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
                         >
                           View Required Changes →

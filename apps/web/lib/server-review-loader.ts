@@ -1,11 +1,7 @@
 import type { SnapshotArtifact } from "@boardreadyops/contracts";
 import type { PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
-import {
-  type CloudPersistenceConfiguration,
-  CloudRuntimeConfigurationError,
-  resolveCloudPersistenceConfiguration,
-} from "./cloud-runtime-config.js";
+import { type CloudPersistenceConfiguration, resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
 import {
   type DemoApproval,
   type DemoChecklistItem,
@@ -16,6 +12,7 @@ import {
   getDemoReview,
 } from "./demo-data.js";
 import { buildDemoSnapshots } from "./demo-snapshots.js";
+import { reviewFixturesEnabled } from "./review-listing.js";
 import type { UserSession } from "./user-session.js";
 
 function mapCanonicalSeverity(raw: string): DemoFinding["severity"] {
@@ -424,26 +421,10 @@ async function loadReviewGovernanceData(
  * suspended installations, or canceled subscriptions.
  */
 export async function loadServerReview(reviewId: string, session?: UserSession | null): Promise<DemoReview | null> {
-  if (reviewId.startsWith("rev_gateway_")) {
-    const fixture = getDemoReview(reviewId);
-    if (fixture) {
-      return {
-        ...fixture,
-        headSnapshots: buildDemoSnapshots(fixture.changedFiles ?? [], fixture.findings),
-      };
-    }
-  }
-
-  let config: CloudPersistenceConfiguration;
-  try {
-    config = resolveCloudPersistenceConfiguration();
-  } catch (error) {
-    if (error instanceof CloudRuntimeConfigurationError && error.code === "missing-database-url") {
-      return null;
-    }
-    throw error;
-  }
-  if (config.mode !== "postgres") {
+  // One predicate for both the listing and the detail page. Previously `rev_gateway_*` fell back
+  // to a fixture unconditionally while every other fixture id only did so outside Postgres, so a
+  // Postgres deployment listed reviews that 404'd when opened (2026-09-01 audit, P0-03).
+  if (reviewFixturesEnabled()) {
     const fixture = getDemoReview(reviewId);
     if (fixture) {
       return {
@@ -453,6 +434,9 @@ export async function loadServerReview(reviewId: string, session?: UserSession |
     }
     return null;
   }
+
+  const config: CloudPersistenceConfiguration = resolveCloudPersistenceConfiguration();
+  if (config.mode !== "postgres") return null;
 
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {

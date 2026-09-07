@@ -1,19 +1,10 @@
-import { FindingDecisionStore, ReviewCollaborationStore, ReviewStore } from "@boardreadyops/db";
+import { ReviewStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { authenticateApiRequest } from "../../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../../lib/cloud-runtime-config.js";
+import { loadAssignedFindings } from "../../../../../lib/work-queue.js";
 
 export const runtime = "nodejs";
-
-interface AssignedFindingSummary {
-  fingerprint: string;
-  ruleId: string;
-  severity: string;
-  message: string;
-  path: string | null;
-  repositoryId: string;
-  reviewId: string;
-}
 
 export async function GET(request: Request): Promise<Response> {
   const auth = await authenticateApiRequest(request, "reviews:read");
@@ -31,45 +22,8 @@ export async function GET(request: Request): Promise<Response> {
 
   const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
   try {
-    const collaborationStore = new ReviewCollaborationStore(executor);
     const reviewStore = new ReviewStore(executor);
-
-    // Assignments are keyed by GitHub login, which is globally unique, so this cross-repository
-    // lookup does not need a repositoryId to stay tenant-safe.
-    const assignments = await collaborationStore.getAssignmentsForAssignee(auth.actorId);
-
-    const assignedFindings: AssignedFindingSummary[] = [];
-    const reviewCache = new Map<string, Awaited<ReturnType<typeof reviewStore.getReviewById>>>();
-    for (const assignment of assignments) {
-      const cacheKey = `${assignment.repositoryId}:${assignment.reviewId}`;
-      let review = reviewCache.get(cacheKey);
-      if (review === undefined) {
-        review = await reviewStore.getReviewById(assignment.repositoryId, assignment.reviewId);
-        reviewCache.set(cacheKey, review);
-      }
-      if (!review) continue;
-
-      const [findingRows, decisions] = await Promise.all([
-        reviewStore.getFindingsForRun(assignment.repositoryId, review.headRunId),
-        new FindingDecisionStore(executor).getLatestDecisionsByReviewId(assignment.reviewId),
-      ]);
-      const findingRow = findingRows.find((row) => row.fingerprint === assignment.findingFingerprint);
-      if (!findingRow) continue;
-
-      const decision = decisions.get(assignment.findingFingerprint);
-      const isOpen = !decision || decision.disposition === "open";
-      if (!isOpen) continue;
-
-      assignedFindings.push({
-        fingerprint: assignment.findingFingerprint,
-        ruleId: findingRow.rule_id,
-        severity: findingRow.severity,
-        message: findingRow.message,
-        path: findingRow.path,
-        repositoryId: assignment.repositoryId,
-        reviewId: assignment.reviewId,
-      });
-    }
+    const assignedFindings = await loadAssignedFindings(executor, auth.actorId);
 
     let awaitingReviews: Awaited<ReturnType<typeof reviewStore.listReviews>>["reviews"] = [];
     let changesRequested: Awaited<ReturnType<typeof reviewStore.listReviews>>["reviews"] = [];
