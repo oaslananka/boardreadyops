@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { touchTargetName } from "../../../qa/audit/checks.js";
+import { touchTargetName } from "../../../qa/audit/touch-target-name.js";
 
 /**
  * The audit's touch-target finding is only useful if it names the control an operator has to go
