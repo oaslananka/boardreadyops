@@ -28,7 +28,14 @@ export type AuditEventCursor = {
 
 export type AuditLogStore = {
   listAuditEvents(input: {
-    installationId: string;
+    /**
+     * One installation, or several.
+     *
+     * The operator export asks about one at a time; a signed-in viewer may belong to more than
+     * one, and asking once beats paginating each separately and merging by hand -- the merge is
+     * where a keyset listing goes wrong.
+     */
+    installationId: string | readonly string[];
     repositoryId?: string;
     releaseRunId?: string;
     eventType?: string;
@@ -180,7 +187,10 @@ function rows(result: unknown): readonly Record<string, unknown>[] {
 export function createSqlAuditLogStore(executor: SqlQueryExecutor): AuditLogStore {
   return {
     async listAuditEvents(input) {
-      const installationId = validatedIdentifier("installationId", input.installationId);
+      const installationIds = (Array.isArray(input.installationId) ? input.installationId : [input.installationId]).map(
+        (value: string) => validatedIdentifier("installationId", value),
+      );
+      if (installationIds.length === 0) return [];
       const repositoryId = validatedIdentifier("repositoryId", input.repositoryId);
       const releaseRunId = validatedIdentifier("releaseRunId", input.releaseRunId);
       const eventType = input.eventType;
@@ -194,8 +204,8 @@ export function createSqlAuditLogStore(executor: SqlQueryExecutor): AuditLogStor
         if (!Number.isFinite(input.cursor.createdAt.valueOf())) throw new Error("cursor.createdAt is invalid");
       }
 
-      const predicates = ["audit.installation_id = $1"];
-      const parameters: unknown[] = [installationId];
+      const predicates = ["audit.installation_id = any($1::text[])"];
+      const parameters: unknown[] = [installationIds];
       const addPredicate = (column: string, value: unknown) => {
         parameters.push(value);
         predicates.push(`${column} = $${parameters.length}`);

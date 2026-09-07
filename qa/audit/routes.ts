@@ -68,6 +68,13 @@ export const routes: readonly QaRoute[] = [
     auth: "authenticated",
     requiresDb: false,
   },
+  {
+    id: "settings-audit",
+    path: "/settings/audit",
+    label: "Audit log",
+    auth: "authenticated",
+    requiresDb: false,
+  },
   { id: "evidence", path: "/evidence", label: "Evidence", auth: "public", requiresDb: false },
   { id: "insights", path: "/insights", label: "Insights", auth: "public", requiresDb: false },
   { id: "work", path: "/work", label: "My Work", auth: "authenticated", requiresDb: false },
