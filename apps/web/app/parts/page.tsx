@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AppShell } from "../../components/app-shell.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
 import { Panel } from "../../components/ui.js";
+import { ViewerNav } from "../../components/viewer-nav.js";
 
 export const metadata: Metadata = {
   title: "Component Intelligence & Parts",
@@ -10,8 +11,8 @@ export const metadata: Metadata = {
 
 export default function PartsPage() {
   return (
-    <AppShell breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Parts" }]}>
-      <main id="main-content" className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+    <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/dashboard", label: "Dashboard" }, { label: "Parts" }]}>
+      <main id="main-content" className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Component Intelligence & Parts</h1>
           <p className="mt-1 text-sm text-muted-foreground">

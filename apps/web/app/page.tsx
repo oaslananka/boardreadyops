@@ -254,7 +254,7 @@ export default function HomePage() {
         </Link>
         <nav
           aria-label="Global navigation"
-          className="flex items-center gap-6 text-sm [&>a]:flex [&>a]:min-h-11 [&>a]:min-w-11 [&>a]:items-center [&>a]:justify-center md:[&>a]:min-h-0 md:[&>a]:min-w-0"
+          className="hidden items-center gap-6 text-sm lg:flex [&>a]:flex [&>a]:min-h-11 [&>a]:min-w-11 [&>a]:items-center [&>a]:justify-center lg:[&>a]:min-h-0 lg:[&>a]:min-w-0"
         >
           <a href="#product" className="text-muted-foreground hover:text-foreground">
             Product
@@ -371,7 +371,7 @@ export default function HomePage() {
         </section>
 
         <section className="border-b border-border py-16" aria-labelledby="proof-heading">
-          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 lg:grid-cols-[1fr_1fr] lg:items-start">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium text-primary">Pull request evidence</p>
               <h2 id="proof-heading" className="text-2xl font-bold text-foreground sm:text-3xl">

@@ -342,7 +342,7 @@ function CategoryBreakdownPanel({ run }: Readonly<{ run: RunDetail }>) {
       id="category-breakdown"
       tone="section"
     >
-      <section className="overflow-x-auto" aria-label="Findings by domain table">
+      <section className="relative overflow-x-auto" aria-label="Findings by domain table">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase text-muted-foreground">
@@ -899,7 +899,7 @@ export function ArtifactTable({ artifacts }: Readonly<{ artifacts: ArtifactDetai
     );
   }
   return (
-    <section className="overflow-x-auto" aria-label="Artifact evidence table">
+    <section className="relative overflow-x-auto" aria-label="Artifact evidence table">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-border text-xs uppercase text-muted-foreground">
