@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const destinations = [
+  { label: "Members", href: "/settings/workspace" },
   { label: "Billing & Seats", href: "/settings/billing" },
   { label: "Security & Access", href: "/settings/security" },
   { label: "Data & Retention", href: "/settings/data" },

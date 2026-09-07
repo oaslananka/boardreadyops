@@ -42,6 +42,35 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows };
     }
 
+    if (s.includes("insert into workspace_members") && s.includes("on conflict")) {
+      const existing = this.members.find((m) => m.workspace_id === params[0] && m.user_id === params[1]);
+      if (existing) existing.role = params[2];
+      else this.members.push({ workspace_id: params[0], user_id: params[1], role: params[2] });
+      return {
+        rows: [{ workspace_id: params[0], user_id: params[1], role: params[2], created_at: new Date().toISOString() }],
+      };
+    }
+
+    if (s.includes("delete from workspace_members")) {
+      const index = this.members.findIndex((m) => m.workspace_id === params[0] && m.user_id === params[1]);
+      if (index === -1) return { rows: [] };
+      const target = this.members[index] as Record<string, unknown>;
+      // The real statement refuses in SQL; the mock mirrors that condition rather than the shape.
+      const otherOwner = this.members.some(
+        (m) => m.workspace_id === params[0] && m.user_id !== params[1] && m.role === "owner",
+      );
+      if (target.role === "owner" && !otherOwner) return { rows: [] };
+      this.members.splice(index, 1);
+      return { rows: [{ user_id: params[1] }] };
+    }
+
+    if (s.includes("from workspace_members") && s.includes("order by case role")) {
+      const rows = this.members
+        .filter((m) => m.workspace_id === params[0])
+        .map((m) => ({ ...m, created_at: new Date().toISOString() }));
+      return { rows };
+    }
+
     if (s.includes("from workspace_members")) {
       const match = this.members.find((m) => m.workspace_id === params[0] && m.user_id === params[1]);
       return { rows: match ? [{ role: match.role }] : [] };
@@ -363,5 +392,51 @@ describe("WorkspaceStore", () => {
     expect(await store.listRevisionsByWorkspace(mine.id)).toEqual([]);
     expect(await store.listDeliveriesByWorkspace(mine.id)).toEqual([]);
     expect(await store.listDeliveriesByWorkspace(theirs.id)).toHaveLength(1);
+  });
+  it("grants access, and re-granting changes the role instead of failing", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
+
+    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "member" });
+    expect(await store.workspaceRoleFor(ws.id, "bob")).toBe("member");
+
+    // "Add them as an admin" when they are already a member has to mean promote, not error.
+    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "admin" });
+    expect(await store.workspaceRoleFor(ws.id, "bob")).toBe("admin");
+    expect(await store.listWorkspaceMembers(ws.id)).toHaveLength(2);
+  });
+
+  it("refuses to remove the last owner, because nobody could then administer the workspace", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
+    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "admin" });
+
+    // Only owners and admins manage members, and an admin cannot promote themselves, so an
+    // ownerless workspace is permanently unadministrable.
+    expect(await store.removeWorkspaceMember(ws.id, "alice")).toBe(false);
+    expect(await store.workspaceRoleFor(ws.id, "alice")).toBe("owner");
+  });
+
+  it("removes an owner once a second owner exists", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
+    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "owner" });
+
+    expect(await store.removeWorkspaceMember(ws.id, "alice")).toBe(true);
+    expect(await store.workspaceRoleFor(ws.id, "alice")).toBeNull();
+    expect(await store.workspaceRoleFor(ws.id, "bob")).toBe("owner");
+  });
+
+  it("removes a non-owner freely and reports a member who was never there", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
+    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "viewer" });
+
+    expect(await store.removeWorkspaceMember(ws.id, "bob")).toBe(true);
+    expect(await store.removeWorkspaceMember(ws.id, "never-a-member")).toBe(false);
   });
 });
