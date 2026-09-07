@@ -112,7 +112,7 @@ const columns: readonly DataColumn<AuditLogEntry>[] = [
 
 type AuditListing = Awaited<ReturnType<typeof loadAuditLog>>;
 
-function AuditLogContent({ listing, eventType }: { listing: AuditListing; eventType: string | undefined }) {
+function AuditLogContent({ listing, eventType }: Readonly<{ listing: AuditListing; eventType: string | undefined }>) {
   if (listing.state === "not-configured") {
     return (
       <EmptyState title="Audit events are not stored">
