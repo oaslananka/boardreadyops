@@ -1,4 +1,4 @@
-import type { WorkspaceDeliveryRecord, WorkspaceMembershipRecord } from "@boardreadyops/db";
+import type { WorkspaceDeliveryRecord } from "@boardreadyops/db";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { Alert, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
+import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import { createDeliveryLinkAction } from "./actions.js";
@@ -110,9 +111,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
 
         {result.state === "ok" ? (
           <>
-            {result.workspaces.length > 1 ? (
-              <WorkspaceSwitcher workspaces={result.workspaces} selectedId={result.selected.id} />
-            ) : null}
+            <WorkspaceSwitcher workspaces={result.workspaces} selectedId={result.selected.id} basePath="/deliveries" />
 
             <Panel title={result.selected.name} description="Newest first. An expired link stops working on its own.">
               <DataTable
@@ -176,33 +175,6 @@ function CreatePanel({
         action={createDeliveryLinkAction}
       />
     </Panel>
-  );
-}
-
-function WorkspaceSwitcher({
-  workspaces,
-  selectedId,
-}: Readonly<{ workspaces: readonly WorkspaceMembershipRecord[]; selectedId: string }>) {
-  return (
-    <nav aria-label="Workspace" className="flex flex-wrap gap-2">
-      {workspaces.map((workspace) => {
-        const current = workspace.id === selectedId;
-        return (
-          <Link
-            key={workspace.id}
-            href={`/deliveries?workspace=${encodeURIComponent(workspace.id)}`}
-            aria-current={current ? "page" : undefined}
-            className={`flex min-h-11 items-center rounded-md border px-3 py-2 text-sm md:min-h-9 ${
-              current
-                ? "border-primary bg-primary/10 text-foreground"
-                : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground"
-            }`}
-          >
-            {workspace.name}
-          </Link>
-        );
-      })}
-    </nav>
   );
 }
 

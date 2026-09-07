@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, ok } from "../../lib/action-result.js";
 import { defineAction } from "../../lib/server-action.js";
+import { openWorkspaceStore } from "../../lib/workspace-store-access.js";
 
 /**
  * Minting a guest delivery link.
@@ -37,13 +38,8 @@ export const createDeliveryLinkAction = defineAction(createSchema, async (input,
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return fail("This deployment has no database configured.");
 
-  const [{ WorkspaceStore }, { createPgQueryExecutor }] = await Promise.all([
-    import("@boardreadyops/db"),
-    import("@boardreadyops/db/pg-executor"),
-  ]);
-  const executor = createPgQueryExecutor({ connectionString, max: 1 });
+  const { store, executor } = await openWorkspaceStore(connectionString);
   try {
-    const store = new WorkspaceStore(executor);
     // Same answer for "not a member" and "no such revision", so a guessed id cannot be used to
     // discover which revisions exist.
     const workspaceId = await store.workspaceIdForRevision(input.revisionId);

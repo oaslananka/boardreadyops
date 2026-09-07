@@ -93,6 +93,35 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows: [row] };
     }
 
+    if (s.includes("from revisions") && s.includes("join projects")) {
+      const workspaceId = params[0];
+      const rows = this.revisions
+        .filter((r) => this.projects.some((p) => p.id === r.project_id && p.workspace_id === workspaceId))
+        .map((r) => ({
+          ...r,
+          project_name: this.projects.find((p) => p.id === r.project_id)?.name,
+        }));
+      return { rows };
+    }
+
+    if (s.includes("from deliveries") && s.includes("join revisions")) {
+      const workspaceId = params[0];
+      const rows = this.deliveries.flatMap((d) => {
+        const revision = this.revisions.find((r) => r.id === d.revision_id);
+        const project = this.projects.find((p) => p.id === revision?.project_id);
+        if (!revision || !project || project.workspace_id !== workspaceId) return [];
+        return [
+          {
+            ...d,
+            revision_label: revision.revision_label,
+            project_id: project.id,
+            project_name: project.name,
+          },
+        ];
+      });
+      return { rows };
+    }
+
     if (s.includes("from revisions") && s.includes("where id = $1")) {
       const match = this.revisions.find((r) => r.id === params[0]);
       return { rows: match ? [match] : [] };
@@ -263,5 +292,76 @@ describe("WorkspaceStore", () => {
     expect(listed.map((workspace) => workspace.id)).toEqual([mine.id]);
     expect(listed[0]?.role).toBe("owner");
     expect(await store.listWorkspacesForUser("nobody")).toEqual([]);
+  });
+  it("lists a workspace's revisions with the project each belongs to", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "acme-admin" });
+    const project = await store.createProject({ workspaceId: ws.id, name: "Gateway board" });
+    await store.createRevisionFromUpload({
+      projectId: project.id,
+      revisionLabel: "rev C",
+      bundleSha256: "a".repeat(64),
+    });
+
+    const revisions = await store.listRevisionsByWorkspace(ws.id);
+
+    expect(revisions).toHaveLength(1);
+    // The project name is the point: a revision label alone does not say which board it is.
+    expect(revisions[0]?.projectName).toBe("Gateway board");
+    expect(revisions[0]?.revisionLabel).toBe("rev C");
+  });
+
+  it("lists a workspace's delivery links without their token hash", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "acme-admin" });
+    const project = await store.createProject({ workspaceId: ws.id, name: "Gateway board" });
+    const revision = await store.createRevisionFromUpload({
+      projectId: project.id,
+      revisionLabel: "rev C",
+      bundleSha256: "a".repeat(64),
+    });
+    await store.createDeliveryLink({
+      revisionId: revision.id,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      signedArchiveUrl: "https://storage.example.com/gateway.zip",
+      recipientNotes: "Panelised",
+    });
+
+    const deliveries = await store.listDeliveriesByWorkspace(ws.id);
+
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]).toMatchObject({
+      revisionLabel: "rev C",
+      projectName: "Gateway board",
+      signedArchiveUrl: "https://storage.example.com/gateway.zip",
+      recipientNotes: "Panelised",
+    });
+    // The hash is the one stored value a guessed guest URL could be checked against, so a
+    // listing must not carry it into a page.
+    expect(deliveries[0]).not.toHaveProperty("accessTokenHash");
+  });
+
+  it("keeps another workspace's revisions and deliveries out of both listings", async () => {
+    const db = new MockWorkspaceDb();
+    const store = new WorkspaceStore(db);
+    const mine = await store.createWorkspace({ name: "Mine", slug: "mine", ownerUserId: "me" });
+    const theirs = await store.createWorkspace({ name: "Theirs", slug: "theirs", ownerUserId: "them" });
+    const theirProject = await store.createProject({ workspaceId: theirs.id, name: "Secret board" });
+    const theirRevision = await store.createRevisionFromUpload({
+      projectId: theirProject.id,
+      revisionLabel: "R1",
+      bundleSha256: "b".repeat(64),
+    });
+    await store.createDeliveryLink({
+      revisionId: theirRevision.id,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      signedArchiveUrl: "https://storage.example.com/secret.zip",
+    });
+
+    expect(await store.listRevisionsByWorkspace(mine.id)).toEqual([]);
+    expect(await store.listDeliveriesByWorkspace(mine.id)).toEqual([]);
+    expect(await store.listDeliveriesByWorkspace(theirs.id)).toHaveLength(1);
   });
 });
