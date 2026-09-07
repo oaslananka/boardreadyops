@@ -146923,6 +146923,7 @@ function readActionInputs(workspace = process.env.GITHUB_WORKSPACE ?? process.cw
     },
     uploadSarif: boolInput("upload-sarif", true),
     uploadArtifacts: boolInput("upload-artifacts", true),
+    githubToken: getInput("github-token").trim(),
     commentPr: boolInput("comment-pr", true),
     commentFormat: commentFormatInput(getInput("comment-format") || "report"),
     artifactName: artifactName(getInput("artifact-name") || "boardreadyops"),
@@ -147113,6 +147114,9 @@ async function runAction() {
   await ensureRunnerFile(process.env.GITHUB_OUTPUT);
   await ensureRunnerFile(process.env.GITHUB_STEP_SUMMARY);
   const inputs = readActionInputs(workspace);
+  if (!process.env.GITHUB_TOKEN && inputs.githubToken) {
+    process.env.GITHUB_TOKEN = inputs.githubToken;
+  }
   const logger7 = createLogger({
     level: inputs.logLevel,
     format: inputs.logFormat,
