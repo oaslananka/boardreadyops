@@ -282,7 +282,13 @@ export async function loadPartsInventory(
   // Lowercased here so the comparison matches the lowercased columns without a per-row function
   // call, and escaped so a `%` typed into the search box is a literal percent sign.
   const search = filters.query?.trim()
-    ? filters.query.trim().toLowerCase().replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")
+    ? filters.query
+        .trim()
+        .toLowerCase()
+        // Backslash first, or the escapes added below would themselves be escaped.
+        .replaceAll("\\", String.raw`\\`)
+        .replaceAll("%", String.raw`\%`)
+        .replaceAll("_", String.raw`\_`)
     : null;
 
   const { createPgQueryExecutor } = await import("@boardreadyops/db/pg-executor");
