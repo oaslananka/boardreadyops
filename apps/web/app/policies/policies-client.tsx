@@ -416,7 +416,7 @@ function PolicyInheritanceDiagram() {
         BoardReadyOps resolves governance rules top-down with strict inheritance. Repositories inherit organization and
         team baselines. Stricter rules apply automatically; exceptions require formal review waivers.
       </p>
-      <div className="mt-4 grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
+      <div className="mt-4 grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]">
         <div className="rounded-md border border-border bg-card p-3">
           <div className="text-xs uppercase text-muted-foreground">Level 1: Global</div>
           <h4 className="text-sm font-bold text-foreground">Organization</h4>

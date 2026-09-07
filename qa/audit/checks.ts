@@ -167,28 +167,6 @@ export async function checkPrimaryTouchTargets(page: Page): Promise<TouchTargetI
     const selector = 'button, [role="button"], [role="tab"], nav a, .product-mobile-trigger';
     const issues: { selector: string; width: number; height: number }[] = [];
 
-    /** The accessible name as a checker would resolve it, so a finding names a real control. */
-    function nameOf(el: HTMLElement): string {
-      const ariaLabel = el.getAttribute("aria-label")?.trim();
-      if (ariaLabel) return ariaLabel.slice(0, 40);
-      const labelledBy = el.getAttribute("aria-labelledby");
-      if (labelledBy) {
-        const text = labelledBy
-          .split(/\s+/u)
-          .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
-          .filter(Boolean)
-          .join(" ");
-        if (text) return text.slice(0, 40);
-      }
-      return el.textContent?.trim().slice(0, 40) || el.getAttribute("title")?.trim().slice(0, 40) || el.tagName;
-    }
-
-    /** Whether a tap at (x, y) is routed to this control. */
-    function hits(el: HTMLElement, x: number, y: number): boolean {
-      const atPoint = document.elementFromPoint(x, y);
-      return atPoint !== null && (atPoint === el || el.contains(atPoint));
-    }
-
     for (const el of document.querySelectorAll<HTMLElement>(selector)) {
       const style = window.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") continue;
@@ -210,10 +188,34 @@ export async function checkPrimaryTouchTargets(page: Page): Promise<TouchTargetI
           [centreX - reach, centreY + reach],
           [centreX + reach, centreY + reach],
         ];
-        if (probes.every(([x, y]) => hits(el, x, y))) continue;
+        // A tap at every probe point must be routed to this control, or to something inside it.
+        const reachable = probes.every(([x, y]) => {
+          const atPoint = document.elementFromPoint(x, y);
+          return atPoint !== null && (atPoint === el || el.contains(atPoint));
+        });
+        if (reachable) continue;
       }
 
-      issues.push({ selector: nameOf(el), width: Math.round(rect.width), height: Math.round(rect.height) });
+      // The accessible name as a checker would resolve it, so a finding names a real control
+      // instead of falling back to the tag. Written inline rather than extracted: this whole
+      // callback is serialized into the page, so a helper cannot live outside it -- and a nested
+      // one is exactly what `typescript:S7721` objects to.
+      const labelledBy = el.getAttribute("aria-labelledby");
+      const labelledByText = labelledBy
+        ? labelledBy
+            .split(/\s+/u)
+            .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+            .filter(Boolean)
+            .join(" ")
+        : "";
+      const name =
+        el.getAttribute("aria-label")?.trim() ||
+        labelledByText ||
+        el.textContent?.trim() ||
+        el.getAttribute("title")?.trim() ||
+        el.tagName;
+
+      issues.push({ selector: name.slice(0, 40), width: Math.round(rect.width), height: Math.round(rect.height) });
     }
     return issues;
   }, touchTargetMinPx);

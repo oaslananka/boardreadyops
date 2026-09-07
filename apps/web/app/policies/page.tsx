@@ -17,7 +17,7 @@ export default function PoliciesPage() {
 
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Policies" }]}>
-      <main className="policies-page-frame mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
+      <main className="policies-page-frame mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <header>
           <h1 className="text-2xl font-bold text-foreground">Organization Governance & Release Policies</h1>
           <p className="mt-1 text-sm text-muted-foreground">

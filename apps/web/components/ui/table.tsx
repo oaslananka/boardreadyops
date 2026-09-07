@@ -18,7 +18,7 @@ export function Table({
     // A scrollable box has to be reachable by keyboard, or someone who cannot use a pointer can
     // never see the columns that overflow (axe: scrollable-region-focusable).
     <section
-      className="w-full overflow-x-auto rounded-md border border-border focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="relative w-full overflow-x-auto rounded-md border border-border focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: axe requires a scrollable region to be keyboard-reachable
       tabIndex={0}
       aria-label={scrollLabel ?? "Scrollable table"}

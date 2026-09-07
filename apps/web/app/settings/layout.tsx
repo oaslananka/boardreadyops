@@ -14,7 +14,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_1fr]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
           <SettingsNav />
 
           <section>{children}</section>

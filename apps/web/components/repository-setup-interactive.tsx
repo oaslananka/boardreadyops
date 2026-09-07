@@ -58,7 +58,7 @@ export function RepositorySetupInteractive({
                 data-selected={isSelected || undefined}
                 key={preset.id}
               >
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
                   <h3 className="text-base font-bold text-foreground">{preset.name}</h3>
                   {isSelected ? <StatusBadge value="selected" label="Selected" /> : null}
                 </div>
@@ -98,7 +98,7 @@ export function RepositorySetupInteractive({
       >
         <div className="flex flex-col gap-4">
           <article className="rounded-md border border-border bg-card p-4 transition-all">
-            <header className="flex items-center justify-between gap-2">
+            <header className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
               <div>
                 <h3 className="text-sm font-bold text-foreground">boardreadyops.yml</h3>
                 <p className="text-xs text-muted-foreground">Selected preset: {activePreset.name}</p>
@@ -120,7 +120,7 @@ export function RepositorySetupInteractive({
           </article>
 
           <article className="rounded-md border border-border bg-card p-4">
-            <header className="flex items-center justify-between gap-2">
+            <header className="flex flex-wrap items-start justify-between gap-2 [&>div]:min-w-0">
               <div>
                 <h3 className="text-sm font-bold text-foreground">.github/workflows/{workflowPath}</h3>
                 <p className="text-xs text-muted-foreground">
