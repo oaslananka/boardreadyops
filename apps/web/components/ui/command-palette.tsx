@@ -75,7 +75,9 @@ export function CommandPalette({ extraItems = [] }: Readonly<{ extraItems?: read
         label: "Open documentation",
         group: "Actions",
         hint: "docs.boardreadyops.com",
-        run: () => window.open("https://docs.boardreadyops.com", "_blank", "noreferrer"),
+        // `noopener` explicitly alongside `noreferrer`: browsers imply it, but relying on that
+        // leaves the opened page one engine quirk away from reaching back through window.opener.
+        run: () => window.open("https://docs.boardreadyops.com", "_blank", "noopener,noreferrer"),
       },
     ];
     return [...destinations, ...extraItems, ...actions];
