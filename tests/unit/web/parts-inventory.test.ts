@@ -38,7 +38,7 @@ function partRow(overrides: Record<string, unknown> = {}) {
 }
 
 /** The listing query resolves first, the unidentified-count query second. */
-function answer(parts: readonly unknown[], unidentified = 0) {
+function answer(parts: readonly unknown[], unidentified: number | string = 0) {
   query.mockReset();
   query.mockImplementation((sql: string) =>
     sql.includes("component.mpn is null")
@@ -171,6 +171,67 @@ describe("loadPartsInventory", () => {
 
     const result = await loadPartsInventory(session, {}, postgres);
     expect(result.state === "ok" && result.parts).toHaveLength(1);
+  });
+
+  it("reads the shapes the pg driver actually returns", async () => {
+    // `count(*)` and `::int` aggregates come back as strings, and timestamps as Date objects.
+    // These are the production paths, not edge cases -- the mocked-object tests above are the
+    // ones using a convenient shape.
+    answer(
+      [
+        partRow({
+          board_count: "4",
+          total_quantity: "12",
+          finding_count: "2",
+          severity_rank: "3",
+          lifecycle_observed_at: new Date("2026-08-01T00:00:00.000Z"),
+        }),
+      ],
+      "9",
+    );
+
+    const result = await loadPartsInventory(session, {}, postgres);
+
+    expect(result.state === "ok" && result.parts[0]).toMatchObject({
+      boardCount: 4,
+      totalQuantity: 12,
+      openFindingCount: 2,
+      worstSeverity: "critical",
+      lifecycleObservedAt: "2026-08-01T00:00:00.000Z",
+    });
+    expect(result.state === "ok" && result.unidentifiedComponentCount).toBe(9);
+  });
+
+  it("falls back to zero rather than NaN when a count is missing or unparseable", async () => {
+    answer([partRow({ board_count: null, total_quantity: "not a number", finding_count: undefined })]);
+
+    const result = await loadPartsInventory(session, {}, postgres);
+
+    expect(result.state === "ok" && result.parts[0]).toMatchObject({
+      boardCount: 0,
+      totalQuantity: 0,
+      openFindingCount: 0,
+    });
+  });
+
+  it("survives a board_names column that is not an array", async () => {
+    answer([partRow({ board_names: null }), partRow({ mpn_key: "b", mpn: "B", board_names: [1, "Gateway"] })]);
+
+    const result = await loadPartsInventory(session, {}, postgres);
+
+    expect(result.state === "ok" && result.parts[0]?.boardNames).toEqual([]);
+    // A non-string element is dropped rather than rendered as "1".
+    expect(result.state === "ok" && result.parts[1]?.boardNames).toEqual(["Gateway"]);
+  });
+
+  it("reports zero unidentified components when the count query returns nothing", async () => {
+    query.mockReset();
+    query.mockImplementation((sql: string) =>
+      sql.includes("component.mpn is null") ? Promise.resolve({ rows: [] }) : Promise.resolve({ rows: [] }),
+    );
+
+    const result = await loadPartsInventory(session, {}, postgres);
+    expect(result.state === "ok" && result.unidentifiedComponentCount).toBe(0);
   });
 
   it("clamps the page size", async () => {

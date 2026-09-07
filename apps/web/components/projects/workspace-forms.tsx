@@ -12,12 +12,16 @@ import { NativeSelect } from "../ui/native-select.js";
  * A slug suggestion, not a slug. The field stays editable because the generated value is only a
  * guess at what the user wants in their URLs, and it is unique-checked server-side either way.
  */
-function suggestSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/gu, "-")
-    .replaceAll(/^-+|-+$/gu, "")
-    .slice(0, 64);
+export function suggestSlug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/gu, "-")
+      // A single `-`, not `-+`: the collapse above already guarantees no runs, so the quantifier
+      // could only ever match one character while giving the engine something to backtrack over.
+      .replaceAll(/^-|-$/gu, "")
+      .slice(0, 64)
+  );
 }
 
 export function CreateWorkspaceForm({ action }: Readonly<{ action: typeof createWorkspaceAction }>) {
