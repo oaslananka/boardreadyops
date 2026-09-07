@@ -1,5 +1,6 @@
 import { AppShell } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
+import { optionalCloudPersistenceConfiguration } from "../../lib/cloud-runtime-config.js";
 import PoliciesClient from "./policies-client.js";
 
 export const metadata = {
@@ -7,7 +8,13 @@ export const metadata = {
   description: "Inheritance: Organization → Team → Repository → Review exception. No hidden precedence.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function PoliciesPage() {
+  // The server already knows whether there is anything to fetch. Telling the client spares it a
+  // request that can only answer 503, and lets the page say what is actually wrong.
+  const storageConfigured = optionalCloudPersistenceConfiguration()?.mode === "postgres";
+
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Policies" }]}>
       <main className="policies-page-frame mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
@@ -19,7 +26,7 @@ export default function PoliciesPage() {
           </p>
         </header>
 
-        <PoliciesClient />
+        <PoliciesClient storageConfigured={storageConfigured} />
       </main>
     </AppShell>
   );

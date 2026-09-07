@@ -182,6 +182,7 @@ interface PolicyBuilderProps {
 }
 
 function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, onClose }: PolicyBuilderProps) {
+  const submitLabel = editingId ? "Update Policy" : "Save Policy";
   const roleTags = draft.requiredRoles
     .split(",")
     .map((s) => s.trim())
@@ -399,7 +400,7 @@ function PolicyBuilderForm({ draft, submitting, editingId, onChange, onSubmit, o
             Cancel
           </Button>
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Saving Policy…" : editingId ? "Update Policy" : "Save Policy"}
+            {submitting ? "Saving Policy…" : submitLabel}
           </Button>
         </footer>
       </form>
@@ -458,7 +459,64 @@ function PolicyInheritanceDiagram() {
   );
 }
 
-export default function PoliciesClient() {
+function splitList(value: string): string[] {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Where a draft is sent and what it carries.
+ *
+ * PATCH cannot move a policy between scopes, so an edit omits `scope`/`scopeId` rather than
+ * sending values the endpoint would ignore, and sends explicit nulls for the two clearable
+ * fields so emptying them actually empties them.
+ */
+function policyRequest(
+  draft: DraftPolicyState,
+  editingId: string | null,
+): { url: string; method: "PATCH" | "POST"; body: Record<string, unknown> } {
+  const mutable = {
+    name: draft.name.trim(),
+    requiredChecklist: splitList(draft.requiredChecklist),
+    requiredRoles: splitList(draft.requiredRoles),
+    requireEvidencePack: draft.requireEvidencePack,
+    requireExternalReview: draft.requireExternalReview,
+  };
+
+  if (editingId) {
+    return {
+      url: `/api/v1/policies/${editingId}`,
+      method: "PATCH",
+      body: {
+        ...mutable,
+        description: draft.description.trim() || null,
+        severityGate: draft.severityGate || null,
+      },
+    };
+  }
+
+  return {
+    url: "/api/v1/policies",
+    method: "POST",
+    body: {
+      ...mutable,
+      scope: draft.scope,
+      scopeId: draft.scope === "organization" ? undefined : draft.scopeId.trim() || undefined,
+      description: draft.description.trim() || undefined,
+      severityGate: draft.severityGate || undefined,
+    },
+  };
+}
+
+function policyOutcomeMessage(draft: DraftPolicyState, editingId: string | null): string {
+  if (editingId) return `Policy "${draft.name}" updated.`;
+  if (draft.severityGate) return `Policy "${draft.name}" created and enforced.`;
+  return `Policy "${draft.name}" created (advisory only — no severity gate configured).`;
+}
+
+export default function PoliciesClient({ storageConfigured = true }: Readonly<{ storageConfigured?: boolean }>) {
   const [policies, setPolicies] = useState<PolicyRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -469,6 +527,11 @@ export default function PoliciesClient() {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const loadPolicies = useCallback(async () => {
+    if (!storageConfigured) {
+      setPolicies([]);
+      setError("This deployment has no policy storage configured, so no governance policies can be loaded or saved.");
+      return;
+    }
     try {
       const res = await fetch("/api/v1/policies");
       if (!res.ok) {
@@ -489,7 +552,7 @@ export default function PoliciesClient() {
       setError(err instanceof Error ? err.message : "Network error loading policies");
       setPolicies([]);
     }
-  }, []);
+  }, [storageConfigured]);
 
   useEffect(() => {
     void loadPolicies();
@@ -521,61 +584,32 @@ export default function PoliciesClient() {
     setError(null);
     setSuccessMessage(null);
 
-    const checklistItems = draft.requiredChecklist
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const roleItems = draft.requiredRoles
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    const payload = {
-      scope: draft.scope,
-      scopeId: draft.scope === "organization" ? undefined : draft.scopeId.trim() || undefined,
-      name: draft.name.trim(),
-      description: draft.description.trim() || undefined,
-      requiredChecklist: checklistItems,
-      requiredRoles: roleItems,
-      severityGate: draft.severityGate || undefined,
-      requireEvidencePack: draft.requireEvidencePack,
-      requireExternalReview: draft.requireExternalReview,
-    };
+    const verb = editingId ? "update" : "create";
+    const request = policyRequest(draft, editingId);
 
     try {
-      // PATCH cannot move a policy between scopes, so an edit sends only the mutable fields.
-      const { scope: _scope, scopeId: _scopeId, ...updatable } = payload;
-      const res = await fetch(editingId ? `/api/v1/policies/${editingId}` : "/api/v1/policies", {
-        method: editingId ? "PATCH" : "POST",
+      const res = await fetch(request.url, {
+        method: request.method,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          editingId
-            ? { ...updatable, description: updatable.description ?? null, severityGate: updatable.severityGate ?? null }
-            : payload,
-        ),
+        body: JSON.stringify(request.body),
       });
       const body = (await res.json().catch(() => ({}))) as { ok: boolean; policy?: PolicyRecord; error?: string };
 
       if (!res.ok || !body.ok || !body.policy) {
-        setError(body.error || `Failed to ${editingId ? "update" : "create"} policy (${res.status})`);
+        setError(body.error || `Failed to ${verb} policy (${res.status})`);
         setSubmitting(false);
         return;
       }
 
-      setSuccessMessage(
-        editingId
-          ? `Policy "${draft.name}" updated.`
-          : draft.severityGate
-            ? `Policy "${draft.name}" created and enforced.`
-            : `Policy "${draft.name}" created (advisory only — no severity gate configured).`,
-      );
+      setSuccessMessage(policyOutcomeMessage(draft, editingId));
       setDraft(emptyDraft);
       setEditingId(null);
       setShowBuilder(false);
       await loadPolicies();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Network error ${editingId ? "updating" : "creating"} policy`);
+      setError(
+        err instanceof Error ? err.message : `Network error ${verb === "update" ? "updating" : "creating"} policy`,
+      );
     } finally {
       setSubmitting(false);
     }
