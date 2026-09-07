@@ -1,6 +1,6 @@
 ---
 id: manufacturing.drill-coverage
-severity-default: high
+severity-default: medium
 applies-to:
   - pcb
 config-keys:
@@ -11,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks parsed PCB drill sizes against generated Excellon drill files.
+Compares PCB drill sizes with generated Excellon drill outputs.
 
 ## When It Fires
 
@@ -24,7 +24,7 @@ version: 1
 rules:
   manufacturing.drill-coverage:
     enabled: true
-    severity: high
+    severity: medium
 ```
 
 ## JSON Finding Details Shape

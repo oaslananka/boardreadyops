@@ -14,7 +14,7 @@ config-keys:
 
 ## What It Checks
 
-Checks an Arduino/C `#define` firmware pin header against BoardReadyOps pinmap firmware labels.
+Checks an Arduino/C `#define` firmware pin header against the BoardReadyOps pinmap.
 
 ## When It Fires
 

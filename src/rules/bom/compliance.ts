@@ -8,7 +8,10 @@ export const complianceRule = rule(
   {
     id: "bom.compliance",
     title: "BOM component compliance is missing or failing",
-    description: "Checks populated BOM components for RoHS/REACH compliance metadata.",
+    // Unlike most rules this one is opt-in (`enabled` must be set), which the description has
+    // to say -- a catalogue that lists it beside always-on rules would otherwise mislead.
+    description:
+      "Checks populated BOM components for RoHS/REACH compliance metadata. Runs only when explicitly enabled.",
     rationale: "Non-compliant or undocumented parts create regulatory and shipment risk for the assembled product.",
     defaultSeverity: "high",
     appliesTo: ["bom"],

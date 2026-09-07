@@ -2,17 +2,17 @@
 id: release.tag-matches-revision
 severity-default: high
 applies-to:
-  - manifest
   - pcb
+  - manifest
 config-keys:
-  - rules.release.tag-matches-revision.enabled
+  - GITHUB_REF_NAME
 ---
 
 # release.tag-matches-revision
 
 ## What It Checks
 
-Checks tag CI context against board revision.
+Checks tag CI context against the board revision recorded in PCB metadata.
 
 ## When It Fires
 

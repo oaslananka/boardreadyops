@@ -4,7 +4,6 @@ severity-default: medium
 applies-to:
   - bom
 config-keys:
-  - rules.bom.risk-score.enabled
   - rules.bom.risk-score.severity
   - rules.bom.risk-score.critical-severity
   - rules.bom.risk-score.high-severity
@@ -21,7 +20,7 @@ config-keys:
 
 ## What It Checks
 
-Scores each populated BOM row on missing MPN, missing manufacturer, no suppliers, and single-source-without-alternates signals.
+Scores each populated BOM row on missing MPN, missing manufacturer, no suppliers, and single-source-without-alternates signals. Emits a finding per at-risk component so release readiness reflects aggregate BOM supply-chain quality.
 
 ## When It Fires
 

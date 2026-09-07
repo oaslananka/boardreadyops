@@ -4,7 +4,6 @@ severity-default: medium
 applies-to:
   - pcb
 config-keys:
-  - rules.manufacturing.layer-stackup.enabled
   - rules.manufacturing.layer-stackup.expected-layers
 ---
 
@@ -12,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks KiCad PCB stackup layer count against expected copper layers.
+Compares the parsed PCB stackup layer count with configured expectations.
 
 ## When It Fires
 

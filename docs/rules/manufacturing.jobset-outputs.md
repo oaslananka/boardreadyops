@@ -11,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Checks enabled KiCad 10 jobset entries for their expected output files.
+Checks enabled KiCad jobset entries for their expected output files.
 
 ## When It Fires
 

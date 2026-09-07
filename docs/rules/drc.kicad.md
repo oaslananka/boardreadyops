@@ -4,15 +4,16 @@ severity-default: high
 applies-to:
   - pcb
 config-keys:
-  - rules.drc.kicad.enabled
-  - rules.drc.severity-overrides
+  - kicad-cli
+  - require-kicad
+  - rules.drc
 ---
 
 # drc.kicad
 
 ## What It Checks
 
-Runs KiCad PCB DRC and normalizes KiCad diagnostics into BoardReadyOps findings.
+Runs KiCad PCB design-rule checks and normalizes their diagnostics into findings.
 
 ## When It Fires
 

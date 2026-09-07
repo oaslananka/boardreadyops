@@ -4,15 +4,15 @@ severity-default: high
 applies-to:
   - pinmap
 config-keys:
-  - rules.pinmap.collision.enabled
-  - rules.pinmap.collision.severity
+  - pinmap
+  - projects.pinmap
 ---
 
 # pinmap.collision
 
 ## What It Checks
 
-Checks pinmap files for duplicate pin or net assignments.
+Checks pinmap files for duplicate pin and net assignments.
 
 ## When It Fires
 

@@ -1,3 +1,3 @@
 # Erc Rules
 
-- [erc.kicad](erc.kicad.md): Runs KiCad schematic ERC and normalizes KiCad diagnostics into BoardReadyOps findings.
+- [erc.kicad](erc.kicad.md): Runs KiCad schematic electrical-rule checks and normalizes their diagnostics into findings.

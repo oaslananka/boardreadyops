@@ -5,15 +5,15 @@ applies-to:
   - pinmap
   - schematic
 config-keys:
-  - rules.pinmap.verify.enabled
-  - rules.pinmap.verify.severity
+  - pinmap
+  - projects.pinmap
 ---
 
 # pinmap.verify
 
 ## What It Checks
 
-Checks configured pinmap nets against schematic net labels.
+Checks configured pinmap nets against parsed schematic net labels.
 
 ## When It Fires
 

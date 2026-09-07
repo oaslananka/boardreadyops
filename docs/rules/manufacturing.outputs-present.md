@@ -2,12 +2,9 @@
 id: manufacturing.outputs-present
 severity-default: high
 applies-to:
-  - manifest
   - pcb
+  - manifest
 config-keys:
-  - vendor.profile
-  - vendor.service
-  - vendor.required
   - rules.manufacturing.outputs-present.required
   - rules.manufacturing.outputs-present.patterns
 ---
@@ -16,7 +13,7 @@ config-keys:
 
 ## What It Checks
 
-Checks configured and vendor-profile fabrication output patterns and freshness against PCB source mtimes.
+Checks required fabrication outputs and whether they are fresh relative to PCB sources.
 
 ## When It Fires
 
