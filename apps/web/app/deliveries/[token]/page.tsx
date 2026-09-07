@@ -2,7 +2,7 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { notFound } from "next/navigation";
 import { DeliverySignoffCard } from "../../../components/delivery-signoff-card.js";
 import { AppShell, EmptyState } from "../../../components/ui.js";
-import { resolveCloudPersistenceConfiguration } from "../../../lib/cloud-runtime-config.js";
+import { optionalCloudPersistenceConfiguration } from "../../../lib/cloud-runtime-config.js";
 import { verifyDeliveryToken } from "../../../lib/delivery-auth.js";
 
 export interface DeliveryPageProps {
@@ -11,9 +11,11 @@ export interface DeliveryPageProps {
 
 export default async function DeliveryPage({ params }: Readonly<DeliveryPageProps>) {
   const { token } = await params;
-  const config = resolveCloudPersistenceConfiguration();
+  // Unset DATABASE_URL is a configuration state, not an exception: this public route should
+  // render its unavailable state rather than 500.
+  const config = optionalCloudPersistenceConfiguration();
 
-  if (config.mode !== "postgres") {
+  if (config?.mode !== "postgres") {
     return (
       <AppShell>
         <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-8" id="main-content">

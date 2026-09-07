@@ -3,7 +3,7 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { PlanComparisonCard } from "../../../components/billing/plan-comparison-card.js";
 import { Alert } from "../../../components/ui.js";
 import { resolveBillingMode } from "../../../lib/billing-mode.js";
-import { resolveCloudPersistenceConfiguration } from "../../../lib/cloud-runtime-config.js";
+import { optionalCloudPersistenceConfiguration } from "../../../lib/cloud-runtime-config.js";
 import { summarizeSubscription } from "../../../lib/subscription-summary.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 import { viewerInstallations } from "../../../lib/viewer-installations.js";
@@ -25,7 +25,11 @@ export default async function BillingSettingsPage() {
     );
   }
 
-  const config = resolveCloudPersistenceConfiguration();
+  // resolveCloudPersistenceConfiguration() throws when DATABASE_URL is unset, which is exactly
+  // the state a self-hosted operator is in before they provision Postgres -- and this page is
+  // reachable while signed in, so it crashed instead of degrading. Seat metrics simply read zero
+  // without a database; the plan tier and the tier comparison still render.
+  const config = optionalCloudPersistenceConfiguration();
   const billingMode = resolveBillingMode();
   let current = 0;
   let forecast = 0;
@@ -36,7 +40,7 @@ export default async function BillingSettingsPage() {
   // paying customer was told they were on the free plan.
   const subscription = summarizeSubscription(await viewerInstallations(viewer.session, "nexar"));
 
-  if (config.mode === "postgres") {
+  if (config?.mode === "postgres") {
     const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
     try {
       const store = new BillingStore(executor);

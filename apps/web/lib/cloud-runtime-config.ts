@@ -55,6 +55,25 @@ export function resolveCloudPersistenceConfiguration(
   return { mode, databaseUrl };
 }
 
+/**
+ * The same configuration, but `undefined` instead of a throw when `DATABASE_URL` is simply
+ * unset.
+ *
+ * Pages are reachable in that state — it is what a self-hosted operator is in before they
+ * provision Postgres — and a page that throws there returns a 500 instead of rendering what it
+ * can. Callers that genuinely require a database should still use the throwing form.
+ */
+export function optionalCloudPersistenceConfiguration(
+  environment: NodeJS.ProcessEnv = process.env,
+): CloudPersistenceConfiguration | undefined {
+  try {
+    return resolveCloudPersistenceConfiguration(environment);
+  } catch (error) {
+    if (error instanceof CloudRuntimeConfigurationError && error.code === "missing-database-url") return undefined;
+    throw error;
+  }
+}
+
 export type ControlPlaneRetentionConfiguration = {
   webhookInboxDays: number;
   ephemeralRecordsDays: number;
