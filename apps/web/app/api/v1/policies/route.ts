@@ -1,7 +1,7 @@
 import { ReviewPolicyStore } from "@boardreadyops/db";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
-import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
+import { optionalCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
 import { viewerAuthorization } from "../../../../lib/viewer-authorization.js";
 
 export const runtime = "nodejs";
@@ -24,8 +24,8 @@ export async function GET(): Promise<Response> {
     return Response.json({ ok: false, error: "authentication required" }, { status: 401 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
+  const config = optionalCloudPersistenceConfiguration();
+  if (config?.mode !== "postgres") {
     return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
   }
 
@@ -62,8 +62,8 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "scopeId is required for team/repository scope" }, { status: 400 });
   }
 
-  const config = resolveCloudPersistenceConfiguration();
-  if (config.mode !== "postgres") {
+  const config = optionalCloudPersistenceConfiguration();
+  if (config?.mode !== "postgres") {
     return Response.json({ ok: false, error: "Database not configured" }, { status: 503 });
   }
 

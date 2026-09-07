@@ -33,6 +33,7 @@ export function TokenCreateForm({
   const [formKey, setFormKey] = useState(0);
   const nameId = useId();
   const expiryId = useId();
+  const scopeId = useId();
   const titleId = useId();
 
   function close() {
@@ -71,19 +72,20 @@ export function TokenCreateForm({
             <fieldset className="flex flex-col gap-2">
               <legend className="text-meta font-medium text-foreground">Scopes</legend>
               {scopeOptions.map((scope) => (
-                <label key={scope.value} className="flex items-start gap-2 text-sm">
+                <div key={scope.value} className="flex items-start gap-2 text-sm">
                   <input
+                    id={`${scopeId}-${scope.value}`}
                     type="checkbox"
                     name="scopes"
                     value={scope.value}
                     defaultChecked={scope.value !== "admin"}
                     className={`${checkboxClassName} mt-0.5`}
                   />
-                  <span>
+                  <label htmlFor={`${scopeId}-${scope.value}`}>
                     <code className="font-mono">{scope.label}</code>
                     <span className="block text-meta text-muted-foreground">{scope.hint}</span>
-                  </span>
-                </label>
+                  </label>
+                </div>
               ))}
               {fieldError(state, "scopes") ? (
                 <p className="text-meta text-danger">{fieldError(state, "scopes")}</p>
@@ -141,7 +143,7 @@ export function TokenCreateForm({
                 checked={acknowledged}
                 onChange={(event) => setAcknowledged(event.target.checked)}
               />
-              I have saved this token somewhere safe
+              <span>I have saved this token somewhere safe</span>
             </label>
             <div className="modal-footer flex justify-end">
               <Button type="button" disabled={!acknowledged} onClick={close}>

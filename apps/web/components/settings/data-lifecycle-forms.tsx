@@ -88,7 +88,7 @@ export function ErasureRequestForm({
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" name="dryRun" defaultChecked className={`${checkboxClassName} mt-0.5`} />
             <span>
-              Preview what would be deleted
+              <span className="block">Preview what would be deleted</span>
               <span className="block text-meta text-muted-foreground">
                 Records the request and reports the scope without removing anything.
               </span>

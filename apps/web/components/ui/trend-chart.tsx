@@ -26,7 +26,7 @@ export function TrendChart({
   caption,
   valueLabel,
   periodLabel = "Period",
-  formatValue = (value: number) => String(value),
+  formatValue = String,
   className,
 }: Readonly<{
   points: readonly TrendPoint[];

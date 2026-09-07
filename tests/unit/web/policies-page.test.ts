@@ -161,7 +161,7 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
       },
     } as viewerAuth.ViewerAuthorizationResult);
 
-    vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
+    vi.spyOn(cloudConfig, "optionalCloudPersistenceConfiguration").mockReturnValue({
       mode: "postgres",
       databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
     });
@@ -184,7 +184,7 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
       },
     } as viewerAuth.ViewerAuthorizationResult);
 
-    vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
+    vi.spyOn(cloudConfig, "optionalCloudPersistenceConfiguration").mockReturnValue({
       mode: "postgres",
       databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
     });
@@ -247,7 +247,7 @@ describe("Organization Policies Page & Server-Authoritative Management", () => {
       },
     } as viewerAuth.ViewerAuthorizationResult);
 
-    vi.spyOn(cloudConfig, "resolveCloudPersistenceConfiguration").mockReturnValue({
+    vi.spyOn(cloudConfig, "optionalCloudPersistenceConfiguration").mockReturnValue({
       mode: "postgres",
       databaseUrl: "postgresql://postgres:postgres@localhost:5432/boardreadyops",
     });

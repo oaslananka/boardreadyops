@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "../../../components/ui/button.js";
-import { DataTable } from "../../../components/ui/data-table.js";
+import { type DataColumn, DataTable } from "../../../components/ui/data-table.js";
 import { Alert, EmptyState, StatusBadge } from "../../../components/ui.js";
 import { type DeadLetterListItem, formatFailureReason, formatTimestamp } from "./dead-letter-view-model.js";
 
@@ -24,6 +24,77 @@ export type DeadLettersPanelProps = {
 
 function rowKey(item: DeadLetterListItem): string {
   return `${item.itemType}:${item.itemId}`;
+}
+
+/**
+ * Built by a factory rather than inline in the component: the `cell` renderers close over the
+ * replay state, but defining them in the render body makes every one of them look like a nested
+ * component definition to a static analyser — and remounts them on each render.
+ */
+function deadLetterColumns(
+  replayState: Readonly<Record<string, ReplayRowState | undefined>>,
+  onReplay: (item: DeadLetterListItem) => void,
+): readonly DataColumn<DeadLetterListItem>[] {
+  return [
+    {
+      id: "item",
+      header: "Item",
+      rowHeader: true,
+      cell: (item) => (
+        <>
+          <StatusBadge value="dead_letter" label={item.itemType} />
+          <div className="mt-1">
+            <code className="font-mono text-meta">{item.itemId}</code>
+          </div>
+        </>
+      ),
+    },
+    { id: "run", header: "Run", cell: (item) => item.releaseRunId ?? "—" },
+    {
+      id: "scope",
+      header: "Installation / Repository",
+      cell: (item) => (
+        <>
+          <div>{item.installationId}</div>
+          {item.repositoryFullName ? (
+            <div className="text-meta text-muted-foreground">{item.repositoryFullName}</div>
+          ) : null}
+        </>
+      ),
+    },
+    { id: "reason", header: "Failure reason", cell: (item) => formatFailureReason(item) },
+    {
+      id: "attempts",
+      header: "Attempts",
+      align: "end",
+      cell: (item) => <span className="tabular-nums">{item.attemptCount}</span>,
+    },
+    { id: "failed-at", header: "Failed at", cell: (item) => formatTimestamp(item.failedAt) },
+    {
+      id: "action",
+      header: "Action",
+      cell: (item) => {
+        const replay = replayState[rowKey(item)];
+        if (!item.replaySafe) return <StatusBadge value="blocked" label="Not replayable" />;
+        return (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={replay?.status === "pending"}
+              onClick={() => onReplay(item)}
+            >
+              {replay?.status === "pending" ? "Replaying…" : "Replay"}
+            </Button>
+            {replay && replay.status !== "pending" ? (
+              <div className="mt-1 text-meta text-muted-foreground">{replay.message}</div>
+            ) : null}
+          </>
+        );
+      },
+    },
+  ];
 }
 
 export function DeadLettersPanel({
@@ -71,66 +142,7 @@ export function DeadLettersPanel({
     <>
       <DataTable
         caption="Dead-lettered jobs and outbox records"
-        columns={[
-          {
-            id: "item",
-            header: "Item",
-            rowHeader: true,
-            cell: (item) => (
-              <>
-                <StatusBadge value="dead_letter" label={item.itemType} />
-                <div className="mt-1">
-                  <code className="font-mono text-meta">{item.itemId}</code>
-                </div>
-              </>
-            ),
-          },
-          { id: "run", header: "Run", cell: (item) => item.releaseRunId ?? "—" },
-          {
-            id: "scope",
-            header: "Installation / Repository",
-            cell: (item) => (
-              <>
-                <div>{item.installationId}</div>
-                {item.repositoryFullName ? (
-                  <div className="text-meta text-muted-foreground">{item.repositoryFullName}</div>
-                ) : null}
-              </>
-            ),
-          },
-          { id: "reason", header: "Failure reason", cell: (item) => formatFailureReason(item) },
-          {
-            id: "attempts",
-            header: "Attempts",
-            align: "end",
-            cell: (item) => <span className="tabular-nums">{item.attemptCount}</span>,
-          },
-          { id: "failed-at", header: "Failed at", cell: (item) => formatTimestamp(item.failedAt) },
-          {
-            id: "action",
-            header: "Action",
-            cell: (item) => {
-              const replay = replayState[rowKey(item)];
-              if (!item.replaySafe) return <StatusBadge value="blocked" label="Not replayable" />;
-              return (
-                <>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={replay?.status === "pending"}
-                    onClick={() => onReplay(item)}
-                  >
-                    {replay?.status === "pending" ? "Replaying…" : "Replay"}
-                  </Button>
-                  {replay && replay.status !== "pending" ? (
-                    <div className="mt-1 text-meta text-muted-foreground">{replay.message}</div>
-                  ) : null}
-                </>
-              );
-            },
-          },
-        ]}
+        columns={deadLetterColumns(replayState, onReplay)}
         rows={items}
         rowKey={rowKey}
         empty={null}
