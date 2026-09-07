@@ -2,6 +2,7 @@ import { type ApiTokenScope, ApiTokenStore } from "@boardreadyops/db";
 import { createPgQueryExecutor, type PgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { checkAuthRateLimit, clientIdentifierFromRequest, recordFailedAuthAttempt } from "./auth-rate-limit.js";
 import { resolveCloudPersistenceConfiguration } from "./cloud-runtime-config.js";
+import { notCancelledSubscription } from "./tenant-scope.js";
 import { viewerAuthorization } from "./viewer-authorization.js";
 
 export interface AuthenticatedApiContext {
@@ -138,18 +139,7 @@ export async function resolveRepositoryApiContext(
         where repositories.id = $1
           and repositories.disabled_at is null
           and installations.suspended_at is null
-          and not exists (
-            select 1
-              from github_marketplace_subscriptions
-             where github_marketplace_subscriptions.status = 'canceled'
-               and (
-                 github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
-                 or (
-                   github_marketplace_subscriptions.github_installation_id is null
-                   and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
-                 )
-               )
-          )
+          and ${notCancelledSubscription}
         limit 1`,
       [repositoryId],
     );
@@ -205,18 +195,7 @@ export async function resolveReviewApiContext(
         where reviews.id = $1
           and repositories.disabled_at is null
           and installations.suspended_at is null
-          and not exists (
-            select 1
-              from github_marketplace_subscriptions
-             where github_marketplace_subscriptions.status = 'canceled'
-               and (
-                 github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
-                 or (
-                   github_marketplace_subscriptions.github_installation_id is null
-                   and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
-                 )
-               )
-          )
+          and ${notCancelledSubscription}
         limit 1`,
       [reviewId],
     );

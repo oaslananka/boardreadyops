@@ -1,5 +1,6 @@
 import { componentKey } from "@boardreadyops/cloud-core";
 import { reviewFixturesEnabled } from "./review-listing.js";
+import { notCancelledSubscription } from "./tenant-scope.js";
 import type { UserSession } from "./user-session.js";
 
 /**
@@ -132,18 +133,7 @@ const partsInventoryQuery = `
        and repositories.disabled_at is null
        and installations.suspended_at is null
        and boards.archived_at is null
-       and not exists (
-         select 1
-           from github_marketplace_subscriptions
-          where github_marketplace_subscriptions.status = 'canceled'
-            and (
-              github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
-              or (
-                github_marketplace_subscriptions.github_installation_id is null
-                and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
-              )
-            )
-       )
+       and ${notCancelledSubscription}
   ),
   latest_snapshot as (
     select distinct on (snapshot.board_id)
@@ -242,18 +232,7 @@ const unidentifiedCountQuery = `
        and repositories.disabled_at is null
        and installations.suspended_at is null
        and boards.archived_at is null
-       and not exists (
-         select 1
-           from github_marketplace_subscriptions
-          where github_marketplace_subscriptions.status = 'canceled'
-            and (
-              github_marketplace_subscriptions.github_installation_id = installations.github_installation_id
-              or (
-                github_marketplace_subscriptions.github_installation_id is null
-                and lower(github_marketplace_subscriptions.account_login) = lower(installations.account_login)
-              )
-            )
-       )
+       and ${notCancelledSubscription}
   ),
   latest_snapshot as (
     select distinct on (snapshot.board_id) snapshot.id, snapshot.board_id
