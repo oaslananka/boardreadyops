@@ -8,13 +8,18 @@ import { buttonVariants } from "./ui/button.js";
 import { Switch } from "./ui/switch.js";
 
 export type ThemeToggleProps = {
-  variant?: "switch" | "button";
+  variant?: "switch" | "button" | "nav-row";
   className?: string;
 };
 
 /**
- * Theme toggle supporting both an icon button variant (for headers) and a switch variant (for sidebars).
- * Defaults to dark theme if unset.
+ * Theme toggle in three presentations: an icon button (headers), a switch (dense surfaces), and a
+ * navigation row that matches the links beside it. Defaults to dark theme if unset.
+ *
+ * `nav-row` exists because the switch is 32x18 -- under the 44px touch minimum, and under WCAG
+ * 2.5.8's 24px floor as well -- which the route audit flagged on mobile. A switch cannot simply be
+ * grown: its own box paints the track, so padding distorts the control. Sitting among full-width
+ * 44px rows it was also the odd one out, so the sidebar uses a row that states the action.
  */
 export function ThemeToggle({ variant = "switch", className }: Readonly<ThemeToggleProps>) {
   const { resolvedTheme, setTheme } = useTheme();
@@ -43,6 +48,23 @@ export function ThemeToggle({ variant = "switch", className }: Readonly<ThemeTog
   }
 
   const isDark = resolvedTheme === "dark";
+
+  if (variant === "nav-row") {
+    return (
+      <button
+        type="button"
+        onClick={() => setTheme(isDark ? "light" : "dark")}
+        title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+        className={cn(
+          "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent md:min-h-9",
+          className,
+        )}
+      >
+        {isDark ? <Sun className="size-4 shrink-0" /> : <Moon className="size-4 shrink-0" />}
+        <span>{isDark ? "Switch to light" : "Switch to dark"}</span>
+      </button>
+    );
+  }
 
   if (variant === "button") {
     return (

@@ -23,7 +23,9 @@ export function SettingsNav() {
             <li key={dest.href}>
               <Link
                 href={dest.href}
-                className={`settings-nav-link block rounded-sm px-3 py-2 text-sm ${current ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+                // 44px on touch, back to the compact 36px once a pointer is precise -- the same
+                // rule the product navigation rows follow.
+                className={`settings-nav-link flex min-h-11 items-center rounded-sm px-3 py-2 text-sm md:min-h-9 ${current ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
                 aria-current={current ? "page" : undefined}
               >
                 {dest.label}

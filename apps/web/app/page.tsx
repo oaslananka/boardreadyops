@@ -252,7 +252,10 @@ export default function HomePage() {
           <BrandMarkIcon size={24} />
           <span>BoardReadyOps</span>
         </Link>
-        <nav aria-label="Global navigation" className="flex items-center gap-6 text-sm">
+        <nav
+          aria-label="Global navigation"
+          className="flex items-center gap-6 text-sm [&>a]:flex [&>a]:min-h-11 [&>a]:min-w-11 [&>a]:items-center [&>a]:justify-center md:[&>a]:min-h-0 md:[&>a]:min-w-0"
+        >
           <a href="#product" className="text-muted-foreground hover:text-foreground">
             Product
           </a>
@@ -271,7 +274,7 @@ export default function HomePage() {
           <a href="https://docs.boardreadyops.com" className="text-muted-foreground hover:text-foreground">
             Docs
           </a>
-          <ThemeToggle variant="button" />
+          <ThemeToggle variant="button" className="size-11 md:size-9" />
           {/* Suspended so reading the session never delays the landing navigation. */}
           <Suspense fallback={null}>
             <LandingNavActions />
@@ -617,7 +620,10 @@ export default function HomePage() {
                 </div>
               ))}
             </dl>
-            <nav className="mt-8 flex flex-wrap gap-4 text-sm" aria-label="Technical discovery references">
+            <nav
+              className="mt-8 flex flex-wrap gap-4 text-sm [&_a]:flex [&_a]:min-h-11 [&_a]:items-center md:[&_a]:min-h-0"
+              aria-label="Technical discovery references"
+            >
               <a href="https://docs.boardreadyops.com" className="text-primary hover:underline">
                 Read the documentation
               </a>

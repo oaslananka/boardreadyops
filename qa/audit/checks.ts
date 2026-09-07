@@ -148,23 +148,72 @@ const touchTargetMinPx = 44;
 export type TouchTargetIssue = { selector: string; width: number; height: number };
 
 /**
- * Flags primary interactive controls under 44x44px. Deliberately scoped to buttons and
- * role="button"/"tab" elements plus nav links, not every inline text link -- per the audit
- * brief, a small inline link isn't a blocker the way an undersized primary action button is.
+ * Flags primary interactive controls whose tap target is under 44x44px. Deliberately scoped to
+ * buttons and role="button"/"tab" elements plus nav links, not every inline text link -- per the
+ * audit brief, a small inline link isn't a blocker the way an undersized primary action button is.
+ *
+ * The target is the region a finger can actually hit, not the element's own border box. A control
+ * may be drawn small on purpose and still be comfortable to tap, because a transparent
+ * pseudo-element, padding on a wrapping hit area, or an overlay stretches the region that routes
+ * a tap to it -- which is what WCAG 2.5.8 measures. Reading `getBoundingClientRect()` alone
+ * reported those as failures and, worse, passed controls that merely *look* big while something
+ * else sits on top of them.
+ *
+ * So: probe the corners and centre of the required box with `elementFromPoint`. If every point
+ * lands on the control (or inside it), the target is big enough however it was built.
  */
 export async function checkPrimaryTouchTargets(page: Page): Promise<TouchTargetIssue[]> {
   return page.evaluate((minSize) => {
     const selector = 'button, [role="button"], [role="tab"], nav a, .product-mobile-trigger';
     const issues: { selector: string; width: number; height: number }[] = [];
+
+    /** The accessible name as a checker would resolve it, so a finding names a real control. */
+    function nameOf(el: HTMLElement): string {
+      const ariaLabel = el.getAttribute("aria-label")?.trim();
+      if (ariaLabel) return ariaLabel.slice(0, 40);
+      const labelledBy = el.getAttribute("aria-labelledby");
+      if (labelledBy) {
+        const text = labelledBy
+          .split(/\s+/u)
+          .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+          .filter(Boolean)
+          .join(" ");
+        if (text) return text.slice(0, 40);
+      }
+      return el.textContent?.trim().slice(0, 40) || el.getAttribute("title")?.trim().slice(0, 40) || el.tagName;
+    }
+
+    /** Whether a tap at (x, y) is routed to this control. */
+    function hits(el: HTMLElement, x: number, y: number): boolean {
+      const atPoint = document.elementFromPoint(x, y);
+      return atPoint !== null && (atPoint === el || el.contains(atPoint));
+    }
+
     for (const el of document.querySelectorAll<HTMLElement>(selector)) {
       const style = window.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") continue;
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) continue;
-      if (rect.width < minSize || rect.height < minSize) {
-        const label = el.getAttribute("aria-label") || el.textContent?.trim().slice(0, 40) || el.tagName;
-        issues.push({ selector: label, width: Math.round(rect.width), height: Math.round(rect.height) });
+      if (rect.width >= minSize && rect.height >= minSize) continue;
+
+      // A control scrolled out of view cannot be probed by point; fall back to its own box.
+      const centreX = rect.left + rect.width / 2;
+      const centreY = rect.top + rect.height / 2;
+      const offScreen = centreX < 0 || centreY < 0 || centreX > window.innerWidth || centreY > window.innerHeight;
+
+      if (!offScreen) {
+        const reach = minSize / 2 - 1;
+        const probes: [number, number][] = [
+          [centreX, centreY],
+          [centreX - reach, centreY - reach],
+          [centreX + reach, centreY - reach],
+          [centreX - reach, centreY + reach],
+          [centreX + reach, centreY + reach],
+        ];
+        if (probes.every(([x, y]) => hits(el, x, y))) continue;
       }
+
+      issues.push({ selector: nameOf(el), width: Math.round(rect.width), height: Math.round(rect.height) });
     }
     return issues;
   }, touchTargetMinPx);

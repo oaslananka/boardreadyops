@@ -45,7 +45,9 @@ function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunV
             <Link
               href={`/runs/${runId}${item.suffix}`}
               aria-current={active === item.view ? "page" : undefined}
-              className={`block border-b-2 px-3 py-2 text-sm font-medium ${active === item.view ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              // 44px on touch, the designed 38px from `md:` up. The strip is a row of small
+              // targets sitting close together, which is the case the minimum exists for.
+              className={`flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium md:min-h-0 ${active === item.view ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {item.label}
             </Link>
@@ -450,7 +452,12 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
             {run.setupWorkflowContractVersion ? `v${run.setupWorkflowContractVersion}` : "Not recorded"}
           </Definition>
         </DefinitionGrid>
-        <nav className="mt-3 flex flex-wrap gap-4 text-sm" aria-label="Open this run in GitHub">
+        {/* The links are the only way out to GitHub from this page, so they get the touch
+            minimum; `[&_a]` keeps it in one place rather than on each of the four. */}
+        <nav
+          className="mt-3 flex flex-wrap gap-4 text-sm [&_a]:flex [&_a]:min-h-11 [&_a]:items-center md:[&_a]:min-h-0"
+          aria-label="Open this run in GitHub"
+        >
           <a
             href={`${githubRepositoryBaseUrl(run)}/commit/${encodeURIComponent(run.commitSha)}`}
             className="text-primary hover:underline"

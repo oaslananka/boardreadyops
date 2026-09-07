@@ -85,15 +85,28 @@ export function ErasureRequestForm({
         <>
           <ScopeFields idPrefix={idPrefix} />
 
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" name="dryRun" defaultChecked className={`${checkboxClassName} mt-0.5`} />
+          {/* An explicit htmlFor/id pair rather than containment: the text sits two <span> levels
+              deep, which is ambiguous to a checker and leaves the accessible name to the browser's
+              own guess. The description is tied on with aria-describedby so it is announced as
+              detail rather than folded into the name. */}
+          <div className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              id={`${idPrefix}-dry-run`}
+              name="dryRun"
+              defaultChecked
+              className={`${checkboxClassName} mt-0.5`}
+              aria-describedby={`${idPrefix}-dry-run-hint`}
+            />
             <span>
-              <span className="block">Preview what would be deleted</span>
-              <span className="block text-meta text-muted-foreground">
+              <label className="block" htmlFor={`${idPrefix}-dry-run`}>
+                Preview what would be deleted
+              </label>
+              <span id={`${idPrefix}-dry-run-hint`} className="block text-meta text-muted-foreground">
                 Records the request and reports the scope without removing anything.
               </span>
             </span>
-          </label>
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-meta font-medium text-foreground" htmlFor={`${idPrefix}-confirm`}>
