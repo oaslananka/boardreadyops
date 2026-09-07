@@ -41,6 +41,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
   {
     label: "Govern",
     items: [
+      { label: "Rules", href: "/rules", icon: "policies" },
       { label: "Policies", href: "/policies", icon: "policies" },
       { label: "Evidence", href: "/evidence", icon: "evidence" },
       { label: "Insights", href: "/insights", icon: "insights" },
