@@ -106,75 +106,170 @@ function validateBranchName(branchName: string, defaultBranch: string): void {
   }
 }
 
+function validateMutationFiles(files: MutationFile[]): void {
+  if (!files || files.length === 0) {
+    throw new Error("mutation requires at least one file");
+  }
+
+  for (const file of files) {
+    if (!isAllowedMutationPath(file.path)) {
+      throw new Error(`path "${file.path}" is not in the allowed repository-mutation allowlist`);
+    }
+  }
+}
+
+async function resolveBaseTreeSha(
+  client: GitHubMutationApiClient,
+  repoPath: string,
+  defaultBranch: string,
+): Promise<{ baseCommitSha: string; baseTreeSha: string }> {
+  const defaultRefRes = await client.request<{ object: { sha: string } }>(
+    `${repoPath}/git/ref/heads/${encodeURIComponent(defaultBranch)}`,
+  );
+  if (!defaultRefRes.ok || !defaultRefRes.data?.object?.sha) {
+    throw new Error(`failed to resolve default branch "${defaultBranch}" commit SHA`);
+  }
+  const baseCommitSha = defaultRefRes.data.object.sha;
+
+  const baseCommitRes = await client.request<{ tree: { sha: string } }>(
+    `${repoPath}/git/commits/${encodeURIComponent(baseCommitSha)}`,
+  );
+  if (!baseCommitRes.ok || !baseCommitRes.data?.tree?.sha) {
+    throw new Error(`failed to resolve tree SHA for base commit "${baseCommitSha}"`);
+  }
+  return { baseCommitSha, baseTreeSha: baseCommitRes.data.tree.sha };
+}
+
+async function resolveBranchState(
+  client: GitHubMutationApiClient,
+  repoPath: string,
+  branchName: string,
+): Promise<{ branchExists: boolean; existingCommitSha?: string | undefined; existingTreeSha?: string | undefined }> {
+  const targetBranchRefPath = branchName.split("/").map(encodeURIComponent).join("/");
+  const targetRefRes = await client.request<{ object: { sha: string } }>(
+    `${repoPath}/git/ref/heads/${targetBranchRefPath}`,
+  );
+  const branchExists = targetRefRes.status === 200 && Boolean(targetRefRes.data?.object?.sha);
+  if (!branchExists) {
+    return { branchExists: false };
+  }
+
+  const existingCommitSha = targetRefRes.data?.object?.sha;
+  let existingTreeSha: string | undefined;
+  if (existingCommitSha) {
+    const commitRes = await client.request<{ tree: { sha: string } }>(
+      `${repoPath}/git/commits/${encodeURIComponent(existingCommitSha)}`,
+    );
+    if (commitRes.ok && commitRes.data?.tree?.sha) {
+      existingTreeSha = commitRes.data.tree.sha;
+    }
+  }
+  return { branchExists: true, existingCommitSha, existingTreeSha };
+}
+
+async function resolveOpenPr(
+  client: GitHubMutationApiClient,
+  repoPath: string,
+  owner: string,
+  branchName: string,
+  defaultBranch: string,
+): Promise<{ number: number; html_url: string } | undefined> {
+  const pullsRes = await client.request<Array<{ number: number; html_url: string; state: string }>>(
+    `${repoPath}/pulls?head=${encodeURIComponent(owner)}:${encodeURIComponent(branchName)}&base=${encodeURIComponent(defaultBranch)}&state=open`,
+  );
+  if (pullsRes.ok && Array.isArray(pullsRes.data) && pullsRes.data.length > 0) {
+    const first = pullsRes.data[0];
+    if (first) {
+      return { number: first.number, html_url: first.html_url };
+    }
+  }
+  return undefined;
+}
+
+async function updateOrCreateBranchRef(
+  client: GitHubMutationApiClient,
+  repoPath: string,
+  branchName: string,
+  branchExists: boolean,
+  newCommitSha: string,
+): Promise<void> {
+  const targetBranchRefPath = branchName.split("/").map(encodeURIComponent).join("/");
+  if (branchExists) {
+    const updateRefRes = await client.request(`${repoPath}/git/refs/heads/${targetBranchRefPath}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        sha: newCommitSha,
+        force: false,
+      }),
+    });
+    if (!updateRefRes.ok) {
+      throw new Error(`failed to update branch ref "${branchName}"`);
+    }
+  } else {
+    const createRefRes = await client.request(`${repoPath}/git/refs`, {
+      method: "POST",
+      body: JSON.stringify({
+        ref: `refs/heads/${branchName}`,
+        sha: newCommitSha,
+      }),
+    });
+    if (!createRefRes.ok) {
+      throw new Error(`failed to create branch ref "${branchName}"`);
+    }
+  }
+}
+
+async function ensurePullRequest(
+  client: GitHubMutationApiClient,
+  repoPath: string,
+  input: ExecuteMutationInput,
+  existingPr: { number: number; html_url: string } | undefined,
+): Promise<{ pullRequestNumber: number; pullRequestUrl: string; outcome: "created" | "updated" }> {
+  if (existingPr) {
+    return {
+      pullRequestNumber: existingPr.number,
+      pullRequestUrl: existingPr.html_url,
+      outcome: "updated",
+    };
+  }
+
+  const createPrRes = await client.request<{ number: number; html_url: string }>(`${repoPath}/pulls`, {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.prTitle,
+      body: input.prBody,
+      head: input.branchName,
+      base: input.defaultBranch,
+    }),
+  });
+  if (!createPrRes.ok || !createPrRes.data?.number || !createPrRes.data?.html_url) {
+    throw new Error("failed to open pull request for mutation");
+  }
+  return {
+    pullRequestNumber: createPrRes.data.number,
+    pullRequestUrl: createPrRes.data.html_url,
+    outcome: "created",
+  };
+}
+
 export function createGitHubMutationService(dependencies: GitHubMutationServiceDependencies): GitHubMutationService {
   const { client } = dependencies;
 
   return {
     async execute(input: ExecuteMutationInput): Promise<MutationResult> {
       validateBranchName(input.branchName, input.defaultBranch);
-
-      if (!input.files || input.files.length === 0) {
-        throw new Error("mutation requires at least one file");
-      }
-
-      for (const file of input.files) {
-        if (!isAllowedMutationPath(file.path)) {
-          throw new Error(`path "${file.path}" is not in the allowed repository-mutation allowlist`);
-        }
-      }
+      validateMutationFiles(input.files);
 
       const repoPath = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}`;
 
-      // 1. Get default branch commit SHA
-      const defaultRefRes = await client.request<{ object: { sha: string } }>(
-        `${repoPath}/git/ref/heads/${encodeURIComponent(input.defaultBranch)}`,
+      const { baseCommitSha, baseTreeSha } = await resolveBaseTreeSha(client, repoPath, input.defaultBranch);
+      const { branchExists, existingCommitSha, existingTreeSha } = await resolveBranchState(
+        client,
+        repoPath,
+        input.branchName,
       );
-      if (!defaultRefRes.ok || !defaultRefRes.data?.object?.sha) {
-        throw new Error(`failed to resolve default branch "${input.defaultBranch}" commit SHA`);
-      }
-      const baseCommitSha = defaultRefRes.data.object.sha;
+      const existingPr = await resolveOpenPr(client, repoPath, input.owner, input.branchName, input.defaultBranch);
 
-      // 2. Get base tree SHA from base commit
-      const baseCommitRes = await client.request<{ tree: { sha: string } }>(
-        `${repoPath}/git/commits/${encodeURIComponent(baseCommitSha)}`,
-      );
-      if (!baseCommitRes.ok || !baseCommitRes.data?.tree?.sha) {
-        throw new Error(`failed to resolve tree SHA for base commit "${baseCommitSha}"`);
-      }
-      const baseTreeSha = baseCommitRes.data.tree.sha;
-
-      // 3. Check if target branch already exists
-      const targetBranchRefPath = input.branchName.split("/").map(encodeURIComponent).join("/");
-      const targetRefRes = await client.request<{ object: { sha: string } }>(
-        `${repoPath}/git/ref/heads/${targetBranchRefPath}`,
-      );
-      const branchExists = targetRefRes.status === 200 && Boolean(targetRefRes.data?.object?.sha);
-      let existingCommitSha: string | undefined;
-      let existingTreeSha: string | undefined;
-
-      if (branchExists) {
-        existingCommitSha = targetRefRes.data.object.sha;
-        const existingCommitRes = await client.request<{ tree: { sha: string } }>(
-          `${repoPath}/git/commits/${encodeURIComponent(existingCommitSha)}`,
-        );
-        if (existingCommitRes.ok && existingCommitRes.data?.tree?.sha) {
-          existingTreeSha = existingCommitRes.data.tree.sha;
-        }
-      }
-
-      // 4. Check for existing open pull request
-      let existingPr: { number: number; html_url: string } | undefined;
-      const pullsRes = await client.request<Array<{ number: number; html_url: string; state: string }>>(
-        `${repoPath}/pulls?head=${encodeURIComponent(input.owner)}:${encodeURIComponent(input.branchName)}&base=${encodeURIComponent(input.defaultBranch)}&state=open`,
-      );
-      if (pullsRes.ok && Array.isArray(pullsRes.data) && pullsRes.data.length > 0) {
-        const first = pullsRes.data[0];
-        if (first) {
-          existingPr = { number: first.number, html_url: first.html_url };
-        }
-      }
-
-      // 5. Create new Git tree
       const treeItems = input.files.map((f) => ({
         path: f.path,
         mode: "100644",
@@ -194,7 +289,6 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
       }
       const newTreeSha = newTreeRes.data.sha;
 
-      // 6. Idempotency check: if branch exists, tree is identical, and open PR exists -> return already_exists
       if (branchExists && existingTreeSha === newTreeSha && existingPr) {
         return {
           outcome: "already_exists",
@@ -205,7 +299,6 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
         };
       }
 
-      // 7. Create Git commit
       const parentSha = branchExists && existingCommitSha ? existingCommitSha : baseCommitSha;
       const newCommitRes = await client.request<{ sha: string }>(`${repoPath}/git/commits`, {
         method: "POST",
@@ -220,57 +313,13 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
       }
       const newCommitSha = newCommitRes.data.sha;
 
-      // 8. Create or update branch ref
-      if (branchExists) {
-        const updateRefRes = await client.request(`${repoPath}/git/refs/heads/${targetBranchRefPath}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            sha: newCommitSha,
-            force: false,
-          }),
-        });
-        if (!updateRefRes.ok) {
-          throw new Error(`failed to update branch ref "${input.branchName}"`);
-        }
-      } else {
-        const createRefRes = await client.request(`${repoPath}/git/refs`, {
-          method: "POST",
-          body: JSON.stringify({
-            ref: `refs/heads/${input.branchName}`,
-            sha: newCommitSha,
-          }),
-        });
-        if (!createRefRes.ok) {
-          throw new Error(`failed to create branch ref "${input.branchName}"`);
-        }
-      }
-
-      // 9. Create pull request if none exists, or use existing
-      let pullRequestNumber: number;
-      let pullRequestUrl: string;
-      let outcome: "created" | "updated";
-
-      if (existingPr) {
-        pullRequestNumber = existingPr.number;
-        pullRequestUrl = existingPr.html_url;
-        outcome = "updated";
-      } else {
-        const createPrRes = await client.request<{ number: number; html_url: string }>(`${repoPath}/pulls`, {
-          method: "POST",
-          body: JSON.stringify({
-            title: input.prTitle,
-            body: input.prBody,
-            head: input.branchName,
-            base: input.defaultBranch,
-          }),
-        });
-        if (!createPrRes.ok || !createPrRes.data?.number || !createPrRes.data?.html_url) {
-          throw new Error("failed to open pull request for mutation");
-        }
-        pullRequestNumber = createPrRes.data.number;
-        pullRequestUrl = createPrRes.data.html_url;
-        outcome = "created";
-      }
+      await updateOrCreateBranchRef(client, repoPath, input.branchName, branchExists, newCommitSha);
+      const { pullRequestNumber, pullRequestUrl, outcome } = await ensurePullRequest(
+        client,
+        repoPath,
+        input,
+        existingPr,
+      );
 
       const auditRecord = {
         eventType: "github.repository_mutation",

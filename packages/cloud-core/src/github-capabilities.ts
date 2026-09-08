@@ -138,81 +138,61 @@ export function evaluateAppCapabilities(
   };
 }
 
+type RequirementRule = {
+  getMissing: (c: GitHubAppCapabilities) => string[];
+  explanation: string;
+};
+
+const REQUIREMENT_RULES: Record<CapabilityRequirement, RequirementRule> = {
+  setup_pr: {
+    getMissing: (c) => [
+      ...(!c.contentsWrite ? ["contents:write"] : []),
+      ...(!c.workflowsWrite ? ["workflows:write"] : []),
+      ...(!c.pullRequestsWrite ? ["pull_requests:write"] : []),
+    ],
+    explanation:
+      "Automated setup PR creation requires Contents (write), Workflows (write), and Pull requests (write) permissions. Please update App permissions or use manual setup.",
+  },
+  remediation_pr: {
+    getMissing: (c) => [
+      ...(!c.contentsWrite ? ["contents:write"] : []),
+      ...(!c.pullRequestsWrite ? ["pull_requests:write"] : []),
+    ],
+    explanation: "Automated remediation PR creation requires Contents (write) and Pull requests (write) permissions.",
+  },
+  waiver_pr: {
+    getMissing: (c) => [
+      ...(!c.contentsWrite ? ["contents:write"] : []),
+      ...(!c.pullRequestsWrite ? ["pull_requests:write"] : []),
+    ],
+    explanation: "Creating waiver PRs requires Contents (write) and Pull requests (write) permissions.",
+  },
+  pr_comment: {
+    getMissing: (c) => (!c.canPostPrComments ? ["pull_requests:write"] : []),
+    explanation: "Posting PR comments requires Pull requests (write) or Issues (write) permission.",
+  },
+  check_run_actions: {
+    getMissing: (c) => (!c.canCreateCheckRunActions ? ["checks:write"] : []),
+    explanation: "Interactive Check Run actions require Checks (write) permission.",
+  },
+  dispatch_analysis: {
+    getMissing: (c) => (!c.canDispatchAnalysis ? ["actions:write"] : []),
+    explanation: "Dispatching analysis workflows requires Actions (write) permission.",
+  },
+};
+
 export function checkCapabilityRequirement(
   capabilities: GitHubAppCapabilities,
   requirement: CapabilityRequirement,
 ): CapabilityCheckResult {
-  const missing: string[] = [];
-
-  switch (requirement) {
-    case "setup_pr": {
-      if (!capabilities.contentsWrite) missing.push("contents:write");
-      if (!capabilities.workflowsWrite) missing.push("workflows:write");
-      if (!capabilities.pullRequestsWrite) missing.push("pull_requests:write");
-      if (missing.length > 0) {
-        return {
-          satisfied: false,
-          missingPermissions: missing,
-          userExplanation:
-            "Automated setup PR creation requires Contents (write), Workflows (write), and Pull requests (write) permissions. Please update App permissions or use manual setup.",
-        };
-      }
-      return { satisfied: true, missingPermissions: [] };
-    }
-    case "remediation_pr": {
-      if (!capabilities.contentsWrite) missing.push("contents:write");
-      if (!capabilities.pullRequestsWrite) missing.push("pull_requests:write");
-      if (missing.length > 0) {
-        return {
-          satisfied: false,
-          missingPermissions: missing,
-          userExplanation:
-            "Automated remediation PR creation requires Contents (write) and Pull requests (write) permissions.",
-        };
-      }
-      return { satisfied: true, missingPermissions: [] };
-    }
-    case "waiver_pr": {
-      if (!capabilities.contentsWrite) missing.push("contents:write");
-      if (!capabilities.pullRequestsWrite) missing.push("pull_requests:write");
-      if (missing.length > 0) {
-        return {
-          satisfied: false,
-          missingPermissions: missing,
-          userExplanation: "Creating waiver PRs requires Contents (write) and Pull requests (write) permissions.",
-        };
-      }
-      return { satisfied: true, missingPermissions: [] };
-    }
-    case "pr_comment": {
-      if (!capabilities.canPostPrComments) {
-        return {
-          satisfied: false,
-          missingPermissions: ["pull_requests:write"],
-          userExplanation: "Posting PR comments requires Pull requests (write) or Issues (write) permission.",
-        };
-      }
-      return { satisfied: true, missingPermissions: [] };
-    }
-    case "check_run_actions": {
-      if (!capabilities.canCreateCheckRunActions) {
-        return {
-          satisfied: false,
-          missingPermissions: ["checks:write"],
-          userExplanation: "Interactive Check Run actions require Checks (write) permission.",
-        };
-      }
-      return { satisfied: true, missingPermissions: [] };
-    }
-    case "dispatch_analysis": {
-      if (!capabilities.canDispatchAnalysis) {
-        return {
-          satisfied: false,
-          missingPermissions: ["actions:write"],
-          userExplanation: "Dispatching analysis workflows requires Actions (write) permission.",
-        };
-      }
-      return { satisfied: true, missingPermissions: [] };
-    }
+  const rule = REQUIREMENT_RULES[requirement];
+  const missing = rule.getMissing(capabilities);
+  if (missing.length > 0) {
+    return {
+      satisfied: false,
+      missingPermissions: missing,
+      userExplanation: rule.explanation,
+    };
   }
+  return { satisfied: true, missingPermissions: [] };
 }
