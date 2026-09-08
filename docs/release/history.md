@@ -8,6 +8,16 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.39.1](https://github.com/oaslananka/boardreadyops/compare/v1.39.0...v1.39.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **cloud:** execute GitHub slash commands durably ([#697](https://github.com/oaslananka/boardreadyops/issues/697)) ([ac74b8e](https://github.com/oaslananka/boardreadyops/commit/ac74b8eadccbd3a3973477ad50a4bad053748814))
+* **cloud:** keep Check Run actions within GitHub limits ([#693](https://github.com/oaslananka/boardreadyops/issues/693)) ([6163cc7](https://github.com/oaslananka/boardreadyops/commit/6163cc7e30bf6bfb6537293d81975dae1c515e12))
+* **cloud:** stop unconfigured runs before dispatch ([#695](https://github.com/oaslananka/boardreadyops/issues/695)) ([e285059](https://github.com/oaslananka/boardreadyops/commit/e28505944637607c14872c88fe5ab14bac08a777))
+* **cloud:** wire zero-touch setup actions ([#696](https://github.com/oaslananka/boardreadyops/issues/696)) ([eae2640](https://github.com/oaslananka/boardreadyops/commit/eae2640cc694cd0f378039118856405c6cc2b165))
+
 ## [1.39.0](https://github.com/oaslananka/boardreadyops/compare/v1.38.0...v1.39.0) (2026-09-08)
 
 
