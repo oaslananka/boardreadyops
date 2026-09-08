@@ -6,9 +6,14 @@ import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "@board
 import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
+type GitHubCommandAction = Extract<GitHubAppLifecycleAction, { type: "github_command.execute" }>;
 
 type ControlPlaneInteractionExecutor = {
-  createSetupPr(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
+  createSetupPr?(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
+  executeGitHubCommand?(
+    action: GitHubCommandAction,
+    context: GitHubAppLifecycleContext,
+  ): Promise<readonly GitHubAppLifecycleAction[]>;
 };
 
 export type ControlPlaneWorkerDependencies = {
@@ -39,6 +44,31 @@ function errorDetails(error: unknown): { errorClass: string; errorMessage: strin
   };
 }
 
+async function processLifecycleActions(
+  actions: readonly GitHubAppLifecycleAction[],
+  dependencies: ControlPlaneWorkerDependencies,
+  context: GitHubAppLifecycleContext,
+): Promise<void> {
+  await planGitHubAppLifecycleActions(actions, dependencies.lifecycle, context);
+  for (const action of actions) {
+    if (action.type === "setup_pr.create") {
+      const createSetupPr = dependencies.interactions?.createSetupPr;
+      if (!createSetupPr) throw new Error("setup lifecycle interaction executor is not configured");
+      await createSetupPr(action, context);
+      continue;
+    }
+    if (action.type === "github_command.execute") {
+      const executeGitHubCommand = dependencies.interactions?.executeGitHubCommand;
+      if (!executeGitHubCommand) throw new Error("GitHub command interaction executor is not configured");
+      const followUpActions = await executeGitHubCommand(action, context);
+      if (followUpActions.some((followUp) => followUp.type === "github_command.execute")) {
+        throw new Error("GitHub command executor returned a recursive command action");
+      }
+      await processLifecycleActions(followUpActions, dependencies, context);
+    }
+  }
+}
+
 export async function processControlPlaneJob(
   job: ClaimedControlPlaneJob,
   dependencies: ControlPlaneWorkerDependencies,
@@ -49,12 +79,7 @@ export async function processControlPlaneJob(
       eventType: job.eventType,
       ...(job.eventAction ? { eventAction: job.eventAction } : {}),
     };
-    await planGitHubAppLifecycleActions(job.actions, dependencies.lifecycle, context);
-    for (const action of job.actions) {
-      if (action.type !== "setup_pr.create") continue;
-      if (!dependencies.interactions) throw new Error("setup lifecycle interaction executor is not configured");
-      await dependencies.interactions.createSetupPr(action, context);
-    }
+    await processLifecycleActions(job.actions, dependencies, context);
     const status = await dependencies.jobs.completeJob({
       jobId: job.jobId,
       workerId: dependencies.workerId,

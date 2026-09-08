@@ -1,4 +1,9 @@
-import type { GitHubAppLifecycleAction, GitHubInstallationRef, GitHubRepositoryRef } from "./lifecycle.js";
+import type {
+  GitHubAppLifecycleAction,
+  GitHubInstallationRef,
+  GitHubRepositoryRef,
+  PullRequestSafeMode,
+} from "./lifecycle.js";
 
 export type ParsedGitHubCommand =
   | { kind: "help" }
@@ -23,6 +28,9 @@ export type CommandExecutionContext = {
   headCommitSha: string;
   headRef: string;
   baseCommitSha?: string;
+  pullRequestDraft?: boolean;
+  pullRequestFromFork?: boolean;
+  safeMode?: PullRequestSafeMode;
   author?: string;
   checkRunId?: number;
 };
@@ -289,6 +297,15 @@ export function executeParsedCommand(
       };
       if (context.baseCommitSha) {
         enqueueAction.baseCommitSha = context.baseCommitSha;
+      }
+      if (context.pullRequestDraft !== undefined) {
+        enqueueAction.pullRequestDraft = context.pullRequestDraft;
+      }
+      if (context.pullRequestFromFork !== undefined) {
+        enqueueAction.pullRequestFromFork = context.pullRequestFromFork;
+      }
+      if (context.safeMode) {
+        enqueueAction.safeMode = context.safeMode;
       }
       return {
         kind: "action",
