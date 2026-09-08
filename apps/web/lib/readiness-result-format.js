@@ -512,3 +512,76 @@ export function buildReadinessPrComment(input) {
   lines.push("", "<!-- boardreadyops:release-readiness -->");
   return `${lines.join("\n")}\n`;
 }
+
+export function buildProgressiveReadinessComment(input) {
+  const outcome = presentation(input);
+  const scoreSuffix = input.readiness ? ` (Score: ${input.readiness.score}/100)` : "";
+  const lines = [`## ${outcome.emoji} BoardReadyOps: ${outcome.label}${scoreSuffix}`, ""];
+
+  const { blockers, warnings } = splitFindings(input);
+  if (blockers.length > 0) {
+    lines.push(
+      `> ⚠️ **Release blocked:** ${blockers.length} blocking ${blockers.length === 1 ? "finding" : "findings"} must be resolved or waived before hardware manufacturing handoff.`,
+      "",
+    );
+  } else if (warnings.length > 0) {
+    lines.push(
+      "> ℹ️ **Review recommended:** Design has warnings or temporary waivers that should be reviewed before release.",
+      "",
+    );
+  } else {
+    lines.push(
+      "> ✅ **Ready for release:** All hardware checks passed and required fabrication packages verified.",
+      "",
+    );
+  }
+
+  lines.push(...summaryTable(input));
+
+  if (input.hardwareImpact) {
+    appendHardwareImpact(lines, input.hardwareImpact);
+  }
+
+  if (blockers.length > 0) {
+    lines.push("", "### Blocking findings", "");
+    for (const finding of blockers.slice(0, 10)) {
+      lines.push(findingLine(finding));
+      lines.push(`  > Quick waiver: \`/boardreadyops waive ${sanitizeInline(finding.ruleId)} --reason "..."\``);
+    }
+  }
+
+  if (warnings.length > 0) {
+    lines.push("", "### Warnings", "");
+    for (const finding of warnings.slice(0, 10)) {
+      lines.push(findingLine(finding));
+    }
+  }
+
+  lines.push("", "<details>", "<summary><strong>Supporting Evidence & Artifacts</strong></summary>", "");
+  appendArtifacts(lines, input.artifacts ?? []);
+  appendMetrics(lines, input.metrics, 8);
+  appendReports(lines, input.reportLinks ?? []);
+  appendWaivers(lines, input);
+  appendReadinessNotes(lines, input.readiness);
+  lines.push("", "</details>");
+
+  lines.push(
+    "",
+    "<details>",
+    "<summary><strong>BoardReadyOps PR Commands</strong></summary>",
+    "",
+    "| Command | Action |",
+    "| :--- | :--- |",
+    "| `/boardreadyops rerun` | Re-trigger fresh release readiness check |",
+    "| `/boardreadyops explain <rule-id>` | Show guidance on how to fix finding in KiCad |",
+    '| `/boardreadyops waive <rule-id> --reason "..."` | Open automated policy waiver PR |',
+    "| `/boardreadyops help` | Show all supported commands |",
+    "",
+    "</details>",
+  );
+
+  appendNextSteps(lines, input);
+  appendDashboard(lines, input.detailsUrl);
+  lines.push("", "<!-- boardreadyops:release-readiness -->");
+  return `${lines.join("\n")}\n`;
+}

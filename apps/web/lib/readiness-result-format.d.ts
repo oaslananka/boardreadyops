@@ -70,3 +70,4 @@ export declare function buildReadinessCheckOutput(input: ReadinessResultTemplate
 };
 
 export declare function buildReadinessPrComment(input: ReadinessResultTemplateInput): string;
+export declare function buildProgressiveReadinessComment(input: ReadinessResultTemplateInput): string;
