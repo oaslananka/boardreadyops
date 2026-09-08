@@ -267,6 +267,14 @@ export function buildCheckRunRequestedActions(context) {
   return actions.slice(0, 3);
 }
 
+function setupRequiredSummary(setupIncomplete, canCreateSetupPr, action) {
+  if (!setupIncomplete) return queuedTrustSummary(action);
+  if (canCreateSetupPr) {
+    return "BoardReadyOps workflow or configuration is missing. Click 'Fix repository setup' to open a setup PR.";
+  }
+  return "BoardReadyOps workflow or configuration is missing. Automated setup PR creation requires Contents, Workflows, and Pull requests write permissions. Update the GitHub App permissions or use the setup page.";
+}
+
 function checkRunCreationBody(input, capabilities) {
   const setupIncomplete = input.action?.setupIncomplete === true;
   const canCreateSetupPr = capabilities?.canCreateSetupPr !== false;
@@ -282,11 +290,7 @@ function checkRunCreationBody(input, capabilities) {
     }),
     output: {
       title: setupIncomplete ? "BoardReadyOps setup required" : "BoardReadyOps release readiness queued",
-      summary: setupIncomplete
-        ? canCreateSetupPr
-          ? "BoardReadyOps workflow or configuration is missing. Click 'Fix repository setup' to open a setup PR."
-          : "BoardReadyOps workflow or configuration is missing. Automated setup PR creation requires Contents, Workflows, and Pull requests write permissions. Update the GitHub App permissions or use the setup page."
-        : queuedTrustSummary(input.action),
+      summary: setupRequiredSummary(setupIncomplete, canCreateSetupPr, input.action),
     },
   };
   const url = detailsUrl(input.runId);
