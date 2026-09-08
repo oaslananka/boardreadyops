@@ -257,18 +257,20 @@ still existing. Build cache accumulates alongside them. Left alone, the host eve
 and `docker compose build` fails part-way through the export with `no space left on device` —
 which reads as a build failure rather than a capacity problem, minutes into the run.
 
-The `cloud-deploy` workflow now checks free space before it builds. Below 12 GiB it reclaims what
-is unambiguously safe:
+The `cloud-deploy` workflow checks free space before it builds. Below 12 GiB it caps BuildKit
+cache at 3 GB and removes dangling image layers:
 
 ```bash
-docker builder prune --force --filter until=168h   # build cache unused for a week
-docker image prune --force                         # dangling layers from previous builds
+docker builder prune --all --force --max-used-space 3GB
+docker image prune --force
 ```
 
-Neither is referenced by a running container and neither is a rollback target, so a deploy can do
-this on its own. If the host is still short afterwards, the run stops with exit 78 and does not
-build: the remaining space is held by tagged images, volumes or logs, and choosing which of those
-to retire is an operator decision.
+The same 3 GB cache cap runs after every successful build, including `dry_run`, because repeated
+rehearsals still build on the production host. This keeps useful recent cache without allowing a
+burst of same-day builds to consume the host. Tagged runtime images are
+not touched by cache GC and remain governed by the rollback retention policy below. If the host is
+still short after safe reclaim, the run stops with exit 78: the remaining space is held by tagged
+images, volumes or logs, and choosing which of those to retire is an operator decision.
 
 To see what is holding the space:
 

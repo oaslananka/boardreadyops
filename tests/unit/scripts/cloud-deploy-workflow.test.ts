@@ -20,6 +20,30 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("deployment runbook is not commissioned");
   });
 
+  it("caps BuildKit cache by size before a low-space build and after every build", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+
+    expect(workflow).toContain("build_cache_max_used_space=3GB");
+    expect(workflow).toContain(
+      'docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true',
+    );
+    expect(workflow).not.toContain("--filter until=168h");
+
+    const lowSpaceCheck = workflow.indexOf('if [ "${available_mib}" -lt "${required_mib}" ]; then');
+    const preflightTrim = workflow.indexOf("            trim_build_cache", lowSpaceCheck);
+    const checkout = workflow.indexOf('cd "${repo_dir}"');
+    const caseStart = workflow.indexOf('case "${deploy_args}" in');
+    const caseEnd = workflow.indexOf("          esac", caseStart);
+    const finalTrim = workflow.indexOf("          trim_build_cache", caseEnd);
+
+    expect(lowSpaceCheck).toBeGreaterThan(0);
+    expect(preflightTrim).toBeGreaterThan(lowSpaceCheck);
+    expect(preflightTrim).toBeLessThan(checkout);
+    expect(caseStart).toBeGreaterThan(checkout);
+    expect(caseEnd).toBeGreaterThan(caseStart);
+    expect(finalTrim).toBeGreaterThan(caseEnd);
+  });
+
   it("documents the remote path as a commissioned contract, not a permanently live host claim", () => {
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
 
