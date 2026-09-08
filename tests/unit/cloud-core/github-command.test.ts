@@ -73,6 +73,22 @@ describe("GitHub PR slash command parsing", () => {
   it("tolerates leading whitespace, bot mentions, and trailing commentary", () => {
     const cmd = parseGitHubCommand("  @boardreadyops /boardreadyops status \n\nThanks!");
     expect(cmd).toEqual({ kind: "status" });
+
+    const bangCmd = parseGitHubCommand("!boardreadyops rerun");
+    expect(bangCmd).toEqual({ kind: "rerun" });
+
+    const tabCmd = parseGitHubCommand("@bot\t/boardreadyops diff");
+    expect(tabCmd).toEqual({ kind: "diff" });
+  });
+
+  it("handles pathological inputs linearly without polynomial backtracking", () => {
+    const spaces = " ".repeat(5000);
+    const pathological = `@bot${spaces}/boardreadyops status`;
+    const start = performance.now();
+    const cmd = parseGitHubCommand(pathological);
+    const duration = performance.now() - start;
+    expect(cmd).toEqual({ kind: "status" });
+    expect(duration).toBeLessThan(100);
   });
 
   it("rejects malformed or injection finding IDs", () => {

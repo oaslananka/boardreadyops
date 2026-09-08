@@ -44,13 +44,11 @@ export function parseGitHubCommand(commentBody: string): ParsedGitHubCommand | u
   const lines = commentBody.split("\n");
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    // Support "/boardreadyops <subcommand>", "@boardreadyops /boardreadyops <subcommand>", or "!boardreadyops <subcommand>"
-    const match = /^(?:@[\w-]+\s+)?[/!]boardreadyops(?:\s+(.*))?$/i.exec(line);
-    if (!match) {
+    const rest = extractCommandArgs(line);
+    if (rest === null) {
       continue;
     }
 
-    const rest = match[1]?.trim() ?? "";
     if (!rest) {
       return { kind: "help" };
     }
@@ -134,6 +132,37 @@ function sanitizeReason(raw: string): string {
     }
   }
   return cleaned;
+}
+
+function extractCommandArgs(line: string): string | null {
+  let text = line;
+  if (text.startsWith("@")) {
+    const spaceIndex = text.indexOf(" ");
+    const tabIndex = text.indexOf("\t");
+    const splitIndex = spaceIndex === -1 ? tabIndex : tabIndex === -1 ? spaceIndex : Math.min(spaceIndex, tabIndex);
+    if (splitIndex === -1) {
+      return null;
+    }
+    const mention = text.slice(1, splitIndex);
+    if (!/^[\w-]+$/.test(mention)) {
+      return null;
+    }
+    text = text.slice(splitIndex).trimStart();
+  }
+
+  const prefix = text.slice(0, 14).toLowerCase();
+  if (prefix !== "/boardreadyops" && prefix !== "!boardreadyops") {
+    return null;
+  }
+
+  const after = text.slice(14);
+  if (after.length === 0) {
+    return "";
+  }
+  if (after[0] !== " " && after[0] !== "\t") {
+    return null;
+  }
+  return after.trim();
 }
 
 function tokenizeArgs(str: string): string[] {
