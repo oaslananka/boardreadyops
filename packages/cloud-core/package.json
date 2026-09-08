@@ -88,6 +88,11 @@
       "types": "./src/github-command.ts",
       "import": "./src/github-command.ts",
       "default": "./src/github-command.ts"
+    },
+    "./telemetry": {
+      "types": "./src/telemetry.ts",
+      "import": "./src/telemetry.ts",
+      "default": "./src/telemetry.ts"
     }
   },
   "scripts": {
