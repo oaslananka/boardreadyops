@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.40.0](https://github.com/oaslananka/boardreadyops/compare/v1.39.1...v1.40.0) (2026-09-08)
+
+
+### Features
+
+* **cloud:** wire durable release preparation ([#702](https://github.com/oaslananka/boardreadyops/issues/702)) ([908b832](https://github.com/oaslananka/boardreadyops/commit/908b8322195df013468a00ccf8fc7d1356f2609d))
+
 ## [1.39.1](https://github.com/oaslananka/boardreadyops/compare/v1.39.0...v1.39.1) (2026-09-08)
 
 
