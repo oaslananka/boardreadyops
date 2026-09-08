@@ -227,7 +227,7 @@ export function buildCheckRunRequestedActions(context) {
   const actions = [
     {
       label: "Re-run checks",
-      description: "Trigger fresh BoardReadyOps release readiness evaluation",
+      description: "Run BoardReadyOps readiness checks again",
       identifier: "rerun_checks",
     },
   ];
@@ -235,20 +235,20 @@ export function buildCheckRunRequestedActions(context) {
   if (context?.setupIncomplete) {
     actions.push({
       label: "Fix repository setup",
-      description: "Open a pull request with reviewed BoardReadyOps files",
+      description: "Open setup PR with BoardReadyOps files",
       identifier: "create_setup_pr",
     });
   } else if (context?.hasBlockers) {
     actions.push({
       label: "Request waiver",
-      description: "Open a pull request proposing a policy waiver for blockers",
+      description: "Open PR proposing a blocker waiver",
       identifier: "request_waiver",
     });
   }
 
   actions.push({
     label: "Prepare release",
-    description: "Evaluate readiness checklist and generate release preview",
+    description: "Evaluate readiness and preview release",
     identifier: "prepare_release",
   });
 
