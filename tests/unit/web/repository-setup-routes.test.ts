@@ -109,11 +109,61 @@ describe("repository setup operator routes", () => {
       repository: { fullName: "octo/board", private: true, defaultBranch: "main" },
       current: { preset: "production" },
       github: { workflowStatus: "probe_required" },
-      permissions: { repository: { contents: "none", actions: "write", checks: "write" } },
-      assistedInstallation: { available: false, explicitOptInRequired: true },
+      permissions: { repository: { contents: "write", actions: "write", checks: "write" } },
+      assistedInstallation: { available: true, explicitOptInRequired: false },
     });
     expect(payload.presets as unknown[]).toHaveLength(4);
     expect(JSON.stringify(payload)).not.toContain("installation-token");
+  });
+
+  it("creates a setup pull request and records setup revision", async () => {
+    const setupStore = store();
+    const executeMock = vi.fn(async () => ({
+      outcome: "created" as const,
+      branchName: "boardreadyops/setup",
+      commitSha: "commit-sha-777",
+      pullRequestNumber: 15,
+      pullRequestUrl: "https://github.test/octo/board/pull/15",
+    }));
+
+    const deps = dependencies(setupStore);
+    deps.mutationService = vi.fn(() => ({
+      execute: executeMock,
+    }));
+
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", preset: "production", requestId: "req-setup-pr-1" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      ok: true,
+      outcome: "created",
+      pullRequestNumber: 15,
+      pullRequestUrl: "https://github.test/octo/board/pull/15",
+    });
+
+    expect(executeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: "setup",
+        branchName: "boardreadyops/setup",
+        files: expect.arrayContaining([
+          expect.objectContaining({ path: "boardreadyops.yml" }),
+          expect.objectContaining({ path: ".github/workflows/readiness-runner.yml" }),
+        ]),
+      }),
+    );
+
+    expect(setupStore.applyRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "operator",
+        diagnostics: [expect.stringContaining("Setup PR #15")],
+      }),
+    );
   });
 
   it("selects a versioned preset idempotently", async () => {

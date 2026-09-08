@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import {
+  createGitHubMutationService,
+  type GitHubMutationApiClient,
+  type GitHubMutationService,
+} from "@boardreadyops/cloud-core/github-mutation-service";
+import {
+  generateSetupPrPlan,
   isRepositorySetupPresetId,
   repositorySetupPresets,
   repositorySetupPresetVersion,
@@ -11,6 +17,7 @@ import {
   type RepositorySetupContext,
   type RepositorySetupStore,
 } from "@boardreadyops/db/repository-setup-store";
+import { createAppAuth } from "@octokit/auth-app";
 import { readBoundedRequestBody } from "./bounded-request-body.js";
 import { authenticateControlPlaneOperator } from "./control-plane-operator-auth.js";
 import { controlPlaneJsonError, controlPlaneJsonResponse } from "./control-plane-operator-response.js";
@@ -25,6 +32,7 @@ export type RepositorySetupRouteDependencies = {
   queryExecutor(): SqlQueryExecutor | undefined;
   createStore(executor: SqlQueryExecutor): RepositorySetupStore;
   githubClient(): RepositorySetupGitHubClient;
+  mutationService?(githubInstallationId: number): GitHubMutationService;
   now(): Date;
 };
 
@@ -40,6 +48,35 @@ function createRepositorySetupRouteDependencies(
     },
     createStore: createSqlRepositorySetupStore,
     githubClient: () => createRepositorySetupGitHubClient({ environment }),
+    mutationService(githubInstallationId: number) {
+      const appId = environment.GITHUB_APP_ID?.trim();
+      const privateKey = environment.GITHUB_APP_PRIVATE_KEY?.replaceAll(String.raw`\n`, "\n").trim();
+      const apiBaseUrl = (environment.GITHUB_API_BASE_URL?.trim() || "https://api.github.com").replace(/\/$/u, "");
+      if (!appId || !privateKey) {
+        throw new Error("GitHub App credentials are not configured");
+      }
+      const authenticate = createAppAuth({ appId, privateKey, installationId: githubInstallationId });
+
+      const client: GitHubMutationApiClient = {
+        async request<T>(path: string, init?: RequestInit) {
+          const auth = await authenticate({ type: "installation" });
+          const response = await fetch(`${apiBaseUrl}${path}`, {
+            ...init,
+            headers: {
+              accept: "application/vnd.github+json",
+              authorization: `Bearer ${auth.token}`,
+              "content-type": "application/json",
+              "x-github-api-version": "2022-11-28",
+              ...init?.headers,
+            },
+          });
+          const data = (await response.json().catch(() => ({}))) as T;
+          return { status: response.status, ok: response.ok, data };
+        },
+      };
+
+      return createGitHubMutationService({ client });
+    },
     now: () => new Date(),
   };
 }
@@ -105,24 +142,27 @@ function setupResponseBase() {
     workflow: {
       path: ".github/workflows/readiness-runner.yml",
       configurationPath: "boardreadyops.yml",
-      installation: "Copy the reviewed workflow and selected boardreadyops.yml to the repository default branch.",
+      installation:
+        "Merge the reviewed setup PR or copy the workflow and selected boardreadyops.yml to the repository default branch.",
     },
     permissions: {
       repository: {
         metadata: "read",
-        pullRequests: "read",
+        pullRequests: "write",
         checks: "write",
         actions: "write",
-        contents: "none",
+        contents: "write",
+        workflows: "write",
       },
       organization: "none",
       account: "none",
     },
     assistedInstallation: {
-      available: false,
-      explicitOptInRequired: true,
+      available: true,
+      explicitOptInRequired: false,
       requiredAdditionalPermission: "contents:write",
-      reason: "The production App intentionally does not write repository contents or workflows.",
+      reason:
+        "Automated setup PR creation generates reviewed branches and pull requests without direct default-branch mutation.",
     },
   } as const;
 }
@@ -375,6 +415,99 @@ async function createProbe(
   return dispatchSetupProbe(store, githubClient, context, created.probeId);
 }
 
+async function createSetupPr(
+  body: Record<string, unknown>,
+  actorId: string,
+  installationId: string,
+  repositoryId: string,
+  store: RepositorySetupStore,
+  dependencies: RepositorySetupRouteDependencies,
+): Promise<Response> {
+  const requestId = body.requestId;
+  if (typeof requestId !== "string" || !validIdentifier(requestId)) {
+    return controlPlaneJsonError("requestId is required", 400);
+  }
+
+  const context = await store.getContext({ installationId, repositoryId });
+  if (!context) return controlPlaneJsonError("repository is unavailable", 404);
+
+  const presetId = isRepositorySetupPresetId(body.preset) ? body.preset : (context.current?.preset ?? "open-source");
+
+  const plan = generateSetupPrPlan({ presetId });
+
+  const mutationService = dependencies.mutationService?.(context.githubInstallationId);
+  if (!mutationService) {
+    return controlPlaneJsonError("GitHub mutation service is not configured", 503);
+  }
+
+  try {
+    const result = await mutationService.execute({
+      installationId: context.githubInstallationId,
+      owner: context.owner,
+      repo: context.name,
+      defaultBranch: context.defaultBranch,
+      intent: "setup",
+      branchName: plan.branchName,
+      commitMessage: plan.commitMessage,
+      prTitle: plan.prTitle,
+      prBody: plan.prBody,
+      files: plan.files,
+      actorId,
+      requestId,
+    });
+
+    await store.applyRevision({
+      installationId: context.installationId,
+      repositoryId: context.repositoryId,
+      preset: plan.preset.id,
+      presetVersion: repositorySetupPresetVersion,
+      source: "operator",
+      actorId,
+      requestId: `setup-pr:${createHash("sha256").update(requestId).digest("hex")}`,
+      workflowStatus: "unknown",
+      configStatus: "unknown",
+      diagnostics: [`Setup PR #${result.pullRequestNumber} (${result.outcome}): ${result.pullRequestUrl}`],
+    });
+
+    return controlPlaneJsonResponse(
+      {
+        ok: true,
+        outcome: result.outcome,
+        pullRequestNumber: result.pullRequestNumber,
+        pullRequestUrl: result.pullRequestUrl,
+        branchName: result.branchName,
+        commitSha: result.commitSha,
+      },
+      result.outcome === "created" ? 201 : 200,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return controlPlaneJsonError(`failed to create setup pull request: ${message}`, 502);
+  }
+}
+
+export async function handleRepositorySetupCreatePr(
+  request: Request,
+  installationId: string,
+  repositoryId: string,
+  dependencies: RepositorySetupRouteDependencies = createRepositorySetupRouteDependencies(),
+): Promise<Response> {
+  const authenticated = authentication(request, dependencies);
+  if (authenticated instanceof Response) return authenticated;
+  if (!validIdentifier(installationId) || !validIdentifier(repositoryId)) {
+    return controlPlaneJsonError("repository setup scope is invalid", 400);
+  }
+  const body = (await requestBody(request)) ?? {};
+  const executor = dependencies.queryExecutor();
+  if (!executor) return controlPlaneJsonError("database is not configured", 503);
+  const store = dependencies.createStore(executor);
+  try {
+    return await createSetupPr(body, authenticated.actorId, installationId, repositoryId, store, dependencies);
+  } catch {
+    return controlPlaneJsonError("repository setup operation failed", 503);
+  }
+}
+
 export async function handleRepositorySetupPost(
   request: Request,
   installationId: string,
@@ -397,6 +530,9 @@ export async function handleRepositorySetupPost(
     }
     if (body.action === "probe") {
       return await createProbe(body, authenticated.actorId, installationId, repositoryId, store, dependencies);
+    }
+    if (body.action === "create_pr" || body.action === "create_setup_pr") {
+      return await createSetupPr(body, authenticated.actorId, installationId, repositoryId, store, dependencies);
     }
     return controlPlaneJsonError("repository setup action is unsupported", 400);
   } catch {
