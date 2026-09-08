@@ -96,6 +96,7 @@ const exportableMetadataKeys = new Set([
   "probeId",
   "publicFailureReason",
   "pullRequestCommentCreated",
+  "pullRequestNumber",
   "reason",
   "readinessReported",
   "readinessScore",

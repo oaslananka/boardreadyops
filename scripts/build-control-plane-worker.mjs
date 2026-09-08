@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -6,6 +7,8 @@ import { verifyControlPlaneWorkerBoundary } from "./verify-control-plane-worker-
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const outputDirectory = join(root, "apps/web/.next");
+const cloudCoreRequire = createRequire(join(root, "packages/cloud-core/package.json"));
+const yamlBrowserEntry = join(dirname(cloudCoreRequire.resolve("yaml/package.json")), "browser/index.js");
 await mkdir(outputDirectory, { recursive: true });
 
 const nodeBundleOptions = {
@@ -21,6 +24,7 @@ const nodeBundleOptions = {
 
 const workerBuild = await build({
   ...nodeBundleOptions,
+  alias: { yaml: yamlBrowserEntry },
   entryPoints: [join(root, "apps/web/worker.ts")],
   outfile: join(outputDirectory, "worker.mjs"),
   metafile: true,

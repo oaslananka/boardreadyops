@@ -6,12 +6,17 @@ import {
   type GitHubMutationService,
 } from "@boardreadyops/cloud-core/github-mutation-service";
 import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "@boardreadyops/cloud-core/lifecycle";
-import { generateSetupPrPlan, repositorySetupPresetVersion } from "@boardreadyops/cloud-core/repository-setup";
+import {
+  generateSetupPrPlan,
+  generateWaiverPrPlan,
+  repositorySetupPresetVersion,
+} from "@boardreadyops/cloud-core/repository-setup";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createSqlRepositorySetupStore, type RepositorySetupStore } from "@boardreadyops/db/repository-setup-store";
 import { createAppAuth } from "@octokit/auth-app";
 
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
+type WaiverAction = Extract<GitHubAppLifecycleAction, { type: "waiver_pr.request" }>;
 
 type InstallationAuthentication = {
   token: string;
@@ -20,6 +25,7 @@ type InstallationAuthentication = {
 
 export type RepositorySetupLifecycleExecutor = {
   createSetupPr(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
+  createWaiverPr(action: WaiverAction, context: GitHubAppLifecycleContext): Promise<void>;
 };
 
 export type RepositorySetupLifecycleExecutorDependencies = {
@@ -36,18 +42,31 @@ function revisionRequestId(value: string): string {
   return `setup-pr:${createHash("sha256").update(value).digest("hex")}`;
 }
 
+function deterministicAuditEventId(parts: readonly string[]): string {
+  const digest = createHash("sha256").update(parts.join("\u0000"), "utf8").digest().subarray(0, 16);
+  digest[6] = ((digest[6] ?? 0) & 0x0f) | 0x80;
+  digest[8] = ((digest[8] ?? 0) & 0x3f) | 0x80;
+  const hex = digest.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+async function repositoryContextForAction(store: RepositorySetupStore, action: SetupAction | WaiverAction) {
+  const repository = await store.getContextByGitHub({
+    githubInstallationId: action.installation.id,
+    githubRepositoryId: action.repository.id,
+  });
+  if (!repository || repository.owner !== action.repository.owner || repository.name !== action.repository.name) {
+    throw new Error("repository setup context is unavailable or does not match the GitHub action scope");
+  }
+  return repository;
+}
+
 export function createRepositorySetupLifecycleExecutor(
   dependencies: RepositorySetupLifecycleExecutorDependencies,
 ): RepositorySetupLifecycleExecutor {
   return {
     async createSetupPr(action, context) {
-      const repository = await dependencies.store.getContextByGitHub({
-        githubInstallationId: action.installation.id,
-        githubRepositoryId: action.repository.id,
-      });
-      if (!repository || repository.owner !== action.repository.owner || repository.name !== action.repository.name) {
-        throw new Error("repository setup context is unavailable or does not match the GitHub action scope");
-      }
+      const repository = await repositoryContextForAction(dependencies.store, action);
 
       const authentication = await dependencies.authenticateInstallation(action.installation.id);
       const capability = checkCapabilityRequirement(evaluateAppCapabilities(authentication.permissions), "setup_pr");
@@ -84,6 +103,79 @@ export function createRepositorySetupLifecycleExecutor(
         workflowStatus: "unknown",
         configStatus: "unknown",
         diagnostics: [`Setup PR #${result.pullRequestNumber} (${result.outcome}): ${result.pullRequestUrl}`],
+      });
+    },
+
+    async createWaiverPr(action, context) {
+      const ruleId = action.ruleId?.trim();
+      const reason = action.reason?.trim();
+      if (!ruleId || !reason) throw new Error("waiver rule and reason are required before repository mutation");
+
+      const repository = await repositoryContextForAction(dependencies.store, action);
+      const authentication = await dependencies.authenticateInstallation(action.installation.id);
+      const capability = checkCapabilityRequirement(evaluateAppCapabilities(authentication.permissions), "waiver_pr");
+      if (!capability.satisfied) {
+        throw new Error(`waiver PR capability is unavailable: ${capability.missingPermissions.join(", ")}`);
+      }
+
+      const mutationService = dependencies.mutationService(authentication.token);
+      const actorId = action.requestedBy ?? "github-app";
+      const durableRequestId = requestId(context.deliveryId);
+      await dependencies.store.recordWaiverPrRequestAudit({
+        eventId: deterministicAuditEventId(["waiver-pr-request", repository.repositoryId, durableRequestId]),
+        installationId: repository.installationId,
+        repositoryId: repository.repositoryId,
+        actorId,
+        requestId: durableRequestId,
+      });
+
+      const snapshot = await mutationService.readFileSnapshot({
+        owner: repository.owner,
+        repo: repository.name,
+        defaultBranch: repository.defaultBranch,
+        path: "boardreadyops.yml",
+      });
+      const plan = generateWaiverPrPlan({
+        ruleId,
+        reason,
+        owner: actorId,
+        currentConfigContent: snapshot.content,
+      });
+      if (!plan.hasChanges) {
+        await dependencies.store.recordWaiverPrResultAudit({
+          eventId: deterministicAuditEventId(["waiver-pr-result", repository.repositoryId, durableRequestId]),
+          installationId: repository.installationId,
+          repositoryId: repository.repositoryId,
+          actorId,
+          requestId: durableRequestId,
+          outcome: "already_present",
+        });
+        return;
+      }
+
+      const result = await mutationService.execute({
+        installationId: repository.githubInstallationId,
+        owner: repository.owner,
+        repo: repository.name,
+        defaultBranch: repository.defaultBranch,
+        intent: "waiver",
+        branchName: plan.branchName,
+        commitMessage: plan.commitMessage,
+        prTitle: plan.prTitle,
+        prBody: plan.prBody,
+        files: plan.files,
+        actorId,
+        requestId: durableRequestId,
+        expectedBaseCommitSha: snapshot.baseCommitSha,
+      });
+      await dependencies.store.recordWaiverPrResultAudit({
+        eventId: deterministicAuditEventId(["waiver-pr-result", repository.repositoryId, durableRequestId]),
+        installationId: repository.installationId,
+        repositoryId: repository.repositoryId,
+        actorId,
+        requestId: durableRequestId,
+        outcome: result.outcome,
+        pullRequestNumber: result.pullRequestNumber,
       });
     },
   };

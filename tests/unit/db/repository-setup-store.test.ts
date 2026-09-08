@@ -145,6 +145,66 @@ describe("repository setup store", () => {
     expect(String(query.mock.calls[0]?.[0])).toContain("boardreadyops_apply_repository_setup_revision");
   });
 
+  it("records an idempotent repository-scoped waiver PR request audit event", async () => {
+    const { query, store } = executor([{ rows: [] }]);
+
+    await store.recordWaiverPrRequestAudit({
+      eventId: "55555555-5555-4555-8555-555555555555",
+      installationId: "installation-1",
+      repositoryId: "repository-1",
+      actorId: "octocat",
+      requestId: "github:delivery-waiver",
+    });
+
+    expect(String(query.mock.calls[0]?.[0])).toContain("insert into audit_events");
+    expect(String(query.mock.calls[0]?.[0])).toContain("github_app.repository.waiver_pr_requested");
+    expect(String(query.mock.calls[0]?.[0])).toContain("on conflict (id) do nothing");
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      "55555555-5555-4555-8555-555555555555",
+      "installation-1",
+      "repository-1",
+      "octocat",
+      "github:delivery-waiver",
+      "2026-07-30T06:00:00.000Z",
+    ]);
+  });
+
+  it("records an idempotent waiver PR result and permits an already-present no-op without a PR number", async () => {
+    const { query, store } = executor([{ rows: [] }, { rows: [] }]);
+
+    await store.recordWaiverPrResultAudit({
+      eventId: "66666666-6666-4666-8666-666666666666",
+      installationId: "installation-1",
+      repositoryId: "repository-1",
+      actorId: "octocat",
+      requestId: "github:delivery-waiver",
+      outcome: "created",
+      pullRequestNumber: 14,
+    });
+    await store.recordWaiverPrResultAudit({
+      eventId: "77777777-7777-4777-8777-777777777777",
+      installationId: "installation-1",
+      repositoryId: "repository-1",
+      actorId: "octocat",
+      requestId: "github:delivery-waiver-duplicate",
+      outcome: "already_present",
+    });
+
+    expect(String(query.mock.calls[0]?.[0])).toContain("github_app.repository.waiver_pr_result");
+    expect(String(query.mock.calls[0]?.[0])).toContain("on conflict (id) do nothing");
+    expect(query.mock.calls[0]?.[1]).toEqual([
+      "66666666-6666-4666-8666-666666666666",
+      "installation-1",
+      "repository-1",
+      "octocat",
+      "github:delivery-waiver",
+      "created",
+      14,
+      "2026-07-30T06:00:00.000Z",
+    ]);
+    expect(query.mock.calls[1]?.[1]?.[6]).toBeNull();
+  });
+
   it("creates, dispatches and completes bounded probes", async () => {
     const { query, store } = executor([
       {

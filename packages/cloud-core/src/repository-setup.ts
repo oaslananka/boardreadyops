@@ -1,4 +1,4 @@
-import * as yaml from "js-yaml";
+import { isMap, isSeq, parseDocument } from "yaml";
 import type { MutationFile } from "./github-mutation-service.js";
 
 export const repositorySetupPresetIds = ["open-source", "prototype", "production", "contract-design"] as const;
@@ -267,6 +267,7 @@ export interface GenerateWaiverPrPlanInput {
 }
 
 export interface WaiverPrPlan {
+  hasChanges: boolean;
   branchName: string;
   commitMessage: string;
   prTitle: string;
@@ -279,25 +280,40 @@ export function generateWaiverPrPlan(input: GenerateWaiverPrPlanInput): WaiverPr
   const commitMessage = `chore(boardreadyops): add waiver for ${input.ruleId}`;
   const prTitle = `chore(boardreadyops): add waiver for ${input.ruleId}`;
 
-  let parsed: Record<string, unknown> = {};
-  if (input.currentConfigContent) {
-    try {
-      const loaded = yaml.load(input.currentConfigContent);
-      if (typeof loaded === "object" && loaded !== null && !Array.isArray(loaded)) {
-        parsed = loaded as Record<string, unknown>;
-      }
-    } catch {}
+  if (!input.currentConfigContent?.trim()) {
+    throw new Error("current boardreadyops.yml content is required for a waiver PR");
   }
 
-  const waivers = Array.isArray(parsed.waivers) ? [...parsed.waivers] : [];
-  waivers.push({
-    rule: input.ruleId,
-    owner: input.owner || "maintainer",
-    reason: input.reason,
-  });
-  parsed.waivers = waivers;
+  const document = parseDocument(input.currentConfigContent);
+  if (document.errors.length > 0) {
+    throw new Error("current boardreadyops.yml must contain valid YAML");
+  }
+  if (!isMap(document.contents)) {
+    throw new Error("current boardreadyops.yml must contain a YAML mapping");
+  }
 
-  const newConfigContent = yaml.dump(parsed, { indent: 2, lineWidth: -1 });
+  const existingWaivers = document.get("waivers", true);
+  if (existingWaivers !== undefined && !isSeq(existingWaivers)) {
+    throw new Error("current boardreadyops.yml waivers must be an array");
+  }
+
+  const owner = input.owner || "maintainer";
+  const duplicate =
+    isSeq(existingWaivers) &&
+    existingWaivers.items.some(
+      (waiver) =>
+        isMap(waiver) &&
+        waiver.get("rule") === input.ruleId &&
+        waiver.get("owner") === owner &&
+        waiver.get("reason") === input.reason,
+    );
+  if (!duplicate) {
+    const waiver = { rule: input.ruleId, owner, reason: input.reason };
+    if (isSeq(existingWaivers)) existingWaivers.add(waiver);
+    else document.set("waivers", [waiver]);
+  }
+
+  const newConfigContent = document.toString({ lineWidth: 0 });
 
   const prBody = [
     `# BoardReadyOps Policy Waiver Request`,
@@ -316,6 +332,7 @@ export function generateWaiverPrPlan(input: GenerateWaiverPrPlanInput): WaiverPr
   ].join("\n");
 
   return {
+    hasChanges: !duplicate,
     branchName,
     commitMessage,
     prTitle,

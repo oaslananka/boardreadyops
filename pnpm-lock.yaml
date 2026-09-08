@@ -256,6 +256,9 @@ importers:
       '@boardreadyops/contracts':
         specifier: workspace:*
         version: link:../contracts
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
 
   packages/contracts:
     dependencies:

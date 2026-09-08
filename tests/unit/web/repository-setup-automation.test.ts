@@ -10,6 +10,15 @@ const action = {
   requestedBy: "octocat",
 };
 
+const waiverAction = {
+  type: "waiver_pr.request" as const,
+  installation: { id: 123 },
+  repository: { id: 456, owner: "octo", name: "board", fullName: "octo/board", private: false, defaultBranch: "main" },
+  ruleId: "rule.test",
+  reason: "temporary exception",
+  requestedBy: "octocat",
+};
+
 function setupStore(): RepositorySetupStore {
   return {
     getContext: vi.fn(),
@@ -25,6 +34,8 @@ function setupStore(): RepositorySetupStore {
     })),
     listRevisions: vi.fn(async () => []),
     applyRevision: vi.fn(async () => ({ outcome: "applied", revisionId: "revision-1", revision: 1 })),
+    recordWaiverPrRequestAudit: vi.fn(async () => undefined),
+    recordWaiverPrResultAudit: vi.fn(async () => undefined),
     createProbe: vi.fn(),
     getProbe: vi.fn(),
     markProbeDispatched: vi.fn(),
@@ -43,7 +54,7 @@ describe("repository setup lifecycle automation", () => {
         token: "token",
         permissions: { checks: "write", actions: "write", pull_requests: "read" },
       })),
-      mutationService: vi.fn(() => ({ execute })),
+      mutationService: vi.fn(() => ({ execute, readFileSnapshot: vi.fn() })),
     });
 
     await expect(
@@ -71,7 +82,7 @@ describe("repository setup lifecycle automation", () => {
         token: "token",
         permissions: { contents: "write", workflows: "write", pull_requests: "write" },
       })),
-      mutationService: vi.fn(() => ({ execute })),
+      mutationService: vi.fn(() => ({ execute, readFileSnapshot: vi.fn() })),
     });
 
     await executor.createSetupPr(action, {
@@ -99,5 +110,158 @@ describe("repository setup lifecycle automation", () => {
         configStatus: "unknown",
       }),
     );
+  });
+  it("fails closed before waiver mutation when effective installation permissions cannot create a waiver PR", async () => {
+    const store = setupStore();
+    const execute = vi.fn();
+    const readFileSnapshot = vi.fn();
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(async () => ({ token: "token", permissions: { pull_requests: "read" } })),
+      mutationService: vi.fn(() => ({ execute, readFileSnapshot })),
+    });
+
+    await expect(
+      executor.createWaiverPr(waiverAction, {
+        deliveryId: "delivery-waiver",
+        eventType: "issue_comment",
+        eventAction: "created",
+      }),
+    ).rejects.toThrow(/contents:write.*pull_requests:write/u);
+    expect(readFileSnapshot).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("reads the exact base config and preserves it while creating an idempotent waiver PR", async () => {
+    const store = setupStore();
+    const recordWaiverPrRequestAudit = vi.mocked(store.recordWaiverPrRequestAudit);
+    const recordWaiverPrResultAudit = vi.mocked(store.recordWaiverPrResultAudit);
+    const readFileSnapshot = vi.fn(async () => ({
+      baseCommitSha: "a".repeat(40),
+      content: "version: 1\nmode: enforce\nrules:\n  bom.missing-mpn: true\n",
+    }));
+    const execute = vi.fn(async () => ({
+      outcome: "created" as const,
+      branchName: "boardreadyops/waiver-rule.test",
+      commitSha: "b".repeat(40),
+      pullRequestNumber: 14,
+      pullRequestUrl: "https://github.test/octo/board/pull/14",
+    }));
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(async () => ({
+        token: "token",
+        permissions: { contents: "write", pull_requests: "write" },
+      })),
+      mutationService: vi.fn(() => ({ execute, readFileSnapshot })),
+    });
+
+    await executor.createWaiverPr(waiverAction, {
+      deliveryId: "delivery-waiver",
+      eventType: "issue_comment",
+      eventAction: "created",
+    });
+
+    expect(readFileSnapshot).toHaveBeenCalledWith({
+      owner: "octo",
+      repo: "board",
+      defaultBranch: "main",
+      path: "boardreadyops.yml",
+    });
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        installationId: 123,
+        owner: "octo",
+        repo: "board",
+        intent: "waiver",
+        actorId: "octocat",
+        requestId: "github:delivery-waiver",
+        expectedBaseCommitSha: "a".repeat(40),
+        files: [
+          expect.objectContaining({
+            path: "boardreadyops.yml",
+            content: expect.stringMatching(
+              /mode: enforce[\s\S]*bom\.missing-mpn: true[\s\S]*rule: rule\.test[\s\S]*reason: temporary exception/u,
+            ),
+          }),
+        ],
+      }),
+    );
+    expect(recordWaiverPrRequestAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        installationId: "installation-1",
+        repositoryId: "repository-1",
+        actorId: "octocat",
+        requestId: "github:delivery-waiver",
+      }),
+    );
+    expect(recordWaiverPrRequestAudit.mock.invocationCallOrder[0]).toBeLessThan(
+      execute.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(recordWaiverPrResultAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        installationId: "installation-1",
+        repositoryId: "repository-1",
+        actorId: "octocat",
+        requestId: "github:delivery-waiver",
+        outcome: "created",
+        pullRequestNumber: 14,
+      }),
+    );
+  });
+
+  it("does not mutate when the identical waiver already exists on the default branch", async () => {
+    const store = setupStore();
+    const recordWaiverPrRequestAudit = vi.mocked(store.recordWaiverPrRequestAudit);
+    const recordWaiverPrResultAudit = vi.mocked(store.recordWaiverPrResultAudit);
+    const readFileSnapshot = vi.fn(async () => ({
+      baseCommitSha: "a".repeat(40),
+      content:
+        "version: 1\nmode: enforce\nwaivers:\n  - rule: rule.test\n    owner: octocat\n    reason: temporary exception\n",
+    }));
+    const execute = vi.fn();
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(async () => ({
+        token: "token",
+        permissions: { contents: "write", pull_requests: "write" },
+      })),
+      mutationService: vi.fn(() => ({ execute, readFileSnapshot })),
+    });
+
+    await executor.createWaiverPr(waiverAction, {
+      deliveryId: "delivery-waiver-duplicate",
+      eventType: "issue_comment",
+      eventAction: "created",
+    });
+
+    expect(recordWaiverPrRequestAudit).toHaveBeenCalledOnce();
+    expect(readFileSnapshot).toHaveBeenCalledOnce();
+    expect(execute).not.toHaveBeenCalled();
+    expect(recordWaiverPrResultAudit).toHaveBeenCalledWith(expect.objectContaining({ outcome: "already_present" }));
+    expect(recordWaiverPrResultAudit.mock.calls[0]?.[0]).not.toHaveProperty("pullRequestNumber");
+  });
+
+  it("rejects a waiver request without an explicit rule and audit reason", async () => {
+    const store = setupStore();
+    const readFileSnapshot = vi.fn();
+    const execute = vi.fn();
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(async () => ({
+        token: "token",
+        permissions: { contents: "write", pull_requests: "write" },
+      })),
+      mutationService: vi.fn(() => ({ execute, readFileSnapshot })),
+    });
+
+    await expect(
+      executor.createWaiverPr(
+        { ...waiverAction, reason: undefined },
+        { deliveryId: "delivery-waiver", eventType: "check_run" },
+      ),
+    ).rejects.toThrow(/rule.*reason.*required/iu);
+    expect(readFileSnapshot).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
   });
 });

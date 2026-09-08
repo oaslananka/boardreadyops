@@ -6,10 +6,12 @@ import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "@board
 import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
+type WaiverAction = Extract<GitHubAppLifecycleAction, { type: "waiver_pr.request" }>;
 type GitHubCommandAction = Extract<GitHubAppLifecycleAction, { type: "github_command.execute" }>;
 
 type ControlPlaneInteractionExecutor = {
   createSetupPr?(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
+  createWaiverPr?(action: WaiverAction, context: GitHubAppLifecycleContext): Promise<void>;
   executeGitHubCommand?(
     action: GitHubCommandAction,
     context: GitHubAppLifecycleContext,
@@ -55,6 +57,12 @@ async function processLifecycleActions(
       const createSetupPr = dependencies.interactions?.createSetupPr;
       if (!createSetupPr) throw new Error("setup lifecycle interaction executor is not configured");
       await createSetupPr(action, context);
+      continue;
+    }
+    if (action.type === "waiver_pr.request") {
+      const createWaiverPr = dependencies.interactions?.createWaiverPr;
+      if (!createWaiverPr) throw new Error("waiver lifecycle interaction executor is not configured");
+      await createWaiverPr(action, context);
       continue;
     }
     if (action.type === "github_command.execute") {

@@ -184,7 +184,9 @@ const githubCommandInteractions = createProductionGitHubCommandLifecycleExecutor
 const interactions =
   setupInteractions || githubCommandInteractions
     ? {
-        ...(setupInteractions ? { createSetupPr: setupInteractions.createSetupPr } : {}),
+        ...(setupInteractions
+          ? { createSetupPr: setupInteractions.createSetupPr, createWaiverPr: setupInteractions.createWaiverPr }
+          : {}),
         ...(githubCommandInteractions ? { executeGitHubCommand: githubCommandInteractions.executeGitHubCommand } : {}),
       }
     : undefined;

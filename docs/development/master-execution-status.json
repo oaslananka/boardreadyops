@@ -796,7 +796,7 @@
           "apps/web/app/page.tsx",
           "apps/web/app/setup/page.tsx",
           "apps/web/app/dashboard/page.tsx",
-          "apps/web/app/styles.css"
+          "apps/web/app/globals.css"
         ],
         "tests": [
           "tests/e2e/qa-audit.spec.ts",
