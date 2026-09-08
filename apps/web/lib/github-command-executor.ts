@@ -235,6 +235,38 @@ function commandResponseMarker(commentId: number): string {
   return `<!-- boardreadyops:command-response:${commentId} -->`;
 }
 
+function commandResponseId(payload: unknown[], marker: string): number | undefined {
+  for (const comment of payload) {
+    const item = record(comment);
+    if (typeof item?.id === "number" && typeof item.body === "string" && item.body.includes(marker)) {
+      return item.id;
+    }
+  }
+  return undefined;
+}
+
+async function findExistingCommandResponse(input: {
+  request: typeof fetch;
+  headers: Record<string, string>;
+  commentsBase: string;
+  marker: string;
+}): Promise<number | undefined> {
+  for (let page = 1; page <= maximumCommentPages; page += 1) {
+    const payload = await responseJson(
+      await input.request(`${input.commentsBase}?per_page=${commentsPerPage}&page=${page}`, {
+        method: "GET",
+        headers: input.headers,
+      }),
+      "GitHub command response lookup",
+    );
+    if (!Array.isArray(payload)) throw new Error("GitHub command response lookup returned an invalid comment list");
+    const existingCommentId = commandResponseId(payload, input.marker);
+    if (existingCommentId !== undefined) return existingCommentId;
+    if (payload.length < commentsPerPage) return undefined;
+  }
+  throw new Error(`GitHub command response lookup exceeded ${maximumCommentPages * commentsPerPage} comments`);
+}
+
 export async function upsertGitHubCommandResponse(input: {
   apiBaseUrl: string;
   token: string;
@@ -250,32 +282,7 @@ export async function upsertGitHubCommandResponse(input: {
   const marker = commandResponseMarker(input.commentId);
   const body = `${input.body.trimEnd()}\n\n${marker}`;
   const commentsBase = `${input.apiBaseUrl}/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}/issues/${encodeURIComponent(String(input.pullRequestNumber))}/comments`;
-  let existingCommentId: number | undefined;
-  let exhausted = true;
-
-  for (let page = 1; page <= maximumCommentPages; page += 1) {
-    const payload = await responseJson(
-      await request(`${commentsBase}?per_page=${commentsPerPage}&page=${page}`, { method: "GET", headers }),
-      "GitHub command response lookup",
-    );
-    if (!Array.isArray(payload)) throw new Error("GitHub command response lookup returned an invalid comment list");
-    for (const comment of payload) {
-      const item = record(comment);
-      if (typeof item?.id === "number" && typeof item.body === "string" && item.body.includes(marker)) {
-        existingCommentId = item.id;
-        break;
-      }
-    }
-    if (existingCommentId !== undefined) break;
-    if (payload.length < commentsPerPage) {
-      exhausted = false;
-      break;
-    }
-  }
-
-  if (existingCommentId === undefined && exhausted) {
-    throw new Error(`GitHub command response lookup exceeded ${maximumCommentPages * commentsPerPage} comments`);
-  }
+  const existingCommentId = await findExistingCommandResponse({ request, headers, commentsBase, marker });
 
   const url =
     existingCommentId === undefined
