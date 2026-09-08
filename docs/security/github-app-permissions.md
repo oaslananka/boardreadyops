@@ -160,7 +160,10 @@ to Contents write, or use a shared VPS worker to bypass the repository boundary.
 4. Install the App on selected repositories first, not all repositories.
 5. Rotate the webhook secret and private key if development credentials were
    exposed to a broader environment.
-6. Re-authorize installations after changing requested permissions.
+6. Apply GitHub's update semantics: Permission and webhook removals take effect
+   immediately. New or broader permissions require installation-owner approval
+   when they apply to an installation; new account permissions require user
+   reauthorization before they take effect.
 7. Execute the validation matrix below.
 8. Record the App settings review date and reviewer in issue #88.
 

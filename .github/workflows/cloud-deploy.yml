@@ -117,20 +117,22 @@ jobs:
           docker_root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || printf '/var/lib/docker')"
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
+          build_cache_max_used_space=3GB
+          trim_build_cache() {
+            docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
+          }
 
           available_mib="$(free_mib "${docker_root}")"
           printf 'cloud-deploy preflight: %s MiB free on %s (want >= %s MiB)\n' \
             "${available_mib}" "${docker_root}" "${required_mib}"
 
           if [ "${available_mib}" -lt "${required_mib}" ]; then
-            # Build cache unused for a week, and dangling layers from previous builds. Neither is
-            # referenced by a running container, and neither is a rollback target: tagged
-            # `boardreadyops-web-runtime:<sha>` images are left alone, because the rollback
-            # procedure in docs/deployment/self-hosted.md depends on the previous one still
-            # existing. Reclaiming those is an operator decision, not something a deploy should
-            # do on its own.
-            printf '%s\n' 'cloud-deploy preflight: below threshold, reclaiming build cache and dangling layers'
-            docker builder prune --force --filter until=168h || true
+            # Bound BuildKit by size instead of age. This host can accumulate many GiB of recent
+            # cache in less than a day, so an age-only filter can leave the disk below the build
+            # threshold even though the cache is safe to reclaim. Tagged runtime images remain
+            # untouched because they are rollback targets.
+            printf '%s\n' 'cloud-deploy preflight: below threshold, capping build cache and reclaiming dangling layers'
+            trim_build_cache
             docker image prune --force || true
             available_mib="$(free_mib "${docker_root}")"
             printf 'cloud-deploy preflight: %s MiB free after reclaim\n' "${available_mib}"
@@ -202,6 +204,13 @@ jobs:
               exit 64
               ;;
           esac
+
+          # Both rehearsal and real deploy paths build on the production host. Keep a bounded
+          # amount of reusable BuildKit state after every successful build so a sequence of
+          # dry-runs cannot refill a small host between disk preflights.
+          printf 'cloud-deploy cache: capping BuildKit cache at %s\n' "${build_cache_max_used_space}"
+          trim_build_cache
+          printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
           REMOTE_DEPLOY
 
       - name: Remove temporary SSH key

@@ -250,7 +250,12 @@ ${operations}`;
     expect(canaries).toContain("47 */6 * * *");
     expect(canaries).toContain("workflow_dispatch:");
     expect(canaries).toContain(
-      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@d93cff3819ffcbbff97ac9600f71a27844c4d005",
+      "oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@dab9e0b1320880ab20875841d779aea55a9fef25",
+    );
+    expect(canaries).toContain("CANARY_WORKFLOW_SHA=dab9e0b1320880ab20875841d779aea55a9fef25");
+    expect(canaries).toContain('git merge-base --is-ancestor "$CANARY_WORKFLOW_SHA" origin/main');
+    expect(canaries).toContain(
+      'git cat-file -e "$CANARY_WORKFLOW_SHA:.github/workflows/synthetic-target-repository-canary.yml"',
     );
     expect(canaries).toContain("actions: read");
     expect(canaries).toContain("checks: read");
