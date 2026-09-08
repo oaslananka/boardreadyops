@@ -1,6 +1,6 @@
-# Merge Queue remains maintainer-controlled.
-# A PR enters the queue only after a maintainer explicitly applies the
-# `queue-me` label. Automation must never add that label.
+# Merge Queue automatically admits eligible pull requests.
+# Drafts and pull requests carrying manual-review or do-not-merge remain
+# outside the queue until a maintainer clears the blocking state.
 #
 # GitHub repository rulesets are the authoritative merge gate.
 # Required GitHub status checks are NOT duplicated here.
@@ -24,7 +24,7 @@ merge_queue:
   # Avoid unnecessary intermediate queue results.
   skip_intermediate_results: true
 
-  # Queue admission is controlled exclusively by the `queue-me` label.
+  # Queue admission is driven by pull_request_rules, not PR comments.
   queue_controls_comment: false
 
 
@@ -93,13 +93,14 @@ queue_rules:
     # Final integration into main uses squash.
     merge_method: squash
 
-    # Maintainer-controlled queue admission.
+    # Eligible pull requests enter automatically.
     #
     # Do NOT repeat ci / lint, ci / build, etc. here.
-    # GitHub Rulesets define those requirements.
+    # GitHub Rulesets define those requirements and Mergify injects them.
     queue_conditions:
-      - label = queue-me
       - -draft
+      - -label = manual-review
+      - -label = do-not-merge
 
     # Keep these identical to queue_conditions so the queue stays
     # compatible with Mergify's in-place checking model.
@@ -107,16 +108,19 @@ queue_rules:
     # GitHub Ruleset requirements are injected automatically in addition
     # to these conditions.
     merge_conditions:
-      - label = queue-me
       - -draft
+      - -label = manual-review
+      - -label = do-not-merge
 
 
 pull_request_rules:
-  # A PR is queued only after a maintainer explicitly adds `queue-me`.
-  - name: queue explicitly approved pull requests
+  # Eligible pull requests enter the queue automatically. GitHub Rulesets
+  # remain authoritative for required CI and security status checks.
+  - name: auto-queue eligible pull requests
     conditions:
-      - label = queue-me
       - -draft
+      - -label = manual-review
+      - -label = do-not-merge
     actions:
       queue:
         name: default

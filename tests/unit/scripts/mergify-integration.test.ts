@@ -33,11 +33,10 @@ function readQueueConditionList(name: "queue_conditions" | "merge_conditions"): 
 }
 
 describe("Mergify integration contract", () => {
-  it("requires an explicit maintainer queue admission signal", () => {
-    expect(mergify).toContain("label = queue-me");
-    expect(mergify).not.toContain("auto-queue release-please");
-    expect(mergify).not.toContain("auto-queue Renovate");
-    expect(mergify).not.toContain("auto-queue feature PRs");
+  it("automatically queues eligible pull requests while preserving manual review escapes", () => {
+    expect(mergify).not.toContain("label = queue-me");
+    expect(mergify).toContain("-label = manual-review");
+    expect(mergify).toContain("-label = do-not-merge");
   });
 
   it("delegates stable required checks to GitHub ruleset injection", () => {
@@ -61,7 +60,7 @@ describe("Mergify integration contract", () => {
     expect(statusChecksRule?.parameters?.strict_required_status_checks_policy).toBe(true);
     const queueConditions = readQueueConditionList("queue_conditions");
     const mergeConditions = readQueueConditionList("merge_conditions");
-    expect(queueConditions).toEqual(["label = queue-me", "-draft"]);
+    expect(queueConditions).toEqual(["-draft", "-label = manual-review", "-label = do-not-merge"]);
     expect(mergeConditions).toEqual(queueConditions);
   });
 
