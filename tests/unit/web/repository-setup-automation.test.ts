@@ -19,6 +19,20 @@ const waiverAction = {
   requestedBy: "octocat",
 };
 
+const releasePrepareAction = {
+  type: "release.prepare" as const,
+  installation: { id: 123 },
+  repository: { id: 456, owner: "octo", name: "board", fullName: "octo/board", private: false, defaultBranch: "main" },
+  checkRunId: 92,
+  pullRequestNumber: 7,
+  ref: "feature/board",
+  commitSha: "a".repeat(40),
+  baseCommitSha: "b".repeat(40),
+  pullRequestDraft: false,
+  pullRequestFromFork: false,
+  requestedBy: "release-engineer",
+};
+
 function setupStore(): RepositorySetupStore {
   return {
     getContext: vi.fn(),
@@ -31,6 +45,25 @@ function setupStore(): RepositorySetupStore {
       name: "board",
       private: false,
       defaultBranch: "main",
+      current: {
+        id: "setup-1",
+        installationId: "installation-1",
+        repositoryId: "repository-1",
+        revision: 1,
+        preset: "production",
+        presetVersion: 1,
+        source: "workflow_probe",
+        actorId: "github-actions",
+        requestId: "probe-result:probe-1",
+        workflowPath: "readiness-runner.yml",
+        workflowContractVersion: 1,
+        workflowStatus: "ready",
+        configStatus: "ready",
+        configVersion: 1,
+        observedSha: "c".repeat(40),
+        diagnostics: [],
+        createdAt: "2026-09-08T18:00:00.000Z",
+      },
     })),
     listRevisions: vi.fn(async () => []),
     applyRevision: vi.fn(async () => ({ outcome: "applied", revisionId: "revision-1", revision: 1 })),
@@ -111,6 +144,90 @@ describe("repository setup lifecycle automation", () => {
       }),
     );
   });
+  it("fails closed before release preparation when Actions write is unavailable", async () => {
+    const store = setupStore();
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(async () => ({
+        token: "token",
+        permissions: { pull_requests: "read", actions: "read" },
+      })),
+      mutationService: vi.fn(),
+    });
+
+    await expect(
+      executor.prepareRelease(releasePrepareAction, {
+        deliveryId: "delivery-release-prepare",
+        eventType: "check_run",
+        eventAction: "requested_action",
+      }),
+    ).rejects.toThrow(/actions:write/u);
+  });
+
+  it("fails closed when repository setup is not ready for release preparation", async () => {
+    const store = setupStore();
+    vi.mocked(store.getContextByGitHub).mockResolvedValueOnce({
+      installationId: "installation-1",
+      githubInstallationId: 123,
+      repositoryId: "repository-1",
+      githubRepositoryId: 456,
+      owner: "octo",
+      name: "board",
+      private: false,
+      defaultBranch: "main",
+    });
+    const authenticateInstallation = vi.fn();
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation,
+      mutationService: vi.fn(),
+    });
+
+    await expect(
+      executor.prepareRelease(releasePrepareAction, {
+        deliveryId: "delivery-release-unconfigured",
+        eventType: "check_run",
+        eventAction: "requested_action",
+      }),
+    ).rejects.toThrow(/setup.*ready/u);
+    expect(authenticateInstallation).not.toHaveBeenCalled();
+  });
+
+  it("audits and returns an exact-SHA release run for an authorized preparation request", async () => {
+    const store = setupStore();
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(async () => ({
+        token: "token",
+        permissions: { actions: "write" },
+      })),
+      mutationService: vi.fn(),
+    });
+
+    await expect(
+      executor.prepareRelease(releasePrepareAction, {
+        deliveryId: "delivery-release-prepare",
+        eventType: "check_run",
+        eventAction: "requested_action",
+      }),
+    ).resolves.toEqual([
+      {
+        type: "release_run.enqueue",
+        installation: { id: 123 },
+        repository: releasePrepareAction.repository,
+        pullRequestNumber: 7,
+        ref: "feature/board",
+        commitSha: "a".repeat(40),
+        baseCommitSha: "b".repeat(40),
+        triggerKind: "pr",
+        pullRequestDraft: false,
+        pullRequestFromFork: false,
+        deliveryId: "delivery-release-prepare",
+        idempotencyScope: "release-prepare:delivery-release-prepare",
+      },
+    ]);
+  });
+
   it("fails closed before waiver mutation when effective installation permissions cannot create a waiver PR", async () => {
     const store = setupStore();
     const execute = vi.fn();

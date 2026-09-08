@@ -117,12 +117,14 @@ describe("GitHub PR command authorization", () => {
       expect(evaluateCommandAuthorization({ kind: "setup" }, assoc).authorized).toBe(true);
       expect(evaluateCommandAuthorization({ kind: "waive", ruleId: "r1" }, assoc).authorized).toBe(true);
       expect(evaluateCommandAuthorization({ kind: "fix" }, assoc).authorized).toBe(true);
+      expect(evaluateCommandAuthorization({ kind: "release-preview" }, assoc).authorized).toBe(true);
     }
 
     for (const assoc of ["CONTRIBUTOR", "FIRST_TIME_CONTRIBUTOR", "NONE", "UNKNOWN"]) {
       const auth = evaluateCommandAuthorization({ kind: "setup" }, assoc);
       expect(auth.authorized).toBe(false);
       expect(auth.reason).toContain("write permissions");
+      expect(evaluateCommandAuthorization({ kind: "release-preview" }, assoc).authorized).toBe(false);
     }
   });
 });
@@ -189,6 +191,30 @@ describe("GitHub PR command execution planning", () => {
       expect(plan.action.type).toBe("waiver_pr.request");
       expect(plan.action.ruleId).toBe("bom.missing-mpn");
       expect(plan.action.reason).toBe("Proto run");
+    }
+  });
+
+  it("generates exact-context release.prepare action for release-preview command", () => {
+    const plan = executeParsedCommand(
+      { kind: "release-preview" },
+      {
+        ...baseContext,
+        baseCommitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        pullRequestDraft: false,
+        pullRequestFromFork: false,
+      },
+    );
+    expect(plan.kind).toBe("action");
+    if (plan.kind === "action" && plan.action.type === "release.prepare") {
+      expect(plan.action).toMatchObject({
+        pullRequestNumber: 42,
+        ref: "feature/board-rev-b",
+        commitSha: "0123456789abcdef0123456789abcdef01234567",
+        baseCommitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        pullRequestDraft: false,
+        pullRequestFromFork: false,
+        requestedBy: "engineer1",
+      });
     }
   });
 });

@@ -108,6 +108,51 @@ describe("GitHub command lifecycle executor", () => {
     });
   });
 
+  it("requires Actions write before release-preview can dispatch a preparation run", async () => {
+    const { executor, readPullRequest, upsertResponse } = executorWithPermissions({
+      pull_requests: "write",
+      issues: "write",
+    });
+
+    await expect(
+      executor.executeGitHubCommand(commandAction("/boardreadyops release-preview"), {
+        deliveryId: "delivery-release-preview-missing-actions",
+        eventType: "issue_comment",
+        eventAction: "created",
+      }),
+    ).resolves.toEqual([]);
+    expect(readPullRequest).not.toHaveBeenCalled();
+    expect(upsertResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.stringContaining("Actions (write)") }),
+    );
+  });
+
+  it("turns an authorized release-preview command into an exact-context release.prepare action", async () => {
+    const { executor, readPullRequest, upsertResponse } = executorWithPermissions({
+      pull_requests: "read",
+      actions: "write",
+    });
+
+    await expect(
+      executor.executeGitHubCommand(commandAction("/boardreadyops release-preview"), {
+        deliveryId: "delivery-release-preview",
+        eventType: "issue_comment",
+        eventAction: "created",
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        type: "release.prepare",
+        pullRequestNumber: 7,
+        ref: "feature/board",
+        commitSha: "a".repeat(40),
+        baseCommitSha: "b".repeat(40),
+        requestedBy: "octocat",
+      }),
+    ]);
+    expect(readPullRequest).toHaveBeenCalledOnce();
+    expect(upsertResponse).not.toHaveBeenCalled();
+  });
+
   it("explains missing setup permissions instead of attempting the setup action", async () => {
     const { executor, readPullRequest, upsertResponse } = executorWithPermissions({
       pull_requests: "read",

@@ -80,6 +80,9 @@ export declare function detailsUrl(runId: string): string | undefined;
 export declare function buildCheckRunRequestedActions(context?: {
   setupIncomplete?: boolean;
   hasBlockers?: boolean;
+  canCreateSetupPr?: boolean;
+  canCreateWaiverPr?: boolean;
+  canDispatchAnalysis?: boolean;
 }): Array<{ label: string; description: string; identifier: string }>;
 export declare function readGitHubCheckRun(input: ReadGitHubCheckRunInput): Promise<GitHubCheckRunObservation>;
 export declare function ensurePullRequestCheckRun(input: EnsurePullRequestCheckRunInput): Promise<{ id: number }>;

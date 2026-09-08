@@ -119,6 +119,7 @@ export async function completeGitHubCheckRun(input) {
       setupIncomplete,
       canCreateSetupPr,
       canCreateWaiverPr: input.capabilities?.canCreateWaiverPr !== false,
+      canDispatchAnalysis: input.capabilities?.canDispatchAnalysis !== false,
     }),
     output: annotationChunks[0]
       ? { ...output, summary: outputSummary, annotations: annotationChunks[0] }
@@ -236,13 +237,15 @@ function queuedTrustSummary(action) {
 }
 
 export function buildCheckRunRequestedActions(context) {
-  const actions = [
-    {
+  const actions = [];
+
+  if (context?.canDispatchAnalysis !== false) {
+    actions.push({
       label: "Re-run checks",
       description: "Run BoardReadyOps readiness checks again",
       identifier: "rerun_checks",
-    },
-  ];
+    });
+  }
 
   if (context?.setupIncomplete && context?.canCreateSetupPr !== false) {
     actions.push({
@@ -258,11 +261,13 @@ export function buildCheckRunRequestedActions(context) {
     });
   }
 
-  actions.push({
-    label: "Prepare release",
-    description: "Evaluate readiness and preview release",
-    identifier: "prepare_release",
-  });
+  if (!context?.setupIncomplete && context?.canDispatchAnalysis !== false) {
+    actions.push({
+      label: "Prepare release",
+      description: "Evaluate readiness and preview release",
+      identifier: "prepare_release",
+    });
+  }
 
   return actions.slice(0, 3);
 }
@@ -287,6 +292,7 @@ function checkRunCreationBody(input, capabilities) {
       setupIncomplete,
       canCreateSetupPr,
       canCreateWaiverPr: capabilities?.canCreateWaiverPr !== false,
+      canDispatchAnalysis: capabilities?.canDispatchAnalysis !== false,
     }),
     output: {
       title: setupIncomplete ? "BoardReadyOps setup required" : "BoardReadyOps release readiness queued",

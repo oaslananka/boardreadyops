@@ -181,6 +181,61 @@ describe("control-plane worker", () => {
     expect(jobs.completeJob).toHaveBeenCalledOnce();
   });
 
+  it("routes release.prepare follow-up through durable release-run planning before completing the job", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const prepareAction = {
+      type: "release.prepare" as const,
+      installation: { id: 123 },
+      repository: {
+        id: 456,
+        owner: "octo",
+        name: "board",
+        fullName: "octo/board",
+        private: false,
+        defaultBranch: "main",
+      },
+      pullRequestNumber: 7,
+      ref: "feature/board",
+      commitSha: "a".repeat(40),
+      baseCommitSha: "b".repeat(40),
+      pullRequestDraft: false,
+      pullRequestFromFork: false,
+      requestedBy: "octocat",
+    };
+    const releaseRunAction = {
+      type: "release_run.enqueue" as const,
+      installation: { id: 123 },
+      repository: prepareAction.repository,
+      pullRequestNumber: 7,
+      ref: "feature/board",
+      commitSha: "a".repeat(40),
+      baseCommitSha: "b".repeat(40),
+      triggerKind: "pr" as const,
+      pullRequestDraft: false,
+      pullRequestFromFork: false,
+      deliveryId: "delivery-1",
+    };
+    const interactions = { prepareRelease: vi.fn(async () => [releaseRunAction]) };
+    const prepareJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "check_run",
+      eventAction: "requested_action",
+      actions: [prepareAction],
+    };
+
+    await expect(
+      processControlPlaneJob(prepareJob, { workerId: "worker-1", jobs, lifecycle, interactions }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(interactions.prepareRelease).toHaveBeenCalledWith(prepareAction, {
+      deliveryId: "delivery-1",
+      eventType: "check_run",
+      eventAction: "requested_action",
+    });
+    expect(lifecycle.enqueueReleaseRunWithOutbox).toHaveBeenCalledWith(releaseRunAction);
+    expect(jobs.completeJob).toHaveBeenCalledOnce();
+  });
+
   it("supports a command-only interaction executor configuration", async () => {
     const lifecycle = lifecycleStore();
     const jobs = jobStore();

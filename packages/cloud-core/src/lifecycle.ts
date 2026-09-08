@@ -80,6 +80,13 @@ export type GitHubAppLifecycleAction =
       installation: GitHubInstallationRef;
       repository: GitHubRepositoryRef;
       checkRunId?: number | undefined;
+      pullRequestNumber: number;
+      ref: string;
+      commitSha: string;
+      baseCommitSha?: string | undefined;
+      pullRequestDraft?: boolean | undefined;
+      pullRequestFromFork?: boolean | undefined;
+      safeMode?: PullRequestSafeMode | undefined;
       requestedBy?: string | undefined;
     }
   | {
@@ -124,6 +131,8 @@ export type GitHubAppLifecycleAction =
       safeMode?: PullRequestSafeMode;
       /** The GitHub webhook delivery (`X-GitHub-Delivery`) that produced this run, for DB-only correlation. */
       deliveryId?: string | undefined;
+      /** Optional explicit-request scope. Same scope retries dedupe; different scopes may re-evaluate the same commit. */
+      idempotencyScope?: string | undefined;
       setupIncomplete?: boolean | undefined;
     };
 
@@ -491,12 +500,32 @@ function normalizeCheckRunEvent(
     }
 
     if (identifier === "prepare_release") {
+      if (!firstPr) return unsupported(options, "prepare_release requires pull request context");
+      const pullRequestNumber = numberValue(firstPr, "number");
+      const commitSha = pullRequestCommitSha(firstPr) ?? stringValue(checkRun, "head_sha");
+      const baseCommitSha = pullRequestBaseCommitSha(firstPr);
+      const ref = pullRequestRef(firstPr);
+      if (pullRequestNumber === undefined || !commitSha || !ref) {
+        return unsupported(options, "prepare_release PR payload does not include number, head sha, or ref");
+      }
+      const pullRequestFromFork = pullRequestIsFromFork(repository, firstPr);
+      const pullRequestDraft = boolValue(firstPr, "draft") ?? false;
+      const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
+      const requestedBy = isRecord(payload.sender) ? stringValue(payload.sender, "login") : undefined;
       return result(options, action, [
         {
           type: "release.prepare",
           installation,
           repository,
           ...(checkRunId !== undefined ? { checkRunId } : {}),
+          pullRequestNumber,
+          ref,
+          commitSha,
+          ...(baseCommitSha ? { baseCommitSha } : {}),
+          pullRequestDraft,
+          pullRequestFromFork,
+          ...(safeMode ? { safeMode } : {}),
+          ...(requestedBy ? { requestedBy } : {}),
         },
       ]);
     }
