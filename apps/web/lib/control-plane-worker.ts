@@ -7,7 +7,7 @@ import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "@boardreadyop
 
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
 
-export type ControlPlaneInteractionExecutor = {
+type ControlPlaneInteractionExecutor = {
   createSetupPr(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
 };
 
