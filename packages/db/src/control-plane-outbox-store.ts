@@ -298,6 +298,27 @@ class SqlControlPlaneOutboxStore implements ControlPlaneOutboxStore {
           completedAt,
         },
       };
+    } else if (payload.action.setupIncomplete === true) {
+      if (!input.nextOutboxId) throw new Error("setup completion requires a next outbox ID");
+      nextEffectType = "github.check_run.complete";
+      nextIdempotencyKey = `github.check_run.complete:${payload.runId}:setup_required`;
+      nextPayload = {
+        version: 1,
+        type: nextEffectType,
+        input: {
+          installationId: payload.action.installation.id,
+          repositoryOwner: payload.action.repository.owner,
+          repositoryName: payload.action.repository.name,
+          checkRunId: input.githubCheckRunId,
+          runId: payload.runId,
+          conclusion: "action_required",
+          title: "BoardReadyOps setup required",
+          summary:
+            "BoardReadyOps workflow or configuration is missing. Click 'Fix repository setup' to open a setup PR.",
+          completedAt,
+          setupIncomplete: true,
+        },
+      };
     } else if (input.dispatchMode === "github-actions") {
       if (!input.executionAttemptId || !input.nextOutboxId) {
         throw new Error("workflow dispatch requires an execution attempt and next outbox ID");

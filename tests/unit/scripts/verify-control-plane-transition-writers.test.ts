@@ -3,6 +3,7 @@ import {
   findProtectedFunctionOwnershipViolations,
   findRuntimeTransitionWriterViolations,
   latestProtectedFunctionDefinitions,
+  protectedFunctionOwners,
   verifyControlPlaneTransitionWriters,
 } from "../../../scripts/verify-control-plane-transition-writers.mjs";
 
@@ -102,6 +103,12 @@ describe("control-plane transition writer boundary", () => {
 
     expect(findProtectedFunctionOwnershipViolations(migrations)).not.toContain(
       expect.stringContaining("boardreadyops_enqueue_release_run_with_outbox"),
+    );
+  });
+
+  it("tracks the setup-incomplete migration as the guarded enqueue owner", () => {
+    expect(protectedFunctionOwners.boardreadyops_enqueue_release_run_with_outbox).toBe(
+      "0065_setup_incomplete_release_runs.sql",
     );
   });
 

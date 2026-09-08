@@ -103,12 +103,14 @@ export async function completeGitHubCheckRun(input) {
   const annotationChunks = chunkAnnotations(input.input.annotations);
   const output = { title: input.input.title, summary: input.input.summary };
 
+  const setupIncomplete = input.input.setupIncomplete === true;
   const firstBody = {
     status: "completed",
     conclusion: input.input.conclusion,
     completed_at: input.input.completedAt ?? new Date().toISOString(),
     actions: buildCheckRunRequestedActions({
       hasBlockers: input.input.conclusion === "failure",
+      setupIncomplete,
     }),
     output: annotationChunks[0] ? { ...output, annotations: annotationChunks[0] } : output,
   };
@@ -256,15 +258,18 @@ export function buildCheckRunRequestedActions(context) {
 }
 
 function checkRunCreationBody(input) {
+  const setupIncomplete = input.action?.setupIncomplete === true;
   const body = {
     name: readinessCheckName,
     head_sha: input.action.commitSha,
     status: "queued",
     external_id: input.runId,
-    actions: buildCheckRunRequestedActions(),
+    actions: buildCheckRunRequestedActions({ setupIncomplete }),
     output: {
-      title: "BoardReadyOps release readiness queued",
-      summary: queuedTrustSummary(input.action),
+      title: setupIncomplete ? "BoardReadyOps setup required" : "BoardReadyOps release readiness queued",
+      summary: setupIncomplete
+        ? "BoardReadyOps workflow or configuration is missing. Click 'Fix repository setup' to open a setup PR."
+        : queuedTrustSummary(input.action),
     },
   };
   const url = detailsUrl(input.runId);

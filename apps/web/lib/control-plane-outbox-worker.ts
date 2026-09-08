@@ -83,7 +83,7 @@ function checkRunCompleteEffect(effect: ClaimedControlPlaneOutboxEffect) {
 }
 
 function requiresCompletionEffect(action: CreatePullRequestCheckRunInput["action"]): boolean {
-  return action.pullRequestDraft === true || action.pullRequestFromFork === true;
+  return action.pullRequestDraft === true || action.pullRequestFromFork === true || action.setupIncomplete === true;
 }
 
 async function processCheckRunCreate(

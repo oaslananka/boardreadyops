@@ -109,6 +109,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0062_finding_category.sql",
       "0063_workspace_project_model.sql",
       "0064_workspace_membership_authorization.sql",
+      "0065_setup_incomplete_release_runs.sql",
     ]);
   });
 

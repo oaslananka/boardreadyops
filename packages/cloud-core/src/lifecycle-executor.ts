@@ -63,10 +63,11 @@ export type CompleteGitHubCheckRunInput = {
   repositoryName: string;
   checkRunId: string | number;
   runId: string;
-  conclusion: "failure" | "neutral" | "success" | "timed_out";
+  conclusion: "action_required" | "failure" | "neutral" | "success" | "timed_out";
   title: string;
   summary: string;
   completedAt?: string | undefined;
+  setupIncomplete?: boolean | undefined;
   // GitHub allows at most 50 annotations per API request; the client chunks this array and
   // makes one PATCH per chunk. See github-app-check-run-client.js#completeGitHubCheckRun.
   annotations?: GitHubCheckRunAnnotation[] | undefined;

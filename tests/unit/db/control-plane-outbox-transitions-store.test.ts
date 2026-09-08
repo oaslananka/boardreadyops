@@ -104,6 +104,58 @@ describe("control-plane outbox transition store", () => {
     expect(String(calls[0]?.params.at(-2))).toContain('"githubCheckRunId":77');
   });
 
+  it("completes Check Run creation with action_required when setup is incomplete", async () => {
+    const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
+    const executor: SqlQueryExecutor = {
+      async query(sql, params = []) {
+        calls.push({ sql, params });
+        return {
+          rows: [
+            {
+              transition_outcome: "completed",
+              next_effect_type: "github.check_run.complete",
+              next_outbox_id: "outbox-setup",
+            },
+          ],
+        };
+      },
+    };
+    const store = createSqlControlPlaneOutboxStore(executor, {
+      now: () => new Date("2026-07-22T02:00:00.000Z"),
+    });
+
+    const createPayload =
+      createEffect.payload.type === "github.check_run.create" ? createEffect.payload : neverAction();
+    const setupEffect: ClaimedControlPlaneOutboxEffect = {
+      ...createEffect,
+      payload: {
+        ...createPayload,
+        action: {
+          ...createPayload.action,
+          setupIncomplete: true,
+        },
+      },
+    };
+
+    await expect(
+      store.completeCheckRunCreateEffect({
+        effect: setupEffect,
+        workerId: "worker-1",
+        githubCheckRunId: 77,
+        dispatchMode: "github-actions",
+        nextOutboxId: "outbox-setup",
+      }),
+    ).resolves.toEqual({
+      outcome: "completed",
+      nextEffectType: "github.check_run.complete",
+      nextOutboxId: "outbox-setup",
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.sql).toContain("boardreadyops_complete_check_run_create_effect");
+    expect(calls[0]?.params).toContain("github.check_run.complete:run-1:setup_required");
+    expect(String(calls[0]?.params.at(-2))).toContain('"conclusion":"action_required"');
+  });
+
   it("records the real GitHub workflow run ID with outbox completion", async () => {
     const executor: SqlQueryExecutor = {
       async query(sql, params = []) {

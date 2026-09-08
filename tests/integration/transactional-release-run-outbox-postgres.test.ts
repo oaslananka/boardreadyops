@@ -14,6 +14,7 @@ const installationRowId = `producer-installation-${suffix}`;
 const repositoryRowId = `producer-repository-${suffix}`;
 const githubInstallationId = 7_000_000_000 + numericSuffix;
 const githubRepositoryId = 8_000_000_000 + numericSuffix;
+const setupRevisionId = `00000000-0000-4000-8000-${suffix}`;
 
 function database() {
   if (!executor) throw new Error("DATABASE_URL is required");
@@ -149,6 +150,21 @@ beforeEach(async () => {
      ) values ($1, $2, $3, 'octo', $4, false, 'main', now(), null)`,
     [repositoryRowId, installationRowId, githubRepositoryId, `board-${suffix}`],
   );
+  await database().query(
+    `insert into repository_setup_revisions (
+       id, installation_id, repository_id, revision, preset, preset_version,
+       source, actor_id, request_id, workflow_contract_version, workflow_status,
+       config_status, config_version, observed_sha
+     ) values (
+       $1, $2, $3, 1, 'prototype', 1, 'workflow_probe', 'integration.fixture', $4,
+       1, 'ready', 'ready', 1, $5
+     )`,
+    [setupRevisionId, installationRowId, repositoryRowId, `fixture-ready-${suffix}`, "e".repeat(40)],
+  );
+  await database().query("update repositories set current_setup_revision_id = $2 where id = $1", [
+    repositoryRowId,
+    setupRevisionId,
+  ]);
 });
 
 afterAll(async () => {
@@ -195,6 +211,62 @@ describeDatabase("transactional release-run outbox producer", () => {
       payload_run_id: first.runId,
       outbox_key: `github.check_run.create:${first.runId}`,
       transition_events: 0,
+    });
+  });
+
+  it("terminalizes an unconfigured repository before workflow dispatch", async () => {
+    await database().query("update repositories set current_setup_revision_id = null where id = $1", [repositoryRowId]);
+    const prepared = await prepareCheckRunCreate("setup-required", action("0".repeat(40)));
+    if (prepared.effect.payload.type !== "github.check_run.create") {
+      throw new Error("expected Check Run creation payload");
+    }
+    expect(prepared.effect.payload.action.setupIncomplete).toBe(true);
+
+    const completionOutboxId = `outbox-setup-required-complete-${suffix}`;
+    await expect(
+      prepared.store.completeCheckRunCreateEffect({
+        effect: prepared.effect,
+        workerId: prepared.workerId,
+        githubCheckRunId: 700000,
+        dispatchMode: "github-actions",
+        nextOutboxId: completionOutboxId,
+      }),
+    ).resolves.toMatchObject({
+      outcome: "completed",
+      nextEffectType: "github.check_run.complete",
+      nextOutboxId: completionOutboxId,
+    });
+
+    expect(
+      rows(
+        await database().query(
+          `select release_runs.status as run_status,
+                  release_runs.decision,
+                  release_runs.execution_attempt_id,
+                  (select count(*)::int from release_run_attempts where run_id = release_runs.id) as attempts,
+                  (select count(*)::int
+                     from control_plane_outbox
+                    where release_run_id = release_runs.id
+                      and effect_type = 'github.workflow.dispatch') as dispatch_effects,
+                  (select effect_type from control_plane_outbox where id = $2) as completion_effect,
+                  (select payload #>> '{input,conclusion}' from control_plane_outbox where id = $2)
+                    as completion_conclusion,
+                  (select payload #>> '{input,setupIncomplete}' from control_plane_outbox where id = $2)
+                    as completion_setup_incomplete
+             from release_runs
+            where release_runs.id = $1`,
+          [prepared.runId, completionOutboxId],
+        ),
+      )[0],
+    ).toEqual({
+      run_status: "completed",
+      decision: "neutral",
+      execution_attempt_id: null,
+      attempts: 0,
+      dispatch_effects: 0,
+      completion_effect: "github.check_run.complete",
+      completion_conclusion: "action_required",
+      completion_setup_incomplete: "true",
     });
   });
 
