@@ -116,19 +116,6 @@ export function createRepositorySetupLifecycleExecutor(
 
     async prepareRelease(action, context) {
       const repository = await repositoryContextForAction(dependencies.store, action);
-      if (repository.current?.workflowStatus !== "ready" || repository.current.configStatus !== "ready") {
-        throw new Error("release preparation requires repository setup to be ready");
-      }
-
-      const authentication = await dependencies.authenticateInstallation(action.installation.id);
-      const capability = checkCapabilityRequirement(
-        evaluateAppCapabilities(authentication.permissions),
-        "dispatch_analysis",
-      );
-      if (!capability.satisfied) {
-        throw new Error(`release preparation capability is unavailable: ${capability.missingPermissions.join(", ")}`);
-      }
-
       const releaseRunAction: GitHubAppLifecycleAction = {
         type: "release_run.enqueue",
         installation: action.installation,
@@ -144,6 +131,19 @@ export function createRepositorySetupLifecycleExecutor(
       if (action.pullRequestDraft !== undefined) releaseRunAction.pullRequestDraft = action.pullRequestDraft;
       if (action.pullRequestFromFork !== undefined) releaseRunAction.pullRequestFromFork = action.pullRequestFromFork;
       if (action.safeMode) releaseRunAction.safeMode = action.safeMode;
+
+      if (repository.current?.workflowStatus !== "ready" || repository.current.configStatus !== "ready") {
+        releaseRunAction.setupIncomplete = true;
+        return [releaseRunAction];
+      }
+
+      const authentication = await dependencies.authenticateInstallation(action.installation.id);
+      const capability = checkCapabilityRequirement(
+        evaluateAppCapabilities(authentication.permissions),
+        "dispatch_analysis",
+      );
+      if (!capability.satisfied) return [];
+
       return [releaseRunAction];
     },
 

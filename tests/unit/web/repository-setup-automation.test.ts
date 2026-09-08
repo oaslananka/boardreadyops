@@ -144,15 +144,16 @@ describe("repository setup lifecycle automation", () => {
       }),
     );
   });
-  it("fails closed before release preparation when Actions write is unavailable", async () => {
+  it("terminalizes a stale release preparation request when Actions write is unavailable", async () => {
     const store = setupStore();
+    const mutationService = vi.fn();
     const executor = createRepositorySetupLifecycleExecutor({
       store,
       authenticateInstallation: vi.fn(async () => ({
         token: "token",
         permissions: { pull_requests: "read", actions: "read" },
       })),
-      mutationService: vi.fn(),
+      mutationService,
     });
 
     await expect(
@@ -161,10 +162,11 @@ describe("repository setup lifecycle automation", () => {
         eventType: "check_run",
         eventAction: "requested_action",
       }),
-    ).rejects.toThrow(/actions:write/u);
+    ).resolves.toEqual([]);
+    expect(mutationService).not.toHaveBeenCalled();
   });
 
-  it("fails closed when repository setup is not ready for release preparation", async () => {
+  it("returns a setup-required release run when repository setup is not ready", async () => {
     const store = setupStore();
     vi.mocked(store.getContextByGitHub).mockResolvedValueOnce({
       installationId: "installation-1",
@@ -189,7 +191,23 @@ describe("repository setup lifecycle automation", () => {
         eventType: "check_run",
         eventAction: "requested_action",
       }),
-    ).rejects.toThrow(/setup.*ready/u);
+    ).resolves.toEqual([
+      {
+        type: "release_run.enqueue",
+        installation: { id: 123 },
+        repository: releasePrepareAction.repository,
+        pullRequestNumber: 7,
+        ref: "feature/board",
+        commitSha: "a".repeat(40),
+        baseCommitSha: "b".repeat(40),
+        triggerKind: "pr",
+        pullRequestDraft: false,
+        pullRequestFromFork: false,
+        deliveryId: "delivery-release-unconfigured",
+        idempotencyScope: "release-prepare:delivery-release-unconfigured",
+        setupIncomplete: true,
+      },
+    ]);
     expect(authenticateInstallation).not.toHaveBeenCalled();
   });
 
