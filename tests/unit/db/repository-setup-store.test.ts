@@ -64,6 +64,37 @@ describe("repository setup store", () => {
     expect(query.mock.calls[0]?.[1]).toEqual(["installation-1", "repository-1"]);
   });
 
+  it("loads a repository setup context by GitHub installation and repository IDs", async () => {
+    const { query, store } = executor([
+      {
+        rows: [
+          {
+            ...revisionRow,
+            github_installation_id: 123,
+            github_repo_id: 456,
+            owner: "octo",
+            name: "board",
+            private: false,
+            default_branch: "main",
+          },
+        ],
+      },
+    ]);
+
+    await expect(
+      store.getContextByGitHub({ githubInstallationId: 123, githubRepositoryId: 456 }),
+    ).resolves.toMatchObject({
+      installationId: "installation-1",
+      repositoryId: "repository-1",
+      githubInstallationId: 123,
+      githubRepositoryId: 456,
+      current: { workflowStatus: "ready", configStatus: "ready" },
+    });
+    expect(String(query.mock.calls[0]?.[0])).toContain("installations.github_installation_id = $1");
+    expect(String(query.mock.calls[0]?.[0])).toContain("repositories.github_repo_id = $2");
+    expect(query.mock.calls[0]?.[1]).toEqual([123, 456]);
+  });
+
   it("loads terminal probes so callbacks can replay and report precise lifecycle outcomes", async () => {
     const { query, store } = executor([
       {

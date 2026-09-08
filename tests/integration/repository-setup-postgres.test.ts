@@ -59,6 +59,24 @@ afterAll(async () => {
 });
 
 describeDatabase("repository setup PostgreSQL integration", () => {
+  it("resolves the tenant-scoped setup context from external GitHub IDs", async () => {
+    const store = createSqlRepositorySetupStore(database());
+
+    await expect(store.getContextByGitHub({ githubInstallationId, githubRepositoryId })).resolves.toMatchObject({
+      installationId,
+      repositoryId,
+      githubInstallationId,
+      githubRepositoryId,
+      owner: "setup-primary",
+      name: "board",
+      defaultBranch: "main",
+    });
+
+    await expect(
+      store.getContextByGitHub({ githubInstallationId, githubRepositoryId: githubRepositoryId + 1 }),
+    ).resolves.toBeUndefined();
+  });
+
   it("keeps setup revisions append-only, tenant-scoped and idempotent", async () => {
     const ids = [revisionOneId, revisionOneId, revisionOneId, revisionTwoId];
     const store = createSqlRepositorySetupStore(database(), {

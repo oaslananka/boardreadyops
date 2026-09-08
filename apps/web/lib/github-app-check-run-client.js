@@ -1,3 +1,4 @@
+import { evaluateAppCapabilities } from "@boardreadyops/cloud-core/github-capabilities";
 import { createAppAuth } from "@octokit/auth-app";
 
 export const readinessCheckName = "BoardReadyOps / release readiness";
@@ -104,6 +105,11 @@ export async function completeGitHubCheckRun(input) {
   const output = { title: input.input.title, summary: input.input.summary };
 
   const setupIncomplete = input.input.setupIncomplete === true;
+  const canCreateSetupPr = input.capabilities?.canCreateSetupPr !== false;
+  const outputSummary =
+    setupIncomplete && !canCreateSetupPr
+      ? "BoardReadyOps workflow or configuration is missing. Automated setup PR creation requires Contents, Workflows, and Pull requests write permissions. Update the GitHub App permissions or use the setup page."
+      : input.input.summary;
   const firstBody = {
     status: "completed",
     conclusion: input.input.conclusion,
@@ -111,8 +117,12 @@ export async function completeGitHubCheckRun(input) {
     actions: buildCheckRunRequestedActions({
       hasBlockers: input.input.conclusion === "failure",
       setupIncomplete,
+      canCreateSetupPr,
+      canCreateWaiverPr: input.capabilities?.canCreateWaiverPr !== false,
     }),
-    output: annotationChunks[0] ? { ...output, annotations: annotationChunks[0] } : output,
+    output: annotationChunks[0]
+      ? { ...output, summary: outputSummary, annotations: annotationChunks[0] }
+      : { ...output, summary: outputSummary },
   };
 
   if (input.detailsUrl) {
@@ -234,13 +244,13 @@ export function buildCheckRunRequestedActions(context) {
     },
   ];
 
-  if (context?.setupIncomplete) {
+  if (context?.setupIncomplete && context?.canCreateSetupPr !== false) {
     actions.push({
       label: "Fix repository setup",
       description: "Open setup PR with BoardReadyOps files",
       identifier: "create_setup_pr",
     });
-  } else if (context?.hasBlockers) {
+  } else if (context?.hasBlockers && context?.canCreateWaiverPr !== false) {
     actions.push({
       label: "Request waiver",
       description: "Open PR proposing a blocker waiver",
@@ -257,19 +267,30 @@ export function buildCheckRunRequestedActions(context) {
   return actions.slice(0, 3);
 }
 
-function checkRunCreationBody(input) {
+function setupRequiredSummary(setupIncomplete, canCreateSetupPr, action) {
+  if (!setupIncomplete) return queuedTrustSummary(action);
+  if (canCreateSetupPr) {
+    return "BoardReadyOps workflow or configuration is missing. Click 'Fix repository setup' to open a setup PR.";
+  }
+  return "BoardReadyOps workflow or configuration is missing. Automated setup PR creation requires Contents, Workflows, and Pull requests write permissions. Update the GitHub App permissions or use the setup page.";
+}
+
+function checkRunCreationBody(input, capabilities) {
   const setupIncomplete = input.action?.setupIncomplete === true;
+  const canCreateSetupPr = capabilities?.canCreateSetupPr !== false;
   const body = {
     name: readinessCheckName,
     head_sha: input.action.commitSha,
     status: "queued",
     external_id: input.runId,
-    actions: buildCheckRunRequestedActions({ setupIncomplete }),
+    actions: buildCheckRunRequestedActions({
+      setupIncomplete,
+      canCreateSetupPr,
+      canCreateWaiverPr: capabilities?.canCreateWaiverPr !== false,
+    }),
     output: {
       title: setupIncomplete ? "BoardReadyOps setup required" : "BoardReadyOps release readiness queued",
-      summary: setupIncomplete
-        ? "BoardReadyOps workflow or configuration is missing. Click 'Fix repository setup' to open a setup PR."
-        : queuedTrustSummary(input.action),
+      summary: setupRequiredSummary(setupIncomplete, canCreateSetupPr, input.action),
     },
   };
   const url = detailsUrl(input.runId);
@@ -302,7 +323,7 @@ export async function ensurePullRequestCheckRun(input) {
     await request(checkRunCollectionEndpoint(input.apiBaseUrl, action.repository.owner, action.repository.name), {
       method: "POST",
       headers,
-      body: JSON.stringify(checkRunCreationBody(input.input)),
+      body: JSON.stringify(checkRunCreationBody(input.input, input.capabilities)),
     }),
     "GitHub check run creation",
   );
@@ -363,27 +384,28 @@ export function createGitHubAppCheckRunClient() {
 
   const apiBaseUrl = process.env.GITHUB_API_BASE_URL ?? "https://api.github.com";
 
-  async function installationToken(installationId) {
+  async function installationAuthentication(installationId) {
     const auth = createAppAuth({
       appId,
       privateKey: githubPrivateKey(),
       installationId,
     });
-    const installationAuth = await auth({ type: "installation" });
-    return installationAuth.token;
+    return auth({ type: "installation" });
   }
 
   async function ensure(input) {
+    const authentication = await installationAuthentication(input.action.installation.id);
     return ensurePullRequestCheckRun({
       apiBaseUrl,
-      token: await installationToken(input.action.installation.id),
+      token: authentication.token,
+      capabilities: evaluateAppCapabilities(authentication.permissions),
       input,
     });
   }
 
   return {
     async readCheckRun(input) {
-      const token = await installationToken(input.installationId);
+      const token = (await installationAuthentication(input.installationId)).token;
       return readGitHubCheckRun({
         apiBaseUrl,
         token,
@@ -396,16 +418,18 @@ export function createGitHubAppCheckRunClient() {
     createPullRequestCheckRun: ensure,
 
     async completeCheckRun(input) {
+      const authentication = await installationAuthentication(input.installationId);
       return completeGitHubCheckRun({
         apiBaseUrl,
-        token: await installationToken(input.installationId),
+        token: authentication.token,
+        capabilities: evaluateAppCapabilities(authentication.permissions),
         input,
         detailsUrl: detailsUrl(input.runId),
       });
     },
 
     async createPullRequestComment(input) {
-      const token = await installationToken(input.installationId);
+      const token = (await installationAuthentication(input.installationId)).token;
       await upsertReadinessComment({
         apiBaseUrl,
         token,

@@ -467,12 +467,14 @@ function normalizeCheckRunEvent(
     const identifier = isRecord(requestedAction) ? stringValue(requestedAction, "identifier") : undefined;
 
     if (identifier === "create_setup_pr") {
+      const requestedBy = isRecord(payload.sender) ? stringValue(payload.sender, "login") : undefined;
       return result(options, action, [
         {
           type: "setup_pr.create",
           installation,
           repository,
           ...(checkRunId !== undefined ? { checkRunId } : {}),
+          ...(requestedBy ? { requestedBy } : {}),
         },
       ]);
     }

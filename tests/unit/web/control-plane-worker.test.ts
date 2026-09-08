@@ -108,6 +108,42 @@ describe("control-plane worker", () => {
     expect(jobs.completeJob).toHaveBeenCalledOnce();
   });
 
+  it("executes a setup PR interaction before completing the durable webhook job", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const setupAction = {
+      type: "setup_pr.create" as const,
+      installation: { id: 123 },
+      repository: {
+        id: 456,
+        owner: "octo",
+        name: "board",
+        fullName: "octo/board",
+        private: false,
+        defaultBranch: "main",
+      },
+      checkRunId: 91,
+      requestedBy: "octocat",
+    };
+    const interactions = { createSetupPr: vi.fn(async () => undefined) };
+    const setupJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "check_run",
+      eventAction: "requested_action",
+      actions: [setupAction],
+    };
+
+    await expect(
+      processControlPlaneJob(setupJob, { workerId: "worker-1", jobs, lifecycle, interactions }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(interactions.createSetupPr).toHaveBeenCalledWith(setupAction, {
+      deliveryId: "delivery-1",
+      eventType: "check_run",
+      eventAction: "requested_action",
+    });
+    expect(jobs.completeJob).toHaveBeenCalledOnce();
+  });
+
   it("requeues a failed database plan with a bounded redacted error", async () => {
     const lifecycle = lifecycleStore();
     vi.mocked(lifecycle.upsertInstallation).mockRejectedValue(new Error(`secret=${"x".repeat(1200)}`));

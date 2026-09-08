@@ -204,12 +204,13 @@ describe("Check Run Actions & File Annotations", () => {
           ...basePayload,
           action: "requested_action",
           requested_action: { identifier: "create_setup_pr" },
+          sender: { login: "octocat" },
         },
       });
 
       expect(result.accepted).toBe(true);
       expect(result.actions).toHaveLength(1);
-      expect(result.actions[0]?.type).toBe("setup_pr.create");
+      expect(result.actions[0]).toMatchObject({ type: "setup_pr.create", requestedBy: "octocat" });
     });
   });
 });

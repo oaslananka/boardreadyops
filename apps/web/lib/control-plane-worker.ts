@@ -2,12 +2,20 @@ import {
   type GitHubAppDurableLifecycleStore,
   planGitHubAppLifecycleActions,
 } from "@boardreadyops/cloud-core/durable-lifecycle-planner";
+import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "@boardreadyops/cloud-core/lifecycle";
 import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
+
+type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
+
+type ControlPlaneInteractionExecutor = {
+  createSetupPr(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
+};
 
 export type ControlPlaneWorkerDependencies = {
   workerId: string;
   jobs: ControlPlaneJobStore;
   lifecycle: GitHubAppDurableLifecycleStore;
+  interactions?: ControlPlaneInteractionExecutor;
 };
 
 export type ProcessControlPlaneJobResult = {
@@ -36,11 +44,17 @@ export async function processControlPlaneJob(
   dependencies: ControlPlaneWorkerDependencies,
 ): Promise<ProcessControlPlaneJobResult> {
   try {
-    await planGitHubAppLifecycleActions(job.actions, dependencies.lifecycle, {
+    const context: GitHubAppLifecycleContext = {
       deliveryId: job.deliveryId,
       eventType: job.eventType,
       ...(job.eventAction ? { eventAction: job.eventAction } : {}),
-    });
+    };
+    await planGitHubAppLifecycleActions(job.actions, dependencies.lifecycle, context);
+    for (const action of job.actions) {
+      if (action.type !== "setup_pr.create") continue;
+      if (!dependencies.interactions) throw new Error("setup lifecycle interaction executor is not configured");
+      await dependencies.interactions.createSetupPr(action, context);
+    }
     const status = await dependencies.jobs.completeJob({
       jobId: job.jobId,
       workerId: dependencies.workerId,
