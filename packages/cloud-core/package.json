@@ -83,6 +83,11 @@
       "types": "./src/github-mutation-service.ts",
       "import": "./src/github-mutation-service.ts",
       "default": "./src/github-mutation-service.ts"
+    },
+    "./github-command": {
+      "types": "./src/github-command.ts",
+      "import": "./src/github-command.ts",
+      "default": "./src/github-command.ts"
     }
   },
   "scripts": {
