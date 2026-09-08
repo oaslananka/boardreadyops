@@ -84,6 +84,22 @@ export type RepositorySetupStore = {
     observedSha?: string;
     diagnostics?: readonly string[];
   }): Promise<{ outcome: "applied" | "conflict" | "not_found" | "replayed"; revisionId?: string; revision?: number }>;
+  recordWaiverPrRequestAudit(input: {
+    eventId: string;
+    installationId: string;
+    repositoryId: string;
+    actorId: string;
+    requestId: string;
+  }): Promise<void>;
+  recordWaiverPrResultAudit(input: {
+    eventId: string;
+    installationId: string;
+    repositoryId: string;
+    actorId: string;
+    requestId: string;
+    outcome: "already_present" | "already_exists" | "created" | "updated";
+    pullRequestNumber?: number;
+  }): Promise<void>;
   createProbe(input: {
     installationId: string;
     repositoryId: string;
@@ -413,6 +429,72 @@ export function createSqlRepositorySetupStore(
       const revisionId = text(row, "revision_id");
       const revision = integer(row, "revision");
       return { outcome, ...(revisionId ? { revisionId } : {}), ...(revision === undefined ? {} : { revision }) };
+    },
+
+    async recordWaiverPrRequestAudit(input) {
+      const eventId = requiredUuid("eventId", input.eventId);
+      const installationId = requiredIdentifier("installationId", input.installationId);
+      const repositoryId = requiredIdentifier("repositoryId", input.repositoryId);
+      const actorId = requiredIdentifier("actorId", input.actorId);
+      const requestId = requiredIdentifier("requestId", input.requestId);
+      await executor.query(
+        `insert into audit_events (
+           id, installation_id, event_type, actor_type, actor_id,
+           subject_type, subject_id, repository_id, request_id, metadata, created_at
+         ) values (
+           $1, $2, 'github_app.repository.waiver_pr_requested', 'operator', $4,
+           'repository', $3, $3, $5, jsonb_build_object('action', 'waiver_pr'), $6::timestamptz
+         )
+         on conflict (id) do nothing`,
+        [eventId, installationId, repositoryId, actorId, requestId, now().toISOString()],
+      );
+    },
+
+    async recordWaiverPrResultAudit(input) {
+      const eventId = requiredUuid("eventId", input.eventId);
+      const installationId = requiredIdentifier("installationId", input.installationId);
+      const repositoryId = requiredIdentifier("repositoryId", input.repositoryId);
+      const actorId = requiredIdentifier("actorId", input.actorId);
+      const requestId = requiredIdentifier("requestId", input.requestId);
+      if (
+        input.outcome !== "already_present" &&
+        input.outcome !== "already_exists" &&
+        input.outcome !== "created" &&
+        input.outcome !== "updated"
+      ) {
+        throw new Error("outcome is invalid");
+      }
+      if (
+        input.pullRequestNumber !== undefined &&
+        (!Number.isSafeInteger(input.pullRequestNumber) || input.pullRequestNumber < 1)
+      ) {
+        throw new Error("pullRequestNumber is invalid");
+      }
+      if (input.outcome !== "already_present" && input.pullRequestNumber === undefined) {
+        throw new Error("pullRequestNumber is required for mutation outcomes");
+      }
+      await executor.query(
+        `insert into audit_events (
+           id, installation_id, event_type, actor_type, actor_id,
+           subject_type, subject_id, repository_id, request_id, metadata, created_at
+         ) values (
+           $1, $2, 'github_app.repository.waiver_pr_result', 'operator', $4,
+           'repository', $3, $3, $5,
+           jsonb_strip_nulls(jsonb_build_object('action', 'waiver_pr', 'outcome', $6::text, 'pullRequestNumber', $7::integer)),
+           $8::timestamptz
+         )
+         on conflict (id) do nothing`,
+        [
+          eventId,
+          installationId,
+          repositoryId,
+          actorId,
+          requestId,
+          input.outcome,
+          input.pullRequestNumber ?? null,
+          now().toISOString(),
+        ],
+      );
     },
 
     async createProbe(input) {

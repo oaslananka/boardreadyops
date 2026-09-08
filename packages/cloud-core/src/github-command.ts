@@ -1,4 +1,9 @@
-import type { GitHubAppLifecycleAction, GitHubInstallationRef, GitHubRepositoryRef } from "./lifecycle.js";
+import type {
+  GitHubAppLifecycleAction,
+  GitHubInstallationRef,
+  GitHubRepositoryRef,
+  PullRequestSafeMode,
+} from "./lifecycle.js";
 
 export type ParsedGitHubCommand =
   | { kind: "help" }
@@ -23,6 +28,9 @@ export type CommandExecutionContext = {
   headCommitSha: string;
   headRef: string;
   baseCommitSha?: string;
+  pullRequestDraft?: boolean;
+  pullRequestFromFork?: boolean;
+  safeMode?: PullRequestSafeMode;
   author?: string;
   checkRunId?: number;
 };
@@ -238,6 +246,74 @@ const EXPLANATIONS: Record<string, { title: string; summary: string; remedy: str
   },
 };
 
+function rerunCommandPlan(context: CommandExecutionContext): CommandExecutionPlan {
+  const enqueueAction: GitHubAppLifecycleAction = {
+    type: "release_run.enqueue",
+    installation: context.installation,
+    repository: context.repository,
+    pullRequestNumber: context.pullRequestNumber,
+    ref: context.headRef,
+    commitSha: context.headCommitSha,
+    triggerKind: "pr",
+  };
+  if (context.baseCommitSha) enqueueAction.baseCommitSha = context.baseCommitSha;
+  if (context.pullRequestDraft !== undefined) enqueueAction.pullRequestDraft = context.pullRequestDraft;
+  if (context.pullRequestFromFork !== undefined) enqueueAction.pullRequestFromFork = context.pullRequestFromFork;
+  if (context.safeMode) enqueueAction.safeMode = context.safeMode;
+  return { kind: "action", action: enqueueAction };
+}
+
+function setupCommandPlan(context: CommandExecutionContext): CommandExecutionPlan {
+  const setupAction: GitHubAppLifecycleAction = {
+    type: "setup_pr.create",
+    installation: context.installation,
+    repository: context.repository,
+  };
+  if (context.checkRunId) setupAction.checkRunId = context.checkRunId;
+  if (context.author) setupAction.requestedBy = context.author;
+  return { kind: "action", action: setupAction };
+}
+
+function waiverCommandPlan(
+  command: Extract<ParsedGitHubCommand, { kind: "waive" }>,
+  context: CommandExecutionContext,
+): CommandExecutionPlan {
+  const waiverAction: GitHubAppLifecycleAction = {
+    type: "waiver_pr.request",
+    installation: context.installation,
+    repository: context.repository,
+    ruleId: command.ruleId,
+  };
+  if (command.reason) waiverAction.reason = command.reason;
+  if (context.checkRunId) waiverAction.checkRunId = context.checkRunId;
+  if (context.author) waiverAction.requestedBy = context.author;
+  return { kind: "action", action: waiverAction };
+}
+
+function explainCommandPlan(command: Extract<ParsedGitHubCommand, { kind: "explain" }>): CommandExecutionPlan {
+  const info = EXPLANATIONS[command.ruleId];
+  if (info) {
+    return {
+      kind: "comment",
+      body: `### Rule Explanation: \`${command.ruleId}\` — ${info.title}
+
+${info.summary}
+
+**Recommended Action:**
+${info.remedy}
+`,
+    };
+  }
+  return {
+    kind: "comment",
+    body: `### Rule Explanation: \`${command.ruleId}\`
+
+Finding \`${command.ruleId}\` was reported by BoardReadyOps release checks.
+Review the design in KiCad, inspect the annotated files in the Check Run or Files Changed tab, or run \`/boardreadyops status\` for details.
+`,
+  };
+}
+
 export function executeParsedCommand(
   command: ParsedGitHubCommand,
   context: CommandExecutionContext,
@@ -277,88 +353,17 @@ export function executeParsedCommand(
       };
     }
 
-    case "rerun": {
-      const enqueueAction: GitHubAppLifecycleAction = {
-        type: "release_run.enqueue",
-        installation: context.installation,
-        repository: context.repository,
-        pullRequestNumber: context.pullRequestNumber,
-        ref: context.headRef,
-        commitSha: context.headCommitSha,
-        triggerKind: "pr",
-      };
-      if (context.baseCommitSha) {
-        enqueueAction.baseCommitSha = context.baseCommitSha;
-      }
-      return {
-        kind: "action",
-        action: enqueueAction,
-      };
-    }
+    case "rerun":
+      return rerunCommandPlan(context);
 
-    case "setup": {
-      const setupAction: GitHubAppLifecycleAction = {
-        type: "setup_pr.create",
-        installation: context.installation,
-        repository: context.repository,
-      };
-      if (context.checkRunId) {
-        setupAction.checkRunId = context.checkRunId;
-      }
-      if (context.author) {
-        setupAction.requestedBy = context.author;
-      }
-      return {
-        kind: "action",
-        action: setupAction,
-      };
-    }
+    case "setup":
+      return setupCommandPlan(context);
 
-    case "waive": {
-      const waiverAction: GitHubAppLifecycleAction = {
-        type: "waiver_pr.request",
-        installation: context.installation,
-        repository: context.repository,
-        ruleId: command.ruleId,
-      };
-      if (command.reason) {
-        waiverAction.reason = command.reason;
-      }
-      if (context.checkRunId) {
-        waiverAction.checkRunId = context.checkRunId;
-      }
-      if (context.author) {
-        waiverAction.requestedBy = context.author;
-      }
-      return {
-        kind: "action",
-        action: waiverAction,
-      };
-    }
+    case "waive":
+      return waiverCommandPlan(command, context);
 
-    case "explain": {
-      const info = EXPLANATIONS[command.ruleId];
-      if (info) {
-        return {
-          kind: "comment",
-          body: `### Rule Explanation: \`${command.ruleId}\` — ${info.title}
-
-${info.summary}
-
-**Recommended Action:**
-${info.remedy}
-`,
-        };
-      }
-      return {
-        kind: "comment",
-        body: `### Rule Explanation: \`${command.ruleId}\`
-
-Finding \`${command.ruleId}\` was reported by BoardReadyOps release checks.
-Review the design in KiCad, inspect the annotated files in the Check Run or Files Changed tab, or run \`/boardreadyops status\` for details.
-`,
-      };
-    }
+    case "explain":
+      return explainCommandPlan(command);
 
     case "diff": {
       return {

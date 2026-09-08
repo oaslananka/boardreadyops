@@ -99,6 +99,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@boardreadyops/contracts": "workspace:*"
+    "@boardreadyops/contracts": "workspace:*",
+    "yaml": "2.9.0"
   }
 }

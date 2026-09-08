@@ -60,6 +60,28 @@ describe("lifecycle issue_comment event normalization", () => {
     expect(res.actions).toEqual([]);
   });
 
+  it("ignores BoardReadyOps bot comments so command responses cannot recurse", () => {
+    const res = normalizeGitHubAppWebhook({
+      event: "issue_comment",
+      delivery: "del-bot",
+      payload: {
+        action: "created",
+        repository,
+        installation,
+        issue: { number: 42, pull_request: { url: "https://api.github.com/..." } },
+        comment: {
+          id: 599,
+          body: "/boardreadyops rerun",
+          user: { login: "boardreadyops[bot]", type: "Bot" },
+          author_association: "CONTRIBUTOR",
+        },
+      },
+    });
+
+    expect(res.accepted).toBe(true);
+    expect(res.actions).toEqual([]);
+  });
+
   it("emits github_command.execute for pull request comments containing /boardreadyops command", () => {
     const res = normalizeGitHubAppWebhook({
       event: "issue_comment",

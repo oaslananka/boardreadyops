@@ -39,6 +39,53 @@ describe("Setup and Waiver PR plan generation", () => {
     expect(plan.preset.id).toBe("open-source");
   });
 
+  it("fails closed when a waiver plan has no current repository config", () => {
+    expect(() =>
+      generateWaiverPrPlan({
+        ruleId: "manufacturing.drill-coverage",
+        reason: "Temporary fab exception",
+      }),
+    ).toThrow(/current.*boardreadyops\.yml.*required/iu);
+  });
+
+  it("fails closed when the current repository config is malformed", () => {
+    expect(() =>
+      generateWaiverPrPlan({
+        ruleId: "manufacturing.drill-coverage",
+        reason: "Temporary fab exception",
+        currentConfigContent: "version: [unterminated",
+      }),
+    ).toThrow(/current.*boardreadyops\.yml.*valid YAML/iu);
+  });
+
+  it("does not duplicate an identical waiver already present in repository config", () => {
+    const plan = generateWaiverPrPlan({
+      ruleId: "rule.test",
+      reason: "temporary exception",
+      owner: "octocat",
+      currentConfigContent:
+        "version: 1\nmode: enforce\nwaivers:\n  - rule: rule.test\n    owner: octocat\n    reason: temporary exception\n",
+    });
+
+    const updated = yaml.load(plan.files[0]?.content ?? "") as Record<string, unknown>;
+    expect(updated.waivers).toEqual([{ rule: "rule.test", owner: "octocat", reason: "temporary exception" }]);
+  });
+
+  it("preserves repository YAML comments while adding a waiver", () => {
+    const plan = generateWaiverPrPlan({
+      ruleId: "rule.test",
+      reason: "temporary exception",
+      owner: "octocat",
+      currentConfigContent:
+        "# keep repository context\nversion: 1\nmode: enforce # keep operator note\nrules:\n  bom.missing-mpn: true # keep rule note\n",
+    });
+
+    const content = plan.files[0]?.content ?? "";
+    expect(content).toContain("# keep repository context");
+    expect(content).toContain("mode: enforce # keep operator note");
+    expect(content).toContain("bom.missing-mpn: true # keep rule note");
+  });
+
   it("generates a waiver PR plan that appends a waiver to existing config", () => {
     const initialConfig = "version: 1\nmode: enforce\n";
     const plan = generateWaiverPrPlan({

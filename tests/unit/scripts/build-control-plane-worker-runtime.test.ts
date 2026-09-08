@@ -23,6 +23,8 @@ describe("control-plane production runtime bundles", () => {
     const metadata = JSON.parse(fs.readFileSync("apps/web/.next/worker-meta.json", "utf8"));
     const imports = metadata.outputs["apps/web/.next/worker.mjs"]?.imports ?? [];
     expect(imports).toContainEqual(expect.objectContaining({ path: "pg", external: true }));
+    const inputs = Object.keys(metadata.inputs ?? {});
+    expect(inputs.some((path) => path.endsWith("apps/web/lib/github-command-executor.ts"))).toBe(true);
 
     const worker = spawnSync(process.execPath, ["apps/web/.next/worker.mjs"], {
       cwd: process.cwd(),

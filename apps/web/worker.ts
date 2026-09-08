@@ -40,6 +40,7 @@ import {
   workerScopeFromReconciliationItem,
 } from "./lib/control-plane-worker-runtime.js";
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
+import { createProductionGitHubCommandLifecycleExecutor } from "./lib/github-command-executor.js";
 import { createGitHubWorkflowReconciliationClient } from "./lib/github-workflow-reconciliation-client.js";
 import { createProductionRepositorySetupLifecycleExecutor } from "./lib/repository-setup-automation.js";
 import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-worker.js";
@@ -179,6 +180,16 @@ const outbox = createSqlControlPlaneOutboxStore(executor);
 const artifactDeletions = createSqlArtifactDeletionStore(executor);
 const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
 const setupInteractions = createProductionRepositorySetupLifecycleExecutor(executor);
+const githubCommandInteractions = createProductionGitHubCommandLifecycleExecutor();
+const interactions =
+  setupInteractions || githubCommandInteractions
+    ? {
+        ...(setupInteractions
+          ? { createSetupPr: setupInteractions.createSetupPr, createWaiverPr: setupInteractions.createWaiverPr }
+          : {}),
+        ...(githubCommandInteractions ? { executeGitHubCommand: githubCommandInteractions.executeGitHubCommand } : {}),
+      }
+    : undefined;
 const scopedConcurrency = createScopedConcurrencyGate({
   installationLimit: installationConcurrency,
   repositoryLimit: repositoryConcurrency,
@@ -605,7 +616,7 @@ async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<vo
           workerId,
           jobs,
           lifecycle,
-          ...(setupInteractions ? { interactions: setupInteractions } : {}),
+          ...(interactions ? { interactions } : {}),
         }),
       ),
     })),

@@ -298,7 +298,7 @@ function pullRequestIsFromFork(repository: GitHubRepositoryRef, pullRequest: Rec
   );
 }
 
-function pullRequestSafeMode(
+export function pullRequestSafeMode(
   repository: GitHubRepositoryRef,
   fromFork: boolean,
   draft: boolean,
@@ -545,7 +545,12 @@ function normalizeIssueCommentEvent(
   const pullRequestNumber = numberValue(issue, "number");
   const commentId = numberValue(comment, "id");
   const commentUser = isRecord(comment.user) ? stringValue(comment.user, "login") : undefined;
+  const commentUserType = isRecord(comment.user) ? stringValue(comment.user, "type") : undefined;
   const authorAssociation = stringValue(comment, "author_association") ?? "NONE";
+
+  if (commentUserType?.toLowerCase() === "bot") {
+    return result(options, action, []);
+  }
 
   if (pullRequestNumber === undefined || commentId === undefined || !commentUser) {
     return unsupported(options, "issue_comment payload does not include PR number, comment id, or author");

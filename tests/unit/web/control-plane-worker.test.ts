@@ -144,6 +144,132 @@ describe("control-plane worker", () => {
     expect(jobs.completeJob).toHaveBeenCalledOnce();
   });
 
+  it("executes a waiver PR interaction before completing the durable webhook job", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const waiverAction = {
+      type: "waiver_pr.request" as const,
+      installation: { id: 123 },
+      repository: {
+        id: 456,
+        owner: "octo",
+        name: "board",
+        fullName: "octo/board",
+        private: false,
+        defaultBranch: "main",
+      },
+      ruleId: "rule.test",
+      reason: "temporary",
+      requestedBy: "octocat",
+    };
+    const interactions = { createWaiverPr: vi.fn(async () => undefined) };
+    const waiverJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "issue_comment",
+      eventAction: "created",
+      actions: [waiverAction],
+    };
+
+    await expect(
+      processControlPlaneJob(waiverJob, { workerId: "worker-1", jobs, lifecycle, interactions }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(interactions.createWaiverPr).toHaveBeenCalledWith(waiverAction, {
+      deliveryId: "delivery-1",
+      eventType: "issue_comment",
+      eventAction: "created",
+    });
+    expect(jobs.completeJob).toHaveBeenCalledOnce();
+  });
+
+  it("supports a command-only interaction executor configuration", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const commandAction = {
+      type: "github_command.execute" as const,
+      installation: { id: 123 },
+      repository: {
+        id: 456,
+        owner: "octo",
+        name: "board",
+        fullName: "octo/board",
+        private: false,
+        defaultBranch: "main",
+      },
+      pullRequestNumber: 7,
+      commentId: 45,
+      commentBody: "/boardreadyops status",
+      commentAuthor: "octocat",
+      authorAssociation: "NONE",
+    };
+    const interactions = {
+      executeGitHubCommand: vi.fn(async () => []),
+    };
+    const commandJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "issue_comment",
+      eventAction: "created",
+      actions: [commandAction],
+    };
+
+    await expect(
+      processControlPlaneJob(commandJob, { workerId: "worker-1", jobs, lifecycle, interactions }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(interactions.executeGitHubCommand).toHaveBeenCalledOnce();
+  });
+
+  it("routes GitHub command actions back through durable lifecycle planning before completing the job", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const commandAction = {
+      type: "github_command.execute" as const,
+      installation: { id: 123 },
+      repository: {
+        id: 456,
+        owner: "octo",
+        name: "board",
+        fullName: "octo/board",
+        private: false,
+        defaultBranch: "main",
+      },
+      pullRequestNumber: 7,
+      commentId: 44,
+      commentBody: "/boardreadyops rerun",
+      commentAuthor: "octocat",
+      authorAssociation: "MEMBER",
+    };
+    const rerunAction = {
+      type: "release_run.enqueue" as const,
+      installation: { id: 123 },
+      repository: commandAction.repository,
+      pullRequestNumber: 7,
+      ref: "feature/board",
+      commitSha: "a".repeat(40),
+      baseCommitSha: "b".repeat(40),
+      triggerKind: "pr" as const,
+    };
+    const interactions = {
+      createSetupPr: vi.fn(async () => undefined),
+      executeGitHubCommand: vi.fn(async () => [rerunAction]),
+    };
+    const commandJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "issue_comment",
+      eventAction: "created",
+      actions: [commandAction],
+    };
+
+    await expect(
+      processControlPlaneJob(commandJob, { workerId: "worker-1", jobs, lifecycle, interactions }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(interactions.executeGitHubCommand).toHaveBeenCalledWith(commandAction, {
+      deliveryId: "delivery-1",
+      eventType: "issue_comment",
+      eventAction: "created",
+    });
+    expect(lifecycle.enqueueReleaseRunWithOutbox).toHaveBeenCalledWith(rerunAction);
+    expect(jobs.completeJob).toHaveBeenCalledOnce();
+  });
+
   it("requeues a failed database plan with a bounded redacted error", async () => {
     const lifecycle = lifecycleStore();
     vi.mocked(lifecycle.upsertInstallation).mockRejectedValue(new Error(`secret=${"x".repeat(1200)}`));
