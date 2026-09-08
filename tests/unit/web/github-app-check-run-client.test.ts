@@ -331,6 +331,14 @@ describe("GitHub App Check Run completion (annotations)", () => {
 
     const defaultActions = buildCheckRunRequestedActions();
     expect(defaultActions.map((a) => a.identifier)).toEqual(["rerun_checks", "prepare_release"]);
+
+    for (const actions of [setupActions, waiverActions, defaultActions]) {
+      for (const action of actions) {
+        expect(action.label.length).toBeLessThanOrEqual(20);
+        expect(action.description.length).toBeLessThanOrEqual(40);
+        expect(action.identifier.length).toBeLessThanOrEqual(20);
+      }
+    }
   });
 
   it("maps annotation fields to GitHub's snake_case shape in a single PATCH when 50 or fewer", async () => {
