@@ -24,6 +24,7 @@ export interface ExecuteMutationInput {
   files: MutationFile[];
   actorId?: string;
   requestId?: string;
+  expectedBaseCommitSha?: string;
 }
 
 export interface MutationResult {
@@ -47,7 +48,20 @@ export interface GitHubMutationServiceDependencies {
   client: GitHubMutationApiClient;
 }
 
+export interface ReadFileSnapshotInput {
+  owner: string;
+  repo: string;
+  defaultBranch: string;
+  path: string;
+}
+
+export interface RepositoryFileSnapshot {
+  baseCommitSha: string;
+  content: string;
+}
+
 export interface GitHubMutationService {
+  readFileSnapshot(input: ReadFileSnapshotInput): Promise<RepositoryFileSnapshot>;
   execute(input: ExecuteMutationInput): Promise<MutationResult>;
 }
 
@@ -118,18 +132,30 @@ function validateMutationFiles(files: MutationFile[]): void {
   }
 }
 
-async function resolveBaseTreeSha(
+async function resolveDefaultBranchCommitSha(
   client: GitHubMutationApiClient,
   repoPath: string,
   defaultBranch: string,
-): Promise<{ baseCommitSha: string; baseTreeSha: string }> {
+): Promise<string> {
   const defaultRefRes = await client.request<{ object: { sha: string } }>(
     `${repoPath}/git/ref/heads/${encodeURIComponent(defaultBranch)}`,
   );
   if (!defaultRefRes.ok || !defaultRefRes.data?.object?.sha) {
     throw new Error(`failed to resolve default branch "${defaultBranch}" commit SHA`);
   }
-  const baseCommitSha = defaultRefRes.data.object.sha;
+  return defaultRefRes.data.object.sha;
+}
+
+async function resolveBaseTreeSha(
+  client: GitHubMutationApiClient,
+  repoPath: string,
+  defaultBranch: string,
+  expectedBaseCommitSha?: string,
+): Promise<{ baseCommitSha: string; baseTreeSha: string }> {
+  const baseCommitSha = await resolveDefaultBranchCommitSha(client, repoPath, defaultBranch);
+  if (expectedBaseCommitSha && expectedBaseCommitSha !== baseCommitSha) {
+    throw new Error("default branch moved after repository snapshot; retry the mutation from the new base");
+  }
 
   const baseCommitRes = await client.request<{ tree: { sha: string } }>(
     `${repoPath}/git/commits/${encodeURIComponent(baseCommitSha)}`,
@@ -173,14 +199,21 @@ async function resolveOpenPr(
   owner: string,
   branchName: string,
   defaultBranch: string,
-): Promise<{ number: number; html_url: string } | undefined> {
-  const pullsRes = await client.request<Array<{ number: number; html_url: string; state: string }>>(
+): Promise<{ number: number; html_url: string; title?: string; body?: string | null } | undefined> {
+  const pullsRes = await client.request<
+    Array<{ number: number; html_url: string; state: string; title?: string; body?: string | null }>
+  >(
     `${repoPath}/pulls?head=${encodeURIComponent(owner)}:${encodeURIComponent(branchName)}&base=${encodeURIComponent(defaultBranch)}&state=open`,
   );
   if (pullsRes.ok && Array.isArray(pullsRes.data) && pullsRes.data.length > 0) {
     const first = pullsRes.data[0];
     if (first) {
-      return { number: first.number, html_url: first.html_url };
+      return {
+        number: first.number,
+        html_url: first.html_url,
+        ...(first.title === undefined ? {} : { title: first.title }),
+        ...(first.body === undefined ? {} : { body: first.body }),
+      };
     }
   }
   return undefined;
@@ -223,9 +256,18 @@ async function ensurePullRequest(
   client: GitHubMutationApiClient,
   repoPath: string,
   input: ExecuteMutationInput,
-  existingPr: { number: number; html_url: string } | undefined,
+  existingPr: { number: number; html_url: string; title?: string; body?: string | null } | undefined,
 ): Promise<{ pullRequestNumber: number; pullRequestUrl: string; outcome: "created" | "updated" }> {
   if (existingPr) {
+    if (existingPr.title !== input.prTitle || (existingPr.body ?? "") !== input.prBody) {
+      const updatePrRes = await client.request(`${repoPath}/pulls/${existingPr.number}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: input.prTitle, body: input.prBody }),
+      });
+      if (!updatePrRes.ok) {
+        throw new Error("failed to update pull request for mutation");
+      }
+    }
     return {
       pullRequestNumber: existingPr.number,
       pullRequestUrl: existingPr.html_url,
@@ -256,13 +298,37 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
   const { client } = dependencies;
 
   return {
+    async readFileSnapshot(input: ReadFileSnapshotInput): Promise<RepositoryFileSnapshot> {
+      if (!isAllowedMutationPath(input.path)) {
+        throw new Error(`path "${input.path}" is not in the allowed repository-mutation allowlist`);
+      }
+      const repoPath = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}`;
+      const baseCommitSha = await resolveDefaultBranchCommitSha(client, repoPath, input.defaultBranch);
+      const encodedPath = input.path.split("/").map(encodeURIComponent).join("/");
+      const fileRes = await client.request<{ encoding?: string; content?: string }>(
+        `${repoPath}/contents/${encodedPath}?ref=${encodeURIComponent(baseCommitSha)}`,
+      );
+      if (!fileRes.ok || fileRes.data?.encoding !== "base64" || typeof fileRes.data.content !== "string") {
+        throw new Error(`failed to read "${input.path}" from default branch snapshot`);
+      }
+      return {
+        baseCommitSha,
+        content: Buffer.from(fileRes.data.content, "base64").toString("utf8"),
+      };
+    },
+
     async execute(input: ExecuteMutationInput): Promise<MutationResult> {
       validateBranchName(input.branchName, input.defaultBranch);
       validateMutationFiles(input.files);
 
       const repoPath = `/repos/${encodeURIComponent(input.owner)}/${encodeURIComponent(input.repo)}`;
 
-      const { baseCommitSha, baseTreeSha } = await resolveBaseTreeSha(client, repoPath, input.defaultBranch);
+      const { baseCommitSha, baseTreeSha } = await resolveBaseTreeSha(
+        client,
+        repoPath,
+        input.defaultBranch,
+        input.expectedBaseCommitSha,
+      );
       const { branchExists, existingCommitSha, existingTreeSha } = await resolveBranchState(
         client,
         repoPath,
@@ -290,8 +356,12 @@ export function createGitHubMutationService(dependencies: GitHubMutationServiceD
       const newTreeSha = newTreeRes.data.sha;
 
       if (branchExists && existingTreeSha === newTreeSha && existingPr) {
+        const metadataMatches = existingPr.title === input.prTitle && (existingPr.body ?? "") === input.prBody;
+        if (!metadataMatches) {
+          await ensurePullRequest(client, repoPath, input, existingPr);
+        }
         return {
-          outcome: "already_exists",
+          outcome: metadataMatches ? "already_exists" : "updated",
           branchName: input.branchName,
           commitSha: existingCommitSha as string,
           pullRequestNumber: existingPr.number,

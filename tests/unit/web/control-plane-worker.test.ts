@@ -144,6 +144,43 @@ describe("control-plane worker", () => {
     expect(jobs.completeJob).toHaveBeenCalledOnce();
   });
 
+  it("executes a waiver PR interaction before completing the durable webhook job", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const waiverAction = {
+      type: "waiver_pr.request" as const,
+      installation: { id: 123 },
+      repository: {
+        id: 456,
+        owner: "octo",
+        name: "board",
+        fullName: "octo/board",
+        private: false,
+        defaultBranch: "main",
+      },
+      ruleId: "rule.test",
+      reason: "temporary",
+      requestedBy: "octocat",
+    };
+    const interactions = { createWaiverPr: vi.fn(async () => undefined) };
+    const waiverJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "issue_comment",
+      eventAction: "created",
+      actions: [waiverAction],
+    };
+
+    await expect(
+      processControlPlaneJob(waiverJob, { workerId: "worker-1", jobs, lifecycle, interactions }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(interactions.createWaiverPr).toHaveBeenCalledWith(waiverAction, {
+      deliveryId: "delivery-1",
+      eventType: "issue_comment",
+      eventAction: "created",
+    });
+    expect(jobs.completeJob).toHaveBeenCalledOnce();
+  });
+
   it("supports a command-only interaction executor configuration", async () => {
     const lifecycle = lifecycleStore();
     const jobs = jobStore();

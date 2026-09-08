@@ -112,12 +112,12 @@ export function createGitHubCommandLifecycleExecutor(
         return [];
       }
 
-      if (command.kind === "waive") {
+      if (command.kind === "waive" && !command.reason?.trim()) {
         await postResponse(
           action,
           api,
           capabilities,
-          "BoardReadyOps waiver PR automation is not available until the current repository configuration can be read and preserved safely. No repository changes were made.",
+          'The `--reason` argument is required for an audited waiver. Use `/boardreadyops waive <rule-id> --reason "<text>"`.',
         );
         return [];
       }

@@ -168,7 +168,7 @@ describe("GitHub command lifecycle executor", () => {
     );
   });
 
-  it("fails closed with an explanatory comment while waiver PR mutation is not wired", async () => {
+  it("returns a durable waiver action with the requesting actor and explicit reason", async () => {
     const { executor, readPullRequest, upsertResponse } = executorWithPermissions({
       contents: "write",
       pull_requests: "write",
@@ -180,13 +180,34 @@ describe("GitHub command lifecycle executor", () => {
         eventType: "issue_comment",
         eventAction: "created",
       }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        type: "waiver_pr.request",
+        ruleId: "rule.test",
+        reason: "temporary",
+        requestedBy: "octocat",
+      }),
+    ]);
+    expect(readPullRequest).toHaveBeenCalledOnce();
+    expect(upsertResponse).not.toHaveBeenCalled();
+  });
+
+  it("fails closed with guidance when a waiver command omits the audit reason", async () => {
+    const { executor, readPullRequest, upsertResponse } = executorWithPermissions({
+      contents: "write",
+      pull_requests: "write",
+    });
+
+    await expect(
+      executor.executeGitHubCommand(commandAction("/boardreadyops waive rule.test"), {
+        deliveryId: "delivery-waive-no-reason",
+        eventType: "issue_comment",
+        eventAction: "created",
+      }),
     ).resolves.toEqual([]);
     expect(readPullRequest).not.toHaveBeenCalled();
     expect(upsertResponse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        commentId: 44,
-        body: expect.stringContaining("waiver PR automation is not available"),
-      }),
+      expect.objectContaining({ body: expect.stringMatching(/--reason.*required/iu) }),
     );
   });
 
