@@ -152,7 +152,7 @@ describe("main branch governance ruleset", () => {
     expect(security).toContain(advisoryUrl);
   });
 
-  it("documents the solo-maintainer review and PR-only emergency bypass policy", async () => {
+  it("documents the solo-maintainer auto-queue and PR-only emergency bypass policy", async () => {
     const governance = await repositoryFile("GOVERNANCE.md");
     const detailedGovernance = await repositoryFile("docs/governance.md");
     const setup = await repositoryFile("scripts/setup-branch-protection.sh");
@@ -162,6 +162,10 @@ describe("main branch governance ruleset", () => {
       expect(normalized).toContain("zero required human approvals");
       expect(normalized).not.toContain("signed commits");
       expect(normalized).toContain("Mergify");
+      expect(normalized).toContain("automatically enter the Mergify queue");
+      expect(normalized).toContain("manual-review");
+      expect(normalized).toContain("do-not-merge");
+      expect(normalized).not.toContain("explicit maintainer merge decision");
       expect(normalized).toContain("PR-only emergency bypass");
       expect(normalized).toContain("retrospective review");
     }

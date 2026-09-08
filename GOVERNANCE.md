@@ -45,8 +45,10 @@ Public contribution status, discussion, review, and CI evidence remain on GitHub
 Every pull request targeting `main` must pass the required CI gates. Because the
 repository currently has one maintainer, the branch ruleset enforces zero
 required human approvals. All review conversations must still be resolved before
-merge, and the maintainer must inspect automated review, security, coverage, and
-CI evidence before making the merge decision.
+merge. Eligible pull requests automatically enter the Mergify queue when they
+are not drafts and carry neither `manual-review` nor `do-not-merge`; GitHub
+Rulesets remain authoritative for the required checks before queue admission and
+again before merge.
 
 When a second trusted maintainer with repository write access is onboarded,
 revisit this policy and consider requiring one independent approval. Until then,
@@ -62,9 +64,10 @@ and rollback plan. Record a retrospective review within two business days and
 open follow-up issues for any findings.
 
 Release Please, Renovate, and other automation may create and update pull
-requests. Their pull requests do not require a human approval while the project
-is single-maintainer, but they must pass the same required checks, resolve all
-review conversations, and receive an explicit maintainer merge decision.
+requests. Their eligible pull requests automatically enter the Mergify queue
+under the same required checks and resolved-conversation rules. Maintainers use
+`manual-review` or `do-not-merge` whenever an explicit human decision is required
+before merge.
 
 ## CODEOWNERS
 
