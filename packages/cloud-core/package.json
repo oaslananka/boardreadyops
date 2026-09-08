@@ -73,6 +73,16 @@
       "types": "./src/repository-setup.ts",
       "import": "./src/repository-setup.ts",
       "default": "./src/repository-setup.ts"
+    },
+    "./github-capabilities": {
+      "types": "./src/github-capabilities.ts",
+      "import": "./src/github-capabilities.ts",
+      "default": "./src/github-capabilities.ts"
+    },
+    "./github-mutation-service": {
+      "types": "./src/github-mutation-service.ts",
+      "import": "./src/github-mutation-service.ts",
+      "default": "./src/github-mutation-service.ts"
     }
   },
   "scripts": {
