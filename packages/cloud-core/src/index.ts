@@ -7,11 +7,15 @@ export * from "./component-intelligence.js";
 export * from "./decision-engine.js";
 export * from "./entitlements.js";
 export * from "./evidence-ledger.js";
+export * from "./github-capabilities.js";
+export * from "./github-command.js";
+export * from "./github-mutation-service.js";
 export * from "./policy-engine.js";
 export * from "./review-diff.js";
 export * from "./runner-request-signature.js";
 export * from "./storage.js";
 export * from "./stripe-service.js";
+export * from "./telemetry.js";
 export * from "./wdrr-metrics.js";
 export * from "./xml-sanitizer.js";
 

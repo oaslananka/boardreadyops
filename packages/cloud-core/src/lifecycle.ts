@@ -1,4 +1,14 @@
-export type GitHubAppWebhookEvent = "installation" | "installation_repositories" | "ping" | "pull_request";
+import { parseGitHubCommand } from "./github-command.js";
+
+export type GitHubAppWebhookEvent =
+  | "check_run"
+  | "installation"
+  | "installation_repositories"
+  | "issue_comment"
+  | "ping"
+  | "pull_request"
+  | "pull_request_review"
+  | "workflow_run";
 
 export type GitHubRepositoryRef = {
   id: number;
@@ -48,6 +58,57 @@ export type GitHubAppLifecycleAction =
       type: "repository.removed";
       installation: GitHubInstallationRef;
       repository: GitHubRepositoryRef;
+    }
+  | {
+      type: "setup_pr.create";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      checkRunId?: number | undefined;
+      requestedBy?: string | undefined;
+    }
+  | {
+      type: "waiver_pr.request";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      checkRunId?: number | undefined;
+      ruleId?: string | undefined;
+      reason?: string | undefined;
+      requestedBy?: string | undefined;
+    }
+  | {
+      type: "release.prepare";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      checkRunId?: number | undefined;
+      requestedBy?: string | undefined;
+    }
+  | {
+      type: "github_command.execute";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      pullRequestNumber: number;
+      commentId: number;
+      commentBody: string;
+      commentAuthor: string;
+      authorAssociation: string;
+    }
+  | {
+      type: "pull_request_review.submitted";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      pullRequestNumber: number;
+      reviewId: number;
+      state: string;
+      reviewer: string;
+    }
+  | {
+      type: "workflow_run.progress";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      workflowRunId: number;
+      workflowName: string;
+      status: string;
+      conclusion?: string | undefined;
     }
   | {
       type: "release_run.enqueue";
@@ -345,6 +406,241 @@ function normalizeInstallationRepositoriesEvent(
   ]);
 }
 
+function normalizeCheckRunEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  const repository = repositoryFromPayload(payload.repository);
+  if (!repository) {
+    return unsupported(options, "payload does not include a valid repository");
+  }
+
+  const checkRun = payload.check_run;
+  if (!isRecord(checkRun)) {
+    return unsupported(options, "payload does not include a valid check_run");
+  }
+
+  const checkRunId = numberValue(checkRun, "id");
+  const checkSuite = checkRun.check_suite;
+  const pullRequests = isRecord(checkSuite) ? arrayValue(checkSuite, "pull_requests") : [];
+  const firstPr =
+    pullRequests.length > 0 && isRecord(pullRequests[0]) ? (pullRequests[0] as Record<string, unknown>) : undefined;
+
+  if (
+    action === "rerequested" ||
+    (action === "requested_action" &&
+      isRecord(payload.requested_action) &&
+      payload.requested_action.identifier === "rerun_checks")
+  ) {
+    if (!firstPr) {
+      return result(options, action, []);
+    }
+    const pullRequestNumber = numberValue(firstPr, "number");
+    const commitSha = pullRequestCommitSha(firstPr) ?? stringValue(checkRun, "head_sha");
+    const baseCommitSha = pullRequestBaseCommitSha(firstPr);
+    const ref = pullRequestRef(firstPr);
+
+    if (pullRequestNumber === undefined || !commitSha || !ref) {
+      return unsupported(options, "check_run PR payload does not include number, head sha, or ref");
+    }
+
+    return result(options, action, [
+      {
+        type: "release_run.enqueue",
+        installation,
+        repository,
+        pullRequestNumber,
+        ref,
+        commitSha,
+        ...(baseCommitSha ? { baseCommitSha } : {}),
+        triggerKind: "pr",
+        deliveryId: options.delivery,
+      },
+    ]);
+  }
+
+  if (action === "requested_action") {
+    const requestedAction = payload.requested_action;
+    const identifier = isRecord(requestedAction) ? stringValue(requestedAction, "identifier") : undefined;
+
+    if (identifier === "create_setup_pr") {
+      return result(options, action, [
+        {
+          type: "setup_pr.create",
+          installation,
+          repository,
+          ...(checkRunId !== undefined ? { checkRunId } : {}),
+        },
+      ]);
+    }
+
+    if (identifier === "request_waiver") {
+      return result(options, action, [
+        {
+          type: "waiver_pr.request",
+          installation,
+          repository,
+          ...(checkRunId !== undefined ? { checkRunId } : {}),
+        },
+      ]);
+    }
+
+    if (identifier === "prepare_release") {
+      return result(options, action, [
+        {
+          type: "release.prepare",
+          installation,
+          repository,
+          ...(checkRunId !== undefined ? { checkRunId } : {}),
+        },
+      ]);
+    }
+
+    return result(options, action, []);
+  }
+
+  return result(options, action, []);
+}
+
+function normalizeIssueCommentEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  if (action !== "created") {
+    return result(options, action, []);
+  }
+
+  const issue = payload.issue;
+  if (!isRecord(issue) || !isRecord(issue.pull_request)) {
+    return result(options, action, []);
+  }
+
+  const comment = payload.comment;
+  if (!isRecord(comment)) {
+    return unsupported(options, "issue_comment payload does not include a valid comment");
+  }
+
+  const body = stringValue(comment, "body");
+  if (!body) {
+    return result(options, action, []);
+  }
+
+  const command = parseGitHubCommand(body);
+  if (!command) {
+    return result(options, action, []);
+  }
+
+  const repository = repositoryFromPayload(payload.repository);
+  if (!repository) {
+    return unsupported(options, "issue_comment payload does not include a valid repository");
+  }
+
+  const pullRequestNumber = numberValue(issue, "number");
+  const commentId = numberValue(comment, "id");
+  const commentUser = isRecord(comment.user) ? stringValue(comment.user, "login") : undefined;
+  const authorAssociation = stringValue(comment, "author_association") ?? "NONE";
+
+  if (pullRequestNumber === undefined || commentId === undefined || !commentUser) {
+    return unsupported(options, "issue_comment payload does not include PR number, comment id, or author");
+  }
+
+  return result(options, action, [
+    {
+      type: "github_command.execute",
+      installation,
+      repository,
+      pullRequestNumber,
+      commentId,
+      commentBody: body,
+      commentAuthor: commentUser,
+      authorAssociation,
+    },
+  ]);
+}
+
+function normalizePullRequestReviewEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  if (action !== "submitted") {
+    return result(options, action, []);
+  }
+
+  const repository = repositoryFromPayload(payload.repository);
+  const pullRequest = payload.pull_request;
+  const review = payload.review;
+
+  if (!repository || !isRecord(pullRequest) || !isRecord(review)) {
+    return unsupported(options, "pull_request_review payload does not include repository, pull_request, or review");
+  }
+
+  const pullRequestNumber = numberValue(pullRequest, "number");
+  const reviewId = numberValue(review, "id");
+  const state = stringValue(review, "state") ?? "unknown";
+  const reviewer = isRecord(review.user) ? stringValue(review.user, "login") : undefined;
+
+  if (pullRequestNumber === undefined || reviewId === undefined || !reviewer) {
+    return unsupported(options, "pull_request_review payload does not include PR number, review id, or reviewer");
+  }
+
+  return result(options, action, [
+    {
+      type: "pull_request_review.submitted",
+      installation,
+      repository,
+      pullRequestNumber,
+      reviewId,
+      state,
+      reviewer,
+    },
+  ]);
+}
+
+function normalizeWorkflowRunEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  if (action !== "completed" && action !== "in_progress" && action !== "requested") {
+    return result(options, action, []);
+  }
+
+  const repository = repositoryFromPayload(payload.repository);
+  const workflowRun = payload.workflow_run;
+
+  if (!repository || !isRecord(workflowRun)) {
+    return unsupported(options, "workflow_run payload does not include repository or workflow_run");
+  }
+
+  const workflowRunId = numberValue(workflowRun, "id");
+  const workflowName = stringValue(workflowRun, "name") ?? "workflow";
+  const status = stringValue(workflowRun, "status") ?? "unknown";
+  const conclusion = stringValue(workflowRun, "conclusion");
+
+  if (workflowRunId === undefined) {
+    return unsupported(options, "workflow_run payload does not include id");
+  }
+
+  const runAction: GitHubAppLifecycleAction = {
+    type: "workflow_run.progress",
+    installation,
+    repository,
+    workflowRunId,
+    workflowName,
+    status,
+    ...(conclusion ? { conclusion } : {}),
+  };
+
+  return result(options, action, [runAction]);
+}
+
 export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOptions): GitHubAppLifecycleResult {
   if (!isRecord(options.payload)) {
     return unsupported(options, "payload must be a JSON object");
@@ -368,6 +664,22 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
 
   if (options.event === "installation_repositories") {
     return normalizeInstallationRepositoriesEvent(options, options.payload, action, installation);
+  }
+
+  if (options.event === "check_run") {
+    return normalizeCheckRunEvent(options, options.payload, action, installation);
+  }
+
+  if (options.event === "issue_comment") {
+    return normalizeIssueCommentEvent(options, options.payload, action, installation);
+  }
+
+  if (options.event === "pull_request_review") {
+    return normalizePullRequestReviewEvent(options, options.payload, action, installation);
+  }
+
+  if (options.event === "workflow_run") {
+    return normalizeWorkflowRunEvent(options, options.payload, action, installation);
   }
 
   if (options.event === "pull_request") {

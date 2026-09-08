@@ -78,6 +78,13 @@ export async function planGitHubAppLifecycleActions(
         if (planned.outboxId) result.outboxEffectsPlanned += 1;
         break;
       }
+      case "setup_pr.create":
+      case "waiver_pr.request":
+      case "release.prepare":
+      case "github_command.execute":
+      case "pull_request_review.submitted":
+      case "workflow_run.progress":
+        break;
       default: {
         const exhaustive: never = action;
         throw new Error(`Unsupported durable lifecycle action: ${JSON.stringify(exhaustive)}`);

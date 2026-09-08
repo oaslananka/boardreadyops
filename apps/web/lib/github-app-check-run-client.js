@@ -107,6 +107,9 @@ export async function completeGitHubCheckRun(input) {
     status: "completed",
     conclusion: input.input.conclusion,
     completed_at: input.input.completedAt ?? new Date().toISOString(),
+    actions: buildCheckRunRequestedActions({
+      hasBlockers: input.input.conclusion === "failure",
+    }),
     output: annotationChunks[0] ? { ...output, annotations: annotationChunks[0] } : output,
   };
 
@@ -220,12 +223,45 @@ function queuedTrustSummary(action) {
   return lines.join("\n");
 }
 
+export function buildCheckRunRequestedActions(context) {
+  const actions = [
+    {
+      label: "Re-run checks",
+      description: "Trigger fresh BoardReadyOps release readiness evaluation",
+      identifier: "rerun_checks",
+    },
+  ];
+
+  if (context?.setupIncomplete) {
+    actions.push({
+      label: "Fix repository setup",
+      description: "Open a pull request with reviewed BoardReadyOps files",
+      identifier: "create_setup_pr",
+    });
+  } else if (context?.hasBlockers) {
+    actions.push({
+      label: "Request waiver",
+      description: "Open a pull request proposing a policy waiver for blockers",
+      identifier: "request_waiver",
+    });
+  }
+
+  actions.push({
+    label: "Prepare release",
+    description: "Evaluate readiness checklist and generate release preview",
+    identifier: "prepare_release",
+  });
+
+  return actions.slice(0, 3);
+}
+
 function checkRunCreationBody(input) {
   const body = {
     name: readinessCheckName,
     head_sha: input.action.commitSha,
     status: "queued",
     external_id: input.runId,
+    actions: buildCheckRunRequestedActions(),
     output: {
       title: "BoardReadyOps release readiness queued",
       summary: queuedTrustSummary(input.action),

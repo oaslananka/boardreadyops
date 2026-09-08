@@ -73,6 +73,26 @@
       "types": "./src/repository-setup.ts",
       "import": "./src/repository-setup.ts",
       "default": "./src/repository-setup.ts"
+    },
+    "./github-mutation-service": {
+      "types": "./src/github-mutation-service.ts",
+      "import": "./src/github-mutation-service.ts",
+      "default": "./src/github-mutation-service.ts"
+    },
+    "./github-capabilities": {
+      "types": "./src/github-capabilities.ts",
+      "import": "./src/github-capabilities.ts",
+      "default": "./src/github-capabilities.ts"
+    },
+    "./github-command": {
+      "types": "./src/github-command.ts",
+      "import": "./src/github-command.ts",
+      "default": "./src/github-command.ts"
+    },
+    "./telemetry": {
+      "types": "./src/telemetry.ts",
+      "import": "./src/telemetry.ts",
+      "default": "./src/telemetry.ts"
     }
   },
   "scripts": {
