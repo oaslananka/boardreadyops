@@ -124,6 +124,7 @@ export type GitHubAppLifecycleAction =
       safeMode?: PullRequestSafeMode;
       /** The GitHub webhook delivery (`X-GitHub-Delivery`) that produced this run, for DB-only correlation. */
       deliveryId?: string | undefined;
+      setupIncomplete?: boolean | undefined;
     };
 
 export type GitHubAppLifecycleResult = {

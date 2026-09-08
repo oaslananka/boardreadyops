@@ -147,6 +147,37 @@ describe("GitHub App Check Run ensure", () => {
     expect(creationBody.output?.summary).toContain("Managed evidence artifacts unavailable");
     expect(creationBody.output?.summary).toContain("safe-mode execution");
   });
+
+  it("attaches setupIncomplete actions and setup required title/summary when action.setupIncomplete is true", async () => {
+    request
+      .mockResolvedValueOnce(jsonResponse({ check_runs: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 91 }, 201));
+
+    await ensurePullRequestCheckRun({
+      apiBaseUrl: "https://github.test/api/v3",
+      token: "installation-token",
+      input: {
+        ...input,
+        action: {
+          ...input.action,
+          setupIncomplete: true,
+        },
+      },
+      request,
+    });
+
+    const creationBody = JSON.parse(String(request.mock.calls[1]?.[1]?.body)) as {
+      actions?: Array<{ identifier: string }>;
+      output?: { title?: string; summary?: string };
+    };
+    expect(creationBody.actions?.map((a) => a.identifier)).toEqual([
+      "rerun_checks",
+      "create_setup_pr",
+      "prepare_release",
+    ]);
+    expect(creationBody.output?.title).toBe("BoardReadyOps setup required");
+    expect(creationBody.output?.summary).toContain("Fix repository setup");
+  });
 });
 
 describe("GitHub App readiness comment upsert", () => {
@@ -320,6 +351,28 @@ describe("GitHub App Check Run completion (annotations)", () => {
       details_url: "https://app.boardreadyops.com/runs/run-1",
     });
     expect(body.output.annotations).toBeUndefined();
+  });
+
+  it("includes setup actions when an action_required completion is explicitly setup-incomplete", async () => {
+    request.mockResolvedValue(jsonResponse({}));
+
+    await completeGitHubCheckRun({
+      apiBaseUrl: "https://api.github.com",
+      token: "installation-token",
+      input: {
+        ...baseInput,
+        conclusion: "action_required",
+        setupIncomplete: true,
+      },
+      request,
+    });
+
+    const [body] = patchBodies();
+    expect(body.actions.map((a: { identifier: string }) => a.identifier)).toEqual([
+      "rerun_checks",
+      "create_setup_pr",
+      "prepare_release",
+    ]);
   });
 
   it("builds check run requested actions depending on context", () => {

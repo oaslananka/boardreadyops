@@ -80,6 +80,49 @@ describe("control-plane outbox effect processor", () => {
     );
   });
 
+  it("plans Check Run completion without an execution attempt when repository setup is incomplete", async () => {
+    const outbox = store();
+    const setupEffect: ClaimedControlPlaneOutboxEffect = {
+      ...createEffect,
+      payload: {
+        ...createEffect.payload,
+        action: {
+          ...(createEffect.payload.type === "github.check_run.create" ? createEffect.payload.action : neverAction()),
+          setupIncomplete: true,
+        },
+      },
+    };
+    const id = vi.fn().mockReturnValue("outbox-complete");
+
+    await expect(
+      processControlPlaneOutboxEffect(setupEffect, {
+        workerId: "worker-1",
+        outbox,
+        dispatchMode: "github-actions",
+        checkRuns: {
+          ensurePullRequestCheckRun: vi.fn(async () => ({ id: 77 })),
+          completeCheckRun: vi.fn(async () => undefined),
+        },
+        workflowDispatch: {
+          dispatchReleaseRunWorkflow: vi.fn(),
+        },
+        id,
+      }),
+    ).resolves.toMatchObject({ status: "completed" });
+
+    expect(id).toHaveBeenCalledTimes(1);
+    expect(outbox.completeCheckRunCreateEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        effect: setupEffect,
+        githubCheckRunId: 77,
+        nextOutboxId: "outbox-complete",
+      }),
+    );
+    expect(outbox.completeCheckRunCreateEffect).toHaveBeenCalledWith(
+      expect.not.objectContaining({ executionAttemptId: expect.anything() }),
+    );
+  });
+
   it("quarantines a workflow dispatch when network delivery is uncertain", async () => {
     const outbox = store();
     const workflowEffect: ClaimedControlPlaneOutboxEffect = {
