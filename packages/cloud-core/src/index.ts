@@ -15,6 +15,7 @@ export * from "./review-diff.js";
 export * from "./runner-request-signature.js";
 export * from "./storage.js";
 export * from "./stripe-service.js";
+export * from "./telemetry.js";
 export * from "./wdrr-metrics.js";
 export * from "./xml-sanitizer.js";
 
