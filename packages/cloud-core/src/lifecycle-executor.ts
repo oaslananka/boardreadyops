@@ -242,7 +242,12 @@ export const emptyGitHubAppLifecycleExecutionResult = {
 } as const satisfies GitHubAppLifecycleExecutionResult;
 
 export function releaseRunIdempotencyKey(action: EnqueueReleaseRunInput): string {
-  return [action.repository.id, action.pullRequestNumber, action.commitSha].join(":");
+  return [
+    action.repository.id,
+    action.pullRequestNumber,
+    action.commitSha,
+    ...(action.idempotencyScope ? [action.idempotencyScope] : []),
+  ].join(":");
 }
 
 type DispatchSkipReason = {

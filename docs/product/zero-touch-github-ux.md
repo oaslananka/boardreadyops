@@ -48,7 +48,7 @@ Directly inside the GitHub Check Run interface, engineers can trigger actions wi
 - **`Re-run checks`**: Re-evaluates release readiness on the latest commit.
 - **`Fix repository setup`**: Opens a reviewed pull request adding `boardreadyops.yml` and `.github/workflows/readiness-runner.yml`.
 - **`Request waiver`**: Opens an audited waiver PR proposing a temporary policy exception for blocking findings.
-- **`Prepare release`**: Checks release gates, runs manufacturing handoff validation, and generates the release bundle draft.
+- **`Prepare release`**: Starts a fresh readiness evaluation bound to the exact pull-request head/base SHA and surfaces the resulting evidence as a release preview. It does not publish tags, GitHub Releases, or mutate the design.
 
 ### C. Progressive Disclosure PR Comment
 Every hardware PR receives an automatically updated comment structured for immediate clarity:
@@ -64,7 +64,7 @@ Engineers and reviewers can interact directly via PR comments:
 - `/boardreadyops rerun`: Trigger fresh evaluation on current PR head commit.
 - `/boardreadyops explain <rule-id>`: Explain why a rule failed and how to resolve it in KiCad.
 - `/boardreadyops diff`: Summarize netlist, layer stack, and BOM deltas against base branch.
-- `/boardreadyops release-preview`: Preview the hardware release checklist and sign-off readiness.
+- `/boardreadyops release-preview`: For authorized repository writers, start a fresh exact-SHA readiness evaluation and surface its evidence as a release preview.
 - `/boardreadyops setup`: Propose one-click setup PR if configuration is missing.
 - `/boardreadyops waive <rule-id> --reason "<reason>"`: Open automated policy waiver PR.
 - `/boardreadyops fix [rule-id]`: Get step-by-step remediation guidance.

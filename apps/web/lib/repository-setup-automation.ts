@@ -17,6 +17,7 @@ import { createAppAuth } from "@octokit/auth-app";
 
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
 type WaiverAction = Extract<GitHubAppLifecycleAction, { type: "waiver_pr.request" }>;
+type ReleasePrepareAction = Extract<GitHubAppLifecycleAction, { type: "release.prepare" }>;
 
 type InstallationAuthentication = {
   token: string;
@@ -26,6 +27,10 @@ type InstallationAuthentication = {
 export type RepositorySetupLifecycleExecutor = {
   createSetupPr(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
   createWaiverPr(action: WaiverAction, context: GitHubAppLifecycleContext): Promise<void>;
+  prepareRelease(
+    action: ReleasePrepareAction,
+    context: GitHubAppLifecycleContext,
+  ): Promise<readonly GitHubAppLifecycleAction[]>;
 };
 
 export type RepositorySetupLifecycleExecutorDependencies = {
@@ -50,7 +55,10 @@ function deterministicAuditEventId(parts: readonly string[]): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-async function repositoryContextForAction(store: RepositorySetupStore, action: SetupAction | WaiverAction) {
+async function repositoryContextForAction(
+  store: RepositorySetupStore,
+  action: SetupAction | WaiverAction | ReleasePrepareAction,
+) {
   const repository = await store.getContextByGitHub({
     githubInstallationId: action.installation.id,
     githubRepositoryId: action.repository.id,
@@ -104,6 +112,39 @@ export function createRepositorySetupLifecycleExecutor(
         configStatus: "unknown",
         diagnostics: [`Setup PR #${result.pullRequestNumber} (${result.outcome}): ${result.pullRequestUrl}`],
       });
+    },
+
+    async prepareRelease(action, context) {
+      const repository = await repositoryContextForAction(dependencies.store, action);
+      if (repository.current?.workflowStatus !== "ready" || repository.current.configStatus !== "ready") {
+        throw new Error("release preparation requires repository setup to be ready");
+      }
+
+      const authentication = await dependencies.authenticateInstallation(action.installation.id);
+      const capability = checkCapabilityRequirement(
+        evaluateAppCapabilities(authentication.permissions),
+        "dispatch_analysis",
+      );
+      if (!capability.satisfied) {
+        throw new Error(`release preparation capability is unavailable: ${capability.missingPermissions.join(", ")}`);
+      }
+
+      const releaseRunAction: GitHubAppLifecycleAction = {
+        type: "release_run.enqueue",
+        installation: action.installation,
+        repository: action.repository,
+        pullRequestNumber: action.pullRequestNumber,
+        ref: action.ref,
+        commitSha: action.commitSha,
+        triggerKind: "pr",
+        deliveryId: context.deliveryId,
+        idempotencyScope: `release-prepare:${context.deliveryId}`,
+      };
+      if (action.baseCommitSha) releaseRunAction.baseCommitSha = action.baseCommitSha;
+      if (action.pullRequestDraft !== undefined) releaseRunAction.pullRequestDraft = action.pullRequestDraft;
+      if (action.pullRequestFromFork !== undefined) releaseRunAction.pullRequestFromFork = action.pullRequestFromFork;
+      if (action.safeMode) releaseRunAction.safeMode = action.safeMode;
+      return [releaseRunAction];
     },
 
     async createWaiverPr(action, context) {

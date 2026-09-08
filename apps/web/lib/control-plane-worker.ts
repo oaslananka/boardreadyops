@@ -8,10 +8,15 @@ import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "@boardreadyop
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
 type WaiverAction = Extract<GitHubAppLifecycleAction, { type: "waiver_pr.request" }>;
 type GitHubCommandAction = Extract<GitHubAppLifecycleAction, { type: "github_command.execute" }>;
+type ReleasePrepareAction = Extract<GitHubAppLifecycleAction, { type: "release.prepare" }>;
 
 type ControlPlaneInteractionExecutor = {
   createSetupPr?(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
   createWaiverPr?(action: WaiverAction, context: GitHubAppLifecycleContext): Promise<void>;
+  prepareRelease?(
+    action: ReleasePrepareAction,
+    context: GitHubAppLifecycleContext,
+  ): Promise<readonly GitHubAppLifecycleAction[]>;
   executeGitHubCommand?(
     action: GitHubCommandAction,
     context: GitHubAppLifecycleContext,
@@ -66,6 +71,20 @@ async function executeWaiverInteraction(
   await createWaiverPr(action, context);
 }
 
+async function executeReleasePrepareInteraction(
+  action: ReleasePrepareAction,
+  dependencies: ControlPlaneWorkerDependencies,
+  context: GitHubAppLifecycleContext,
+): Promise<void> {
+  const prepareRelease = dependencies.interactions?.prepareRelease;
+  if (!prepareRelease) throw new Error("release prepare lifecycle interaction executor is not configured");
+  const followUpActions = await prepareRelease(action, context);
+  if (followUpActions.some((followUp) => followUp.type === "release.prepare")) {
+    throw new Error("release prepare executor returned a recursive release.prepare action");
+  }
+  await processLifecycleActions(followUpActions, dependencies, context);
+}
+
 async function executeCommandInteraction(
   action: GitHubCommandAction,
   dependencies: ControlPlaneWorkerDependencies,
@@ -90,6 +109,8 @@ async function executeInteractionAction(
       return executeSetupInteraction(action, dependencies, context);
     case "waiver_pr.request":
       return executeWaiverInteraction(action, dependencies, context);
+    case "release.prepare":
+      return executeReleasePrepareInteraction(action, dependencies, context);
     case "github_command.execute":
       return executeCommandInteraction(action, dependencies, context);
     default:

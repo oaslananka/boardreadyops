@@ -212,5 +212,41 @@ describe("Check Run Actions & File Annotations", () => {
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0]).toMatchObject({ type: "setup_pr.create", requestedBy: "octocat" });
     });
+
+    it("normalizes prepare_release into an exact-PR release.prepare intent", () => {
+      const result = normalizeGitHubAppWebhook({
+        event: "check_run",
+        delivery: "del_prepare",
+        payload: {
+          ...basePayload,
+          action: "requested_action",
+          requested_action: { identifier: "prepare_release" },
+          sender: { login: "release-engineer" },
+        },
+      });
+
+      expect(result.accepted).toBe(true);
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0]).toEqual({
+        type: "release.prepare",
+        installation: { id: 12345 },
+        repository: {
+          id: 999,
+          owner: "octo",
+          name: "board",
+          fullName: "octo/board",
+          private: false,
+          defaultBranch: "main",
+        },
+        checkRunId: 8888,
+        pullRequestNumber: 10,
+        ref: "feature/usb-c",
+        commitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        baseCommitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        pullRequestDraft: false,
+        pullRequestFromFork: false,
+        requestedBy: "release-engineer",
+      });
+    });
   });
 });

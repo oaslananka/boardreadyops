@@ -64,7 +64,7 @@ const maximumCommentPages = 20;
 const commentsPerPage = 100;
 
 function commandCapabilityRequirement(command: ParsedGitHubCommand): CapabilityRequirement | undefined {
-  if (command.kind === "rerun") return "dispatch_analysis";
+  if (command.kind === "rerun" || command.kind === "release-preview") return "dispatch_analysis";
   if (command.kind === "setup") return "setup_pr";
   if (command.kind === "waive") return "waiver_pr";
   return undefined;

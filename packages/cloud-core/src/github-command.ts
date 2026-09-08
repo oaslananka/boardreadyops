@@ -40,7 +40,7 @@ export type CommandExecutionPlan =
   | { kind: "action"; action: GitHubAppLifecycleAction }
   | { kind: "actions"; actions: GitHubAppLifecycleAction[] };
 
-const MUTATING_COMMANDS = new Set(["rerun", "setup", "waive", "fix"]);
+const MUTATING_COMMANDS = new Set(["rerun", "setup", "waive", "fix", "release-preview"]);
 const PRIVILEGED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const VALID_RULE_ID_PATTERN = /^[a-zA-Z0-9_.-]{1,100}$/;
 
@@ -263,6 +263,24 @@ function rerunCommandPlan(context: CommandExecutionContext): CommandExecutionPla
   return { kind: "action", action: enqueueAction };
 }
 
+function releasePrepareCommandPlan(context: CommandExecutionContext): CommandExecutionPlan {
+  const action: GitHubAppLifecycleAction = {
+    type: "release.prepare",
+    installation: context.installation,
+    repository: context.repository,
+    pullRequestNumber: context.pullRequestNumber,
+    ref: context.headRef,
+    commitSha: context.headCommitSha,
+  };
+  if (context.baseCommitSha) action.baseCommitSha = context.baseCommitSha;
+  if (context.pullRequestDraft !== undefined) action.pullRequestDraft = context.pullRequestDraft;
+  if (context.pullRequestFromFork !== undefined) action.pullRequestFromFork = context.pullRequestFromFork;
+  if (context.safeMode) action.safeMode = context.safeMode;
+  if (context.author) action.requestedBy = context.author;
+  if (context.checkRunId) action.checkRunId = context.checkRunId;
+  return { kind: "action", action };
+}
+
 function setupCommandPlan(context: CommandExecutionContext): CommandExecutionPlan {
   const setupAction: GitHubAppLifecycleAction = {
     type: "setup_pr.create",
@@ -377,22 +395,8 @@ Evaluating schematic, netlist, PCB layer stack, and BOM deltas against base comm
       };
     }
 
-    case "release-preview": {
-      return {
-        kind: "comment",
-        body: `### Hardware Release Preview
-
-| Gate | Status | Details |
-| :--- | :--- | :--- |
-| **BOM Completion** | Monitored | Verify all components have valid MPNs and lifecycle status |
-| **DRC / Fabrication** | Monitored | Check PCB clearances and courtyard overlaps |
-| **Pin / Net Integrity** | Monitored | Ensure no unassigned or floating critical nets |
-| **Waiver Audit** | Checked | Ensure all temporary waivers are approved and unexpired |
-
-When all checks pass, BoardReadyOps will mark this PR as **Ready for Release**.
-`,
-      };
-    }
+    case "release-preview":
+      return releasePrepareCommandPlan(context);
 
     case "fix": {
       return {

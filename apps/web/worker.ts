@@ -185,7 +185,11 @@ const interactions =
   setupInteractions || githubCommandInteractions
     ? {
         ...(setupInteractions
-          ? { createSetupPr: setupInteractions.createSetupPr, createWaiverPr: setupInteractions.createWaiverPr }
+          ? {
+              createSetupPr: setupInteractions.createSetupPr,
+              createWaiverPr: setupInteractions.createWaiverPr,
+              prepareRelease: setupInteractions.prepareRelease,
+            }
           : {}),
         ...(githubCommandInteractions ? { executeGitHubCommand: githubCommandInteractions.executeGitHubCommand } : {}),
       }

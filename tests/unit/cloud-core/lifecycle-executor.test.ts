@@ -176,6 +176,12 @@ describe("GitHub App lifecycle execution", () => {
     expect(releaseRunIdempotencyKey(releaseAction())).toBe("98765:12:0123456789abcdef");
   });
 
+  it("scopes an explicit release preparation request without changing normal run keys", () => {
+    expect(releaseRunIdempotencyKey(releaseAction({ idempotencyScope: "release-prepare:delivery-prepare-1" }))).toBe(
+      "98765:12:0123456789abcdef:release-prepare:delivery-prepare-1",
+    );
+  });
+
   it("dispatches a private same-repository pull request with safe-mode metadata", async () => {
     const store = lifecycleStore();
     const checks = checkRunClient();

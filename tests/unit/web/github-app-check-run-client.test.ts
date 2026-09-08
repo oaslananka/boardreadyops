@@ -170,11 +170,7 @@ describe("GitHub App Check Run ensure", () => {
       actions?: Array<{ identifier: string }>;
       output?: { title?: string; summary?: string };
     };
-    expect(creationBody.actions?.map((a) => a.identifier)).toEqual([
-      "rerun_checks",
-      "create_setup_pr",
-      "prepare_release",
-    ]);
+    expect(creationBody.actions?.map((a) => a.identifier)).toEqual(["rerun_checks", "create_setup_pr"]);
     expect(creationBody.output?.title).toBe("BoardReadyOps setup required");
     expect(creationBody.output?.summary).toContain("Fix repository setup");
   });
@@ -199,7 +195,7 @@ describe("GitHub App Check Run ensure", () => {
       actions?: Array<{ identifier: string }>;
       output?: { summary?: string };
     };
-    expect(body.actions?.map((a) => a.identifier)).toEqual(["rerun_checks", "prepare_release"]);
+    expect(body.actions?.map((a) => a.identifier)).toEqual(["rerun_checks"]);
     expect(body.output?.summary).toContain("Contents, Workflows, and Pull requests write permissions");
     expect(body.output?.summary).not.toContain("Click 'Fix repository setup'");
   });
@@ -393,11 +389,7 @@ describe("GitHub App Check Run completion (annotations)", () => {
     });
 
     const [body] = patchBodies();
-    expect(body.actions.map((a: { identifier: string }) => a.identifier)).toEqual([
-      "rerun_checks",
-      "create_setup_pr",
-      "prepare_release",
-    ]);
+    expect(body.actions.map((a: { identifier: string }) => a.identifier)).toEqual(["rerun_checks", "create_setup_pr"]);
   });
 
   it("omits setup action on completion when installation capabilities cannot create setup PRs", async () => {
@@ -416,19 +408,22 @@ describe("GitHub App Check Run completion (annotations)", () => {
     });
 
     const [body] = patchBodies();
-    expect(body.actions.map((a: { identifier: string }) => a.identifier)).toEqual(["rerun_checks", "prepare_release"]);
+    expect(body.actions.map((a: { identifier: string }) => a.identifier)).toEqual(["rerun_checks"]);
     expect(body.output.summary).toContain("Contents, Workflows, and Pull requests write permissions");
   });
 
   it("builds check run requested actions depending on context", () => {
     const setupActions = buildCheckRunRequestedActions({ setupIncomplete: true });
-    expect(setupActions.map((a) => a.identifier)).toEqual(["rerun_checks", "create_setup_pr", "prepare_release"]);
+    expect(setupActions.map((a) => a.identifier)).toEqual(["rerun_checks", "create_setup_pr"]);
 
     const waiverActions = buildCheckRunRequestedActions({ hasBlockers: true });
     expect(waiverActions.map((a) => a.identifier)).toEqual(["rerun_checks", "request_waiver", "prepare_release"]);
 
     const defaultActions = buildCheckRunRequestedActions();
     expect(defaultActions.map((a) => a.identifier)).toEqual(["rerun_checks", "prepare_release"]);
+
+    const noDispatchActions = buildCheckRunRequestedActions({ canDispatchAnalysis: false });
+    expect(noDispatchActions.map((a) => a.identifier)).toEqual([]);
 
     for (const actions of [setupActions, waiverActions, defaultActions]) {
       for (const action of actions) {
