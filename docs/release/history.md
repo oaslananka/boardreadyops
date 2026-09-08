@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.40.1](https://github.com/oaslananka/boardreadyops/compare/v1.40.0...v1.40.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **cloud:** terminalize release prepare setup rejection ([#704](https://github.com/oaslananka/boardreadyops/issues/704)) ([6bceac2](https://github.com/oaslananka/boardreadyops/commit/6bceac2aa9e52b47df7c15a6c55c0a04b423455a))
+
 ## [1.40.0](https://github.com/oaslananka/boardreadyops/compare/v1.39.1...v1.40.0) (2026-09-08)
 
 
