@@ -13,6 +13,9 @@ export type RepositorySetupInteractiveProps = {
   workflowPath: string;
   workflowContractVersion: number;
   workflowSource: string;
+  installationId?: string;
+  repositoryId?: string;
+  canCreatePr?: boolean;
 };
 
 export function RepositorySetupInteractive({
@@ -22,8 +25,19 @@ export function RepositorySetupInteractive({
   workflowPath,
   workflowContractVersion,
   workflowSource,
+  installationId,
+  repositoryId,
+  canCreatePr = true,
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
+  const [isCreatingPr, setIsCreatingPr] = useState(false);
+  const [prResult, setPrResult] = useState<{
+    ok: boolean;
+    outcome?: string;
+    pullRequestNumber?: number;
+    pullRequestUrl?: string;
+    error?: string;
+  } | null>(null);
 
   const fallback = presets[0];
   if (!fallback) throw new Error("At least one preset must be provided");
@@ -37,6 +51,40 @@ export function RepositorySetupInteractive({
       window.history.replaceState({}, "", url.toString());
     }
   }, []);
+
+  const handleCreateSetupPr = useCallback(async () => {
+    if (!installationId || !repositoryId) return;
+    setIsCreatingPr(true);
+    setPrResult(null);
+    try {
+      const res = await fetch(
+        `/api/v1/operator/installations/${encodeURIComponent(installationId)}/repositories/${encodeURIComponent(repositoryId)}/setup/pr`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            preset: activePreset.id,
+            requestId: `ui-setup-${Date.now()}`,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setPrResult({ ok: false, error: data.error || "Failed to create setup PR" });
+      } else {
+        setPrResult({
+          ok: true,
+          outcome: data.outcome,
+          pullRequestNumber: data.pullRequestNumber,
+          pullRequestUrl: data.pullRequestUrl,
+        });
+      }
+    } catch (err) {
+      setPrResult({ ok: false, error: err instanceof Error ? err.message : "Network error" });
+    } finally {
+      setIsCreatingPr(false);
+    }
+  }, [installationId, repositoryId, activePreset.id]);
 
   return (
     <>
@@ -150,6 +198,66 @@ export function RepositorySetupInteractive({
           </article>
         </div>
       </Panel>
+
+      {installationId && repositoryId && canCreatePr ? (
+        <Panel
+          id="automated-setup"
+          title="3. One-click setup pull request"
+          description="Open a pull request on your repository with the selected configuration and workflow without opening a terminal."
+        >
+          <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 className="text-base font-bold text-foreground">Open reviewed setup PR</h4>
+                <p className="text-sm text-muted-foreground">
+                  Creates branch <code>boardreadyops/setup</code> with <code>boardreadyops.yml</code> and{" "}
+                  <code>.github/workflows/{workflowPath}</code>.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isCreatingPr}
+                onClick={handleCreateSetupPr}
+                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:opacity-50 transition-all duration-150 active:scale-[0.98]"
+              >
+                {isCreatingPr ? "Opening setup PR..." : "Create setup PR"}
+              </button>
+            </div>
+
+            {prResult ? (
+              <div
+                className={`mt-2 rounded-md p-3 text-sm border ${
+                  prResult.ok
+                    ? "border-primary/40 bg-primary/10 text-foreground"
+                    : "border-destructive/40 bg-destructive/10 text-destructive"
+                }`}
+                role="status"
+              >
+                {prResult.ok ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span>
+                      ✓ Setup pull request #{prResult.pullRequestNumber}{" "}
+                      {prResult.outcome === "already_exists" ? "is already open" : "created"}!
+                    </span>
+                    {prResult.pullRequestUrl ? (
+                      <a
+                        href={prResult.pullRequestUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold underline underline-offset-2 text-primary"
+                      >
+                        View pull request on GitHub →
+                      </a>
+                    ) : null}
+                  </div>
+                ) : (
+                  <span>Setup PR creation failed: {prResult.error}</span>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </Panel>
+      ) : null}
     </>
   );
 }
