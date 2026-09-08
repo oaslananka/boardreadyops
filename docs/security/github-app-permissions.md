@@ -57,7 +57,7 @@ All repository mutations performed by BoardReadyOps are governed by the `GitHubM
 
 5. **Ruleset & Protection Respect**:
    - BoardReadyOps never attempts to bypass branch protections, code owner reviews, or repository rulesets.
-   - It **never** automatically applies restricted labels like `queue-me` or auto-merges without human approval.
+   - For a customer repository, the GitHub App does not apply repository-specific approval labels or auto-merge mutation PRs; the customer's native rulesets and maintainer policy remain authoritative.
 
 ---
 

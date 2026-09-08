@@ -32,9 +32,11 @@ Security vulnerabilities and sensitive security details are not part of public i
 
 Every pull request targeting `main` must pass the required checks. While
 `@oaslananka` is the sole maintainer, the ruleset uses zero required human
-approvals. Unresolved review conversations still block merge, and the maintainer
-must inspect automated analysis, security findings, coverage, and CI evidence
-before merging.
+approvals. Unresolved review conversations still block merge. Eligible pull
+requests automatically enter the Mergify queue when they are not drafts and
+carry neither `manual-review` nor `do-not-merge`; GitHub Rulesets remain the
+source of truth for required checks before queue admission and again before
+merge.
 
 `CODEOWNERS` continues to identify responsible ownership. CODEOWNERS review is
 not required while `@oaslananka` is both the sole code owner and sole maintainer,
@@ -42,10 +44,11 @@ because that setting would not provide an independent reviewer. Re-evaluate both
 CODEOWNERS review and a one-approval rule when another trusted maintainer or
 dedicated security owner is onboarded.
 
-Release Please, Renovate, Dependabot, GitHub Actions, and other automation have
-no silent merge path. They may create or update pull requests, which must pass
-the same checks, resolve review conversations, and receive an explicit maintainer
-merge decision.
+Release Please, Renovate, Dependabot, GitHub Actions, and other automation may
+create or update pull requests. Eligible pull requests automatically enter the
+Mergify queue after the same required checks and resolved-conversation rules are
+satisfied. Maintainers apply `manual-review` or `do-not-merge` when an explicit
+human decision is required before merge.
 
 ## Branch Protection Baseline
 
