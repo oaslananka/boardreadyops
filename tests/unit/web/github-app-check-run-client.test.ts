@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildCheckRunRequestedActions,
   completeGitHubCheckRun,
   ensurePullRequestCheckRun,
   upsertReadinessComment,
@@ -314,10 +315,22 @@ describe("GitHub App Check Run completion (annotations)", () => {
       status: "completed",
       conclusion: "failure",
       completed_at: "2026-05-23T00:00:00.000Z",
+      actions: buildCheckRunRequestedActions({ hasBlockers: true }),
       output: { title: baseInput.title, summary: baseInput.summary },
       details_url: "https://app.boardreadyops.com/runs/run-1",
     });
     expect(body.output.annotations).toBeUndefined();
+  });
+
+  it("builds check run requested actions depending on context", () => {
+    const setupActions = buildCheckRunRequestedActions({ setupIncomplete: true });
+    expect(setupActions.map((a) => a.identifier)).toEqual(["rerun_checks", "create_setup_pr", "prepare_release"]);
+
+    const waiverActions = buildCheckRunRequestedActions({ hasBlockers: true });
+    expect(waiverActions.map((a) => a.identifier)).toEqual(["rerun_checks", "request_waiver", "prepare_release"]);
+
+    const defaultActions = buildCheckRunRequestedActions();
+    expect(defaultActions.map((a) => a.identifier)).toEqual(["rerun_checks", "prepare_release"]);
   });
 
   it("maps annotation fields to GitHub's snake_case shape in a single PATCH when 50 or fewer", async () => {

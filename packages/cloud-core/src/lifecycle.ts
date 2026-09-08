@@ -1,4 +1,9 @@
-export type GitHubAppWebhookEvent = "installation" | "installation_repositories" | "ping" | "pull_request";
+export type GitHubAppWebhookEvent =
+  | "check_run"
+  | "installation"
+  | "installation_repositories"
+  | "ping"
+  | "pull_request";
 
 export type GitHubRepositoryRef = {
   id: number;
@@ -48,6 +53,57 @@ export type GitHubAppLifecycleAction =
       type: "repository.removed";
       installation: GitHubInstallationRef;
       repository: GitHubRepositoryRef;
+    }
+  | {
+      type: "setup_pr.create";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      checkRunId?: number | undefined;
+      requestedBy?: string | undefined;
+    }
+  | {
+      type: "waiver_pr.request";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      checkRunId?: number | undefined;
+      ruleId?: string | undefined;
+      reason?: string | undefined;
+      requestedBy?: string | undefined;
+    }
+  | {
+      type: "release.prepare";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      checkRunId?: number | undefined;
+      requestedBy?: string | undefined;
+    }
+  | {
+      type: "github_command.execute";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      pullRequestNumber: number;
+      commentId: number;
+      commentBody: string;
+      commentAuthor: string;
+      authorAssociation: string;
+    }
+  | {
+      type: "pull_request_review.submitted";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      pullRequestNumber: number;
+      reviewId: number;
+      state: string;
+      reviewer: string;
+    }
+  | {
+      type: "workflow_run.progress";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      workflowRunId: number;
+      workflowName: string;
+      status: string;
+      conclusion?: string | undefined;
     }
   | {
       type: "release_run.enqueue";
@@ -345,6 +401,104 @@ function normalizeInstallationRepositoriesEvent(
   ]);
 }
 
+function normalizeCheckRunEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  const repository = repositoryFromPayload(payload.repository);
+  if (!repository) {
+    return unsupported(options, "payload does not include a valid repository");
+  }
+
+  const checkRun = payload.check_run;
+  if (!isRecord(checkRun)) {
+    return unsupported(options, "payload does not include a valid check_run");
+  }
+
+  const checkRunId = numberValue(checkRun, "id");
+  const checkSuite = checkRun.check_suite;
+  const pullRequests = isRecord(checkSuite) ? arrayValue(checkSuite, "pull_requests") : [];
+  const firstPr =
+    pullRequests.length > 0 && isRecord(pullRequests[0]) ? (pullRequests[0] as Record<string, unknown>) : undefined;
+
+  if (
+    action === "rerequested" ||
+    (action === "requested_action" &&
+      isRecord(payload.requested_action) &&
+      payload.requested_action.identifier === "rerun_checks")
+  ) {
+    if (!firstPr) {
+      return result(options, action, []);
+    }
+    const pullRequestNumber = numberValue(firstPr, "number");
+    const commitSha = pullRequestCommitSha(firstPr) ?? stringValue(checkRun, "head_sha");
+    const baseCommitSha = pullRequestBaseCommitSha(firstPr);
+    const ref = pullRequestRef(firstPr);
+
+    if (pullRequestNumber === undefined || !commitSha || !ref) {
+      return unsupported(options, "check_run PR payload does not include number, head sha, or ref");
+    }
+
+    return result(options, action, [
+      {
+        type: "release_run.enqueue",
+        installation,
+        repository,
+        pullRequestNumber,
+        ref,
+        commitSha,
+        ...(baseCommitSha ? { baseCommitSha } : {}),
+        triggerKind: "pr",
+        deliveryId: options.delivery,
+      },
+    ]);
+  }
+
+  if (action === "requested_action") {
+    const requestedAction = payload.requested_action;
+    const identifier = isRecord(requestedAction) ? stringValue(requestedAction, "identifier") : undefined;
+
+    if (identifier === "create_setup_pr") {
+      return result(options, action, [
+        {
+          type: "setup_pr.create",
+          installation,
+          repository,
+          ...(checkRunId !== undefined ? { checkRunId } : {}),
+        },
+      ]);
+    }
+
+    if (identifier === "request_waiver") {
+      return result(options, action, [
+        {
+          type: "waiver_pr.request",
+          installation,
+          repository,
+          ...(checkRunId !== undefined ? { checkRunId } : {}),
+        },
+      ]);
+    }
+
+    if (identifier === "prepare_release") {
+      return result(options, action, [
+        {
+          type: "release.prepare",
+          installation,
+          repository,
+          ...(checkRunId !== undefined ? { checkRunId } : {}),
+        },
+      ]);
+    }
+
+    return result(options, action, []);
+  }
+
+  return result(options, action, []);
+}
+
 export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOptions): GitHubAppLifecycleResult {
   if (!isRecord(options.payload)) {
     return unsupported(options, "payload must be a JSON object");
@@ -368,6 +522,10 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
 
   if (options.event === "installation_repositories") {
     return normalizeInstallationRepositoriesEvent(options, options.payload, action, installation);
+  }
+
+  if (options.event === "check_run") {
+    return normalizeCheckRunEvent(options, options.payload, action, installation);
   }
 
   if (options.event === "pull_request") {
