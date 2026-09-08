@@ -178,6 +178,31 @@ describe("GitHub App Check Run ensure", () => {
     expect(creationBody.output?.title).toBe("BoardReadyOps setup required");
     expect(creationBody.output?.summary).toContain("Fix repository setup");
   });
+
+  it("omits the setup mutation action when effective installation permissions cannot create setup PRs", async () => {
+    request
+      .mockResolvedValueOnce(jsonResponse({ check_runs: [] }))
+      .mockResolvedValueOnce(jsonResponse({ id: 92 }, 201));
+
+    await ensurePullRequestCheckRun({
+      apiBaseUrl: "https://github.test/api/v3",
+      token: "installation-token",
+      capabilities: { canCreateSetupPr: false },
+      input: {
+        ...input,
+        action: { ...input.action, setupIncomplete: true },
+      },
+      request,
+    });
+
+    const body = JSON.parse(String(request.mock.calls[1]?.[1]?.body)) as {
+      actions?: Array<{ identifier: string }>;
+      output?: { summary?: string };
+    };
+    expect(body.actions?.map((a) => a.identifier)).toEqual(["rerun_checks", "prepare_release"]);
+    expect(body.output?.summary).toContain("Contents, Workflows, and Pull requests write permissions");
+    expect(body.output?.summary).not.toContain("Click 'Fix repository setup'");
+  });
 });
 
 describe("GitHub App readiness comment upsert", () => {
@@ -373,6 +398,26 @@ describe("GitHub App Check Run completion (annotations)", () => {
       "create_setup_pr",
       "prepare_release",
     ]);
+  });
+
+  it("omits setup action on completion when installation capabilities cannot create setup PRs", async () => {
+    request.mockResolvedValue(jsonResponse({}));
+
+    await completeGitHubCheckRun({
+      apiBaseUrl: "https://api.github.com",
+      token: "installation-token",
+      capabilities: { canCreateSetupPr: false },
+      input: {
+        ...baseInput,
+        conclusion: "action_required",
+        setupIncomplete: true,
+      },
+      request,
+    });
+
+    const [body] = patchBodies();
+    expect(body.actions.map((a: { identifier: string }) => a.identifier)).toEqual(["rerun_checks", "prepare_release"]);
+    expect(body.output.summary).toContain("Contents, Workflows, and Pull requests write permissions");
   });
 
   it("builds check run requested actions depending on context", () => {

@@ -60,6 +60,10 @@ export type RepositorySetupProbeContext = {
 
 export type RepositorySetupStore = {
   getContext(input: { installationId: string; repositoryId: string }): Promise<RepositorySetupContext | undefined>;
+  getContextByGitHub(input: {
+    githubInstallationId: number;
+    githubRepositoryId: number;
+  }): Promise<RepositorySetupContext | undefined>;
   listRevisions(input: {
     installationId: string;
     repositoryId: string;
@@ -267,6 +271,80 @@ export function createSqlRepositorySetupStore(
       const name = text(row, "name");
       const defaultBranch = text(row, "default_branch");
       if (githubInstallationId === undefined || githubRepositoryId === undefined || !owner || !name || !defaultBranch) {
+        throw new Error("repository setup context is invalid");
+      }
+      const current = text(row, "setup_id") ? setupRevision(row) : undefined;
+      return {
+        installationId,
+        githubInstallationId,
+        repositoryId,
+        githubRepositoryId,
+        owner,
+        name,
+        private: boolean(row, "private"),
+        defaultBranch,
+        ...(current ? { current } : {}),
+      };
+    },
+
+    async getContextByGitHub(input) {
+      if (!Number.isSafeInteger(input.githubInstallationId) || input.githubInstallationId <= 0) {
+        throw new Error("githubInstallationId is invalid");
+      }
+      if (!Number.isSafeInteger(input.githubRepositoryId) || input.githubRepositoryId <= 0) {
+        throw new Error("githubRepositoryId is invalid");
+      }
+      const result = await executor.query(
+        `select installations.id as installation_id,
+                installations.github_installation_id,
+                repositories.id as repository_id,
+                repositories.github_repo_id,
+                repositories.owner,
+                repositories.name,
+                repositories.private,
+                repositories.default_branch,
+                setup.id as setup_id,
+                setup.revision,
+                setup.preset,
+                setup.preset_version,
+                setup.source,
+                setup.actor_id,
+                setup.request_id,
+                setup.workflow_path,
+                setup.workflow_contract_version,
+                setup.workflow_status,
+                setup.config_status,
+                setup.config_version,
+                setup.observed_sha,
+                setup.diagnostics,
+                setup.created_at
+           from repositories
+           join installations on installations.id = repositories.installation_id
+           left join repository_setup_revisions as setup
+             on setup.id = repositories.current_setup_revision_id
+          where installations.github_installation_id = $1
+            and repositories.github_repo_id = $2
+            and repositories.disabled_at is null`,
+        [input.githubInstallationId, input.githubRepositoryId],
+      );
+      const row = rows(result)[0];
+      if (!row) return undefined;
+      const installationId = text(row, "installation_id");
+      const repositoryId = text(row, "repository_id");
+      const githubInstallationId = integer(row, "github_installation_id");
+      const githubRepositoryId = integer(row, "github_repo_id");
+      const owner = text(row, "owner");
+      const name = text(row, "name");
+      const defaultBranch = text(row, "default_branch");
+      if (
+        !installationId ||
+        !repositoryId ||
+        githubInstallationId === undefined ||
+        githubRepositoryId === undefined ||
+        !owner ||
+        !name ||
+        !defaultBranch
+      ) {
         throw new Error("repository setup context is invalid");
       }
       const current = text(row, "setup_id") ? setupRevision(row) : undefined;

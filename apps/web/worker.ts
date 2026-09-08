@@ -41,6 +41,7 @@ import {
 } from "./lib/control-plane-worker-runtime.js";
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
 import { createGitHubWorkflowReconciliationClient } from "./lib/github-workflow-reconciliation-client.js";
+import { createProductionRepositorySetupLifecycleExecutor } from "./lib/repository-setup-automation.js";
 import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-worker.js";
 import { createRunnerClient } from "./lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mode.js";
@@ -177,6 +178,7 @@ const controlPlaneSlo = createControlPlaneSloEvaluator();
 const outbox = createSqlControlPlaneOutboxStore(executor);
 const artifactDeletions = createSqlArtifactDeletionStore(executor);
 const lifecycle = createSqlTransactionalGitHubAppLifecycleStore(executor);
+const setupInteractions = createProductionRepositorySetupLifecycleExecutor(executor);
 const scopedConcurrency = createScopedConcurrencyGate({
   installationLimit: installationConcurrency,
   repositoryLimit: repositoryConcurrency,
@@ -603,6 +605,7 @@ async function processClaimedJobs(claimed: ClaimedControlPlaneJob[]): Promise<vo
           workerId,
           jobs,
           lifecycle,
+          ...(setupInteractions ? { interactions: setupInteractions } : {}),
         }),
       ),
     })),
