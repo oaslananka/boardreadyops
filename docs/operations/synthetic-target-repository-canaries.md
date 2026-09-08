@@ -65,6 +65,17 @@ When this token opens or updates the persistent pull request, GitHub creates the
 
 Private source, workflow logs, and artifacts remain in `oaslananka-dev/boardreadyops-canary-private`. Canary summaries contain repository identity, expected SHA, elapsed time, stable reason code, and known Check Run or workflow URLs only. They do not contain source, findings, artifact names, webhook payloads, credentials, OIDC claims, installation tokens, or raw GitHub response bodies.
 
+Before copying either wrapper, verify the reusable-workflow pin from a current BoardReadyOps checkout. A commit that is still readable through the GitHub API but has diverged from `main` is not an acceptable canary pin:
+
+```bash
+CANARY_WORKFLOW_SHA=dab9e0b1320880ab20875841d779aea55a9fef25
+git fetch origin main
+git merge-base --is-ancestor "$CANARY_WORKFLOW_SHA" origin/main
+git cat-file -e "$CANARY_WORKFLOW_SHA:.github/workflows/synthetic-target-repository-canary.yml"
+```
+
+Both verification commands must exit zero. If either fails, stop commissioning and choose a newer reviewed immutable SHA that is reachable from `main` and contains the reusable workflow. Keep both canary wrappers on the same reviewed SHA.
+
 ## Public repository wrapper
 
 Create `.github/workflows/boardreadyops-canary.yml` in `oaslananka-dev/boardreadyops-canary-public`:
@@ -89,7 +100,7 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@d93cff3819ffcbbff97ac9600f71a27844c4d005 # BoardReadyOps canary workflow
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@dab9e0b1320880ab20875841d779aea55a9fef25 # BoardReadyOps canary workflow
     with:
       visibility: public
       public-origin: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
@@ -119,7 +130,7 @@ concurrency:
 
 jobs:
   canary:
-    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@d93cff3819ffcbbff97ac9600f71a27844c4d005 # BoardReadyOps canary workflow
+    uses: oaslananka/boardreadyops/.github/workflows/synthetic-target-repository-canary.yml@dab9e0b1320880ab20875841d779aea55a9fef25 # BoardReadyOps canary workflow
     with:
       visibility: private
       public-origin: ${{ vars.BOARDREADYOPS_CLOUD_ORIGIN }}
