@@ -75,6 +75,7 @@ The stable required checks are:
 | `ci / build` | Bundle and artifact compilation |
 | `ci / verify-dist` | Committed bundle integrity |
 | `ci / coverage-gate` | Core and cloud coverage enforcement |
+| `SonarCloud Code Analysis` | Authoritative SonarCloud pull-request quality analysis |
 | `security / gate` | Aggregate mandatory security, dependency, secret, compliance, and SBOM decision |
 
 Conditional matrix, integration, accessibility, coverage, mutation, and

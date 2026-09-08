@@ -72,6 +72,7 @@ describe("main branch governance ruleset", () => {
       "ci / build",
       "ci / verify-dist",
       "ci / coverage-gate",
+      "SonarCloud Code Analysis",
       "security / gate",
     ]);
   });
