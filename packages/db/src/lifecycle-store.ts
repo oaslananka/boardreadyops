@@ -127,6 +127,10 @@ export function lifecycleAuditEventForAction(
     };
   }
 
+  if (action.type !== "repository.upsert" && action.type !== "repository.removed") {
+    return undefined;
+  }
+
   const eventType = repositoryAuditEventType(action, context);
   if (!eventType) return undefined;
   return {

@@ -87,6 +87,29 @@ function annotationLevelForFindingSeverity(
   }
 }
 
+const CAD_BINARY_EXTENSIONS = new Set([
+  ".step",
+  ".stp",
+  ".pdf",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".zip",
+  ".tar",
+  ".gz",
+  ".bin",
+  ".exe",
+]);
+
+function isCadBinaryFile(path: string | undefined): boolean {
+  if (!path) return false;
+  const lower = path.toLowerCase();
+  for (const ext of CAD_BINARY_EXTENSIONS) {
+    if (lower.endsWith(ext)) return true;
+  }
+  return false;
+}
+
 /**
  * Convert a ReleaseRunFinding (the wire/contracts shape, not src/core's CLI-only Finding) into a
  * GitHub Check Run annotation, or undefined if it has no line location -- GitHub annotations
@@ -101,7 +124,16 @@ export function findingToCheckRunAnnotation(finding: ReleaseRunFinding): GitHubC
   if (finding.path === undefined || finding.startLine === undefined) {
     return undefined;
   }
-  const endLine = finding.endLine ?? finding.startLine;
+  if (!Number.isSafeInteger(finding.startLine) || finding.startLine < 1 || finding.startLine > 65535) {
+    return undefined;
+  }
+  if (isCadBinaryFile(finding.path)) {
+    return undefined;
+  }
+  let endLine = finding.endLine ?? finding.startLine;
+  if (!Number.isSafeInteger(endLine) || endLine < finding.startLine) {
+    endLine = finding.startLine;
+  }
   return {
     path: finding.path,
     startLine: finding.startLine,
@@ -114,13 +146,24 @@ export function findingToCheckRunAnnotation(finding: ReleaseRunFinding): GitHubC
   };
 }
 
-/** Maps findings to Check Run annotations, silently dropping findings with no line location. */
+export const MAX_CHECK_RUN_ANNOTATIONS = 500;
+
+/** Maps findings to Check Run annotations, silently dropping findings with no line location or binary CAD files. */
 export function findingsToCheckRunAnnotations(findings: ReleaseRunFinding[]): GitHubCheckRunAnnotation[] {
   const annotations: GitHubCheckRunAnnotation[] = [];
+  const seen = new Set<string>();
+
   for (const finding of findings) {
     const annotation = findingToCheckRunAnnotation(finding);
-    if (annotation) {
-      annotations.push(annotation);
+    if (!annotation) continue;
+
+    const dedupeKey = `${annotation.path}:${annotation.startLine}:${annotation.endLine}:${annotation.message}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    annotations.push(annotation);
+    if (annotations.length >= MAX_CHECK_RUN_ANNOTATIONS) {
+      break;
     }
   }
   return annotations;
@@ -416,6 +459,14 @@ export async function executeGitHubAppLifecycleActions(
         );
         break;
       }
+      case "setup_pr.create":
+      case "waiver_pr.request":
+      case "release.prepare":
+      case "github_command.execute":
+      case "pull_request_review.submitted":
+      case "workflow_run.progress":
+        // Handled via external orchestrator or webhook response
+        break;
       default: {
         const exhaustive: never = action;
         throw new Error(`Unsupported GitHub App lifecycle action: ${JSON.stringify(exhaustive)}`);
