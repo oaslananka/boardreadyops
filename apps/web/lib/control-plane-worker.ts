@@ -46,35 +46,64 @@ function errorDetails(error: unknown): { errorClass: string; errorMessage: strin
   };
 }
 
+async function executeSetupInteraction(
+  action: SetupAction,
+  dependencies: ControlPlaneWorkerDependencies,
+  context: GitHubAppLifecycleContext,
+): Promise<void> {
+  const createSetupPr = dependencies.interactions?.createSetupPr;
+  if (!createSetupPr) throw new Error("setup lifecycle interaction executor is not configured");
+  await createSetupPr(action, context);
+}
+
+async function executeWaiverInteraction(
+  action: WaiverAction,
+  dependencies: ControlPlaneWorkerDependencies,
+  context: GitHubAppLifecycleContext,
+): Promise<void> {
+  const createWaiverPr = dependencies.interactions?.createWaiverPr;
+  if (!createWaiverPr) throw new Error("waiver lifecycle interaction executor is not configured");
+  await createWaiverPr(action, context);
+}
+
+async function executeCommandInteraction(
+  action: GitHubCommandAction,
+  dependencies: ControlPlaneWorkerDependencies,
+  context: GitHubAppLifecycleContext,
+): Promise<void> {
+  const executeGitHubCommand = dependencies.interactions?.executeGitHubCommand;
+  if (!executeGitHubCommand) throw new Error("GitHub command interaction executor is not configured");
+  const followUpActions = await executeGitHubCommand(action, context);
+  if (followUpActions.some((followUp) => followUp.type === "github_command.execute")) {
+    throw new Error("GitHub command executor returned a recursive command action");
+  }
+  await processLifecycleActions(followUpActions, dependencies, context);
+}
+
+async function executeInteractionAction(
+  action: GitHubAppLifecycleAction,
+  dependencies: ControlPlaneWorkerDependencies,
+  context: GitHubAppLifecycleContext,
+): Promise<void> {
+  switch (action.type) {
+    case "setup_pr.create":
+      return executeSetupInteraction(action, dependencies, context);
+    case "waiver_pr.request":
+      return executeWaiverInteraction(action, dependencies, context);
+    case "github_command.execute":
+      return executeCommandInteraction(action, dependencies, context);
+    default:
+      return undefined;
+  }
+}
+
 async function processLifecycleActions(
   actions: readonly GitHubAppLifecycleAction[],
   dependencies: ControlPlaneWorkerDependencies,
   context: GitHubAppLifecycleContext,
 ): Promise<void> {
   await planGitHubAppLifecycleActions(actions, dependencies.lifecycle, context);
-  for (const action of actions) {
-    if (action.type === "setup_pr.create") {
-      const createSetupPr = dependencies.interactions?.createSetupPr;
-      if (!createSetupPr) throw new Error("setup lifecycle interaction executor is not configured");
-      await createSetupPr(action, context);
-      continue;
-    }
-    if (action.type === "waiver_pr.request") {
-      const createWaiverPr = dependencies.interactions?.createWaiverPr;
-      if (!createWaiverPr) throw new Error("waiver lifecycle interaction executor is not configured");
-      await createWaiverPr(action, context);
-      continue;
-    }
-    if (action.type === "github_command.execute") {
-      const executeGitHubCommand = dependencies.interactions?.executeGitHubCommand;
-      if (!executeGitHubCommand) throw new Error("GitHub command interaction executor is not configured");
-      const followUpActions = await executeGitHubCommand(action, context);
-      if (followUpActions.some((followUp) => followUp.type === "github_command.execute")) {
-        throw new Error("GitHub command executor returned a recursive command action");
-      }
-      await processLifecycleActions(followUpActions, dependencies, context);
-    }
-  }
+  for (const action of actions) await executeInteractionAction(action, dependencies, context);
 }
 
 export async function processControlPlaneJob(
