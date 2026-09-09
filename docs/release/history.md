@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.41.2](https://github.com/oaslananka/boardreadyops/compare/v1.41.1...v1.41.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* **core:** avoid code construction in process fixture ([#716](https://github.com/oaslananka/boardreadyops/issues/716)) ([40949de](https://github.com/oaslananka/boardreadyops/commit/40949deb23a2587927972404ba3a5c6c16dd286b))
+
 ## [1.41.1](https://github.com/oaslananka/boardreadyops/compare/v1.41.0...v1.41.1) (2026-09-09)
 
 
