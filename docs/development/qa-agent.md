@@ -40,12 +40,11 @@ useful for "run literally everything once" locally, not for CI (too slow for a P
 
 `tests/e2e/global-setup.ts` mints a signed `brops_session` cookie directly — no live GitHub
 OAuth round trip — using `encodeUserSession()` from `apps/web/lib/user-session.ts`, the exact
-function the real callback route uses. It needs a `QA_SESSION_SECRET` (or `SESSION_SECRET`) of
-at least 32 characters in the environment you invoke `pnpm qa:*` from; `playwright.config.ts`
-forwards it to the dev server it starts, and falls back to a fixed local-only placeholder if
-neither is set, so local runs work out of the box. In CI, set a real secret via repository
-variables if you want the authenticated storageState to actually get written — otherwise
-`global-setup.ts` logs a warning and authenticated specs fall back to running signed out.
+function the real callback route uses. `QA_SESSION_SECRET` (or `SESSION_SECRET`) can override the
+local QA key, but it is not required: both `playwright.config.ts` and `global-setup.ts` fall back
+to the same fixed local-only placeholder. The storage state is written directly as JSON, so
+Firefox/WebKit matrix jobs do not need Chromium installed just to mint the cookie, and routes
+marked `auth: "authenticated"` are actually exercised signed in by default.
 
 A spec that needs to be signed in does:
 
@@ -237,12 +236,10 @@ unrelated changes while standing this up:
   "don't chase Lighthouse scores" instruction.
 - **Checkly**: documented above as the migration target for `production-smoke.spec.ts`, not
   integrated — no account/credentials available in this environment.
-- **Real authenticated-session coverage in `qa:audit`**: without `QA_SESSION_SECRET` configured
-  (the default locally), `auth: "authenticated"` routes run signed out, and `qa/audit/checks.ts`
-  allowlists the resulting "responded with a status of 401" console errors as expected fail-closed
-  behavior. That allowlist entry would also hide a *real* session-plumbing regression if a secret
-  *is* configured and an authenticated route still 401s — CI/nightly should set the secret and
-  someone should periodically confirm the audit still passes with it set, since this local pass
-  never exercised that path.
-- **Visual baselines are Windows-only** (`-win32` suffix); see "Updating visual baselines" above
-  for the one-time step to add the Linux (`-linux`) baselines `qa-nightly`'s Ubuntu runner needs.
+- **DB-backed authenticated coverage**: `qa:audit` now always has a deterministic signed-in QA
+  session, so an unexpected 401 is a real P0 instead of an allowlisted local-dev artifact. Routes
+  that require an installation/repository seeded in Postgres are still skipped or degraded when
+  `DATABASE_URL` is absent; a disposable seeded tenant remains a separate infrastructure task.
+- **Visual baselines**: Linux Chromium baselines are checked in for every `visualRoutes` entry and
+  are the authoritative nightly snapshots. Update them only after reviewing an intentional UI
+  change with `pnpm qa:visual:update`.

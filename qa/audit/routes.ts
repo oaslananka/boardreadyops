@@ -30,7 +30,7 @@ export type QaRoute = {
   requiresDb: boolean;
   /** Skip this route's dynamic content entirely without DATABASE_URL, rather than auditing a stub. */
   skipWithoutDb?: boolean;
-  /** Extra internal links this page is expected to expose, for the link-integrity check to prioritize. */
+  /** Internal link prefixes this page is expected to expose and the link-integrity check should probe. */
   expectedLinkPrefixes?: string[];
 };
 

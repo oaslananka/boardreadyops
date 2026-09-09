@@ -3,8 +3,8 @@
  *   import { authenticatedStorageState } from "./fixtures/auth.js";
  *   test.use({ storageState: authenticatedStorageState });
  *
- * If QA_SESSION_SECRET/SESSION_SECRET wasn't set, global-setup skips writing this file and the
- * spec runs signed out instead of failing outright -- authenticated-only assertions in that case
- * should expect a sign-in prompt rather than crash. See docs/qa-agent.md.
+ * global-setup always writes this file. When no explicit secret is configured it uses the same
+ * deterministic local-only secret as the Playwright webServer, so authenticated QA routes are
+ * exercised as signed in instead of silently degrading to sign-in screens.
  */
 export const authenticatedStorageState = "tests/e2e/.auth/storage-state.json";
