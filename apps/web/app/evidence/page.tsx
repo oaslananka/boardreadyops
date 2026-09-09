@@ -123,7 +123,7 @@ export default async function EvidencePage() {
           <pre
             className="mt-3 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm"
             // biome-ignore lint/a11y/noNoninteractiveTabindex: axe requires a scrollable region to be keyboard-reachable
-            tabIndex={0}
+            tabIndex={0} // NOSONAR -- scrollable region must remain keyboard-focusable (axe scrollable-region-focusable).
           >
             boardreadyops release verify --ledger ./evidence-ledger.json
           </pre>

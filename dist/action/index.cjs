@@ -37092,16 +37092,21 @@ var require_loader = __commonJS({
         state3.result += _result;
       }
     }
+    function chargeMergeWork(state3) {
+      state3.totalMergeKeys++;
+      if (state3.maxTotalMergeKeys !== -1 && state3.totalMergeKeys > state3.maxTotalMergeKeys) {
+        throwError2(state3, "merge keys exceeded maxTotalMergeKeys (" + state3.maxTotalMergeKeys + ")");
+      }
+    }
     function mergeMappings(state3, destination, source, overridableKeys) {
       if (!common.isObject(source)) {
         throwError2(state3, "cannot merge mappings; the provided source object is unacceptable");
       }
+      chargeMergeWork(state3);
       const sourceKeys = Object.keys(source);
       for (let index = 0, quantity = sourceKeys.length; index < quantity; index += 1) {
         const key = sourceKeys[index];
-        if (state3.maxTotalMergeKeys !== -1 && ++state3.totalMergeKeys > state3.maxTotalMergeKeys) {
-          throwError2(state3, "merge keys exceeded maxTotalMergeKeys (" + state3.maxTotalMergeKeys + ")");
-        }
+        chargeMergeWork(state3);
         if (!_hasOwnProperty.call(destination, key)) {
           setProperty(destination, key, source[key]);
           overridableKeys[key] = true;
@@ -37129,6 +37134,9 @@ var require_loader = __commonJS({
       }
       if (keyTag === "tag:yaml.org,2002:merge") {
         if (Array.isArray(valueNode)) {
+          if (valueNode.length > 100) {
+            throwError2(state3, "abnormal merge sequence size");
+          }
           for (let index = 0, quantity = valueNode.length; index < quantity; index += 1) {
             mergeMappings(state3, _result, valueNode[index], overridableKeys);
           }
@@ -79382,7 +79390,9 @@ function structuredEntry(level, message, fields, options) {
 }
 function formatText(entry) {
   const level = String(entry.level);
-  const prefix2 = level === "critical" || level === "error" ? import_picocolors.default.red(level) : level === "warn" ? import_picocolors.default.yellow(level) : level;
+  let prefix2 = level;
+  if (level === "critical" || level === "error") prefix2 = import_picocolors.default.red(level);
+  else if (level === "warn") prefix2 = import_picocolors.default.yellow(level);
   const fields = { ...entry };
   delete fields.ts;
   delete fields.level;
@@ -79435,7 +79445,7 @@ function redactString(value, projectRoot, maxFieldLength, key) {
   let output = value.replace(/Authorization:\s*Bearer\s+\S+/gi, "Authorization: Bearer [REDACTED]").replace(/\b(?:api[_-]?key|token|access_token|refresh_token|client_secret|password)=([^&\s]+)/gi, (match) => {
     const [name] = match.split("=");
     return `${name}=[REDACTED]`;
-  }).replace(/\b(?:ghp|github_pat|npm)_[A-Za-z0-9_]{20,}\b/g, "[REDACTED]");
+  }).replace(/\b(?:ghp|github_pat|npm)_\w{20,}\b/g, "[REDACTED]");
   if (projectRoot) {
     for (const root of /* @__PURE__ */ new Set([projectRoot, projectRoot.replaceAll("/", "\\")])) {
       output = output.replaceAll(root, "<project>");
@@ -79636,7 +79646,7 @@ function envValue(env, name) {
 async function postJson(fetcher, url3, body2) {
   const activeFetch = fetcher ?? globalThis.fetch;
   if (typeof activeFetch !== "function") {
-    throw new Error("fetch is not available");
+    throw new TypeError("fetch is not available");
   }
   const response = await activeFetch(url3, {
     method: "POST",
@@ -79714,7 +79724,8 @@ async function sendSmtpEmail(smtpUrl, message, options = {}) {
   if (parsed.protocol !== "smtp:" && parsed.protocol !== "smtps:") {
     throw new Error("SMTP URL must use smtp or smtps.");
   }
-  const port = parsed.port ? Number.parseInt(parsed.port, 10) : parsed.protocol === "smtps:" ? 465 : 25;
+  let port = parsed.protocol === "smtps:" ? 465 : 25;
+  if (parsed.port) port = Number.parseInt(parsed.port, 10);
   const secure = parsed.protocol === "smtps:";
   const socket = secure ? import_node_tls.default.connect({ host: parsed.hostname, port, servername: parsed.hostname }) : import_node_net.default.connect({ host: parsed.hostname, port });
   const client2 = new SmtpClient(socket, options.timeoutMs ?? 1e4);
@@ -83506,7 +83517,7 @@ function refIgnored(reference, patterns) {
   return patterns.some((pattern) => typeof pattern === "string" && globLike(pattern, reference));
 }
 function globLike(pattern, value) {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`).replaceAll("*", ".*");
   return new RegExp(`^${escaped}$`, "i").test(value);
 }
 
@@ -84784,7 +84795,10 @@ function lifecycleFindings(row, databaseStatus, context5) {
   }
   const ruleConfig2 = configFor(context5, "bom.lifecycle");
   const canonicalStatus = classifyLifecycleStatus(lifecycle);
-  const severity = typeof ruleConfig2.severity === "string" ? configuredSeverity(context5, "bom.lifecycle", "medium") : canonicalStatus === "eol" || canonicalStatus === "obsolete" ? "high" : configuredSeverity(context5, "bom.lifecycle", "medium");
+  let severity = configuredSeverity(context5, "bom.lifecycle", "medium");
+  if (typeof ruleConfig2.severity !== "string" && (canonicalStatus === "eol" || canonicalStatus === "obsolete")) {
+    severity = "high";
+  }
   return [
     finding(context5, {
       ruleId: "bom.lifecycle",
@@ -100069,8 +100083,8 @@ function defaultKicadCliCandidates() {
   if (process.platform === "win32") {
     return [
       "kicad-cli",
-      "C:\\Program Files\\KiCad\\10.1\\bin\\kicad-cli.exe",
-      "C:\\Program Files\\KiCad\\10.0\\bin\\kicad-cli.exe"
+      String.raw`C:\Program Files\KiCad\10.1\bin\kicad-cli.exe`,
+      String.raw`C:\Program Files\KiCad\10.0\bin\kicad-cli.exe`
     ];
   }
   if (process.platform === "darwin") {
@@ -100437,7 +100451,7 @@ function parseMeta(comment) {
   };
 }
 function matchMeta(comment, key) {
-  return new RegExp(`\\b${key}\\s*=\\s*(\\S+)`, "i").exec(comment)?.[1];
+  return new RegExp(String.raw`\b${key}\s*=\s*(\S+)`, "i").exec(comment)?.[1];
 }
 
 // src/rules/firmware/shared.ts
@@ -100482,7 +100496,10 @@ var pinmapSchema = external_exports.object({
 async function loadPinmap(file2) {
   try {
     const lowered = file2.toLowerCase();
-    const document2 = lowered.endsWith(".json") ? await readJsonPinmap(file2) : lowered.endsWith(".csv") ? await readCsvPinmap(file2) : await readYamlPinmap(file2);
+    let document2;
+    if (lowered.endsWith(".json")) document2 = await readJsonPinmap(file2);
+    else if (lowered.endsWith(".csv")) document2 = await readCsvPinmap(file2);
+    else document2 = await readYamlPinmap(file2);
     const parsed = pinmapSchema.safeParse(document2);
     if (!parsed.success) {
       return { errors: parsed.error.issues.map((issue3) => `${issue3.path.join(".")}: ${issue3.message}`) };
@@ -101102,7 +101119,7 @@ function missingReferences(text, references) {
   if (uniqueReferences.length === 0) {
     return [];
   }
-  const alternatives = uniqueReferences.map((reference) => reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const alternatives = uniqueReferences.map((reference) => reference.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join("|");
   const found = /* @__PURE__ */ new Set();
   const matcher = new RegExp(`(^|[^A-Za-z0-9_])(${alternatives})(?=[^A-Za-z0-9_]|$)`, "gm");
   for (const match of text.matchAll(matcher)) {
@@ -102867,8 +102884,8 @@ var changelogPresentRule = rule(
   }
 );
 function changelogHasRevision(text, revision2) {
-  const escaped = revision2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^##\\s+\\[?v?${escaped}\\]?\\b`, "m").test(text);
+  const escaped = revision2.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`^##\s+\[?v?${escaped}\]?\b`, "m").test(text);
 }
 
 // src/rules/release/revision-set.ts
@@ -102892,7 +102909,7 @@ var revisionSetRule = rule(
     }
     const output = [];
     const config2 = configFor(context5, "release.revision-set");
-    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : "^v?\\d+\\.\\d+(?:\\.\\d+)?$";
+    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : String.raw`^v?\d+\.\d+(?:\.\d+)?$`;
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
@@ -103285,7 +103302,7 @@ function bomRiskSummaryFromFindings(findings) {
     const d = f.details;
     const factors = d.factors || {};
     return {
-      reference: typeof d.reference === "string" ? d.reference : String(d.reference ?? ""),
+      reference: typeof d.reference === "string" ? d.reference : "",
       mpn: typeof d.mpn === "string" ? d.mpn : void 0,
       manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : void 0,
       riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,
@@ -105600,7 +105617,7 @@ function t(key, params = {}, locale = resolveLocale()) {
   if (template.includes("{findingWord}")) {
     values.findingWord = typeof params.count === "number" && params.count === 1 ? catalog["report.finding.word"] : catalog["report.finding.word.plural"];
   }
-  const rendered = template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => {
+  const rendered = template.replace(/\{(\w+)\}/g, (match, name) => {
     const value = values[name];
     return value === void 0 ? match : String(value);
   });
@@ -106918,7 +106935,8 @@ var runnerTerminalResultRequestSchema = runnerLeaseContextSchema.extend({
 // packages/cloud-core/src/review-diff.ts
 var import_node_crypto5 = require("node:crypto");
 function ordinalCompare(a, b) {
-  return a < b ? -1 : a > b ? 1 : 0;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
 }
 function computeEvidenceDigest(input) {
   const sortedFingerprints = [...input.findingFingerprints].sort(ordinalCompare);

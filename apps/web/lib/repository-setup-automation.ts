@@ -12,7 +12,12 @@ import {
   repositorySetupPresetVersion,
 } from "@boardreadyops/cloud-core/repository-setup";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
-import { createSqlRepositorySetupStore, type RepositorySetupStore } from "@boardreadyops/db/repository-setup-store";
+import {
+  createSqlRepositorySetupStore,
+  type RepositorySetupContext,
+  type RepositorySetupRevision,
+  type RepositorySetupStore,
+} from "@boardreadyops/db/repository-setup-store";
 import { createAppAuth } from "@octokit/auth-app";
 import { createRepositorySetupGitHubClient, type RepositorySetupGitHubClient } from "./repository-setup-github.js";
 
@@ -81,6 +86,71 @@ async function repositoryContextForAction(
   return repository;
 }
 
+type SetupProbeCreation = Awaited<ReturnType<RepositorySetupStore["createProbe"]>>;
+type NonProbeWorkflowStatus = Exclude<
+  Awaited<ReturnType<RepositorySetupGitHubClient["inspect"]>>["workflowStatus"],
+  "missing" | "probe_required"
+>;
+
+async function recordSetupReadiness(
+  store: RepositorySetupStore,
+  repository: RepositorySetupContext,
+  current: RepositorySetupRevision,
+  action: SetupProbeAction,
+  context: GitHubAppLifecycleContext,
+  workflowStatus: NonProbeWorkflowStatus,
+): Promise<void> {
+  await store.applyRevision({
+    installationId: repository.installationId,
+    repositoryId: repository.repositoryId,
+    preset: current.preset,
+    presetVersion: current.presetVersion,
+    source: "operator",
+    actorId: action.requestedBy ?? "github-app",
+    requestId: probeReadinessRequestId(requestId(context.deliveryId)),
+    workflowStatus,
+    configStatus: "unknown",
+    diagnostics: [`GitHub readiness after setup PR #${action.pullRequestNumber}: ${workflowStatus}`],
+  });
+}
+
+function requiredProbeId(created: SetupProbeCreation): string {
+  if (created.outcome === "not_configured") {
+    throw new Error("repository setup probe requires an existing setup revision");
+  }
+  if (created.outcome === "conflict") throw new Error("repository setup probe request conflicted");
+  if (!created.probeId) throw new Error("repository setup probe did not return a probe id");
+  return created.probeId;
+}
+
+async function replayRequiresDispatch(
+  store: RepositorySetupStore,
+  created: SetupProbeCreation,
+  probeId: string,
+): Promise<boolean> {
+  if (created.outcome !== "replayed") return true;
+
+  const replayed = await store.getProbe(probeId);
+  if (!replayed) throw new Error("replayed repository setup probe is unavailable");
+  if (replayed.status === "completed" || replayed.status === "dispatched") return false;
+  if (replayed.status !== "pending") throw new Error(`replayed repository setup probe is ${replayed.status}`);
+  return true;
+}
+
+async function persistProbeDispatch(
+  store: RepositorySetupStore,
+  probeId: string,
+  workflowRunId: string,
+): Promise<void> {
+  const marked = await store.markProbeDispatched({ probeId, workflowRunId });
+  if (marked === "applied" || marked === "replayed") return;
+  if (marked !== "stale") throw new Error(`repository setup probe dispatch could not be persisted: ${marked}`);
+
+  const terminal = await store.getProbe(probeId);
+  if (terminal?.status === "completed" || terminal?.status === "dispatched") return;
+  throw new Error(`repository setup probe dispatch could not be persisted: ${marked}`);
+}
+
 export function createRepositorySetupLifecycleExecutor(
   dependencies: RepositorySetupLifecycleExecutorDependencies,
 ): RepositorySetupLifecycleExecutor {
@@ -145,18 +215,7 @@ export function createRepositorySetupLifecycleExecutor(
         throw new Error("repository setup workflow is not visible on the default branch after setup merge");
       }
       if (readiness.workflowStatus !== "probe_required") {
-        await dependencies.store.applyRevision({
-          installationId: repository.installationId,
-          repositoryId: repository.repositoryId,
-          preset: current.preset,
-          presetVersion: current.presetVersion,
-          source: "operator",
-          actorId: action.requestedBy ?? "github-app",
-          requestId: probeReadinessRequestId(requestId(context.deliveryId)),
-          workflowStatus: readiness.workflowStatus,
-          configStatus: "unknown",
-          diagnostics: [`GitHub readiness after setup PR #${action.pullRequestNumber}: ${readiness.workflowStatus}`],
-        });
+        await recordSetupReadiness(dependencies.store, repository, current, action, context, readiness.workflowStatus);
         return;
       }
 
@@ -167,21 +226,8 @@ export function createRepositorySetupLifecycleExecutor(
         requestId: requestId(context.deliveryId),
         expiresAt: new Date((dependencies.now?.() ?? new Date()).valueOf() + setupProbeLifetimeMs),
       });
-      if (created.outcome === "not_configured") {
-        throw new Error("repository setup probe requires an existing setup revision");
-      }
-      if (created.outcome === "conflict") throw new Error("repository setup probe request conflicted");
-      if (!created.probeId) throw new Error("repository setup probe did not return a probe id");
-      const probeId = created.probeId;
-
-      if (created.outcome === "replayed") {
-        const replayed = await dependencies.store.getProbe(probeId);
-        if (!replayed) throw new Error("replayed repository setup probe is unavailable");
-        if (replayed.status === "completed" || replayed.status === "dispatched") return;
-        if (replayed.status !== "pending") {
-          throw new Error(`replayed repository setup probe is ${replayed.status}`);
-        }
-      }
+      const probeId = requiredProbeId(created);
+      if (!(await replayRequiresDispatch(dependencies.store, created, probeId))) return;
 
       const dispatched = await githubClient.dispatchProbe({
         githubInstallationId: repository.githubInstallationId,
@@ -190,16 +236,7 @@ export function createRepositorySetupLifecycleExecutor(
         defaultBranch: repository.defaultBranch,
         probeId,
       });
-      const marked = await dependencies.store.markProbeDispatched({
-        probeId,
-        workflowRunId: dispatched.workflowRunId,
-      });
-      if (marked === "applied" || marked === "replayed") return;
-      if (marked === "stale") {
-        const terminal = await dependencies.store.getProbe(probeId);
-        if (terminal?.status === "completed" || terminal?.status === "dispatched") return;
-      }
-      throw new Error(`repository setup probe dispatch could not be persisted: ${marked}`);
+      await persistProbeDispatch(dependencies.store, probeId, dispatched.workflowRunId);
     },
 
     async prepareRelease(action, context) {

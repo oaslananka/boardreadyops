@@ -67,5 +67,5 @@ function parseMeta(comment: string): {
 }
 
 function matchMeta(comment: string, key: string): string | undefined {
-  return new RegExp(`\\b${key}\\s*=\\s*(\\S+)`, "i").exec(comment)?.[1];
+  return new RegExp(String.raw`\b${key}\s*=\s*(\S+)`, "i").exec(comment)?.[1];
 }

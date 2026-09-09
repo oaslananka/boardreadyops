@@ -21,6 +21,11 @@ export type ViewerInstallation = {
   componentCredentialRejectedReason: string | undefined;
 };
 
+function numericId(value: unknown): number {
+  if (typeof value === "number") return value;
+  return typeof value === "string" ? Number(value) : Number.NaN;
+}
+
 function text(row: Record<string, unknown>, name: string): string | undefined {
   const value = row[name];
   if (typeof value === "string") return value;
@@ -73,7 +78,7 @@ export async function viewerInstallations(
       const id = text(row, "id");
       // node-postgres decodes bigint as a string to avoid precision loss.
       const raw = row.github_installation_id;
-      const githubInstallationId = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : Number.NaN;
+      const githubInstallationId = numericId(raw);
       if (!id || !Number.isSafeInteger(githubInstallationId)) return [];
       return [
         {

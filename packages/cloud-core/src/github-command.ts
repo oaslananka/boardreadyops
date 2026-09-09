@@ -44,88 +44,70 @@ const MUTATING_COMMANDS = new Set(["rerun", "setup", "waive", "fix", "release-pr
 const PRIVILEGED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const VALID_RULE_ID_PATTERN = /^[a-zA-Z0-9_.-]{1,100}$/;
 
-export function parseGitHubCommand(commentBody: string): ParsedGitHubCommand | undefined {
-  if (!commentBody || typeof commentBody !== "string") {
-    return undefined;
+function parseWaiveCommand(tokens: readonly string[]): ParsedGitHubCommand | undefined {
+  const ruleId = tokens[1];
+  if (!ruleId || !VALID_RULE_ID_PATTERN.test(ruleId)) return undefined;
+
+  let reason: string | undefined;
+  for (const [index, token] of tokens.entries()) {
+    if (index < 2) continue;
+    const nextToken = tokens[index + 1];
+    if (token === "--reason" && nextToken) {
+      reason = sanitizeReason(nextToken);
+      break;
+    }
+    if (token.startsWith("--reason=")) {
+      reason = sanitizeReason(token.slice("--reason=".length));
+      break;
+    }
   }
 
-  const lines = commentBody.split("\n");
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    const rest = extractCommandArgs(line);
-    if (rest === null) {
-      continue;
-    }
+  return reason ? { kind: "waive", ruleId, reason } : { kind: "waive", ruleId };
+}
 
-    if (!rest) {
+function parseFixCommand(tokens: readonly string[]): ParsedGitHubCommand | undefined {
+  const ruleId = tokens[1];
+  if (ruleId && !VALID_RULE_ID_PATTERN.test(ruleId)) return undefined;
+  return ruleId ? { kind: "fix", ruleId } : { kind: "fix" };
+}
+
+function parseTokenizedCommand(tokens: readonly string[]): ParsedGitHubCommand | undefined {
+  const sub = tokens[0]?.toLowerCase();
+  if (!sub) return { kind: "help" };
+
+  switch (sub) {
+    case "help":
       return { kind: "help" };
+    case "status":
+      return { kind: "status" };
+    case "rerun":
+      return { kind: "rerun" };
+    case "diff":
+      return { kind: "diff" };
+    case "release-preview":
+      return { kind: "release-preview" };
+    case "setup":
+      return { kind: "setup" };
+    case "explain": {
+      const ruleId = tokens[1];
+      return ruleId && VALID_RULE_ID_PATTERN.test(ruleId) ? { kind: "explain", ruleId } : undefined;
     }
-
-    const tokens = tokenizeArgs(rest);
-    if (tokens.length === 0) {
+    case "waive":
+      return parseWaiveCommand(tokens);
+    case "fix":
+      return parseFixCommand(tokens);
+    default:
       return { kind: "help" };
-    }
+  }
+}
 
-    const sub = tokens[0]?.toLowerCase();
-    if (!sub) {
-      return { kind: "help" };
-    }
+export function parseGitHubCommand(commentBody: string): ParsedGitHubCommand | undefined {
+  if (!commentBody) return undefined;
 
-    switch (sub) {
-      case "help":
-        return { kind: "help" };
-      case "status":
-        return { kind: "status" };
-      case "rerun":
-        return { kind: "rerun" };
-      case "diff":
-        return { kind: "diff" };
-      case "release-preview":
-        return { kind: "release-preview" };
-      case "setup":
-        return { kind: "setup" };
-      case "explain": {
-        const ruleId = tokens[1];
-        if (!ruleId || !VALID_RULE_ID_PATTERN.test(ruleId)) {
-          return undefined;
-        }
-        return { kind: "explain", ruleId };
-      }
-      case "waive": {
-        const ruleId = tokens[1];
-        if (!ruleId || !VALID_RULE_ID_PATTERN.test(ruleId)) {
-          return undefined;
-        }
-        let reason: string | undefined;
-        for (let i = 2; i < tokens.length; i++) {
-          const token = tokens[i];
-          const nextToken = tokens[i + 1];
-          if (!token) continue;
-          if (token === "--reason" && nextToken) {
-            reason = sanitizeReason(nextToken);
-            break;
-          }
-          if (token.startsWith("--reason=")) {
-            reason = sanitizeReason(token.slice("--reason=".length));
-            break;
-          }
-        }
-        const waiveCmd: ParsedGitHubCommand = { kind: "waive", ruleId };
-        if (reason) {
-          waiveCmd.reason = reason;
-        }
-        return waiveCmd;
-      }
-      case "fix": {
-        const ruleId = tokens[1];
-        if (ruleId && !VALID_RULE_ID_PATTERN.test(ruleId)) {
-          return undefined;
-        }
-        return ruleId ? { kind: "fix", ruleId } : { kind: "fix" };
-      }
-      default:
-        return { kind: "help" };
-    }
+  for (const rawLine of commentBody.split("\n")) {
+    const rest = extractCommandArgs(rawLine.trim());
+    if (rest === null) continue;
+    return parseTokenizedCommand(tokenizeArgs(rest));
   }
 
   return undefined;
@@ -133,43 +115,41 @@ export function parseGitHubCommand(commentBody: string): ParsedGitHubCommand | u
 
 function sanitizeReason(raw: string): string {
   let cleaned = "";
-  for (let i = 0; i < raw.length && cleaned.length < 500; i++) {
-    const code = raw.charCodeAt(i);
-    if (code >= 32 && code !== 127) {
-      cleaned += raw[i];
+  for (const char of raw) {
+    if (cleaned.length >= 500) break;
+    const code = char.codePointAt(0);
+    if (code !== undefined && code >= 32 && code !== 127) {
+      cleaned += char.slice(0, 500 - cleaned.length);
     }
   }
   return cleaned;
 }
 
+function firstMentionSeparatorIndex(text: string): number {
+  const spaceIndex = text.indexOf(" ");
+  const tabIndex = text.indexOf("\t");
+  if (spaceIndex === -1) return tabIndex;
+  if (tabIndex === -1) return spaceIndex;
+  return Math.min(spaceIndex, tabIndex);
+}
+
 function extractCommandArgs(line: string): string | null {
   let text = line;
   if (text.startsWith("@")) {
-    const spaceIndex = text.indexOf(" ");
-    const tabIndex = text.indexOf("\t");
-    const splitIndex = spaceIndex === -1 ? tabIndex : tabIndex === -1 ? spaceIndex : Math.min(spaceIndex, tabIndex);
-    if (splitIndex === -1) {
-      return null;
-    }
+    const splitIndex = firstMentionSeparatorIndex(text);
+    if (splitIndex === -1) return null;
+
     const mention = text.slice(1, splitIndex);
-    if (!/^[\w-]+$/.test(mention)) {
-      return null;
-    }
+    if (!/^[\w-]+$/.test(mention)) return null;
     text = text.slice(splitIndex).trimStart();
   }
 
-  const prefix = text.slice(0, 14).toLowerCase();
-  if (prefix !== "/boardreadyops" && prefix !== "!boardreadyops") {
-    return null;
-  }
+  const normalized = text.toLowerCase();
+  if (!normalized.startsWith("/boardreadyops") && !normalized.startsWith("!boardreadyops")) return null;
 
   const after = text.slice(14);
-  if (after.length === 0) {
-    return "";
-  }
-  if (after[0] !== " " && after[0] !== "\t") {
-    return null;
-  }
+  if (after.length === 0) return "";
+  if (!after.startsWith(" ") && !after.startsWith("\t")) return null;
   return after.trim();
 }
 
@@ -178,31 +158,30 @@ function tokenizeArgs(str: string): string[] {
   let current = "";
   let inQuotes: "'" | '"' | null = null;
 
-  for (let i = 0; i < str.length; i++) {
-    const char = str[i];
-    if (!char) continue;
+  for (const char of str) {
     if (inQuotes) {
-      if (char === inQuotes) {
-        inQuotes = null;
-      } else {
-        current += char;
-      }
-    } else if (char === '"' || char === "'") {
+      if (char === inQuotes) inQuotes = null;
+      else current += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
       inQuotes = char;
-    } else if (/\s/.test(char)) {
-      if (current.length > 0) {
-        tokens.push(current);
-        current = "";
-      }
-    } else {
+      continue;
+    }
+
+    if (!/\s/.test(char)) {
       current += char;
+      continue;
+    }
+
+    if (current.length > 0) {
+      tokens.push(current);
+      current = "";
     }
   }
 
-  if (current.length > 0) {
-    tokens.push(current);
-  }
-
+  if (current.length > 0) tokens.push(current);
   return tokens;
 }
 

@@ -301,9 +301,8 @@ async function bootstrap(config, paths) {
   renderPythonSelection(pythonSelection.attempts);
   const uvVersion = await commandVersion("uv", ["--version"], process.env);
   const venvCommand = buildVirtualEnvironmentCommand(config, paths, pythonSelection.command, uvVersion);
-  process.stdout.write(
-    `==> Python environment: ${uvVersion === config.python.uv ? `uv ${uvVersion}` : "stdlib venv (pinned uv unavailable)"}\n`,
-  );
+  const pythonEnvironment = uvVersion === config.python.uv ? `uv ${uvVersion}` : "stdlib venv (pinned uv unavailable)";
+  process.stdout.write(`==> Python environment: ${pythonEnvironment}\n`);
   const normalizedDirectories = await normalizeRepositoryModes(paths.repositoryRoot);
   if (normalizedDirectories > 0) {
     process.stdout.write(`==> Normalized ${normalizedDirectories} inherited directory mode(s)\n`);

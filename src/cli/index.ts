@@ -88,6 +88,7 @@ if (
     cliEntryName === "index.cjs")
 ) {
   void runCli(process.argv.slice(2)).then((code) => {
+    // NOSONAR -- CJS bundle forbids top-level await.
     process.exitCode = code;
   });
 }

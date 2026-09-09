@@ -86,6 +86,17 @@ function dependencySnapshotKey(name, version) {
   return `${name}@${version}`;
 }
 
+function snapshotDependencyKeys(snapshot) {
+  const keys = [];
+  for (const field of ["dependencies", "optionalDependencies"]) {
+    for (const [name, version] of Object.entries(snapshot[field] ?? {})) {
+      const dependencyKey = dependencySnapshotKey(name, version);
+      if (dependencyKey) keys.push(dependencyKey);
+    }
+  }
+  return keys;
+}
+
 function traverseSnapshots(roots, snapshots, constrainedBaseKeys, stopAtConstrained) {
   const visited = new Set();
   const stack = [...roots];
@@ -104,14 +115,7 @@ function traverseSnapshots(roots, snapshots, constrainedBaseKeys, stopAtConstrai
     if (!snapshot) {
       continue;
     }
-    for (const field of ["dependencies", "optionalDependencies"]) {
-      for (const [name, version] of Object.entries(snapshot[field] ?? {})) {
-        const dependencyKey = dependencySnapshotKey(name, version);
-        if (dependencyKey) {
-          stack.push(dependencyKey);
-        }
-      }
-    }
+    stack.push(...snapshotDependencyKeys(snapshot));
   }
 
   return visited;

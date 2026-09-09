@@ -3,14 +3,26 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import glob from "fast-glob";
 
-const ACTION_USE_PATTERN = /^\s*(?:-\s*)?uses:\s+[^\s#]+@([^\s#]+)(?:\s*#\s*(\S.*))?\s*$/;
 const RELEASE_SHA_PATTERN = /^[a-f0-9]{40}$/i;
+
+function actionUseReference(line) {
+  let value = line.trim();
+  if (value.startsWith("-")) value = value.slice(1).trimStart();
+  if (!value.startsWith("uses:")) return undefined;
+  value = value.slice("uses:".length).trimStart();
+  const commentIndex = value.indexOf("#");
+  const reference = (commentIndex >= 0 ? value.slice(0, commentIndex) : value).trim();
+  const comment = commentIndex >= 0 ? value.slice(commentIndex + 1).trim() : "";
+  const atIndex = reference.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex === reference.length - 1) return undefined;
+  return { revision: reference.slice(atIndex + 1), comment };
+}
 
 export function findUnpinnedActionUses(file, markdown) {
   return markdown
     .split(/\r?\n/)
-    .map((line, index) => ({ line, lineNumber: index + 1, match: line.match(ACTION_USE_PATTERN) }))
-    .filter(({ match }) => match && (!RELEASE_SHA_PATTERN.test(match[1]) || !match[2]))
+    .map((line, index) => ({ line, lineNumber: index + 1, use: actionUseReference(line) }))
+    .filter(({ use }) => use && (!RELEASE_SHA_PATTERN.test(use.revision) || !use.comment))
     .map(({ line, lineNumber }) => `${file}:${lineNumber}: ${line}`);
 }
 

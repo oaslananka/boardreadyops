@@ -115,7 +115,8 @@ function isoColumn(row: Record<string, unknown> | undefined, key: string): strin
 function positiveInteger(value: number | undefined, fallback: number, name: string, maximum?: number): number {
   const selected = value ?? fallback;
   if (!Number.isSafeInteger(selected) || selected <= 0 || (maximum !== undefined && selected > maximum)) {
-    throw new Error(`${name} must be a positive integer${maximum === undefined ? "" : ` no greater than ${maximum}`}`);
+    const maximumDescription = maximum === undefined ? "" : ` no greater than ${maximum}`;
+    throw new Error(`${name} must be a positive integer${maximumDescription}`);
   }
   return selected;
 }
@@ -214,7 +215,7 @@ export function createSqlRunnerArtifactStore(
       if (input.artifacts.length < 1 || input.artifacts.length > 100) return { status: "stale" };
 
       const declarations = input.artifacts.map(normalizeDeclaration);
-      if (declarations.some((declaration) => declaration === undefined)) return { status: "stale" };
+      if (declarations.includes(undefined)) return { status: "stale" };
 
       const expiresAt = new Date(at.valueOf() + capabilityTtlSeconds * 1000);
       const nonceExpiresAt = new Date(at.valueOf() + requestNonceTtlSeconds * 1000);

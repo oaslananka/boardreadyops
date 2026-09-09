@@ -15,7 +15,7 @@ function requiredEnv(name) {
 }
 
 function githubPrivateKey() {
-  return requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n");
+  return requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll(String.raw`\n`, "\n");
 }
 
 export function detailsUrl(runId) {
@@ -335,7 +335,7 @@ export async function ensurePullRequestCheckRun(input) {
   );
 
   if (typeof created.id !== "number") {
-    throw new Error("GitHub check run response did not include a numeric id");
+    throw new TypeError("GitHub check run response did not include a numeric id");
   }
 
   return { id: created.id };

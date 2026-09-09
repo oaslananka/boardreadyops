@@ -38,7 +38,7 @@ export function parseNpmPackOutput(raw) {
   const [packResult] = candidates;
 
   if (!Number.isFinite(packResult.size) || !Number.isFinite(packResult.unpackedSize)) {
-    throw new Error("npm pack output did not include numeric size metadata");
+    throw new TypeError("npm pack output did not include numeric size metadata");
   }
 
   return packResult;

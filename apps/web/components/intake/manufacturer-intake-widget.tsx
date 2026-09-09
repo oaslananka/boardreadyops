@@ -37,6 +37,18 @@ export interface ManufacturerIntakeWidgetProps {
   partnerName: string;
 }
 
+function detectedFormat(isIpc: boolean, isAltium: boolean): string {
+  if (isIpc) return "IPC-2581 Rev B";
+  return isAltium ? "Altium Designer" : "KiCad / Gerber";
+}
+
+function detectedFormatMessage(isIpc: boolean, isAltium: boolean): string {
+  if (isIpc) return "Valid IPC-2581 Rev B XML package with native stackup and netlist.";
+  return isAltium
+    ? "Altium Designer RS-274X Gerbers and Excellon drill package detected."
+    : "Generic Gerber package identified.";
+}
+
 export function ManufacturerIntakeWidget({ partnerSlug, partnerName }: Readonly<ManufacturerIntakeWidgetProps>) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -61,11 +73,7 @@ export function ManufacturerIntakeWidget({ partnerSlug, partnerName }: Readonly<
           label: "CAD Package Format Detection",
           category: "format",
           status: "pass",
-          message: isIpc
-            ? "Valid IPC-2581 Rev B XML package with native stackup and netlist."
-            : isAltium
-              ? "Altium Designer RS-274X Gerbers and Excellon drill package detected."
-              : "Generic Gerber package identified.",
+          message: detectedFormatMessage(isIpc, isAltium),
         },
         {
           id: "stk-1",
@@ -107,7 +115,7 @@ export function ManufacturerIntakeWidget({ partnerSlug, partnerName }: Readonly<
       }
 
       setSummary({
-        format: isIpc ? "IPC-2581 Rev B" : isAltium ? "Altium Designer" : "KiCad / Gerber",
+        format: detectedFormat(isIpc, isAltium),
         layers: 4,
         widthMm: 50.0,
         heightMm: 40.0,

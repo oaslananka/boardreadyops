@@ -39,10 +39,10 @@ export function isAllowedLicenseExpression(expression, allowedSet = new Set(allo
     return false;
   }
 
-  const normalized = expression.replace(/[()]/g, "");
+  const normalized = expression.replace(/[()]/g, "").replace(/\s+/g, " ").trim();
   return normalized
-    .split(/\s+OR\s+/)
-    .some((choice) => choice.split(/\s+AND\s+/).every((license) => allowedSet.has(license.trim())));
+    .split(" OR ")
+    .some((choice) => choice.split(" AND ").every((license) => allowedSet.has(license.trim())));
 }
 
 export function formatLicensePolicyViolations(violations) {

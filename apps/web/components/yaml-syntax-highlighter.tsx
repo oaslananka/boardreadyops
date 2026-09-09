@@ -11,37 +11,82 @@ type YamlToken = {
   text: string;
 };
 
+function isYamlWhitespace(char: string | undefined): boolean {
+  return char === " " || char === "\t";
+}
+
+function yamlPrefixEnd(line: string): number {
+  let index = 0;
+  while (isYamlWhitespace(line[index])) index += 1;
+  if (line[index] !== "-") return index;
+  index += 1;
+  while (isYamlWhitespace(line[index])) index += 1;
+  return index;
+}
+
+function yamlKeyEnd(line: string, start: number): number {
+  let index = start;
+  while (index < line.length && /[a-zA-Z0-9_.-]/u.test(line[index] ?? "")) index += 1;
+  return index;
+}
+
+function yamlKeyValueParts(line: string): { prefix: string; key: string; colon: string; rawValue: string } | undefined {
+  const prefixEnd = yamlPrefixEnd(line);
+  const keyEnd = yamlKeyEnd(line, prefixEnd);
+  if (keyEnd === prefixEnd) return undefined;
+
+  let colonIndex = keyEnd;
+  while (isYamlWhitespace(line[colonIndex])) colonIndex += 1;
+  if (line[colonIndex] !== ":") return undefined;
+
+  let valueIndex = colonIndex + 1;
+  while (isYamlWhitespace(line[valueIndex])) valueIndex += 1;
+  return {
+    prefix: line.slice(0, prefixEnd),
+    key: line.slice(prefixEnd, keyEnd),
+    colon: line.slice(keyEnd, valueIndex),
+    rawValue: line.slice(valueIndex),
+  };
+}
+
+function yamlListParts(line: string): { marker: string; content: string } | undefined {
+  let index = 0;
+  while (isYamlWhitespace(line[index])) index += 1;
+  if (line[index] !== "-") return undefined;
+  index += 1;
+  while (isYamlWhitespace(line[index])) index += 1;
+  return { marker: line.slice(0, index), content: line.slice(index) };
+}
+
 export function tokenizeYamlLine(line: string, lineIndex: number): YamlToken[] {
   if (!line) return [{ id: `L${lineIndex}-empty`, type: "plain", text: "" }];
 
-  // Comment line
-  const commentMatch = line.match(/^(\s*)(#.*)$/);
-  if (commentMatch) {
-    const indent = commentMatch[1] ?? "";
-    const comment = commentMatch[2] ?? "";
+  let contentIndex = 0;
+  while (isYamlWhitespace(line[contentIndex])) contentIndex += 1;
+  if (line[contentIndex] === "#") {
+    const indent = line.slice(0, contentIndex);
+    const comment = line.slice(contentIndex);
     const tokens: YamlToken[] = [];
     if (indent) tokens.push({ id: `L${lineIndex}-indent`, type: "plain", text: indent });
     tokens.push({ id: `L${lineIndex}-comment`, type: "comment", text: comment });
     return tokens;
   }
 
-  // Key-value pair, e.g. "  bom.missing-mpn: true" or "version: 1" or "  - path: ."
-  const kvMatch = line.match(/^(\s*(?:-\s*)?)([a-zA-Z0-9_.-]+)(\s*:\s*)(.*)$/);
-  if (kvMatch) {
-    const prefix = kvMatch[1] ?? "";
-    const key = kvMatch[2] ?? "";
-    const colon = kvMatch[3] ?? "";
-    const rawValue = kvMatch[4] ?? "";
+  const keyValue = yamlKeyValueParts(line);
+  if (keyValue) {
+    const { prefix, key, colon, rawValue } = keyValue;
     const tokens: YamlToken[] = [];
     if (prefix) tokens.push({ id: `L${lineIndex}-prefix`, type: "punctuation", text: prefix });
-    tokens.push({ id: `L${lineIndex}-k-${key}`, type: "key", text: key });
-    tokens.push({ id: `L${lineIndex}-colon`, type: "punctuation", text: colon });
+    tokens.push(
+      { id: `L${lineIndex}-k-${key}`, type: "key", text: key },
+      { id: `L${lineIndex}-colon`, type: "punctuation", text: colon },
+    );
 
     if (rawValue) {
       const trimmedVal = rawValue.trim();
       if (trimmedVal === "true" || trimmedVal === "false") {
         tokens.push({ id: `L${lineIndex}-bool`, type: "boolean", text: rawValue });
-      } else if (/^\d+(?:\.\d+)?$/.test(trimmedVal)) {
+      } else if (/^\d+(?:\.\d+)?$/u.test(trimmedVal)) {
         tokens.push({ id: `L${lineIndex}-num`, type: "number", text: rawValue });
       } else {
         tokens.push({ id: `L${lineIndex}-str`, type: "string", text: rawValue });
@@ -50,14 +95,11 @@ export function tokenizeYamlLine(line: string, lineIndex: number): YamlToken[] {
     return tokens;
   }
 
-  // List item without key: "  - foo"
-  const listMatch = line.match(/^(\s*-\s*)(.*)$/);
-  if (listMatch) {
-    const marker = listMatch[1] ?? "";
-    const content = listMatch[2] ?? "";
+  const list = yamlListParts(line);
+  if (list) {
     return [
-      { id: `L${lineIndex}-marker`, type: "punctuation", text: marker },
-      { id: `L${lineIndex}-item`, type: "string", text: content },
+      { id: `L${lineIndex}-marker`, type: "punctuation", text: list.marker },
+      { id: `L${lineIndex}-item`, type: "string", text: list.content },
     ];
   }
 

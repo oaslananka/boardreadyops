@@ -452,8 +452,10 @@ export async function deployCloud(options = readDeployOptions()) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  deployCloud().catch((error) => {
+  try {
+    await deployCloud();
+  } catch (error) {
     logError(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
-  });
+  }
 }

@@ -40,15 +40,15 @@ export function setRevision(text: string, revision: string, rootForm: "kicad_pcb
   if (/\(title_block\b/.test(text)) {
     return text.replace(/\(title_block\b/, `(title_block (rev "${revision}")`);
   }
-  return text.replace(new RegExp(`\\(${rootForm}\\b`), `(${rootForm}\n  (title_block (rev "${revision}"))`);
+  return text.replace(new RegExp(String.raw`\(${rootForm}\b`), `(${rootForm}\n  (title_block (rev "${revision}"))`);
 }
 
 /**
  * Check whether a changelog text already contains an entry for the given revision.
  */
 export function changelogHasRevision(text: string, revision: string): boolean {
-  const escaped = revision.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^##\\s+\\[?v?${escaped}\\]?\\b`, "m").test(text);
+  const escaped = revision.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`^##\s+\[?v?${escaped}\]?\b`, "m").test(text);
 }
 
 /**

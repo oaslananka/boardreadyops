@@ -37,7 +37,7 @@ function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
   let copperLayerCount = 0;
 
   for (const entry of files) {
-    const cleanName = entry.filename.replace(/\\/g, "/");
+    const cleanName = entry.filename.replaceAll("\\", "/");
     const classification = classifyLayer(cleanName);
     if (!classification) continue;
 
@@ -150,7 +150,7 @@ function classifyLayer(filename: string): LayerClassification | null {
   }
 
   // Copper Inner
-  const innerMatch = lower.match(/\.g(\d+)$/) || lower.match(/[-_]in(\d+)_cu\.gbr$/);
+  const innerMatch = /\.g(\d+)$/u.exec(lower) ?? /[-_]in(\d+)_cu\.gbr$/u.exec(lower);
   const innerNum = innerMatch?.[1];
   if (innerNum) {
     const idx = Number.parseInt(innerNum, 10);
@@ -199,7 +199,7 @@ function gerberCoordinateScale(content: string): number {
   const isInch = /%MOIN\*%/.test(content) && !/%MOMM\*%/.test(content);
 
   let divisor = 100000;
-  const decimalsStr = content.match(/%FSLAX(\d)(\d)Y(\d)(\d)\*%/)?.[2];
+  const decimalsStr = /%FSLAX(\d)(\d)Y(\d)(\d)\*%/u.exec(content)?.[2];
   if (decimalsStr) {
     divisor = 10 ** Number.parseInt(decimalsStr, 10);
   }

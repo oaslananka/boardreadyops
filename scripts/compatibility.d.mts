@@ -62,10 +62,10 @@ export interface CompatibilityDrift {
   }>;
 }
 
-export function renderSupportMatrix(input: CompatibilityConfig | unknown): string;
+export function renderSupportMatrix(input: unknown): string;
 
 export function findCompatibilityDrift(
-  input: CompatibilityConfig | unknown,
+  input: unknown,
   sources: { kicadReleases?: string[]; nodeReleases?: NodeRelease[]; cycloneDxSchema?: CycloneDxSchema },
 ): CompatibilityDrift;
 
@@ -75,9 +75,6 @@ export function fetchNodeReleases(fetchImpl?: typeof fetch): Promise<NodeRelease
 
 export function fetchKicadReleaseTags(fetchImpl?: typeof fetch): Promise<string[]>;
 
-export function fetchCycloneDxSchema(
-  input: CompatibilityConfig | string | unknown,
-  fetchImpl?: typeof fetch,
-): Promise<CycloneDxSchema>;
+export function fetchCycloneDxSchema(input: unknown, fetchImpl?: typeof fetch): Promise<CycloneDxSchema>;
 
 export function main(args?: string[], options?: { root?: string; fetch?: typeof fetch }): Promise<void>;

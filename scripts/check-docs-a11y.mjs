@@ -93,9 +93,7 @@ export function formatPa11yFailures(siteDir, results) {
     const relativePage = path.relative(siteDir, result.page).split(path.sep).join("/");
     lines.push(`- ${relativePage}`);
     for (const issue of result.issues) {
-      lines.push(`  - ${issue.type}: ${issue.message}`);
-      lines.push(`    selector: ${issue.selector}`);
-      lines.push(`    code: ${issue.code}`);
+      lines.push(`  - ${issue.type}: ${issue.message}`, `    selector: ${issue.selector}`, `    code: ${issue.code}`);
     }
   }
   return lines.join("\n");
@@ -266,7 +264,7 @@ async function resolveRequestPath(siteDir, pathname, sitePathPrefix) {
     throw new Error(`refusing to serve path outside site dir: ${pathname}`);
   }
   const info = await stat(candidate).catch((error) => {
-    if (error && error.code === "ENOENT") {
+    if (error?.code === "ENOENT") {
       return undefined;
     }
     throw error;

@@ -25,7 +25,7 @@ export function parseIpc2581Package(xmlContent: string, sourceFileName = "board.
   const warnings: ParserWarning[] = [];
 
   // Extract revision/version
-  const revMatch = xmlContent.match(/<IPC-2581[^>]*\s(?:revision|version)=["']([^"']+)["']/i);
+  const revMatch = /<IPC-2581[^>]*\s(?:revision|version)=["']([^"']+)["']/i.exec(xmlContent);
   const formatVersion = revMatch?.[1] || "B";
 
   // Extract units
@@ -82,7 +82,7 @@ function assertSafeXml(xml: string): void {
 }
 
 function extractUnitFactor(xml: string): number {
-  const match = xml.match(/\bunits=["']([^"']+)["']/i);
+  const match = /\bunits=["']([^"']+)["']/i.exec(xml);
   if (!match?.[1]) return 1.0;
   const unit = match[1].toUpperCase();
   if (unit === "INCH" || unit === "INCHES") return 25.4;
@@ -149,10 +149,10 @@ function extractLayers(xml: string, filename: string): NormalizedLayer[] {
 
   while (match !== null) {
     const attrStr = match[1] || "";
-    const nameMatch = attrStr.match(/\bname=["']([^"']+)["']/i);
-    const funcMatch = attrStr.match(/\blayerFunction=["']([^"']+)["']/i);
-    const sideMatch = attrStr.match(/\bside=["']([^"']+)["']/i);
-    const seqMatch = attrStr.match(/\bsequence=["'](\d+)["']/i);
+    const nameMatch = /\bname=["']([^"']+)["']/i.exec(attrStr);
+    const funcMatch = /\blayerFunction=["']([^"']+)["']/i.exec(attrStr);
+    const sideMatch = /\bside=["']([^"']+)["']/i.exec(attrStr);
+    const seqMatch = /\bsequence=["'](\d+)["']/i.exec(attrStr);
 
     if (nameMatch?.[1]) {
       const rawName = nameMatch[1];
@@ -203,13 +203,13 @@ function extractBomCharacteristics(xml: string): Map<string, BomCharInfo> {
   let itemMatch: RegExpExecArray | null = bomItemRegex.exec(xml);
   while (itemMatch !== null) {
     const itemContent = itemMatch[1] || "";
-    const refMatch = itemContent.match(/<ComponentRef\s+componentRef=["']([^"']+)["']/i);
+    const refMatch = /<ComponentRef\s+componentRef=["']([^"']+)["']/i.exec(itemContent);
     if (refMatch?.[1]) {
       const refDes = refMatch[1].trim();
-      const valMatch = itemContent.match(/<Characteristic[^>]*name=["']VALUE["'][^>]*value=["']([^"']+)["']/i);
-      const pkgMatch = itemContent.match(/<Characteristic[^>]*name=["']PACKAGE["'][^>]*value=["']([^"']+)["']/i);
-      const mpnMatch = itemContent.match(
-        /<Characteristic[^>]*name=["'](?:MPN|PART_NUMBER|PART_NO)["'][^>]*value=["']([^"']+)["']/i,
+      const valMatch = /<Characteristic[^>]*name=["']VALUE["'][^>]*value=["']([^"']+)["']/i.exec(itemContent);
+      const pkgMatch = /<Characteristic[^>]*name=["']PACKAGE["'][^>]*value=["']([^"']+)["']/i.exec(itemContent);
+      const mpnMatch = /<Characteristic[^>]*name=["'](?:MPN|PART_NUMBER|PART_NO)["'][^>]*value=["']([^"']+)["']/i.exec(
+        itemContent,
       );
 
       bomMap.set(refDes.toUpperCase(), {
@@ -307,15 +307,15 @@ function extractComponents(
 
 function extractDrillHoles(xml: string, unitFactor: number): NormalizedDrillHole[] {
   const holes: NormalizedDrillHole[] = [];
-  const holeRegex = /<Hole\s+([^>]+)\/?>/gi;
+  const holeRegex = /<Hole\s+([^>]{1,4096})\/?>/gi;
 
   let match: RegExpExecArray | null = holeRegex.exec(xml);
   while (match !== null) {
     const attrs = match[1] || "";
-    const xMatch = attrs.match(/\bx=["']([\d.-]+)["']/i);
-    const yMatch = attrs.match(/\by=["']([\d.-]+)["']/i);
-    const dMatch = attrs.match(/\bdiameter=["']([\d.-]+)["']/i);
-    const platedMatch = attrs.match(/\bplating=["']([^"']+)["']/i);
+    const xMatch = /\bx=["']([\d.-]+)["']/i.exec(attrs);
+    const yMatch = /\by=["']([\d.-]+)["']/i.exec(attrs);
+    const dMatch = /\bdiameter=["']([\d.-]+)["']/i.exec(attrs);
+    const platedMatch = /\bplating=["']([^"']+)["']/i.exec(attrs);
 
     if (xMatch?.[1] && yMatch?.[1] && dMatch?.[1]) {
       const x = Number.parseFloat(xMatch[1]) * unitFactor;

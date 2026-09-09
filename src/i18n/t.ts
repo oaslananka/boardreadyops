@@ -16,7 +16,7 @@ export function t(key: MessageKey, params: MessageParams = {}, locale: Locale = 
         ? catalog["report.finding.word"]
         : catalog["report.finding.word.plural"];
   }
-  const rendered = template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name: string) => {
+  const rendered = template.replace(/\{(\w+)\}/g, (match, name: string) => {
     const value = values[name];
     return value === undefined ? match : String(value);
   });

@@ -194,7 +194,8 @@ export async function main(argv = process.argv.slice(2), env = process.env, root
     ...missingRequiredMutationFiles(report),
   ];
   if (failures.length > 0 && !options.noFail) {
-    throw new Error(`mutation thresholds failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
+    const failureList = failures.map((failure) => `- ${failure}`).join("\n");
+    throw new Error(`mutation thresholds failed:\n${failureList}`);
   }
 }
 

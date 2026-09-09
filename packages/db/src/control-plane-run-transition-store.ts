@@ -108,7 +108,7 @@ function validReasonCode(value: string): string {
 
 function validDate(value: Date): string {
   if (!(value instanceof Date) || !Number.isFinite(value.valueOf())) {
-    throw new Error("transitionedAt must be a valid date");
+    throw new TypeError("transitionedAt must be a valid date");
   }
   return value.toISOString();
 }

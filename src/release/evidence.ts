@@ -115,9 +115,11 @@ export async function writeReleaseEvidenceBundle(
   await fs.mkdir(path.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
 
   const artifacts: ReleaseEvidenceArtifact[] = [];
-  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)));
-  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)));
-  artifacts.push(...(await copyManufacturingArtifacts(root, outputDir)));
+  artifacts.push(
+    await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)),
+    await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)),
+    ...(await copyManufacturingArtifacts(root, outputDir)),
+  );
   if (options.includeGenerated) {
     artifacts.push(...(await copyGeneratedOutputs(root, outputDir, options.includeGenerated)));
   }

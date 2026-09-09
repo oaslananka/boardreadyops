@@ -90,6 +90,6 @@ export function refIgnored(reference: string, patterns: unknown): boolean {
 }
 
 export function globLike(pattern: string, value: string): boolean {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`).replaceAll("*", ".*");
   return new RegExp(`^${escaped}$`, "i").test(value);
 }

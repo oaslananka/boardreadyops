@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: RunPageProps) {
   return { title: await resolveRunPageTitle(runId, "Summary", viewer.authorizeRepository) };
 }
 
-export default async function RunPage({ params }: RunPageProps) {
+export default async function RunPage({ params }: Readonly<RunPageProps>) {
   const { runId } = await params;
   const viewer = await viewerAuthorization();
   const result = await loadRunDashboard(

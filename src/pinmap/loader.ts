@@ -24,11 +24,10 @@ export interface LoadedPinmap {
 export async function loadPinmap(file: string): Promise<LoadedPinmap> {
   try {
     const lowered = file.toLowerCase();
-    const document = lowered.endsWith(".json")
-      ? await readJsonPinmap(file)
-      : lowered.endsWith(".csv")
-        ? await readCsvPinmap(file)
-        : await readYamlPinmap(file);
+    let document: unknown;
+    if (lowered.endsWith(".json")) document = await readJsonPinmap(file);
+    else if (lowered.endsWith(".csv")) document = await readCsvPinmap(file);
+    else document = await readYamlPinmap(file);
     const parsed = pinmapSchema.safeParse(document);
     if (!parsed.success) {
       return { errors: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`) };

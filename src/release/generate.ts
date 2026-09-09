@@ -281,6 +281,11 @@ async function gitState(root: string): Promise<GenerateGitState> {
   }
 }
 
+async function ensureGenerateStepOutputDirectory(absoluteOutput: string, step: GeneratePlanStep): Promise<void> {
+  const directory = step.isDirectory ? absoluteOutput : path.dirname(absoluteOutput);
+  await fs.mkdir(directory, { recursive: true });
+}
+
 export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptions): Promise<GenerateResult> {
   const outputDir = path.resolve(options.outputDir);
   const available: GenerateAvailability = {
@@ -301,11 +306,7 @@ export async function runGenerate(recipe: GenerateRecipe, options: GenerateOptio
 
   for (const step of plan.steps) {
     const absoluteOutput = path.join(outputDir, step.output);
-    if (step.isDirectory) {
-      await fs.mkdir(absoluteOutput, { recursive: true });
-    } else {
-      await fs.mkdir(path.dirname(absoluteOutput), { recursive: true });
-    }
+    await ensureGenerateStepOutputDirectory(absoluteOutput, step);
     const args = generateStepArgs(step, {
       boardFile: options.boardFile,
       schematicFile: options.schematicFile,

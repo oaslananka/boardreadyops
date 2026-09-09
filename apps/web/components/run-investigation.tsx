@@ -930,6 +930,11 @@ export function ArtifactTable({ artifacts }: Readonly<{ artifacts: ArtifactDetai
   );
 }
 
+function artifactLifecycleTone(lifecycle: RunDetail["artifactLifecycle"]): "danger" | "warning" | "info" {
+  if (lifecycle.failedDeletion > 0) return "danger";
+  return lifecycle.pendingDeletion > 0 ? "warning" : "info";
+}
+
 export function ArtifactsView({
   run,
   searchParameters,
@@ -942,12 +947,7 @@ export function ArtifactsView({
     run.artifactLifecycle.missing +
     run.artifactLifecycle.pendingDeletion +
     run.artifactLifecycle.failedDeletion;
-  const artifactLifecycleTone =
-    run.artifactLifecycle.failedDeletion > 0
-      ? ("danger" as const)
-      : run.artifactLifecycle.pendingDeletion > 0
-        ? ("warning" as const)
-        : ("info" as const);
+  const lifecycleTone = artifactLifecycleTone(run.artifactLifecycle);
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
     <Panel
@@ -1017,7 +1017,7 @@ export function ArtifactsView({
       ) : null}
       {artifactLifecycleTotal > 0 ? (
         <div className="mt-3">
-          <Alert title="Artifact lifecycle history" tone={artifactLifecycleTone}>
+          <Alert title="Artifact lifecycle history" tone={lifecycleTone}>
             <p>
               Run-wide counts come from durable artifact deletion jobs. Replaced artifact metadata is removed before
               physical deletion; these counts do not imply an automatic age-based expiry policy.

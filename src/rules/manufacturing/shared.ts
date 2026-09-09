@@ -89,7 +89,9 @@ export function missingReferences(text: string, references: string[]): string[] 
   if (uniqueReferences.length === 0) {
     return [];
   }
-  const alternatives = uniqueReferences.map((reference) => reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const alternatives = uniqueReferences
+    .map((reference) => reference.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`))
+    .join("|");
   const found = new Set<string>();
   const matcher = new RegExp(`(^|[^A-Za-z0-9_])(${alternatives})(?=[^A-Za-z0-9_]|$)`, "gm");
   for (const match of text.matchAll(matcher)) {

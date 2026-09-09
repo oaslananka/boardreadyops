@@ -16,7 +16,8 @@ checkMarketplaceBadge(readme);
 await checkReadmeLinks(readme);
 
 if (failures.length > 0) {
-  throw new Error(`Marketplace listing validation failed:\n${failures.map((entry) => `- ${entry}`).join("\n")}`);
+  const failureList = failures.map((entry) => `- ${entry}`).join("\n");
+  throw new Error(`Marketplace listing validation failed:\n${failureList}`);
 }
 
 function checkActionMetadata(metadata) {
@@ -43,9 +44,23 @@ function checkMarketplaceBadge(markdown) {
   }
 }
 
+function markdownLinkDestinations(markdown) {
+  const destinations = [];
+  let offset = 0;
+  while (offset < markdown.length) {
+    const open = markdown.indexOf("](", offset);
+    if (open < 0) break;
+    const close = markdown.indexOf(")", open + 2);
+    if (close < 0) break;
+    destinations.push(markdown.slice(open + 2, close));
+    offset = close + 1;
+  }
+  return destinations;
+}
+
 async function checkReadmeLinks(markdown) {
-  for (const destination of markdown.matchAll(/!?\[[^\]]+\]\(([^)]+)\)/g)) {
-    const link = destination[1]?.trim();
+  for (const destination of markdownLinkDestinations(markdown)) {
+    const link = destination.trim();
     if (!link || link.startsWith("#") || link.startsWith("mailto:")) {
       continue;
     }

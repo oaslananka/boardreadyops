@@ -360,8 +360,8 @@ function sameOrigin(value, expectedOrigin) {
 
 function workflowRunIdFromSummary(summary, repository) {
   if (typeof summary !== "string" || !summary.includes("**Reports:**")) return undefined;
-  const escaped = repository.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
-  const match = new RegExp(`https://github\\.com/${escaped}/actions/runs/(\\d+)`, "u").exec(summary);
+  const escaped = repository.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`);
+  const match = new RegExp(String.raw`https://github\.com/${escaped}/actions/runs/(\d+)`, "u").exec(summary);
   const value = match?.[1] ? Number(match[1]) : undefined;
   return Number.isSafeInteger(value) ? value : undefined;
 }

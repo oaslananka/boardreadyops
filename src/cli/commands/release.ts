@@ -227,12 +227,9 @@ function writePrepareSummary(
 ): void {
   const { generate, validate } = summary.stages;
   stdout.write(`Release prepare decision: ${summary.decision.status.toUpperCase()}\n`);
-  const generateDetail =
-    generate.status === "generated"
-      ? ` (${generate.artifacts ?? 0} artifacts)`
-      : generate.reason
-        ? ` (${generate.reason})`
-        : "";
+  let generateDetail = "";
+  if (generate.status === "generated") generateDetail = ` (${generate.artifacts ?? 0} artifacts)`;
+  else if (generate.reason) generateDetail = ` (${generate.reason})`;
   stdout.write(`  generate: ${generate.status}${generateDetail}\n`);
   stdout.write(
     `  validate: ${validate.status} (${validate.summary.total} findings, max ${validate.summary.maxSeverity})\n`,
@@ -243,44 +240,59 @@ function writePrepareSummary(
   stdout.write(`Summary written to ${path.join(outputDir, "release-prepare.json")}\n`);
 }
 
-export async function releaseVerifyCommand(
-  bundleInput: string | undefined,
+type ReleaseBundleSignatureResult = Awaited<ReturnType<typeof verifyReleaseBundleSignature>> & {
+  matchedKeyId?: string | undefined;
+};
+
+type ReleaseVerifySignatureResolution =
+  | { exitCode: 2 }
+  | { signature: ReleaseBundleSignatureResult; signatureRequired: boolean };
+
+async function resolveReleaseVerifySignature(
+  bundleDir: string,
   options: ReleaseVerifyOptions,
-  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
-): Promise<number> {
-  const bundleDir = path.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
-  const verification = await verifyReleaseEvidenceBundle(bundleDir);
-
+  stderr: NodeJS.WritableStream,
+): Promise<ReleaseVerifySignatureResolution> {
   if (options.publicKey && options.trustStore) {
-    streams.stderr.write("Pass either --public-key or --trust-store, not both.\n");
-    return 2;
+    stderr.write("Pass either --public-key or --trust-store, not both.\n");
+    return { exitCode: 2 };
   }
-
-  let signature: { present: boolean; ok: boolean; errors: string[]; matchedKeyId?: string | undefined };
   const signatureRequired = Boolean(options.publicKey || options.trustStore);
   if (options.trustStore) {
-    let trustStore: Awaited<ReturnType<typeof loadTrustStore>>;
     try {
-      trustStore = await loadTrustStore(path.resolve(normalizePathInput(options.trustStore)));
-    } catch (error) {
-      streams.stderr.write(
-        `Trust store could not be loaded: ${error instanceof Error ? error.message : String(error)}\n`,
+      const trustStore = await loadTrustStore(path.resolve(normalizePathInput(options.trustStore)));
+      const signature = await verifyReleaseBundleSignatureAgainstTrustStore(
+        bundleDir,
+        trustStore,
+        new Date().toISOString(),
       );
-      return 2;
+      return { signature, signatureRequired };
+    } catch (error) {
+      stderr.write(`Trust store could not be loaded: ${error instanceof Error ? error.message : String(error)}\n`);
+      return { exitCode: 2 };
     }
-    signature = await verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustStore, new Date().toISOString());
-  } else {
-    let trustedKey: string | undefined;
-    if (options.publicKey) {
-      try {
-        trustedKey = await readTextFile(path.resolve(normalizePathInput(options.publicKey)));
-      } catch {
-        streams.stderr.write(`Public key not found: ${options.publicKey}\n`);
-        return 2;
-      }
-    }
-    signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
   }
+
+  let trustedKey: string | undefined;
+  if (options.publicKey) {
+    try {
+      trustedKey = await readTextFile(path.resolve(normalizePathInput(options.publicKey)));
+    } catch {
+      stderr.write(`Public key not found: ${options.publicKey}\n`);
+      return { exitCode: 2 };
+    }
+  }
+  const signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
+  return { signature, signatureRequired };
+}
+
+function writeReleaseVerifyOutcome(
+  verification: Awaited<ReturnType<typeof verifyReleaseEvidenceBundle>>,
+  signature: ReleaseBundleSignatureResult,
+  signatureRequired: boolean,
+  options: ReleaseVerifyOptions,
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
+): number {
   const signatureErrors = [...signature.errors];
   if (signatureRequired && !signature.present) {
     signatureErrors.push("expected a signed manifest (manifest.sig) but none was found");
@@ -319,6 +331,24 @@ export async function releaseVerifyCommand(
     );
   }
   return ok ? 0 : 1;
+}
+
+export async function releaseVerifyCommand(
+  bundleInput: string | undefined,
+  options: ReleaseVerifyOptions,
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
+): Promise<number> {
+  const bundleDir = path.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
+  const verification = await verifyReleaseEvidenceBundle(bundleDir);
+  const signatureResolution = await resolveReleaseVerifySignature(bundleDir, options, streams.stderr);
+  if ("exitCode" in signatureResolution) return signatureResolution.exitCode;
+  return writeReleaseVerifyOutcome(
+    verification,
+    signatureResolution.signature,
+    signatureResolution.signatureRequired,
+    options,
+    streams,
+  );
 }
 
 export async function releaseSignCommand(

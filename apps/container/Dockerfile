@@ -19,9 +19,7 @@ RUN set -eux; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends kicad; \
     rm -f /usr/bin/pebble; \
-    rm -rf /var/lib/apt/lists/*
-
-RUN set -eux; \
+    rm -rf /var/lib/apt/lists/*; \
     case "$(dpkg --print-architecture)" in \
       amd64) node_arch="x64" ;; \
       arm64) node_arch="arm64" ;; \

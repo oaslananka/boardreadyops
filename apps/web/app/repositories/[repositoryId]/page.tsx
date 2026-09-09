@@ -83,7 +83,7 @@ const supplyColumns: readonly DataColumn<SupplyRow>[] = [
   },
 ];
 
-export default async function RepositoryPage({ params }: PageProps) {
+export default async function RepositoryPage({ params }: Readonly<PageProps>) {
   const { repositoryId } = await params;
   const viewer = await viewerAuthorization();
   const detail = await loadRepositoryDetail(repositoryId, viewer.session);

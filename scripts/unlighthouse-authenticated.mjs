@@ -177,8 +177,10 @@ async function main() {
 
 const isDirectExecution = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectExecution) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : "Authenticated UI audit failed"}\n`);
     process.exitCode = 1;
-  });
+  }
 }

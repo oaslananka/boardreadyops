@@ -18,6 +18,67 @@ export type RepositorySetupInteractiveProps = {
   canCreatePr?: boolean;
 };
 
+type SetupPrResult = {
+  ok: boolean;
+  outcome?: string;
+  pullRequestNumber?: number;
+  pullRequestUrl?: string;
+  error?: string;
+};
+
+async function requestSetupPr(installationId: string, repositoryId: string, presetId: string): Promise<SetupPrResult> {
+  try {
+    const response = await fetch(
+      `/api/v1/operator/installations/${encodeURIComponent(installationId)}/repositories/${encodeURIComponent(repositoryId)}/setup/pr`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ preset: presetId, requestId: `ui-setup-${Date.now()}` }),
+      },
+    );
+    const data = await response.json();
+    if (!response.ok || !data.ok) return { ok: false, error: data.error || "Failed to create setup PR" };
+    return {
+      ok: true,
+      outcome: data.outcome,
+      pullRequestNumber: data.pullRequestNumber,
+      pullRequestUrl: data.pullRequestUrl,
+    };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Network error" };
+  }
+}
+
+function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
+  const tone = result.ok
+    ? "border-primary/40 bg-primary/10 text-foreground"
+    : "border-destructive/40 bg-destructive/10 text-destructive";
+  return (
+    <output className={`mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm ${tone}`}>
+      {result.ok ? (
+        <>
+          <span>
+            ✓ Setup pull request #{result.pullRequestNumber}{" "}
+            {result.outcome === "already_exists" ? "is already open" : "created"}!
+          </span>
+          {result.pullRequestUrl ? (
+            <a
+              href={result.pullRequestUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold underline underline-offset-2 text-primary"
+            >
+              View pull request on GitHub →
+            </a>
+          ) : null}
+        </>
+      ) : (
+        <span>Setup PR creation failed: {result.error}</span>
+      )}
+    </output>
+  );
+}
+
 export function RepositorySetupInteractive({
   presets,
   initialPresetId,
@@ -31,13 +92,7 @@ export function RepositorySetupInteractive({
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
-  const [prResult, setPrResult] = useState<{
-    ok: boolean;
-    outcome?: string;
-    pullRequestNumber?: number;
-    pullRequestUrl?: string;
-    error?: string;
-  } | null>(null);
+  const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
 
   const fallback = presets[0];
   if (!fallback) throw new Error("At least one preset must be provided");
@@ -56,34 +111,9 @@ export function RepositorySetupInteractive({
     if (!installationId || !repositoryId) return;
     setIsCreatingPr(true);
     setPrResult(null);
-    try {
-      const res = await fetch(
-        `/api/v1/operator/installations/${encodeURIComponent(installationId)}/repositories/${encodeURIComponent(repositoryId)}/setup/pr`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            preset: activePreset.id,
-            requestId: `ui-setup-${Date.now()}`,
-          }),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        setPrResult({ ok: false, error: data.error || "Failed to create setup PR" });
-      } else {
-        setPrResult({
-          ok: true,
-          outcome: data.outcome,
-          pullRequestNumber: data.pullRequestNumber,
-          pullRequestUrl: data.pullRequestUrl,
-        });
-      }
-    } catch (err) {
-      setPrResult({ ok: false, error: err instanceof Error ? err.message : "Network error" });
-    } finally {
-      setIsCreatingPr(false);
-    }
+    const result = await requestSetupPr(installationId, repositoryId, activePreset.id);
+    setPrResult(result);
+    setIsCreatingPr(false);
   }, [installationId, repositoryId, activePreset.id]);
 
   return (
@@ -224,37 +254,7 @@ export function RepositorySetupInteractive({
               </button>
             </div>
 
-            {prResult ? (
-              <div
-                className={`mt-2 rounded-md p-3 text-sm border ${
-                  prResult.ok
-                    ? "border-primary/40 bg-primary/10 text-foreground"
-                    : "border-destructive/40 bg-destructive/10 text-destructive"
-                }`}
-                role="status"
-              >
-                {prResult.ok ? (
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span>
-                      ✓ Setup pull request #{prResult.pullRequestNumber}{" "}
-                      {prResult.outcome === "already_exists" ? "is already open" : "created"}!
-                    </span>
-                    {prResult.pullRequestUrl ? (
-                      <a
-                        href={prResult.pullRequestUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-semibold underline underline-offset-2 text-primary"
-                      >
-                        View pull request on GitHub →
-                      </a>
-                    ) : null}
-                  </div>
-                ) : (
-                  <span>Setup PR creation failed: {prResult.error}</span>
-                )}
-              </div>
-            ) : null}
+            {prResult ? <SetupPrResultOutput result={prResult} /> : null}
           </div>
         </Panel>
       ) : null}

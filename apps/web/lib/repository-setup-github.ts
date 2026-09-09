@@ -180,8 +180,9 @@ export function createRepositorySetupGitHubClient(
           ? String(body.workflow_run_id)
           : undefined;
       if (!workflowRunId) throw new Error("repository setup probe dispatch did not return a workflow run id");
-      const workflowRunUrl =
-        typeof body.html_url === "string" ? body.html_url : typeof body.run_url === "string" ? body.run_url : undefined;
+      let workflowRunUrl: string | undefined;
+      if (typeof body.html_url === "string") workflowRunUrl = body.html_url;
+      else if (typeof body.run_url === "string") workflowRunUrl = body.run_url;
       return { workflowRunId, ...(workflowRunUrl ? { workflowRunUrl } : {}) };
     },
   };

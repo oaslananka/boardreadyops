@@ -545,8 +545,10 @@ export function buildProgressiveReadinessComment(input) {
   if (blockers.length > 0) {
     lines.push("", "### Blocking findings", "");
     for (const finding of blockers.slice(0, 10)) {
-      lines.push(findingLine(finding));
-      lines.push(`  > Quick waiver: \`/boardreadyops waive ${sanitizeInline(finding.ruleId)} --reason "..."\``);
+      lines.push(
+        findingLine(finding),
+        `  > Quick waiver: \`/boardreadyops waive ${sanitizeInline(finding.ruleId)} --reason "..."\``,
+      );
     }
   }
 
@@ -563,9 +565,9 @@ export function buildProgressiveReadinessComment(input) {
   appendReports(lines, input.reportLinks ?? []);
   appendWaivers(lines, input);
   appendReadinessNotes(lines, input.readiness);
-  lines.push("", "</details>");
-
   lines.push(
+    "",
+    "</details>",
     "",
     "<details>",
     "<summary><strong>BoardReadyOps PR Commands</strong></summary>",

@@ -66,7 +66,7 @@ async function assertChecksumFile(checksumsPath, expectedContent) {
 }
 
 function normalizeNewlines(content) {
-  return content.replace(/\r\n/g, "\n");
+  return content.replaceAll("\r\n", "\n");
 }
 
 function parseArgs(argv) {

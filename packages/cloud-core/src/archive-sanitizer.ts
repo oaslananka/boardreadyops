@@ -162,7 +162,9 @@ function resolveSafeEntryPath(rawName: string): string {
 
 function assertAllowedExtension(normalizedName: string, allowedExtSet: Set<string> | null): void {
   if (!allowedExtSet) return;
-  const ext = normalizedName.match(/\.[^./\\]+$/)?.[0]?.toLowerCase() ?? "";
+  const lastSlash = Math.max(normalizedName.lastIndexOf("/"), normalizedName.lastIndexOf("\\"));
+  const lastDot = normalizedName.lastIndexOf(".");
+  const ext = lastDot > lastSlash ? normalizedName.slice(lastDot).toLowerCase() : "";
   if (!allowedExtSet.has(ext)) {
     throw new ArchiveSanitizerError("DISALLOWED_EXTENSION", `File extension "${ext}" is not permitted in upload`);
   }

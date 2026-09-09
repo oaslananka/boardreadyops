@@ -39,6 +39,14 @@ interface ReviewNavigationTabsProps {
   readonly onSelectTab: (tab: ReviewTabKey) => void;
 }
 
+function nextReviewTabIndex(key: string, currentIndex: number): number | undefined {
+  if (key === "ArrowRight") return (currentIndex + 1) % reviewTabKeys.length;
+  if (key === "ArrowLeft") return (currentIndex - 1 + reviewTabKeys.length) % reviewTabKeys.length;
+  if (key === "Home") return 0;
+  if (key === "End") return reviewTabKeys.length - 1;
+  return undefined;
+}
+
 function ReviewNavigationTabs({
   activeTab,
   changedFilesCount,
@@ -50,12 +58,8 @@ function ReviewNavigationTabs({
 }: ReviewNavigationTabsProps) {
   function handleTabKeyDown(e: KeyboardEvent<HTMLButtonElement>, currentTab: ReviewTabKey) {
     const currentIndex = reviewTabKeys.indexOf(currentTab);
-    let nextIndex: number | null = null;
-    if (e.key === "ArrowRight") nextIndex = (currentIndex + 1) % reviewTabKeys.length;
-    else if (e.key === "ArrowLeft") nextIndex = (currentIndex - 1 + reviewTabKeys.length) % reviewTabKeys.length;
-    else if (e.key === "Home") nextIndex = 0;
-    else if (e.key === "End") nextIndex = reviewTabKeys.length - 1;
-    if (nextIndex === null) return;
+    const nextIndex = nextReviewTabIndex(e.key, currentIndex);
+    if (nextIndex === undefined) return;
     e.preventDefault();
     const nextTab = reviewTabKeys[nextIndex];
     if (!nextTab) return;

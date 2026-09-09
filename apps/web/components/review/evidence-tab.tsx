@@ -2,7 +2,7 @@ import type { DemoReview } from "../../lib/demo-data.js";
 import { CopyButton } from "../copy-button.js";
 import { Panel } from "../ui.js";
 
-export function EvidenceTab({ review }: { review: DemoReview }) {
+export function EvidenceTab({ review }: Readonly<{ review: DemoReview }>) {
   return (
     <div className="flex flex-col gap-5">
       <Panel
@@ -76,9 +76,9 @@ export function EvidenceTab({ review }: { review: DemoReview }) {
           <pre className="mt-2 overflow-x-auto text-sm">
             <code>
               {`# Run local deterministic verification of evidence pack
-boardreadyops review verify \\
-  --digest ${review.evidenceDigest} \\
-  --repo ${review.repositoryName} \\
+boardreadyops review verify ${"\\"}
+  --digest ${review.evidenceDigest} ${"\\"}
+  --repo ${review.repositoryName} ${"\\"}
   --head ${review.headCommitSha}`}
             </code>
           </pre>

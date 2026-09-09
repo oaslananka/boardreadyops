@@ -33,7 +33,7 @@ export function activeVariantDnpRefs(variant: KicadVariant, baseComponents: stri
   return variant.dnpOverrides.filter((reference) => known.has(reference.toUpperCase()));
 }
 
-function parseJson(text: string): unknown | undefined {
+function parseJson(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {

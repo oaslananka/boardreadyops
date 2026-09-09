@@ -436,67 +436,110 @@ function normalizeInstallationRepositoriesEvent(
   ]);
 }
 
-function normalizeCheckRunEvent(
+function firstCheckRunPullRequest(checkRun: Record<string, unknown>): Record<string, unknown> | undefined {
+  const checkSuite = checkRun.check_suite;
+  const pullRequests = isRecord(checkSuite) ? arrayValue(checkSuite, "pull_requests") : [];
+  const firstPullRequest = pullRequests[0];
+  return isRecord(firstPullRequest) ? firstPullRequest : undefined;
+}
+
+function checkRunRequestsRerun(action: string | undefined, payload: Record<string, unknown>): boolean {
+  if (action === "rerequested") return true;
+  if (action !== "requested_action" || !isRecord(payload.requested_action)) return false;
+  return payload.requested_action.identifier === "rerun_checks";
+}
+
+function normalizeCheckRunRerun(
+  options: NormalizeGitHubAppWebhookOptions,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+  repository: GitHubRepositoryRef,
+  checkRun: Record<string, unknown>,
+  pullRequest: Record<string, unknown> | undefined,
+): GitHubAppLifecycleResult {
+  if (!pullRequest) return result(options, action, []);
+
+  const pullRequestNumber = numberValue(pullRequest, "number");
+  const commitSha = pullRequestCommitSha(pullRequest) ?? stringValue(checkRun, "head_sha");
+  const baseCommitSha = pullRequestBaseCommitSha(pullRequest);
+  const ref = pullRequestRef(pullRequest);
+  if (pullRequestNumber === undefined || !commitSha || !ref) {
+    return unsupported(options, "check_run PR payload does not include number, head sha, or ref");
+  }
+
+  return result(options, action, [
+    {
+      type: "release_run.enqueue",
+      installation,
+      repository,
+      pullRequestNumber,
+      ref,
+      commitSha,
+      ...(baseCommitSha ? { baseCommitSha } : {}),
+      triggerKind: "pr",
+      deliveryId: options.delivery,
+    },
+  ]);
+}
+
+function normalizePrepareReleaseAction(
   options: NormalizeGitHubAppWebhookOptions,
   payload: Record<string, unknown>,
   action: string | undefined,
   installation: GitHubInstallationRef,
+  repository: GitHubRepositoryRef,
+  checkRun: Record<string, unknown>,
+  checkRunId: number | undefined,
+  pullRequest: Record<string, unknown> | undefined,
 ): GitHubAppLifecycleResult {
-  const repository = repositoryFromPayload(payload.repository);
-  if (!repository) {
-    return unsupported(options, "payload does not include a valid repository");
+  if (!pullRequest) return unsupported(options, "prepare_release requires pull request context");
+
+  const pullRequestNumber = numberValue(pullRequest, "number");
+  const commitSha = pullRequestCommitSha(pullRequest) ?? stringValue(checkRun, "head_sha");
+  const baseCommitSha = pullRequestBaseCommitSha(pullRequest);
+  const ref = pullRequestRef(pullRequest);
+  if (pullRequestNumber === undefined || !commitSha || !ref) {
+    return unsupported(options, "prepare_release PR payload does not include number, head sha, or ref");
   }
 
-  const checkRun = payload.check_run;
-  if (!isRecord(checkRun)) {
-    return unsupported(options, "payload does not include a valid check_run");
-  }
+  const pullRequestFromFork = pullRequestIsFromFork(repository, pullRequest);
+  const pullRequestDraft = boolValue(pullRequest, "draft") ?? false;
+  const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
+  const requestedBy = isRecord(payload.sender) ? stringValue(payload.sender, "login") : undefined;
+  return result(options, action, [
+    {
+      type: "release.prepare",
+      installation,
+      repository,
+      ...(checkRunId !== undefined ? { checkRunId } : {}),
+      pullRequestNumber,
+      ref,
+      commitSha,
+      ...(baseCommitSha ? { baseCommitSha } : {}),
+      pullRequestDraft,
+      pullRequestFromFork,
+      ...(safeMode ? { safeMode } : {}),
+      ...(requestedBy ? { requestedBy } : {}),
+    },
+  ]);
+}
 
-  const checkRunId = numberValue(checkRun, "id");
-  const checkSuite = checkRun.check_suite;
-  const pullRequests = isRecord(checkSuite) ? arrayValue(checkSuite, "pull_requests") : [];
-  const firstPr =
-    pullRequests.length > 0 && isRecord(pullRequests[0]) ? (pullRequests[0] as Record<string, unknown>) : undefined;
+function normalizeCheckRunRequestedAction(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+  repository: GitHubRepositoryRef,
+  checkRun: Record<string, unknown>,
+  checkRunId: number | undefined,
+  pullRequest: Record<string, unknown> | undefined,
+): GitHubAppLifecycleResult {
+  const requestedAction = payload.requested_action;
+  const identifier = isRecord(requestedAction) ? stringValue(requestedAction, "identifier") : undefined;
+  const requestedBy = isRecord(payload.sender) ? stringValue(payload.sender, "login") : undefined;
 
-  if (
-    action === "rerequested" ||
-    (action === "requested_action" &&
-      isRecord(payload.requested_action) &&
-      payload.requested_action.identifier === "rerun_checks")
-  ) {
-    if (!firstPr) {
-      return result(options, action, []);
-    }
-    const pullRequestNumber = numberValue(firstPr, "number");
-    const commitSha = pullRequestCommitSha(firstPr) ?? stringValue(checkRun, "head_sha");
-    const baseCommitSha = pullRequestBaseCommitSha(firstPr);
-    const ref = pullRequestRef(firstPr);
-
-    if (pullRequestNumber === undefined || !commitSha || !ref) {
-      return unsupported(options, "check_run PR payload does not include number, head sha, or ref");
-    }
-
-    return result(options, action, [
-      {
-        type: "release_run.enqueue",
-        installation,
-        repository,
-        pullRequestNumber,
-        ref,
-        commitSha,
-        ...(baseCommitSha ? { baseCommitSha } : {}),
-        triggerKind: "pr",
-        deliveryId: options.delivery,
-      },
-    ]);
-  }
-
-  if (action === "requested_action") {
-    const requestedAction = payload.requested_action;
-    const identifier = isRecord(requestedAction) ? stringValue(requestedAction, "identifier") : undefined;
-
-    if (identifier === "create_setup_pr") {
-      const requestedBy = isRecord(payload.sender) ? stringValue(payload.sender, "login") : undefined;
+  switch (identifier) {
+    case "create_setup_pr":
       return result(options, action, [
         {
           type: "setup_pr.create",
@@ -506,9 +549,7 @@ function normalizeCheckRunEvent(
           ...(requestedBy ? { requestedBy } : {}),
         },
       ]);
-    }
-
-    if (identifier === "request_waiver") {
+    case "request_waiver":
       return result(options, action, [
         {
           type: "waiver_pr.request",
@@ -517,43 +558,50 @@ function normalizeCheckRunEvent(
           ...(checkRunId !== undefined ? { checkRunId } : {}),
         },
       ]);
-    }
-
-    if (identifier === "prepare_release") {
-      if (!firstPr) return unsupported(options, "prepare_release requires pull request context");
-      const pullRequestNumber = numberValue(firstPr, "number");
-      const commitSha = pullRequestCommitSha(firstPr) ?? stringValue(checkRun, "head_sha");
-      const baseCommitSha = pullRequestBaseCommitSha(firstPr);
-      const ref = pullRequestRef(firstPr);
-      if (pullRequestNumber === undefined || !commitSha || !ref) {
-        return unsupported(options, "prepare_release PR payload does not include number, head sha, or ref");
-      }
-      const pullRequestFromFork = pullRequestIsFromFork(repository, firstPr);
-      const pullRequestDraft = boolValue(firstPr, "draft") ?? false;
-      const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
-      const requestedBy = isRecord(payload.sender) ? stringValue(payload.sender, "login") : undefined;
-      return result(options, action, [
-        {
-          type: "release.prepare",
-          installation,
-          repository,
-          ...(checkRunId !== undefined ? { checkRunId } : {}),
-          pullRequestNumber,
-          ref,
-          commitSha,
-          ...(baseCommitSha ? { baseCommitSha } : {}),
-          pullRequestDraft,
-          pullRequestFromFork,
-          ...(safeMode ? { safeMode } : {}),
-          ...(requestedBy ? { requestedBy } : {}),
-        },
-      ]);
-    }
-
-    return result(options, action, []);
+    case "prepare_release":
+      return normalizePrepareReleaseAction(
+        options,
+        payload,
+        action,
+        installation,
+        repository,
+        checkRun,
+        checkRunId,
+        pullRequest,
+      );
+    default:
+      return result(options, action, []);
   }
+}
 
-  return result(options, action, []);
+function normalizeCheckRunEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  const repository = repositoryFromPayload(payload.repository);
+  if (!repository) return unsupported(options, "payload does not include a valid repository");
+
+  const checkRun = payload.check_run;
+  if (!isRecord(checkRun)) return unsupported(options, "payload does not include a valid check_run");
+
+  const pullRequest = firstCheckRunPullRequest(checkRun);
+  if (checkRunRequestsRerun(action, payload)) {
+    return normalizeCheckRunRerun(options, action, installation, repository, checkRun, pullRequest);
+  }
+  if (action !== "requested_action") return result(options, action, []);
+
+  return normalizeCheckRunRequestedAction(
+    options,
+    payload,
+    action,
+    installation,
+    repository,
+    checkRun,
+    numberValue(checkRun, "id"),
+    pullRequest,
+  );
 }
 
 function normalizeIssueCommentEvent(
@@ -698,128 +746,133 @@ function normalizeWorkflowRunEvent(
   return result(options, action, [runAction]);
 }
 
-export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOptions): GitHubAppLifecycleResult {
-  if (!isRecord(options.payload)) {
-    return unsupported(options, "payload must be a JSON object");
-  }
+function normalizeMergedSetupPullRequest(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+  repository: GitHubRepositoryRef,
+  pullRequest: Record<string, unknown>,
+): GitHubAppLifecycleResult {
+  if (boolValue(pullRequest, "merged") !== true) return result(options, action, []);
 
-  const action = stringValue(options.payload, "action");
-
-  if (options.event === "ping") {
+  const headRef = pullRequestRef(pullRequest);
+  const baseRef = pullRequestBaseRef(pullRequest);
+  if (headRef !== repositorySetupBranchName || !repository.defaultBranch || baseRef !== repository.defaultBranch) {
     return result(options, action, []);
   }
 
-  const installation = installationFromPayload(options.payload);
-
-  if (!installation) {
-    return unsupported(options, "payload does not include a valid installation");
+  const pullRequestNumber = numberValue(pullRequest, "number");
+  const commitSha = pullRequestMergeCommitSha(pullRequest);
+  if (pullRequestNumber === undefined || !commitSha) {
+    return unsupported(options, "merged setup pull request payload does not include number or merge commit sha");
   }
 
-  if (options.event === "installation") {
-    return normalizeInstallationEvent(options, options.payload, action, installation);
-  }
-
-  if (options.event === "installation_repositories") {
-    return normalizeInstallationRepositoriesEvent(options, options.payload, action, installation);
-  }
-
-  if (options.event === "check_run") {
-    return normalizeCheckRunEvent(options, options.payload, action, installation);
-  }
-
-  if (options.event === "issue_comment") {
-    return normalizeIssueCommentEvent(options, options.payload, action, installation);
-  }
-
-  if (options.event === "pull_request_review") {
-    return normalizePullRequestReviewEvent(options, options.payload, action, installation);
-  }
-
-  if (options.event === "workflow_run") {
-    return normalizeWorkflowRunEvent(options, options.payload, action, installation);
-  }
-
-  if (options.event === "pull_request") {
-    const repository = repositoryFromPayload(options.payload.repository);
-    const pullRequest = options.payload.pull_request;
-
-    if (!repository || !isRecord(pullRequest)) {
-      return unsupported(options, "payload does not include a valid repository and pull request");
-    }
-
-    if (action === "closed") {
-      if (boolValue(pullRequest, "merged") !== true) return result(options, action, []);
-      const headRef = pullRequestRef(pullRequest);
-      const baseRef = pullRequestBaseRef(pullRequest);
-      if (headRef !== repositorySetupBranchName || !repository.defaultBranch || baseRef !== repository.defaultBranch) {
-        return result(options, action, []);
-      }
-
-      const pullRequestNumber = numberValue(pullRequest, "number");
-      const commitSha = pullRequestMergeCommitSha(pullRequest);
-      if (pullRequestNumber === undefined || !commitSha) {
-        return unsupported(options, "merged setup pull request payload does not include number or merge commit sha");
-      }
-      const requestedBy = isRecord(options.payload.sender) ? stringValue(options.payload.sender, "login") : undefined;
-      return result(options, action, [
-        {
-          type: "setup_probe.dispatch",
-          installation,
-          repository,
-          pullRequestNumber,
-          commitSha,
-          ...(requestedBy ? { requestedBy } : {}),
-        },
-      ]);
-    }
-
-    if (!isQueuedPullRequestAction(action)) {
-      return result(options, action, []);
-    }
-
-    const pullRequestNumber = numberValue(pullRequest, "number");
-    const baseCommitSha = pullRequestBaseCommitSha(pullRequest);
-    const commitSha = pullRequestCommitSha(pullRequest);
-    const ref = pullRequestRef(pullRequest);
-
-    if (pullRequestNumber === undefined || !baseCommitSha || !commitSha || !ref) {
-      return unsupported(options, "pull request payload does not include number, base sha, head sha, and head ref");
-    }
-
-    const pullRequestFromFork = pullRequestIsFromFork(repository, pullRequest);
-    const pullRequestDraft = boolValue(pullRequest, "draft") ?? false;
-    const enqueueAction: GitHubAppLifecycleAction = {
-      type: "release_run.enqueue",
+  const requestedBy = isRecord(payload.sender) ? stringValue(payload.sender, "login") : undefined;
+  return result(options, action, [
+    {
+      type: "setup_probe.dispatch",
       installation,
       repository,
       pullRequestNumber,
-      ref,
       commitSha,
-      baseCommitSha,
-      triggerKind: "pr",
-      pullRequestDraft,
-      pullRequestFromFork,
-      deliveryId: options.delivery,
-    };
-    const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
+      ...(requestedBy ? { requestedBy } : {}),
+    },
+  ]);
+}
 
-    if (safeMode) {
-      enqueueAction.safeMode = safeMode;
-    }
-
-    return result(options, action, [
-      {
-        type: "installation.upsert",
-        installation,
-      },
-      {
-        type: "repository.upsert",
-        installation,
-        repository,
-      },
-      enqueueAction,
-    ]);
+function normalizeQueuedPullRequest(
+  options: NormalizeGitHubAppWebhookOptions,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+  repository: GitHubRepositoryRef,
+  pullRequest: Record<string, unknown>,
+): GitHubAppLifecycleResult {
+  const pullRequestNumber = numberValue(pullRequest, "number");
+  const baseCommitSha = pullRequestBaseCommitSha(pullRequest);
+  const commitSha = pullRequestCommitSha(pullRequest);
+  const ref = pullRequestRef(pullRequest);
+  if (pullRequestNumber === undefined || !baseCommitSha || !commitSha || !ref) {
+    return unsupported(options, "pull request payload does not include number, base sha, head sha, and head ref");
   }
 
-  return unsupported(options, `unsupported GitHub App event: ${options.event}`);
+  const pullRequestFromFork = pullRequestIsFromFork(repository, pullRequest);
+  const pullRequestDraft = boolValue(pullRequest, "draft") ?? false;
+  const enqueueAction: GitHubAppLifecycleAction = {
+    type: "release_run.enqueue",
+    installation,
+    repository,
+    pullRequestNumber,
+    ref,
+    commitSha,
+    baseCommitSha,
+    triggerKind: "pr",
+    pullRequestDraft,
+    pullRequestFromFork,
+    deliveryId: options.delivery,
+  };
+  const safeMode = pullRequestSafeMode(repository, pullRequestFromFork, pullRequestDraft);
+  if (safeMode) enqueueAction.safeMode = safeMode;
+
+  return result(options, action, [
+    { type: "installation.upsert", installation },
+    { type: "repository.upsert", installation, repository },
+    enqueueAction,
+  ]);
+}
+
+function normalizePullRequestEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  const repository = repositoryFromPayload(payload.repository);
+  const pullRequest = payload.pull_request;
+  if (!repository || !isRecord(pullRequest)) {
+    return unsupported(options, "payload does not include a valid repository and pull request");
+  }
+
+  if (action === "closed") {
+    return normalizeMergedSetupPullRequest(options, payload, action, installation, repository, pullRequest);
+  }
+  if (!isQueuedPullRequestAction(action)) return result(options, action, []);
+  return normalizeQueuedPullRequest(options, action, installation, repository, pullRequest);
+}
+
+function normalizeInstalledEvent(
+  options: NormalizeGitHubAppWebhookOptions,
+  payload: Record<string, unknown>,
+  action: string | undefined,
+  installation: GitHubInstallationRef,
+): GitHubAppLifecycleResult {
+  switch (options.event) {
+    case "installation":
+      return normalizeInstallationEvent(options, payload, action, installation);
+    case "installation_repositories":
+      return normalizeInstallationRepositoriesEvent(options, payload, action, installation);
+    case "check_run":
+      return normalizeCheckRunEvent(options, payload, action, installation);
+    case "issue_comment":
+      return normalizeIssueCommentEvent(options, payload, action, installation);
+    case "pull_request_review":
+      return normalizePullRequestReviewEvent(options, payload, action, installation);
+    case "workflow_run":
+      return normalizeWorkflowRunEvent(options, payload, action, installation);
+    case "pull_request":
+      return normalizePullRequestEvent(options, payload, action, installation);
+    default:
+      return unsupported(options, `unsupported GitHub App event: ${options.event}`);
+  }
+}
+
+export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOptions): GitHubAppLifecycleResult {
+  if (!isRecord(options.payload)) return unsupported(options, "payload must be a JSON object");
+
+  const action = stringValue(options.payload, "action");
+  if (options.event === "ping") return result(options, action, []);
+
+  const installation = installationFromPayload(options.payload);
+  if (!installation) return unsupported(options, "payload does not include a valid installation");
+  return normalizeInstalledEvent(options, options.payload, action, installation);
 }

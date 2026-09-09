@@ -278,7 +278,8 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
 
           <div className="text-xs text-muted-foreground">
             <span>Shortcuts: </span>
-            <kbd className="rounded-sm border border-border bg-muted px-1">j</kbd>/
+            <kbd className="rounded-sm border border-border bg-muted px-1">j</kbd>
+            {" / "}
             <kbd className="rounded-sm border border-border bg-muted px-1">k</kbd>
             {" navigate "}
             <kbd className="rounded-sm border border-border bg-muted px-1">e</kbd>
@@ -312,16 +313,15 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                 key={finding.fingerprint}
                 className={`finding-scan-row finding-triage-card rounded-md border p-3 ${isSelected ? "selected-row border-primary" : "border-border"} ${isWaived ? "opacity-60" : ""} bg-card`}
                 data-selected={isSelected}
-                onClick={() => setSelectedIndex(idx)}
-                onFocus={() => setSelectedIndex(idx)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setSelectedIndex(idx);
-                  }
-                }}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={`Select finding ${finding.ruleId}`}
+                    className="flex flex-wrap items-center gap-2 text-left"
+                    onClick={() => setSelectedIndex(idx)}
+                  >
                     <span
                       className={`rounded-sm px-1.5 py-0.5 text-xs uppercase ${getSeverityBadgeClass(finding.severity)}`}
                     >
@@ -336,7 +336,7 @@ export function FindingsTab({ findings, onUpdateDisposition, onAssign }: Readonl
                         {finding.component}
                       </span>
                     ) : null}
-                  </div>
+                  </button>
 
                   {/* `disposition-select` carries no styling any more -- kept as a stable
                       selector hook for tests/unit/web/findings-tab.test.ts,

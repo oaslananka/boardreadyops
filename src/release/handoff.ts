@@ -53,7 +53,7 @@ function outputDirectory(kind: string): string {
 
 function baseName(source: string): string {
   const segments = source.split("/");
-  return segments[segments.length - 1] ?? source;
+  return segments.at(-1) ?? source;
 }
 
 /**
@@ -128,6 +128,10 @@ export function buildHandoffManifest(
   };
 }
 
+function handoffStatus(missingOutputs: readonly string[]): string {
+  return missingOutputs.length === 0 ? "ready" : `incomplete (missing ${missingOutputs.join(", ")})`;
+}
+
 export function renderHandoffReadme(profile: HandoffProfileSummary, plan: HandoffPlan, generatedAt: string): string {
   const lines: string[] = [
     `# ${profile.name} manufacturer handoff package`,
@@ -136,7 +140,7 @@ export function renderHandoffReadme(profile: HandoffProfileSummary, plan: Handof
     "",
     `- Vendor profile: \`${profile.id}\` (${profile.name})`,
     `- Service: ${profile.service}`,
-    `- Status: ${plan.missingOutputs.length === 0 ? "ready" : `incomplete (missing ${plan.missingOutputs.join(", ")})`}`,
+    `- Status: ${handoffStatus(plan.missingOutputs)}`,
     "",
     "## Contents",
     "",

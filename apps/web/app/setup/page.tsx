@@ -56,7 +56,7 @@ const permissionColumns: readonly DataColumn<(typeof requestedPermissions)[numbe
   { id: "purpose", header: "Purpose", cell: (row) => <span className="text-muted-foreground">{row.purpose}</span> },
 ];
 
-export default async function SetupPage({ searchParams }: SetupPageProps) {
+export default async function SetupPage({ searchParams }: Readonly<SetupPageProps>) {
   const parameters = await searchParams;
   const selectedValue = first(parameters.preset);
   const hasInstallationHandoff = first(parameters.installation_id) !== undefined;
@@ -170,8 +170,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
             <li>Dispatch the setup probe with a 15-minute persisted deadline and idempotency key.</li>
             <li>
               The workflow checks out its own default branch without persisted credentials and validates{" "}
-              <code>boardreadyops.yml</code>
-              with a pinned BoardReadyOps CLI.
+              <code>boardreadyops.yml</code> with a pinned BoardReadyOps CLI.
             </li>
             <li>
               The result is posted with GitHub Actions OIDC bound to the repository ID, workflow ref, branch ref, and

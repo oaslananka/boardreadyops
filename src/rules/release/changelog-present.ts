@@ -64,6 +64,6 @@ export const changelogPresentRule = rule(
 );
 
 function changelogHasRevision(text: string, revision: string): boolean {
-  const escaped = revision.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^##\\s+\\[?v?${escaped}\\]?\\b`, "m").test(text);
+  const escaped = revision.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`^##\s+\[?v?${escaped}\]?\b`, "m").test(text);
 }

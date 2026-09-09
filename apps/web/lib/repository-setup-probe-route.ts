@@ -73,7 +73,7 @@ function parsedResult(value: unknown): SetupProbeResult | undefined {
   };
 }
 
-async function requestBody(request: Request): Promise<unknown | undefined> {
+async function requestBody(request: Request): Promise<unknown> {
   try {
     return JSON.parse((await readBoundedRequestBody(request, maximumBodyBytes)).toString("utf8")) as unknown;
   } catch {

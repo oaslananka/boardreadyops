@@ -65,12 +65,10 @@ function lifecycleFindings(row: BomRow, databaseStatus: string | undefined, cont
   }
   const ruleConfig = configFor(context, "bom.lifecycle");
   const canonicalStatus = classifyLifecycleStatus(lifecycle);
-  const severity =
-    typeof ruleConfig.severity === "string"
-      ? configuredSeverity(context, "bom.lifecycle", "medium")
-      : canonicalStatus === "eol" || canonicalStatus === "obsolete"
-        ? "high"
-        : configuredSeverity(context, "bom.lifecycle", "medium");
+  let severity = configuredSeverity(context, "bom.lifecycle", "medium");
+  if (typeof ruleConfig.severity !== "string" && (canonicalStatus === "eol" || canonicalStatus === "obsolete")) {
+    severity = "high";
+  }
   return [
     finding(context, {
       ruleId: "bom.lifecycle",
