@@ -24,7 +24,8 @@ describe("runProcess cancellation", () => {
       process.execPath,
       [
         "-e",
-        `process.on("SIGTERM", () => {}); setInterval(() => {}, 1000); require("node:fs").writeFileSync(${JSON.stringify(readyFile)}, "ready");`,
+        'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000); require("node:fs").writeFileSync(process.argv[1], "ready");',
+        readyFile,
       ],
       options,
     );
