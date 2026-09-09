@@ -187,6 +187,7 @@ const interactions =
         ...(setupInteractions
           ? {
               createSetupPr: setupInteractions.createSetupPr,
+              probeSetup: setupInteractions.probeSetup,
               createWaiverPr: setupInteractions.createWaiverPr,
               prepareRelease: setupInteractions.prepareRelease,
             }
