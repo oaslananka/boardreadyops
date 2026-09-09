@@ -414,7 +414,7 @@ describe("dependency and security automation configuration", () => {
     // holds every override to its own declared-safe floor.
     const jsYaml = packageJson.devDependencies?.["js-yaml"] ?? "";
     expect(jsYaml).toMatch(/^\d+\.\d+\.\d+$/u);
-    expect(compareVersions(jsYaml, "4.3.0")).toBeGreaterThanOrEqual(0);
+    expect(compareVersions(jsYaml, "4.3.2")).toBeGreaterThanOrEqual(0);
 
     expect(workspace).not.toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
     for (const override of [
@@ -422,7 +422,7 @@ describe("dependency and security automation configuration", () => {
       "'brace-expansion@>=5 <5.0.9':",
       "'fast-uri@>=3 <3.1.6':",
       "'qs@>=6.11.1 <6.16.0':",
-      "js-yaml@>=4 <4.3.0:",
+      "js-yaml@>=4 <4.3.2:",
       "linkify-it@>=5 <5.0.2:",
       "ws@>=8 <8.21.1:",
     ]) {
