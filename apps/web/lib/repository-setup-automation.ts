@@ -319,11 +319,13 @@ export function createProductionRepositorySetupLifecycleExecutor(
   if (!appId || !privateKey) return undefined;
   const apiBaseUrl = (environment.GITHUB_API_BASE_URL?.trim() || "https://api.github.com").replace(/\/$/u, "");
 
+  const cloudOrigin = environment.BOARDREADYOPS_PUBLIC_URL?.trim() || environment.NEXT_PUBLIC_APP_URL?.trim();
+
   return createRepositorySetupLifecycleExecutor({
     store: createSqlRepositorySetupStore(executor),
     githubClient: createRepositorySetupGitHubClient({ environment }),
     now: () => new Date(),
-    cloudOrigin: environment.BOARDREADYOPS_PUBLIC_URL?.trim() || environment.NEXT_PUBLIC_APP_URL?.trim() || undefined,
+    ...(cloudOrigin ? { cloudOrigin } : {}),
     async authenticateInstallation(installationId) {
       const authenticate = createAppAuth({ appId, privateKey, installationId });
       const authentication = await authenticate({ type: "installation" });
