@@ -183,7 +183,7 @@
     "happy-dom": "20.11.3",
     "html-validate": "11.8.0",
     "husky": "9.1.7",
-    "js-yaml": "5.3.0",
+    "js-yaml": "5.4.0",
     "knip": "6.32.2",
     "lint-staged": "17.3.0",
     "mustache": "4.2.0",
@@ -197,7 +197,7 @@
     "typedoc-plugin-markdown": "4.12.0",
     "typescript": "6.0.3",
     "vite": "8.2.1",
-    "vitest": "4.1.10",
+    "vitest": "5.0.0",
     "zod": "4.4.3"
   },
   "publishConfig": {
