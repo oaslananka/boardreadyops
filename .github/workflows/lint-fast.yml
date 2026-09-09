@@ -13,6 +13,10 @@ permissions:
 
 jobs:
   lint-fast:
+    # release-please creates a transient PR head before this repo regenerates
+    # version-derived release artifacts and rewrites the branch to its verified head.
+    # The required `ci / lint` check still validates the final release PR SHA.
+    if: ${{ github.event_name != 'pull_request' || !startsWith(github.head_ref, 'release-please--branches--') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
