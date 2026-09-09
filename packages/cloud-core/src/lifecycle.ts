@@ -1,4 +1,5 @@
 import { parseGitHubCommand } from "./github-command.js";
+import { repositorySetupBranchName } from "./repository-setup.js";
 
 export type GitHubAppWebhookEvent =
   | "check_run"
@@ -64,6 +65,14 @@ export type GitHubAppLifecycleAction =
       installation: GitHubInstallationRef;
       repository: GitHubRepositoryRef;
       checkRunId?: number | undefined;
+      requestedBy?: string | undefined;
+    }
+  | {
+      type: "setup_probe.dispatch";
+      installation: GitHubInstallationRef;
+      repository: GitHubRepositoryRef;
+      pullRequestNumber: number;
+      commitSha: string;
       requestedBy?: string | undefined;
     }
   | {
@@ -277,6 +286,17 @@ function pullRequestRef(pullRequest: Record<string, unknown>): string | null {
   }
 
   return stringValue(head, "ref") ?? null;
+}
+
+function pullRequestBaseRef(pullRequest: Record<string, unknown>): string | null {
+  const base = pullRequest.base;
+  if (!isRecord(base)) return null;
+  return stringValue(base, "ref") ?? null;
+}
+
+function pullRequestMergeCommitSha(pullRequest: Record<string, unknown>): string | null {
+  const sha = stringValue(pullRequest, "merge_commit_sha");
+  return sha && fullLowercaseCommitSha.test(sha) ? sha : null;
 }
 
 function pullRequestHeadRepository(pullRequest: Record<string, unknown>): string | undefined {
@@ -720,15 +740,41 @@ export function normalizeGitHubAppWebhook(options: NormalizeGitHubAppWebhookOpti
   }
 
   if (options.event === "pull_request") {
-    if (!isQueuedPullRequestAction(action)) {
-      return result(options, action, []);
-    }
-
     const repository = repositoryFromPayload(options.payload.repository);
     const pullRequest = options.payload.pull_request;
 
     if (!repository || !isRecord(pullRequest)) {
       return unsupported(options, "payload does not include a valid repository and pull request");
+    }
+
+    if (action === "closed") {
+      if (boolValue(pullRequest, "merged") !== true) return result(options, action, []);
+      const headRef = pullRequestRef(pullRequest);
+      const baseRef = pullRequestBaseRef(pullRequest);
+      if (headRef !== repositorySetupBranchName || !repository.defaultBranch || baseRef !== repository.defaultBranch) {
+        return result(options, action, []);
+      }
+
+      const pullRequestNumber = numberValue(pullRequest, "number");
+      const commitSha = pullRequestMergeCommitSha(pullRequest);
+      if (pullRequestNumber === undefined || !commitSha) {
+        return unsupported(options, "merged setup pull request payload does not include number or merge commit sha");
+      }
+      const requestedBy = isRecord(options.payload.sender) ? stringValue(options.payload.sender, "login") : undefined;
+      return result(options, action, [
+        {
+          type: "setup_probe.dispatch",
+          installation,
+          repository,
+          pullRequestNumber,
+          commitSha,
+          ...(requestedBy ? { requestedBy } : {}),
+        },
+      ]);
+    }
+
+    if (!isQueuedPullRequestAction(action)) {
+      return result(options, action, []);
     }
 
     const pullRequestNumber = numberValue(pullRequest, "number");
