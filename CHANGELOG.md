@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.41.3](https://github.com/oaslananka/boardreadyops/compare/v1.41.2...v1.41.3) (2026-09-09)
+
+
+### Bug Fixes
+
+* **ci:** skip lint-fast on release-please transients ([#718](https://github.com/oaslananka/boardreadyops/issues/718)) ([85db042](https://github.com/oaslananka/boardreadyops/commit/85db0423d21977b8f1f65efcee83c1ccd379661a))
+
 ## [1.41.2](https://github.com/oaslananka/boardreadyops/compare/v1.41.1...v1.41.2) (2026-09-09)
 
 
