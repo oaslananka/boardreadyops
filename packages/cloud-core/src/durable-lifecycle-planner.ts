@@ -79,6 +79,7 @@ export async function planGitHubAppLifecycleActions(
         break;
       }
       case "setup_pr.create":
+      case "setup_probe.dispatch":
       case "waiver_pr.request":
       case "release.prepare":
       case "github_command.execute":

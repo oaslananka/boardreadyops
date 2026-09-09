@@ -14,8 +14,10 @@ import {
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createSqlRepositorySetupStore, type RepositorySetupStore } from "@boardreadyops/db/repository-setup-store";
 import { createAppAuth } from "@octokit/auth-app";
+import { createRepositorySetupGitHubClient, type RepositorySetupGitHubClient } from "./repository-setup-github.js";
 
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
+type SetupProbeAction = Extract<GitHubAppLifecycleAction, { type: "setup_probe.dispatch" }>;
 type WaiverAction = Extract<GitHubAppLifecycleAction, { type: "waiver_pr.request" }>;
 type ReleasePrepareAction = Extract<GitHubAppLifecycleAction, { type: "release.prepare" }>;
 
@@ -26,6 +28,7 @@ type InstallationAuthentication = {
 
 export type RepositorySetupLifecycleExecutor = {
   createSetupPr(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
+  probeSetup(action: SetupProbeAction, context: GitHubAppLifecycleContext): Promise<void>;
   createWaiverPr(action: WaiverAction, context: GitHubAppLifecycleContext): Promise<void>;
   prepareRelease(
     action: ReleasePrepareAction,
@@ -37,6 +40,9 @@ export type RepositorySetupLifecycleExecutorDependencies = {
   store: RepositorySetupStore;
   authenticateInstallation(installationId: number): Promise<InstallationAuthentication>;
   mutationService(token: string): GitHubMutationService;
+  githubClient?: RepositorySetupGitHubClient;
+  now?: () => Date;
+  cloudOrigin?: string;
 };
 
 function requestId(deliveryId: string): string {
@@ -46,6 +52,12 @@ function requestId(deliveryId: string): string {
 function revisionRequestId(value: string): string {
   return `setup-pr:${createHash("sha256").update(value).digest("hex")}`;
 }
+
+function probeReadinessRequestId(value: string): string {
+  return `setup-readiness:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+const setupProbeLifetimeMs = 15 * 60 * 1000;
 
 function deterministicAuditEventId(parts: readonly string[]): string {
   const digest = createHash("sha256").update(parts.join("\u0000"), "utf8").digest().subarray(0, 16);
@@ -57,7 +69,7 @@ function deterministicAuditEventId(parts: readonly string[]): string {
 
 async function repositoryContextForAction(
   store: RepositorySetupStore,
-  action: SetupAction | WaiverAction | ReleasePrepareAction,
+  action: SetupAction | SetupProbeAction | WaiverAction | ReleasePrepareAction,
 ) {
   const repository = await store.getContextByGitHub({
     githubInstallationId: action.installation.id,
@@ -82,7 +94,10 @@ export function createRepositorySetupLifecycleExecutor(
         throw new Error(`setup PR capability is unavailable: ${capability.missingPermissions.join(", ")}`);
       }
 
-      const plan = generateSetupPrPlan({ presetId: repository.current?.preset ?? "open-source" });
+      const plan = generateSetupPrPlan({
+        presetId: repository.current?.preset ?? "open-source",
+        ...(dependencies.cloudOrigin ? { cloudOrigin: dependencies.cloudOrigin } : {}),
+      });
       const durableRequestId = requestId(context.deliveryId);
       const actorId = action.requestedBy ?? "github-app";
       const result = await dependencies.mutationService(authentication.token).execute({
@@ -112,6 +127,79 @@ export function createRepositorySetupLifecycleExecutor(
         configStatus: "unknown",
         diagnostics: [`Setup PR #${result.pullRequestNumber} (${result.outcome}): ${result.pullRequestUrl}`],
       });
+    },
+
+    async probeSetup(action, context) {
+      const repository = await repositoryContextForAction(dependencies.store, action);
+      const current = repository.current;
+      if (!current) throw new Error("repository setup revision is unavailable after setup merge");
+      const githubClient = dependencies.githubClient;
+      if (!githubClient) throw new Error("repository setup GitHub client is not configured");
+
+      const readiness = await githubClient.inspect({
+        githubInstallationId: repository.githubInstallationId,
+        owner: repository.owner,
+        name: repository.name,
+      });
+      if (readiness.workflowStatus === "missing") {
+        throw new Error("repository setup workflow is not visible on the default branch after setup merge");
+      }
+      if (readiness.workflowStatus !== "probe_required") {
+        await dependencies.store.applyRevision({
+          installationId: repository.installationId,
+          repositoryId: repository.repositoryId,
+          preset: current.preset,
+          presetVersion: current.presetVersion,
+          source: "operator",
+          actorId: action.requestedBy ?? "github-app",
+          requestId: probeReadinessRequestId(requestId(context.deliveryId)),
+          workflowStatus: readiness.workflowStatus,
+          configStatus: "unknown",
+          diagnostics: [`GitHub readiness after setup PR #${action.pullRequestNumber}: ${readiness.workflowStatus}`],
+        });
+        return;
+      }
+
+      const created = await dependencies.store.createProbe({
+        installationId: repository.installationId,
+        repositoryId: repository.repositoryId,
+        requestedBy: action.requestedBy ?? "github-app",
+        requestId: requestId(context.deliveryId),
+        expiresAt: new Date((dependencies.now?.() ?? new Date()).valueOf() + setupProbeLifetimeMs),
+      });
+      if (created.outcome === "not_configured") {
+        throw new Error("repository setup probe requires an existing setup revision");
+      }
+      if (created.outcome === "conflict") throw new Error("repository setup probe request conflicted");
+      if (!created.probeId) throw new Error("repository setup probe did not return a probe id");
+      const probeId = created.probeId;
+
+      if (created.outcome === "replayed") {
+        const replayed = await dependencies.store.getProbe(probeId);
+        if (!replayed) throw new Error("replayed repository setup probe is unavailable");
+        if (replayed.status === "completed" || replayed.status === "dispatched") return;
+        if (replayed.status !== "pending") {
+          throw new Error(`replayed repository setup probe is ${replayed.status}`);
+        }
+      }
+
+      const dispatched = await githubClient.dispatchProbe({
+        githubInstallationId: repository.githubInstallationId,
+        owner: repository.owner,
+        name: repository.name,
+        defaultBranch: repository.defaultBranch,
+        probeId,
+      });
+      const marked = await dependencies.store.markProbeDispatched({
+        probeId,
+        workflowRunId: dispatched.workflowRunId,
+      });
+      if (marked === "applied" || marked === "replayed") return;
+      if (marked === "stale") {
+        const terminal = await dependencies.store.getProbe(probeId);
+        if (terminal?.status === "completed" || terminal?.status === "dispatched") return;
+      }
+      throw new Error(`repository setup probe dispatch could not be persisted: ${marked}`);
     },
 
     async prepareRelease(action, context) {
@@ -231,8 +319,13 @@ export function createProductionRepositorySetupLifecycleExecutor(
   if (!appId || !privateKey) return undefined;
   const apiBaseUrl = (environment.GITHUB_API_BASE_URL?.trim() || "https://api.github.com").replace(/\/$/u, "");
 
+  const cloudOrigin = environment.BOARDREADYOPS_PUBLIC_URL?.trim() || environment.NEXT_PUBLIC_APP_URL?.trim();
+
   return createRepositorySetupLifecycleExecutor({
     store: createSqlRepositorySetupStore(executor),
+    githubClient: createRepositorySetupGitHubClient({ environment }),
+    now: () => new Date(),
+    ...(cloudOrigin ? { cloudOrigin } : {}),
     async authenticateInstallation(installationId) {
       const authenticate = createAppAuth({ appId, privateKey, installationId });
       const authentication = await authenticate({ type: "installation" });

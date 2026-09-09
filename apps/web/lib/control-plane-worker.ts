@@ -6,12 +6,14 @@ import type { GitHubAppLifecycleAction, GitHubAppLifecycleContext } from "@board
 import type { ClaimedControlPlaneJob, ControlPlaneJobStore } from "@boardreadyops/db/control-plane-job-store";
 
 type SetupAction = Extract<GitHubAppLifecycleAction, { type: "setup_pr.create" }>;
+type SetupProbeAction = Extract<GitHubAppLifecycleAction, { type: "setup_probe.dispatch" }>;
 type WaiverAction = Extract<GitHubAppLifecycleAction, { type: "waiver_pr.request" }>;
 type GitHubCommandAction = Extract<GitHubAppLifecycleAction, { type: "github_command.execute" }>;
 type ReleasePrepareAction = Extract<GitHubAppLifecycleAction, { type: "release.prepare" }>;
 
 type ControlPlaneInteractionExecutor = {
   createSetupPr?(action: SetupAction, context: GitHubAppLifecycleContext): Promise<void>;
+  probeSetup?(action: SetupProbeAction, context: GitHubAppLifecycleContext): Promise<void>;
   createWaiverPr?(action: WaiverAction, context: GitHubAppLifecycleContext): Promise<void>;
   prepareRelease?(
     action: ReleasePrepareAction,
@@ -61,6 +63,16 @@ async function executeSetupInteraction(
   await createSetupPr(action, context);
 }
 
+async function executeSetupProbeInteraction(
+  action: SetupProbeAction,
+  dependencies: ControlPlaneWorkerDependencies,
+  context: GitHubAppLifecycleContext,
+): Promise<void> {
+  const probeSetup = dependencies.interactions?.probeSetup;
+  if (!probeSetup) throw new Error("setup probe lifecycle interaction executor is not configured");
+  await probeSetup(action, context);
+}
+
 async function executeWaiverInteraction(
   action: WaiverAction,
   dependencies: ControlPlaneWorkerDependencies,
@@ -107,6 +119,8 @@ async function executeInteractionAction(
   switch (action.type) {
     case "setup_pr.create":
       return executeSetupInteraction(action, dependencies, context);
+    case "setup_probe.dispatch":
+      return executeSetupProbeInteraction(action, dependencies, context);
     case "waiver_pr.request":
       return executeWaiverInteraction(action, dependencies, context);
     case "release.prepare":

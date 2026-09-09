@@ -19,6 +19,15 @@ const waiverAction = {
   requestedBy: "octocat",
 };
 
+const setupProbeAction = {
+  type: "setup_probe.dispatch" as const,
+  installation: { id: 123 },
+  repository: { id: 456, owner: "octo", name: "board", fullName: "octo/board", private: false, defaultBranch: "main" },
+  pullRequestNumber: 12,
+  commitSha: "c".repeat(40),
+  requestedBy: "maintainer",
+};
+
 const releasePrepareAction = {
   type: "release.prepare" as const,
   installation: { id: 123 },
@@ -144,6 +153,213 @@ describe("repository setup lifecycle automation", () => {
       }),
     );
   });
+  it("creates and dispatches one persisted setup probe for a merged setup PR", async () => {
+    const store = setupStore();
+    vi.mocked(store.createProbe).mockResolvedValue({
+      outcome: "created",
+      probeId: "11111111-1111-4111-8111-111111111111",
+      setupRevisionId: "setup-1",
+    });
+    vi.mocked(store.markProbeDispatched).mockResolvedValue("applied");
+    const inspect = vi.fn(async () => ({ actionsEnabled: true, workflowStatus: "probe_required" as const }));
+    const dispatchProbe = vi.fn(async () => ({
+      workflowRunId: "9988",
+      workflowRunUrl: "https://github.test/run/9988",
+    }));
+    const now = new Date("2026-09-09T03:50:00.000Z");
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(),
+      mutationService: vi.fn(),
+      githubClient: { inspect, dispatchProbe },
+      now: () => now,
+    });
+    const probeSetup = (executor as typeof executor & { probeSetup?: typeof executor.createSetupPr }).probeSetup;
+    expect(probeSetup).toBeDefined();
+    if (!probeSetup) return;
+
+    await probeSetup(setupProbeAction, {
+      deliveryId: "delivery-probe",
+      eventType: "pull_request",
+      eventAction: "closed",
+    });
+
+    expect(inspect).toHaveBeenCalledWith({ githubInstallationId: 123, owner: "octo", name: "board" });
+    expect(store.createProbe).toHaveBeenCalledWith({
+      installationId: "installation-1",
+      repositoryId: "repository-1",
+      requestedBy: "maintainer",
+      requestId: "github:delivery-probe",
+      expiresAt: new Date("2026-09-09T04:05:00.000Z"),
+    });
+    expect(dispatchProbe).toHaveBeenCalledWith({
+      githubInstallationId: 123,
+      owner: "octo",
+      name: "board",
+      defaultBranch: "main",
+      probeId: "11111111-1111-4111-8111-111111111111",
+    });
+    expect(store.markProbeDispatched).toHaveBeenCalledWith({
+      probeId: "11111111-1111-4111-8111-111111111111",
+      workflowRunId: "9988",
+    });
+    expect(store.completeProbe).not.toHaveBeenCalled();
+  });
+
+  it.each(["dispatched", "completed"] as const)(
+    "does not dispatch a second workflow when the setup probe delivery is replayed after %s",
+    async (status) => {
+      const store = setupStore();
+      vi.mocked(store.createProbe).mockResolvedValue({
+        outcome: "replayed",
+        probeId: "11111111-1111-4111-8111-111111111111",
+        setupRevisionId: "setup-1",
+      });
+      vi.mocked(store.getProbe).mockResolvedValue({
+        probeId: "11111111-1111-4111-8111-111111111111",
+        installationId: "installation-1",
+        githubInstallationId: 123,
+        repositoryId: "repository-1",
+        githubRepositoryId: 456,
+        owner: "octo",
+        name: "board",
+        defaultBranch: "main",
+        preset: "production",
+        presetVersion: 1,
+        status,
+        expiresAt: "2026-09-09T04:05:00.000Z",
+      });
+      const dispatchProbe = vi.fn();
+      const executor = createRepositorySetupLifecycleExecutor({
+        store,
+        authenticateInstallation: vi.fn(),
+        mutationService: vi.fn(),
+        githubClient: {
+          inspect: vi.fn(async () => ({ actionsEnabled: true, workflowStatus: "probe_required" as const })),
+          dispatchProbe,
+        },
+      });
+
+      await executor.probeSetup(setupProbeAction, {
+        deliveryId: "delivery-probe",
+        eventType: "pull_request",
+        eventAction: "closed",
+      });
+
+      expect(dispatchProbe).not.toHaveBeenCalled();
+      expect(store.markProbeDispatched).not.toHaveBeenCalled();
+    },
+  );
+
+  it("redispatches the same probe id when a replay finds the probe still pending", async () => {
+    const store = setupStore();
+    vi.mocked(store.createProbe).mockResolvedValue({
+      outcome: "replayed",
+      probeId: "11111111-1111-4111-8111-111111111111",
+      setupRevisionId: "setup-1",
+    });
+    vi.mocked(store.getProbe).mockResolvedValue({
+      probeId: "11111111-1111-4111-8111-111111111111",
+      installationId: "installation-1",
+      githubInstallationId: 123,
+      repositoryId: "repository-1",
+      githubRepositoryId: 456,
+      owner: "octo",
+      name: "board",
+      defaultBranch: "main",
+      preset: "production",
+      presetVersion: 1,
+      status: "pending",
+      expiresAt: "2026-09-09T04:05:00.000Z",
+    });
+    vi.mocked(store.markProbeDispatched).mockResolvedValue("applied");
+    const dispatchProbe = vi.fn(async () => ({ workflowRunId: "9988" }));
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(),
+      mutationService: vi.fn(),
+      githubClient: {
+        inspect: vi.fn(async () => ({ actionsEnabled: true, workflowStatus: "probe_required" as const })),
+        dispatchProbe,
+      },
+    });
+
+    await executor.probeSetup(setupProbeAction, {
+      deliveryId: "delivery-probe",
+      eventType: "pull_request",
+      eventAction: "closed",
+    });
+
+    expect(dispatchProbe).toHaveBeenCalledWith(
+      expect.objectContaining({ probeId: "11111111-1111-4111-8111-111111111111" }),
+    );
+    expect(store.markProbeDispatched).toHaveBeenCalledWith({
+      probeId: "11111111-1111-4111-8111-111111111111",
+      workflowRunId: "9988",
+    });
+  });
+
+  it.each(["actions_disabled", "disabled", "incompatible"] as const)(
+    "records a fail-closed setup revision instead of dispatching when merged workflow readiness is %s",
+    async (workflowStatus) => {
+      const store = setupStore();
+      const dispatchProbe = vi.fn();
+      const executor = createRepositorySetupLifecycleExecutor({
+        store,
+        authenticateInstallation: vi.fn(),
+        mutationService: vi.fn(),
+        githubClient: {
+          inspect: vi.fn(async () => ({
+            actionsEnabled: workflowStatus !== "actions_disabled",
+            workflowStatus,
+          })),
+          dispatchProbe,
+        },
+      });
+
+      await executor.probeSetup(setupProbeAction, {
+        deliveryId: "delivery-disabled",
+        eventType: "pull_request",
+        eventAction: "closed",
+      });
+
+      expect(store.applyRevision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          installationId: "installation-1",
+          repositoryId: "repository-1",
+          workflowStatus,
+          configStatus: "unknown",
+          actorId: "maintainer",
+        }),
+      );
+      expect(store.createProbe).not.toHaveBeenCalled();
+      expect(dispatchProbe).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps a not-yet-visible merged workflow retryable without persisting false readiness", async () => {
+    const store = setupStore();
+    const executor = createRepositorySetupLifecycleExecutor({
+      store,
+      authenticateInstallation: vi.fn(),
+      mutationService: vi.fn(),
+      githubClient: {
+        inspect: vi.fn(async () => ({ actionsEnabled: true, workflowStatus: "missing" as const })),
+        dispatchProbe: vi.fn(),
+      },
+    });
+
+    await expect(
+      executor.probeSetup(setupProbeAction, {
+        deliveryId: "delivery-missing",
+        eventType: "pull_request",
+        eventAction: "closed",
+      }),
+    ).rejects.toThrow(/not visible.*default branch/iu);
+    expect(store.applyRevision).not.toHaveBeenCalled();
+    expect(store.createProbe).not.toHaveBeenCalled();
+  });
+
   it("terminalizes a stale release preparation request when Actions write is unavailable", async () => {
     const store = setupStore();
     const mutationService = vi.fn();

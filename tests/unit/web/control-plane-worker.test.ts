@@ -144,6 +144,43 @@ describe("control-plane worker", () => {
     expect(jobs.completeJob).toHaveBeenCalledOnce();
   });
 
+  it("dispatches a merged setup probe interaction before completing the durable webhook job", async () => {
+    const lifecycle = lifecycleStore();
+    const jobs = jobStore();
+    const probeAction = {
+      type: "setup_probe.dispatch" as const,
+      installation: { id: 123 },
+      repository: {
+        id: 456,
+        owner: "octo",
+        name: "board",
+        fullName: "octo/board",
+        private: false,
+        defaultBranch: "main",
+      },
+      pullRequestNumber: 12,
+      commitSha: "c".repeat(40),
+      requestedBy: "maintainer",
+    };
+    const interactions = { probeSetup: vi.fn(async () => undefined) };
+    const probeJob: ClaimedControlPlaneJob = {
+      ...job,
+      eventType: "pull_request",
+      eventAction: "closed",
+      actions: [probeAction],
+    };
+
+    await expect(
+      processControlPlaneJob(probeJob, { workerId: "worker-1", jobs, lifecycle, interactions }),
+    ).resolves.toMatchObject({ status: "completed" });
+    expect(interactions.probeSetup).toHaveBeenCalledWith(probeAction, {
+      deliveryId: "delivery-1",
+      eventType: "pull_request",
+      eventAction: "closed",
+    });
+    expect(jobs.completeJob).toHaveBeenCalledOnce();
+  });
+
   it("executes a waiver PR interaction before completing the durable webhook job", async () => {
     const lifecycle = lifecycleStore();
     const jobs = jobStore();

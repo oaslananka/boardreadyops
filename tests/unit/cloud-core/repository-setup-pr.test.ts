@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { generateSetupPrPlan, generateWaiverPrPlan } from "../../../packages/cloud-core/src/repository-setup.js";
 import { validateConfig } from "../../../src/core/config.js";
 
+const expression = (value: string) => `$${value}`;
+
 describe("Setup and Waiver PR plan generation", () => {
   it("generates a complete setup PR plan for production preset", () => {
     const plan = generateSetupPrPlan({
@@ -29,6 +31,28 @@ describe("Setup and Waiver PR plan generation", () => {
     // Verify config is valid against core config schema
     const parsedConfig = yaml.load(configFile.content);
     expect(validateConfig(parsedConfig)).toEqual([]);
+  });
+
+  it("generates a self-contained setup probe workflow pinned to the trusted cloud origin", () => {
+    const plan = generateSetupPrPlan({
+      presetId: "open-source",
+      cloudOrigin: "https://cloud.example",
+    });
+    const workflowFile = plan.files.find((file) => file.path === ".github/workflows/readiness-runner.yml");
+    expect(workflowFile).toBeDefined();
+    if (!workflowFile) throw new Error("Expected workflowFile");
+
+    const document = yaml.load(workflowFile.content) as Record<string, unknown>;
+    const jobs = document.jobs as Record<string, Record<string, unknown>>;
+    const probe = jobs["setup-probe"];
+    expect(probe?.if).toBe(expression("{{ inputs.setup_probe_id != '' }}"));
+    expect(probe?.permissions).toEqual({ contents: "read", "id-token": "write" });
+    const setupProbeVariable = "${" + "SETUP_PROBE_ID}";
+    expect(workflowFile.content).toContain(
+      `expected_url="https://cloud.example/api/v1/setup-probes/result?probe_id=${setupProbeVariable}"`,
+    );
+    expect(workflowFile.content).not.toContain("vars.BOARDREADYOPS_CLOUD_ORIGIN");
+    expect(workflowFile.content).not.toContain("contents: write");
   });
 
   it("falls back to default preset if invalid preset specified", () => {

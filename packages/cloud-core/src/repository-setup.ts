@@ -8,6 +8,7 @@ export const repositorySetupPresetVersion = 1;
 export const repositorySetupWorkflowPath = "readiness-runner.yml";
 export const repositorySetupWorkflowContractVersion = 1;
 export const repositorySetupWorkflowName = "BoardReadyOps Readiness Runner";
+export const repositorySetupBranchName = "boardreadyops/setup";
 
 export type RepositorySetupPreset = {
   id: RepositorySetupPresetId;
@@ -193,9 +194,223 @@ jobs:
             });
 `;
 
+const defaultRepositorySetupCloudOrigin = "https://boardreadyops.com";
+
+function normalizedRepositorySetupCloudOrigin(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("repository setup cloud origin must be an HTTPS origin");
+  }
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.username ||
+    parsed.password ||
+    parsed.pathname !== "/" ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error("repository setup cloud origin must be an HTTPS origin");
+  }
+  return parsed.origin;
+}
+
+function setupProbeWorkflowJob(cloudOrigin: string): string {
+  const trustedOrigin = normalizedRepositorySetupCloudOrigin(cloudOrigin);
+  return `
+  setup-probe:
+    if: \${{ inputs.setup_probe_id != '' }}
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate setup probe binding
+        id: validate
+        env:
+          SETUP_PROBE_ID: \${{ inputs.setup_probe_id }}
+          SETUP_RESULT_URL: \${{ inputs.setup_result_url }}
+          TARGET: \${{ inputs.target }}
+        run: |
+          if ! [[ "$SETUP_PROBE_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+            echo "setup_probe_id must be a lowercase UUID" >&2
+            exit 1
+          fi
+          if [ "$TARGET" != "$GITHUB_REPOSITORY" ]; then
+            echo "target must match the repository that owns this workflow" >&2
+            exit 1
+          fi
+          expected_url="__BOARDREADYOPS_CLOUD_ORIGIN__/api/v1/setup-probes/result?probe_id=\${SETUP_PROBE_ID}"
+          if [ "$SETUP_RESULT_URL" != "$expected_url" ]; then
+            echo "setup_result_url must target the BoardReadyOps setup callback for this probe" >&2
+            exit 1
+          fi
+
+      - name: Check out default branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Check out verified BoardReadyOps release
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          repository: oaslananka/boardreadyops
+          ref: ce925376bd71daf7e07f31fb1bb19a8bde30b172 # v1.24.1
+          path: .boardreadyops-tool
+          persist-credentials: false
+          sparse-checkout: |
+            dist/cli/index.cjs
+            package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Validate BoardReadyOps configuration
+        id: inspect
+        env:
+          BOARDREADYOPS_LOCALE: en
+          CONFIG_PATH: \${{ vars.BOARDREADYOPS_CONFIG || 'boardreadyops.yml' }}
+        run: |
+          observed_sha="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+          if ! [[ "$observed_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "default-branch checkout did not resolve to a full commit SHA" >&2
+            exit 1
+          fi
+
+          tool_version="$(node "$GITHUB_WORKSPACE/.boardreadyops-tool/dist/cli/index.cjs" --version)"
+          if [ "$tool_version" != "1.24.1" ]; then
+            echo "verified BoardReadyOps checkout returned unexpected version: $tool_version" >&2
+            exit 1
+          fi
+
+          OBSERVED_SHA="$observed_sha" TOOL_VERSION="$tool_version" node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const { execFileSync } = require("node:child_process");
+
+          const workspace = fs.realpathSync(process.env.GITHUB_WORKSPACE);
+          const configured = String(process.env.CONFIG_PATH ?? "").trim();
+          const observedSha = process.env.OBSERVED_SHA;
+          const toolVersion = process.env.TOOL_VERSION;
+          if (!configured || path.isAbsolute(configured)) {
+            throw new Error("CONFIG_PATH must stay within the checked-out repository");
+          }
+
+          const candidate = path.resolve(workspace, configured);
+          const relative = path.relative(workspace, candidate);
+          if (relative === ".." || relative.startsWith(\`..\${path.sep}\`) || path.isAbsolute(relative)) {
+            throw new Error("CONFIG_PATH must stay within the checked-out repository");
+          }
+
+          let tracked = true;
+          try {
+            execFileSync("git", ["-C", workspace, "ls-files", "--error-unmatch", "--", configured], {
+              stdio: "ignore",
+            });
+          } catch {
+            tracked = false;
+          }
+          if (!tracked || !fs.existsSync(candidate)) {
+            fs.writeFileSync("setup-result.json", JSON.stringify({
+              contractVersion: 1,
+              configStatus: "missing",
+              observedSha,
+              toolVersion,
+              diagnostics: ["The configured BoardReadyOps path is missing on the default branch."],
+            }));
+            process.exit(0);
+          }
+
+          const metadata = fs.lstatSync(candidate);
+          const realCandidate = fs.realpathSync(candidate);
+          const realRelative = path.relative(workspace, realCandidate);
+          if (
+            metadata.isSymbolicLink() ||
+            !metadata.isFile() ||
+            realRelative === ".." ||
+            realRelative.startsWith(\`..\${path.sep}\`) ||
+            path.isAbsolute(realRelative)
+          ) {
+            throw new Error("CONFIG_PATH must resolve to a tracked regular file inside the checked-out repository");
+          }
+
+          const probeRoot = path.join(process.env.RUNNER_TEMP, "boardreadyops-setup-probe");
+          fs.rmSync(probeRoot, { recursive: true, force: true });
+          fs.mkdirSync(probeRoot, { recursive: true });
+          fs.copyFileSync(realCandidate, path.join(probeRoot, "boardreadyops.yml"));
+          NODE
+
+          if [ -f setup-result.json ]; then
+            exit 0
+          fi
+
+          (
+            cd "$RUNNER_TEMP/boardreadyops-setup-probe"
+            node "$GITHUB_WORKSPACE/.boardreadyops-tool/dist/cli/index.cjs" doctor --check repository --format json > "$GITHUB_WORKSPACE/doctor.json"
+          )
+          OBSERVED_SHA="$observed_sha" TOOL_VERSION="$tool_version" node <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(fs.readFileSync("doctor.json", "utf8"));
+          const reportToolVersion = String(report?.tool?.version ?? "").trim();
+          if (reportToolVersion !== process.env.TOOL_VERSION) {
+            throw new Error("BoardReadyOps doctor reported an unexpected tool version");
+          }
+          const repository = report?.checks?.find((check) => check?.name === "repository");
+          const configItem = repository?.items?.find((item) =>
+            typeof item?.message === "string" &&
+            (item.message.includes("found and valid") || item.message.includes("configuration is invalid"))
+          );
+          const configStatus = configItem?.severity === "pass" ? "ready" : "invalid";
+          const diagnostics = configStatus === "ready"
+            ? []
+            : [String(configItem?.message ?? "BoardReadyOps could not validate the configuration.").slice(0, 512)];
+          fs.writeFileSync("setup-result.json", JSON.stringify({
+            contractVersion: 1,
+            configStatus,
+            configVersion: configStatus === "ready" ? 1 : undefined,
+            observedSha: process.env.OBSERVED_SHA,
+            toolVersion: reportToolVersion,
+            diagnostics,
+          }));
+          NODE
+
+      - name: Publish OIDC-authenticated setup result
+        if: always() && steps.validate.outcome == 'success' && steps.inspect.outcome == 'success'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          SETUP_PROBE_ID: \${{ inputs.setup_probe_id }}
+          SETUP_RESULT_URL: \${{ inputs.setup_result_url }}
+        with:
+          script: |
+            const fs = require("node:fs");
+            const probeId = process.env.SETUP_PROBE_ID;
+            const resultUrl = process.env.SETUP_RESULT_URL;
+            const payload = JSON.parse(fs.readFileSync("setup-result.json", "utf8"));
+            const oidcToken = await core.getIDToken(\`boardreadyops-setup:\${probeId}\`);
+            let response;
+            for (let attempt = 1; attempt <= 3; attempt += 1) {
+              response = await fetch(resultUrl, {
+                method: "POST",
+                headers: {
+                  authorization: \`Bearer \${oidcToken}\`,
+                  "content-type": "application/json",
+                },
+                body: JSON.stringify(payload),
+              });
+              if (response.ok) break;
+              if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+            }
+            if (!response?.ok) {
+              const responseText = response ? (await response.text()).slice(0, 512) : "no response";
+              throw new Error(\`BoardReadyOps setup callback failed: HTTP \${response?.status ?? "unknown"}: \${responseText}\`);
+            }
+`.replace("__BOARDREADYOPS_CLOUD_ORIGIN__", trustedOrigin);
+}
+
 export interface GenerateSetupFilesInput {
   presetId: RepositorySetupPresetId;
   workflowContent?: string;
+  cloudOrigin?: string;
 }
 
 export interface SetupPrPlan {
@@ -213,9 +428,11 @@ export function generateSetupPrPlan(input: GenerateSetupFilesInput): SetupPrPlan
     throw new Error("No default repository setup preset available");
   }
   const preset = repositorySetupPreset(input.presetId) ?? defaultPreset;
-  const workflowContent = input.workflowContent ?? defaultReadinessWorkflowTemplate;
+  const workflowContent =
+    input.workflowContent ??
+    `${defaultReadinessWorkflowTemplate}${setupProbeWorkflowJob(input.cloudOrigin ?? defaultRepositorySetupCloudOrigin)}`;
 
-  const branchName = "boardreadyops/setup";
+  const branchName = repositorySetupBranchName;
   const commitMessage = `chore(boardreadyops): initialize release readiness (${preset.name})`;
   const prTitle = `chore(boardreadyops): initialize BoardReadyOps release readiness (${preset.name})`;
 

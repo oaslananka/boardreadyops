@@ -298,6 +298,72 @@ describe("GitHub App lifecycle normalization", () => {
     expect(normalized.actions).toEqual([]);
   });
 
+  it("dispatches a setup probe when the canonical setup PR is merged into the default branch", () => {
+    const mergeSha = "c".repeat(40);
+    const normalized = normalizeGitHubAppWebhook({
+      event: "pull_request",
+      delivery: "delivery-setup-merge",
+      payload: {
+        action: "closed",
+        installation,
+        repository: publicRepository,
+        sender: { login: "maintainer" },
+        pull_request: {
+          number: 77,
+          merged: true,
+          merge_commit_sha: mergeSha,
+          base: { ref: "main", sha: baseSha },
+          head: { ref: "boardreadyops/setup", sha: headSha },
+        },
+      },
+    });
+
+    expect(normalized.accepted).toBe(true);
+    expect(normalized.actions).toEqual([
+      {
+        type: "setup_probe.dispatch",
+        installation: { id: 12345, accountLogin: "octo-org", accountType: "Organization" },
+        repository: {
+          id: 98765,
+          owner: "octo-org",
+          name: "hardware-board",
+          fullName: "octo-org/hardware-board",
+          private: false,
+          defaultBranch: "main",
+        },
+        pullRequestNumber: 77,
+        commitSha: mergeSha,
+        requestedBy: "maintainer",
+      },
+    ]);
+  });
+
+  it.each([
+    ["unmerged", { merged: false, headRef: "boardreadyops/setup", baseRef: "main" }],
+    ["wrong setup branch", { merged: true, headRef: "feature/setup", baseRef: "main" }],
+    ["wrong base branch", { merged: true, headRef: "boardreadyops/setup", baseRef: "develop" }],
+  ])("does not dispatch a setup probe for %s closed pull requests", (_label, scenario) => {
+    const normalized = normalizeGitHubAppWebhook({
+      event: "pull_request",
+      delivery: `delivery-setup-negative-${scenario.headRef}-${scenario.baseRef}`,
+      payload: {
+        action: "closed",
+        installation,
+        repository: publicRepository,
+        pull_request: {
+          number: 77,
+          merged: scenario.merged,
+          merge_commit_sha: "c".repeat(40),
+          base: { ref: scenario.baseRef, sha: baseSha },
+          head: { ref: scenario.headRef, sha: headSha },
+        },
+      },
+    });
+
+    expect(normalized.accepted).toBe(true);
+    expect(normalized.actions).toEqual([]);
+  });
+
   it("accepts ignored pull request actions without enqueueing work", () => {
     const normalized = normalizeGitHubAppWebhook({
       event: "pull_request",

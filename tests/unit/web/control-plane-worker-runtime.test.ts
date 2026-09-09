@@ -232,6 +232,12 @@ describe("control-plane worker runtime", () => {
     expect(source).toContain("cleanupBatchSize");
   });
 
+  it("wires merged setup probes into the production repository setup interaction executor", () => {
+    const source = workerSource();
+
+    expect(source).toContain("probeSetup: setupInteractions.probeSetup");
+  });
+
   it("wires durable artifact deletion without exposing storage paths in health", () => {
     const source = workerSource();
 
