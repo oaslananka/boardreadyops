@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.41.0](https://github.com/oaslananka/boardreadyops/compare/v1.40.1...v1.41.0) (2026-09-09)
+
+
+### Features
+
+* **cloud:** auto-probe repository setup after merge ([#706](https://github.com/oaslananka/boardreadyops/issues/706)) ([44b625a](https://github.com/oaslananka/boardreadyops/commit/44b625a1f703949330cd723d912fb4e28010125a))
+
 ## [1.40.1](https://github.com/oaslananka/boardreadyops/compare/v1.40.0...v1.40.1) (2026-09-08)
 
 
