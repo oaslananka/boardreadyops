@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.41.1](https://github.com/oaslananka/boardreadyops/compare/v1.41.0...v1.41.1) (2026-09-09)
+
+
+### Bug Fixes
+
+* remediate OSV and Sonar findings ([#714](https://github.com/oaslananka/boardreadyops/issues/714)) ([f88d0b0](https://github.com/oaslananka/boardreadyops/commit/f88d0b082788e7e399263f505bfaa6e0a9b06858))
+
 ## [1.41.0](https://github.com/oaslananka/boardreadyops/compare/v1.40.1...v1.41.0) (2026-09-09)
 
 
