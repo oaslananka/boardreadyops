@@ -104,11 +104,10 @@ function diffReadiness(
 }
 
 export function formatReleaseDiffText(diff: ReleaseDiff): string {
-  const lines: string[] = [];
-  lines.push("Release diff");
-  lines.push(
+  const lines: string[] = [
+    "Release diff",
     `  readiness: ${formatScore(diff.readiness.previousScore)} -> ${formatScore(diff.readiness.currentScore)} (${formatDelta(diff.readiness.scoreDelta)})`,
-  );
+  ];
   if (diff.readiness.statusChanged) {
     lines.push(`  status: ${diff.readiness.previousStatus ?? "n/a"} -> ${diff.readiness.currentStatus ?? "n/a"}`);
   }
@@ -118,13 +117,10 @@ export function formatReleaseDiffText(diff: ReleaseDiff): string {
   if (diff.readiness.resolvedRequired.length > 0) {
     lines.push(`  resolved required: ${diff.readiness.resolvedRequired.join(", ")}`);
   }
-  lines.push(`  bom rows changed: ${diff.summary.bomChanged}`);
-  lines.push(`  outputs changed: ${diff.summary.outputsChanged}`);
   lines.push(
+    `  bom rows changed: ${diff.summary.bomChanged}`,
+    `  outputs changed: ${diff.summary.outputsChanged}`,
     `  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved} / ~${diff.summary.findingsWorsened} worse / ~${diff.summary.findingsImproved} better`,
-  );
-
-  lines.push(
     ...bomRowChangeLines(diff.fabrication.bom),
     ...outputChangeLines(diff.fabrication.outputs),
     ...findingChangeLines("new findings", diff.fabrication.findings.added),

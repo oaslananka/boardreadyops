@@ -72,16 +72,26 @@ function tierAllowingBoards(count: number): PlanTier | undefined {
  * contain as many boards as it likes, and evidence is still recorded for all of them. What
  * the plan meters is the ongoing service of watching them.
  */
+function watchLimitReason(
+  tier: PlanTier,
+  limit: number,
+  currentWatchedBoards: number,
+  next: PlanTier | undefined,
+): string {
+  if (next === undefined) {
+    return `Watching ${currentWatchedBoards + 1} boards is beyond every published plan. Contact us to size a plan.`;
+  }
+  const boardWord = limit === 1 ? "board" : "boards";
+  return `The ${tier} plan watches ${limit} ${boardWord}. Upgrade to ${next} to watch more.`;
+}
+
 export function canWatchAnotherBoard(tier: PlanTier, currentWatchedBoards: number): EntitlementDecision {
   const limit = limits[tier].watchedBoards;
   if (currentWatchedBoards < limit) return { allowed: true };
   const next = tierAllowingBoards(currentWatchedBoards + 1);
   return {
     allowed: false,
-    reason:
-      next === undefined
-        ? `Watching ${currentWatchedBoards + 1} boards is beyond every published plan. Contact us to size a plan.`
-        : `The ${tier} plan watches ${limit} board${limit === 1 ? "" : "s"}. Upgrade to ${next} to watch more.`,
+    reason: watchLimitReason(tier, limit, currentWatchedBoards, next),
     limit,
     current: currentWatchedBoards,
     requiredTier: next,

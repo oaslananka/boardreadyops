@@ -214,6 +214,7 @@ async function repositoryCheck(root: string, configInput?: string): Promise<Doct
       }),
     );
   }
+  const projectStatus = projects.length === 1 ? "pass" : "warn";
   const projectItem =
     projects.length === 0
       ? item("warn", "No KiCad projects discovered.", {
@@ -221,14 +222,10 @@ async function repositoryCheck(root: string, configInput?: string): Promise<Doct
           messageKey: "doctor.repository.noProjects",
           recommendationKey: "doctor.recommendation.repository.projects",
         })
-      : item(
-          projects.length === 1 ? "pass" : "warn",
-          `${projects.length} KiCad project${plural(projects.length)} discovered.`,
-          {
-            messageKey: "doctor.repository.projectsDiscovered",
-            messageParams: { count: projects.length },
-          },
-        );
+      : item(projectStatus, `${projects.length} KiCad project${plural(projects.length)} discovered.`, {
+          messageKey: "doctor.repository.projectsDiscovered",
+          messageParams: { count: projects.length },
+        });
 
   items.push(
     projectItem,

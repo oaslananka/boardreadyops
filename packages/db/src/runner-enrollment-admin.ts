@@ -317,7 +317,7 @@ function revokePsqlInvocation(params: readonly unknown[]): PsqlInvocation {
     typeof actorId !== "string" ||
     typeof reason !== "string"
   ) {
-    throw new Error("runner revocation database parameters were invalid");
+    throw new TypeError("runner revocation database parameters were invalid");
   }
   return {
     variables: {

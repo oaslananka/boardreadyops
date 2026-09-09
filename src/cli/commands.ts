@@ -355,7 +355,7 @@ export function registerAllCommands(
       .option("--server <url>", "BoardReadyOps cloud server URL")
       .option("--title <title>", "review title")
       .option("--repo <repo>", "target repository identifier")
-      .option("--pr <number>", "pull request number", (v) => Number(v)),
+      .option("--pr <number>", "pull request number", Number),
   ).action(async (pathInput: string | undefined, options: ReviewPublishOptions) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });

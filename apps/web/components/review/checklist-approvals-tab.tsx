@@ -6,19 +6,24 @@ import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Panel, StatusBadge } from "../ui.js";
 
+function approvalStatusTone(status: DemoApproval["status"]): string {
+  if (status === "approved") return "pass";
+  return status === "invalidated" ? "warning" : "failed";
+}
+
 export function ChecklistApprovalsTab({
   checklist,
   approvals,
   evidenceDigest,
   onToggleChecklist,
   onAddChecklist,
-}: {
+}: Readonly<{
   checklist: DemoChecklistItem[];
   approvals: DemoApproval[];
   evidenceDigest: string;
   onToggleChecklist?: (id: string, completed: boolean) => void;
   onAddChecklist?: (title: string) => void;
-}) {
+}>) {
   const [newItemTitle, setNewItemTitle] = useState("");
   const newItemFieldId = useId();
 
@@ -135,12 +140,7 @@ export function ChecklistApprovalsTab({
                         ) : null}
                       </td>
                       <td className="py-2 pr-3">
-                        <StatusBadge
-                          value={
-                            app.status === "approved" ? "pass" : app.status === "invalidated" ? "warning" : "failed"
-                          }
-                          label={app.status}
-                        />
+                        <StatusBadge value={approvalStatusTone(app.status)} label={app.status} />
                       </td>
                       <td className="py-2 pr-3">
                         {app.reason ?? "—"}

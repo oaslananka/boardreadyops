@@ -331,7 +331,9 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
 
       return rows(result).map((row): BoardBomExposureEntry => {
         const raw = row.matches;
-        const parsed = Array.isArray(raw) ? raw : typeof raw === "string" ? JSON.parse(raw) : [];
+        let parsed: Record<string, unknown>[] = [];
+        if (Array.isArray(raw)) parsed = raw as Record<string, unknown>[];
+        else if (typeof raw === "string") parsed = JSON.parse(raw) as Record<string, unknown>[];
         return {
           boardId: required(row, "board_id"),
           repositoryId: required(row, "repository_id"),
@@ -339,9 +341,9 @@ export function createSqlBoardBomStore(executor: SqlQueryExecutor, options: Boar
           displayName: required(row, "display_name"),
           snapshotId: required(row, "snapshot_id"),
           capturedAt: new Date(row.captured_at as string | number | Date).toISOString(),
-          matches: (parsed as Record<string, unknown>[]).map((match) => ({
-            reference: String(match.reference ?? ""),
-            mpn: String(match.mpn ?? ""),
+          matches: parsed.map((match) => ({
+            reference: typeof match.reference === "string" ? match.reference : "",
+            mpn: typeof match.mpn === "string" ? match.mpn : "",
             manufacturer: typeof match.manufacturer === "string" ? match.manufacturer : undefined,
             quantity: typeof match.quantity === "number" ? match.quantity : undefined,
           })),

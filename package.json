@@ -171,7 +171,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@unlighthouse/core": "0.18.0",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "axe-core": "4.13.0",
@@ -197,7 +197,7 @@
     "typedoc-plugin-markdown": "4.12.0",
     "typescript": "6.0.3",
     "vite": "8.2.1",
-    "vitest": "4.1.10",
+    "vitest": "4.1.11",
     "zod": "4.4.3"
   },
   "publishConfig": {

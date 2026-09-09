@@ -71,13 +71,13 @@ export function createCycloneDxBom({ packageJson, lockfile, timestamp, serialNum
 
 function rootDependencyEntries(importer = {}) {
   return [
-    ...dependencyEntriesFromLockEntries(importer.dependencies, "required"),
-    ...dependencyEntriesFromLockEntries(importer.devDependencies, "optional"),
-    ...dependencyEntriesFromLockEntries(importer.optionalDependencies, "optional"),
+    ...dependencyEntriesFromLockEntries("required", importer.dependencies),
+    ...dependencyEntriesFromLockEntries("optional", importer.devDependencies),
+    ...dependencyEntriesFromLockEntries("optional", importer.optionalDependencies),
   ];
 }
 
-function dependencyEntriesFromLockEntries(entries = {}, scope) {
+function dependencyEntriesFromLockEntries(scope, entries = {}) {
   return Object.entries(entries).map(([name, metadata]) =>
     dependencyIdentity(name, resolvedRawVersion(metadata), scope),
   );
@@ -148,7 +148,7 @@ function snapshotDependencyRefs(snapshots, identity, componentRefs) {
 
 function snapshotDependencyEntriesForIdentity(snapshots, identity, scope) {
   return snapshotEntriesForIdentity(snapshots, identity).flatMap((snapshot) =>
-    snapshotDependencyEntries(snapshot, scope),
+    snapshotDependencyEntries(scope, snapshot),
   );
 }
 
@@ -161,10 +161,10 @@ function snapshotEntriesForIdentity(snapshots, identity) {
   return exactSnapshot.concat(peerQualifiedSnapshots);
 }
 
-function snapshotDependencyEntries(snapshot = {}, scope) {
+function snapshotDependencyEntries(scope, snapshot = {}) {
   return [
-    ...dependencyEntriesFromLockEntries(snapshot.dependencies, scope),
-    ...dependencyEntriesFromLockEntries(snapshot.optionalDependencies, "optional"),
+    ...dependencyEntriesFromLockEntries(scope, snapshot.dependencies),
+    ...dependencyEntriesFromLockEntries("optional", snapshot.optionalDependencies),
   ];
 }
 

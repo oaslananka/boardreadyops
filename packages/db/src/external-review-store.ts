@@ -26,6 +26,11 @@ export function generateExternalReviewToken(): { rawToken: string; tokenHash: st
   return { rawToken, tokenHash };
 }
 
+function optionalIsoDate(value: string | Date | null): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.toISOString();
+}
+
 function mapInvitation(row: StoredExternalReviewInvitationRow): ExternalReviewInvitation {
   return {
     id: row.id,
@@ -36,11 +41,7 @@ function mapInvitation(row: StoredExternalReviewInvitationRow): ExternalReviewIn
     scope: row.scope,
     tokenHash: row.token_hash,
     expiresAt: typeof row.expires_at === "string" ? row.expires_at : row.expires_at.toISOString(),
-    revokedAt: row.revoked_at
-      ? typeof row.revoked_at === "string"
-        ? row.revoked_at
-        : row.revoked_at.toISOString()
-      : null,
+    revokedAt: optionalIsoDate(row.revoked_at),
     createdById: row.created_by_id,
     createdAt: typeof row.created_at === "string" ? row.created_at : row.created_at.toISOString(),
   };

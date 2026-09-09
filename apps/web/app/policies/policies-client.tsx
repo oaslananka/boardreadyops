@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { Dialog } from "../../components/dialog.js";
 import { Button } from "../../components/ui/button.js";
 import { Input } from "../../components/ui/input.js";
@@ -647,6 +647,48 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
   const scopeSummary = summarizeScope(policies ?? []);
   const enforcementSummary = summarizeEnforcement(policies ?? []);
 
+  let policiesContent: ReactNode;
+  if (policies === null) {
+    policiesContent = (
+      <div className="mt-3 rounded-md border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+        Loading governance policies…
+      </div>
+    );
+  } else if (policies.length === 0) {
+    policiesContent = (
+      <div className="mt-3">
+        <Panel title="No Policies Configured">
+          <EmptyState
+            title="No governance policies configured yet"
+            action={
+              <Button type="button" onClick={() => setShowBuilder(true)}>
+                + New Governance Policy
+              </Button>
+            }
+          >
+            <p>
+              Hardware reviews currently use default open policy behavior. Creating a policy enables explicit release
+              gates, required approver roles, and mandatory verification checklists.
+            </p>
+          </EmptyState>
+        </Panel>
+      </div>
+    );
+  } else {
+    policiesContent = (
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {policies.map((policy) => (
+          <PolicyCard
+            key={policy.id}
+            policy={policy}
+            onEdit={startEditing}
+            onDelete={(id, name) => setPendingDelete({ id, name })}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <PolicyInheritanceDiagram />
@@ -717,40 +759,7 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
           </p>
         </header>
 
-        {policies === null ? (
-          <div className="mt-3 rounded-md border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-            Loading governance policies…
-          </div>
-        ) : policies.length === 0 ? (
-          <div className="mt-3">
-            <Panel title="No Policies Configured">
-              <EmptyState
-                title="No governance policies configured yet"
-                action={
-                  <Button type="button" onClick={() => setShowBuilder(true)}>
-                    + New Governance Policy
-                  </Button>
-                }
-              >
-                <p>
-                  Hardware reviews currently use default open policy behavior. Creating a policy enables explicit
-                  release gates, required approver roles, and mandatory verification checklists.
-                </p>
-              </EmptyState>
-            </Panel>
-          </div>
-        ) : (
-          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {policies.map((policy) => (
-              <PolicyCard
-                key={policy.id}
-                policy={policy}
-                onEdit={startEditing}
-                onDelete={(id, name) => setPendingDelete({ id, name })}
-              />
-            ))}
-          </div>
-        )}
+        {policiesContent}
       </section>
 
       {pendingDelete ? (

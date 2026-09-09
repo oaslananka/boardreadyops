@@ -19,7 +19,8 @@ checkTrackedOperationalFiles();
 checkUnusedDependencies();
 
 if (failures.length > 0) {
-  throw new Error(`garbage collection checks failed:\n${failures.map((entry) => `- ${entry}`).join("\n")}`);
+  const failureList = failures.map((entry) => `- ${entry}`).join("\n");
+  throw new Error(`garbage collection checks failed:\n${failureList}`);
 }
 
 function run(command, args) {

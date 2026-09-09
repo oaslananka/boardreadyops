@@ -52,16 +52,29 @@ async function buildBundle(entryPoint, outfile, mode) {
   }
 }
 
+function trimTrailingHorizontalWhitespace(text) {
+  return text
+    .split("\n")
+    .map((line) => {
+      const carriageReturn = line.endsWith("\r");
+      const end = carriageReturn ? line.length - 1 : line.length;
+      let index = end;
+      while (index > 0 && (line[index - 1] === " " || line[index - 1] === "\t")) index -= 1;
+      return `${line.slice(0, index)}${carriageReturn ? "\r" : ""}`;
+    })
+    .join("\n");
+}
+
 async function postprocessBundles(files) {
   const transitiveUnicodeToken = `"Bidi_${"Mi"}${"rr"}${"or"}${"ed"}"`;
   const splitUnicodeToken = `"Bidi_"+"Mi"+"rr"+"or"+"ed"`;
   for (const file of files) {
     const text = await readFile(file, "utf8");
-    const cleaned = text
-      .replace(/node_modules\/\.pnpm\/[^/]+\/node_modules\//g, "node_modules/")
-      .replaceAll(transitiveUnicodeToken, splitUnicodeToken)
-      .replace(/[ \t]+(\r?\n)/g, "$1")
-      .replace(/\r?\n?$/, "\n");
+    const cleaned = trimTrailingHorizontalWhitespace(
+      text
+        .replace(/node_modules\/\.pnpm\/[^/]+\/node_modules\//g, "node_modules/")
+        .replaceAll(transitiveUnicodeToken, splitUnicodeToken),
+    ).replace(/\r?\n?$/, "\n");
     if (cleaned !== text) {
       await writeFile(file, cleaned, "utf8");
     }

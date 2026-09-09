@@ -177,8 +177,9 @@ function structuredEntry(
 
 function formatText(entry: Record<string, unknown>): string {
   const level = String(entry.level);
-  const prefix =
-    level === "critical" || level === "error" ? pc.red(level) : level === "warn" ? pc.yellow(level) : level;
+  let prefix = level;
+  if (level === "critical" || level === "error") prefix = pc.red(level);
+  else if (level === "warn") prefix = pc.yellow(level);
   const fields = { ...entry };
   delete fields.ts;
   delete fields.level;
@@ -246,7 +247,7 @@ function redactString(value: string, projectRoot: string | undefined, maxFieldLe
       const [name] = match.split("=");
       return `${name}=[REDACTED]`;
     })
-    .replace(/\b(?:ghp|github_pat|npm)_[A-Za-z0-9_]{20,}\b/g, "[REDACTED]");
+    .replace(/\b(?:ghp|github_pat|npm)_\w{20,}\b/g, "[REDACTED]");
   if (projectRoot) {
     for (const root of new Set([projectRoot, projectRoot.replaceAll("/", "\\")])) {
       output = output.replaceAll(root, "<project>");

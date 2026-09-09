@@ -267,7 +267,7 @@ export class ReviewStore {
 
     let nextCursor: string | undefined;
     if (hasMore && items.length > 0) {
-      const last = items[items.length - 1];
+      const last = items.at(-1);
       if (last) {
         nextCursor = Buffer.from(
           JSON.stringify({ updatedAt: new Date(last.updated_at).toISOString(), id: last.id }),

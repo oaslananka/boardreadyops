@@ -153,7 +153,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@stryker-mutator/vitest-runner@9.6.1`
   - Description: A plugin to use the vitest test runner and framework in Stryker, the JavaScript mutation testing framework
   - Homepage: https://stryker-mutator.io/docs/stryker-js/vitest-runner
-- `@swc/helpers@0.5.15`
+- `@swc/helpers@0.5.23`
   - Description: External helpers for the swc project.
   - Homepage: https://swc.rs
 - `@webassemblyjs/leb128@1.13.2`
@@ -183,7 +183,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `bare-url@2.4.3`
   - Description: WHATWG URL implementation for JavaScript
   - Homepage: https://github.com/holepunchto/bare-url
-- `baseline-browser-mapping@2.10.30`, `baseline-browser-mapping@2.11.19`
+- `baseline-browser-mapping@2.11.19`
   - Description: A library for obtaining browser versions with their maximum supported Baseline feature set and Widely Available status.
   - Homepage: https://github.com/web-platform-dx/baseline-browser-mapping#readme
 - `before-after-hook@4.0.0`
@@ -286,7 +286,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `semifies@1.0.0`
   - Description: Slimmed down satisfies from semver
   - Homepage: https://github.com/holepunchto/semifies
-- `sharp@0.35.3`
+- `sharp@0.35.4`
   - Description: High performance Node.js image processing, the fastest module to resize JPEG, PNG, WebP, GIF, AVIF and TIFF images
   - Homepage: https://sharp.pixelplumbing.com
 - `text-decoder@1.2.7`
@@ -415,7 +415,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 
 ## CC-BY-4.0
 
-- `caniuse-lite@1.0.30001793`, `caniuse-lite@1.0.30001810`
+- `caniuse-lite@1.0.30001810`
   - Description: A smaller version of caniuse-db, with only the essentials!
   - Homepage: https://github.com/browserslist/caniuse-lite#readme
 
@@ -949,7 +949,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@modelcontextprotocol/sdk@1.30.0`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
-- `@next/env@16.2.12`
+- `@next/env@16.3.3`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
 - `@nodable/entities@2.1.0`
@@ -1523,28 +1523,28 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@visx/shape@4.0.1-alpha.0`
   - Description: visx shape
   - Homepage: https://github.com/airbnb/visx#readme
-- `@vitest/coverage-v8@4.1.10`
+- `@vitest/coverage-v8@4.1.11`
   - Description: V8 coverage provider for Vitest
   - Homepage: https://vitest.dev/guide/coverage
-- `@vitest/expect@4.1.10`
+- `@vitest/expect@4.1.11`
   - Description: Jest's expect matchers as a Chai plugin
   - Homepage: https://vitest.dev/api/expect
-- `@vitest/mocker@4.1.10`
+- `@vitest/mocker@4.1.11`
   - Description: Vitest module mocker implementation
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/mocker
-- `@vitest/pretty-format@4.1.10`
+- `@vitest/pretty-format@4.1.11`
   - Description: Fork of pretty-format with support for ESM
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/pretty-format
-- `@vitest/runner@4.1.10`
+- `@vitest/runner@4.1.11`
   - Description: Vitest test runner
   - Homepage: https://vitest.dev/api/advanced/runner
-- `@vitest/snapshot@4.1.10`
+- `@vitest/snapshot@4.1.11`
   - Description: Vitest snapshot manager
   - Homepage: https://vitest.dev/guide/snapshot
-- `@vitest/spy@4.1.10`
+- `@vitest/spy@4.1.11`
   - Description: Lightweight Jest compatible spy implementation
   - Homepage: https://vitest.dev/api/mock
-- `@vitest/utils@4.1.10`
+- `@vitest/utils@4.1.11`
   - Description: Shared Vitest utility functions
   - Homepage: https://github.com/vitest-dev/vitest/tree/main/packages/utils
 - `@vue/compiler-core@3.5.41`
@@ -1952,7 +1952,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `es-errors@1.3.0`
   - Description: A simple cache for a few of the JS Error constructors.
   - Homepage: https://github.com/ljharb/es-errors#readme
-- `es-module-lexer@2.1.0`, `es-module-lexer@2.3.2`
+- `es-module-lexer@2.3.2`
   - Description: Lexes ES modules returning their import/export metadata
   - Homepage: https://github.com/guybedford/es-module-lexer#readme
 - `es-object-atoms@1.1.1`
@@ -2152,7 +2152,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `hey-listen@1.0.8`
   - Description: Warning and invariant dev-ex messaging.
   - Homepage: https://github.com/Popmotion/hey-listen#readme
-- `hono@4.13.3`
+- `hono@4.13.5`
   - Description: Web framework built on Web Standards
   - Homepage: https://hono.dev
 - `hookable@6.1.1`
@@ -2274,7 +2274,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `js-tokens@4.0.0`, `js-tokens@10.0.0`
   - Description: Tiny JavaScript tokenizer.
   - Homepage: https://github.com/lydell/js-tokens#readme
-- `js-yaml@4.3.1`, `js-yaml@5.3.0`
+- `js-yaml@4.3.2`, `js-yaml@5.3.0`
   - Description: YAML 1.2 parser and serializer
   - Homepage: https://github.com/nodeca/js-yaml#readme
 - `jsesc@3.1.0`
@@ -2465,7 +2465,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `neo-async@2.6.2`
   - Description: Neo-Async is a drop-in replacement for Async, it almost fully covers its functionality and runs faster
   - Homepage: https://github.com/suguru03/neo-async
-- `next@16.2.12`
+- `next@16.3.3`
   - Description: The React Framework
   - Homepage: https://nextjs.org
 - `next-themes@0.4.6`
@@ -2599,7 +2599,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `pkg-types@1.3.1`, `pkg-types@2.3.1`
   - Description: Node.js utilities and TypeScript definitions for `package.json` and `tsconfig.json`
   - Homepage: https://github.com/unjs/pkg-types#readme
-- `postcss@8.5.26`
+- `postcss@8.5.23`, `postcss@8.5.26`
   - Description: Tool for transforming styles with JS plugins
   - Homepage: https://postcss.org/
 - `postgres-array@2.0.0`
@@ -2860,7 +2860,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `statuses@2.0.2`
   - Description: HTTP status utility
   - Homepage: https://github.com/jshttp/statuses#readme
-- `std-env@3.10.0`, `std-env@4.1.0`, `std-env@4.2.0`
+- `std-env@3.10.0`, `std-env@4.2.0`
   - Description: Runtime agnostic JS utils
   - Homepage: https://github.com/unjs/std-env#readme
 - `streamx@2.25.0`
@@ -3073,7 +3073,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `vite@8.0.16`
   - Description: Native-ESM powered web dev build tool
   - Homepage: https://vite.dev
-- `vitest@4.1.10`
+- `vitest@4.1.11`
   - Description: Next generation testing framework powered by Vite
   - Homepage: https://vitest.dev
 - `vue@3.5.41`

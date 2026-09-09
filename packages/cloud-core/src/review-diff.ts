@@ -155,7 +155,8 @@ export function computeFindingDiff(
 // localeCompare's collation can vary across ICU builds/locales — it must stay byte-identical
 // everywhere the digest is computed.
 function ordinalCompare(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
 }
 
 export function computeEvidenceDigest(input: EvidenceDigestInput): string {

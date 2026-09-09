@@ -12,7 +12,7 @@ async function getOwnedPolicyOrError(
   tenantId: string,
 ): Promise<ReviewPolicyRecord | Response> {
   const existing = await store.getPolicyById(id);
-  if (!existing || existing.tenantId !== tenantId) {
+  if (existing?.tenantId !== tenantId) {
     return Response.json({ ok: false, error: "Policy not found" }, { status: 404 });
   }
   return existing;

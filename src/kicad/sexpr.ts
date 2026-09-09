@@ -35,6 +35,8 @@ export interface SexprDocument {
   errors: SexprParseError[];
 }
 
+type SexprSearchRoot = SexprDocument | SexprListNode | readonly SexprNode[];
+
 interface MutablePosition {
   offset: number;
   line: number;
@@ -76,7 +78,7 @@ export function sexprStringAfter(block: string, head: string): string | undefine
 }
 
 export function findSexprLists(
-  root: SexprDocument | SexprListNode | readonly SexprNode[],
+  root: SexprSearchRoot,
   head: string,
   options: { recursive?: boolean } = {},
 ): SexprListNode[] {

@@ -270,7 +270,7 @@ function t(key, params = {}, locale = resolveLocale()) {
   if (template.includes("{findingWord}")) {
     values.findingWord = typeof params.count === "number" && params.count === 1 ? catalog["report.finding.word"] : catalog["report.finding.word.plural"];
   }
-  const rendered = template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => {
+  const rendered = template.replace(/\{(\w+)\}/g, (match, name) => {
     const value = values[name];
     return value === void 0 ? match : String(value);
   });
@@ -10485,16 +10485,21 @@ var require_loader = __commonJS({
         state.result += _result;
       }
     }
+    function chargeMergeWork(state) {
+      state.totalMergeKeys++;
+      if (state.maxTotalMergeKeys !== -1 && state.totalMergeKeys > state.maxTotalMergeKeys) {
+        throwError2(state, "merge keys exceeded maxTotalMergeKeys (" + state.maxTotalMergeKeys + ")");
+      }
+    }
     function mergeMappings(state, destination, source, overridableKeys) {
       if (!common.isObject(source)) {
         throwError2(state, "cannot merge mappings; the provided source object is unacceptable");
       }
+      chargeMergeWork(state);
       const sourceKeys = Object.keys(source);
       for (let index = 0, quantity = sourceKeys.length; index < quantity; index += 1) {
         const key = sourceKeys[index];
-        if (state.maxTotalMergeKeys !== -1 && ++state.totalMergeKeys > state.maxTotalMergeKeys) {
-          throwError2(state, "merge keys exceeded maxTotalMergeKeys (" + state.maxTotalMergeKeys + ")");
-        }
+        chargeMergeWork(state);
         if (!_hasOwnProperty.call(destination, key)) {
           setProperty(destination, key, source[key]);
           overridableKeys[key] = true;
@@ -10522,6 +10527,9 @@ var require_loader = __commonJS({
       }
       if (keyTag === "tag:yaml.org,2002:merge") {
         if (Array.isArray(valueNode)) {
+          if (valueNode.length > 100) {
+            throwError2(state, "abnormal merge sequence size");
+          }
           for (let index = 0, quantity = valueNode.length; index < quantity; index += 1) {
             mergeMappings(state, _result, valueNode[index], overridableKeys);
           }
@@ -35400,7 +35408,10 @@ function canonicalJsonStringify(obj) {
   if (Array.isArray(obj)) {
     return `[${obj.map(canonicalJsonStringify).join(",")}]`;
   }
-  const sortedKeys = Object.keys(obj).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  const sortedKeys = Object.keys(obj).sort((a, b) => {
+    if (a === b) return 0;
+    return a < b ? -1 : 1;
+  });
   const pairs = sortedKeys.map((key) => {
     const val = obj[key];
     return `${JSON.stringify(key)}:${canonicalJsonStringify(val)}`;
@@ -36173,9 +36184,11 @@ async function writeReleaseEvidenceBundle(root, result, options) {
   await import_promises19.default.mkdir(import_node_path57.default.join(outputDir, BUNDLE_LAYOUT.reports), { recursive: true });
   await import_promises19.default.mkdir(import_node_path57.default.join(outputDir, BUNDLE_LAYOUT.artifacts), { recursive: true });
   const artifacts = [];
-  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)));
-  artifacts.push(await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)));
-  artifacts.push(...await copyManufacturingArtifacts(root, outputDir));
+  artifacts.push(
+    await writeReport(outputDir, "reports/boardreadyops-report.json", formatJson(result)),
+    await writeReport(outputDir, "reports/boardreadyops-report.md", formatMarkdown(result)),
+    ...await copyManufacturingArtifacts(root, outputDir)
+  );
   if (options.includeGenerated) {
     artifacts.push(...await copyGeneratedOutputs(root, outputDir, options.includeGenerated));
   }
@@ -43375,7 +43388,7 @@ function envValue(env, name) {
 async function postJson(fetcher, url2, body) {
   const activeFetch = fetcher ?? globalThis.fetch;
   if (typeof activeFetch !== "function") {
-    throw new Error("fetch is not available");
+    throw new TypeError("fetch is not available");
   }
   const response = await activeFetch(url2, {
     method: "POST",
@@ -43453,7 +43466,8 @@ async function sendSmtpEmail(smtpUrl, message, options = {}) {
   if (parsed.protocol !== "smtp:" && parsed.protocol !== "smtps:") {
     throw new Error("SMTP URL must use smtp or smtps.");
   }
-  const port = parsed.port ? Number.parseInt(parsed.port, 10) : parsed.protocol === "smtps:" ? 465 : 25;
+  let port = parsed.protocol === "smtps:" ? 465 : 25;
+  if (parsed.port) port = Number.parseInt(parsed.port, 10);
   const secure = parsed.protocol === "smtps:";
   const socket = secure ? import_node_tls.default.connect({ host: parsed.hostname, port, servername: parsed.hostname }) : import_node_net.default.connect({ host: parsed.hostname, port });
   const client = new SmtpClient(socket, options.timeoutMs ?? 1e4);
@@ -43984,7 +43998,7 @@ function refIgnored(reference, patterns) {
   return patterns.some((pattern) => typeof pattern === "string" && globLike(pattern, reference));
 }
 function globLike(pattern, value) {
-  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*");
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, String.raw`\$&`).replaceAll("*", ".*");
   return new RegExp(`^${escaped}$`, "i").test(value);
 }
 
@@ -45299,7 +45313,10 @@ function lifecycleFindings(row, databaseStatus, context) {
   }
   const ruleConfig2 = configFor(context, "bom.lifecycle");
   const canonicalStatus = classifyLifecycleStatus(lifecycle);
-  const severity = typeof ruleConfig2.severity === "string" ? configuredSeverity(context, "bom.lifecycle", "medium") : canonicalStatus === "eol" || canonicalStatus === "obsolete" ? "high" : configuredSeverity(context, "bom.lifecycle", "medium");
+  let severity = configuredSeverity(context, "bom.lifecycle", "medium");
+  if (typeof ruleConfig2.severity !== "string" && (canonicalStatus === "eol" || canonicalStatus === "obsolete")) {
+    severity = "high";
+  }
   return [
     finding(context, {
       ruleId: "bom.lifecycle",
@@ -46071,8 +46088,8 @@ function defaultKicadCliCandidates() {
   if (process.platform === "win32") {
     return [
       "kicad-cli",
-      "C:\\Program Files\\KiCad\\10.1\\bin\\kicad-cli.exe",
-      "C:\\Program Files\\KiCad\\10.0\\bin\\kicad-cli.exe"
+      String.raw`C:\Program Files\KiCad\10.1\bin\kicad-cli.exe`,
+      String.raw`C:\Program Files\KiCad\10.0\bin\kicad-cli.exe`
     ];
   }
   if (process.platform === "darwin") {
@@ -46439,7 +46456,7 @@ function parseMeta(comment) {
   };
 }
 function matchMeta(comment, key) {
-  return new RegExp(`\\b${key}\\s*=\\s*(\\S+)`, "i").exec(comment)?.[1];
+  return new RegExp(String.raw`\b${key}\s*=\s*(\S+)`, "i").exec(comment)?.[1];
 }
 
 // src/rules/firmware/shared.ts
@@ -46487,7 +46504,10 @@ var pinmapSchema = external_exports.object({
 async function loadPinmap(file2) {
   try {
     const lowered = file2.toLowerCase();
-    const document = lowered.endsWith(".json") ? await readJsonPinmap(file2) : lowered.endsWith(".csv") ? await readCsvPinmap(file2) : await readYamlPinmap(file2);
+    let document;
+    if (lowered.endsWith(".json")) document = await readJsonPinmap(file2);
+    else if (lowered.endsWith(".csv")) document = await readCsvPinmap(file2);
+    else document = await readYamlPinmap(file2);
     const parsed = pinmapSchema.safeParse(document);
     if (!parsed.success) {
       return { errors: parsed.error.issues.map((issue2) => `${issue2.path.join(".")}: ${issue2.message}`) };
@@ -47108,7 +47128,7 @@ function missingReferences(text, references) {
   if (uniqueReferences.length === 0) {
     return [];
   }
-  const alternatives = uniqueReferences.map((reference) => reference.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const alternatives = uniqueReferences.map((reference) => reference.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)).join("|");
   const found = /* @__PURE__ */ new Set();
   const matcher = new RegExp(`(^|[^A-Za-z0-9_])(${alternatives})(?=[^A-Za-z0-9_]|$)`, "gm");
   for (const match of text.matchAll(matcher)) {
@@ -48890,8 +48910,8 @@ var changelogPresentRule = rule(
   }
 );
 function changelogHasRevision(text, revision2) {
-  const escaped = revision2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^##\\s+\\[?v?${escaped}\\]?\\b`, "m").test(text);
+  const escaped = revision2.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`^##\s+\[?v?${escaped}\]?\b`, "m").test(text);
 }
 
 // src/rules/release/revision-set.ts
@@ -48915,7 +48935,7 @@ var revisionSetRule = rule(
     }
     const output = [];
     const config2 = configFor(context, "release.revision-set");
-    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : "^v?\\d+\\.\\d+(?:\\.\\d+)?$";
+    const tagPattern = typeof config2["tag-pattern"] === "string" ? config2["tag-pattern"] : String.raw`^v?\d+\.\d+(?:\.\d+)?$`;
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
@@ -49269,7 +49289,7 @@ function bomRiskSummaryFromFindings(findings) {
     const d = f.details;
     const factors = d.factors || {};
     return {
-      reference: typeof d.reference === "string" ? d.reference : String(d.reference ?? ""),
+      reference: typeof d.reference === "string" ? d.reference : "",
       mpn: typeof d.mpn === "string" ? d.mpn : void 0,
       manufacturer: typeof d.manufacturer === "string" ? d.manufacturer : void 0,
       riskScore: typeof d.riskScore === "number" ? d.riskScore : 0,
@@ -49589,7 +49609,9 @@ function structuredEntry(level, message, fields, options) {
 }
 function formatText(entry) {
   const level = String(entry.level);
-  const prefix = level === "critical" || level === "error" ? import_picocolors.default.red(level) : level === "warn" ? import_picocolors.default.yellow(level) : level;
+  let prefix = level;
+  if (level === "critical" || level === "error") prefix = import_picocolors.default.red(level);
+  else if (level === "warn") prefix = import_picocolors.default.yellow(level);
   const fields = { ...entry };
   delete fields.ts;
   delete fields.level;
@@ -49642,7 +49664,7 @@ function redactString(value, projectRoot, maxFieldLength, key) {
   let output = value.replace(/Authorization:\s*Bearer\s+\S+/gi, "Authorization: Bearer [REDACTED]").replace(/\b(?:api[_-]?key|token|access_token|refresh_token|client_secret|password)=([^&\s]+)/gi, (match) => {
     const [name] = match.split("=");
     return `${name}=[REDACTED]`;
-  }).replace(/\b(?:ghp|github_pat|npm)_[A-Za-z0-9_]{20,}\b/g, "[REDACTED]");
+  }).replace(/\b(?:ghp|github_pat|npm)_\w{20,}\b/g, "[REDACTED]");
   if (projectRoot) {
     for (const root of /* @__PURE__ */ new Set([projectRoot, projectRoot.replaceAll("/", "\\")])) {
       output = output.replaceAll(root, "<project>");
@@ -53116,18 +53138,15 @@ async function repositoryCheck(root, configInput) {
       })
     );
   }
+  const projectStatus = projects.length === 1 ? "pass" : "warn";
   const projectItem = projects.length === 0 ? item("warn", "No KiCad projects discovered.", {
     recommendation: "Add a .kicad_pro project before CI.",
     messageKey: "doctor.repository.noProjects",
     recommendationKey: "doctor.recommendation.repository.projects"
-  }) : item(
-    projects.length === 1 ? "pass" : "warn",
-    `${projects.length} KiCad project${plural(projects.length)} discovered.`,
-    {
-      messageKey: "doctor.repository.projectsDiscovered",
-      messageParams: { count: projects.length }
-    }
-  );
+  }) : item(projectStatus, `${projects.length} KiCad project${plural(projects.length)} discovered.`, {
+    messageKey: "doctor.repository.projectsDiscovered",
+    messageParams: { count: projects.length }
+  });
   items.push(
     projectItem,
     gerbers.length === 0 ? item("fail", "No Gerber outputs found.", {
@@ -53399,8 +53418,11 @@ async function explainCommand(ruleId6, pathInput, streams) {
 function formatExplanation(explanation) {
   const lines = [explanation.ruleId, "", explanation.summary];
   for (const section of explanation.sections) {
-    lines.push("", section.title);
-    lines.push(...section.lines.length > 0 ? section.lines.map((line) => `- ${line}`) : ["- none"]);
+    lines.push(
+      "",
+      section.title,
+      ...section.lines.length > 0 ? section.lines.map((line) => `- ${line}`) : ["- none"]
+    );
   }
   return `${lines.join("\n")}
 `;
@@ -53599,12 +53621,12 @@ function setRevision(text, revision2, rootForm) {
   if (/\(title_block\b/.test(text)) {
     return text.replace(/\(title_block\b/, `(title_block (rev "${revision2}")`);
   }
-  return text.replace(new RegExp(`\\(${rootForm}\\b`), `(${rootForm}
+  return text.replace(new RegExp(String.raw`\(${rootForm}\b`), `(${rootForm}
   (title_block (rev "${revision2}"))`);
 }
 function changelogHasRevision2(text, revision2) {
-  const escaped = revision2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^##\\s+\\[?v?${escaped}\\]?\\b`, "m").test(text);
+  const escaped = revision2.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  return new RegExp(String.raw`^##\s+\[?v?${escaped}\]?\b`, "m").test(text);
 }
 function createChangelog(revisions) {
   return `# Changelog
@@ -54599,6 +54621,10 @@ async function gitState(root) {
     return {};
   }
 }
+async function ensureGenerateStepOutputDirectory(absoluteOutput, step) {
+  const directory = step.isDirectory ? absoluteOutput : import_node_path52.default.dirname(absoluteOutput);
+  await import_promises17.default.mkdir(directory, { recursive: true });
+}
 async function runGenerate(recipe, options) {
   const outputDir = import_node_path52.default.resolve(options.outputDir);
   const available = {
@@ -54616,11 +54642,7 @@ async function runGenerate(recipe, options) {
   const artifacts = [];
   for (const step of plan.steps) {
     const absoluteOutput = import_node_path52.default.join(outputDir, step.output);
-    if (step.isDirectory) {
-      await import_promises17.default.mkdir(absoluteOutput, { recursive: true });
-    } else {
-      await import_promises17.default.mkdir(import_node_path52.default.dirname(absoluteOutput), { recursive: true });
-    }
+    await ensureGenerateStepOutputDirectory(absoluteOutput, step);
     const args = generateStepArgs(step, {
       boardFile: options.boardFile,
       schematicFile: options.schematicFile,
@@ -55228,7 +55250,7 @@ function shellToken(value) {
   if (/^[A-Za-z0-9_./:=@+-]+$/.test(value)) {
     return value;
   }
-  return `'${value.replaceAll("'", "'\\''")}'`;
+  return `'${value.replaceAll("'", String.raw`'\''`)}'`;
 }
 
 // src/cli/commands/policy.ts
@@ -55425,11 +55447,10 @@ function diffReadiness(previous, current) {
   };
 }
 function formatReleaseDiffText(diff) {
-  const lines = [];
-  lines.push("Release diff");
-  lines.push(
+  const lines = [
+    "Release diff",
     `  readiness: ${formatScore(diff.readiness.previousScore)} -> ${formatScore(diff.readiness.currentScore)} (${formatDelta(diff.readiness.scoreDelta)})`
-  );
+  ];
   if (diff.readiness.statusChanged) {
     lines.push(`  status: ${diff.readiness.previousStatus ?? "n/a"} -> ${diff.readiness.currentStatus ?? "n/a"}`);
   }
@@ -55439,12 +55460,10 @@ function formatReleaseDiffText(diff) {
   if (diff.readiness.resolvedRequired.length > 0) {
     lines.push(`  resolved required: ${diff.readiness.resolvedRequired.join(", ")}`);
   }
-  lines.push(`  bom rows changed: ${diff.summary.bomChanged}`);
-  lines.push(`  outputs changed: ${diff.summary.outputsChanged}`);
   lines.push(
-    `  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved} / ~${diff.summary.findingsWorsened} worse / ~${diff.summary.findingsImproved} better`
-  );
-  lines.push(
+    `  bom rows changed: ${diff.summary.bomChanged}`,
+    `  outputs changed: ${diff.summary.outputsChanged}`,
+    `  findings: +${diff.summary.findingsAdded} / -${diff.summary.findingsRemoved} / ~${diff.summary.findingsWorsened} worse / ~${diff.summary.findingsImproved} better`,
     ...bomRowChangeLines(diff.fabrication.bom),
     ...outputChangeLines(diff.fabrication.outputs),
     ...findingChangeLines("new findings", diff.fabrication.findings.added),
@@ -55528,7 +55547,7 @@ function outputDirectory(kind) {
 }
 function baseName(source) {
   const segments = source.split("/");
-  return segments[segments.length - 1] ?? source;
+  return segments.at(-1) ?? source;
 }
 function planHandoffPackage(outputs, profile) {
   const orderedKinds = [
@@ -55585,6 +55604,9 @@ function buildHandoffManifest(profile, plan, files, generatedAt) {
     files: [...files].sort((left, right) => left.target.localeCompare(right.target))
   };
 }
+function handoffStatus(missingOutputs) {
+  return missingOutputs.length === 0 ? "ready" : `incomplete (missing ${missingOutputs.join(", ")})`;
+}
 function renderHandoffReadme(profile, plan, generatedAt) {
   const lines = [
     `# ${profile.name} manufacturer handoff package`,
@@ -55593,7 +55615,7 @@ function renderHandoffReadme(profile, plan, generatedAt) {
     "",
     `- Vendor profile: \`${profile.id}\` (${profile.name})`,
     `- Service: ${profile.service}`,
-    `- Status: ${plan.missingOutputs.length === 0 ? "ready" : `incomplete (missing ${plan.missingOutputs.join(", ")})`}`,
+    `- Status: ${handoffStatus(plan.missingOutputs)}`,
     "",
     "## Contents",
     ""
@@ -55816,7 +55838,7 @@ async function loadTrustStore(filePath) {
   const raw = await import_promises20.default.readFile(filePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) {
-    throw new Error(`trust store at ${filePath} must be a JSON array`);
+    throw new TypeError(`trust store at ${filePath} must be a JSON array`);
   }
   for (const [index, entry] of parsed.entries()) {
     if (typeof entry !== "object" || entry === null || typeof entry.keyId !== "string" || typeof entry.publicKey !== "string" || typeof entry.validFrom !== "string") {
@@ -56073,7 +56095,9 @@ function writePrepareSummary(summary, outputDir, stdout) {
   const { generate, validate: validate2 } = summary.stages;
   stdout.write(`Release prepare decision: ${summary.decision.status.toUpperCase()}
 `);
-  const generateDetail = generate.status === "generated" ? ` (${generate.artifacts ?? 0} artifacts)` : generate.reason ? ` (${generate.reason})` : "";
+  let generateDetail = "";
+  if (generate.status === "generated") generateDetail = ` (${generate.artifacts ?? 0} artifacts)`;
+  else if (generate.reason) generateDetail = ` (${generate.reason})`;
   stdout.write(`  generate: ${generate.status}${generateDetail}
 `);
   stdout.write(
@@ -56087,40 +56111,41 @@ function writePrepareSummary(summary, outputDir, stdout) {
   stdout.write(`Summary written to ${import_node_path59.default.join(outputDir, "release-prepare.json")}
 `);
 }
-async function releaseVerifyCommand(bundleInput, options, streams) {
-  const bundleDir = import_node_path59.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
-  const verification = await verifyReleaseEvidenceBundle(bundleDir);
+async function resolveReleaseVerifySignature(bundleDir, options, stderr) {
   if (options.publicKey && options.trustStore) {
-    streams.stderr.write("Pass either --public-key or --trust-store, not both.\n");
-    return 2;
+    stderr.write("Pass either --public-key or --trust-store, not both.\n");
+    return { exitCode: 2 };
   }
-  let signature;
   const signatureRequired = Boolean(options.publicKey || options.trustStore);
   if (options.trustStore) {
-    let trustStore;
     try {
-      trustStore = await loadTrustStore(import_node_path59.default.resolve(normalizePathInput(options.trustStore)));
-    } catch (error51) {
-      streams.stderr.write(
-        `Trust store could not be loaded: ${error51 instanceof Error ? error51.message : String(error51)}
-`
+      const trustStore = await loadTrustStore(import_node_path59.default.resolve(normalizePathInput(options.trustStore)));
+      const signature2 = await verifyReleaseBundleSignatureAgainstTrustStore(
+        bundleDir,
+        trustStore,
+        (/* @__PURE__ */ new Date()).toISOString()
       );
-      return 2;
-    }
-    signature = await verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustStore, (/* @__PURE__ */ new Date()).toISOString());
-  } else {
-    let trustedKey;
-    if (options.publicKey) {
-      try {
-        trustedKey = await readTextFile(import_node_path59.default.resolve(normalizePathInput(options.publicKey)));
-      } catch {
-        streams.stderr.write(`Public key not found: ${options.publicKey}
+      return { signature: signature2, signatureRequired };
+    } catch (error51) {
+      stderr.write(`Trust store could not be loaded: ${error51 instanceof Error ? error51.message : String(error51)}
 `);
-        return 2;
-      }
+      return { exitCode: 2 };
     }
-    signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
   }
+  let trustedKey;
+  if (options.publicKey) {
+    try {
+      trustedKey = await readTextFile(import_node_path59.default.resolve(normalizePathInput(options.publicKey)));
+    } catch {
+      stderr.write(`Public key not found: ${options.publicKey}
+`);
+      return { exitCode: 2 };
+    }
+  }
+  const signature = await verifyReleaseBundleSignature(bundleDir, trustedKey);
+  return { signature, signatureRequired };
+}
+function writeReleaseVerifyOutcome(verification, signature, signatureRequired, options, streams) {
   const signatureErrors = [...signature.errors];
   if (signatureRequired && !signature.present) {
     signatureErrors.push("expected a signed manifest (manifest.sig) but none was found");
@@ -56161,6 +56186,19 @@ async function releaseVerifyCommand(bundleInput, options, streams) {
     );
   }
   return ok ? 0 : 1;
+}
+async function releaseVerifyCommand(bundleInput, options, streams) {
+  const bundleDir = import_node_path59.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
+  const verification = await verifyReleaseEvidenceBundle(bundleDir);
+  const signatureResolution = await resolveReleaseVerifySignature(bundleDir, options, streams.stderr);
+  if ("exitCode" in signatureResolution) return signatureResolution.exitCode;
+  return writeReleaseVerifyOutcome(
+    verification,
+    signatureResolution.signature,
+    signatureResolution.signatureRequired,
+    options,
+    streams
+  );
 }
 async function releaseSignCommand(bundleInput, options, streams) {
   const bundleDir = import_node_path59.default.resolve(normalizePathInput(bundleInput ?? "build/boardreadyops-release"));
@@ -56370,7 +56408,8 @@ init_src();
 // packages/cloud-core/src/review-diff.ts
 var import_node_crypto10 = require("node:crypto");
 function ordinalCompare(a, b) {
-  return a < b ? -1 : a > b ? 1 : 0;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
 }
 function computeEvidenceDigest(input) {
   const sortedFingerprints = [...input.findingFingerprints].sort(ordinalCompare);
@@ -57264,7 +57303,7 @@ from issued;
 function revokePsqlInvocation(params) {
   const [revokedAt, installationId, registrationId, actorId, reason] = params;
   if (typeof revokedAt !== "string" || typeof installationId !== "string" || typeof registrationId !== "string" || typeof actorId !== "string" || typeof reason !== "string") {
-    throw new Error("runner revocation database parameters were invalid");
+    throw new TypeError("runner revocation database parameters were invalid");
   }
   return {
     variables: {
@@ -60493,7 +60532,7 @@ function registerAllCommands(program2, streams) {
   );
   const review = program2.command("review").description("manage and publish hardware reviews");
   addCommonOptions(
-    review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", (v) => Number(v))
+    review.command("publish").description("publish hardware review and evidence pack to cloud").argument("[path]", "directory to scan").option("--base <commit>", "base git commit or run id for diff computation").option("--head <commit>", "head git commit (defaults to HEAD)").option("--upload <mode>", "upload mode: metadata, snapshots, or source", "metadata").option("--dry-run", "simulate review publish without uploading").option("--token <token>", "workspace API token").option("--server <url>", "BoardReadyOps cloud server URL").option("--title <title>", "review title").option("--repo <repo>", "target repository identifier").option("--pr <number>", "pull request number", Number)
   ).action(async (pathInput, options) => {
     process.exitCode = await reviewPublishCommand(pathInput, options, streams);
   });

@@ -43,6 +43,76 @@ const roleMeans: Record<string, string> = {
   viewer: "Reads only",
 };
 
+function workspaceUserCell(member: WorkspaceMemberRecord, viewerLogin: string | undefined) {
+  return (
+    <span className="flex items-center gap-2">
+      <span className="font-mono break-all">{member.userId}</span>
+      {member.userId === viewerLogin ? <span className="text-meta text-muted-foreground">(you)</span> : null}
+    </span>
+  );
+}
+
+function workspaceRoleCell(member: WorkspaceMemberRecord) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <StatusBadge value={roleTone[member.role] ?? "neutral"} label={member.role} />
+      <span className="text-meta text-muted-foreground">{roleMeans[member.role]}</span>
+    </span>
+  );
+}
+
+function workspaceSinceCell(member: WorkspaceMemberRecord) {
+  return (
+    <time dateTime={member.createdAt} className="text-muted-foreground tabular-nums">
+      {member.createdAt.slice(0, 10)}
+    </time>
+  );
+}
+
+function workspaceActionCell(
+  member: WorkspaceMemberRecord,
+  members: readonly WorkspaceMemberRecord[],
+  workspaceId: string,
+) {
+  if (isLastOwner(members, member.userId)) {
+    return <span className="text-meta text-muted-foreground">Last owner</span>;
+  }
+  return (
+    <RemoveWorkspaceMemberButton
+      workspaceId={workspaceId}
+      userId={member.userId}
+      action={removeWorkspaceMemberAction}
+    />
+  );
+}
+
+function workspaceColumns(input: {
+  viewerLogin: string | undefined;
+  manage: boolean;
+  members: readonly WorkspaceMemberRecord[];
+  workspaceId: string;
+}): readonly DataColumn<WorkspaceMemberRecord>[] {
+  const columns: DataColumn<WorkspaceMemberRecord>[] = [
+    {
+      id: "user",
+      header: "GitHub username",
+      rowHeader: true,
+      cell: (member) => workspaceUserCell(member, input.viewerLogin),
+    },
+    { id: "role", header: "Role", cell: workspaceRoleCell },
+    { id: "since", header: "Since", align: "end", cell: workspaceSinceCell },
+  ];
+  if (input.manage) {
+    columns.push({
+      id: "actions",
+      header: "",
+      align: "end",
+      cell: (member) => workspaceActionCell(member, input.members, input.workspaceId),
+    });
+  }
+  return columns;
+}
+
 export default async function WorkspaceSettingsPage({ searchParams }: Readonly<WorkspaceSettingsPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
@@ -51,62 +121,12 @@ export default async function WorkspaceSettingsPage({ searchParams }: Readonly<W
   if (result.state !== "ok") return <Unavailable state={result.state} />;
 
   const manage = canManageMembers(result.selected.role);
-  const columns: readonly DataColumn<WorkspaceMemberRecord>[] = [
-    {
-      id: "user",
-      header: "GitHub username",
-      rowHeader: true,
-      cell: (member) => (
-        <span className="flex items-center gap-2">
-          <span className="font-mono break-all">{member.userId}</span>
-          {member.userId === viewer.session?.login ? (
-            <span className="text-meta text-muted-foreground">(you)</span>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      id: "role",
-      header: "Role",
-      cell: (member) => (
-        <span className="flex flex-col gap-0.5">
-          <StatusBadge value={roleTone[member.role] ?? "neutral"} label={member.role} />
-          <span className="text-meta text-muted-foreground">{roleMeans[member.role]}</span>
-        </span>
-      ),
-    },
-    {
-      id: "since",
-      header: "Since",
-      align: "end",
-      cell: (member) => (
-        <time dateTime={member.createdAt} className="text-muted-foreground tabular-nums">
-          {member.createdAt.slice(0, 10)}
-        </time>
-      ),
-    },
-    ...(manage
-      ? [
-          {
-            id: "actions",
-            header: "",
-            align: "end" as const,
-            cell: (member: WorkspaceMemberRecord) =>
-              // The last owner's control is hidden because it would always fail. The store is
-              // what actually refuses it.
-              isLastOwner(result.members, member.userId) ? (
-                <span className="text-meta text-muted-foreground">Last owner</span>
-              ) : (
-                <RemoveWorkspaceMemberButton
-                  workspaceId={result.selected.id}
-                  userId={member.userId}
-                  action={removeWorkspaceMemberAction}
-                />
-              ),
-          },
-        ]
-      : []),
-  ];
+  const columns = workspaceColumns({
+    viewerLogin: viewer.session?.login,
+    manage,
+    members: result.members,
+    workspaceId: result.selected.id,
+  });
 
   return (
     <>

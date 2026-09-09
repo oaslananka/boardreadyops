@@ -3,7 +3,7 @@ import { AppShell } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { SettingsNav } from "./settings-nav.js";
 
-export default function SettingsLayout({ children }: { children: ReactNode }) {
+export default function SettingsLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <AppShell viewerNav={<ViewerNav />} breadcrumbs={[{ href: "/", label: "Home" }, { label: "Settings" }]}>
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">

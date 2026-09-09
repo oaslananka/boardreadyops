@@ -104,6 +104,7 @@ export async function runAction(): Promise<void> {
 }
 
 runAction().catch((error) => {
+  // NOSONAR -- CJS bundle forbids top-level await.
   core.setFailed(error instanceof Error ? error.message : "BoardReadyOps failed.");
 });
 

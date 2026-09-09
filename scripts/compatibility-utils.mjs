@@ -30,7 +30,7 @@ export function stringRecord(value, name) {
   const record = objectValue(value, name);
   for (const [key, entry] of Object.entries(record)) {
     if (typeof entry !== "string") {
-      throw new Error(`Expected ${name}.${key} to be a string`);
+      throw new TypeError(`Expected ${name}.${key} to be a string`);
     }
   }
   return record;

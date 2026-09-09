@@ -20,58 +20,63 @@ export interface ApiAuthError {
   status: number;
 }
 
+async function authenticateBearerToken(
+  request: Request,
+  rawToken: string,
+  requiredScope?: ApiTokenScope,
+): Promise<AuthenticatedApiContext | ApiAuthError> {
+  const clientId = clientIdentifierFromRequest(request);
+  const rateLimit = checkAuthRateLimit(clientId);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      error: `Too many failed authentication attempts, retry after ${rateLimit.retryAfterSeconds}s`,
+      status: 429,
+    };
+  }
+
+  try {
+    const config = resolveCloudPersistenceConfiguration();
+    if (config.mode !== "postgres") {
+      return { ok: false, error: "Database not configured", status: 503 };
+    }
+
+    const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
+    try {
+      const store = new ApiTokenStore(executor);
+      const tokenRecord = await store.validateToken(rawToken);
+      if (!tokenRecord) {
+        recordFailedAuthAttempt(clientId);
+        return { ok: false, error: "Invalid or expired API token", status: 401 };
+      }
+
+      if (requiredScope && !tokenRecord.scopes.includes(requiredScope) && !tokenRecord.scopes.includes("admin")) {
+        return { ok: false, error: `Missing required scope: ${requiredScope}`, status: 403 };
+      }
+
+      return {
+        ok: true,
+        repositoryId: tokenRecord.repositoryId,
+        actorId: tokenRecord.id,
+        scopes: tokenRecord.scopes,
+        authType: "bearer_token",
+      };
+    } finally {
+      await executor.close();
+    }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Authentication error", status: 500 };
+  }
+}
+
 export async function authenticateApiRequest(
   request: Request,
   requiredScope?: ApiTokenScope,
 ): Promise<AuthenticatedApiContext | ApiAuthError> {
   const authHeader = request.headers.get("authorization");
-
   if (authHeader?.startsWith("Bearer ")) {
-    const rawToken = authHeader.slice("Bearer ".length).trim();
-    const clientId = clientIdentifierFromRequest(request);
-    const rateLimit = checkAuthRateLimit(clientId);
-    if (!rateLimit.allowed) {
-      return {
-        ok: false,
-        error: `Too many failed authentication attempts, retry after ${rateLimit.retryAfterSeconds}s`,
-        status: 429,
-      };
-    }
-
-    try {
-      const config = resolveCloudPersistenceConfiguration();
-      if (config.mode !== "postgres") {
-        return { ok: false, error: "Database not configured", status: 503 };
-      }
-
-      const executor = createPgQueryExecutor({ connectionString: config.databaseUrl });
-      try {
-        const store = new ApiTokenStore(executor);
-        const tokenRecord = await store.validateToken(rawToken);
-        if (!tokenRecord) {
-          recordFailedAuthAttempt(clientId);
-          return { ok: false, error: "Invalid or expired API token", status: 401 };
-        }
-
-        if (requiredScope && !tokenRecord.scopes.includes(requiredScope) && !tokenRecord.scopes.includes("admin")) {
-          return { ok: false, error: `Missing required scope: ${requiredScope}`, status: 403 };
-        }
-
-        return {
-          ok: true,
-          repositoryId: tokenRecord.repositoryId,
-          actorId: tokenRecord.id,
-          scopes: tokenRecord.scopes,
-          authType: "bearer_token",
-        };
-      } finally {
-        await executor.close();
-      }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : "Authentication error", status: 500 };
-    }
+    return authenticateBearerToken(request, authHeader.slice("Bearer ".length).trim(), requiredScope);
   }
-
   const viewer = await viewerAuthorization();
   if (viewer.session) {
     return {

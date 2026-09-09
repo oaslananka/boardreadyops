@@ -20,7 +20,7 @@ export function Table({
     <section
       className="relative w-full overflow-x-auto rounded-md border border-border focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: axe requires a scrollable region to be keyboard-reachable
-      tabIndex={0}
+      tabIndex={0} // NOSONAR -- scrollable region must remain keyboard-focusable (axe scrollable-region-focusable).
       aria-label={scrollLabel ?? "Scrollable table"}
     >
       <table data-slot="table" className={cn("w-full caption-bottom border-collapse text-sm", className)} {...props} />

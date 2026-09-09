@@ -73,6 +73,11 @@ export async function viewerAuthorization(
  * The session stores GitHub's ids because that is what the OAuth flow returns; the dashboard
  * carries the internal id. Resolving here keeps the mapping server-side and out of the cookie.
  */
+function numericId(value: unknown): number {
+  if (typeof value === "number") return value;
+  return typeof value === "string" ? Number(value) : Number.NaN;
+}
+
 async function githubInstallationIdFor(
   installationId: string,
   environment: Readonly<Record<string, string | undefined>>,
@@ -94,7 +99,7 @@ async function githubInstallationIdFor(
     const rows = (result as { rows?: readonly Record<string, unknown>[] }).rows ?? [];
     const value = rows[0]?.github_installation_id;
     // node-postgres decodes bigint as a string to avoid precision loss.
-    const parsed = typeof value === "string" ? Number(value) : typeof value === "number" ? value : Number.NaN;
+    const parsed = numericId(value);
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
   } finally {
     await executor.close();

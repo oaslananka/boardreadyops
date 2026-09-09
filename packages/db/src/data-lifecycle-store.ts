@@ -120,7 +120,9 @@ export class DataLifecycleStore {
       [input.tenantId, input.scope, input.scopeId ?? null],
     )) as { rows?: Array<Record<string, unknown>> };
     const blocked = (holdCheck.rows?.length ?? 0) > 0;
-    const status = blocked ? "blocked_by_hold" : input.dryRun ? "preview" : "pending";
+    let status = "pending";
+    if (blocked) status = "blocked_by_hold";
+    else if (input.dryRun) status = "preview";
     const id = randomUUID();
     const r = (await this.db.query(
       `INSERT INTO erasure_requests (id, tenant_id, requested_by, scope, scope_id, status, dry_run, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *`,

@@ -35,7 +35,7 @@ export function envValue(
 export async function postJson(fetcher: Fetcher | undefined, url: string, body: unknown): Promise<void> {
   const activeFetch = fetcher ?? globalThis.fetch;
   if (typeof activeFetch !== "function") {
-    throw new Error("fetch is not available");
+    throw new TypeError("fetch is not available");
   }
   const response = await activeFetch(url, {
     method: "POST",

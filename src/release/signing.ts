@@ -292,7 +292,7 @@ export async function loadTrustStore(filePath: string): Promise<TrustStore> {
   const raw = await fs.readFile(filePath, "utf8");
   const parsed: unknown = JSON.parse(raw);
   if (!Array.isArray(parsed)) {
-    throw new Error(`trust store at ${filePath} must be a JSON array`);
+    throw new TypeError(`trust store at ${filePath} must be a JSON array`);
   }
   for (const [index, entry] of parsed.entries()) {
     if (

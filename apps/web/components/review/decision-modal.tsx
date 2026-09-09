@@ -13,7 +13,7 @@ export interface DecisionModalProps {
   onClose: () => void;
 }
 
-export function DecisionModal({ finding, targetDisposition, onConfirm, onClose }: DecisionModalProps) {
+export function DecisionModal({ finding, targetDisposition, onConfirm, onClose }: Readonly<DecisionModalProps>) {
   const isAcceptedRisk = targetDisposition === "accepted_risk";
   const [reason, setReason] = useState(finding.decisionReason ?? "");
   const [owner, setOwner] = useState(finding.decisionOwner ?? "engineer@company.com");

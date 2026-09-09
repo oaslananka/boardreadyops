@@ -33,7 +33,8 @@ scanWorkflowRuntimeContent();
 scanBannedLanguage();
 
 if (failures.length > 0) {
-  throw new Error(`clean tree verification failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
+  const failureList = failures.map((failure) => `- ${failure}`).join("\n");
+  throw new Error(`clean tree verification failed:\n${failureList}`);
 }
 
 function scanForbiddenContent() {
@@ -231,7 +232,7 @@ function ignored(file) {
 }
 
 function normalize(file) {
-  return file.replace(/\\/g, "/");
+  return file.replaceAll("\\", "/");
 }
 
 function readText(file) {

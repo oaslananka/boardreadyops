@@ -218,6 +218,25 @@ function parsedQuery(request: Request): ParsedAuditQuery | Response {
   };
 }
 
+function auditListResponse(items: readonly AuditEventExportItem[], query: ParsedAuditQuery): Response {
+  const lastItem = items.length === query.limit ? items.at(-1) : undefined;
+  const nextCursor = lastItem ? encodeCursor({ createdAt: lastItem.createdAt, id: lastItem.id }) : undefined;
+  const digestHeaders = { "x-content-digest": `sha256:${computeCanonicalHash(items)}` };
+  if (query.format === "csv") {
+    return controlPlaneRawResponse(auditEventsToCsv(items), 200, "text/csv; charset=utf-8", {
+      ...digestHeaders,
+      ...(nextCursor ? { "x-next-cursor": nextCursor } : {}),
+    });
+  }
+  if (query.format === "jsonl") {
+    return controlPlaneRawResponse(auditEventsToJsonl(items), 200, "application/x-ndjson; charset=utf-8", {
+      ...digestHeaders,
+      ...(nextCursor ? { "x-next-cursor": nextCursor } : {}),
+    });
+  }
+  return controlPlaneJsonResponse({ ok: true, items, ...(nextCursor ? { nextCursor } : {}) }, 200, digestHeaders);
+}
+
 export async function handleControlPlaneAuditListRequest(
   request: Request,
   installationId: string,
@@ -241,31 +260,7 @@ export async function handleControlPlaneAuditListRequest(
       ...(query.eventType ? { eventType: query.eventType } : {}),
       ...(query.cursor ? { cursor: query.cursor } : {}),
     });
-    const lastItem = items.length === query.limit ? items.at(-1) : undefined;
-    const nextCursor = lastItem ? encodeCursor({ createdAt: lastItem.createdAt, id: lastItem.id }) : undefined;
-    const digestHeaders = { "x-content-digest": `sha256:${computeCanonicalHash(items)}` };
-
-    if (query.format === "csv") {
-      return controlPlaneRawResponse(auditEventsToCsv(items), 200, "text/csv; charset=utf-8", {
-        ...digestHeaders,
-        ...(nextCursor ? { "x-next-cursor": nextCursor } : {}),
-      });
-    }
-    if (query.format === "jsonl") {
-      return controlPlaneRawResponse(auditEventsToJsonl(items), 200, "application/x-ndjson; charset=utf-8", {
-        ...digestHeaders,
-        ...(nextCursor ? { "x-next-cursor": nextCursor } : {}),
-      });
-    }
-    return controlPlaneJsonResponse(
-      {
-        ok: true,
-        items,
-        ...(nextCursor ? { nextCursor } : {}),
-      },
-      200,
-      digestHeaders,
-    );
+    return auditListResponse(items, query);
   } catch {
     return controlPlaneJsonError("audit export is temporarily unavailable", 503);
   }

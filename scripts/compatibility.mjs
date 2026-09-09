@@ -516,7 +516,7 @@ function cycloneDxSchemaVersion(schema) {
   } else if (typeof value.id === "string") {
     id = value.id;
   }
-  const idMatch = id.match(/bom-(\d+\.\d+)\.schema\.json/);
+  const idMatch = /bom-(\d+\.\d+)\.schema\.json/.exec(id);
   if (idMatch) {
     return idMatch[1];
   }

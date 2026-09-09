@@ -1,6 +1,7 @@
 import { configuredCredentialCipher } from "@boardreadyops/cloud-core/credential-encryption";
 import { planLimits, planTierOf } from "@boardreadyops/cloud-core/entitlements";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Button } from "../../../components/ui/button.js";
 import { Input } from "../../../components/ui/input.js";
 import { Alert, Definition, DefinitionGrid, EmptyState, Panel, type StatusTone } from "../../../components/ui.js";
@@ -42,7 +43,7 @@ const outcomes: Record<string, { tone: StatusTone; title: string; message: strin
   failed: { tone: "danger", title: "Could not store", message: "The credential could not be stored. Try again." },
 };
 
-export default async function ComponentIntelligencePage({ searchParams }: PageProps) {
+export default async function ComponentIntelligencePage({ searchParams }: Readonly<PageProps>) {
   const parameters = await searchParams;
   const outcome = outcomes[first(parameters.status) ?? ""];
   const viewer = await viewerAuthorization();
@@ -51,6 +52,127 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
   const installations = await viewerInstallations(session, nexarProviderName);
   const secret = process.env.SESSION_SECRET?.trim();
   const now = new Date();
+
+  let installationContent: ReactNode;
+  if (!session) {
+    installationContent = (
+      <Panel title="Sign in required">
+        <EmptyState title="Sign in to configure component intelligence">
+          <p>Credentials are stored per installation, so we need to know which installations you can administer.</p>
+        </EmptyState>
+      </Panel>
+    );
+  } else if (installations.length === 0) {
+    installationContent = (
+      <Panel title="No installations">
+        <EmptyState title="No active installations found">
+          <p>Install the BoardReadyOps GitHub App on an account you administer, then return here.</p>
+        </EmptyState>
+      </Panel>
+    );
+  } else {
+    installationContent = installations.map((installation) => {
+      const limits = planLimits(planTierOf(installation.planTier));
+      const token = secret ? issueSettingsFormToken(session, installation.id, secret, now) : "";
+
+      return (
+        <Panel key={installation.id} title={installation.accountLogin}>
+          <DefinitionGrid>
+            <Definition label="Plan">{installation.planTier}</Definition>
+            <Definition label="Supply watch">
+              {limits.supplyWatch ? "Included" : "Not included on this plan"}
+            </Definition>
+            <Definition label="Credential">{installation.hasComponentCredential ? "Stored" : "Not set"}</Definition>
+          </DefinitionGrid>
+
+          {!limits.supplyWatch ? (
+            <div className="mt-3">
+              <Alert tone="info" title="Supply watch is not on this plan">
+                Supply watch is not included on the {installation.planTier} plan. You can store a credential now; boards
+                will start being checked when the plan includes it.
+              </Alert>
+            </div>
+          ) : undefined}
+
+          {installation.componentCredentialRejectedAt ? (
+            <div className="mt-3">
+              <Alert tone="warning" title="The provider refused this credential">
+                Refused on {new Date(installation.componentCredentialRejectedAt).toISOString().slice(0, 10)}
+                {installation.componentCredentialRejectedReason
+                  ? ` (${installation.componentCredentialRejectedReason})`
+                  : ""}
+                . Replace it below; the stored credential is kept until you do, in case the refusal was temporary.
+              </Alert>
+            </div>
+          ) : undefined}
+
+          <form action="/api/v1/settings/component-intelligence" method="post" className="mt-3 flex flex-col gap-3">
+            <input type="hidden" name="installation_id" value={installation.id} />
+            <input type="hidden" name="form_token" value={token} />
+
+            <div>
+              <label htmlFor={`client-id-${installation.id}`} className="text-sm font-medium text-foreground">
+                Nexar client ID
+              </label>
+              <Input
+                id={`client-id-${installation.id}`}
+                name="client_id"
+                type="text"
+                autoComplete="off"
+                maxLength={512}
+                required
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <label htmlFor={`client-secret-${installation.id}`} className="text-sm font-medium text-foreground">
+                Nexar client secret
+              </label>
+              {/* Never rendered back: the stored value is write-only from this page. */}
+              <Input
+                id={`client-secret-${installation.id}`}
+                name="client_secret"
+                type="password"
+                autoComplete="new-password"
+                maxLength={512}
+                required
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <label htmlFor={`scope-${installation.id}`} className="text-sm font-medium text-foreground">
+                OAuth scope (optional)
+              </label>
+              <Input
+                id={`scope-${installation.id}`}
+                name="scope"
+                type="text"
+                autoComplete="off"
+                maxLength={512}
+                placeholder="supply.domain"
+                className="mt-1"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button type="submit" name="action" value="save" disabled={!cipherConfigured}>
+                {installation.hasComponentCredential ? "Replace credential" : "Save credential"}
+              </Button>
+              {/* formNoValidate: removal does not need the credential fields, and the
+                        browser would otherwise block the submit on their required attribute. */}
+              {installation.hasComponentCredential ? (
+                <Button type="submit" name="action" value="remove" variant="secondary" formNoValidate>
+                  Remove
+                </Button>
+              ) : undefined}
+            </div>
+          </form>
+        </Panel>
+      );
+    });
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -77,121 +199,7 @@ export default async function ComponentIntelligencePage({ searchParams }: PagePr
         </Alert>
       ) : undefined}
 
-      {!session ? (
-        <Panel title="Sign in required">
-          <EmptyState title="Sign in to configure component intelligence">
-            <p>Credentials are stored per installation, so we need to know which installations you can administer.</p>
-          </EmptyState>
-        </Panel>
-      ) : installations.length === 0 ? (
-        <Panel title="No installations">
-          <EmptyState title="No active installations found">
-            <p>Install the BoardReadyOps GitHub App on an account you administer, then return here.</p>
-          </EmptyState>
-        </Panel>
-      ) : (
-        installations.map((installation) => {
-          const limits = planLimits(planTierOf(installation.planTier));
-          const token = secret ? issueSettingsFormToken(session, installation.id, secret, now) : "";
-
-          return (
-            <Panel key={installation.id} title={installation.accountLogin}>
-              <DefinitionGrid>
-                <Definition label="Plan">{installation.planTier}</Definition>
-                <Definition label="Supply watch">
-                  {limits.supplyWatch ? "Included" : "Not included on this plan"}
-                </Definition>
-                <Definition label="Credential">{installation.hasComponentCredential ? "Stored" : "Not set"}</Definition>
-              </DefinitionGrid>
-
-              {!limits.supplyWatch ? (
-                <div className="mt-3">
-                  <Alert tone="info" title="Supply watch is not on this plan">
-                    Supply watch is not included on the {installation.planTier} plan. You can store a credential now;
-                    boards will start being checked when the plan includes it.
-                  </Alert>
-                </div>
-              ) : undefined}
-
-              {installation.componentCredentialRejectedAt ? (
-                <div className="mt-3">
-                  <Alert tone="warning" title="The provider refused this credential">
-                    Refused on {new Date(installation.componentCredentialRejectedAt).toISOString().slice(0, 10)}
-                    {installation.componentCredentialRejectedReason
-                      ? ` (${installation.componentCredentialRejectedReason})`
-                      : ""}
-                    . Replace it below; the stored credential is kept until you do, in case the refusal was temporary.
-                  </Alert>
-                </div>
-              ) : undefined}
-
-              <form action="/api/v1/settings/component-intelligence" method="post" className="mt-3 flex flex-col gap-3">
-                <input type="hidden" name="installation_id" value={installation.id} />
-                <input type="hidden" name="form_token" value={token} />
-
-                <div>
-                  <label htmlFor={`client-id-${installation.id}`} className="text-sm font-medium text-foreground">
-                    Nexar client ID
-                  </label>
-                  <Input
-                    id={`client-id-${installation.id}`}
-                    name="client_id"
-                    type="text"
-                    autoComplete="off"
-                    maxLength={512}
-                    required
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor={`client-secret-${installation.id}`} className="text-sm font-medium text-foreground">
-                    Nexar client secret
-                  </label>
-                  {/* Never rendered back: the stored value is write-only from this page. */}
-                  <Input
-                    id={`client-secret-${installation.id}`}
-                    name="client_secret"
-                    type="password"
-                    autoComplete="new-password"
-                    maxLength={512}
-                    required
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor={`scope-${installation.id}`} className="text-sm font-medium text-foreground">
-                    OAuth scope (optional)
-                  </label>
-                  <Input
-                    id={`scope-${installation.id}`}
-                    name="scope"
-                    type="text"
-                    autoComplete="off"
-                    maxLength={512}
-                    placeholder="supply.domain"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button type="submit" name="action" value="save" disabled={!cipherConfigured}>
-                    {installation.hasComponentCredential ? "Replace credential" : "Save credential"}
-                  </Button>
-                  {/* formNoValidate: removal does not need the credential fields, and the
-                        browser would otherwise block the submit on their required attribute. */}
-                  {installation.hasComponentCredential ? (
-                    <Button type="submit" name="action" value="remove" variant="secondary" formNoValidate>
-                      Remove
-                    </Button>
-                  ) : undefined}
-                </div>
-              </form>
-            </Panel>
-          );
-        })
-      )}
+      {installationContent}
 
       <Panel title="What we store">
         <p className="text-sm text-foreground">

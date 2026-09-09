@@ -175,7 +175,9 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
 
       return rows(result).map((row): DueBoard => {
         const raw = row.components;
-        const parsed = Array.isArray(raw) ? raw : typeof raw === "string" ? JSON.parse(raw) : [];
+        let parsed: Record<string, unknown>[] = [];
+        if (Array.isArray(raw)) parsed = raw as Record<string, unknown>[];
+        else if (typeof raw === "string") parsed = JSON.parse(raw) as Record<string, unknown>[];
         return {
           boardId: required(row, "board_id"),
           projectPath: required(row, "project_path"),
@@ -183,10 +185,10 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           installationId: required(row, "installation_id"),
           planTier: text(row, "plan_tier"),
           snapshotId: text(row, "snapshot_id"),
-          components: (parsed as Record<string, unknown>[]).map((component) => ({
-            mpn: String(component.mpn ?? ""),
+          components: parsed.map((component) => ({
+            mpn: typeof component.mpn === "string" ? component.mpn : "",
             manufacturer: typeof component.manufacturer === "string" ? component.manufacturer : undefined,
-            reference: String(component.reference ?? ""),
+            reference: typeof component.reference === "string" ? component.reference : "",
           })),
         };
       });

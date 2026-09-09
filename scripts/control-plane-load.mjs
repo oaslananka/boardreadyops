@@ -1043,7 +1043,7 @@ function incrementRecoveryEvidence(recovery, evidence) {
   for (const [name, value] of Object.entries(evidence)) recovery[name] += value;
 }
 
-const workerProcessFixtureSource = `
+const workerProcessFixtureSource = /* NOSONAR -- generated JS fixture requires cooked template escape semantics. */ `
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -1167,7 +1167,7 @@ async function terminateWorkerProcess(child) {
 }
 
 async function cleanupWorkerProcess(child) {
-  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  if (child?.exitCode !== null || child.signalCode !== null) return;
   const exited = waitForWorkerExit(child).catch(() => undefined);
   child.kill("SIGKILL");
   await exited;
@@ -1381,7 +1381,7 @@ async function runWorkerFleetInterruptionValidation(configuration, input) {
 function requiredDatabaseInterruptionDependency(dependencies, name) {
   const dependency = dependencies[name];
   if (typeof dependency !== "function") {
-    throw new Error(`database-interruption dependency is required: ${name}`);
+    throw new TypeError(`database-interruption dependency is required: ${name}`);
   }
   return dependency;
 }

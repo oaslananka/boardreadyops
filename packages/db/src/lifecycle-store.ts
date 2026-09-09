@@ -8,7 +8,7 @@ export type SqlQueryResult = {
 };
 
 export type SqlQueryExecutor = {
-  query(sql: string, params?: readonly unknown[]): Promise<SqlQueryResult | unknown>;
+  query(sql: string, params?: readonly unknown[]): Promise<unknown>;
 };
 
 export type ReleaseRepositoryRolloutPolicy = {

@@ -93,7 +93,7 @@ export type RunnerLeaseStore = {
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const base64UrlPattern = /^[A-Za-z0-9_-]+$/u;
 const capabilityPattern = /^[a-z0-9][a-z0-9._:-]*$/u;
-const runnerVersionPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
+const runnerVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
 
 function validRunnerVersion(value: string): boolean {
   return (

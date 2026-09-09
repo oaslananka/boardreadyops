@@ -74,8 +74,11 @@ export async function explainCommand(
 function formatExplanation(explanation: RuleExplanation): string {
   const lines = [explanation.ruleId, "", explanation.summary];
   for (const section of explanation.sections) {
-    lines.push("", section.title);
-    lines.push(...(section.lines.length > 0 ? section.lines.map((line) => `- ${line}`) : ["- none"]));
+    lines.push(
+      "",
+      section.title,
+      ...(section.lines.length > 0 ? section.lines.map((line) => `- ${line}`) : ["- none"]),
+    );
   }
   return `${lines.join("\n")}\n`;
 }

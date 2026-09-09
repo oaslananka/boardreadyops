@@ -19,7 +19,8 @@ export async function sendSmtpEmail(smtpUrl: string, message: EmailMessage, opti
   if (parsed.protocol !== "smtp:" && parsed.protocol !== "smtps:") {
     throw new Error("SMTP URL must use smtp or smtps.");
   }
-  const port = parsed.port ? Number.parseInt(parsed.port, 10) : parsed.protocol === "smtps:" ? 465 : 25;
+  let port = parsed.protocol === "smtps:" ? 465 : 25;
+  if (parsed.port) port = Number.parseInt(parsed.port, 10);
   const secure = parsed.protocol === "smtps:";
   const socket = secure
     ? tls.connect({ host: parsed.hostname, port, servername: parsed.hostname })

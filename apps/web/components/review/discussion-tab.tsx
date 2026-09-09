@@ -10,12 +10,12 @@ export function DiscussionTab({
   viewerLogin,
   onAddComment,
   onToggleStatus,
-}: {
+}: Readonly<{
   comments: DemoComment[];
   viewerLogin?: string | undefined;
   onAddComment?: (content: string) => void;
   onToggleStatus?: (commentId: string, nextStatus: "open" | "resolved") => void;
-}) {
+}>) {
   const [newContent, setNewContent] = useState("");
   const commentFieldId = useId();
 

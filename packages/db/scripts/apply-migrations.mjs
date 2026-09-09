@@ -92,15 +92,14 @@ export async function applyCloudMigrations({ connectionString, dryRun = false } 
 // backslashes while import.meta.url is a file:/// URL, so the old comparison never matched
 // and running this script directly did nothing at all - silently, reporting success.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  applyCloudMigrations({
-    connectionString: process.env.DATABASE_URL,
-    dryRun: envFlag("BOARDREADYOPS_DB_MIGRATE_DRY_RUN"),
-  })
-    .then((result) => {
-      log(JSON.stringify(result));
-    })
-    .catch((error) => {
-      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-      process.exitCode = 1;
+  try {
+    const result = await applyCloudMigrations({
+      connectionString: process.env.DATABASE_URL,
+      dryRun: envFlag("BOARDREADYOPS_DB_MIGRATE_DRY_RUN"),
     });
+    log(JSON.stringify(result));
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
 }

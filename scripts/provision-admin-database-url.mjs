@@ -23,7 +23,7 @@ export const defaultAdminDatabaseUrlOptions = {
   dryRun: false,
 };
 
-const requiredKeys = ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"];
+const requiredKeys = new Set(["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"]);
 
 function envFlag(env, name) {
   return ["1", "true", "yes"].includes(String(env[name] ?? "").toLowerCase());
@@ -91,10 +91,10 @@ export function parseRuntimeEnvironment(text) {
 
   for (const [index, line] of lines.entries()) {
     if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
-    const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/u.exec(line);
+    const match = /^([A-Za-z_]\w*)=(.*)$/u.exec(line);
     if (!match) continue;
     const [, name, rawValue] = match;
-    if (!requiredKeys.includes(name)) continue;
+    if (!requiredKeys.has(name)) continue;
     selected[name] = parseValue(rawValue, index + 1);
   }
 
