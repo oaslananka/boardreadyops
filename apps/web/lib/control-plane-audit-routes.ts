@@ -218,7 +218,7 @@ function parsedQuery(request: Request): ParsedAuditQuery | Response {
   };
 }
 
-function auditListResponse(items: readonly ControlPlaneAuditEvent[], query: ParsedAuditQuery): Response {
+function auditListResponse(items: readonly AuditEventExportItem[], query: ParsedAuditQuery): Response {
   const lastItem = items.length === query.limit ? items.at(-1) : undefined;
   const nextCursor = lastItem ? encodeCursor({ createdAt: lastItem.createdAt, id: lastItem.id }) : undefined;
   const digestHeaders = { "x-content-digest": `sha256:${computeCanonicalHash(items)}` };
