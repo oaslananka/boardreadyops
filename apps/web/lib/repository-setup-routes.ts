@@ -433,7 +433,9 @@ async function createSetupPr(
 
   const presetId = isRepositorySetupPresetId(body.preset) ? body.preset : (context.current?.preset ?? "open-source");
 
-  const plan = generateSetupPrPlan({ presetId });
+  const cloudOrigin =
+    dependencies.environment.BOARDREADYOPS_PUBLIC_URL?.trim() || dependencies.environment.NEXT_PUBLIC_APP_URL?.trim();
+  const plan = generateSetupPrPlan({ presetId, ...(cloudOrigin ? { cloudOrigin } : {}) });
 
   const mutationService = dependencies.mutationService?.(context.githubInstallationId);
   if (!mutationService) {

@@ -37,6 +37,7 @@ export type RepositorySetupLifecycleExecutorDependencies = {
   store: RepositorySetupStore;
   authenticateInstallation(installationId: number): Promise<InstallationAuthentication>;
   mutationService(token: string): GitHubMutationService;
+  cloudOrigin?: string;
 };
 
 function requestId(deliveryId: string): string {
@@ -82,7 +83,10 @@ export function createRepositorySetupLifecycleExecutor(
         throw new Error(`setup PR capability is unavailable: ${capability.missingPermissions.join(", ")}`);
       }
 
-      const plan = generateSetupPrPlan({ presetId: repository.current?.preset ?? "open-source" });
+      const plan = generateSetupPrPlan({
+        presetId: repository.current?.preset ?? "open-source",
+        ...(dependencies.cloudOrigin ? { cloudOrigin: dependencies.cloudOrigin } : {}),
+      });
       const durableRequestId = requestId(context.deliveryId);
       const actorId = action.requestedBy ?? "github-app";
       const result = await dependencies.mutationService(authentication.token).execute({
@@ -233,6 +237,7 @@ export function createProductionRepositorySetupLifecycleExecutor(
 
   return createRepositorySetupLifecycleExecutor({
     store: createSqlRepositorySetupStore(executor),
+    cloudOrigin: environment.BOARDREADYOPS_PUBLIC_URL?.trim() || environment.NEXT_PUBLIC_APP_URL?.trim() || undefined,
     async authenticateInstallation(installationId) {
       const authenticate = createAppAuth({ appId, privateKey, installationId });
       const authentication = await authenticate({ type: "installation" });
