@@ -48,7 +48,7 @@ var boardReadyVersion;
 var init_version = __esm({
   "src/generated/version.ts"() {
     "use strict";
-    boardReadyVersion = "1.41.5";
+    boardReadyVersion = "1.42.0";
   }
 });
 
