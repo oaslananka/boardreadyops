@@ -33,7 +33,10 @@ function ScopeFields({ idPrefix }: Readonly<{ idPrefix: string }>) {
   );
 }
 
-export function ExportRequestForm({ action }: Readonly<{ action: typeof requestExportAction }>) {
+export function ExportRequestForm({
+  installationId,
+  action,
+}: Readonly<{ installationId: string; action: typeof requestExportAction }>) {
   const idPrefix = useId();
   const [issued, setIssued] = useState<{ exportId: string; status: string } | null>(null);
 
@@ -41,6 +44,7 @@ export function ExportRequestForm({ action }: Readonly<{ action: typeof requestE
     <ActionForm action={action} className="flex flex-col gap-4" onSuccess={setIssued}>
       {({ pending }) => (
         <>
+          <input type="hidden" name="installationId" value={installationId} />
           <ScopeFields idPrefix={idPrefix} />
           <div>
             <Button type="submit" disabled={pending}>
@@ -73,9 +77,10 @@ export function ExportRequestForm({ action }: Readonly<{ action: typeof requestE
  * only the client enforces is not a confirmation.
  */
 export function ErasureRequestForm({
+  installationId,
   action,
   defaultScopeLabel,
-}: Readonly<{ action: typeof requestErasureAction; defaultScopeLabel: string }>) {
+}: Readonly<{ installationId: string; action: typeof requestErasureAction; defaultScopeLabel: string }>) {
   const idPrefix = useId();
   const [outcome, setOutcome] = useState<{ status: string; dryRun: boolean } | null>(null);
 
@@ -83,6 +88,7 @@ export function ErasureRequestForm({
     <ActionForm action={action} className="flex flex-col gap-4" onSuccess={setOutcome}>
       {({ state, pending }) => (
         <>
+          <input type="hidden" name="installationId" value={installationId} />
           <ScopeFields idPrefix={idPrefix} />
 
           {/* An explicit htmlFor/id pair rather than containment: the text sits two <span> levels

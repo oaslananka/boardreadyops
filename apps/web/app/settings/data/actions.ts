@@ -1,7 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { fail, ok } from "../../../lib/action-result.js";
+import {
+  createLegalHoldForViewer,
+  releaseLegalHoldForViewer,
+  requestErasureForViewer,
+  requestExportForViewer,
+  saveRetentionPolicyForViewer,
+} from "../../../lib/data-settings-admin.js";
 import { defineAction } from "../../../lib/server-action.js";
 
 /**
@@ -9,13 +16,14 @@ import { defineAction } from "../../../lib/server-action.js";
  * `/api/v1/erasure-requests`, which had no UI consumer at all — the settings page described the
  * retention tiers and offered no way to act on them.
  *
- * Tenancy follows the same simplified mapping the API routes use (the viewer's login), so the UI
- * and the endpoint cannot request different scopes for the same person.
+ * Tenant ids are resolved server-side from the viewer's authorized GitHub App installation.
+ * Form values never become tenant authority.
  */
 
 const scopes = ["organization", "repository", "user"] as const;
 
 const exportSchema = z.object({
+  installationId: z.string().min(1),
   scope: z.enum(scopes).default("organization"),
   scopeId: z
     .string()
@@ -24,71 +32,53 @@ const exportSchema = z.object({
 });
 
 const erasureSchema = exportSchema.extend({
-  /** Checkbox: present means "preview only", absent means the real thing. */
   dryRun: z.union([z.literal("on"), z.literal("")]).optional(),
-  /** Typed confirmation, checked server-side so the guard is not just a client nicety. */
   confirm: z.string(),
 });
 
-async function lifecycleStore(): Promise<
-  | { ok: true; store: InstanceType<typeof import("@boardreadyops/db").DataLifecycleStore>; close: () => Promise<void> }
-  | { ok: false }
-> {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return { ok: false };
-  const [{ DataLifecycleStore }, { createPgQueryExecutor }] = await Promise.all([
-    import("@boardreadyops/db"),
-    import("@boardreadyops/db/pg-executor"),
-  ]);
-  const executor = createPgQueryExecutor({ connectionString, max: 1 });
-  return { ok: true, store: new DataLifecycleStore(executor), close: () => executor.close() };
-}
+export const requestExportAction = defineAction(exportSchema, async (input, { session }) =>
+  requestExportForViewer(session, input),
+);
 
-export const requestExportAction = defineAction(exportSchema, async (input, { session }) => {
-  const opened = await lifecycleStore();
-  if (!opened.ok) return fail("This deployment has no database configured.");
-  try {
-    const record = await opened.store.createExport({
-      tenantId: session.login,
-      requestedBy: session.login,
-      scope: input.scope,
-      scopeId: input.scopeId ?? null,
-    });
-    return ok(
-      { exportId: record.id, status: record.status },
-      "Export requested. It is generated asynchronously and the download link is time-limited.",
-    );
-  } finally {
-    await opened.close();
-  }
+export const requestErasureAction = defineAction(erasureSchema, async (input, { session }) =>
+  requestErasureForViewer(session, { ...input, dryRun: input.dryRun === "on" }),
+);
+
+const retentionPolicySchema = z.object({
+  installationId: z.string().min(1),
+  retentionDays: z.string().max(4).optional(),
 });
 
-export const requestErasureAction = defineAction(erasureSchema, async (input, { session }) => {
-  const expected = input.scopeId ?? session.login;
-  if (input.confirm.trim() !== expected) {
-    return fail(`Type "${expected}" exactly to confirm.`, { confirm: ["Confirmation does not match."] });
-  }
+const legalHoldSchema = z.object({
+  installationId: z.string().min(1),
+  scope: z.enum(scopes),
+  scopeId: z
+    .string()
+    .max(256)
+    .optional()
+    .transform((value) => (value === undefined || value.trim() === "" ? undefined : value.trim())),
+  reason: z.string().trim().min(10, "Give the legal hold a reason of at least 10 characters.").max(500),
+});
 
-  const opened = await lifecycleStore();
-  if (!opened.ok) return fail("This deployment has no database configured.");
-  try {
-    const record = await opened.store.createErasure({
-      tenantId: session.login,
-      requestedBy: session.login,
-      scope: input.scope,
-      scopeId: input.scopeId ?? null,
-      dryRun: input.dryRun === "on",
-    });
-    if (record.status === "blocked_by_hold") {
-      return fail("An active legal hold covers this scope, so nothing was erased.");
-    }
-    return ok(
-      { erasureId: record.id, status: record.status, dryRun: record.dryRun },
-      record.dryRun
-        ? "Preview recorded. Nothing was deleted — review the scope before running it for real."
-        : "Erasure requested. It is processed asynchronously and cannot be undone.",
-    );
-  } finally {
-    await opened.close();
-  }
+const releaseLegalHoldSchema = z.object({
+  installationId: z.string().min(1),
+  holdId: z.string().min(1),
+});
+
+export const saveRetentionPolicyAction = defineAction(retentionPolicySchema, async (input, { session }) => {
+  const result = await saveRetentionPolicyForViewer(session, input);
+  if (result.status === "ok") revalidatePath("/settings/data");
+  return result;
+});
+
+export const createLegalHoldAction = defineAction(legalHoldSchema, async (input, { session }) => {
+  const result = await createLegalHoldForViewer(session, input);
+  if (result.status === "ok") revalidatePath("/settings/data");
+  return result;
+});
+
+export const releaseLegalHoldAction = defineAction(releaseLegalHoldSchema, async (input, { session }) => {
+  const result = await releaseLegalHoldForViewer(session, input);
+  if (result.status === "ok") revalidatePath("/settings/data");
+  return result;
 });

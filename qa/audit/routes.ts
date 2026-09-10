@@ -154,6 +154,13 @@ export const routes: readonly QaRoute[] = [
     requiresDb: false,
   },
   {
+    id: "settings-integrations",
+    path: "/settings/integrations",
+    label: "Settings: Integrations & Health",
+    auth: "authenticated",
+    requiresDb: false,
+  },
+  {
     id: "runs-list",
     path: "/runs",
     label: "Runs listing",
