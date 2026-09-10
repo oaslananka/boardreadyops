@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.42.1](https://github.com/oaslananka/boardreadyops/compare/v1.42.0...v1.42.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **web:** give labelled panels region semantics ([#726](https://github.com/oaslananka/boardreadyops/issues/726)) ([1686379](https://github.com/oaslananka/boardreadyops/commit/168637920fb7400413c3c55f61bca0be831e2a61))
+
 ## [1.42.0](https://github.com/oaslananka/boardreadyops/compare/v1.41.5...v1.42.0) (2026-09-10)
 
 
