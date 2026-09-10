@@ -25,6 +25,29 @@ describe("QA nightly workflow", () => {
     expect(regressionSuite?.env?.QA_CROSS_BROWSER).toBeUndefined();
   });
 
+  it("keeps the PR smoke audit honest without a fake database", async () => {
+    const ci = load(await readFile(".github/workflows/ci.yml", "utf8")) as {
+      jobs?: {
+        "qa-e2e"?: { steps?: Array<{ name?: string; env?: Record<string, string> }> };
+      };
+    };
+    const smoke = ci.jobs?.["qa-e2e"]?.steps?.find(
+      (step) => step.name === "QA smoke suite (Chromium, critical routes)",
+    );
+    const auditSource = await readFile("tests/e2e/qa-audit.spec.ts", "utf8");
+
+    expect(smoke?.env?.DATABASE_URL).toBe("");
+    expect(auditSource).toContain('test("no P0 findings across the full audit @smoke"');
+  });
+
+  it("keeps global setup browser-independent and signed in by default", async () => {
+    const source = await readFile("tests/e2e/global-setup.ts", "utf8");
+
+    expect(source).not.toContain("import { chromium");
+    expect(source).toContain("qa-agent-local-session-secret-not-for-production!");
+    expect(source).toContain("writeFile");
+  });
+
   it("ships Linux Chromium baselines for every nightly visual route", () => {
     for (const routeId of visualRoutes) {
       expect(

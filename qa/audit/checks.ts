@@ -28,15 +28,6 @@ const consoleAllowlist: readonly string[] = [
   // correctly-implemented notFound() route (qa/audit/routes.ts's errorStates). A page returning
   // its actual 404 status is the intended behavior, not a bug.
   "the server responded with a status of 404",
-  // Routes marked auth: "authenticated" in qa/audit/routes.ts (e.g. /policies) fire an
-  // authenticated fetch on mount; without QA_SESSION_SECRET configured (the common local-dev
-  // case -- see tests/e2e/global-setup.ts), the crawler has no real session to attach, so the
-  // API correctly fail-closes with 401 and Chromium logs the rejected fetch. This is the same
-  // "intended non-2xx, not a regression" case as the 404 entry above, not a hole that would also
-  // hide a real bug: if a real session *were* configured (CI/nightly with the secret set) and an
-  // authenticated route still 401'd, that failure is a genuine session-plumbing bug this
-  // allowlist entry would mask -- see docs/development/qa-agent.md's "What's not done" section.
-  "the server responded with a status of 401",
 ];
 
 function isAllowlisted(text: string): boolean {
@@ -115,20 +106,30 @@ export type LinkCheckResult = { href: string; status: number | "error" };
  * every route in the inventory directly; this exists to catch links a route inventory can't
  * predict, like a review card linking to a specific dynamic id.
  */
-export async function checkInternalLinks(page: Page, originPrefix: string): Promise<LinkCheckResult[]> {
-  const hrefs = await page.evaluate((prefix) => {
-    const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"));
-    const seen = new Set<string>();
-    for (const a of anchors) {
-      const href = a.getAttribute("href") ?? "";
-      // /api/ routes have their own error contracts (e.g. auth/webhook endpoints deliberately
-      // fail closed with 503 when unconfigured, the same way the Stripe webhook does) -- not
-      // page-to-page navigation, so not this check's concern.
-      if (!href || href.startsWith("#") || href.startsWith("/api/")) continue;
-      if (href.startsWith("/") || href.startsWith(prefix)) seen.add(href);
-    }
-    return Array.from(seen);
-  }, originPrefix);
+export async function checkInternalLinks(
+  page: Page,
+  originPrefix: string,
+  expectedLinkPrefixes: readonly string[] = [],
+): Promise<LinkCheckResult[]> {
+  const hrefs = await page.evaluate(
+    ({ originPrefix: prefix, expectedLinkPrefixes: expected }) => {
+      const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"));
+      const seen = new Set<string>();
+      for (const a of anchors) {
+        const href = a.getAttribute("href") ?? "";
+        // /api/ routes have their own error contracts (e.g. auth/webhook endpoints deliberately
+        // fail closed with 503 when unconfigured, the same way the Stripe webhook does) -- not
+        // page-to-page navigation, so not this check's concern.
+        if (!href || href.startsWith("#") || href.startsWith("/api/")) continue;
+        if (!(href.startsWith("/") || href.startsWith(prefix))) continue;
+        const path = href.startsWith("http") ? new URL(href).pathname : href;
+        if (expected.length > 0 && !expected.some((expectedPrefix) => path.startsWith(expectedPrefix))) continue;
+        seen.add(href);
+      }
+      return Array.from(seen);
+    },
+    { originPrefix, expectedLinkPrefixes },
+  );
 
   const results: LinkCheckResult[] = [];
   for (const href of hrefs) {

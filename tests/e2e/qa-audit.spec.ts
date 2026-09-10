@@ -116,7 +116,7 @@ for (const viewport of viewports) {
 
         if (route.expectedLinkPrefixes && viewport.name === "desktop") {
           const origin = new URL(route.path, page.url()).origin;
-          for (const result of await checkInternalLinks(page, origin)) {
+          for (const result of await checkInternalLinks(page, origin, route.expectedLinkPrefixes)) {
             if (result.status === "error" || (typeof result.status === "number" && result.status >= 400)) {
               record(
                 route.id,
@@ -172,7 +172,7 @@ for (const viewport of viewports) {
 // errors or axe violations don't hide findings on the other routes -- this gate is what turns
 // "P0 findings exist" into an actual red CI run.
 test.describe("audit gate", () => {
-  test("no P0 findings across the full audit", () => {
+  test("no P0 findings across the full audit @smoke", () => {
     const p0 = report.summary().findings.filter((f) => f.severity === "P0");
     expect(p0, `P0 findings:\n${JSON.stringify(p0, null, 2)}`).toEqual([]);
   });
