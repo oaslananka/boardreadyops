@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.41.4](https://github.com/oaslananka/boardreadyops/compare/v1.41.3...v1.41.4) (2026-09-10)
+
+
+### Bug Fixes
+
+* **ci:** make UI audit gates reliable ([#720](https://github.com/oaslananka/boardreadyops/issues/720)) ([fd7c942](https://github.com/oaslananka/boardreadyops/commit/fd7c9422d3e5431c40facc5a06d813276d903a39))
+
 ## [1.41.3](https://github.com/oaslananka/boardreadyops/compare/v1.41.2...v1.41.3) (2026-09-09)
 
 
