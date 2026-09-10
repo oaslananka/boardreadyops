@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.42.0](https://github.com/oaslananka/boardreadyops/compare/v1.41.5...v1.42.0) (2026-09-10)
+
+
+### Features
+
+* **web:** complete settings administration ([#724](https://github.com/oaslananka/boardreadyops/issues/724)) ([f5f5b8d](https://github.com/oaslananka/boardreadyops/commit/f5f5b8dde3d0a464385450e4ac4634ba9dad2b80))
+
 ## [1.41.5](https://github.com/oaslananka/boardreadyops/compare/v1.41.4...v1.41.5) (2026-09-10)
 
 
