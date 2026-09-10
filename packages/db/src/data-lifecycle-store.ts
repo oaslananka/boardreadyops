@@ -41,6 +41,8 @@ export type LegalHold = {
   scopeId: string | null;
   active: boolean;
   createdAt: string;
+  releasedAt: string | null;
+  releasedBy: string | null;
 };
 
 export class DataLifecycleStore {
@@ -59,6 +61,60 @@ export class DataLifecycleStore {
       retentionDays: row.retention_days === null ? null : Number(row.retention_days),
       sourceRetentionHours: Number(row.source_retention_hours),
     };
+  }
+
+  async upsertRetentionPolicy(input: {
+    tenantId: string;
+    tier: string;
+    retentionDays: number | null;
+    sourceRetentionHours: number;
+  }): Promise<RetentionPolicy> {
+    if (
+      input.retentionDays !== null &&
+      (!Number.isSafeInteger(input.retentionDays) || input.retentionDays < 1 || input.retentionDays > 3_650)
+    ) {
+      throw new Error("retentionDays must be null or an integer between 1 and 3650");
+    }
+    if (!Number.isSafeInteger(input.sourceRetentionHours) || input.sourceRetentionHours < 1) {
+      throw new Error("sourceRetentionHours must be a positive integer");
+    }
+    const id = randomUUID();
+    const r = (await this.db.query(
+      `INSERT INTO retention_policies (id, tenant_id, tier, retention_days, source_retention_hours, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,NOW(),NOW())
+       ON CONFLICT (tenant_id) DO UPDATE
+         SET tier=EXCLUDED.tier, retention_days=EXCLUDED.retention_days,
+             source_retention_hours=EXCLUDED.source_retention_hours, updated_at=NOW()
+       RETURNING *`,
+      [id, input.tenantId, input.tier, input.retentionDays, input.sourceRetentionHours],
+    )) as { rows?: Array<Record<string, unknown>> };
+    const row = r.rows?.[0];
+    if (!row) throw new Error("upsert failed");
+    return {
+      id: String(row.id),
+      tenantId: String(row.tenant_id),
+      tier: String(row.tier),
+      retentionDays: row.retention_days === null ? null : Number(row.retention_days),
+      sourceRetentionHours: Number(row.source_retention_hours),
+    };
+  }
+
+  async listLegalHolds(tenantId: string): Promise<LegalHold[]> {
+    const r = (await this.db.query(`SELECT * FROM legal_holds WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 100`, [
+      tenantId,
+    ])) as { rows?: Array<Record<string, unknown>> };
+    return (r.rows ?? []).map((row) => ({
+      id: String(row.id),
+      tenantId: String(row.tenant_id),
+      createdBy: String(row.created_by),
+      reason: String(row.reason),
+      scope: String(row.scope),
+      scopeId: (row.scope_id as string | null) ?? null,
+      active: Boolean(row.active),
+      createdAt: new Date(row.created_at as string).toISOString(),
+      releasedAt: row.released_at ? new Date(row.released_at as string).toISOString() : null,
+      releasedBy: (row.released_by as string | null) ?? null,
+    }));
   }
 
   async createExport(input: {
@@ -166,6 +222,8 @@ export class DataLifecycleStore {
       scopeId: (row.scope_id as string | null) ?? null,
       active: Boolean(row.active),
       createdAt: new Date(row.created_at as string).toISOString(),
+      releasedAt: null,
+      releasedBy: null,
     };
   }
 

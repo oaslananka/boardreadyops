@@ -11,6 +11,7 @@ const destinations = [
   { label: "Data & Retention", href: "/settings/data" },
   { label: "API Tokens", href: "/settings/tokens" },
   { label: "Component Intelligence", href: "/settings/component-intelligence" },
+  { label: "Integrations & Health", href: "/settings/integrations" },
 ] as const;
 
 export function SettingsNav() {
