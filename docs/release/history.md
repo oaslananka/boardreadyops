@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.41.5](https://github.com/oaslananka/boardreadyops/compare/v1.41.4...v1.41.5) (2026-09-10)
+
+
+### Bug Fixes
+
+* **web:** polish billing copy and setup touch targets ([#722](https://github.com/oaslananka/boardreadyops/issues/722)) ([3548d5a](https://github.com/oaslananka/boardreadyops/commit/3548d5a64820ac844cdd32a88557dbb12d817a2b))
+
 ## [1.41.4](https://github.com/oaslananka/boardreadyops/compare/v1.41.3...v1.41.4) (2026-09-10)
 
 
