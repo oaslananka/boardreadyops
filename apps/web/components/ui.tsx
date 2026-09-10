@@ -101,7 +101,7 @@ const panelToneClass: Record<PanelTone, string> = {
 export function Panel({ children, title, description, actions, id, tone = "default" }: Readonly<PanelProps>) {
   const headingId = id ? `${id}-heading` : undefined;
   return (
-    <Card id={id} className={panelToneClass[tone]} aria-labelledby={headingId}>
+    <Card id={id} className={panelToneClass[tone]} role={id ? "region" : undefined} aria-labelledby={headingId}>
       <CardHeader>
         <div className="min-w-0">
           <CardTitle id={headingId}>{title}</CardTitle>
