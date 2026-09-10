@@ -63,5 +63,6 @@ describe("Graphite & Iris UI contract", () => {
     expect(markup).toContain("border-dashed");
     expect(markup).toContain('id="gate"');
     expect(markup).toContain('aria-labelledby="gate-heading"');
+    expect(markup).toContain('role="region"');
   });
 });
