@@ -19,7 +19,7 @@ export default async function BillingSettingsPage() {
   if (!viewer.session) {
     return (
       <div className="rounded-md border border-border bg-card p-5 shadow-e2">
-        <h2 className="text-lg font-bold text-foreground">Billing & Subscriptions</h2>
+        <h2 className="text-lg font-bold text-foreground">Billing & Plans</h2>
         <p className="mt-1 text-sm text-muted-foreground">Sign in to view and manage your BoardReadyOps plan.</p>
       </div>
     );
@@ -61,7 +61,7 @@ export default async function BillingSettingsPage() {
       <div className="rounded-md border border-border bg-card p-5 shadow-e2">
         <header>
           <h2 id="billing-heading" className="text-lg font-bold text-foreground">
-            Workspace Subscription & Plans
+            Billing & Plans
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Choose the tier that matches your hardware design workflow, team scale, and manufacturing delivery

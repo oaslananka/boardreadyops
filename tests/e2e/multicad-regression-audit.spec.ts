@@ -73,9 +73,9 @@ test.describe("Release Deliveries & Guest Access", () => {
 test.describe("Commercial Billing & Entitlements Gate", () => {
   test.use({ storageState: authenticatedStorageState });
 
-  test("5. Billing settings page displays 4-tier commercial plans and upgrade triggers", async ({ page }) => {
+  test("5. Billing settings page displays 4-tier commercial plans and correct plan CTAs", async ({ page }) => {
     await page.goto("/settings/billing");
-    await expect(page.getByRole("heading", { name: "Subscription & Billing" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Billing & Plans" })).toBeVisible();
 
     // Verify all 4 commercial tiers are present
     await expect(page.getByRole("heading", { name: "Community" })).toBeVisible();
@@ -83,8 +83,16 @@ test.describe("Commercial Billing & Entitlements Gate", () => {
     await expect(page.getByRole("heading", { name: "Business" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Paid Pilot" })).toBeVisible();
 
-    // Verify upgrade buttons exist for paid tiers
-    const upgradeTeamBtn = page.getByRole("button", { name: /Upgrade to Team/i });
-    await expect(upgradeTeamBtn).toBeVisible();
+    // The default billing mode routes paid plan changes through GitHub Marketplace.
+    const marketplaceLinks = page.getByRole("link", { name: "Managed through GitHub Marketplace" });
+    await expect(marketplaceLinks).toHaveCount(2);
+    await expect(marketplaceLinks.first()).toHaveAttribute(
+      "href",
+      "https://github.com/marketplace/actions/boardreadyops",
+    );
+    await expect(page.getByRole("link", { name: "Apply for Pilot" })).toHaveAttribute(
+      "href",
+      "mailto:pilot@boardreadyops.com?subject=Paid%20Pilot%20Inquiry",
+    );
   });
 });

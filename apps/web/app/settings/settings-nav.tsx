@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 const destinations = [
   { label: "Members", href: "/settings/workspace" },
-  { label: "Billing & Seats", href: "/settings/billing" },
+  { label: "Billing & Plans", href: "/settings/billing" },
   { label: "Security & Access", href: "/settings/security" },
   { label: "Audit Log", href: "/settings/audit" },
   { label: "Data & Retention", href: "/settings/data" },

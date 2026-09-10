@@ -77,6 +77,19 @@ describe("repository setup preview page", () => {
     expect(markup).toContain('href="#readiness"');
   });
 
+  it("gives every preset selection action a 44px mobile touch target", async () => {
+    const markup = await render({ preset: "prototype" });
+    const window = new Window({ url: "https://boardreadyops.example/setup" });
+    window.document.write(markup);
+    const presetLinks = [...window.document.querySelectorAll<HTMLAnchorElement>('a[href^="/setup?preset="]')];
+
+    expect(presetLinks).toHaveLength(4);
+    for (const link of presetLinks) {
+      expect(link.classList.contains("min-h-11")).toBe(true);
+    }
+    await window.close();
+  });
+
   it("emphasizes configuration preview honesty and explicit recovery actions", async () => {
     const markup = await render({ preset: "prototype" });
     expect(markup).toContain("Configuration preview only");
