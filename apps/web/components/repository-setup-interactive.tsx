@@ -149,7 +149,7 @@ export function RepositorySetupInteractive({
                   <Definition label="Fail threshold">{preset.failOn}</Definition>
                 </DefinitionGrid>
                 <Link
-                  className={`mt-2 inline-flex w-fit items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] ${
+                  className={`mt-2 inline-flex min-h-11 w-fit items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] ${
                     isSelected
                       ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
                       : "border-border bg-secondary text-secondary-foreground hover:bg-secondary/80"
