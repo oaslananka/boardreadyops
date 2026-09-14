@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.48.0](https://github.com/oaslananka/boardreadyops/compare/v1.47.1...v1.48.0) (2026-09-14)
+
+
+### Features
+
+* **cloud:** let an operator resolve a workspace slug, and record the demo corpus licence ([#760](https://github.com/oaslananka/boardreadyops/issues/760)) ([a3fae17](https://github.com/oaslananka/boardreadyops/commit/a3fae179b8e986376a1f9823cf2c5ed22242c864))
+
 ## [1.47.1](https://github.com/oaslananka/boardreadyops/compare/v1.47.0...v1.47.1) (2026-09-14)
 
 
