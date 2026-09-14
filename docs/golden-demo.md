@@ -4,7 +4,7 @@ The golden demo is a tiny, self-contained corpus that shows BoardReadyOps catchi
 
 ## Live pull request demos
 
-Two public repositories turn the local fixture into a reviewable GitHub experience. Both carry the same synthetic hardware as `examples/golden-demo`, under the same MIT licence, and run the published Action pinned to a commit SHA. No GitHub App installation is needed to read them.
+Two public repositories turn the local fixture into a reviewable GitHub experience. Both carry the same synthetic hardware as `examples/golden-demo` and run the published Action pinned to a commit SHA. The two demo repositories are published under MIT so a reader can lift the board, the config, or the workflow straight into their own project; this is deliberately more permissive than BoardReadyOps itself, which is [PolyForm Noncommercial](https://github.com/oaslananka/boardreadyops/blob/main/LICENSE). No GitHub App installation is needed to read them.
 
 | Repository | Pull request | Check on the PR | What it shows |
 | --- | --- | --- | --- |

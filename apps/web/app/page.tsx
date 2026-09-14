@@ -468,7 +468,7 @@ export default function HomePage() {
               ))}
             </ul>
             <p className="mt-4 text-xs text-muted-foreground">
-              Synthetic hardware, MIT licensed. Reproduce either locally with{" "}
+              Synthetic hardware under MIT, so you can copy it. Reproduce either locally with{" "}
               <code className="rounded-sm bg-muted px-1.5 py-0.5">npx @boardreadyops/cli run .</code> — no KiCad
               installation needed.
             </p>
