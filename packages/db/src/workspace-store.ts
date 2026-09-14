@@ -243,6 +243,35 @@ export class WorkspaceStore {
     }));
   }
 
+  /**
+   * A workspace by slug, with the logins that own it.
+   *
+   * Exists for one question that was previously unanswerable: someone is told their chosen slug
+   * is taken, on a page that has just told them they belong to no workspaces. Both statements are
+   * true -- slugs are a single global namespace because they appear in URLs, while the page lists
+   * only your own memberships -- so the conflict is usually with a workspace the person cannot
+   * see, and nobody could say which.
+   *
+   * Owners rather than every member: enough to route the question to a human, and no more of
+   * other people's membership than that needs.
+   */
+  async findWorkspaceBySlugWithOwners(
+    slug: string,
+  ): Promise<{ workspace: WorkspaceRecord; owners: readonly string[] } | null> {
+    const workspace = await this.getWorkspaceBySlug(slug);
+    if (!workspace) return null;
+
+    const result = (await this.executor.query(
+      `select user_id
+         from workspace_members
+        where workspace_id = $1 and role = 'owner'
+        order by user_id`,
+      [workspace.id],
+    )) as { rows?: { user_id: string }[] };
+
+    return { workspace, owners: (result?.rows ?? []).map((row) => row.user_id) };
+  }
+
   async getWorkspaceBySlug(slug: string): Promise<WorkspaceRecord | null> {
     const result = (await this.executor.query(
       `select id, name, slug, plan_tier, stripe_customer_id, created_at

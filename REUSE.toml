@@ -32,3 +32,19 @@ path = [
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Osman Aslan"
 SPDX-License-Identifier = "LicenseRef-REUSE"
+
+# The golden-demo corpus is MIT, deliberately more permissive than the project around it.
+#
+# These exact bytes are already published under MIT in oaslananka/boardreadyops-demo-pass and
+# -demo-fail, whose READMEs invite the reader to copy the board, the config, or the workflow into
+# their own project. That invitation has to be real -- a demo nobody may reuse teaches nothing --
+# and the grant has already been made to the same bytes by the same copyright holder. So this
+# records what is true rather than extending anything; without it the identical files claim two
+# different licences depending on which repository you happen to read.
+[[annotations]]
+path = [
+  "examples/golden-demo/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Osman Aslan"
+SPDX-License-Identifier = "MIT"
