@@ -32,7 +32,7 @@ const kindOptions: readonly KindOption[] = [
   {
     value: "slack",
     label: "Slack",
-    hint: "Paste an incoming webhook URL from a Slack app. Messages arrive formatted, with a link back.",
+    hint: "Create one in Slack under Apps → Incoming Webhooks → Add to Slack, pick the channel, then paste the URL it gives you. Messages arrive formatted, with a link back.",
     destinationLabel: "Incoming webhook URL",
     destinationPlaceholder: "https://hooks.slack.com/services/…",
     destinationType: "url",

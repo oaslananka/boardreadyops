@@ -160,9 +160,11 @@ function AuditLogContent({ listing, eventType }: Readonly<{ listing: AuditListin
             from a row" only works if a row with the type you want happens to be on screen.
           */}
           <datalist id="audit-event-type-options">
-            {[...new Set(listing.events.map((entry) => entry.eventType))].sort().map((type) => (
-              <option key={type} value={type} />
-            ))}
+            {[...new Set(listing.events.map((entry) => entry.eventType))]
+              .sort((a, b) => a.localeCompare(b))
+              .map((type) => (
+                <option key={type} value={type} />
+              ))}
           </datalist>
           <p id="audit-event-type-hint" className="text-meta text-muted-foreground">
             An exact event type. The box suggests the ones on this page; there are more than these.
