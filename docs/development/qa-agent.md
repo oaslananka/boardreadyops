@@ -26,8 +26,8 @@ overflow, touch target size), and cross-page link integrity.
 | `pnpm qa:audit` | Full route audit, 3 viewports (375/768/1440), one browser | Before a UI-heavy PR, or `pnpm qa` |
 | `pnpm qa:e2e` | Review lifecycle, modal contract, tabs contract, regression suite | After touching review/modal/tab UI |
 | `pnpm qa:a11y` | Just the axe pass from the audit, desktop, critical routes | Quick accessibility check |
-| `pnpm qa:visual` | Screenshot regression against `tests/e2e/*-snapshots/` | After a visual change |
-| `pnpm qa:visual:update` | Regenerates visual baselines | **Only** after reviewing the diff yourself |
+| `pnpm qa:visual` | Screenshot regression against `tests/e2e/*-snapshots/` | After a visual change (also `ci / visual` on every web-UI PR) |
+| `pnpm qa:visual:update` | Regenerates visual baselines | Linux only — use the `qa-visual-baselines` workflow, and review the render yourself |
 | `pnpm qa:cross-browser` | Full audit + qa:e2e across Chromium/Firefox/WebKit | Nightly (also `qa-nightly.yml`) |
 | `pnpm qa:route-coverage` | Fails if a `page.tsx` has no `qa/audit/routes.ts` entry | Runs as part of `qa:audit`'s file set |
 | `pnpm qa:production-smoke` | Read-only synthetic checks against a real deployment | Manually, with `PLAYWRIGHT_BASE_URL` set |
@@ -92,15 +92,37 @@ shows before/after/diff images) and confirming the change is the *intended* UI c
 regression. Commit baseline updates in the same PR as the UI change that caused them, with a
 one-line note on why in the commit message.
 
-Playwright names snapshots per-OS (`<id>-chromium-<platform>.png`). The baselines currently
-committed were generated on Windows (`-win32`) because this repo's dev environment has no
-Docker/Linux available. `qa-nightly`'s `visual` job runs on `ubuntu-24.04`, so its **first** run
-will fail with "no baseline found" for every route -- expected, not a regression. To fix: run
-`qa-nightly` once (`workflow_dispatch`), download the `qa-visual-diffs` artifact from the failed
-run (already wired up via `actions/upload-artifact` on failure), copy the `-chromium-linux.png`
-actual-screenshot files it contains into `tests/e2e/visual.spec.ts-snapshots/`, review them, and
-commit. After that one-time step, both the Windows and Linux baselines are present and the job
-diffs normally on every subsequent run.
+### Where the baselines are checked
+
+`ci / visual` runs `pnpm qa:visual` on every pull request that touches the web UI, gated on the
+same `needs_accessibility` signal as the accessibility and `qa-e2e` jobs. `qa-nightly`'s `visual`
+job runs the same suite on a schedule.
+
+The pull request check is the one that matters. Before it existed, a change could alter the page
+and merge with a stale baseline while every check was green, and the failure surfaced the next
+morning on a run nobody was watching — pointing at a page that was correct. That happened once;
+hence the job.
+
+### Regenerating them
+
+Playwright names snapshots per-OS (`<id>-chromium-<platform>.png`) and the committed baselines
+are Linux-only (`-chromium-linux.png`), because that is what CI runs on. A Windows or macOS
+checkout **cannot** produce them: a local `pnpm qa:visual:update` writes `-win32` or `-darwin`
+files that CI never reads, and the Linux baseline stays stale.
+
+So regenerate through the `qa-visual-baselines` workflow instead:
+
+1. Push the UI change to a branch.
+2. `gh workflow run qa-visual-baselines.yml --ref <branch>` — it runs `qa:visual:update` on
+   `ubuntu-24.04` and uploads the snapshot directory as an artifact. It has `contents: read`
+   only, so it cannot commit; you decide what lands.
+3. `gh run download <run-id>` and compare each file against what is committed. The workflow
+   regenerates **all** baselines, so check the hashes and commit only the ones that actually
+   changed — otherwise an unrelated drift rides along unreviewed.
+4. **Open the new screenshot and look at it** before committing. A baseline is worth exactly as
+   much as the render inside it; committing a broken layout teaches the suite that the breakage
+   is correct. Cropping the changed region and reading it takes a minute.
+5. Commit with a note on what changed and why, ideally citing the run id.
 
 ## Inspecting a failure
 
@@ -240,6 +262,7 @@ unrelated changes while standing this up:
   session, so an unexpected 401 is a real P0 instead of an allowlisted local-dev artifact. Routes
   that require an installation/repository seeded in Postgres are still skipped or degraded when
   `DATABASE_URL` is absent; a disposable seeded tenant remains a separate infrastructure task.
-- **Visual baselines**: Linux Chromium baselines are checked in for every `visualRoutes` entry and
-  are the authoritative nightly snapshots. Update them only after reviewing an intentional UI
-  change with `pnpm qa:visual:update`.
+- **Visual baselines**: Linux Chromium baselines are checked in for every `visualRoutes` entry
+  and are checked by `ci / visual` on every web-UI pull request, not only nightly. Regenerate
+  them through the `qa-visual-baselines` workflow — a local `qa:visual:update` writes a
+  `-win32`/`-darwin` file CI never reads — and look at the render before committing it.
