@@ -83,9 +83,9 @@ inputs:
     default: "true"
   github-token:
     description: >-
-      Token used to comment on pull requests, upload SARIF, and read the base run for the
-      fabrication diff. Defaults to the workflow's own token; override only to post as a
-      different identity.
+      Token used to comment on pull requests, upload SARIF, and read the earlier run that the
+      fabrication diff compares against. Defaults to the workflow's own token; override only to
+      post as a different identity.
     required: false
     default: ${{ github.token }}
   comment-pr:

@@ -46,7 +46,7 @@ moves with stable releases.
 | `hbom` | `` | Output CycloneDX hardware SBOM path. Empty disables. |
 | `upload-sarif` | `true` | Upload SARIF to GitHub Code Scanning. |
 | `upload-artifacts` | `true` | Upload reports as workflow artifacts. |
-| `github-token` | `${{ github.token }}` | Token used to comment on pull requests, upload SARIF, and read the base run for the fabrication diff. Defaults to the workflow's own token; override only to post as a different identity. |
+| `github-token` | `${{ github.token }}` | Token used to comment on pull requests, upload SARIF, and read the earlier run that the fabrication diff compares against. Defaults to the workflow's own token; override only to post as a different identity. |
 | `comment-pr` | `true` | Post a sticky Markdown comment on pull requests. |
 | `comment-format` | `report` | Pull request comment style. One of report (full Markdown report) or review (compact release-review summary). |
 | `artifact-name` | `boardreadyops` | Workflow artifact name. |

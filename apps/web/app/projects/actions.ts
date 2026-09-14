@@ -67,8 +67,16 @@ export const createWorkspaceAction = defineAction(createWorkspaceSchema, async (
 
   const { store, executor } = await openWorkspaceStore(connectionString);
   try {
+    // Slugs are one global namespace because they appear in workspace URLs, but this page only
+    // lists the workspaces you belong to. So the conflict is usually with a workspace you cannot
+    // see, and "already taken" read as if you had made a duplicate -- on a page that had just
+    // told you that you have none. Say which namespace it is.
     const existing = await store.getWorkspaceBySlug(input.slug);
-    if (existing) return fail("That slug is already taken.");
+    if (existing) {
+      return fail(
+        `Another workspace already uses the slug "${input.slug}". Slugs are unique across all of BoardReadyOps because they appear in URLs, so this can be a workspace you are not a member of. Pick a different one.`,
+      );
+    }
 
     // The creator becomes the owner in the same statement that inserts the workspace, so one can
     // never exist with no member — which is the state that made the v2 API unauthorizable.
