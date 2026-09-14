@@ -129,6 +129,25 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
             <Definition label="Open findings">{repository.latestRunId ? repository.openFindings : "—"}</Definition>
             <Definition label="Boards watched">{repository.watchedBoards}</Definition>
           </DefinitionGrid>
+          {/*
+            "How do I stop watching this repository?" had no answer anywhere in the product. It
+            is GitHub's to answer — the App's repository access is what connects it, and
+            `repositories.disabled_at` is set from the `installation_repositories` webhook rather
+            than by anything here — but saying nothing left people hunting for a button that
+            should not exist.
+          */}
+          <p className="mt-4 border-t border-border pt-3 text-meta text-muted-foreground">
+            To stop watching this repository, remove it from the BoardReadyOps App's repository access on GitHub;{" "}
+            <a
+              href={`https://github.com/settings/installations/${repository.githubInstallationId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              manage the installation
+            </a>
+            . Runs and evidence already recorded stay here.
+          </p>
         </Panel>
 
         <Panel title="Recent runs">

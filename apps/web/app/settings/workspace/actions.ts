@@ -44,6 +44,31 @@ function refuseMemberManagement(actorRole: string | null, targetRole?: (typeof r
   return undefined;
 }
 
+/**
+ * Whether GitHub knows this login.
+ *
+ * The form takes a username and grants access to it. A typo therefore grants access to an account
+ * that may not exist — or, worse, to a different real person whose name is one character away.
+ * Nothing here can tell those two apart, but refusing the first catches most of it.
+ *
+ * Unauthenticated, so it is rate limited; a rate limit or an outage resolves to "cannot tell",
+ * and the grant proceeds. Blocking member management because GitHub is briefly unreachable would
+ * be the worse failure.
+ */
+async function githubLoginExists(login: string): Promise<boolean | undefined> {
+  try {
+    const response = await fetch(`https://api.github.com/users/${encodeURIComponent(login)}`, {
+      headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (response.status === 404) return false;
+    if (response.ok) return true;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const upsertWorkspaceMemberAction = defineAction(upsertSchema, async (input, { session }) => {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return fail("This deployment has no database configured.");
@@ -53,6 +78,12 @@ export const upsertWorkspaceMemberAction = defineAction(upsertSchema, async (inp
     const actorRole = await store.workspaceRoleFor(input.workspaceId, session.login);
     const refusal = refuseMemberManagement(actorRole, input.role);
     if (refusal) return fail(refusal);
+
+    // Checked after authorization, so an unauthorized caller cannot use this form to probe
+    // which GitHub logins exist.
+    if ((await githubLoginExists(input.userId)) === false) {
+      return fail(`GitHub has no user called "${input.userId}". Check the spelling.`);
+    }
 
     // Demoting yourself out of ownership is how a workspace loses its last owner without anyone
     // being removed, so it is refused for the same reason removal is.
