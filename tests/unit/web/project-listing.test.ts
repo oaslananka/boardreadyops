@@ -4,6 +4,10 @@ import type { UserSession } from "../../../apps/web/lib/user-session.js";
 
 const listWorkspacesForUser = vi.fn();
 const listProjectsByWorkspace = vi.fn();
+// The listing carries what a delete would destroy, so the confirmation dialog can state the
+// blast radius without waiting for a round trip. Only an owner pays for these.
+const workspaceDeletionImpact = vi.fn(async () => ({ projects: 0, revisions: 0, deliveries: 0 }));
+const projectDeletionImpact = vi.fn(async () => ({ revisions: 0, deliveries: 0 }));
 const close = vi.fn();
 
 vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
@@ -13,6 +17,8 @@ vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
   WorkspaceStore: class {
     listWorkspacesForUser = listWorkspacesForUser;
     listProjectsByWorkspace = listProjectsByWorkspace;
+    workspaceDeletionImpact = workspaceDeletionImpact;
+    projectDeletionImpact = projectDeletionImpact;
   },
 }));
 
