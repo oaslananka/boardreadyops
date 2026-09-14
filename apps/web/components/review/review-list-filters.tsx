@@ -40,8 +40,13 @@ export function ReviewListFilterBar({
 }: Readonly<ReviewListFilterBarProps>) {
   return (
     <section className="flex flex-col gap-3 rounded-md border border-border bg-card p-4" aria-label="Review filters">
-      <form method="get" className="flex flex-col gap-3 lg:flex-row lg:items-end">
-        <div className="min-w-0 flex-1">
+      {/*
+        Wraps rather than forcing one row. Five controls and a button do not fit on one line even
+        at desktop width, and the search field — the only one without a fixed minimum — was the
+        one that got squeezed to nothing, leaving its label overlapping the next control.
+      */}
+      <form method="get" className="flex flex-wrap items-end gap-3">
+        <div className="min-w-56 flex-1">
           <label htmlFor="review-filter-q" className="text-meta font-medium text-foreground">
             Search
           </label>
