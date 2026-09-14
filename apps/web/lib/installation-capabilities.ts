@@ -79,7 +79,7 @@ export function createInstallationCapabilitiesDependencies(
 }
 
 /** GitHub's own installation settings page, which is where a grant is widened. */
-export function installationManageUrl(githubInstallationId: number): string {
+function installationManageUrl(githubInstallationId: number): string {
   return `https://github.com/settings/installations/${githubInstallationId}`;
 }
 
@@ -101,19 +101,4 @@ export async function loadInstallationCapabilities(
     actions: evaluateActionAvailability(permissions),
     manageUrl: installationManageUrl(githubInstallationId),
   };
-}
-
-/** Whether a named action is available, with the explanation to show when it is not. */
-export function actionAvailability(
-  capabilities: InstallationCapabilities | undefined,
-  actionId: GitHubAppActionAvailability["id"],
-): { available: boolean; explanation?: string | undefined } {
-  // Without a reading, assume available and let the server refuse with the authoritative reason.
-  // Hiding a button because GitHub was briefly unreachable is the worse failure.
-  if (!capabilities) return { available: true };
-  const action = capabilities.actions.find((entry) => entry.id === actionId);
-  if (!action) return { available: true };
-  return action.satisfied
-    ? { available: true }
-    : { available: false, explanation: action.userExplanation ?? "This action requires additional App permissions." };
 }

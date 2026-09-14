@@ -49,7 +49,7 @@ export type NotificationAdminScope = {
   emailAvailable: boolean;
 };
 
-export function toChannelView(record: NotificationChannelRecord): NotificationChannelView {
+function toChannelView(record: NotificationChannelRecord): NotificationChannelView {
   return {
     id: record.id,
     kind: record.kind,

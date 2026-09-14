@@ -38,7 +38,7 @@ export const reviewSortLabels: Record<ReviewListSort, string> = {
 };
 
 /** Decision values shown in the filter, in the order a reviewer cares about them. */
-export const reviewDecisionOrder: readonly string[] = ["pending", "changes_requested", "approved", "rejected"];
+const reviewDecisionOrder: readonly string[] = ["pending", "changes_requested", "approved", "rejected"];
 
 function single(value: string | string[] | undefined): string | undefined {
   const first = Array.isArray(value) ? value[0] : value;
@@ -130,8 +130,11 @@ export function reviewListFacets(reviews: readonly ReviewListFilterable[]): {
       };
       return rank(a) - rank(b) || a.localeCompare(b);
     }),
-    statuses: [...statuses].sort(),
-    repositories: [...repositories].sort(),
+    // `localeCompare` rather than a bare sort: these are rendered in a dropdown a person reads,
+    // and the default comparator orders by UTF-16 code unit, which misplaces any owner or board
+    // name outside ASCII.
+    statuses: [...statuses].sort((a, b) => a.localeCompare(b)),
+    repositories: [...repositories].sort((a, b) => a.localeCompare(b)),
   };
 }
 

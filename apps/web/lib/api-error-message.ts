@@ -12,7 +12,7 @@
  * while keeping developer shorthand off the screen.
  */
 
-export type ApiFailureAction = {
+type ApiFailureAction = {
   label: string;
   href: string;
 };

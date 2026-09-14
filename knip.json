@@ -14,8 +14,13 @@
       "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.mjs"]
     },
     "apps/web": {
-      "entry": ["worker.ts"],
-      "project": ["lib/**/*.{ts,js}", "app/api/github/webhook/**/*.{ts,js}", "components/review/**/*.{ts,tsx}"],
+      "entry": ["worker.ts", "app/**/page.tsx", "app/**/route.ts", "app/**/actions.ts"],
+      "project": [
+        "lib/**/*.{ts,js}",
+        "app/api/github/webhook/**/*.{ts,js}",
+        "components/review/**/*.{ts,tsx}",
+        "components/settings/**/*.{ts,tsx}"
+      ],
       "ignoreDependencies": [
         "class-variance-authority",
         "lucide-react",

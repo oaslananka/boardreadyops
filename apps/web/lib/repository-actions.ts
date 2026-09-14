@@ -59,7 +59,7 @@ export type RepositoryActionDependencies = {
   newId(): string;
 };
 
-export function createRepositoryActionDependencies(
+function createRepositoryActionDependencies(
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): RepositoryActionDependencies {
   const capabilities = createInstallationCapabilitiesDependencies(environment);
