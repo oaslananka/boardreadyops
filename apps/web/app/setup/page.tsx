@@ -6,10 +6,13 @@ import {
   repositorySetupWorkflowContractVersion,
   repositorySetupWorkflowPath,
 } from "@boardreadyops/cloud-core/repository-setup";
+import { AppPermissionProfile } from "../../components/app-permission-profile.js";
 import { RepositorySetupInteractive } from "../../components/repository-setup-interactive.js";
-import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { Alert, AppShell, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
+import { loadInstallationCapabilities } from "../../lib/installation-capabilities.js";
+import { loadViewerRepositories } from "../../lib/repository-dashboard.js";
+import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
 export const metadata = {
   title: "Repository setup preview",
@@ -24,42 +27,45 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/** The exact GitHub App permission set, kept as data so the page cannot drift from the list. */
-const requestedPermissions = [
-  { scope: "Repository", permission: "Metadata: read", purpose: "Bind the installation to the intended repository." },
-  {
-    scope: "Repository",
-    permission: "Pull requests: read",
-    purpose: "Attach each run to the pull request it belongs to.",
-  },
-  { scope: "Repository", permission: "Checks: write", purpose: "Publish verified readiness conclusions." },
-  {
-    scope: "Repository",
-    permission: "Actions: write",
-    purpose: "Dispatch the repository-owned readiness workflow.",
-  },
-  {
-    scope: "Repository",
-    permission: "Contents: none",
-    purpose: "Repository files stay under contributor-controlled pull requests.",
-  },
-  {
-    scope: "Organization / account",
-    permission: "None",
-    purpose: "No organization-wide or user-account authority.",
-  },
-];
+/**
+ * The repositories a signed-in viewer may open a setup pull request against.
+ *
+ * Resolved here rather than in the client component so the list is already scoped to the
+ * viewer's installations by `loadViewerRepositories`; the client never learns about a repository
+ * the session does not cover, and the action route re-checks the same scope anyway.
+ */
+async function setupTargets() {
+  const viewer = await viewerAuthorization();
+  if (!viewer.session) return { signedIn: false, repositories: [] as const, capabilities: undefined };
 
-const permissionColumns: readonly DataColumn<(typeof requestedPermissions)[number]>[] = [
-  { id: "scope", header: "Scope", rowHeader: true, cell: (row) => row.scope },
-  { id: "permission", header: "Permission", cell: (row) => row.permission },
-  { id: "purpose", header: "Purpose", cell: (row) => <span className="text-muted-foreground">{row.purpose}</span> },
-];
+  const groups = await loadViewerRepositories(viewer.session);
+  const repositories = groups.flatMap((group) =>
+    group.repositories.map((repository) => ({
+      id: repository.id,
+      fullName: `${repository.owner}/${repository.name}`,
+      accountLogin: repository.accountLogin,
+      githubInstallationId: repository.githubInstallationId,
+    })),
+  );
+
+  // Every repository in one installation shares its grants, and nearly every workspace has a
+  // single installation, so one reading answers the page. A mixed-installation viewer sees the
+  // first installation's grants and the server still refuses per repository with the exact reason.
+  const capabilities = await loadInstallationCapabilities(repositories[0]?.githubInstallationId);
+  return { signedIn: true, repositories, capabilities };
+}
 
 export default async function SetupPage({ searchParams }: Readonly<SetupPageProps>) {
   const parameters = await searchParams;
   const selectedValue = first(parameters.preset);
   const hasInstallationHandoff = first(parameters.installation_id) !== undefined;
+  const targets = await setupTargets();
+  const installationGrants = targets.capabilities;
+  // When the grants are readable and the capability is absent, say so on the button rather than
+  // hiding it: a missing permission is a fixable state, and a button that vanished teaches nothing.
+  const setupBlockedReason = installationGrants?.actions.find(
+    (action) => action.id === "setup" && !action.satisfied,
+  )?.userExplanation;
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
   const selected =
@@ -71,27 +77,27 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8" id="main-content">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs uppercase text-muted-foreground">Repository setup preview</p>
+            <p className="text-xs uppercase text-muted-foreground">Repository setup</p>
             <h1 className="text-2xl font-bold text-foreground">
-              Choose a policy, review every file, then validate the default branch.
+              Choose a policy, review every file, then let us open the pull request.
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              BoardReadyOps never writes repository contents with the production GitHub App. Review the exact
-              configuration below, commit it through your normal branch protections, and run an OIDC-bound readiness
-              probe.
+              Nothing is committed until you act. Read the exact two files below, then either copy them into your own
+              branch or have BoardReadyOps open the pull request for you — the contents are identical either way, and
+              both land as a pull request your reviewers approve.
             </p>
           </div>
-          <StatusBadge value="preview" label="No repository changes are made here" />
+          <StatusBadge value="preview" label="Nothing changes until you choose" />
         </header>
 
-        <Alert title="Configuration preview only" tone="info">
+        <Alert title="Read the files before you decide" tone="info">
           <p>
-            No files are written to your repository automatically. Review the exact configuration below, commit it
-            through your normal pull request process, and trigger your first run to establish the baseline.
+            Both paths end at the same reviewed pull request against a new branch, never a commit to your default
+            branch. Step 3 is where you choose between copying the files yourself and having them opened for you.
           </p>
         </Alert>
 
-        <nav className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Repository setup steps">
+        <nav className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Repository setup steps">
           <a
             href="#policy-preset"
             className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
@@ -115,14 +121,25 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
             </strong>
           </a>
           <a
-            href="#readiness"
+            href="#automated-setup"
             className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
           >
             <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground border border-border text-sm font-bold transition-colors group-hover:border-primary/40 group-hover:text-foreground">
               03
             </span>
             <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
-              3. Validate readiness in GitHub Actions
+              3. Open the pull request
+            </strong>
+          </a>
+          <a
+            href="#readiness"
+            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
+          >
+            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground border border-border text-sm font-bold transition-colors group-hover:border-primary/40 group-hover:text-foreground">
+              04
+            </span>
+            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
+              4. Validate readiness in GitHub Actions
             </strong>
           </a>
         </nav>
@@ -143,11 +160,13 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
           </Alert>
         ) : null}
 
-        <Alert title="Least privilege is preserved" tone="info">
+        <Alert title="What BoardReadyOps may write, and where it may not" tone="info">
           <p>
-            The App uses Metadata read, Pull requests read, Checks write, and Actions write. Contents access,
-            organization permissions, and account permissions remain disabled. Any future assisted installation would
-            require a separate, explicit opt-in to Contents write.
+            Repository writes are limited to <code>boardreadyops.yml</code>,{" "}
+            <code>.github/workflows/{repositorySetupWorkflowPath}</code>, and <code>.boardreadyops/**</code>, always on
+            a new branch opened as a pull request for your review. BoardReadyOps never commits to a default branch,
+            never bypasses branch protection or required reviews, and requests no organization or account permission.
+            The full list is in <a href="#permissions">Permission review</a> below.
           </p>
         </Alert>
 
@@ -158,11 +177,14 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
           workflowPath={repositorySetupWorkflowPath}
           workflowContractVersion={repositorySetupWorkflowContractVersion}
           workflowSource={workflowSource}
+          repositories={targets.repositories}
+          signedIn={targets.signedIn}
+          {...(setupBlockedReason ? { blockedReason: setupBlockedReason } : {})}
         />
 
         <Panel
           id="readiness"
-          title="3. Validate readiness in GitHub Actions"
+          title="4. Validate readiness in GitHub Actions"
           description="The control plane first inspects Actions and workflow metadata, then dispatches a short-lived probe owned by the target repository."
         >
           <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
@@ -204,19 +226,11 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
           </div>
         </Panel>
 
-        <Panel
-          id="permissions"
-          title="Permission review"
-          description="No hidden organization or account access is requested."
-        >
-          <DataTable
-            caption="Required GitHub App permissions and purposes"
-            columns={permissionColumns}
-            rows={requestedPermissions}
-            rowKey={(row) => `${row.scope}:${row.permission}`}
-            empty={null}
-          />
-        </Panel>
+        <AppPermissionProfile
+          {...(installationGrants ? { granted: installationGrants.permissions } : {})}
+          {...(installationGrants ? { missing: installationGrants.missing } : {})}
+          {...(installationGrants?.manageUrl ? { manageUrl: installationGrants.manageUrl } : {})}
+        />
       </main>
     </AppShell>
   );

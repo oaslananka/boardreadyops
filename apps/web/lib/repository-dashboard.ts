@@ -15,6 +15,10 @@ import type { UserSession } from "./user-session.js";
 
 export type RepositorySummary = {
   id: string;
+  /** Internal installation id; what every control-plane store and route is keyed by. */
+  installationId: string;
+  /** GitHub's installation id; what an installation access token and its grants are minted from. */
+  githubInstallationId: number;
   accountLogin: string;
   owner: string;
   name: string;
@@ -72,6 +76,7 @@ const repositorySummaryQuery = `
            repositories.owner,
            repositories.name,
            repositories.private,
+           repositories.installation_id,
            installations.account_login,
            installations.github_installation_id
       from repositories
@@ -96,6 +101,8 @@ const repositorySummaryQuery = `
          visible.owner,
          visible.name,
          visible.private,
+         visible.installation_id,
+         visible.github_installation_id,
          coalesce(nullif(visible.account_login, ''), visible.owner) as account_login,
          latest.run_id,
          latest.status,
@@ -142,11 +149,15 @@ export async function loadViewerRepositories(
       const id = text(row, "id");
       const owner = text(row, "owner");
       const name = text(row, "name");
-      if (!id || !owner || !name) continue;
+      const installationId = text(row, "installation_id");
+      if (!id || !owner || !name || !installationId) continue;
       const accountLogin = text(row, "account_login") ?? owner;
 
       const summary: RepositorySummary = {
         id,
+        installationId,
+        // node-postgres decodes bigint as a string to avoid precision loss.
+        githubInstallationId: count(row, "github_installation_id"),
         accountLogin,
         owner,
         name,
