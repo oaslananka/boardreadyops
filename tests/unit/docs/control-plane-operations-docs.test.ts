@@ -266,7 +266,15 @@ ${operations}`;
     expect(canaries).toContain("verify the live App registration");
     expect(canaries).toContain("Do not install the App");
     expect(canaries).toContain("No organization or account permissions");
-    expect(canaries).toContain("#88");
+    // The runbook used to tell operators to refuse any installation requesting Contents and to
+    // keep #88 open until the registration was reduced. That instruction contradicted the
+    // capability model and the mutation service, which have always needed `contents: write` to
+    // open a setup, waiver, or remediation pull request. ADR-0018 settled it; the runbook now
+    // points at the declared profile rather than carrying its own copy of the list.
+    expect(canaries).toContain("githubAppPermissionProfile");
+    expect(canaries).toContain("A Contents or Workflows write grant is expected");
+    expect(canaries).toContain("ADR-0018");
+    expect(canaries).not.toContain("keep [#88]");
     expect(canaries).toContain("approval-required state");
     expect(canaries).toContain("does not depend on those ordinary pull request workflows");
     expect(canaries).toContain("exact nonce SHA");
