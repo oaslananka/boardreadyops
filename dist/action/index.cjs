@@ -79716,7 +79716,7 @@ ${payload.summary}`,
   }
 };
 
-// src/notifiers/email/smtp.ts
+// packages/cloud-core/src/smtp.ts
 var import_node_net = __toESM(require("node:net"), 1);
 var import_node_tls = __toESM(require("node:tls"), 1);
 async function sendSmtpEmail(smtpUrl, message, options = {}) {
