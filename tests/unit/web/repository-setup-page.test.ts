@@ -38,7 +38,7 @@ async function axeViolations(markup: string): Promise<string[]> {
 }
 
 describe("repository setup preview page", () => {
-  it("renders all presets, exact file paths, least privilege and validation steps", async () => {
+  it("renders all presets, exact file paths, the declared permission profile and validation steps", async () => {
     const markup = await render({ preset: "production" });
     expect(markup).toContain("Open-source hardware");
     expect(markup).toContain("Prototype fabrication");
@@ -46,7 +46,12 @@ describe("repository setup preview page", () => {
     expect(markup).toContain("Contract design handoff");
     expect(markup).toContain("boardreadyops.yml");
     expect(markup).toContain(".github/workflows/readiness-runner.yml");
-    expect(markup).toContain("Contents: none");
+    // The page renders the profile declared in cloud-core rather than its own copy of the list,
+    // which is what previously let it advertise `Contents: none` while the setup API and the
+    // mutation service were both built for `contents: write`.
+    expect(markup).toContain("Contents");
+    expect(markup).toContain("never to the default branch");
+    expect(markup).not.toContain("Contents: none");
     expect(markup).toContain("GitHub Actions OIDC");
     expect(markup).toContain("releaseMode: production");
     expect(markup).toContain("Enabled findings at medium severity or above");
@@ -67,14 +72,25 @@ describe("repository setup preview page", () => {
     expect(markup).not.toContain("123456789");
   });
 
-  it("presents setup as a three-step guided journey", async () => {
+  it("presents setup as a four-step guided journey ending at a real pull request", async () => {
     const markup = await render({ preset: "prototype" });
     expect(markup).toContain("1. Choose a release policy");
     expect(markup).toContain("2. Review repository-owned files");
-    expect(markup).toContain("3. Validate readiness in GitHub Actions");
+    expect(markup).toContain("3. Open the pull request");
+    expect(markup).toContain("4. Validate readiness in GitHub Actions");
     expect(markup).toContain('href="#policy-preset"');
     expect(markup).toContain('href="#proposed-files"');
+    expect(markup).toContain('href="#automated-setup"');
     expect(markup).toContain('href="#readiness"');
+  });
+
+  it("offers the one-click step to a signed-out visitor instead of hiding it", async () => {
+    const markup = await render({ preset: "prototype" });
+    // The panel used to render only when an installation and repository were both passed, and
+    // the only caller passed neither, so the zero-touch promise had no entry point at all.
+    expect(markup).toContain("3. Open the setup pull request");
+    expect(markup).toContain("Sign in with GitHub");
+    expect(markup).toContain("commit them yourself");
   });
 
   it("gives every preset selection action a 44px mobile touch target", async () => {
@@ -90,9 +106,10 @@ describe("repository setup preview page", () => {
     await window.close();
   });
 
-  it("emphasizes configuration preview honesty and explicit recovery actions", async () => {
+  it("says what is written and where it cannot be written, plus explicit recovery actions", async () => {
     const markup = await render({ preset: "prototype" });
-    expect(markup).toContain("Configuration preview only");
+    expect(markup).toContain("Read the files before you decide");
+    expect(markup).toContain("never a commit to your default");
     expect(markup).toContain("Recovery and troubleshooting");
   });
 

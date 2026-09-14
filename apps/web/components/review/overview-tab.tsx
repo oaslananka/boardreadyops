@@ -1,5 +1,29 @@
 import type { DemoReview } from "../../lib/demo-data.js";
+import { Button } from "../ui/button.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
+
+/**
+ * Whether this revision has rendered schematic/PCB snapshots behind the Changes tab.
+ *
+ * The overview's file list reads as the whole of the hardware diff, so a reviewer who never
+ * opened Changes had no reason to believe the product could show them the board at all. The
+ * canvas (pan, zoom, base/head overlay, finding markers) has been there since run snapshots
+ * shipped; this panel is where they find out.
+ */
+function hasCanvas(review: DemoReview): boolean {
+  return (review.headSnapshots?.length ?? 0) > 0;
+}
+
+function canvasSummary(review: DemoReview): string {
+  const head = review.headSnapshots?.length ?? 0;
+  if (head === 0) {
+    return "No rendered schematic or PCB snapshot was published for this revision, so the file list is the whole diff.";
+  }
+  const sheets = head === 1 ? "1 rendered sheet or layer" : `${head} rendered sheets and layers`;
+  return (review.baseSnapshots?.length ?? 0) > 0
+    ? `${sheets}, with the base revision available for side-by-side and overlay comparison.`
+    : `${sheets} you can pan, zoom, and open findings on.`;
+}
 
 type ReadinessTone = "danger" | "success" | "warning";
 
@@ -40,7 +64,14 @@ const readinessTextClass: Record<"danger" | "success" | "warning", string> = {
   warning: "text-warning",
 };
 
-export function OverviewTab({ review }: { readonly review: DemoReview }) {
+export function OverviewTab({
+  review,
+  onOpenChanges,
+}: {
+  readonly review: DemoReview;
+  /** Switches to the Changes tab, where the schematic and PCB canvas lives. */
+  readonly onOpenChanges?: (() => void) | undefined;
+}) {
   const blockingFindings = review.findings.filter(
     (f) => (f.severity === "error" || f.severity === "critical") && f.disposition === "open",
   );
@@ -113,7 +144,18 @@ export function OverviewTab({ review }: { readonly review: DemoReview }) {
         </div>
       </section>
 
-      <Panel title="Changed Hardware Surfaces" tone="default">
+      <Panel
+        title="Changed Hardware Surfaces"
+        description={canvasSummary(review)}
+        tone="default"
+        actions={
+          onOpenChanges ? (
+            <Button type="button" size="sm" variant="outline" onClick={onOpenChanges}>
+              {hasCanvas(review) ? "Open the visual diff" : "Open Changes"}
+            </Button>
+          ) : undefined
+        }
+      >
         <div>{changedFilesContent}</div>
       </Panel>
 

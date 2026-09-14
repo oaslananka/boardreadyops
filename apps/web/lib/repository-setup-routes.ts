@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { declaredPermissionRecord } from "@boardreadyops/cloud-core/github-capabilities";
 import {
   createGitHubMutationService,
   type GitHubMutationApiClient,
@@ -145,15 +146,10 @@ function setupResponseBase() {
       installation:
         "Merge the reviewed setup PR or copy the workflow and selected boardreadyops.yml to the repository default branch.",
     },
+    // Read from the declared profile rather than restated here: this response and the /setup
+    // page used to carry two different hand-maintained copies of the permission list.
     permissions: {
-      repository: {
-        metadata: "read",
-        pullRequests: "write",
-        checks: "write",
-        actions: "write",
-        contents: "write",
-        workflows: "write",
-      },
+      repository: declaredPermissionRecord(),
       organization: "none",
       account: "none",
     },
@@ -485,6 +481,38 @@ async function createSetupPr(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return controlPlaneJsonError(`failed to create setup pull request: ${message}`, 502);
+  }
+}
+
+/**
+ * Creates the setup pull request for an already-authorized actor.
+ *
+ * The operator route below authenticates with a bearer token; the dashboard authenticates with
+ * the viewer's session and its installation scope. Both end in the same `createSetupPr`, so the
+ * branch, the allowlisted files, and the audit revision cannot differ between them.
+ */
+export async function handleRepositorySetupCreatePrForActor(
+  input: Readonly<{
+    actorId: string;
+    installationId: string;
+    repositoryId: string;
+    preset?: string;
+    requestId: string;
+  }>,
+  dependencies: RepositorySetupRouteDependencies = createRepositorySetupRouteDependencies(),
+): Promise<Response> {
+  if (!validIdentifier(input.installationId) || !validIdentifier(input.repositoryId)) {
+    return controlPlaneJsonError("repository setup scope is invalid", 400);
+  }
+  const executor = dependencies.queryExecutor();
+  if (!executor) return controlPlaneJsonError("database is not configured", 503);
+  const store = dependencies.createStore(executor);
+  const body: Record<string, unknown> = { requestId: input.requestId };
+  if (input.preset !== undefined) body.preset = input.preset;
+  try {
+    return await createSetupPr(body, input.actorId, input.installationId, input.repositoryId, store, dependencies);
+  } catch {
+    return controlPlaneJsonError("repository setup operation failed", 503);
   }
 }
 

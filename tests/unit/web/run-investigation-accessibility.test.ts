@@ -234,10 +234,13 @@ describe("run investigation accessibility", () => {
     expect(artifacts).toContain("Download signed copy");
   });
 
-  it("provides clear corrective action and verification note for findings", () => {
+  it("provides clear corrective action and an in-product way to verify the fix", () => {
     const markup = viewMarkup("findings");
     expect(markup).toContain("Corrective action");
-    expect(markup).toContain("Rerun required to verify");
+    // The note used to send the reader to GitHub to push a commit, which was the only way to
+    // re-check anything. It now points at the re-run control on the same page.
+    expect(markup).toContain("Re-run readiness");
+    expect(markup).not.toContain("Rerun required to verify");
   });
 
   it("renders stable investigation flow snapshots", () => {

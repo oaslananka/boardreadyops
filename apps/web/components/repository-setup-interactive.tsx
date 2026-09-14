@@ -6,6 +6,12 @@ import { useCallback, useState } from "react";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
+export type SetupTargetRepository = {
+  id: string;
+  fullName: string;
+  accountLogin: string;
+};
+
 export type RepositorySetupInteractiveProps = {
   presets: readonly RepositorySetupPreset[];
   initialPresetId: string;
@@ -13,9 +19,11 @@ export type RepositorySetupInteractiveProps = {
   workflowPath: string;
   workflowContractVersion: number;
   workflowSource: string;
-  installationId?: string;
-  repositoryId?: string;
-  canCreatePr?: boolean;
+  /** Repositories the viewer's session may act on. Empty for a signed-out visitor. */
+  repositories?: readonly SetupTargetRepository[];
+  signedIn?: boolean;
+  /** Why the one-click path is unavailable for this installation, when it is. */
+  blockedReason?: string;
 };
 
 type SetupPrResult = {
@@ -24,28 +32,40 @@ type SetupPrResult = {
   pullRequestNumber?: number;
   pullRequestUrl?: string;
   error?: string;
+  manageUrl?: string;
 };
 
-async function requestSetupPr(installationId: string, repositoryId: string, presetId: string): Promise<SetupPrResult> {
+/**
+ * Opens the setup pull request as the signed-in viewer.
+ *
+ * This used to call the operator API, which authenticates with a control-plane bearer token no
+ * browser has, so the button could only ever have returned 401 — which is why the page never
+ * passed the props that would have rendered it. The session-authenticated route re-checks that
+ * the viewer's installations cover this repository before it writes anything.
+ */
+async function requestSetupPr(repositoryId: string, presetId: string): Promise<SetupPrResult> {
   try {
-    const response = await fetch(
-      `/api/v1/operator/installations/${encodeURIComponent(installationId)}/repositories/${encodeURIComponent(repositoryId)}/setup/pr`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ preset: presetId, requestId: `ui-setup-${Date.now()}` }),
-      },
-    );
-    const data = await response.json();
-    if (!response.ok || !data.ok) return { ok: false, error: data.error || "Failed to create setup PR" };
+    const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "setup", preset: presetId, requestId: `ui-setup-${Date.now()}` }),
+    });
+    const data = (await response.json()) as Record<string, unknown>;
+    if (!response.ok || data.ok !== true) {
+      return {
+        ok: false,
+        error: typeof data.error === "string" ? data.error : "The setup pull request could not be opened.",
+        ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
+      };
+    }
     return {
       ok: true,
-      outcome: data.outcome,
-      pullRequestNumber: data.pullRequestNumber,
-      pullRequestUrl: data.pullRequestUrl,
+      ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
+      ...(typeof data.pullRequestNumber === "number" ? { pullRequestNumber: data.pullRequestNumber } : {}),
+      ...(typeof data.pullRequestUrl === "string" ? { pullRequestUrl: data.pullRequestUrl } : {}),
     };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Network error" };
+  } catch {
+    return { ok: false, error: "The network request failed. Check your connection and try again." };
   }
 }
 
@@ -73,7 +93,17 @@ function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
           ) : null}
         </>
       ) : (
-        <span>Setup PR creation failed: {result.error}</span>
+        <span>
+          {result.error}
+          {result.manageUrl ? (
+            <>
+              {" "}
+              <a href={result.manageUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                Review the installation on GitHub →
+              </a>
+            </>
+          ) : null}
+        </span>
       )}
     </output>
   );
@@ -86,13 +116,14 @@ export function RepositorySetupInteractive({
   workflowPath,
   workflowContractVersion,
   workflowSource,
-  installationId,
-  repositoryId,
-  canCreatePr = true,
+  repositories = [],
+  signedIn = false,
+  blockedReason,
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
+  const [repositoryId, setRepositoryId] = useState(repositories[0]?.id ?? "");
 
   const fallback = presets[0];
   if (!fallback) throw new Error("At least one preset must be provided");
@@ -108,13 +139,13 @@ export function RepositorySetupInteractive({
   }, []);
 
   const handleCreateSetupPr = useCallback(async () => {
-    if (!installationId || !repositoryId) return;
+    if (!repositoryId) return;
     setIsCreatingPr(true);
     setPrResult(null);
-    const result = await requestSetupPr(installationId, repositoryId, activePreset.id);
+    const result = await requestSetupPr(repositoryId, activePreset.id);
     setPrResult(result);
     setIsCreatingPr(false);
-  }, [installationId, repositoryId, activePreset.id]);
+  }, [repositoryId, activePreset.id]);
 
   return (
     <>
@@ -229,35 +260,138 @@ export function RepositorySetupInteractive({
         </div>
       </Panel>
 
-      {installationId && repositoryId && canCreatePr ? (
-        <Panel
-          id="automated-setup"
-          title="3. One-click setup pull request"
-          description="Open a pull request on your repository with the selected configuration and workflow without opening a terminal."
-        >
-          <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h4 className="text-base font-bold text-foreground">Open reviewed setup PR</h4>
-                <p className="text-sm text-muted-foreground">
-                  Creates branch <code>boardreadyops/setup</code> with <code>boardreadyops.yml</code> and{" "}
-                  <code>.github/workflows/{workflowPath}</code>.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={isCreatingPr}
-                onClick={handleCreateSetupPr}
-                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:opacity-50 transition-all duration-150 active:scale-[0.98]"
-              >
-                {isCreatingPr ? "Opening setup PR..." : "Create setup PR"}
-              </button>
-            </div>
-
-            {prResult ? <SetupPrResultOutput result={prResult} /> : null}
-          </div>
-        </Panel>
-      ) : null}
+      <Panel
+        id="automated-setup"
+        title="3. Open the setup pull request"
+        description="Commits the two files above to a new branch and opens a pull request, without a terminal or a local clone."
+      >
+        <OneClickSetup
+          signedIn={signedIn}
+          repositories={repositories}
+          repositoryId={repositoryId}
+          onSelectRepository={setRepositoryId}
+          onCreate={handleCreateSetupPr}
+          isCreating={isCreatingPr}
+          workflowPath={workflowPath}
+          {...(blockedReason ? { blockedReason } : {})}
+          {...(prResult ? { result: prResult } : {})}
+        />
+      </Panel>
     </>
+  );
+}
+
+type OneClickSetupProps = {
+  signedIn: boolean;
+  repositories: readonly SetupTargetRepository[];
+  repositoryId: string;
+  onSelectRepository: (id: string) => void;
+  onCreate: () => void;
+  isCreating: boolean;
+  workflowPath: string;
+  blockedReason?: string;
+  result?: SetupPrResult;
+};
+
+/**
+ * Step 3 renders in every state rather than disappearing.
+ *
+ * The panel used to be hidden unless an installation and repository were both supplied, and the
+ * only page that rendered the component supplied neither, so the product's headline "install
+ * once and we do the rest" promise had no visible entry point at all. Each state now says what
+ * it is and what the next move is.
+ */
+function OneClickSetup({
+  signedIn,
+  repositories,
+  repositoryId,
+  onSelectRepository,
+  onCreate,
+  isCreating,
+  workflowPath,
+  blockedReason,
+  result,
+}: Readonly<OneClickSetupProps>) {
+  const selectId = "one-click-setup-repository";
+
+  if (!signedIn) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
+        <p className="text-sm text-muted-foreground">
+          Sign in and BoardReadyOps opens the pull request on a repository you pick. You can also copy the two files
+          above and commit them yourself — the result is identical.
+        </p>
+        <a
+          href="/api/auth/github/login"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+        >
+          Sign in with GitHub
+        </a>
+      </div>
+    );
+  }
+
+  if (repositories.length === 0) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
+        <p className="text-sm text-muted-foreground">
+          No repository is connected to your account yet. Install the BoardReadyOps GitHub App on the repository holding
+          your KiCad project, then come back to this step.
+        </p>
+        <a
+          href="https://github.com/apps/boardreadyops/installations/new"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+        >
+          Install the GitHub App
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <label htmlFor={selectId} className="text-sm font-medium text-foreground">
+            Repository
+          </label>
+          <select
+            id={selectId}
+            value={repositoryId}
+            onChange={(event) => onSelectRepository(event.currentTarget.value)}
+            className="mt-1 min-h-11 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            {repositories.map((repository) => (
+              <option key={repository.id} value={repository.id}>
+                {repository.fullName}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-meta text-muted-foreground">
+            Creates branch <code>boardreadyops/setup</code> with <code>boardreadyops.yml</code> and{" "}
+            <code>.github/workflows/{workflowPath}</code>, then opens a pull request. Nothing reaches your default
+            branch until you merge it.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={isCreating || blockedReason !== undefined || !repositoryId}
+          onClick={onCreate}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+        >
+          {isCreating ? "Opening pull request…" : "Open setup pull request"}
+        </button>
+      </div>
+
+      {blockedReason ? (
+        <p className="rounded-md border border-warning/40 bg-warning-surface p-3 text-sm text-foreground">
+          {blockedReason}
+        </p>
+      ) : null}
+
+      {result ? <SetupPrResultOutput result={result} /> : null}
+    </div>
   );
 }

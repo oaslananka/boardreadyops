@@ -9,6 +9,7 @@ const destinations = [
   { label: "Security & Access", href: "/settings/security" },
   { label: "Audit Log", href: "/settings/audit" },
   { label: "Data & Retention", href: "/settings/data" },
+  { label: "Notifications", href: "/settings/notifications" },
   { label: "API Tokens", href: "/settings/tokens" },
   { label: "Component Intelligence", href: "/settings/component-intelligence" },
   { label: "Integrations & Health", href: "/settings/integrations" },

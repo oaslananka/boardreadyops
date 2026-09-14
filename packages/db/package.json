@@ -115,6 +115,11 @@
       "types": "./src/entitlement-store.ts",
       "import": "./src/entitlement-store.ts",
       "default": "./src/entitlement-store.ts"
+    },
+    "./notification-store": {
+      "types": "./src/notification-store.ts",
+      "import": "./src/notification-store.ts",
+      "default": "./src/notification-store.ts"
     }
   },
   "devDependencies": {

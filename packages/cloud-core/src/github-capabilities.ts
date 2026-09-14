@@ -196,3 +196,218 @@ export function checkCapabilityRequirement(
   }
   return { satisfied: true, missingPermissions: [] };
 }
+
+/**
+ * The declared GitHub App permission profile.
+ *
+ * This is the single source of truth for what the App asks for and why. Three places used to
+ * carry their own copy of this list and had drifted apart: the public `/setup` page claimed
+ * `contents: none` and `pull_requests: read`, `handleRepositorySetupGet`'s response claimed
+ * `contents: write` and `pull_requests: write`, and the ops canary runbook instructed operators
+ * to refuse any installation that requested Contents at all. The capability evaluator above and
+ * `GitHubMutationService` were both written against the broad profile, so the narrow claims
+ * described a product that could not open a setup, waiver, or remediation pull request.
+ *
+ * `requirement` separates the permissions without which nothing works from the ones that buy a
+ * specific capability. `degradation` is the user-facing sentence shown when a permission is
+ * absent, so no surface has to invent its own wording for a missing grant.
+ */
+export type GitHubAppPermissionRequirement = "capability" | "core";
+
+export type GitHubAppPermissionScope = "account" | "organization" | "repository";
+
+export type GitHubAppPermissionLevel = Extract<GitHubPermissionLevel, "read" | "write">;
+
+export type GitHubAppPermissionDeclaration = {
+  /** GitHub's API key for the permission, as it appears in an installation's `permissions` object. */
+  key: string;
+  /** The permission's name on GitHub's own installation and authorization screens. */
+  label: string;
+  level: GitHubAppPermissionLevel;
+  scope: GitHubAppPermissionScope;
+  requirement: GitHubAppPermissionRequirement;
+  /** What the product does with the grant, in terms a reviewer of the install prompt can check. */
+  purpose: string;
+  /** What stops working when the grant is absent. Rendered verbatim by the setup and repository pages. */
+  degradation: string;
+};
+
+export const githubAppPermissionProfile: readonly GitHubAppPermissionDeclaration[] = [
+  {
+    key: "metadata",
+    label: "Metadata",
+    level: "read",
+    scope: "repository",
+    requirement: "core",
+    purpose: "Bind the installation to the intended repository and follow installation lifecycle events.",
+    degradation: "BoardReadyOps cannot identify the repository. Nothing runs without this grant.",
+  },
+  {
+    key: "checks",
+    label: "Checks",
+    level: "write",
+    scope: "repository",
+    requirement: "core",
+    purpose: "Publish the readiness Check Run, inline annotations, and its interactive action buttons.",
+    degradation: "Results are posted as a pull request comment and in the dashboard instead of a native Check Run.",
+  },
+  {
+    key: "actions",
+    label: "Actions",
+    level: "write",
+    scope: "repository",
+    requirement: "core",
+    purpose: "Dispatch the repository-owned readiness workflow on pull request events and re-run requests.",
+    degradation: "Runs must be triggered by pushing a commit or by starting the workflow from the Actions tab.",
+  },
+  {
+    key: "pull_requests",
+    label: "Pull requests",
+    level: "write",
+    scope: "repository",
+    requirement: "capability",
+    purpose: "Open setup, waiver, and remediation pull requests, and keep one readiness summary comment current.",
+    degradation: "Automated pull requests and the summary comment are unavailable; the Check Run stays authoritative.",
+  },
+  {
+    key: "contents",
+    label: "Contents",
+    level: "write",
+    scope: "repository",
+    requirement: "capability",
+    purpose:
+      "Commit only boardreadyops.yml, .github/workflows/readiness-runner.yml, and .boardreadyops/** to a new branch for review, never to the default branch.",
+    degradation: "One-click setup and remediation are replaced by copy-ready files you commit yourself.",
+  },
+  {
+    key: "workflows",
+    label: "Workflows",
+    level: "write",
+    scope: "repository",
+    requirement: "capability",
+    purpose: "Include the readiness runner workflow file in that same reviewed setup pull request.",
+    degradation: "The setup pull request omits the workflow file; copy it to .github/workflows/ yourself.",
+  },
+  {
+    key: "issues",
+    label: "Issues",
+    level: "write",
+    scope: "repository",
+    requirement: "capability",
+    purpose: "Reply to /boardreadyops slash commands on pull request conversations.",
+    degradation: "Slash commands are unavailable; use the dashboard action buttons instead.",
+  },
+];
+
+/** Permission keys the profile declares, in profile order. */
+export function declaredPermissionKeys(): readonly string[] {
+  return githubAppPermissionProfile.map((entry) => entry.key);
+}
+
+/**
+ * The declared profile as GitHub's own `permissions` shape.
+ *
+ * Used by the setup API response and by the tests that assert the documented profile and the
+ * evaluated capabilities agree.
+ */
+export function declaredPermissionRecord(): Record<string, GitHubAppPermissionLevel> {
+  const record: Record<string, GitHubAppPermissionLevel> = {};
+  for (const entry of githubAppPermissionProfile) record[entry.key] = entry.level;
+  return record;
+}
+
+function permissionSatisfied(capabilities: GitHubAppCapabilities, entry: GitHubAppPermissionDeclaration): boolean {
+  const write = entry.level === "write";
+  switch (entry.key) {
+    case "metadata":
+      return capabilities.metadataRead;
+    case "checks":
+      return write ? capabilities.checksWrite : capabilities.checksRead;
+    case "actions":
+      return write ? capabilities.actionsDispatch : capabilities.actionsRead;
+    case "pull_requests":
+      return write ? capabilities.pullRequestsWrite : capabilities.pullRequestsRead;
+    case "contents":
+      return write ? capabilities.contentsWrite : capabilities.contentsRead;
+    case "workflows":
+      return write ? capabilities.workflowsWrite : capabilities.workflowsRead;
+    case "issues":
+      return write ? capabilities.issuesWrite : capabilities.issuesRead;
+    default:
+      return false;
+  }
+}
+
+/**
+ * The declared permissions an installation has not granted at the declared level.
+ *
+ * Driven by the live `permissions` object GitHub returns when an installation token is minted,
+ * so a page can explain exactly which grant is missing rather than guessing from a failed call.
+ */
+export function missingDeclaredPermissions(
+  permissions: GitHubAppPermissions | Record<string, string | undefined> = {},
+): readonly GitHubAppPermissionDeclaration[] {
+  const capabilities = evaluateAppCapabilities(permissions);
+  return githubAppPermissionProfile.filter((entry) => !permissionSatisfied(capabilities, entry));
+}
+
+/**
+ * The product actions a surface can offer, and what each one needs.
+ *
+ * `requirement` reuses the capability vocabulary `checkCapabilityRequirement` already validates,
+ * so a button's enablement and the server's refusal reason can never disagree.
+ */
+export type GitHubAppActionId = "fix" | "release-preview" | "rerun" | "setup" | "waive";
+
+export type GitHubAppAction = {
+  id: GitHubAppActionId;
+  label: string;
+  description: string;
+  requirement: CapabilityRequirement;
+};
+
+export const githubAppActions: readonly GitHubAppAction[] = [
+  {
+    id: "rerun",
+    label: "Re-run readiness",
+    description: "Dispatch a fresh readiness run against the current head commit.",
+    requirement: "dispatch_analysis",
+  },
+  {
+    id: "release-preview",
+    label: "Preview release",
+    description: "Build the release checklist and manufacturing package draft without publishing a tag.",
+    requirement: "dispatch_analysis",
+  },
+  {
+    id: "setup",
+    label: "Open setup pull request",
+    description: "Commit boardreadyops.yml and the readiness workflow to a reviewed branch.",
+    requirement: "setup_pr",
+  },
+  {
+    id: "waive",
+    label: "Propose waiver",
+    description: "Record an audited policy waiver for a rule as a reviewed pull request.",
+    requirement: "waiver_pr",
+  },
+  {
+    id: "fix",
+    label: "Open remediation pull request",
+    description: "Apply the suggested configuration fix on a reviewed branch.",
+    requirement: "remediation_pr",
+  },
+];
+
+export type GitHubAppActionAvailability = CapabilityCheckResult & GitHubAppAction;
+
+/** Which declared actions the given permissions allow, carrying the reason for each refusal. */
+export function evaluateActionAvailability(
+  permissions: GitHubAppPermissions | Record<string, string | undefined> = {},
+): readonly GitHubAppActionAvailability[] {
+  const capabilities = evaluateAppCapabilities(permissions);
+  return githubAppActions.map((action) => ({
+    ...action,
+    ...checkCapabilityRequirement(capabilities, action.requirement),
+  }));
+}

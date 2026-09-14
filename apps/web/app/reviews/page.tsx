@@ -1,9 +1,18 @@
 import Link from "next/link";
+import { ReviewListFilterBar } from "../../components/review/review-list-filters.js";
 import { ReviewListItem } from "../../components/review/review-list-item.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { DEMO_REVIEWS } from "../../lib/demo-data.js";
+import {
+  applyReviewListFilters,
+  hasActiveReviewFilter,
+  parseReviewListFilters,
+  reviewListFacets,
+  reviewListSorts,
+  reviewSortLabels,
+} from "../../lib/review-list-filters.js";
 import { loadViewerReviews, type ReviewListEntry } from "../../lib/review-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 
@@ -53,6 +62,23 @@ const columns: readonly DataColumn<ReviewListEntry>[] = [
   },
 ];
 
+function NoMatchingReviews() {
+  return (
+    <Panel title="No matching reviews">
+      <EmptyState
+        title="No review matches these filters"
+        action={
+          <Link href="/reviews" className="text-primary underline underline-offset-2">
+            Clear the filters
+          </Link>
+        }
+      >
+        <p>Widen the search, or pick a different decision, status, or repository.</p>
+      </EmptyState>
+    </Panel>
+  );
+}
+
 function NoReviews() {
   return (
     <Panel title="No Reviews">
@@ -65,7 +91,12 @@ function NoReviews() {
   );
 }
 
-export default async function ReviewsListPage() {
+type ReviewsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function ReviewsListPage({ searchParams }: Readonly<ReviewsPageProps>) {
+  const filters = parseReviewListFilters(await searchParams);
   const viewer = await viewerAuthorization();
   const listing = await loadViewerReviews(viewer.session, { fixtures: DEMO_REVIEWS });
 
@@ -88,28 +119,44 @@ export default async function ReviewsListPage() {
 
   const total = listing.reviews.length;
   const awaiting = listing.reviews.filter((review) => review.decision === "pending").length;
+  const facets = reviewListFacets(listing.reviews);
+  const filtered = hasActiveReviewFilter(filters);
 
   // The bundled demo reviews carry full finding detail, so they keep the richer card; database
-  // rows only have what the listing query selects, which is a table's worth.
+  // rows only have what the listing query selects, which is a table's worth. Both go through the
+  // same filter so the two shapes cannot diverge in what a filter means.
   let reviewsBody = <NoReviews />;
-  if (total > 0 && listing.state === "fixtures") {
-    reviewsBody = (
-      <div className="grid grid-cols-1 gap-4">
-        {listing.reviews.map((review) => (
-          <ReviewListItem key={review.id} review={review} context="registry" />
-        ))}
-      </div>
-    );
-  } else if (total > 0) {
-    reviewsBody = (
-      <DataTable
-        caption="Hardware reviews across every visible repository"
-        columns={columns}
-        rows={listing.reviews}
-        rowKey={(review) => review.id}
-        empty={<NoReviews />}
-      />
-    );
+  let shown = 0;
+  if (listing.state === "fixtures") {
+    const visible = applyReviewListFilters(listing.reviews, filters);
+    shown = visible.length;
+    if (visible.length > 0) {
+      reviewsBody = (
+        <div className="grid grid-cols-1 gap-4">
+          {visible.map((review) => (
+            <ReviewListItem key={review.id} review={review} context="registry" />
+          ))}
+        </div>
+      );
+    } else if (total > 0) {
+      reviewsBody = <NoMatchingReviews />;
+    }
+  } else {
+    const visible = applyReviewListFilters(listing.reviews, filters);
+    shown = visible.length;
+    if (visible.length > 0) {
+      reviewsBody = (
+        <DataTable
+          caption="Hardware reviews across every visible repository"
+          columns={columns}
+          rows={visible}
+          rowKey={(review) => review.id}
+          empty={<NoReviews />}
+        />
+      );
+    } else if (total > 0) {
+      reviewsBody = <NoMatchingReviews />;
+    }
   }
 
   return (
@@ -122,13 +169,18 @@ export default async function ReviewsListPage() {
           </p>
         </header>
 
-        <section
-          className="rounded-md border border-border bg-card px-4 py-3 text-sm"
-          aria-label="Review registry summary"
-        >
-          Showing <strong>{total}</strong> review{total === 1 ? "" : "s"} (<strong>{awaiting}</strong> awaiting a
-          decision)
-        </section>
+        {total > 0 ? (
+          <ReviewListFilterBar
+            filters={filters}
+            facets={facets}
+            sorts={reviewListSorts}
+            sortLabels={reviewSortLabels}
+            shown={shown}
+            total={total}
+            awaiting={awaiting}
+            filtered={filtered}
+          />
+        ) : null}
 
         {reviewsBody}
       </main>

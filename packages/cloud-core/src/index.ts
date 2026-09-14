@@ -10,6 +10,7 @@ export * from "./evidence-ledger.js";
 export * from "./github-capabilities.js";
 export * from "./github-command.js";
 export * from "./github-mutation-service.js";
+export * from "./notifications.js";
 export * from "./policy-engine.js";
 export * from "./review-diff.js";
 export * from "./runner-request-signature.js";

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useEffect, useState } from "react";
 import type { DemoApproval, DemoChecklistItem, DemoReview } from "../../lib/demo-data.js";
+import { Button } from "../ui/button.js";
 import { ApprovalModal } from "./approval-modal.js";
 import { ChangesTab } from "./changes-tab.js";
 import { ChecklistApprovalsTab } from "./checklist-approvals-tab.js";
@@ -197,6 +198,8 @@ export function ReviewView({
   const [submittingAction, setSubmittingAction] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [mutationSuccess, setMutationSuccess] = useState<string | null>(null);
+  /** Set after a risk is accepted, to offer writing that waiver into the repository. */
+  const [waiverOffer, setWaiverOffer] = useState<{ ruleId: string; reason: string } | null>(null);
 
   const blockingCount = review.findings.filter(
     (f) => (f.severity === "error" || f.severity === "critical") && f.disposition === "open",
@@ -255,8 +258,52 @@ export function ReviewView({
         ),
       }));
       setMutationSuccess("Finding decision recorded.");
+
+      // Accepting a risk here records the decision against *this* review only. Future runs
+      // re-report the same finding until the waiver is written into the repository, which is
+      // what `/boardreadyops waive` did and nothing in the UI offered. Offer it as the explicit
+      // follow-up rather than doing it silently: one is a review record, the other is a commit.
+      if (disposition === "accepted_risk") {
+        const finding = review.findings.find((candidate) => candidate.fingerprint === fingerprint);
+        if (finding) setWaiverOffer({ ruleId: finding.ruleId, reason: effectiveReason });
+      }
     } catch (err) {
       setMutationError(`Failed to record decision: ${err instanceof Error ? err.message : "Network error"}`);
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
+  async function handleProposeWaiverPr() {
+    if (!waiverOffer || submittingAction) return;
+    setSubmittingAction("waiver_pr");
+    setMutationError(null);
+    try {
+      const res = await fetch(`/api/v1/repositories/${encodeURIComponent(review.repositoryId)}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "waive",
+          ruleId: waiverOffer.ruleId,
+          reason: waiverOffer.reason,
+          requestId: `ui-waive-${waiverOffer.ruleId}-${Date.now()}`,
+        }),
+      });
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!res.ok || data.ok !== true) {
+        setMutationError(
+          typeof data.error === "string" ? data.error : "The waiver pull request could not be requested.",
+        );
+        return;
+      }
+      setWaiverOffer(null);
+      setMutationSuccess(
+        data.outcome === "duplicate"
+          ? "That waiver pull request is already queued."
+          : `Waiver pull request queued for ${waiverOffer.ruleId}. It appears on the repository for review.`,
+      );
+    } catch (err) {
+      setMutationError(`Failed to request waiver: ${err instanceof Error ? err.message : "Network error"}`);
     } finally {
       setSubmittingAction(null);
     }
@@ -565,6 +612,37 @@ export function ReviewView({
         </output>
       ) : null}
 
+      {waiverOffer ? (
+        <section
+          className="flex flex-col gap-3 rounded-md border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          aria-labelledby="waiver-offer-heading"
+        >
+          <div className="min-w-0">
+            <h2 id="waiver-offer-heading" className="text-sm font-bold text-foreground">
+              Make this waiver stick for future runs?
+            </h2>
+            <p className="mt-0.5 text-meta text-muted-foreground">
+              The decision is recorded on this review. To stop <code>{waiverOffer.ruleId}</code> from blocking later
+              runs, the waiver has to live in the repository — BoardReadyOps can open that pull request for your
+              reviewers.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={submittingAction !== null}
+              onClick={() => void handleProposeWaiverPr()}
+            >
+              {submittingAction === "waiver_pr" ? "Requesting…" : "Open waiver pull request"}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setWaiverOffer(null)}>
+              Not now
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       <ReviewNavigationTabs
         activeTab={rawActiveTab}
         changedFilesCount={review.changedFiles?.length}
@@ -576,7 +654,9 @@ export function ReviewView({
       />
 
       <main id={`panel-${rawActiveTab}`} role="tabpanel" aria-labelledby={`tab-${rawActiveTab}`} className="pt-4">
-        {rawActiveTab === "overview" ? <OverviewTab review={review} /> : null}
+        {rawActiveTab === "overview" ? (
+          <OverviewTab review={review} onOpenChanges={() => setActiveTab("changes")} />
+        ) : null}
         {rawActiveTab === "changes" ? <ChangesTab review={review} /> : null}
         {rawActiveTab === "findings" ? (
           <FindingsTab

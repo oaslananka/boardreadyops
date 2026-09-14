@@ -4,6 +4,7 @@ import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
 import { runVerdict } from "../lib/run-verdict.js";
 import { CopyButton } from "./copy-button.js";
+import { RunActionBar } from "./run-action-bar.js";
 import { RunLiveRefresh } from "./run-live-refresh.js";
 import { Button, buttonVariants } from "./ui/button.js";
 import { Input } from "./ui/input.js";
@@ -77,18 +78,25 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
           </span>
         </p>
       </div>
-      <fieldset className="shrink-0">
-        <legend className="sr-only">Readiness score</legend>
-        <div className="run-readiness-signature flex flex-col items-center rounded-md border border-border bg-muted px-4 py-2">
-          <strong className="text-2xl font-bold text-foreground">{run.readinessScore ?? "—"}</strong>
-          <span className="text-xs text-muted-foreground">Readiness score</span>
-          <span className="sr-only">
-            {run.readinessScore === undefined
-              ? "Readiness score unavailable"
-              : `Readiness score ${run.readinessScore} out of 100`}
-          </span>
-        </div>
-      </fieldset>
+      <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
+        <fieldset>
+          <legend className="sr-only">Readiness score</legend>
+          <div className="run-readiness-signature flex flex-col items-center rounded-md border border-border bg-muted px-4 py-2">
+            <strong className="text-2xl font-bold text-foreground">{run.readinessScore ?? "—"}</strong>
+            <span className="text-xs text-muted-foreground">Readiness score</span>
+            <span className="sr-only">
+              {run.readinessScore === undefined
+                ? "Readiness score unavailable"
+                : `Readiness score ${run.readinessScore} out of 100`}
+            </span>
+          </div>
+        </fieldset>
+        <RunActionBar
+          repositoryId={run.repositoryId}
+          runId={run.id}
+          hasPullRequest={run.pullRequestNumber !== undefined}
+        />
+      </div>
     </header>
   );
 }
@@ -883,7 +891,10 @@ function FindingRow({ finding }: Readonly<{ finding: FindingDetail }>) {
           in your CAD tool to resolve {finding.ruleId}.
         </p>
         <p className="mt-1">
-          <small>Rerun required to verify: Push updated commit to trigger re-analysis in GitHub Actions.</small>
+          <small>
+            To verify the fix, push the updated commit — or use <strong>Re-run readiness</strong> at the top of this
+            page to re-check the current commit without leaving BoardReadyOps.
+          </small>
         </p>
       </div>
     </li>

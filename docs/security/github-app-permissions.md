@@ -1,6 +1,8 @@
 # GitHub App Capabilities, Permissions & Security Boundary
 
-This document is the authoritative product capability and security model for the BoardReadyOps GitHub App. It supersedes early exploratory and restrictive permission notes (including historical issue #88) with an explicit, capability-driven security architecture for a zero-touch, GitHub-native hardware release platform.
+This document explains the product capability and security model for the BoardReadyOps GitHub App.
+
+> **The machine-readable profile is the source of truth.** `githubAppPermissionProfile` in `packages/cloud-core/src/github-capabilities.ts` declares every permission, its level, its purpose, and what stops working without it. The `/setup` page, the setup API response, and the operations runbooks all read from it, and `tests/unit/cloud-core/github-app-permission-profile.test.ts` fails if the declaration and the capability evaluator disagree. Prose here that drifts from that array is the prose that is wrong. See [ADR-0018](../architecture/adr/0018-github-app-permission-profile.md) for the decision and why `contents: write` is justified.
 
 ---
 
