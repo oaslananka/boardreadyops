@@ -35,6 +35,10 @@ export type WorkspaceProjectsResult =
        * can tell you the blast radius is a confirmation people click through.
        */
       impact: WorkspaceProjectsImpact;
+      /** Total projects in the workspace, which is more than the page shows. */
+      total: number;
+      page: number;
+      totalPages: number;
     };
 
 export type WorkspaceProjectsImpact = {
@@ -68,6 +72,7 @@ export async function loadWorkspaceProjects(
   session: UserSession | undefined,
   requestedWorkspaceId: string | undefined,
   environment: NodeJS.ProcessEnv = process.env,
+  requestedPage: string | string[] | undefined = undefined,
 ): Promise<WorkspaceProjectsResult> {
   if (reviewFixturesEnabled(environment)) return { state: "not-configured" };
   if (!session) return { state: "signed-out" };
@@ -87,7 +92,14 @@ export async function loadWorkspaceProjects(
     const selected = workspaces.find((workspace) => workspace.id === requestedWorkspaceId) ?? workspaces[0];
     if (!selected) return { state: "no-workspaces" };
 
-    const projects = await store.listProjectsByWorkspace(selected.id);
+    const counts = await store.workspaceListingCounts(selected.id);
+    const total = counts.projects;
+    const totalPages = Math.max(1, Math.ceil(total / workspaceListingPageSize));
+    const page = parseListingPage(requestedPage, totalPages);
+    const projects = await store.listProjectsByWorkspace(selected.id, {
+      limit: workspaceListingPageSize,
+      offset: (page - 1) * workspaceListingPageSize,
+    });
 
     // Only an owner can delete, so only an owner pays for the counts.
     let impact: WorkspaceProjectsImpact = { workspace: { projects: 0, revisions: 0, deliveries: 0 }, byProject: {} };
@@ -101,8 +113,19 @@ export async function loadWorkspaceProjects(
       impact = { workspace: workspaceImpact, byProject: Object.fromEntries(projectImpacts) };
     }
 
-    return { state: "ok", workspaces, selected, projects, impact };
+    return { state: "ok", workspaces, selected, projects, impact, total, page, totalPages };
   } finally {
     await executor.close();
   }
+}
+
+/** 25 rows a page: enough that a small team never sees the control, few enough that a big one can move. */
+export const workspaceListingPageSize = 25;
+
+/** Reads a `page` search param, clamped so a hand-edited URL cannot ask for row nine million. */
+export function parseListingPage(value: string | string[] | undefined, totalPages: number): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) return 1;
+  return Math.min(parsed, Math.max(1, totalPages));
 }
