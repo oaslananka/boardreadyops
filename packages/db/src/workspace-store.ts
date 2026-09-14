@@ -267,7 +267,17 @@ export class WorkspaceStore {
     return row ? mapWorkspace(row) : null;
   }
 
-  async listWorkspaceMembers(workspaceId: string): Promise<readonly WorkspaceMemberRecord[]> {
+  /**
+   * Members of one workspace, privileged roles first.
+   *
+   * `page` is optional because two callers need every member rather than a page of them: the
+   * last-owner guard in the member actions, and the authorization checks. A limit there would
+   * silently let the guard pass on a workspace whose only other owner was on page two.
+   */
+  async listWorkspaceMembers(
+    workspaceId: string,
+    page?: { limit: number; offset: number },
+  ): Promise<readonly WorkspaceMemberRecord[]> {
     const result = (await this.executor.query(
       `select workspace_id, user_id, role, created_at
          from workspace_members
@@ -278,8 +288,9 @@ export class WorkspaceStore {
                    when 'member' then 2
                    else 3
                  end,
-                 user_id`,
-      [workspaceId],
+                 user_id
+        ${page ? "limit $2 offset $3" : ""}`,
+      page ? [workspaceId, page.limit, page.offset] : [workspaceId],
     )) as { rows?: { workspace_id: string; user_id: string; role: string; created_at: string | Date }[] };
 
     return (result?.rows ?? []).map((row) => ({
@@ -397,13 +408,17 @@ export class WorkspaceStore {
     return mapProject(row);
   }
 
-  async listProjectsByWorkspace(workspaceId: string): Promise<ProjectRecord[]> {
+  async listProjectsByWorkspace(
+    workspaceId: string,
+    page?: { limit: number; offset: number },
+  ): Promise<ProjectRecord[]> {
     const result = (await this.executor.query(
       `select id, workspace_id, name, description, default_cad_format, github_repo_full_name, created_at
        from projects
        where workspace_id = $1
-       order by created_at desc`,
-      [workspaceId],
+       order by created_at desc
+       ${page ? "limit $2 offset $3" : ""}`,
+      page ? [workspaceId, page.limit, page.offset] : [workspaceId],
     )) as { rows?: ProjectRow[] };
 
     return (result?.rows ?? []).map(mapProject);
@@ -466,7 +481,11 @@ export class WorkspaceStore {
   }
 
   /** Every delivery link in a workspace, newest first. Excludes the token hash by construction. */
-  async listDeliveriesByWorkspace(workspaceId: string, limit = 200): Promise<readonly WorkspaceDeliveryRecord[]> {
+  async listDeliveriesByWorkspace(
+    workspaceId: string,
+    limit = 200,
+    offset = 0,
+  ): Promise<readonly WorkspaceDeliveryRecord[]> {
     const result = (await this.executor.query(
       `select deliveries.id, deliveries.revision_id, deliveries.expires_at,
               deliveries.signed_archive_url, deliveries.recipient_notes, deliveries.created_at,
@@ -476,8 +495,8 @@ export class WorkspaceStore {
          join projects on projects.id = revisions.project_id
         where projects.workspace_id = $1
         order by deliveries.created_at desc, deliveries.id desc
-        limit $2`,
-      [workspaceId, limit],
+        limit $2 offset $3`,
+      [workspaceId, limit, offset],
     )) as {
       rows?: {
         id: string;
@@ -503,6 +522,35 @@ export class WorkspaceStore {
       ...(row.recipient_notes !== null ? { recipientNotes: row.recipient_notes } : {}),
       createdAt: new Date(row.created_at).toISOString(),
     }));
+  }
+
+  /**
+   * Row counts for the three workspace listings that render as tables.
+   *
+   * One statement rather than three round trips: every page that needs one needs the others'
+   * shape too (a table plus its page controls), and the three sub-selects are indexed.
+   */
+  async workspaceListingCounts(workspaceId: string): Promise<{
+    projects: number;
+    deliveries: number;
+    members: number;
+  }> {
+    const result = (await this.executor.query(
+      `select
+         (select count(*) from projects where workspace_id = $1)::int as projects,
+         (select count(*) from deliveries
+            join revisions on revisions.id = deliveries.revision_id
+            join projects on projects.id = revisions.project_id
+           where projects.workspace_id = $1)::int as deliveries,
+         (select count(*) from workspace_members where workspace_id = $1)::int as members`,
+      [workspaceId],
+    )) as { rows?: { projects: number; deliveries: number; members: number }[] };
+    const row = result?.rows?.[0];
+    return {
+      projects: Number(row?.projects ?? 0),
+      deliveries: Number(row?.deliveries ?? 0),
+      members: Number(row?.members ?? 0),
+    };
   }
 
   async createDeliveryLink(input: {

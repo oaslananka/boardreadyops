@@ -142,6 +142,7 @@ export default async function NotificationsSettingsPage({ searchParams }: Readon
           installationId={selected.id}
           action={createNotificationChannelAction}
           emailAvailable={scope.emailAvailable}
+          componentIntelligenceReady={scope.componentIntelligenceReady}
         />
         {scope.emailAvailable ? null : (
           <p className="mt-3 text-meta text-muted-foreground">
@@ -188,13 +189,20 @@ export default async function NotificationsSettingsPage({ searchParams }: Readon
                 </p>
 
                 <details className="border-t border-border pt-3">
-                  <summary className="cursor-pointer text-sm text-muted-foreground">Change what this receives</summary>
+                  {/*
+                    Names both actions in the summary. With only "Change what this receives", the
+                    delete sat two clicks deep behind a label that did not suggest it was there.
+                  */}
+                  <summary className="cursor-pointer text-sm text-muted-foreground">
+                    Change what this receives, or remove it
+                  </summary>
                   <div className="mt-3">
                     <NotificationChannelEditForm
                       installationId={selected.id}
                       channel={channel}
                       updateAction={updateNotificationChannelAction}
                       deleteAction={deleteNotificationChannelAction}
+                      componentIntelligenceReady={scope.componentIntelligenceReady}
                     />
                   </div>
                 </details>
