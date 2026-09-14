@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.44.0](https://github.com/oaslananka/boardreadyops/compare/v1.43.1...v1.44.0) (2026-09-14)
+
+
+### Features
+
+* **web:** let people undo what the create forms made ([#732](https://github.com/oaslananka/boardreadyops/issues/732)) ([6b41836](https://github.com/oaslananka/boardreadyops/commit/6b418362a89bc45a4a1f18fb0cf4f0a2e4ce86ba))
+
 ## [1.43.1](https://github.com/oaslananka/boardreadyops/compare/v1.43.0...v1.43.1) (2026-09-14)
 
 
