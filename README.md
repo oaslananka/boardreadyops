@@ -171,10 +171,10 @@ for the current digest and manifest list.
 
 ## Live demos
 
-- [Passing release-readiness PR](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) — expected pass after focused design, BOM, and manufacturing-output remediation.
-- [Failing release-readiness PR](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) — expected fail with clear annotations, a sticky review, and downloadable workflow artifacts.
+- [A board that gets fixed](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) — a blocked baseline, and the pull request that closes all five findings. The check goes green.
+- [A board that gets broken](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) — a clean baseline, and a pull request that reads as routine housekeeping and makes the board unfabricable. The check goes red and says why.
 
-Both repositories contain synthetic public-domain KiCad fixtures and can be evaluated without customer data or secrets. See the [golden demo walkthrough](docs/golden-demo.md).
+Both are public and run the published Action, so you can read the findings, the sticky comment, and the fabrication diff without installing anything. The hardware is synthetic, so there is no customer data or secret to worry about. See the [golden demo walkthrough](docs/golden-demo.md).
 
 ## CLI
 
