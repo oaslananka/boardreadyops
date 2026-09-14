@@ -33,7 +33,12 @@ test.describe("Review lifecycle", () => {
   test("1. Reviews list renders decision-ready summaries per repository/PR", async ({ page }) => {
     await page.goto("/reviews");
     await expect(page.getByRole("heading", { name: "Hardware Reviews" })).toBeVisible();
-    await expect(page.getByText("acme-hardware/industrial-iot-gateway")).toBeVisible();
+    // Match the review's own link, not any text on the page. The filter bar's repository
+    // <select> carries an <option> with the same name, so a bare getByText resolves to two
+    // elements and fails strict mode -- it was only ever unambiguous because the filter did
+    // not exist yet. Asserting the link is also the stronger claim: the row is there and it
+    // goes somewhere.
+    await expect(page.getByRole("link", { name: /acme-hardware\/industrial-iot-gateway/ })).toBeVisible();
     await expect(page.getByText("PR #42")).toBeVisible();
   });
 
@@ -140,9 +145,26 @@ test.describe("Review lifecycle", () => {
     await expect(page.getByRole("heading", { name: /Marketplace plan|Billing/i })).toBeVisible();
   });
 
-  test("12. Data settings page renders export/erasure controls", async ({ page }) => {
+  /*
+   * This spec runs without the authenticated storage state, so every test here sees the
+   * signed-out surface. The previous version of this test claimed to check "export/erasure
+   * controls" and asserted only `getByRole("heading", {name: /Data/i})`, which never reached
+   * those controls -- they render for a viewer with an installation. It passed by accident
+   * until a second heading matching /Data/i appeared ("Sign in to administer data policy"),
+   * and then failed strict mode for the right reason on the wrong assertion.
+   *
+   * So it now asserts what this page genuinely owes a signed-out visitor: the retention policy
+   * it states publicly, and a way in. The export and erasure controls themselves need a viewer
+   * with an installation and are not covered here.
+   */
+  test("12. Data settings page states the retention policy and offers a way in", async ({ page }) => {
     await page.goto("/settings/data");
-    await expect(page.getByRole("heading", { name: /Data/i })).toBeVisible();
+    // Scoped to the page body: the app shell's banner carries its own "Sign in with GitHub"
+    // for signed-out viewers, so an unscoped locator matches twice.
+    const body = page.locator("#main-content");
+    await expect(body.getByRole("heading", { name: "Data & Retention" })).toBeVisible();
+    await expect(body.getByText(/Free keeps evidence for 30 days/)).toBeVisible();
+    await expect(body.getByRole("link", { name: /Sign in with GitHub/i })).toBeVisible();
   });
 
   test("13. Keyboard-only triage: j/k move selection, e opens the waiver modal", async ({ page }) => {
