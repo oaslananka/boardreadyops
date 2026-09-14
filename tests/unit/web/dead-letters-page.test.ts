@@ -1,10 +1,30 @@
 import { Window } from "happy-dom";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DeadLetterListItem } from "../../../apps/web/app/ops/dead-letters/dead-letter-view-model.js";
 import { DeadLettersPanel } from "../../../apps/web/app/ops/dead-letters/dead-letters-panel.js";
-import DeadLettersPage from "../../../apps/web/app/ops/dead-letters/page.js";
+
+vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
+  viewerAuthorization: vi.fn(async () => ({
+    session: { login: "octocat", installationIds: [12345] },
+    authorizeRepository: async () => true,
+    authorizeInstallation: async () => true,
+  })),
+}));
+
+const viewerInstallations = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/web/lib/viewer-installations.js", () => ({ viewerInstallations }));
+
+const { default: DeadLettersPage } = await import("../../../apps/web/app/ops/dead-letters/page.js");
+
+/** The page reads the viewer's installations server-side, so it is async now. */
+async function renderPage(
+  installations: { id: string; accountLogin: string }[] = [{ id: "inst-1", accountLogin: "acme-hardware" }],
+): Promise<string> {
+  viewerInstallations.mockResolvedValue(installations);
+  return renderToStaticMarkup(await DeadLettersPage());
+}
 
 const domGlobalKeys = ["window", "document", "Node", "Element", "Document", "HTMLElement", "SVGElement"] as const;
 type DomGlobalKey = (typeof domGlobalKeys)[number];
@@ -75,12 +95,22 @@ function noop() {
 }
 
 describe("DeadLettersPage", () => {
-  it("renders breadcrumbs, heading, and the connect form", () => {
-    const markup = renderToStaticMarkup(createElement(DeadLettersPage));
+  it("renders breadcrumbs, heading, and an installation picker instead of a credential field", async () => {
+    const markup = await renderPage();
     expect(markup).toContain("Dead-Letter Queue");
     expect(markup).toContain("Ops");
-    expect(markup).toContain("Installation ID");
-    expect(markup).toContain("Operator bearer token");
+    expect(markup).toContain("acme-hardware");
+    // Reading your own stuck jobs used to require pasting the control-plane operator token into
+    // a form field in the browser. The session covers it now; the field is gone.
+    expect(markup).not.toContain("Operator bearer token");
+    expect(markup).not.toContain("BOARDREADYOPS_OPERATOR_API_TOKEN");
+    expect(markup).not.toContain('type="password"');
+  });
+
+  it("explains itself rather than showing an empty picker when the viewer administers nothing", async () => {
+    const markup = await renderPage([]);
+    expect(markup).toContain("No installation is available to you");
+    expect(markup).toContain("operator bearer token against the API directly");
   });
 });
 
@@ -180,8 +210,8 @@ describe("DeadLettersPanel states", () => {
 });
 
 describe("DeadLettersPage accessibility", () => {
-  it("has no WCAG A/AA violations on the connect form", async () => {
-    const html = renderToStaticMarkup(createElement(DeadLettersPage));
+  it("has no WCAG A/AA violations on the installation picker", async () => {
+    const html = await renderPage();
     const violations = await axeViolations(html, "/ops/dead-letters");
     expect(violations).toEqual([]);
   });

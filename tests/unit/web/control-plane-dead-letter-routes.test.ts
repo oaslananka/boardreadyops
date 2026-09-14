@@ -14,6 +14,7 @@ import {
   handleControlPlaneDeadLetterReplayRequest,
 } from "../../../apps/web/lib/control-plane-dead-letter-routes.js";
 import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-rate-limit.js";
+import type { ViewerAuthorization } from "../../../apps/web/lib/viewer-authorization.js";
 import type { ControlPlaneOperationsStore } from "../../../packages/db/src/control-plane-operations-store.js";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
 
@@ -62,6 +63,27 @@ function dependencies(
     environment,
     queryExecutor: vi.fn(() => executor),
     createOperationsStore: vi.fn(() => store),
+    // No session by default: these cases assert the operator-token path fails closed, and a
+    // signed-in viewer would be a different (also valid) way in.
+    resolveViewer: vi.fn(async () => signedOutViewer()),
+  };
+}
+
+/** A viewer with no session, which denies every installation. */
+function signedOutViewer(): ViewerAuthorization {
+  return {
+    session: undefined,
+    authorizeRepository: async () => false,
+    authorizeInstallation: async () => false,
+  };
+}
+
+/** A viewer whose session covers the installation under test. */
+function signedInViewer(login = "octocat"): ViewerAuthorization {
+  return {
+    session: { login, installationIds: [12345] },
+    authorizeRepository: async () => true,
+    authorizeInstallation: async () => true,
   };
 }
 
@@ -477,5 +499,39 @@ describe("control-plane dead-letter operator routes", () => {
       expect(response.status).toBe(testCase.status);
       expect(await json(response)).toEqual({ ok: false, error: testCase.error });
     }
+  });
+
+  it("lets a signed-in viewer read their own installation without pasting an operator token", async () => {
+    // The panel used to require BOARDREADYOPS_OPERATOR_API_TOKEN in a browser form field, which
+    // asked a customer to handle a control-plane credential to read their own queue.
+    const store = operationsStore();
+    const deps = dependencies(store, { DATABASE_URL: "postgresql://example.invalid/boardreadyops" });
+    deps.resolveViewer = vi.fn(async () => signedInViewer());
+
+    const response = await handleControlPlaneDeadLetterListRequest(
+      new Request("https://control.invalid/api/v1/operator/installations/inst-1/dead-letters"),
+      "inst-1",
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await json(response)).toMatchObject({ ok: true });
+  });
+
+  it("refuses an installation the viewer's session does not cover", async () => {
+    const deps = dependencies(operationsStore(), { DATABASE_URL: "postgresql://example.invalid/boardreadyops" });
+    deps.resolveViewer = vi.fn(async () => ({
+      session: { login: "octocat", installationIds: [999] },
+      authorizeRepository: async () => false,
+      authorizeInstallation: async () => false,
+    }));
+
+    const response = await handleControlPlaneDeadLetterListRequest(
+      new Request("https://control.invalid/api/v1/operator/installations/inst-other/dead-letters"),
+      "inst-other",
+      deps,
+    );
+
+    expect(response.status).toBe(401);
   });
 });

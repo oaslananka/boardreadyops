@@ -7,6 +7,7 @@ import { Input } from "../../components/ui/input.js";
 import { NativeSelect } from "../../components/ui/native-select.js";
 import { Textarea } from "../../components/ui/textarea.js";
 import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
+import { type ApiFailure, describeApiFailure, describeNetworkFailure } from "../../lib/api-error-message.js";
 
 export interface PolicyRecord {
   readonly id: string;
@@ -518,7 +519,7 @@ function policyOutcomeMessage(draft: DraftPolicyState, editingId: string | null)
 
 export default function PoliciesClient({ storageConfigured = true }: Readonly<{ storageConfigured?: boolean }>) {
   const [policies, setPolicies] = useState<PolicyRecord[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiFailure | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftPolicyState>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
@@ -529,14 +530,16 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
   const loadPolicies = useCallback(async () => {
     if (!storageConfigured) {
       setPolicies([]);
-      setError("This deployment has no policy storage configured, so no governance policies can be loaded or saved.");
+      setError({
+        message: "This deployment has no policy storage configured, so no governance policies can be loaded or saved.",
+      });
       return;
     }
     try {
       const res = await fetch("/api/v1/policies");
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error || `Server returned error (${res.status})`);
+        setError(describeApiFailure(res.status, body.error, "governance policies"));
         setPolicies([]);
         return;
       }
@@ -545,11 +548,11 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
         setPolicies(body.policies);
         setError(null);
       } else {
-        setError(body.error || "Failed to parse policies");
+        setError(describeApiFailure(res.status, body.error, "governance policies"));
         setPolicies([]);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error loading policies");
+    } catch {
+      setError(describeNetworkFailure());
       setPolicies([]);
     }
   }, [storageConfigured]);
@@ -584,7 +587,6 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
     setError(null);
     setSuccessMessage(null);
 
-    const verb = editingId ? "update" : "create";
     const request = policyRequest(draft, editingId);
 
     try {
@@ -596,7 +598,7 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
       const body = (await res.json().catch(() => ({}))) as { ok: boolean; policy?: PolicyRecord; error?: string };
 
       if (!res.ok || !body.ok || !body.policy) {
-        setError(body.error || `Failed to ${verb} policy (${res.status})`);
+        setError(describeApiFailure(res.status, body.error, "this policy"));
         setSubmitting(false);
         return;
       }
@@ -606,9 +608,8 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
       setEditingId(null);
       setShowBuilder(false);
       await loadPolicies();
-    } catch (err) {
-      const networkFailure = `Network error ${verb === "update" ? "updating" : "creating"} policy`;
-      setError(err instanceof Error ? err.message : networkFailure);
+    } catch {
+      setError(describeNetworkFailure());
     } finally {
       setSubmitting(false);
     }
@@ -621,13 +622,13 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
       const res = await fetch(`/api/v1/policies/${id}`, { method: "DELETE" });
       const body = (await res.json().catch(() => ({}))) as { ok: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        setError(body.error || `Failed to delete policy (${res.status})`);
+        setError(describeApiFailure(res.status, body.error, "this policy"));
         return;
       }
       setSuccessMessage(`Policy "${name}" removed from enforcement.`);
       await loadPolicies();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error deleting policy");
+    } catch {
+      setError(describeNetworkFailure());
     }
   }
 
@@ -727,10 +728,15 @@ export default function PoliciesClient({ storageConfigured = true }: Readonly<{ 
 
       {error ? (
         <div
-          className="rounded-md border border-danger/40 bg-danger-surface px-4 py-3 text-sm text-danger"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/40 bg-danger-surface px-4 py-3 text-sm text-foreground"
           role="alert"
         >
-          {error}
+          <span>{error.message}</span>
+          {error.action ? (
+            <a href={error.action.href} className="shrink-0 font-medium text-primary underline underline-offset-2">
+              {error.action.label}
+            </a>
+          ) : null}
         </div>
       ) : null}
 

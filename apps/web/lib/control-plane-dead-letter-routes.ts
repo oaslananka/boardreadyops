@@ -7,6 +7,7 @@ import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { authenticateControlPlaneOperator } from "./control-plane-operator-auth.js";
 import { controlPlaneJsonError, controlPlaneJsonResponse } from "./control-plane-operator-response.js";
+import { type ViewerAuthorization, viewerAuthorization } from "./viewer-authorization.js";
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const supportedItemTypes = new Set<ControlPlaneDeadLetterItemType>(["job", "outbox"]);
@@ -17,6 +18,8 @@ export type ControlPlaneDeadLetterRouteDependencies = {
   environment: Readonly<Record<string, string | undefined>>;
   queryExecutor(): SqlQueryExecutor | undefined;
   createOperationsStore(executor: SqlQueryExecutor): DeadLetterOperations;
+  /** Resolves the signed-in viewer, for the session-scoped path. */
+  resolveViewer(): Promise<ViewerAuthorization>;
 };
 
 type ReplayRouteParams = {
@@ -50,15 +53,44 @@ export function createControlPlaneDeadLetterRouteDependencies(
       });
     },
     createOperationsStore: factories.createOperationsStore,
+    resolveViewer: () => viewerAuthorization(environment),
   };
 }
 
-function authenticatedActor(
+/**
+ * Who is asking, and may they see this installation.
+ *
+ * Two ways in, deliberately:
+ *
+ * - **Operator bearer token** — the cross-installation path an on-call operator uses. Unchanged.
+ * - **Viewer session, scoped to its own installations** — added because the only way to look at
+ *   your own stuck jobs used to be pasting `BOARDREADYOPS_OPERATOR_API_TOKEN` into a form field
+ *   in the browser, which asks a customer to handle a control-plane credential in order to read
+ *   their own queue. The session path can only ever reach installations the cookie recorded.
+ *
+ * The operator path is tried first so an operator with both never falls back to the narrower one.
+ */
+async function authenticatedActor(
   request: Request,
+  installationId: string,
   dependencies: ControlPlaneDeadLetterRouteDependencies,
-): { actorId: string } | Response {
+): Promise<{ actorId: string } | Response> {
   const authentication = authenticateControlPlaneOperator(request, dependencies.environment);
-  if (authentication.status === "disabled") {
+  if (authentication.status === "authenticated") return { actorId: authentication.actorId };
+
+  let signedIn = false;
+  if (authentication.status === "unauthorized" || authentication.status === "disabled") {
+    const viewer = await dependencies.resolveViewer();
+    signedIn = viewer.session !== undefined;
+    if (viewer.session && (await viewer.authorizeInstallation(installationId))) {
+      return { actorId: `session:${viewer.session.login}` };
+    }
+  }
+
+  // A signed-in viewer who simply does not cover this installation is told so, whatever the
+  // operator API's configuration is: "not configured" would be an answer about the deployment
+  // to someone whose problem is their own scope.
+  if (authentication.status === "disabled" && !signedIn) {
     return controlPlaneJsonError("operator API is not configured", 503);
   }
   if (authentication.status === "rate_limited") {
@@ -68,10 +100,7 @@ function authenticatedActor(
       { "retry-after": String(authentication.retryAfterSeconds) },
     );
   }
-  if (authentication.status === "unauthorized") {
-    return controlPlaneJsonError("operator authentication is required", 401, { "www-authenticate": "Bearer" });
-  }
-  return { actorId: authentication.actorId };
+  return controlPlaneJsonError("Sign in to read this installation's queue.", 401, { "www-authenticate": "Bearer" });
 }
 
 function validIdentifier(value: string): boolean {
@@ -107,9 +136,9 @@ export async function handleControlPlaneDeadLetterListRequest(
   installationId: string,
   dependencies: ControlPlaneDeadLetterRouteDependencies = createControlPlaneDeadLetterRouteDependencies(),
 ): Promise<Response> {
-  const actor = authenticatedActor(request, dependencies);
-  if (actor instanceof Response) return actor;
   if (!validIdentifier(installationId)) return controlPlaneJsonError("installation identifier is invalid", 400);
+  const actor = await authenticatedActor(request, installationId, dependencies);
+  if (actor instanceof Response) return actor;
 
   const query = parsedListQuery(request);
   if (query instanceof Response) return query;
@@ -141,9 +170,6 @@ export async function handleControlPlaneDeadLetterReplayRequest(
   params: ReplayRouteParams,
   dependencies: ControlPlaneDeadLetterRouteDependencies = createControlPlaneDeadLetterRouteDependencies(),
 ): Promise<Response> {
-  const actor = authenticatedActor(request, dependencies);
-  if (actor instanceof Response) return actor;
-
   if (
     !validIdentifier(params.installationId) ||
     !validIdentifier(params.itemId) ||
@@ -151,6 +177,11 @@ export async function handleControlPlaneDeadLetterReplayRequest(
   ) {
     return controlPlaneJsonError("dead-letter replay target is invalid", 400);
   }
+
+  // Authorized after the identifiers are validated, so a malformed installation id can never
+  // reach the session scope check.
+  const actor = await authenticatedActor(request, params.installationId, dependencies);
+  if (actor instanceof Response) return actor;
 
   const operationId = request.headers.get("idempotency-key") ?? "";
   if (!validIdentifier(operationId)) return controlPlaneJsonError("Idempotency-Key header is required", 400);
