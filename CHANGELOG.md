@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.47.1](https://github.com/oaslananka/boardreadyops/compare/v1.47.0...v1.47.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **web:** say which namespace the slug collides in, and stop claiming a base-run diff ([#750](https://github.com/oaslananka/boardreadyops/issues/750)) ([9ea60ee](https://github.com/oaslananka/boardreadyops/commit/9ea60ee65c54d6a290f58b05628e02b9dd4bf2e9))
+
 ## [1.47.0](https://github.com/oaslananka/boardreadyops/compare/v1.46.0...v1.47.0) (2026-09-14)
 
 
