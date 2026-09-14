@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: "24.20.0"
+  NODE_VERSION: "24.21.0"
 
 jobs:
   audit:
