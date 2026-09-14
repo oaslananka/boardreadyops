@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.43.1](https://github.com/oaslananka/boardreadyops/compare/v1.43.0...v1.43.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **web:** stop the review search field collapsing to nothing ([#733](https://github.com/oaslananka/boardreadyops/issues/733)) ([7de4e57](https://github.com/oaslananka/boardreadyops/commit/7de4e57ced3f405599ee17b8397c11d8fe1d17e3))
+
 ## [1.43.0](https://github.com/oaslananka/boardreadyops/compare/v1.42.1...v1.43.0) (2026-09-14)
 
 
