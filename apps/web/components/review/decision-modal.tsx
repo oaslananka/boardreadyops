@@ -114,6 +114,16 @@ export function DecisionModal({ finding, targetDisposition, onConfirm, onClose }
               onChange={(e) => setExpiresAt(e.currentTarget.value)}
               className="mt-1 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
+            {/*
+              The behaviour was only ever visible in the scan that queues the reminder. Someone
+              deciding between "no expiry" and "ninety days" could not see what the difference
+              bought them, which is the decision this field exists to make.
+            */}
+            <p className="mt-1 text-meta text-muted-foreground">
+              {expiresAt
+                ? "After this date the rule blocks releases again. A reminder goes to your notification channels seven days before, if any are set up."
+                : "Leave empty and the acceptance never lapses — nothing will bring it back for review."}
+            </p>
           </div>
         </div>
 
