@@ -8,6 +8,20 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.47.0](https://github.com/oaslananka/boardreadyops/compare/v1.46.0...v1.47.0) (2026-09-14)
+
+
+### Features
+
+* **web:** send the landing page somewhere the product is running ([#743](https://github.com/oaslananka/boardreadyops/issues/743)) ([e453b42](https://github.com/oaslananka/boardreadyops/commit/e453b427a6d63e99621ad7f4d33133b5119b0977))
+
+## [1.46.0](https://github.com/oaslananka/boardreadyops/compare/v1.45.0...v1.46.0) (2026-09-14)
+
+
+### Features
+
+* **web:** page the long lists and name what the short ones assume ([#740](https://github.com/oaslananka/boardreadyops/issues/740)) ([e956f4d](https://github.com/oaslananka/boardreadyops/commit/e956f4d3660ad4663795d4cb479b3fa7c0abf4da))
+
 ## [1.45.0](https://github.com/oaslananka/boardreadyops/compare/v1.44.0...v1.45.0) (2026-09-14)
 
 

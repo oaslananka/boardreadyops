@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { UserSession } from "../../../apps/web/lib/user-session.js";
 import { canManageMembers, isLastOwner, loadWorkspaceMembers } from "../../../apps/web/lib/workspace-members.js";
 
+const workspaceListingCounts = vi.fn(async () => ({ projects: 0, deliveries: 0, members: 0 }));
 const listWorkspacesForUser = vi.fn();
 const listWorkspaceMembers = vi.fn();
 const close = vi.fn();
@@ -9,6 +10,7 @@ const close = vi.fn();
 vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   WorkspaceStore: class {
+    workspaceListingCounts = workspaceListingCounts;
     listWorkspacesForUser = listWorkspacesForUser;
     listWorkspaceMembers = listWorkspaceMembers;
   },
@@ -80,7 +82,7 @@ describe("loadWorkspaceMembers", () => {
     const result = await loadWorkspaceMembers(session, "ws_b", postgres);
 
     expect(result.state === "ok" && result.selected.id).toBe("ws_b");
-    expect(listWorkspaceMembers).toHaveBeenCalledWith("ws_b");
+    expect(listWorkspaceMembers).toHaveBeenCalledWith("ws_b", { limit: 25, offset: 0 });
   });
 
   it("keys the workspace list on the viewer's login", async () => {
@@ -100,7 +102,7 @@ describe("loadWorkspaceMembers", () => {
     const result = await loadWorkspaceMembers(session, "ws_someone_elses", postgres);
 
     expect(result.state === "ok" && result.selected.id).toBe("ws_a");
-    expect(listWorkspaceMembers).not.toHaveBeenCalledWith("ws_someone_elses");
+    expect(listWorkspaceMembers).not.toHaveBeenCalledWith("ws_someone_elses", { limit: 25, offset: 0 });
   });
 
   it("reports no-workspaces, signed-out and not-configured distinctly", async () => {

@@ -47,6 +47,14 @@ export type NotificationAdminScope = {
    * would dead-letter on its first delivery.
    */
   emailAvailable: boolean;
+  /**
+   * Whether supply watch can run for the selected installation.
+   *
+   * `supply.risk_detected` is on by default for a new channel, but the pass that produces it only
+   * runs where a component-intelligence credential is stored. Without this the checkbox is ticked
+   * and nothing ever arrives, which reads as a broken notification rather than a prerequisite.
+   */
+  componentIntelligenceReady: boolean;
 };
 
 function toChannelView(record: NotificationChannelRecord): NotificationChannelView {
@@ -93,10 +101,12 @@ export async function resolveNotificationAdminScope(
     channels: [],
     storageUnavailable: !environment.DATABASE_URL,
     emailAvailable: emailNotificationsAvailable(environment),
+    componentIntelligenceReady: false,
   };
   if (!session) return empty;
 
-  const installations = (await viewerInstallations(session, "nexar", environment)).map((installation) => ({
+  const records = await viewerInstallations(session, "nexar", environment);
+  const installations = records.map((installation) => ({
     id: installation.id,
     accountLogin: installation.accountLogin,
   }));
@@ -114,13 +124,16 @@ export async function resolveNotificationAdminScope(
   ]);
   const executor = createPgQueryExecutor({ connectionString, max: 1 });
   try {
-    const records = await createSqlNotificationStore(executor).listChannels(selected.id);
+    const channelRecords = await createSqlNotificationStore(executor).listChannels(selected.id);
     return {
       installations,
       selected,
-      channels: records.map(toChannelView),
+      channels: channelRecords.map(toChannelView),
       storageUnavailable: false,
       emailAvailable: emailNotificationsAvailable(environment),
+      componentIntelligenceReady: records.some(
+        (installation) => installation.id === selected.id && installation.hasComponentCredential,
+      ),
     };
   } finally {
     await executor.close();

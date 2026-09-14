@@ -25,6 +25,31 @@ const proofItems = [
   "Every result tied to a file and a checksum",
 ] as const;
 
+/**
+ * The two public repositories that run the published Action on a real pull request.
+ *
+ * Everything else on this page is described rather than shown, including the panel in the
+ * hero, which says so. Someone deciding whether to install a GitHub App on a repository
+ * holding their board files wants to watch it work on someone else's board first, and until
+ * these existed there was nowhere to send them.
+ */
+const liveDemos = [
+  {
+    verdict: "pass" as const,
+    title: "A board that gets fixed",
+    href: "https://github.com/oaslananka/boardreadyops-demo-pass/pull/1",
+    baseline: "main is blocked: five findings",
+    body: "The pull request closes the outline, deduplicates a reference designator, and sources the BOM. The check goes green and the comment shows which BOM lines changed.",
+  },
+  {
+    verdict: "fail" as const,
+    title: "A board that gets broken",
+    href: "https://github.com/oaslananka/boardreadyops-demo-fail/pull/1",
+    baseline: "main is clean: no findings",
+    body: "The pull request reads as routine housekeeping and makes the board unfabricable. Nothing in the diff says so. The check goes red and names all five reasons.",
+  },
+] as const;
+
 const workflowSteps = [
   {
     number: "01",
@@ -363,8 +388,17 @@ export default function HomePage() {
                   <span className="text-xs text-muted-foreground">Downloadable</span>
                 </li>
               </ol>
+              {/*
+                This panel is a drawing, and saying so is the honest thing. Saying only that
+                left the reader with no way to see a real one, so it now points at the pull
+                requests below where the same thing happens on an actual board.
+              */}
               <p className="mt-4 text-xs text-muted-foreground">
-                Illustrative sample. Your repository and its workflow logs stay the source of truth.
+                Illustrative sample — your repository and its workflow logs stay the source of truth.{" "}
+                <a href="#live-demos" className="text-primary underline underline-offset-2">
+                  See it on a real pull request
+                </a>
+                .
               </p>
             </aside>
           </div>
@@ -390,6 +424,54 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
+          </div>
+        </section>
+
+        <section className="border-b border-border py-16" id="live-demos" aria-labelledby="live-demos-heading">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="flex max-w-2xl flex-col gap-2">
+              <p className="text-sm font-medium text-primary">Live pull requests</p>
+              <h2 id="live-demos-heading" className="text-2xl font-bold text-foreground sm:text-3xl">
+                Watch it work before you install anything.
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Two public repositories running the published Action on the same board, in opposite directions. Open
+                either pull request and read the check: the findings, the files they point at, and the fabrication diff
+                against the base run.
+              </p>
+            </div>
+            <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {liveDemos.map((demo) => (
+                <li key={demo.href} className="flex flex-col rounded-md border border-border bg-card p-5">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span
+                      className={`size-2 rounded-full ${demo.verdict === "pass" ? "bg-success" : "bg-danger"}`}
+                      aria-hidden="true"
+                    />
+                    <span>{demo.baseline}</span>
+                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-foreground">
+                      Check on the PR: {demo.verdict === "pass" ? "green" : "red"}
+                    </span>
+                  </div>
+                  <strong className="mt-3 text-base text-foreground">{demo.title}</strong>
+                  <p className="mt-2 flex-1 text-sm text-muted-foreground">{demo.body}</p>
+                  <a
+                    href={demo.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-4 inline-flex items-center gap-1.5 self-start text-sm text-primary underline underline-offset-2"
+                  >
+                    <span>Open the pull request</span>
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Synthetic hardware, MIT licensed. Reproduce either locally with{" "}
+              <code className="rounded-sm bg-muted px-1.5 py-0.5">npx @boardreadyops/cli run .</code> — no KiCad
+              installation needed.
+            </p>
           </div>
         </section>
 

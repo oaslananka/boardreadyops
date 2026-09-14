@@ -1,4 +1,5 @@
 import type { WorkspaceDeliveryRecord, WorkspaceMembershipRecord, WorkspaceRevisionRecord } from "@boardreadyops/db";
+import { parseListingPage, workspaceListingPageSize } from "./project-listing.js";
 import { reviewFixturesEnabled } from "./review-listing.js";
 import type { UserSession } from "./user-session.js";
 import { openWorkspaceStore } from "./workspace-store-access.js";
@@ -30,12 +31,16 @@ export type DeliveryListingResult =
        * exists once a package has been uploaded, and that upload is API-only today.
        */
       revisions: readonly WorkspaceRevisionRecord[];
+      total: number;
+      page: number;
+      totalPages: number;
     };
 
 export async function loadWorkspaceDeliveries(
   session: UserSession | undefined,
   requestedWorkspaceId: string | undefined,
   environment: NodeJS.ProcessEnv = process.env,
+  requestedPage: string | string[] | undefined = undefined,
 ): Promise<DeliveryListingResult> {
   if (reviewFixturesEnabled(environment)) return { state: "not-configured" };
   if (!session) return { state: "signed-out" };
@@ -51,11 +56,17 @@ export async function loadWorkspaceDeliveries(
     const selected = workspaces.find((workspace) => workspace.id === requestedWorkspaceId) ?? workspaces[0];
     if (!selected) return { state: "no-workspaces" };
 
+    const counts = await store.workspaceListingCounts(selected.id);
+    const total = counts.deliveries;
+    const totalPages = Math.max(1, Math.ceil(total / workspaceListingPageSize));
+    const page = parseListingPage(requestedPage, totalPages);
     const [deliveries, revisions] = await Promise.all([
-      store.listDeliveriesByWorkspace(selected.id),
+      store.listDeliveriesByWorkspace(selected.id, workspaceListingPageSize, (page - 1) * workspaceListingPageSize),
+      // The revision picker in the create form is unpaged on purpose: it is a dropdown of things
+      // you might share, not a listing, and a paged dropdown cannot be searched.
       store.listRevisionsByWorkspace(selected.id),
     ]);
-    return { state: "ok", workspaces, selected, deliveries, revisions };
+    return { state: "ok", workspaces, selected, deliveries, revisions, total, page, totalPages };
   } finally {
     await executor.close();
   }

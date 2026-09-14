@@ -4,14 +4,16 @@ The golden demo is a tiny, self-contained corpus that shows BoardReadyOps catchi
 
 ## Live pull request demos
 
-Two public repositories turn the local fixture into a reviewable GitHub experience. Both contain synthetic CC0 hardware only, use SHA-pinned Actions, and publish JSON, SARIF, and Markdown workflow artifacts.
+Two public repositories turn the local fixture into a reviewable GitHub experience. Both carry the same synthetic hardware as `examples/golden-demo`, under the same MIT licence, and run the published Action pinned to a commit SHA. No GitHub App installation is needed to read them.
 
-| Repository | Pull request | Expected result | What it shows |
+| Repository | Pull request | Check on the PR | What it shows |
 | --- | --- | --- | --- |
-| [`oaslananka/boardreadyops-demo-pass`](https://github.com/oaslananka/boardreadyops-demo-pass) | [`demo/pass` PR #1](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) | **Expected pass** | A blocked baseline is repaired: the board outline, references, BOM data, and Gerber/drill/placement evidence become release-ready. |
-| [`oaslananka/boardreadyops-demo-fail`](https://github.com/oaslananka/boardreadyops-demo-fail) | [`demo/fail` PR #1](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) | **Expected fail** | A clean baseline gains understandable design, BOM, and missing-manufacturing-output blockers. |
+| [`oaslananka/boardreadyops-demo-pass`](https://github.com/oaslananka/boardreadyops-demo-pass) | [PR #1 — repair the board](https://github.com/oaslananka/boardreadyops-demo-pass/pull/1) | **green** | `main` is the blocked baseline. The pull request closes the outline, deduplicates the reference designator, and sources the BOM, and readiness goes from five findings to none. |
+| [`oaslananka/boardreadyops-demo-fail`](https://github.com/oaslananka/boardreadyops-demo-fail) | [PR #1 — a plausible layout tweak](https://github.com/oaslananka/boardreadyops-demo-fail/pull/1) | **red** | `main` is clean. The pull request reads as routine housekeeping and makes the board unfabricable; nothing in the diff says so, and the check does. |
 
-The passing PR posts a `100/100` release review. The failing PR posts a bounded list of blockers and still uploads the complete workflow artifacts so the remediation path remains inspectable. Each repository also includes the reviewed target-repository `readiness-runner.yml` used by the GitHub App setup flow.
+Each pull request carries the Action's sticky comment: the finding list, and the fabrication diff against the base run — the BOM lines and outputs that changed, which is what a reviewer cannot get from the diff itself. JSON, SARIF, and Markdown reports upload as workflow artifacts on every run.
+
+Both repositories also ship the target-repository `readiness-runner.yml`, so installing the GitHub App on them lights up the hosted review at `app.boardreadyops.com` without any further setup.
 
 ## Run it in two commands
 
@@ -20,7 +22,7 @@ boardreadyops run examples/golden-demo/broken
 boardreadyops run examples/golden-demo/fixed
 ```
 
-The `broken` board exits `1` with four blocking findings; the `fixed` board exits `0`. Both projects keep DRC and ERC disabled, so the demo runs without `kicad-cli`.
+The `broken` board exits `1` with five findings, four of them blocking at the default `high` threshold; the `fixed` board exits `0`. Both projects keep DRC and ERC disabled, so the demo runs without `kicad-cli`.
 
 ## What the broken board reports
 
@@ -30,8 +32,9 @@ The `broken` board exits `1` with four blocking findings; the `fixed` board exit
 | `design.unique-references` | high | A reference designator (`R1`) is used twice. |
 | `bom.missing-mpn` | high | A populated BOM row has no manufacturer part number. |
 | `bom.compliance` | high | A populated part is marked `Non-Compliant`. |
+| `bom.risk-score` | medium | The missing MPN scores `R1` at 60/100 for supply risk. Below the `high` threshold, so it warns rather than blocks. |
 
-The `fixed` board resolves all four and reports nothing. Each problem maps to one clear cause and one clear fix, documented in the [demo README](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo#expected-findings).
+The `fixed` board resolves all five and reports nothing. Each problem maps to one clear cause and one clear fix, documented in the [demo README](https://github.com/oaslananka/boardreadyops/tree/main/examples/golden-demo#expected-findings).
 
 ## How it stays correct
 
