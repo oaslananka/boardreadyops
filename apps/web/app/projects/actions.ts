@@ -33,6 +33,34 @@ const createProjectSchema = z.object({
   defaultCadFormat: z.enum(["kicad", "altium", "easyeda", "fusion360", "ipc2581", "generic_gerber"]).default("kicad"),
 });
 
+/**
+ * Deleting names the thing being deleted back to the server.
+ *
+ * `confirmName` must match the record's current name. A yes/no dialog is the wrong control for a
+ * cascade: `projects`, `revisions` and `deliveries` all cascade from `workspaces`, so one careless
+ * click can take a month of release evidence with it. Typing the name is the cheapest control that
+ * makes the action deliberate, and it costs a careful user four seconds.
+ */
+const renameProjectSchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().trim().min(1, "Give the project a name.").max(128),
+});
+
+const deleteProjectSchema = z.object({
+  projectId: z.string().min(1),
+  confirmName: z.string().trim().min(1, "Type the project name to confirm."),
+});
+
+const renameWorkspaceSchema = z.object({
+  workspaceId: z.string().min(1),
+  name: z.string().trim().min(1, "Give the workspace a name.").max(128),
+});
+
+const deleteWorkspaceSchema = z.object({
+  workspaceId: z.string().min(1),
+  confirmName: z.string().trim().min(1, "Type the workspace name to confirm."),
+});
+
 export const createWorkspaceAction = defineAction(createWorkspaceSchema, async (input, { session }) => {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return fail("This deployment has no database configured.");
@@ -77,6 +105,119 @@ export const createProjectAction = defineAction(createProjectSchema, async (inpu
     });
     revalidatePath("/projects");
     return ok({ projectId: project.id }, `Created ${project.name}.`);
+  } finally {
+    await executor.close();
+  }
+});
+
+/** Owners and admins may rename a project; viewers may not. */
+export const renameProjectAction = defineAction(renameProjectSchema, async (input, { session }) => {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return fail("This deployment has no database configured.");
+
+  const { store, executor } = await openWorkspaceStore(connectionString);
+  try {
+    // The project id is a hidden input, so the workspace it belongs to is resolved server-side
+    // and the caller's membership re-read before anything is written.
+    const workspaceId = await store.workspaceIdForProject(input.projectId);
+    if (!workspaceId) return fail("Project not found.");
+    const role = await store.workspaceRoleFor(workspaceId, session.login);
+    if (!role) return fail("Project not found.");
+    if (role === "viewer") return fail("Viewers cannot rename projects.");
+
+    const renamed = await store.renameProject(input.projectId, input.name);
+    if (!renamed) return fail("Project not found.");
+    revalidatePath("/projects");
+    return ok(undefined, `Renamed to ${input.name}.`);
+  } finally {
+    await executor.close();
+  }
+});
+
+/** Only an owner may delete a project, and only by typing its name. */
+export const deleteProjectAction = defineAction(deleteProjectSchema, async (input, { session }) => {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return fail("This deployment has no database configured.");
+
+  const { store, executor } = await openWorkspaceStore(connectionString);
+  try {
+    const workspaceId = await store.workspaceIdForProject(input.projectId);
+    if (!workspaceId) return fail("Project not found.");
+    const role = await store.workspaceRoleFor(workspaceId, session.login);
+    if (!role) return fail("Project not found.");
+    if (role !== "owner") return fail("Only a workspace owner can delete a project.");
+
+    const projects = await store.listProjectsByWorkspace(workspaceId);
+    const project = projects.find((entry) => entry.id === input.projectId);
+    if (!project) return fail("Project not found.");
+    if (input.confirmName !== project.name) {
+      return fail(`Type the project name exactly — "${project.name}" — to confirm.`);
+    }
+
+    const impact = await store.projectDeletionImpact(input.projectId);
+    const deleted = await store.deleteProject(input.projectId);
+    if (!deleted) return fail("Project not found.");
+    revalidatePath("/projects");
+    return ok(
+      undefined,
+      `Deleted ${project.name}, with ${impact.revisions} revision(s) and ${impact.deliveries} delivery link(s).`,
+    );
+  } finally {
+    await executor.close();
+  }
+});
+
+export const renameWorkspaceAction = defineAction(renameWorkspaceSchema, async (input, { session }) => {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return fail("This deployment has no database configured.");
+
+  const { store, executor } = await openWorkspaceStore(connectionString);
+  try {
+    const role = await store.workspaceRoleFor(input.workspaceId, session.login);
+    if (!role) return fail("Workspace not found.");
+    if (role !== "owner" && role !== "admin") return fail("Only owners and admins can rename a workspace.");
+
+    const renamed = await store.renameWorkspace(input.workspaceId, input.name);
+    if (!renamed) return fail("Workspace not found.");
+    revalidatePath("/projects");
+    revalidatePath("/settings/workspace");
+    return ok(undefined, `Renamed to ${input.name}.`);
+  } finally {
+    await executor.close();
+  }
+});
+
+/**
+ * Only an owner may delete a workspace, and only by typing its name.
+ *
+ * The slug is not reused afterwards by anything, but everything beneath the workspace is removed
+ * by cascade, so the confirmation message states the counts the caller was shown.
+ */
+export const deleteWorkspaceAction = defineAction(deleteWorkspaceSchema, async (input, { session }) => {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return fail("This deployment has no database configured.");
+
+  const { store, executor } = await openWorkspaceStore(connectionString);
+  try {
+    const role = await store.workspaceRoleFor(input.workspaceId, session.login);
+    if (!role) return fail("Workspace not found.");
+    if (role !== "owner") return fail("Only a workspace owner can delete it.");
+
+    const workspace = await store.getWorkspaceById(input.workspaceId);
+    if (!workspace) return fail("Workspace not found.");
+    if (input.confirmName !== workspace.name) {
+      return fail(`Type the workspace name exactly — "${workspace.name}" — to confirm.`);
+    }
+
+    const impact = await store.workspaceDeletionImpact(input.workspaceId);
+    const deleted = await store.deleteWorkspace(input.workspaceId);
+    if (!deleted) return fail("Workspace not found.");
+    revalidatePath("/projects");
+    revalidatePath("/settings/workspace");
+    return ok(
+      undefined,
+      `Deleted ${workspace.name}, with ${impact.projects} project(s), ${impact.revisions} revision(s) and ${impact.deliveries} delivery link(s).`,
+    );
   } finally {
     await executor.close();
   }

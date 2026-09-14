@@ -535,6 +535,111 @@ export class WorkspaceStore {
     };
   }
 
+  /**
+   * What disappears if this workspace is deleted.
+   *
+   * `projects`, `revisions` and `deliveries` all cascade from `workspaces`, so a delete is far
+   * more destructive than its button implies. A caller shows these counts before asking, rather
+   * than letting someone discover the blast radius afterwards.
+   */
+  async workspaceDeletionImpact(workspaceId: string): Promise<{
+    projects: number;
+    revisions: number;
+    deliveries: number;
+  }> {
+    const result = (await this.executor.query(
+      `select
+         (select count(*) from projects where workspace_id = $1)::int as projects,
+         (select count(*) from revisions
+            join projects on projects.id = revisions.project_id
+           where projects.workspace_id = $1)::int as revisions,
+         (select count(*) from deliveries
+            join revisions on revisions.id = deliveries.revision_id
+            join projects on projects.id = revisions.project_id
+           where projects.workspace_id = $1)::int as deliveries`,
+      [workspaceId],
+    )) as { rows?: { projects: number; revisions: number; deliveries: number }[] };
+    const row = result?.rows?.[0];
+    return {
+      projects: Number(row?.projects ?? 0),
+      revisions: Number(row?.revisions ?? 0),
+      deliveries: Number(row?.deliveries ?? 0),
+    };
+  }
+
+  async renameWorkspace(workspaceId: string, name: string): Promise<boolean> {
+    const result = (await this.executor.query(`update workspaces set name = $2 where id = $1 returning id`, [
+      workspaceId,
+      name,
+    ])) as { rows?: unknown[] };
+    return (result?.rows ?? []).length > 0;
+  }
+
+  /** Removes the workspace and, by cascade, every project, revision and delivery beneath it. */
+  async deleteWorkspace(workspaceId: string): Promise<boolean> {
+    const result = (await this.executor.query(`delete from workspaces where id = $1 returning id`, [workspaceId])) as {
+      rows?: unknown[];
+    };
+    return (result?.rows ?? []).length > 0;
+  }
+
+  /** What disappears if this project is deleted. Same reasoning as the workspace version. */
+  async projectDeletionImpact(projectId: string): Promise<{ revisions: number; deliveries: number }> {
+    const result = (await this.executor.query(
+      `select
+         (select count(*) from revisions where project_id = $1)::int as revisions,
+         (select count(*) from deliveries
+            join revisions on revisions.id = deliveries.revision_id
+           where revisions.project_id = $1)::int as deliveries`,
+      [projectId],
+    )) as { rows?: { revisions: number; deliveries: number }[] };
+    const row = result?.rows?.[0];
+    return { revisions: Number(row?.revisions ?? 0), deliveries: Number(row?.deliveries ?? 0) };
+  }
+
+  async renameProject(projectId: string, name: string): Promise<boolean> {
+    const result = (await this.executor.query(`update projects set name = $2 where id = $1 returning id`, [
+      projectId,
+      name,
+    ])) as { rows?: unknown[] };
+    return (result?.rows ?? []).length > 0;
+  }
+
+  async deleteProject(projectId: string): Promise<boolean> {
+    const result = (await this.executor.query(`delete from projects where id = $1 returning id`, [projectId])) as {
+      rows?: unknown[];
+    };
+    return (result?.rows ?? []).length > 0;
+  }
+
+  /**
+   * Ends a guest delivery link now.
+   *
+   * Expires the link rather than deleting the row: `getDeliveryByToken` already refuses anything
+   * past `expires_at`, so this closes access immediately while the record stays in place for the
+   * audit trail — who shared what, and when it was withdrawn.
+   */
+  async revokeDeliveryLink(deliveryId: string): Promise<boolean> {
+    const result = (await this.executor.query(
+      `update deliveries set expires_at = now() where id = $1 and expires_at > now() returning id`,
+      [deliveryId],
+    )) as { rows?: unknown[] };
+    return (result?.rows ?? []).length > 0;
+  }
+
+  /** The workspace a delivery belongs to, for authorizing a request that names only the delivery. */
+  async workspaceIdForDelivery(deliveryId: string): Promise<string | null> {
+    const result = (await this.executor.query(
+      `select projects.workspace_id
+         from deliveries
+         join revisions on revisions.id = deliveries.revision_id
+         join projects on projects.id = revisions.project_id
+        where deliveries.id = $1`,
+      [deliveryId],
+    )) as { rows?: { workspace_id: string }[] };
+    return result?.rows?.[0]?.workspace_id ?? null;
+  }
+
   async getDeliveryByToken(rawToken: string): Promise<DeliveryRecord | null> {
     const accessTokenHash = createHash("sha256").update(rawToken).digest("hex");
     const result = (await this.executor.query(

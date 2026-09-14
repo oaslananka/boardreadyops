@@ -3,15 +3,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
 import { GuidedChecklist } from "../../components/guided-checklist.js";
+import { ProjectRowActions, WorkspaceDangerZone } from "../../components/projects/teardown-forms.js";
 import { CreateProjectForm, CreateWorkspaceForm } from "../../components/projects/workspace-forms.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
-import { loadWorkspaceProjects } from "../../lib/project-listing.js";
+import { loadWorkspaceProjects, type WorkspaceProjectsImpact } from "../../lib/project-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
-import { createProjectAction, createWorkspaceAction } from "./actions.js";
+import {
+  createProjectAction,
+  createWorkspaceAction,
+  deleteProjectAction,
+  deleteWorkspaceAction,
+  renameProjectAction,
+  renameWorkspaceAction,
+} from "./actions.js";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -43,48 +51,67 @@ function when(value: string): string {
   return Number.isNaN(parsed) ? "unknown" : new Date(parsed).toISOString().slice(0, 10);
 }
 
-const columns: readonly DataColumn<ProjectRecord>[] = [
-  {
-    id: "name",
-    header: "Project",
-    rowHeader: true,
-    cell: (project) => (
-      <span className="flex flex-col gap-0.5">
-        <span className="font-medium text-foreground">{project.name}</span>
-        {project.description ? (
-          <span className="text-meta text-muted-foreground break-words">{project.description}</span>
-        ) : null}
-      </span>
-    ),
-  },
-  {
-    id: "format",
-    header: "CAD format",
-    cell: (project) => (
-      <StatusBadge value="neutral" label={cadFormatLabels[project.defaultCadFormat] ?? project.defaultCadFormat} />
-    ),
-  },
-  {
-    id: "repository",
-    header: "Repository",
-    cell: (project) =>
-      project.githubRepoFullName ? (
-        <span className="font-mono break-all">{project.githubRepoFullName}</span>
-      ) : (
-        <span className="text-muted-foreground">Not linked</span>
+function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly DataColumn<ProjectRecord>[] {
+  return [
+    {
+      id: "name",
+      header: "Project",
+      rowHeader: true,
+      cell: (project) => (
+        <span className="flex flex-col gap-0.5">
+          <span className="font-medium text-foreground">{project.name}</span>
+          {project.description ? (
+            <span className="text-meta text-muted-foreground break-words">{project.description}</span>
+          ) : null}
+        </span>
       ),
-  },
-  {
-    id: "created",
-    header: "Created",
-    align: "end",
-    cell: (project) => (
-      <time dateTime={project.createdAt} className="text-muted-foreground tabular-nums">
-        {when(project.createdAt)}
-      </time>
-    ),
-  },
-];
+    },
+    {
+      id: "format",
+      header: "CAD format",
+      cell: (project) => (
+        <StatusBadge value="neutral" label={cadFormatLabels[project.defaultCadFormat] ?? project.defaultCadFormat} />
+      ),
+    },
+    {
+      id: "repository",
+      header: "Repository",
+      cell: (project) =>
+        project.githubRepoFullName ? (
+          <span className="font-mono break-all">{project.githubRepoFullName}</span>
+        ) : (
+          <span className="text-muted-foreground">Not linked</span>
+        ),
+    },
+    {
+      id: "created",
+      header: "Created",
+      align: "end",
+      cell: (project) => (
+        <time dateTime={project.createdAt} className="text-muted-foreground tabular-nums">
+          {when(project.createdAt)}
+        </time>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      align: "end",
+      cell: (project) => (
+        <ProjectRowActions
+          projectId={project.id}
+          projectName={project.name}
+          revisions={impact.byProject[project.id]?.revisions ?? 0}
+          deliveries={impact.byProject[project.id]?.deliveries ?? 0}
+          canRename={role !== "viewer"}
+          canDelete={role === "owner"}
+          renameAction={renameProjectAction}
+          deleteAction={deleteProjectAction}
+        />
+      ),
+    },
+  ];
+}
 
 export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPageProps>) {
   const parameters = await searchParams;
@@ -123,7 +150,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
             >
               <DataTable
                 caption={`Projects in ${result.selected.name}`}
-                columns={columns}
+                columns={projectColumns(result.selected.role, result.impact)}
                 rows={result.projects}
                 rowKey={(project) => project.id}
                 empty={
@@ -139,6 +166,26 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
                 <CreateProjectForm workspaceId={result.selected.id} action={createProjectAction} />
               </Panel>
             )}
+
+            {result.selected.role === "owner" || result.selected.role === "admin" ? (
+              <Panel
+                title="Workspace settings"
+                description="Renaming is safe. Deleting is not — it takes every project, revision and delivery link with it."
+                tone="section"
+              >
+                <WorkspaceDangerZone
+                  workspaceId={result.selected.id}
+                  workspaceName={result.selected.name}
+                  projects={result.impact.workspace.projects}
+                  revisions={result.impact.workspace.revisions}
+                  deliveries={result.impact.workspace.deliveries}
+                  canRename={true}
+                  canDelete={result.selected.role === "owner"}
+                  renameAction={renameWorkspaceAction}
+                  deleteAction={deleteWorkspaceAction}
+                />
+              </Panel>
+            ) : null}
           </>
         ) : (
           <ProjectsUnavailable state={result.state} />
