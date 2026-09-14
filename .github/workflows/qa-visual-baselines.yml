@@ -1,0 +1,54 @@
+name: QA visual baselines
+
+# Regenerates the Playwright visual baselines on the platform they are named for.
+#
+# The committed snapshots are `*-chromium-linux.png`, so they can only be produced on Linux —
+# a maintainer on macOS or Windows cannot refresh them locally without committing
+# wrong-platform files. `qa-nightly` compares against these baselines but never rewrites them,
+# which left the only path "notice the nightly is red, then find a Linux machine".
+#
+# Deliberately `contents: read` and artifact-only: this job does not commit or open a pull
+# request, so it needs no write scope. Download the artifact, unpack it over
+# `tests/e2e/visual.spec.ts-snapshots/`, review the image diff like any other change, and commit.
+
+on:
+  workflow_dispatch: {}
+
+env:
+  NODE_VERSION: "24.20.0"
+
+permissions:
+  contents: read
+
+jobs:
+  baselines:
+    name: qa-visual-baselines / regenerate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      - run: corepack enable
+      - run: node scripts/toolchain.mjs corepack-install
+      - run: corepack pnpm run deps:install-ci
+      - run: corepack pnpm exec playwright install --with-deps chromium
+      - name: Regenerate visual baselines
+        run: corepack pnpm run qa:visual:update
+        env:
+          CI: "true"
+      - name: Report what changed
+        if: always()
+        run: git --no-pager diff --stat -- tests/e2e/visual.spec.ts-snapshots
+      - name: Upload regenerated baselines
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: qa-visual-baselines
+          path: tests/e2e/visual.spec.ts-snapshots/
+          retention-days: 14
+          if-no-files-found: error
