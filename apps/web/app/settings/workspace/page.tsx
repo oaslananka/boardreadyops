@@ -7,7 +7,7 @@ import {
 } from "../../../components/settings/workspace-member-forms.js";
 import { Button } from "../../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../../components/ui/data-table.js";
-import { Alert, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
+import { Alert, EmptyState, Pagination, Panel, StatusBadge } from "../../../components/ui.js";
 import { WorkspaceSwitcher } from "../../../components/workspace-switcher.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 import { canManageMembers, isLastOwner, loadWorkspaceMembers } from "../../../lib/workspace-members.js";
@@ -116,7 +116,7 @@ function workspaceColumns(input: {
 export default async function WorkspaceSettingsPage({ searchParams }: Readonly<WorkspaceSettingsPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
-  const result = await loadWorkspaceMembers(viewer.session, first(parameters.workspace));
+  const result = await loadWorkspaceMembers(viewer.session, first(parameters.workspace), process.env, parameters.page);
 
   if (result.state !== "ok") return <Unavailable state={result.state} />;
 
@@ -153,6 +153,15 @@ export default async function WorkspaceSettingsPage({ searchParams }: Readonly<W
             </EmptyState>
           }
         />
+        <div className="mt-4">
+          <Pagination
+            basePath="/settings/workspace"
+            page={result.page}
+            totalPages={result.totalPages}
+            pageParameter="page"
+            searchParameters={{ workspace: result.selected.id }}
+          />
+        </div>
       </Panel>
 
       {manage ? (

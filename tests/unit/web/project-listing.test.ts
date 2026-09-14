@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { loadViewerWorkspaces, loadWorkspaceProjects } from "../../../apps/web/lib/project-listing.js";
 import type { UserSession } from "../../../apps/web/lib/user-session.js";
 
+const workspaceListingCounts = vi.fn(async () => ({ projects: 0, deliveries: 0, members: 0 }));
 const listWorkspacesForUser = vi.fn();
 const listProjectsByWorkspace = vi.fn();
 // The listing carries what a delete would destroy, so the confirmation dialog can state the
@@ -15,6 +16,7 @@ vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
   // A class, not `vi.fn(() => ({...}))`: the module under test calls `new WorkspaceStore(...)`,
   // and an arrow function is not a constructor.
   WorkspaceStore: class {
+    workspaceListingCounts = workspaceListingCounts;
     listWorkspacesForUser = listWorkspacesForUser;
     listProjectsByWorkspace = listProjectsByWorkspace;
     workspaceDeletionImpact = workspaceDeletionImpact;
@@ -56,7 +58,7 @@ describe("loadWorkspaceProjects", () => {
 
     expect(result.state).toBe("ok");
     expect(result.state === "ok" && result.selected.id).toBe("ws_b");
-    expect(listProjectsByWorkspace).toHaveBeenCalledWith("ws_b");
+    expect(listProjectsByWorkspace).toHaveBeenCalledWith("ws_b", { limit: 25, offset: 0 });
   });
 
   it("scopes the workspace list to the viewer's login, which is the membership key", async () => {
@@ -78,8 +80,8 @@ describe("loadWorkspaceProjects", () => {
 
     expect(result.state === "ok" && result.selected.id).toBe("ws_a");
     // Crucially it never asked the store for the requested workspace's projects.
-    expect(listProjectsByWorkspace).toHaveBeenCalledWith("ws_a");
-    expect(listProjectsByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses");
+    expect(listProjectsByWorkspace).toHaveBeenCalledWith("ws_a", { limit: 25, offset: 0 });
+    expect(listProjectsByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses", { limit: 25, offset: 0 });
   });
 
   it("reports no-workspaces rather than an empty list, so the page can offer to create one", async () => {

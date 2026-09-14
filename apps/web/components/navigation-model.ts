@@ -49,7 +49,7 @@ export const navigationGroups: readonly NavigationGroup[] = [
   },
   {
     label: "Workspace",
-    items: [{ label: "Settings", href: "/settings/billing", icon: "settings" }],
+    items: [{ label: "Settings", href: "/settings/workspace", icon: "settings" }],
   },
 ] as const;
 
@@ -64,6 +64,8 @@ export const navigationDestinations: readonly (NavigationItem & { group: string 
 export function isCurrentRoute(pathname: string | null | undefined, href: string): boolean {
   if (!pathname) return false;
   // Settings is one nav entry pointing at its first tab, so every /settings/* child keeps it lit.
-  if (href === "/settings/billing") return pathname.startsWith("/settings/");
+  // That tab is Members rather than Billing: "Settings" landing on an invoice surprised people,
+  // and members is what someone opening Settings is usually after.
+  if (href === "/settings/workspace") return pathname.startsWith("/settings/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }

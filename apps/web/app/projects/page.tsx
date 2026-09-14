@@ -7,7 +7,7 @@ import { ProjectRowActions, WorkspaceDangerZone } from "../../components/project
 import { CreateProjectForm, CreateWorkspaceForm } from "../../components/projects/workspace-forms.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
-import { EmptyState, Panel, StatusBadge } from "../../components/ui.js";
+import { EmptyState, Pagination, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { loadWorkspaceProjects, type WorkspaceProjectsImpact } from "../../lib/project-listing.js";
@@ -116,7 +116,7 @@ function projectColumns(role: string, impact: WorkspaceProjectsImpact): readonly
 export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
-  const result = await loadWorkspaceProjects(viewer.session, first(parameters.workspace));
+  const result = await loadWorkspaceProjects(viewer.session, first(parameters.workspace), process.env, parameters.page);
 
   return (
     <AppShell
@@ -159,6 +159,15 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
                   </EmptyState>
                 }
               />
+              <div className="mt-4">
+                <Pagination
+                  basePath="/projects"
+                  page={result.page}
+                  totalPages={result.totalPages}
+                  pageParameter="page"
+                  searchParameters={{ workspace: result.selected.id }}
+                />
+              </div>
             </Panel>
 
             {result.selected.role === "viewer" ? null : (

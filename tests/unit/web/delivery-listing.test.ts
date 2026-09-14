@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../../apps/web/lib/delivery-listing.js";
 import type { UserSession } from "../../../apps/web/lib/user-session.js";
 
+const workspaceListingCounts = vi.fn(async () => ({ projects: 0, deliveries: 0, members: 0 }));
 const listWorkspacesForUser = vi.fn();
 const listDeliveriesByWorkspace = vi.fn();
 const listRevisionsByWorkspace = vi.fn();
@@ -10,6 +11,7 @@ const close = vi.fn();
 vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   WorkspaceStore: class {
+    workspaceListingCounts = workspaceListingCounts;
     listWorkspacesForUser = listWorkspacesForUser;
     listDeliveriesByWorkspace = listDeliveriesByWorkspace;
     listRevisionsByWorkspace = listRevisionsByWorkspace;
@@ -70,7 +72,7 @@ describe("loadWorkspaceDeliveries", () => {
 
     expect(result.state).toBe("ok");
     expect(result.state === "ok" && result.selected.id).toBe("ws_b");
-    expect(listDeliveriesByWorkspace).toHaveBeenCalledWith("ws_b");
+    expect(listDeliveriesByWorkspace).toHaveBeenCalledWith("ws_b", 25, 0);
     expect(listRevisionsByWorkspace).toHaveBeenCalledWith("ws_b");
   });
 
@@ -92,7 +94,7 @@ describe("loadWorkspaceDeliveries", () => {
     const result = await loadWorkspaceDeliveries(session, "ws_someone_elses", postgres);
 
     expect(result.state === "ok" && result.selected.id).toBe("ws_a");
-    expect(listDeliveriesByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses");
+    expect(listDeliveriesByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses", 25, 0);
     expect(listRevisionsByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses");
   });
 

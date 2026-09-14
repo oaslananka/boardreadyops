@@ -1,4 +1,5 @@
 import type { WorkspaceMemberRecord, WorkspaceMembershipRecord } from "@boardreadyops/db";
+import { parseListingPage, workspaceListingPageSize } from "./project-listing.js";
 import { reviewFixturesEnabled } from "./review-listing.js";
 import type { UserSession } from "./user-session.js";
 import { openWorkspaceStore } from "./workspace-store-access.js";
@@ -20,12 +21,17 @@ export type WorkspaceMembersResult =
       workspaces: readonly WorkspaceMembershipRecord[];
       selected: WorkspaceMembershipRecord;
       members: readonly WorkspaceMemberRecord[];
+      /** Total members, which is more than one page shows. */
+      total: number;
+      page: number;
+      totalPages: number;
     };
 
 export async function loadWorkspaceMembers(
   session: UserSession | undefined,
   requestedWorkspaceId: string | undefined,
   environment: NodeJS.ProcessEnv = process.env,
+  requestedPage: string | string[] | undefined = undefined,
 ): Promise<WorkspaceMembersResult> {
   if (reviewFixturesEnabled(environment)) return { state: "not-configured" };
   if (!session) return { state: "signed-out" };
@@ -41,8 +47,15 @@ export async function loadWorkspaceMembers(
     const selected = workspaces.find((workspace) => workspace.id === requestedWorkspaceId) ?? workspaces[0];
     if (!selected) return { state: "no-workspaces" };
 
-    const members = await store.listWorkspaceMembers(selected.id);
-    return { state: "ok", workspaces, selected, members };
+    const counts = await store.workspaceListingCounts(selected.id);
+    const total = counts.members;
+    const totalPages = Math.max(1, Math.ceil(total / workspaceListingPageSize));
+    const page = parseListingPage(requestedPage, totalPages);
+    const members = await store.listWorkspaceMembers(selected.id, {
+      limit: workspaceListingPageSize,
+      offset: (page - 1) * workspaceListingPageSize,
+    });
+    return { state: "ok", workspaces, selected, members, total, page, totalPages };
   } finally {
     await executor.close();
   }
