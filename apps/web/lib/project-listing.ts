@@ -27,7 +27,20 @@ export type WorkspaceProjectsResult =
       workspaces: readonly WorkspaceMembershipRecord[];
       selected: WorkspaceMembershipRecord;
       projects: readonly ProjectRecord[];
+      /**
+       * What a delete would take with it, per project and for the workspace as a whole.
+       *
+       * Carried alongside the listing rather than fetched when a dialog opens: the counts are
+       * two indexed aggregates, and a confirmation that has to wait for a round trip before it
+       * can tell you the blast radius is a confirmation people click through.
+       */
+      impact: WorkspaceProjectsImpact;
     };
+
+export type WorkspaceProjectsImpact = {
+  workspace: { projects: number; revisions: number; deliveries: number };
+  byProject: Readonly<Record<string, { revisions: number; deliveries: number }>>;
+};
 
 /**
  * Every workspace the viewer is a member of, newest first.
@@ -75,7 +88,20 @@ export async function loadWorkspaceProjects(
     if (!selected) return { state: "no-workspaces" };
 
     const projects = await store.listProjectsByWorkspace(selected.id);
-    return { state: "ok", workspaces, selected, projects };
+
+    // Only an owner can delete, so only an owner pays for the counts.
+    let impact: WorkspaceProjectsImpact = { workspace: { projects: 0, revisions: 0, deliveries: 0 }, byProject: {} };
+    if (selected.role === "owner") {
+      const [workspaceImpact, projectImpacts] = await Promise.all([
+        store.workspaceDeletionImpact(selected.id),
+        Promise.all(
+          projects.map(async (project) => [project.id, await store.projectDeletionImpact(project.id)] as const),
+        ),
+      ]);
+      impact = { workspace: workspaceImpact, byProject: Object.fromEntries(projectImpacts) };
+    }
+
+    return { state: "ok", workspaces, selected, projects, impact };
   } finally {
     await executor.close();
   }
