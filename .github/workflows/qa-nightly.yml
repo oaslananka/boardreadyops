@@ -73,6 +73,11 @@ jobs:
         run: corepack pnpm run qa:visual
         env:
           CI: "true"
+      # The remote half of the own-link check lives here rather than in pull request CI because it
+      # needs the network. The in-repository half runs in `lint` on every pull request.
+      - name: Own links resolve
+        if: always()
+        run: corepack pnpm run check:links:remote
       - name: Upload diffs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
