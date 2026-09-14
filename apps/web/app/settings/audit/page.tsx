@@ -147,13 +147,25 @@ function AuditLogContent({ listing, eventType }: Readonly<{ listing: AuditListin
           <Input
             id="audit-event-type"
             name="event"
+            list="audit-event-type-options"
             defaultValue={eventType ?? ""}
             placeholder="github_app.installation.suspended"
             maxLength={160}
             aria-describedby="audit-event-type-hint"
           />
+          {/*
+            A `datalist` rather than a select: the field takes an exact type and the full
+            vocabulary is not knowable from one page, so the control has to stay free text. What
+            it can do is stop requiring someone to already know the internal names — "copy one
+            from a row" only works if a row with the type you want happens to be on screen.
+          */}
+          <datalist id="audit-event-type-options">
+            {[...new Set(listing.events.map((entry) => entry.eventType))].sort().map((type) => (
+              <option key={type} value={type} />
+            ))}
+          </datalist>
           <p id="audit-event-type-hint" className="text-meta text-muted-foreground">
-            An exact event type. Copy one from a row you are interested in.
+            An exact event type. The box suggests the ones on this page; there are more than these.
           </p>
         </div>
         <Button type="submit" variant="outline">

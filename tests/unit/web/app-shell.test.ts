@@ -25,7 +25,10 @@ describe("AppShell", () => {
     expect(markup).toContain("Get a board in");
     expect(markup).toContain("Work the findings");
     expect(markup).toContain("Ship it");
-    expect(markup.match(/href="\/settings\/billing"/gu)).toHaveLength(1);
+    // Settings points at Members, not Billing: landing on an invoice surprised people, and
+    // members is what someone opening Settings is usually after.
+    expect(markup.match(/href="\/settings\/workspace"/gu)).toHaveLength(1);
+    expect(markup).not.toContain('href="/settings/billing"');
     expect(markup).not.toContain(">BR<");
   });
 

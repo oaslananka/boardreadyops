@@ -7,7 +7,7 @@ import { DeliveryCreateForm } from "../../components/deliveries/delivery-create-
 import { DeliveryRevokeButton } from "../../components/deliveries/delivery-revoke-button.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
-import { Alert, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
+import { Alert, EmptyState, Pagination, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
@@ -103,7 +103,12 @@ function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliv
 export default async function DeliveriesListPage({ searchParams }: Readonly<DeliveriesPageProps>) {
   const parameters = await searchParams;
   const viewer = await viewerAuthorization();
-  const result = await loadWorkspaceDeliveries(viewer.session, first(parameters.workspace));
+  const result = await loadWorkspaceDeliveries(
+    viewer.session,
+    first(parameters.workspace),
+    process.env,
+    parameters.page,
+  );
 
   // The copied value has to be a URL the recipient can open, so the origin comes from the request
   // rather than being assumed.
@@ -142,6 +147,15 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
                   </EmptyState>
                 }
               />
+              <div className="mt-4">
+                <Pagination
+                  basePath="/deliveries"
+                  page={result.page}
+                  totalPages={result.totalPages}
+                  pageParameter="page"
+                  searchParameters={{ workspace: result.selected.id }}
+                />
+              </div>
             </Panel>
 
             {result.selected.role === "viewer" ? null : <CreatePanel result={result} origin={origin} />}
@@ -171,8 +185,13 @@ function CreatePanel({
       <Panel title="Share a package">
         <Alert tone="info" title="No revisions to share yet">
           A guest link points at a revision, and a revision is recorded when a manufacturing package is uploaded for a
-          project. That upload runs through <code className="font-mono">POST /api/v2/revisions/upload</code> today — the
-          hosted upload path is not connected yet.
+          project. There is no upload form here yet, so produce and register one from the command line:{" "}
+          <code className="font-mono">boardreadyops release prepare . --output build/release</code>, then post the
+          bundle to <code className="font-mono">POST /api/v2/revisions/upload</code> with a{" "}
+          <Link href="/settings/tokens" className="text-primary underline underline-offset-2">
+            repository API token
+          </Link>
+          .
         </Alert>
       </Panel>
     );

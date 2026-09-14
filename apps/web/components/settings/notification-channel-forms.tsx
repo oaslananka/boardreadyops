@@ -62,7 +62,13 @@ function EventCheckboxes({
   name,
   selected,
   idPrefix,
-}: Readonly<{ name: string; selected: readonly string[]; idPrefix: string }>) {
+  componentIntelligenceReady,
+}: Readonly<{
+  name: string;
+  selected: readonly string[];
+  idPrefix: string;
+  componentIntelligenceReady: boolean;
+}>) {
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="text-sm font-medium text-foreground">Tell me when…</legend>
@@ -81,6 +87,17 @@ function EventCheckboxes({
             <label htmlFor={id} className="min-w-0">
               <span className="block text-sm text-foreground">{event.label}</span>
               <span className="block text-meta text-muted-foreground">{event.description}</span>
+              {/*
+                Supply watch only runs where a component-intelligence credential is configured.
+                Ticking the box on a workspace without one produces silence, and silence reads
+                like a broken notification rather than a missing prerequisite.
+              */}
+              {event.type === "supply.risk_detected" && !componentIntelligenceReady ? (
+                <span className="block text-meta text-warning">
+                  Needs a component-intelligence credential before it can fire — set one up under Settings → Component
+                  Intelligence.
+                </span>
+              ) : null}
             </label>
           </div>
         );
@@ -93,9 +110,12 @@ export function NotificationChannelCreateForm({
   installationId,
   action,
   emailAvailable = false,
+  componentIntelligenceReady = false,
 }: Readonly<{
   installationId: string;
   action: typeof createNotificationChannelAction;
+  /** Whether supply watch can actually run for this installation. */
+  componentIntelligenceReady?: boolean;
   /**
    * Whether this deployment has an SMTP relay.
    *
@@ -183,7 +203,12 @@ export function NotificationChannelCreateForm({
             ) : null}
           </div>
 
-          <EventCheckboxes name="events" selected={defaults} idPrefix={eventsId} />
+          <EventCheckboxes
+            name="events"
+            selected={defaults}
+            idPrefix={eventsId}
+            componentIntelligenceReady={componentIntelligenceReady}
+          />
 
           <div className="flex justify-end border-t border-border pt-3">
             <Button type="submit" disabled={pending}>
@@ -201,9 +226,11 @@ export function NotificationChannelEditForm({
   channel,
   updateAction,
   deleteAction,
+  componentIntelligenceReady = false,
 }: Readonly<{
   installationId: string;
   channel: NotificationChannelView;
+  componentIntelligenceReady?: boolean;
   updateAction: typeof updateNotificationChannelAction;
   deleteAction: typeof deleteNotificationChannelAction;
 }>) {
@@ -218,7 +245,12 @@ export function NotificationChannelEditForm({
             <input type="hidden" name="installationId" value={installationId} />
             <input type="hidden" name="channelId" value={channel.id} />
 
-            <EventCheckboxes name="events" selected={channel.subscribedEvents} idPrefix={eventsId} />
+            <EventCheckboxes
+              name="events"
+              selected={channel.subscribedEvents}
+              idPrefix={eventsId}
+              componentIntelligenceReady={componentIntelligenceReady}
+            />
 
             <div className="flex items-center gap-2.5">
               <input
