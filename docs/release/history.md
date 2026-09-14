@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.43.0](https://github.com/oaslananka/boardreadyops/compare/v1.42.1...v1.43.0) (2026-09-14)
+
+
+### Features
+
+* wire the product's real capabilities to the dashboard, and tell people what it finds ([#729](https://github.com/oaslananka/boardreadyops/issues/729)) ([5192fcf](https://github.com/oaslananka/boardreadyops/commit/5192fcf76ed2cc3ec453a6e7ca5377eb85c56842))
+
 ## [1.42.1](https://github.com/oaslananka/boardreadyops/compare/v1.42.0...v1.42.1) (2026-09-10)
 
 
