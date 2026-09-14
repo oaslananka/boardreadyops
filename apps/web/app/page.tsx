@@ -437,7 +437,7 @@ export default function HomePage() {
               <p className="text-sm text-muted-foreground">
                 Two public repositories running the published Action on the same board, in opposite directions. Open
                 either pull request and read the check: the findings, the files they point at, and the fabrication diff
-                against the base run.
+                showing which BOM lines and outputs changed.
               </p>
             </div>
             <ul className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">

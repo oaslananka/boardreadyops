@@ -65,7 +65,16 @@ export async function POST(request: Request): Promise<Response> {
     const store = new WorkspaceStore(executor);
     const existing = await store.getWorkspaceBySlug(parsed.data.slug);
     if (existing) {
-      return Response.json({ ok: false, error: "Workspace slug already exists" }, { status: 409 });
+      // Same namespace, same reasoning as the UI action: the conflict may be with a workspace
+      // the caller cannot list, so the error says which namespace it is rather than implying
+      // the caller owns the duplicate.
+      return Response.json(
+        {
+          ok: false,
+          error: `Another workspace already uses the slug "${parsed.data.slug}". Slugs are unique across all of BoardReadyOps because they appear in URLs.`,
+        },
+        { status: 409 },
+      );
     }
 
     const workspace = await store.createWorkspace({
