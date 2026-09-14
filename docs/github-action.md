@@ -63,7 +63,7 @@ GitHub Docker action keeps the image default user so GitHub can mount and access
 
 Container image redistributes KiCad under GPL terms. The image preserves the
 GPL text at `/usr/share/doc/boardreadyops/LICENSE-KICAD` and the KiCad package
-notices under `/usr/share/doc/kicad/`; BoardReadyOps' Node code remains MIT
+notices under `/usr/share/doc/kicad/`; BoardReadyOps project-authored Node code is source-available under PolyForm Noncommercial 1.0.0
 licensed and invokes KiCad as a separate CLI process.
 
 Tagged container builds wait until the matching npm package version is visible,

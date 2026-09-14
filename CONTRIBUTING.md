@@ -55,6 +55,8 @@ GitHub Issues and GitHub Pull Requests are the public source of truth for contri
 
 Contributions from forks are welcome. A contributor only needs public GitHub access to open a compliant pull request. Private maintainer trackers, organization workspaces, and tracker-specific branch names are not contributor requirements.
 
+For non-trivial external code contributions, review [CONTRIBUTOR-LICENSING.md](CONTRIBUTOR-LICENSING.md). A reviewed Contributor License Agreement (CLA) must be on record before such code is merged so the project can preserve both community and commercial licensing options.
+
 Do not use public issues for vulnerabilities or sensitive security details. Follow [SECURITY.md](SECURITY.md) and GitHub private vulnerability reporting instead.
 
 ## Required PR Validation

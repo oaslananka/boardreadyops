@@ -3,9 +3,9 @@
   "repo_url": "https://github.com/oaslananka/boardreadyops",
   "badge_project_id": 13378,
   "badge_url": "https://www.bestpractices.dev/projects/13378",
-  "target_level": "passing-to-silver",
+  "target_level": "historical-mit-period",
   "gold_claim": false,
   "evidence": ["docs/openssf-evidence.md", "docs/openssf-gap-analysis.md", "docs/repo-maturity-report.md"],
   "last_local_audit": "2026-07-02",
-  "notes": "This file is repository-local evidence metadata for OpenSSF Best Practices follow-up. BadgeApp remains the source of truth for submitted criteria."
+  "notes": "Historical OpenSSF Best Practices evidence from the MIT-licensed period. Current project-authored source is PolyForm Noncommercial 1.0.0 and source-available, not OSI-approved open source; BadgeApp status must not be presented as a current FLOSS licensing claim."
 }

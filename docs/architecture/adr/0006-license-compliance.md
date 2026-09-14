@@ -1,7 +1,9 @@
 # ADR-0006 - License Compliance
 
-**Status:** Accepted
+**Status:** Partially superseded by ADR-0019
 **Date:** 2026-05-23
+
+> Licensing choice for BoardReadyOps project-authored source is superseded by ADR-0019. Third-party separation and notice requirements documented here remain relevant.
 
 ## Context
 

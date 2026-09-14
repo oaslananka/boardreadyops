@@ -9,12 +9,11 @@ Local-first, policy-as-code hardware review gate for KiCad PCB teams. Explains w
 [![CI](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/ci.yml)
 [![Security](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml/badge.svg)](https://github.com/oaslananka/boardreadyops/actions/workflows/security.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/oaslananka/boardreadyops/badge)](https://scorecard.dev/viewer/?uri=github.com/oaslananka/boardreadyops)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13378/badge)](https://www.bestpractices.dev/projects/13378)
 
 [![npm](https://img.shields.io/npm/v/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
 [![npm downloads](https://img.shields.io/npm/dt/boardreadyops)](https://www.npmjs.com/package/boardreadyops)
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-BoardReadyOps-blue?logo=github)](https://github.com/marketplace/actions/boardreadyops)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 
 [Repository Maturity](docs/repo-maturity-report.md) ·
 [OpenSSF Evidence](docs/openssf-evidence.md) ·
@@ -265,6 +264,6 @@ BoardReadyOps is evolving from a validation gate into a full hardware release OS
 
 ## License
 
-MIT. Third-party notices are generated in `NOTICE`. The full container image
-redistributes KiCad under GPL terms and preserves the KiCad license text inside
-the image.
+Current project-authored source is licensed under [PolyForm Noncommercial 1.0.0](LICENSE). Commercial use requires a separate written license; see [Commercial Licensing](COMMERCIAL-LICENSING.md). Earlier MIT releases retain the MIT rights that applied when they were published; see [Licensing](LICENSING.md).
+
+Third-party notices are generated in `NOTICE`. The full container image redistributes KiCad under its applicable GPL terms and preserves the KiCad license text inside the image.

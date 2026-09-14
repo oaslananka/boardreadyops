@@ -1,5 +1,7 @@
 # OpenSSF Evidence
 
+> **Historical licensing note:** this evidence was assembled while BoardReadyOps was MIT-licensed. Current project-authored source is licensed under PolyForm Noncommercial 1.0.0 and is source-available rather than OSI-approved open source. Do not treat historical FLOSS/badge evidence as a current license claim.
+
 This file maps repository evidence to OpenSSF Best Practices and Scorecard-style
 expectations. BadgeApp remains the source of truth for submitted answers; this
 file is the maintainer-facing evidence register.
@@ -9,7 +11,7 @@ file is the maintainer-facing evidence register.
 - Project: BoardReadyOps
 - Repository: <https://github.com/oaslananka/boardreadyops>
 - Package: `boardreadyops` on npm
-- License: MIT
+- Historical license: MIT; current project license: PolyForm Noncommercial 1.0.0 (source-available)
 - OpenSSF Best Practices Badge project: <https://www.bestpractices.dev/projects/13378>
 
 ## Practices and evidence

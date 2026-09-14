@@ -3,7 +3,7 @@
   "version": "1.45.0",
   "description": "BoardReadyOps checks KiCad hardware repositories for production readiness before fabrication.",
   "type": "module",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "author": "Osman Aslan",
   "repository": {
     "type": "git",
@@ -27,6 +27,8 @@
     "schemas",
     "README.md",
     "LICENSE",
+    "COMMERCIAL-LICENSING.md",
+    "LICENSING.md",
     "NOTICE",
     "SECURITY.md",
     "action.yml"
