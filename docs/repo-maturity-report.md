@@ -1,5 +1,7 @@
 # Repository Maturity Report
 
+> **Historical licensing note (2026-09-14):** this audit was written during BoardReadyOps' MIT-licensed period. Current project-authored source is licensed under PolyForm Noncommercial 1.0.0, so the MIT/OpenSSF license statements below are retained only as historical audit evidence.
+
 Audit date: 2026-07-02
 Repository: `oaslananka/boardreadyops`
 Mode: audit plus low-risk implementation pull request

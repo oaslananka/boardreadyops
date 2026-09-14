@@ -2,7 +2,7 @@ class Boardreadyops < Formula
   desc "CI preflight for production-ready PCBs"
   homepage "https://github.com/oaslananka/boardreadyops"
   version "1.31.2"
-  license "MIT"
+  license "PolyForm-Noncommercial-1.0.0"
 
   # Release v1.31.2 checksums from SHA256SUMS.
   # Regenerate with: gh release download v#{version} && sha256sum boardreadyops-* > SHA256SUMS

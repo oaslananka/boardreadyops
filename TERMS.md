@@ -10,7 +10,7 @@ Please read these Terms of Service ("Terms") carefully before using BoardReadyOp
 
 By installing the BoardReadyOps GitHub App, running BoardReadyOps in GitHub Actions, or accessing the hosted web dashboard, you agree to be bound by these Terms. If you are entering into these Terms on behalf of an organization, you represent that you have the authority to bind that entity.
 
-- **Open Source Software**: The BoardReadyOps CLI and GitHub Action codebases are distributed under the permissive MIT License (see `LICENSE` in the repository). These Terms govern your access to and use of the hosted services and GitHub Marketplace integrations.
+- **Source-Available Software**: Current BoardReadyOps project-authored source is distributed under the PolyForm Noncommercial License 1.0.0 (see `LICENSE`). Commercial use requires a separate written software license. Previously published MIT-licensed releases retain the MIT rights that applied when they were published. These Terms govern access to and use of hosted services and GitHub Marketplace integrations.
 - **Hosted Cloud Service**: The hosted control plane at `boardreadyops.com` and related services provide automated review coordination, dashboards, and reporting.
 
 ---

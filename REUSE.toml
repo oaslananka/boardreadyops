@@ -12,7 +12,7 @@ path = [
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Osman Aslan"
-SPDX-License-Identifier = "MIT"
+SPDX-License-Identifier = "PolyForm-Noncommercial-1.0.0"
 
 [[annotations]]
 path = [
@@ -23,7 +23,7 @@ path = [
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Osman Aslan"
-SPDX-License-Identifier = "MIT"
+SPDX-License-Identifier = "PolyForm-Noncommercial-1.0.0"
 
 [[annotations]]
 path = [

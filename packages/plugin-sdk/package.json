@@ -3,7 +3,7 @@
   "version": "1.0.2",
   "description": "Type helpers and definePlugin for BoardReadyOps plugins.",
   "type": "module",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/oaslananka/boardreadyops.git",
