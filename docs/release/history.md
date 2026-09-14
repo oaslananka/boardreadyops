@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.45.0](https://github.com/oaslananka/boardreadyops/compare/v1.44.0...v1.45.0) (2026-09-14)
+
+
+### Features
+
+* **web:** answer four questions the product left hanging ([#738](https://github.com/oaslananka/boardreadyops/issues/738)) ([3430a90](https://github.com/oaslananka/boardreadyops/commit/3430a904616e9c3cd250da1c7eb9f6d9759181f1))
+
 ## [1.44.0](https://github.com/oaslananka/boardreadyops/compare/v1.43.1...v1.44.0) (2026-09-14)
 
 
