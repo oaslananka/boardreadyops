@@ -37,6 +37,16 @@ export type WatchBoard = {
 
 type WatchOutcome = "evaluated" | "skipped_no_snapshot" | "no_provider" | "not_entitled" | "failed";
 
+/** One part on one board that is no longer safe to design in. */
+export type RiskyComponentFinding = {
+  boardId: string;
+  mpn: string;
+  manufacturer?: string | undefined;
+  reference?: string | undefined;
+  status: ComponentLifecycleStatus;
+  severity: ReturnType<typeof supplyFindingSeverity>;
+};
+
 export type SupplyWatchStore = {
   claimDueBoards(now: Date, limit: number): Promise<WatchBoard[]>;
   freshObservations(
@@ -102,6 +112,20 @@ export type SupplyWatchOptions = {
    * cause invisible. Surfacing it here keeps "kept going" from meaning "silently gave up".
    */
   onError?: (boardId: string, error: unknown) => void;
+  /**
+   * Called with every currently-risky part on a board the pass just evaluated.
+   *
+   * The whole risky set rather than only the newly-opened rows, deliberately: the notification
+   * outbox deduplicates on a key derived from the board and the part, so re-reporting a part
+   * that was already announced costs nothing and a notification lost to a delivery failure is
+   * still recoverable on the next pass. Detecting an end-of-life part and telling nobody was
+   * the gap this exists to close.
+   */
+  onRiskDetected?: (input: {
+    board: WatchBoard;
+    findings: readonly RiskyComponentFinding[];
+    newlyOpened: number;
+  }) => Promise<void> | void;
 };
 
 export type SupplyWatchReport = {
@@ -246,6 +270,16 @@ async function evaluateSingleBoard(
   const open = buildOpenRiskyFindings(board, parts, statuses);
   const reconciled = await store.reconcileFindings(board.boardId, open, now);
   await store.completeEvaluation(board.boardId, "evaluated", now, new Date(now.getTime() + intervalMs));
+
+  if (open.length > 0 && options.onRiskDetected) {
+    // Awaited so a pass cannot outrun its own notifications, but never allowed to fail the
+    // evaluation: the finding is already persisted and is the durable record.
+    try {
+      await options.onRiskDetected({ board, findings: open, newlyOpened: reconciled.opened });
+    } catch (error) {
+      options.onError?.(board.boardId, error);
+    }
+  }
 
   return {
     skipped: false,

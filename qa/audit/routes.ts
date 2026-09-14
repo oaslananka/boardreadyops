@@ -140,6 +140,13 @@ export const routes: readonly QaRoute[] = [
     requiresDb: false,
   },
   {
+    id: "settings-notifications",
+    path: "/settings/notifications",
+    label: "Settings: Notifications",
+    auth: "authenticated",
+    requiresDb: false,
+  },
+  {
     id: "settings-tokens",
     path: "/settings/tokens",
     label: "Settings: API Tokens",

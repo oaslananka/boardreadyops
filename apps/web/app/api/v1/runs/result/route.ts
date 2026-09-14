@@ -11,6 +11,7 @@ import {
   detailsUrl as githubDetailsUrl,
 } from "../../../../../lib/github-app-check-run-client.js";
 import { buildReadinessCheckOutput, buildReadinessPrComment } from "../../../../../lib/readiness-result-format.js";
+import { runOutcomeEvent } from "../../../../../lib/run-notifications.js";
 import { configuredSecretValue } from "../../../../../lib/secret-value.js";
 
 export const runtime = "nodejs";
@@ -992,6 +993,7 @@ async function persistRunnerResult(
             (select release_runs.commit_sha from release_runs where release_runs.id = effective.id) as commit_sha,
             repositories.owner,
             repositories.name,
+            repositories.installation_id,
             installations.github_installation_id,
             installations.plan_tier,
             effective.trust_mode,
@@ -1241,6 +1243,54 @@ async function publishTerminalResult(
   };
 }
 
+/**
+ * Tells the installation's notification channels what this run decided.
+ *
+ * Never allowed to fail the request: the run is persisted and the Check Run is authoritative, so
+ * a notification that could not be queued is a missed message rather than a lost result.
+ */
+async function announceRunOutcome(
+  executor: ResultQueryExecutor,
+  dependencies: ResultRouteDependencies,
+  value: ParsedResultRequest,
+  row: QueryRow,
+  persistenceOutcome: string,
+): Promise<void> {
+  // A replay is the same news a second time; the dedupe key would absorb it, but not asking is
+  // cheaper than asking and being refused.
+  if (persistenceOutcome === "replayed") return;
+
+  const installationId = stringCell(row, "installation_id");
+  const owner = stringCell(row, "owner");
+  const name = stringCell(row, "name");
+  if (!installationId || !owner || !name) return;
+
+  const pullRequestNumber = numberCell(row, "pull_request_number");
+  // The same link the Check Run's "Details" button points at, so a notification and the check
+  // never disagree about where the answer lives.
+  const runUrl = dependencies.detailsUrl(value.runId);
+  const event = runOutcomeEvent({
+    runId: value.runId,
+    installationId,
+    repositoryFullName: `${owner}/${name}`,
+    ...(pullRequestNumber === undefined ? {} : { pullRequestNumber }),
+    ...(stringCell(row, "commit_sha") ? { commitSha: stringCell(row, "commit_sha") } : {}),
+    decision: value.result.decision ?? undefined,
+    status: value.result.status,
+    findings: value.result.findings,
+    ...(runUrl ? { runUrl } : {}),
+    occurredAt: dependencies.now().toISOString(),
+  });
+  if (!event) return;
+
+  try {
+    const { createSqlNotificationStore } = await import("@boardreadyops/db/notification-store");
+    await createSqlNotificationStore(executor).enqueueEvent(event);
+  } catch {
+    // Intentionally silent: see the doc comment. The run itself already succeeded.
+  }
+}
+
 export async function handleResultRequest(
   request: Request,
   dependencies: ResultRouteDependencies = defaultResultRouteDependencies,
@@ -1261,6 +1311,11 @@ export async function handleResultRequest(
     requestRead.value.executionAttemptId,
   );
   if (rejection) return rejection;
+
+  // Enqueued on the same executor that just persisted the run: one cheap INSERT, and the
+  // delivery itself is drained asynchronously by the worker, so a rate-limited Slack workspace
+  // can never slow down or fail a runner's result submission.
+  await announceRunOutcome(executor, dependencies, requestRead.value, persisted.row, persistenceOutcome);
 
   const snapshotWarning = await recordBoardBomSnapshots(executor, dependencies, requestRead.value, persisted.row);
 

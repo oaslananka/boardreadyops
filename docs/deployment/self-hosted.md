@@ -300,6 +300,19 @@ docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --scale
 
 Recommended initial values are four lifecycle jobs, four outbox effects, four operations per installation, and two operations per repository per replica. Increase them only with queue-lag, GitHub rate-limit, database pool, and readiness data.
 
+### Outbound notifications
+
+Notification channels are configured per installation under **Settings → Notifications** and deliver to Slack incoming webhooks, any HTTPS endpoint the customer controls, or — when this deployment has an SMTP relay — an email address. The worker drains the delivery outbox every `BOARDREADYOPS_NOTIFICATION_DELIVERY_INTERVAL_MS` and scans for time-based events — a waiver about to lapse, a review left awaiting a decision — every `BOARDREADYOPS_NOTIFICATION_SCAN_INTERVAL_MS`. Both are safe to leave at their defaults.
+
+Two operational notes:
+
+- **Deep links need `BOARDREADYOPS_PUBLIC_URL`.** Without it notifications still deliver, but carry no link back to the run or review.
+- **Delivery is leased and retried like every other outbound effect.** A destination that answers 4xx in a way retrying cannot fix (401, 403, 404, 410 — typically an uninstalled Slack app) is dead-lettered immediately and its failure is shown on the channel in Settings, rather than retried until it ages out. Transient failures back off and retry. A slow or failing destination cannot delay a release run or a supply-watch pass: enqueueing is one INSERT on the transaction that produced the news, and delivery happens on the worker.
+
+**Email is optional and gated on configuration.** Set `BOARDREADYOPS_NOTIFICATION_SMTP_URL` (`smtp://` or `smtps://`, credentials in the URL when the relay needs them) and `BOARDREADYOPS_NOTIFICATION_EMAIL_FROM` together. With either missing, the email kind is absent from the Settings form and refused by the API, so a customer cannot create a channel this deployment has no way to deliver to. If a deployment removes the settings while email channels still exist, those channels dead-letter with an explanation on the channel rather than failing the delivery pass. A 5xx from the relay is a permanent refusal; a 4xx or a connection failure backs off and retries.
+
+Scaling worker replicas scales notification delivery with them; `for update ... skip locked` on the outbox keeps two replicas from delivering the same message twice.
+
 ## Rolling deployment and rollback
 
 Use an application-first rolling deployment:
@@ -337,6 +350,10 @@ BOARDREADYOPS_WORKER_REPOSITORY_CONCURRENCY=2
 BOARDREADYOPS_WORKER_POLL_MS=1000
 BOARDREADYOPS_OUTBOX_CONCURRENCY=4
 BOARDREADYOPS_OUTBOX_POLL_MS=500
+BOARDREADYOPS_NOTIFICATION_DELIVERY_INTERVAL_MS=30000
+BOARDREADYOPS_NOTIFICATION_SCAN_INTERVAL_MS=3600000
+BOARDREADYOPS_NOTIFICATION_SMTP_URL=smtps://user:password@smtp.example.com:465
+BOARDREADYOPS_NOTIFICATION_EMAIL_FROM=boardreadyops@example.com
 BOARDREADYOPS_WORKER_METRICS_INTERVAL_MS=30000
 BOARDREADYOPS_WORKER_RETENTION_CLEANUP_INTERVAL_MS=3600000
 BOARDREADYOPS_RETENTION_CLEANUP_BATCH_SIZE=1000

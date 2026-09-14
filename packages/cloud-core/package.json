@@ -89,6 +89,16 @@
       "import": "./src/github-command.ts",
       "default": "./src/github-command.ts"
     },
+    "./notifications": {
+      "types": "./src/notifications.ts",
+      "import": "./src/notifications.ts",
+      "default": "./src/notifications.ts"
+    },
+    "./smtp": {
+      "types": "./src/smtp.ts",
+      "import": "./src/smtp.ts",
+      "default": "./src/smtp.ts"
+    },
     "./telemetry": {
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts",

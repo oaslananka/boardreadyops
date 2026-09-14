@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { hostname } from "node:os";
 import { configuredCredentialCipher } from "@boardreadyops/cloud-core/credential-encryption";
-import { runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
+import { type RiskyComponentFinding, runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
 import {
   type ClaimedArtifactDeletion,
   createSqlArtifactDeletionStore,
@@ -18,6 +19,7 @@ import {
   createSqlControlPlaneOutboxStore,
 } from "@boardreadyops/db/control-plane-outbox-store";
 import { createSqlInstallationCredentialStore } from "@boardreadyops/db/installation-credential-store";
+import { createSqlNotificationStore } from "@boardreadyops/db/notification-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { createSqlRetentionMaintenanceStore } from "@boardreadyops/db/retention-maintenance-store";
 import { createSqlTransactionalGitHubAppLifecycleStore } from "@boardreadyops/db/transactional-lifecycle-store";
@@ -42,6 +44,11 @@ import {
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
 import { createProductionGitHubCommandLifecycleExecutor } from "./lib/github-command-executor.js";
 import { createGitHubWorkflowReconciliationClient } from "./lib/github-workflow-reconciliation-client.js";
+import {
+  createNotificationWorkerDependencies,
+  runNotificationDeliveryPass,
+  runNotificationScanPass,
+} from "./lib/notification-worker.js";
 import { createProductionRepositorySetupLifecycleExecutor } from "./lib/repository-setup-automation.js";
 import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-worker.js";
 import { createRunnerClient } from "./lib/runner-client.js";
@@ -151,6 +158,29 @@ const supplyWatchIntervalMilliseconds = integerEnvironment(
   86_400_000,
 );
 const supplyWatchBoardsPerPass = integerEnvironment("BOARDREADYOPS_SUPPLY_WATCH_BOARDS_PER_PASS", 50, 1, 500);
+// Notifications are time-sensitive in a way the other maintenance passes are not: a blocked
+// board someone is waiting on is worth a minute, not an hour.
+const notificationDeliveryIntervalMilliseconds = integerEnvironment(
+  "BOARDREADYOPS_NOTIFICATION_DELIVERY_INTERVAL_MS",
+  30_000,
+  5_000,
+  3_600_000,
+);
+// A lapsing waiver and an unanswered review are produced by time passing rather than by an
+// event, so they need a scan. Hourly is well inside the shortest useful horizon (a waiver is
+// announced seven days out) and costs one indexed query per hour when nobody has a channel.
+const notificationScanIntervalMilliseconds = integerEnvironment(
+  "BOARDREADYOPS_NOTIFICATION_SCAN_INTERVAL_MS",
+  3_600_000,
+  60_000,
+  86_400_000,
+);
+/** Absolute origin used in notification deep links; without it a notification carries no link. */
+const publicUrl = (
+  process.env.BOARDREADYOPS_PUBLIC_URL?.trim() ||
+  process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+  ""
+).replace(/\/$/u, "");
 const retention = resolveControlPlaneRetentionConfiguration();
 const healthPort = integerEnvironment("BOARDREADYOPS_WORKER_HEALTH_PORT", 3001, 1, 65_535);
 const databasePoolMaximum = integerEnvironment(
@@ -166,6 +196,8 @@ const retentionMaintenance = createSqlRetentionMaintenanceStore(executor, {
 });
 const operations = createSqlControlPlaneOperationsStore(executor);
 const supplyWatchStore = createSqlBoardSupplyWatchStore(executor);
+const notifications = createSqlNotificationStore(executor);
+const notificationWorker = createNotificationWorkerDependencies(executor, workerId);
 // Each installation's lookups run under its own licence, so the provider is resolved per
 // installation from the credential that installation supplied. Without an encryption key
 // configured this resolves to the null provider for everyone, and the pass records
@@ -253,6 +285,8 @@ let lastSuccessfulRetentionCleanupAt: string | undefined;
 let nextMetricsAt = 0;
 let nextRetentionCleanupAt = 0;
 let nextSupplyWatchAt = 0;
+let nextNotificationDeliveryAt = 0;
+let nextNotificationScanAt = 0;
 let nextLifecycleReconciliationDetectionAt = 0;
 let nextReconciliationDetectionAt = 0;
 let nextCheckRunReconciliationDetectionAt = 0;
@@ -482,12 +516,89 @@ async function runSupplyWatch(currentTime: number): Promise<void> {
       maximumBoardsPerRun: supplyWatchBoardsPerPass,
       onError: (boardId, error) =>
         log("warn", "worker.supply_watch_board_failed", { boardId, errorClass: errorClass(error) }),
+      onRiskDetected: (detection) => announceSupplyRisk(detection, currentTime),
     });
     if (report.boardsEvaluated > 0 || report.boardsSkipped > 0 || report.failures > 0) {
       log("info", "worker.supply_watch_pass", { ...report });
     }
   } catch (error) {
     log("warn", "worker.supply_watch_failed", { errorClass: errorClass(error) });
+  }
+}
+
+/**
+ * Turns a supply-watch detection into a notification.
+ *
+ * One event per board rather than per part: a BOM refresh that marks six parts end-of-life at
+ * once is one piece of news, and six messages would be the fastest possible way to get the
+ * channel muted. The dedupe key names the board and every part in the batch, so a later pass
+ * that finds the same set announces nothing while a pass that finds a seventh part announces
+ * again.
+ */
+async function announceSupplyRisk(
+  detection: { board: { boardId: string; installationId: string }; findings: readonly RiskyComponentFinding[] },
+  currentTime: number,
+): Promise<void> {
+  const parts = [...detection.findings].sort((a, b) => a.mpn.localeCompare(b.mpn));
+  if (parts.length === 0) return;
+  const worst = parts.find((part) => part.severity === "critical") ?? parts[0];
+  if (!worst) return;
+
+  const occurredAt = new Date(currentTime).toISOString();
+  const digest = createHash("sha256")
+    .update(parts.map((part) => `${part.mpn}:${part.status}`).join("|"))
+    .digest("hex")
+    .slice(0, 32);
+
+  try {
+    const queued = await notifications.enqueueEvent({
+      type: "supply.risk_detected",
+      installationId: detection.board.installationId,
+      repositoryFullName: detection.board.boardId,
+      headline:
+        parts.length === 1
+          ? `${worst.mpn} is ${worst.status.toUpperCase()} and is on this board`
+          : `${parts.length} parts on this board are end-of-life or NRND`,
+      details: parts.map(
+        (part) =>
+          `${part.mpn}${part.reference ? ` (${part.reference})` : ""} — ${part.status.toUpperCase()}, ${part.severity} risk`,
+      ),
+      ...(publicUrl ? { url: `${publicUrl}/parts` } : {}),
+      dedupeKey: `supply:${detection.board.boardId}:${digest}`,
+      occurredAt,
+    });
+    if (queued > 0) log("info", "worker.supply_risk_announced", { queued, parts: parts.length });
+  } catch (error) {
+    // Never fail the pass for a notification: the finding row is the durable record and the
+    // next pass re-derives the same dedupe key, so the news is not lost.
+    log("warn", "worker.supply_risk_announce_failed", { errorClass: errorClass(error) });
+  }
+}
+
+async function deliverNotifications(currentTime: number): Promise<void> {
+  if (currentTime < nextNotificationDeliveryAt) return;
+  nextNotificationDeliveryAt = currentTime + notificationDeliveryIntervalMilliseconds;
+  try {
+    const result = await runNotificationDeliveryPass(notificationWorker);
+    if (result.claimed > 0) log("info", "worker.notification_delivery_pass", { ...result });
+  } catch (error) {
+    log("warn", "worker.notification_delivery_failed", { errorClass: errorClass(error) });
+  }
+}
+
+async function scanForTimeBasedNotifications(currentTime: number): Promise<void> {
+  if (currentTime < nextNotificationScanAt) return;
+  nextNotificationScanAt = currentTime + notificationScanIntervalMilliseconds;
+  try {
+    const result = await runNotificationScanPass(notificationWorker, {
+      now: new Date(currentTime),
+      ...(publicUrl ? { publicUrl } : {}),
+    });
+    if (result.waiversQueued > 0 || result.reviewsQueued > 0) {
+      log("info", "worker.notification_scan_pass", { ...result });
+    }
+  } catch (error) {
+    log("warn", "worker.notification_scan_failed", { errorClass: errorClass(error) });
   }
 }
 
@@ -864,6 +975,8 @@ async function runMaintenanceLoop(): Promise<void> {
     await detectWorkflowReconciliationCandidates(currentTime);
     await detectCheckRunReconciliationCandidates(currentTime);
     await runSupplyWatch(currentTime);
+    await scanForTimeBasedNotifications(currentTime);
+    await deliverNotifications(currentTime);
     await purgeExpiredRetentionData(currentTime);
     await sleep(1000);
   }
