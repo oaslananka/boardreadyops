@@ -4,6 +4,7 @@ import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
 import { runVerdict } from "../lib/run-verdict.js";
 import { CopyButton } from "./copy-button.js";
+import { FindingWaiverButton } from "./finding-waiver-button.js";
 import { RunActionBar } from "./run-action-bar.js";
 import { RunLiveRefresh } from "./run-live-refresh.js";
 import { Button, buttonVariants } from "./ui/button.js";
@@ -715,8 +716,9 @@ function findingGroupValue(finding: FindingDetail, group: FindingGroup): string 
 
 export function FindingList({
   findings,
+  repositoryId,
   group = "none",
-}: Readonly<{ findings: FindingDetail[]; group?: FindingGroup }>) {
+}: Readonly<{ findings: FindingDetail[]; repositoryId: string; group?: FindingGroup }>) {
   if (findings.length === 0) {
     return (
       <EmptyState title="No matching findings">
@@ -728,7 +730,7 @@ export function FindingList({
     return (
       <ul className="flex flex-col gap-2">
         {findings.map((finding) => (
-          <FindingRow key={finding.id} finding={finding} />
+          <FindingRow key={finding.id} finding={finding} repositoryId={repositoryId} />
         ))}
       </ul>
     );
@@ -750,7 +752,7 @@ export function FindingList({
           </header>
           <ul className="mt-2 flex flex-col gap-2">
             {entries.map((finding) => (
-              <FindingRow key={finding.id} finding={finding} />
+              <FindingRow key={finding.id} finding={finding} repositoryId={repositoryId} />
             ))}
           </ul>
         </section>
@@ -836,7 +838,7 @@ export function FindingsView({
         {run.findingsPage.total} matching finding{run.findingsPage.total === 1 ? "" : "s"}
       </p>
       <div className="mt-3">
-        <FindingList findings={run.findings} group={group} />
+        <FindingList findings={run.findings} repositoryId={run.repositoryId} group={group} />
       </div>
       <div className="mt-4">
         <Pagination
@@ -851,15 +853,22 @@ export function FindingsView({
   );
 }
 
-function FindingRow({ finding }: Readonly<{ finding: FindingDetail }>) {
+function FindingRow({ finding, repositoryId }: Readonly<{ finding: FindingDetail; repositoryId: string }>) {
   return (
     <li className="rounded-md border border-border bg-card p-3">
-      <header className="flex items-center justify-between gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <strong className="text-sm text-foreground">{finding.ruleId}</strong>
           <StatusBadge value={finding.severity} />
         </div>
-        <StatusBadge value={finding.waivedAt ? "waived" : "active"} />
+        <div className="flex items-center gap-2">
+          <StatusBadge value={finding.waivedAt ? "waived" : "active"} />
+          <FindingWaiverButton
+            repositoryId={repositoryId}
+            ruleId={finding.ruleId}
+            alreadyWaived={finding.waivedAt !== undefined}
+          />
+        </div>
       </header>
       <p className="mt-1 text-sm text-foreground">{finding.message}</p>
       <dl className="mt-2 grid grid-cols-3 gap-3">
