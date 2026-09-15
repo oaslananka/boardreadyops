@@ -79508,7 +79508,7 @@ var import_promises14 = __toESM(require("node:fs/promises"), 1);
 var import_node_path44 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
-var boardReadyVersion = "1.62.1";
+var boardReadyVersion = "1.63.0";
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);
@@ -105904,7 +105904,7 @@ function createHbom(result) {
         name: hardwareName(result),
         "bom-ref": rootRef
       },
-      properties: metadataProperties(components)
+      properties: metadataProperties(components, result.projects.length)
     },
     components,
     dependencies: [
@@ -105956,7 +105956,7 @@ function componentFromBomRow(row) {
   }
   return component;
 }
-function metadataProperties(components) {
+function metadataProperties(components, projectCount) {
   const identifiers = (component) => ({ purl: component.purl, cpe: component.cpe });
   const summary2 = summariseIndexedIdentifiers(components.map(identifiers));
   const firmware = components.filter((component) => componentClassOf(component) === "firmware");
@@ -105970,7 +105970,18 @@ function metadataProperties(components) {
     // reader deciding what to chase needs to know which.
     { name: "boardreadyops:hardwareComponentCount", value: String(summary2.total - firmware.length) },
     { name: "boardreadyops:firmwareComponentCount", value: String(firmware.length) },
-    { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: String(firmwareSummary.indexed) }
+    { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: String(firmwareSummary.indexed) },
+    ...firmwareScopeProperties(firmware.length, projectCount)
+  ];
+}
+function firmwareScopeProperties(firmwareCount, projectCount) {
+  if (firmwareCount === 0) return [];
+  return [
+    { name: "boardreadyops:firmwareScope", value: "repository" },
+    {
+      name: "boardreadyops:firmwareScopeNote",
+      value: projectCount > 1 ? `These firmware dependencies are scoped to the repository, not to one board. This document covers ${projectCount} projects and the dependencies are not attributed to any single one of them.` : "These firmware dependencies are scoped to the repository. This document covers one project, so the repository and the board coincide."
+    }
   ];
 }
 function componentClassOf(component) {
