@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.49.0](https://github.com/oaslananka/boardreadyops/compare/v1.48.0...v1.49.0) (2026-09-15)
+
+
+### Features
+
+* **mfg:** read the drill files instead of trusting their names ([#764](https://github.com/oaslananka/boardreadyops/issues/764)) ([79482a3](https://github.com/oaslananka/boardreadyops/commit/79482a3cfffb5a80bdc0e5979f3de77e75888097))
+
 ## [1.48.0](https://github.com/oaslananka/boardreadyops/compare/v1.47.1...v1.48.0) (2026-09-14)
 
 
