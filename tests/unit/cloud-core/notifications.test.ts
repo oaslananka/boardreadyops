@@ -27,6 +27,7 @@ describe("notification event catalogue", () => {
     expect(notificationEventCatalog.map((entry) => entry.type)).toEqual([
       "release.blocked",
       "supply.risk_detected",
+      "firmware.advisory_detected",
       "waiver.expiring",
       "review.decision_requested",
       "release.ready",
@@ -41,6 +42,9 @@ describe("notification event catalogue", () => {
     expect(defaults).toContain("supply.risk_detected");
     expect(defaults).toContain("release.blocked");
     expect(defaults).not.toContain("release.ready");
+    // A published CVE against firmware on a board already shipping is the other case worth
+    // waking someone for, so it is on by default like supply risk.
+    expect(defaults).toContain("firmware.advisory_detected");
   });
 });
 

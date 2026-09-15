@@ -15,6 +15,7 @@
  */
 
 export type NotificationEventType =
+  | "firmware.advisory_detected"
   | "release.blocked"
   | "release.ready"
   | "review.decision_requested"
@@ -50,6 +51,13 @@ export const notificationEventCatalog: readonly NotificationEventDefinition[] = 
     label: "A part went end-of-life or NRND",
     description:
       "Continuous supply watch found a component on a watched board that is no longer safe to design in. This is the one that arrives months before it would otherwise hurt.",
+    defaultOn: true,
+  },
+  {
+    type: "firmware.advisory_detected",
+    label: "A firmware dependency has a published advisory",
+    description:
+      "An advisory database reported a vulnerability against a firmware dependency on a board you ship. The message always states how much of the bill of materials could be looked up, because most of it cannot.",
     defaultOn: true,
   },
   {
