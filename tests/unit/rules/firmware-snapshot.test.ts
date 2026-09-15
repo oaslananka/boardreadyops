@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { captureFirmwareSnapshot } from "../../../src/firmware/snapshot.js";
+import { captureFirmwareSnapshot } from "../../../src/rules/firmware-snapshot.js";
 
 /**
  * Puts firmware dependencies into the run result so the SBOM can carry them. Before #786 nothing

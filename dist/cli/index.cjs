@@ -43195,6 +43195,10 @@ function redactControlCharacters(value) {
 function splitRefs(value) {
   return value.split(/[,\s]+/g).map((entry) => entry.trim()).filter(Boolean);
 }
+function compareCodePoints(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
 
 // src/core/findings.ts
 var severityNames = ["critical", "high", "medium", "low", "info"];
@@ -43355,214 +43359,6 @@ function validateLoaded(config2, file2) {
 // src/core/pipeline.ts
 var import_promises14 = __toESM(require("node:fs/promises"), 1);
 var import_node_path45 = __toESM(require("node:path"), 1);
-
-// src/firmware/snapshot.ts
-var import_node_path6 = __toESM(require("node:path"), 1);
-
-// src/util/glob.ts
-var import_fast_glob = __toESM(require_out4(), 1);
-init_path();
-async function globFiles(root, patterns) {
-  const results = await (0, import_fast_glob.default)(patterns, {
-    cwd: root,
-    absolute: true,
-    dot: false,
-    onlyFiles: true,
-    unique: true,
-    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/coverage/**"]
-  });
-  return results.map(toPosixPath).sort((a, b) => a.localeCompare(b));
-}
-
-// src/firmware/snapshot.ts
-init_path();
-
-// src/firmware/component-identity.ts
-var mappings = [
-  {
-    match: "https://github.com/mcu-tools/mcuboot",
-    purl: "pkg:golang/github.com/mcu-tools/mcuboot",
-    evidence: "reported",
-    // Confirmed present by querying the OSV API for this advisory; the alias is the CVE.
-    source: "OSV GO-2024-2799 (CVE-2024-32883)"
-  }
-];
-function normalise(value) {
-  return value.trim().toLowerCase().replace(/\.git$/u, "").replace(/\/+$/u, "");
-}
-function candidateKeys(dependency) {
-  const source = dependency.source;
-  if (source.kind === "registry") return [`${source.namespace}/${source.name}`];
-  if (source.kind === "git") return [source.url];
-  return [];
-}
-function resolveComponentIdentity(dependency) {
-  if (dependency.source.kind === "local" || dependency.source.kind === "framework") {
-    return { evidence: "unidentified", searchable: false };
-  }
-  const keys = candidateKeys(dependency).map(normalise);
-  const entry = mappings.find((mapping) => keys.includes(normalise(mapping.match)));
-  if (!entry) return { evidence: "unidentified", searchable: false };
-  const versioned = dependency.pinned && dependency.versionSpec ? `${entry.purl}@${dependency.versionSpec.trim()}` : entry.purl;
-  return {
-    purl: versioned,
-    evidence: entry.evidence,
-    source: entry.source,
-    ...entry.verifiedAt ? { verifiedAt: entry.verifiedAt } : {},
-    // A known identifier is searchable even where the version is a range: the query then asks
-    // about the package rather than one release, which is a weaker but real answer.
-    searchable: true
-  };
-}
-function summariseIdentities(dependencies) {
-  const unidentifiedNames = [];
-  let searchable = 0;
-  for (const dependency of dependencies) {
-    if (resolveComponentIdentity(dependency).searchable) searchable += 1;
-    else unidentifiedNames.push(dependency.declaredName);
-  }
-  return {
-    total: dependencies.length,
-    searchable,
-    unidentified: unidentifiedNames.length,
-    unidentifiedNames: unidentifiedNames.sort((a, b) => a.localeCompare(b))
-  };
-}
-
-// src/firmware/idf-manifest.ts
-var defaultNamespace = "espressif";
-function isPinned(spec) {
-  if (!spec) return false;
-  const trimmed = spec.trim();
-  if (!trimmed || trimmed === "*") return false;
-  if (/[\^~><!*,|]/u.test(trimmed)) return false;
-  if (/(^|\.)x($|\.)/iu.test(trimmed)) return false;
-  return /^=?\s*\d+(\.\d+)*([.-][0-9A-Za-z.-]+)?$/u.test(trimmed);
-}
-function registrySource(key, registryUrl) {
-  const slash = key.indexOf("/");
-  const namespace = slash === -1 ? defaultNamespace : key.slice(0, slash);
-  const name = slash === -1 ? key : key.slice(slash + 1);
-  return registryUrl === void 0 ? { kind: "registry", namespace, name } : { kind: "registry", namespace, name, registryUrl };
-}
-function stringField(value) {
-  return typeof value === "string" && value.trim() ? value.trim() : void 0;
-}
-function dependencyFrom(key, value, warnings) {
-  if (key === "idf") {
-    const spec = typeof value === "string" ? value : stringField(value?.version);
-    return { declaredName: key, source: { kind: "framework" }, versionSpec: spec, pinned: isPinned(spec) };
-  }
-  if (typeof value === "string") {
-    return { declaredName: key, source: registrySource(key, void 0), versionSpec: value, pinned: isPinned(value) };
-  }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    warnings.push(`Dependency "${key}" is neither a version string nor a table; skipped.`);
-    return void 0;
-  }
-  const table = value;
-  const versionSpec = stringField(table.version);
-  const git = stringField(table.git);
-  const path70 = stringField(table.path);
-  const overridePath = stringField(table.override_path);
-  if (git) {
-    const subPath = path70;
-    return {
-      declaredName: key,
-      source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
-      versionSpec,
-      pinned: isPinned(versionSpec)
-    };
-  }
-  if (overridePath) {
-    warnings.push(`Dependency "${key}" is overridden by local source at "${overridePath}".`);
-    return { declaredName: key, source: { kind: "local", path: overridePath }, versionSpec, pinned: false };
-  }
-  if (path70) {
-    return { declaredName: key, source: { kind: "local", path: path70 }, versionSpec, pinned: false };
-  }
-  return {
-    declaredName: key,
-    source: registrySource(key, stringField(table.registry_url)),
-    versionSpec,
-    pinned: isPinned(versionSpec)
-  };
-}
-function parseIdfManifest(content, path70) {
-  const warnings = [];
-  let document;
-  try {
-    document = load(content);
-  } catch (error51) {
-    return {
-      dependencies: [],
-      warnings: [
-        `${path70 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
-      ]
-    };
-  }
-  if (typeof document !== "object" || document === null || Array.isArray(document)) {
-    return { dependencies: [], warnings: [`${path70 ?? "idf_component.yml"} does not contain a mapping.`] };
-  }
-  const root = document;
-  const raw = root.dependencies;
-  if (raw === void 0) {
-    return {
-      ...stringField(root.name) ? { name: stringField(root.name) } : {},
-      ...stringField(root.version) ? { version: stringField(root.version) } : {},
-      dependencies: [],
-      warnings
-    };
-  }
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return {
-      dependencies: [],
-      warnings: [`${path70 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
-    };
-  }
-  const dependencies = [];
-  for (const [key, value] of Object.entries(raw)) {
-    if (key === "rules") continue;
-    const dependency = dependencyFrom(key, value, warnings);
-    if (dependency) dependencies.push(dependency);
-  }
-  return {
-    ...stringField(root.name) ? { name: stringField(root.name) } : {},
-    ...stringField(root.version) ? { version: stringField(root.version) } : {},
-    dependencies: dependencies.sort((a, b) => a.declaredName.localeCompare(b.declaredName)),
-    warnings
-  };
-}
-
-// src/firmware/snapshot.ts
-async function captureFirmwareSnapshot(root) {
-  const manifests = (await globFiles(root, ["**/idf_component.yml"])).sort();
-  const dependencies = [];
-  const warnings = [];
-  for (const file2 of manifests) {
-    const manifestPath = toPosixPath(import_node_path6.default.relative(root, file2));
-    const text = await readTextFile(file2).catch(() => void 0);
-    if (text === void 0) continue;
-    const manifest = parseIdfManifest(text, manifestPath);
-    warnings.push(...manifest.warnings);
-    for (const dependency of manifest.dependencies) {
-      const identity = resolveComponentIdentity(dependency);
-      dependencies.push({
-        name: dependency.declaredName,
-        manifestPath,
-        origin: dependency.source.kind,
-        ...dependency.versionSpec === void 0 ? {} : { versionSpec: dependency.versionSpec },
-        pinned: dependency.pinned,
-        ...identity.purl === void 0 ? {} : { purl: identity.purl },
-        searchable: identity.searchable,
-        ...identity.source === void 0 ? {} : { identitySource: identity.source }
-      });
-    }
-  }
-  return { dependencies, warnings };
-}
-
-// src/core/pipeline.ts
 init_version();
 
 // src/notifiers/Notifier.ts
@@ -44174,7 +43970,7 @@ function checkRuleCapabilities(rule2, capabilities) {
 }
 
 // src/rules/helpers.ts
-var import_node_path7 = __toESM(require("node:path"), 1);
+var import_node_path6 = __toESM(require("node:path"), 1);
 init_path();
 function rule(meta3, run) {
   return { meta: meta3, run };
@@ -44195,7 +43991,7 @@ function configFor(context, id) {
   return ruleConfig(context.config, id);
 }
 function finding(context, input) {
-  const absolute = import_node_path7.default.isAbsolute(input.path) ? input.path : import_node_path7.default.resolve(context.root, input.path);
+  const absolute = import_node_path6.default.isAbsolute(input.path) ? input.path : import_node_path6.default.resolve(context.root, input.path);
   const location = input.line || input.column ? { line: input.line, column: input.column } : void 0;
   const reference = `https://github.com/oaslananka/boardreadyops/blob/main/docs/rules/${input.ruleId.split(".")[0]}.md`;
   const base = {
@@ -44237,7 +44033,7 @@ function globLike(pattern, value) {
 }
 
 // src/rules/bom/shared.ts
-var import_node_path8 = __toESM(require("node:path"), 1);
+var import_node_path7 = __toESM(require("node:path"), 1);
 
 // src/util/delimited.ts
 function parseDelimitedRows(text, delimiter) {
@@ -45149,6 +44945,21 @@ function boolValue(value) {
   return /^(true|yes|1|dnp)$/i.test(value ?? "");
 }
 
+// src/util/glob.ts
+var import_fast_glob = __toESM(require_out4(), 1);
+init_path();
+async function globFiles(root, patterns) {
+  const results = await (0, import_fast_glob.default)(patterns, {
+    cwd: root,
+    absolute: true,
+    dot: false,
+    onlyFiles: true,
+    unique: true,
+    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/coverage/**"]
+  });
+  return results.map(toPosixPath).sort((a, b) => a.localeCompare(b));
+}
+
 // src/rules/bom/shared.ts
 async function loadBomContext(context) {
   const bomPath = await resolveBomPath(context);
@@ -45157,11 +44968,11 @@ async function loadBomContext(context) {
   const pcbFootprints = /* @__PURE__ */ new Map();
   for (const project of context.projects) {
     for (const schematic of project.schematicFiles) {
-      const parsed = await parseSchematic(import_node_path8.default.resolve(context.root, schematic));
+      const parsed = await parseSchematic(import_node_path7.default.resolve(context.root, schematic));
       schematicRows.push(...parsed.components);
     }
     for (const board of project.boardFiles) {
-      const parsed = await parsePcb(import_node_path8.default.resolve(context.root, board));
+      const parsed = await parsePcb(import_node_path7.default.resolve(context.root, board));
       for (const footprint of parsed.footprints) {
         pcbFootprints.set(footprint.reference, { footprint: footprint.footprint, dnp: footprint.dnp });
       }
@@ -45171,11 +44982,11 @@ async function loadBomContext(context) {
 }
 async function resolveBomPath(context) {
   if (context.options.bom && context.options.bom !== "auto") {
-    return import_node_path8.default.resolve(context.root, context.options.bom);
+    return import_node_path7.default.resolve(context.root, context.options.bom);
   }
   const configured = context.config.projects?.find((project) => project.bom)?.bom;
   if (configured) {
-    return import_node_path8.default.resolve(context.root, configured);
+    return import_node_path7.default.resolve(context.root, configured);
   }
   const found = await globFiles(context.root, ["**/bom*.csv", "**/*bom*.csv", "**/bom*.tsv", "**/*bom*.tsv"]);
   return found[0];
@@ -45454,7 +45265,7 @@ function checkBomSchematicConflicts(context, bomRows, schematicRows) {
 
 // src/rules/bom/lifecycle.ts
 var import_promises5 = __toESM(require("node:fs/promises"), 1);
-var import_node_path9 = __toESM(require("node:path"), 1);
+var import_node_path8 = __toESM(require("node:path"), 1);
 
 // src/bom/lifecycle.ts
 var EOL_PATTERNS = /\b(eol|end[\s-]of[\s-]life)\b/i;
@@ -45511,7 +45322,7 @@ async function loadLifecycleDatabase(root, configured) {
     return /* @__PURE__ */ new Map();
   }
   try {
-    const raw = JSON.parse(await import_promises5.default.readFile(import_node_path9.default.resolve(root, configured), "utf8"));
+    const raw = JSON.parse(await import_promises5.default.readFile(import_node_path8.default.resolve(root, configured), "utf8"));
     return new Map(
       Object.entries(raw).filter((entry) => typeof entry[1] === "string").map(([mpn, status]) => [mpn, status])
     );
@@ -45807,7 +45618,7 @@ var singleSourceRule = rule(
 
 // src/rules/bom/unknown-lifecycle.ts
 var import_promises6 = __toESM(require("node:fs/promises"), 1);
-var import_node_path10 = __toESM(require("node:path"), 1);
+var import_node_path9 = __toESM(require("node:path"), 1);
 var unknownLifecycleRule = rule(
   {
     id: "bom.unknown-lifecycle",
@@ -45854,7 +45665,7 @@ async function loadLifecycleDb(root, configured) {
     return /* @__PURE__ */ new Set();
   }
   try {
-    const raw = JSON.parse(await import_promises6.default.readFile(import_node_path10.default.resolve(root, configured), "utf8"));
+    const raw = JSON.parse(await import_promises6.default.readFile(import_node_path9.default.resolve(root, configured), "utf8"));
     return new Set(
       Object.keys(raw).filter((key) => typeof raw[key] === "string").map((key) => key.trim().toUpperCase())
     );
@@ -45864,7 +45675,7 @@ async function loadLifecycleDb(root, configured) {
 }
 
 // src/rules/bom/variant-consistency.ts
-var import_node_path11 = __toESM(require("node:path"), 1);
+var import_node_path10 = __toESM(require("node:path"), 1);
 var variantConsistencyRule = rule(
   {
     id: "bom.variant-consistency",
@@ -45892,8 +45703,8 @@ var variantConsistencyRule = rule(
 async function checkProjectVariants(context, project) {
   const output = [];
   const projectConfig = context.config.projects?.find((candidate) => {
-    const candidateRoot = import_node_path11.default.resolve(context.root, candidate.path);
-    const projectRoot = import_node_path11.default.resolve(context.root, project.root);
+    const candidateRoot = import_node_path10.default.resolve(context.root, candidate.path);
+    const projectRoot = import_node_path10.default.resolve(context.root, project.root);
     return candidateRoot === projectRoot;
   });
   let configuredVariants = (projectConfig?.variants ?? []).filter(
@@ -45905,13 +45716,13 @@ async function checkProjectVariants(context, project) {
   if (configuredVariants.length === 0) {
     return [];
   }
-  const parsedVariants = parseVariants(await readDesignFile(import_node_path11.default.resolve(context.root, project.projectFile)) ?? "");
+  const parsedVariants = parseVariants(await readDesignFile(import_node_path10.default.resolve(context.root, project.projectFile)) ?? "");
   for (const configuredVariant of configuredVariants) {
     const parsedVariant = parsedVariants.find((variant) => variant.name === configuredVariant.name);
     if (!parsedVariant || !configuredVariant.bom) {
       continue;
     }
-    const rows2 = await loadBom(import_node_path11.default.resolve(context.root, configuredVariant.bom));
+    const rows2 = await loadBom(import_node_path10.default.resolve(context.root, configuredVariant.bom));
     const activeDnp = new Set(
       activeVariantDnpRefs(
         parsedVariant,
@@ -45938,7 +45749,7 @@ async function checkProjectVariants(context, project) {
 }
 
 // src/rules/design/board-outline.ts
-var import_node_path12 = __toESM(require("node:path"), 1);
+var import_node_path11 = __toESM(require("node:path"), 1);
 var boardOutlineRule = rule(
   {
     id: "design.board-outline",
@@ -45959,7 +45770,7 @@ var boardOutlineRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path12.default.resolve(context.root, board));
+        const parsed = await parsePcb(import_node_path11.default.resolve(context.root, board));
         if (!parsed.outlineClosed) {
           output.push(
             finding(context, {
@@ -45979,7 +45790,7 @@ var boardOutlineRule = rule(
 );
 
 // src/rules/design/copper-balance.ts
-var import_node_path13 = __toESM(require("node:path"), 1);
+var import_node_path12 = __toESM(require("node:path"), 1);
 var copperBalanceRule = rule(
   {
     id: "design.copper-balance",
@@ -46010,7 +45821,7 @@ var copperBalanceRule = rule(
 );
 async function checkBoardCopperBalance(context, board, minimum) {
   const output = [];
-  const parsed = await parsePcb(import_node_path13.default.resolve(context.root, board));
+  const parsed = await parsePcb(import_node_path12.default.resolve(context.root, board));
   if (!parsed.boardArea || parsed.boardArea <= 0) {
     return [];
   }
@@ -46035,7 +45846,7 @@ async function checkBoardCopperBalance(context, board, minimum) {
 }
 
 // src/rules/design/unique-references.ts
-var import_node_path14 = __toESM(require("node:path"), 1);
+var import_node_path13 = __toESM(require("node:path"), 1);
 var uniqueReferencesRule = rule(
   {
     id: "design.unique-references",
@@ -46068,7 +45879,7 @@ var uniqueReferencesRule = rule(
 );
 async function checkBoardUniqueReferences(context, board, config2) {
   const output = [];
-  const parsed = await parsePcb(import_node_path14.default.resolve(context.root, board));
+  const parsed = await parsePcb(import_node_path13.default.resolve(context.root, board));
   const counts = /* @__PURE__ */ new Map();
   for (const footprint of parsed.footprints) {
     if (refIgnored(footprint.reference, config2["ignore-refs"])) {
@@ -46095,16 +45906,16 @@ async function checkBoardUniqueReferences(context, board, config2) {
 }
 
 // src/rules/kicad-report.ts
-var import_node_path17 = __toESM(require("node:path"), 1);
+var import_node_path16 = __toESM(require("node:path"), 1);
 
 // src/kicad/cli.ts
 var import_promises7 = __toESM(require("node:fs/promises"), 1);
 var import_node_os = __toESM(require("node:os"), 1);
-var import_node_path16 = __toESM(require("node:path"), 1);
+var import_node_path15 = __toESM(require("node:path"), 1);
 
 // src/util/process.ts
 var import_node_child_process2 = require("node:child_process");
-var import_node_path15 = require("node:path");
+var import_node_path14 = require("node:path");
 function runProcess(command, args, options = {}) {
   if (options.signal?.aborted) {
     return Promise.reject(abortReason(options.signal));
@@ -46190,7 +46001,7 @@ function abortReason(signal) {
 function trustedCmdExe() {
   const systemRoot = process.env.SystemRoot;
   if (systemRoot && /^[a-z]:\\Windows$/i.test(systemRoot)) {
-    return (0, import_node_path15.join)(systemRoot, "System32", "cmd.exe");
+    return (0, import_node_path14.join)(systemRoot, "System32", "cmd.exe");
   }
   return String.raw`C:\Windows\System32\cmd.exe`;
 }
@@ -46327,7 +46138,7 @@ function parseKicadMajor(version2) {
 async function detectKicadCli(explicit, signal) {
   const candidates = explicit && explicit.trim() !== "" ? [explicit] : defaultKicadCliCandidates();
   for (const candidate of candidates) {
-    if (candidate.includes(import_node_path16.default.sep) && !await pathExists(candidate)) {
+    if (candidate.includes(import_node_path15.default.sep) && !await pathExists(candidate)) {
       continue;
     }
     const version2 = await runProcess(candidate, ["version"], {
@@ -46354,8 +46165,8 @@ async function detectKicadCli(explicit, signal) {
   return { found: false };
 }
 async function runKicadReport(cliPath, kind, inputFile, options = {}) {
-  const tempDir = await import_promises7.default.mkdtemp(import_node_path16.default.join(import_node_os.default.tmpdir(), "boardreadyops-"));
-  const output = import_node_path16.default.join(tempDir, `${kind}.json`);
+  const tempDir = await import_promises7.default.mkdtemp(import_node_path15.default.join(import_node_os.default.tmpdir(), "boardreadyops-"));
+  const output = import_node_path15.default.join(tempDir, `${kind}.json`);
   const args = kicadReportArgs(kind, output, inputFile, options);
   const result = await runProcess(cliPath, args, {
     timeoutMs: 12e4,
@@ -46461,7 +46272,7 @@ async function runKicadReportRule(context, options) {
   const output = [];
   for (const project of context.projects) {
     for (const designFile of options.files(project)) {
-      const absoluteFile = import_node_path17.default.resolve(context.root, designFile);
+      const absoluteFile = import_node_path16.default.resolve(context.root, designFile);
       output.push(...await processDesignFileReport(context, cli.path, cli.version, options, absoluteFile));
     }
   }
@@ -46584,7 +46395,7 @@ function ercSeverity(context, kicadRule, fallback) {
 }
 
 // src/rules/firmware/arduino-pin-contract.ts
-var import_node_path21 = __toESM(require("node:path"), 1);
+var import_node_path20 = __toESM(require("node:path"), 1);
 
 // src/firmware/arduino.ts
 var import_promises8 = __toESM(require("node:fs/promises"), 1);
@@ -46679,7 +46490,7 @@ function matchMeta(comment, key) {
 }
 
 // src/rules/firmware/shared.ts
-var import_node_path20 = __toESM(require("node:path"), 1);
+var import_node_path19 = __toESM(require("node:path"), 1);
 
 // src/pinmap/loader.ts
 init_zod();
@@ -46738,14 +46549,14 @@ async function loadPinmap(file2) {
 }
 
 // src/rules/pinmap/shared.ts
-var import_node_path19 = __toESM(require("node:path"), 1);
+var import_node_path18 = __toESM(require("node:path"), 1);
 
 // src/kicad/schematic-graph.ts
 var import_promises9 = __toESM(require("node:fs/promises"), 1);
-var import_node_path18 = __toESM(require("node:path"), 1);
+var import_node_path17 = __toESM(require("node:path"), 1);
 var MAX_SCHEMATIC_SHEETS = 5e3;
 async function buildSchematicNetGraph(rootFiles) {
-  const normalizedRoots = [...new Set(rootFiles.map((file2) => import_node_path18.default.resolve(file2)))].sort(
+  const normalizedRoots = [...new Set(rootFiles.map((file2) => import_node_path17.default.resolve(file2)))].sort(
     (left, right) => left.localeCompare(right)
   );
   const queue = normalizedRoots.map((file2) => ({ file: file2, sheetPins: [] }));
@@ -46758,7 +46569,7 @@ async function buildSchematicNetGraph(rootFiles) {
     if (!next) {
       break;
     }
-    const file2 = import_node_path18.default.resolve(next.file);
+    const file2 = import_node_path17.default.resolve(next.file);
     if (visited.has(file2)) {
       continue;
     }
@@ -46811,7 +46622,7 @@ async function processSheetQueueItem(file2, next, sheets, missingSheets, unresol
     }
   }
   for (const reference of parsed.sheetReferences) {
-    const resolvedPath = import_node_path18.default.resolve(import_node_path18.default.dirname(file2), reference.fileName);
+    const resolvedPath = import_node_path17.default.resolve(import_node_path17.default.dirname(file2), reference.fileName);
     if (!await fileExists(resolvedPath)) {
       missingSheets.push(missingSheet(file2, reference, resolvedPath));
       continue;
@@ -46848,7 +46659,7 @@ async function fileExists(file2) {
 // src/rules/pinmap/shared.ts
 function resolvePinmap(context) {
   const configured = context.options.pinmap || context.config.projects?.find((project) => project.pinmap)?.pinmap;
-  return configured ? import_node_path19.default.resolve(context.root, configured) : void 0;
+  return configured ? import_node_path18.default.resolve(context.root, configured) : void 0;
 }
 async function schematicNetLabels(context) {
   return (await schematicNetGraph(context)).visibleNetLabels;
@@ -46858,7 +46669,7 @@ async function schematicNetGraph(context) {
   for (const project of context.projects) {
     const firstSchematic = project.schematicFiles[0];
     if (firstSchematic) {
-      roots.push(import_node_path19.default.resolve(context.root, firstSchematic));
+      roots.push(import_node_path18.default.resolve(context.root, firstSchematic));
     }
   }
   return buildSchematicNetGraph(roots);
@@ -46930,7 +46741,7 @@ async function runFirmwareContractRule(context, options) {
         path: contractPath,
         kind: "firmware",
         line: 1,
-        details: { firmware: assignment, pinmapPath: import_node_path20.default.relative(context.root, pinmapPath) }
+        details: { firmware: assignment, pinmapPath: import_node_path19.default.relative(context.root, pinmapPath) }
       })
     );
   }
@@ -46948,8 +46759,8 @@ async function runFirmwareContractRule(context, options) {
           firmware: assignment,
           hardware,
           sources: {
-            firmware: import_node_path20.default.relative(context.root, contractPath),
-            pinmap: import_node_path20.default.relative(context.root, pinmapPath)
+            firmware: import_node_path19.default.relative(context.root, contractPath),
+            pinmap: import_node_path19.default.relative(context.root, pinmapPath)
           }
         }
       })
@@ -46964,7 +46775,7 @@ async function runFirmwareContractRule(context, options) {
         path: pinmapPath,
         kind: "pinmap",
         line: 1,
-        details: { hardware, firmwarePath: import_node_path20.default.relative(context.root, contractPath) }
+        details: { hardware, firmwarePath: import_node_path19.default.relative(context.root, contractPath) }
       })
     );
   }
@@ -47004,11 +46815,170 @@ var arduinoPinContractRule = rule(
 function resolveArduinoContract(context) {
   const ruleFile = configFor(context, ruleId).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context.config.projects?.find((project) => project.firmware?.arduino?.pinAssignments)?.firmware?.arduino?.pinAssignments ?? context.config.firmware?.arduino?.pinAssignments;
-  return configured ? import_node_path21.default.resolve(context.root, configured) : void 0;
+  return configured ? import_node_path20.default.resolve(context.root, configured) : void 0;
 }
 
 // src/rules/firmware/dependency-identification.ts
-var import_node_path22 = __toESM(require("node:path"), 1);
+var import_node_path21 = __toESM(require("node:path"), 1);
+
+// src/firmware/component-identity.ts
+var mappings = [
+  {
+    match: "https://github.com/mcu-tools/mcuboot",
+    purl: "pkg:golang/github.com/mcu-tools/mcuboot",
+    evidence: "reported",
+    // Confirmed present by querying the OSV API for this advisory; the alias is the CVE.
+    source: "OSV GO-2024-2799 (CVE-2024-32883)"
+  }
+];
+function normalise(value) {
+  return value.trim().toLowerCase().replace(/\.git$/u, "").replace(/\/+$/u, "");
+}
+function candidateKeys(dependency) {
+  const source = dependency.source;
+  if (source.kind === "registry") return [`${source.namespace}/${source.name}`];
+  if (source.kind === "git") return [source.url];
+  return [];
+}
+function resolveComponentIdentity(dependency) {
+  if (dependency.source.kind === "local" || dependency.source.kind === "framework") {
+    return { evidence: "unidentified", searchable: false };
+  }
+  const keys = candidateKeys(dependency).map(normalise);
+  const entry = mappings.find((mapping) => keys.includes(normalise(mapping.match)));
+  if (!entry) return { evidence: "unidentified", searchable: false };
+  const versioned = dependency.pinned && dependency.versionSpec ? `${entry.purl}@${dependency.versionSpec.trim()}` : entry.purl;
+  return {
+    purl: versioned,
+    evidence: entry.evidence,
+    source: entry.source,
+    ...entry.verifiedAt ? { verifiedAt: entry.verifiedAt } : {},
+    // A known identifier is searchable even where the version is a range: the query then asks
+    // about the package rather than one release, which is a weaker but real answer.
+    searchable: true
+  };
+}
+function summariseIdentities(dependencies) {
+  const unidentifiedNames = [];
+  let searchable = 0;
+  for (const dependency of dependencies) {
+    if (resolveComponentIdentity(dependency).searchable) searchable += 1;
+    else unidentifiedNames.push(dependency.declaredName);
+  }
+  return {
+    total: dependencies.length,
+    searchable,
+    unidentified: unidentifiedNames.length,
+    unidentifiedNames: unidentifiedNames.sort(compareCodePoints)
+  };
+}
+
+// src/firmware/idf-manifest.ts
+var defaultNamespace = "espressif";
+function isPinned(spec) {
+  if (!spec) return false;
+  const trimmed = spec.trim();
+  if (!trimmed || trimmed === "*") return false;
+  if (/[\^~><!*,|]/u.test(trimmed)) return false;
+  if (/(^|\.)x($|\.)/iu.test(trimmed)) return false;
+  return /^=?\s*\d+(\.\d+)*([.-][0-9A-Za-z.-]+)?$/u.test(trimmed);
+}
+function registrySource(key, registryUrl) {
+  const slash = key.indexOf("/");
+  const namespace = slash === -1 ? defaultNamespace : key.slice(0, slash);
+  const name = slash === -1 ? key : key.slice(slash + 1);
+  return registryUrl === void 0 ? { kind: "registry", namespace, name } : { kind: "registry", namespace, name, registryUrl };
+}
+function stringField(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : void 0;
+}
+function dependencyFrom(key, value, warnings) {
+  if (key === "idf") {
+    const spec = typeof value === "string" ? value : stringField(value?.version);
+    return { declaredName: key, source: { kind: "framework" }, versionSpec: spec, pinned: isPinned(spec) };
+  }
+  if (typeof value === "string") {
+    return { declaredName: key, source: registrySource(key, void 0), versionSpec: value, pinned: isPinned(value) };
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    warnings.push(`Dependency "${key}" is neither a version string nor a table; skipped.`);
+    return void 0;
+  }
+  const table = value;
+  const versionSpec = stringField(table.version);
+  const git = stringField(table.git);
+  const path70 = stringField(table.path);
+  const overridePath = stringField(table.override_path);
+  if (git) {
+    const subPath = path70;
+    return {
+      declaredName: key,
+      source: subPath === void 0 ? { kind: "git", url: git } : { kind: "git", url: git, path: subPath },
+      versionSpec,
+      pinned: isPinned(versionSpec)
+    };
+  }
+  if (overridePath) {
+    warnings.push(`Dependency "${key}" is overridden by local source at "${overridePath}".`);
+    return { declaredName: key, source: { kind: "local", path: overridePath }, versionSpec, pinned: false };
+  }
+  if (path70) {
+    return { declaredName: key, source: { kind: "local", path: path70 }, versionSpec, pinned: false };
+  }
+  return {
+    declaredName: key,
+    source: registrySource(key, stringField(table.registry_url)),
+    versionSpec,
+    pinned: isPinned(versionSpec)
+  };
+}
+function parseIdfManifest(content, path70) {
+  const warnings = [];
+  let document;
+  try {
+    document = load(content);
+  } catch (error51) {
+    return {
+      dependencies: [],
+      warnings: [
+        `${path70 ?? "idf_component.yml"} is not valid YAML: ${error51 instanceof Error ? error51.message : "unknown"}`
+      ]
+    };
+  }
+  if (typeof document !== "object" || document === null || Array.isArray(document)) {
+    return { dependencies: [], warnings: [`${path70 ?? "idf_component.yml"} does not contain a mapping.`] };
+  }
+  const root = document;
+  const raw = root.dependencies;
+  if (raw === void 0) {
+    return {
+      ...stringField(root.name) ? { name: stringField(root.name) } : {},
+      ...stringField(root.version) ? { version: stringField(root.version) } : {},
+      dependencies: [],
+      warnings
+    };
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return {
+      dependencies: [],
+      warnings: [`${path70 ?? "idf_component.yml"} has a "dependencies" key that is not a mapping.`]
+    };
+  }
+  const dependencies = [];
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === "rules") continue;
+    const dependency = dependencyFrom(key, value, warnings);
+    if (dependency) dependencies.push(dependency);
+  }
+  return {
+    ...stringField(root.name) ? { name: stringField(root.name) } : {},
+    ...stringField(root.version) ? { version: stringField(root.version) } : {},
+    dependencies: dependencies.sort((a, b) => compareCodePoints(a.declaredName, b.declaredName)),
+    warnings
+  };
+}
+
+// src/rules/firmware/dependency-identification.ts
 var dependencyIdentificationRule = rule(
   {
     id: "firmware.dependency-identification",
@@ -47032,7 +47002,7 @@ var dependencyIdentificationRule = rule(
     }
     const output = [];
     for (const file2 of manifests) {
-      const relative = import_node_path22.default.relative(context.root, file2);
+      const relative = import_node_path21.default.relative(context.root, file2);
       const text = await readTextFile(file2).catch(() => void 0);
       if (text === void 0) continue;
       const manifest = parseIdfManifest(text, relative);
@@ -47059,7 +47029,7 @@ var dependencyIdentificationRule = rule(
 );
 
 // src/rules/firmware/esp-idf-pin-contract.ts
-var import_node_path23 = __toESM(require("node:path"), 1);
+var import_node_path22 = __toESM(require("node:path"), 1);
 
 // src/firmware/yaml-contract.ts
 var import_promises10 = __toESM(require("node:fs/promises"), 1);
@@ -47141,11 +47111,11 @@ var espIdfPinContractRule = rule(
 function resolveContract(context) {
   const ruleFile = configFor(context, ruleId2).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context.config.projects?.find((project) => project.firmware?.["esp-idf"]?.pinAssignments)?.firmware?.["esp-idf"]?.pinAssignments ?? context.config.firmware?.["esp-idf"]?.pinAssignments;
-  return configured ? import_node_path23.default.resolve(context.root, configured) : void 0;
+  return configured ? import_node_path22.default.resolve(context.root, configured) : void 0;
 }
 
 // src/rules/firmware/platformio-pin-contract.ts
-var import_node_path24 = __toESM(require("node:path"), 1);
+var import_node_path23 = __toESM(require("node:path"), 1);
 
 // src/firmware/platformio.ts
 async function loadPlatformioPinContract(file2) {
@@ -47182,11 +47152,11 @@ var platformioPinContractRule = rule(
 function resolvePlatformioContract(context) {
   const ruleFile = configFor(context, ruleId3).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context.config.projects?.find((project) => project.firmware?.platformio?.pinAssignments)?.firmware?.platformio?.pinAssignments ?? context.config.firmware?.platformio?.pinAssignments;
-  return configured ? import_node_path24.default.resolve(context.root, configured) : void 0;
+  return configured ? import_node_path23.default.resolve(context.root, configured) : void 0;
 }
 
 // src/rules/firmware/stm32cubemx-pin-contract.ts
-var import_node_path25 = __toESM(require("node:path"), 1);
+var import_node_path24 = __toESM(require("node:path"), 1);
 
 // src/firmware/stm32cubemx.ts
 var import_promises11 = __toESM(require("node:fs/promises"), 1);
@@ -47284,11 +47254,11 @@ var stm32CubeMxPinContractRule = rule(
 function resolveContract2(context) {
   const ruleFile = configFor(context, ruleId4).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context.config.projects?.find((project) => project.firmware?.stm32cubemx?.project)?.firmware?.stm32cubemx?.project ?? context.config.firmware?.stm32cubemx?.project;
-  return configured ? import_node_path25.default.resolve(context.root, configured) : void 0;
+  return configured ? import_node_path24.default.resolve(context.root, configured) : void 0;
 }
 
 // src/rules/firmware/zephyr-pin-contract.ts
-var import_node_path26 = __toESM(require("node:path"), 1);
+var import_node_path25 = __toESM(require("node:path"), 1);
 
 // src/firmware/zephyr.ts
 async function loadZephyrPinContract(file2) {
@@ -47325,11 +47295,11 @@ var zephyrPinContractRule = rule(
 function resolveContract3(context) {
   const ruleFile = configFor(context, ruleId5).file;
   const configured = (typeof ruleFile === "string" && ruleFile.trim() !== "" ? ruleFile : void 0) ?? context.config.projects?.find((project) => project.firmware?.zephyr?.pinAssignments)?.firmware?.zephyr?.pinAssignments ?? context.config.firmware?.zephyr?.pinAssignments;
-  return configured ? import_node_path26.default.resolve(context.root, configured) : void 0;
+  return configured ? import_node_path25.default.resolve(context.root, configured) : void 0;
 }
 
 // src/rules/manufacturing/shared.ts
-var import_node_path27 = __toESM(require("node:path"), 1);
+var import_node_path26 = __toESM(require("node:path"), 1);
 function positiveInteger(value, fallback) {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
 }
@@ -47337,7 +47307,7 @@ async function parsedBoards(context) {
   const boards = [];
   for (const project of context.projects) {
     for (const board of project.boardFiles) {
-      boards.push({ path: board, footprints: (await parsePcb(import_node_path27.default.resolve(context.root, board))).footprints });
+      boards.push({ path: board, footprints: (await parsePcb(import_node_path26.default.resolve(context.root, board))).footprints });
     }
   }
   return boards;
@@ -47368,20 +47338,20 @@ function assemblyFootprints(footprints2) {
 async function positionOutputText(root, searchRoots, patterns = defaultPositionPatterns()) {
   const files = /* @__PURE__ */ new Set();
   for (const searchRoot of normalizedSearchRoots(searchRoots)) {
-    const directory = import_node_path27.default.resolve(root, searchRoot);
+    const directory = import_node_path26.default.resolve(root, searchRoot);
     for (const file2 of await globFiles(directory, patterns)) {
       files.add(file2);
     }
   }
   const sortedFiles = [...files].sort((a, b) => a.localeCompare(b));
   const texts = await Promise.all(sortedFiles.map((file2) => readTextFile(file2).catch(() => "")));
-  return { files: sortedFiles.map((file2) => import_node_path27.default.relative(root, file2)), text: texts.join("\n") };
+  return { files: sortedFiles.map((file2) => import_node_path26.default.relative(root, file2)), text: texts.join("\n") };
 }
 function projectOutputSearchRoots(context) {
   return [
     ...new Set(
       context.projects.flatMap(
-        (project) => [project.projectFile, ...project.boardFiles, ...project.schematicFiles, ...project.jobsetFiles].map((entry) => import_node_path27.default.dirname(entry)).filter((entry) => entry.length > 0)
+        (project) => [project.projectFile, ...project.boardFiles, ...project.schematicFiles, ...project.jobsetFiles].map((entry) => import_node_path26.default.dirname(entry)).filter((entry) => entry.length > 0)
       )
     )
   ];
@@ -47451,7 +47421,7 @@ var assemblySidesRule = rule(
 );
 
 // src/rules/manufacturing/drill-coverage.ts
-var import_node_path28 = __toESM(require("node:path"), 1);
+var import_node_path27 = __toESM(require("node:path"), 1);
 
 // src/multicad/excellon-parser.ts
 var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
@@ -47698,12 +47668,12 @@ var drillCoverageRule = rule(
     for (const file2 of drillFiles) {
       const text = await readTextFile(file2).catch(() => "");
       if (!text) continue;
-      diameters.push(...parseExcellon(text, import_node_path28.default.relative(context.root, file2)).tools.map((tool) => tool.diameterMm));
+      diameters.push(...parseExcellon(text, import_node_path27.default.relative(context.root, file2)).tools.map((tool) => tool.diameterMm));
     }
     const output = [];
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path28.default.resolve(context.root, board));
+        const parsed = await parsePcb(import_node_path27.default.resolve(context.root, board));
         for (const size of parsed.drillSizes) {
           const wanted = Number(size);
           if (!Number.isFinite(wanted) || wanted <= 0) continue;
@@ -47743,7 +47713,7 @@ function nearestDiameter(diameters, wanted) {
 }
 
 // src/rules/manufacturing/fab-notes.ts
-var import_node_path29 = __toESM(require("node:path"), 1);
+var import_node_path28 = __toESM(require("node:path"), 1);
 var fabNotesRule = rule(
   {
     id: "manufacturing.fab-notes",
@@ -47763,7 +47733,7 @@ var fabNotesRule = rule(
     }
     const candidates = ["fab/README.md", "manufacturing/notes.md", "docs/fab-notes.md"];
     for (const candidate of candidates) {
-      if (await pathExists(import_node_path29.default.resolve(context.root, candidate))) {
+      if (await pathExists(import_node_path28.default.resolve(context.root, candidate))) {
         return [];
       }
     }
@@ -47823,10 +47793,10 @@ var fiducialsRule = rule(
 );
 
 // src/rules/manufacturing/jobset-outputs.ts
-var import_node_path31 = __toESM(require("node:path"), 1);
+var import_node_path30 = __toESM(require("node:path"), 1);
 
 // src/kicad/jobset.ts
-var import_node_path30 = __toESM(require("node:path"), 1);
+var import_node_path29 = __toESM(require("node:path"), 1);
 async function parseJobset(file2) {
   const text = await readDesignFile(file2) ?? "";
   const parsed = parseJsonValue(text);
@@ -47923,7 +47893,7 @@ function uniqueJobs(jobs) {
   return output;
 }
 function normalizePath(value) {
-  return import_node_path30.default.normalize(value).replaceAll("\\", "/");
+  return import_node_path29.default.normalize(value).replaceAll("\\", "/");
 }
 
 // src/rules/manufacturing/jobset-outputs.ts
@@ -47947,10 +47917,10 @@ var jobsetOutputsRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const jobset of project.jobsetFiles) {
-        const parsed = await parseJobset(import_node_path31.default.resolve(context.root, jobset));
+        const parsed = await parseJobset(import_node_path30.default.resolve(context.root, jobset));
         for (const job of parsed.jobs.filter((entry) => entry.enabled)) {
-          const outputPath = (job.destinationPath ? import_node_path31.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
-          const absoluteOutput = import_node_path31.default.resolve(context.root, project.root, outputPath);
+          const outputPath = (job.destinationPath ? import_node_path30.default.join(job.destinationPath, job.outputPath) : job.outputPath).replaceAll("\\", "/");
+          const absoluteOutput = import_node_path30.default.resolve(context.root, project.root, outputPath);
           if (!await pathExists(absoluteOutput)) {
             output.push(
               finding(context, {
@@ -47971,7 +47941,7 @@ var jobsetOutputsRule = rule(
 );
 
 // src/rules/manufacturing/layer-stackup.ts
-var import_node_path32 = __toESM(require("node:path"), 1);
+var import_node_path31 = __toESM(require("node:path"), 1);
 var layerStackupRule = rule(
   {
     id: "manufacturing.layer-stackup",
@@ -47993,7 +47963,7 @@ var layerStackupRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path32.default.resolve(context.root, board));
+        const parsed = await parsePcb(import_node_path31.default.resolve(context.root, board));
         const expectedLayers = typeof expected === "number" ? expected : parsed.copperLayerCount;
         if (parsed.stackupLayerCount !== void 0 && parsed.stackupLayerCount !== expectedLayers) {
           output.push(
@@ -48014,7 +47984,7 @@ var layerStackupRule = rule(
 );
 
 // src/rules/manufacturing/mask-coverage.ts
-var import_node_path33 = __toESM(require("node:path"), 1);
+var import_node_path32 = __toESM(require("node:path"), 1);
 
 // src/multicad/gerber-parser.ts
 var inchToMm2 = 25.4;
@@ -48410,7 +48380,7 @@ var maskCoverageRule = rule(
     }
     const entries = await Promise.all(
       files.map(async (file2) => ({
-        filename: import_node_path33.default.relative(context.root, file2),
+        filename: import_node_path32.default.relative(context.root, file2),
         content: await readTextFile(file2).catch(() => void 0) ?? void 0
       }))
     );
@@ -48448,7 +48418,7 @@ var maskCoverageRule = rule(
 );
 
 // src/rules/manufacturing/outputs-present.ts
-var import_node_path34 = __toESM(require("node:path"), 1);
+var import_node_path33 = __toESM(require("node:path"), 1);
 init_path();
 
 // src/vendor/outputs.ts
@@ -49034,7 +49004,7 @@ async function inspectRequiredOutputs(context) {
     0,
     ...(await Promise.all(
       context.projects.flatMap(
-        (project) => project.boardFiles.map((board) => fileMtimeMs(import_node_path34.default.resolve(context.root, board)))
+        (project) => project.boardFiles.map((board) => fileMtimeMs(import_node_path33.default.resolve(context.root, board)))
       )
     )).filter((value) => typeof value === "number")
   );
@@ -49111,7 +49081,7 @@ function isPatternMap(value) {
 }
 
 // src/rules/manufacturing/package-completeness.ts
-var import_node_path35 = __toESM(require("node:path"), 1);
+var import_node_path34 = __toESM(require("node:path"), 1);
 var BASE_CATEGORIES = [
   {
     id: "gerbers",
@@ -49245,7 +49215,7 @@ async function resolveCategories(root, categories) {
 }
 async function checkFabNotes(root) {
   for (const candidate of FAB_NOTES_PATHS) {
-    if (await pathExists(import_node_path35.default.resolve(root, candidate))) {
+    if (await pathExists(import_node_path34.default.resolve(root, candidate))) {
       return true;
     }
   }
@@ -49654,7 +49624,7 @@ var pinmapNetLabelRule = rule(
 );
 
 // src/rules/pinmap/verify.ts
-var import_node_path36 = __toESM(require("node:path"), 1);
+var import_node_path35 = __toESM(require("node:path"), 1);
 var pinmapVerifyRule = rule(
   {
     id: "pinmap.verify",
@@ -49694,8 +49664,8 @@ var pinmapVerifyRule = rule(
         finding(context, {
           ruleId: "pinmap.verify",
           severity: configuredSeverity(context, "pinmap.verify", "high"),
-          message: `Hierarchical sheet ${missing.fileName} referenced by ${import_node_path36.default.relative(context.root, missing.parentFile)} was not found.`,
-          path: import_node_path36.default.relative(context.root, missing.parentFile),
+          message: `Hierarchical sheet ${missing.fileName} referenced by ${import_node_path35.default.relative(context.root, missing.parentFile)} was not found.`,
+          path: import_node_path35.default.relative(context.root, missing.parentFile),
           kind: "schematic",
           details: { ...missing }
         })
@@ -49706,8 +49676,8 @@ var pinmapVerifyRule = rule(
         finding(context, {
           ruleId: "pinmap.verify",
           severity: configuredSeverity(context, "pinmap.verify", "high"),
-          message: `Sheet pin ${unresolved.pin} on ${import_node_path36.default.relative(context.root, unresolved.parentFile)} has no matching hierarchical label in ${import_node_path36.default.relative(context.root, unresolved.childFile)}.`,
-          path: import_node_path36.default.relative(context.root, unresolved.parentFile),
+          message: `Sheet pin ${unresolved.pin} on ${import_node_path35.default.relative(context.root, unresolved.parentFile)} has no matching hierarchical label in ${import_node_path35.default.relative(context.root, unresolved.childFile)}.`,
+          path: import_node_path35.default.relative(context.root, unresolved.parentFile),
           kind: "schematic",
           details: { ...unresolved }
         })
@@ -49803,7 +49773,7 @@ var pinmapUnmappedPinRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const schematic of project.schematicFiles) {
-        const parsed = await parseSchematic(import_node_path36.default.resolve(context.root, schematic));
+        const parsed = await parseSchematic(import_node_path35.default.resolve(context.root, schematic));
         for (const pin of parsed.connectedPins) {
           const key = `${pin.designator}.${pin.pin}`;
           if (!mapped.has(key)) {
@@ -49826,7 +49796,7 @@ var pinmapUnmappedPinRule = rule(
 );
 
 // src/rules/release/changelog-present.ts
-var import_node_path37 = __toESM(require("node:path"), 1);
+var import_node_path36 = __toESM(require("node:path"), 1);
 var changelogPresentRule = rule(
   {
     id: "release.changelog-present",
@@ -49847,13 +49817,13 @@ var changelogPresentRule = rule(
     const revisions = /* @__PURE__ */ new Set();
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path37.default.resolve(context.root, board))).revision;
+        const revision2 = (await parsePcb(import_node_path36.default.resolve(context.root, board))).revision;
         if (revision2) {
           revisions.add(revision2);
         }
       }
     }
-    const changelog = import_node_path37.default.resolve(context.root, "CHANGELOG.md");
+    const changelog = import_node_path36.default.resolve(context.root, "CHANGELOG.md");
     if (!await pathExists(changelog)) {
       return [
         finding(context, {
@@ -49888,7 +49858,7 @@ function changelogHasRevision(text, revision2) {
 }
 
 // src/rules/release/revision-set.ts
-var import_node_path38 = __toESM(require("node:path"), 1);
+var import_node_path37 = __toESM(require("node:path"), 1);
 var revisionSetRule = rule(
   {
     id: "release.revision-set",
@@ -49912,7 +49882,7 @@ var revisionSetRule = rule(
     const revisionPattern = new RegExp(tagPattern);
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const parsed = await parsePcb(import_node_path38.default.resolve(context.root, board));
+        const parsed = await parsePcb(import_node_path37.default.resolve(context.root, board));
         if (!parsed.revision) {
           output.push(
             finding(context, {
@@ -49942,7 +49912,7 @@ var revisionSetRule = rule(
 );
 
 // src/rules/release/tag-matches-revision.ts
-var import_node_path39 = __toESM(require("node:path"), 1);
+var import_node_path38 = __toESM(require("node:path"), 1);
 var tagMatchesRevisionRule = rule(
   {
     id: "release.tag-matches-revision",
@@ -49967,7 +49937,7 @@ var tagMatchesRevisionRule = rule(
     const output = [];
     for (const project of context.projects) {
       for (const board of project.boardFiles) {
-        const revision2 = (await parsePcb(import_node_path39.default.resolve(context.root, board))).revision;
+        const revision2 = (await parsePcb(import_node_path38.default.resolve(context.root, board))).revision;
         if (!revision2 || tag !== revision2 && tag !== `v${revision2}`) {
           output.push(
             finding(context, {
@@ -49987,7 +49957,7 @@ var tagMatchesRevisionRule = rule(
 );
 
 // src/rules/release/version-format.ts
-var import_node_path40 = __toESM(require("node:path"), 1);
+var import_node_path39 = __toESM(require("node:path"), 1);
 var versionFormatRule = rule(
   {
     id: "release.version-format",
@@ -50030,7 +50000,7 @@ var versionFormatRule = rule(
 );
 async function checkProjectBoards(context, project, regex, pattern, output) {
   for (const board of project.boardFiles) {
-    const revision2 = (await parsePcb(import_node_path40.default.resolve(context.root, board))).revision;
+    const revision2 = (await parsePcb(import_node_path39.default.resolve(context.root, board))).revision;
     if (revision2 && !regex.test(revision2)) {
       output.push(
         finding(context, {
@@ -50047,7 +50017,7 @@ async function checkProjectBoards(context, project, regex, pattern, output) {
 }
 async function checkProjectSchematics(context, project, regex, pattern, output) {
   for (const schematic of project.schematicFiles) {
-    const text = await readDesignFile(import_node_path40.default.resolve(context.root, schematic)) ?? "";
+    const text = await readDesignFile(import_node_path39.default.resolve(context.root, schematic)) ?? "";
     const revision2 = /\(rev\s+"([^"]+)"/.exec(text)?.[1];
     if (revision2 && !regex.test(revision2)) {
       output.push(
@@ -50131,7 +50101,7 @@ function registerBuiltInRules() {
 // src/rules/fabrication-snapshot.ts
 var import_node_crypto4 = __toESM(require("node:crypto"), 1);
 var import_node_fs2 = require("node:fs");
-var import_node_path41 = __toESM(require("node:path"), 1);
+var import_node_path40 = __toESM(require("node:path"), 1);
 init_path();
 var manufacturingPatterns = {
   gerber: ["**/*.gbr", "**/*.gbrjob"],
@@ -50157,9 +50127,9 @@ async function captureFabricationSnapshot(root, projects, options, config2) {
 }
 async function resolveBomPaths(root, options, config2) {
   if (options.bom && options.bom !== "auto") {
-    return [import_node_path41.default.resolve(root, options.bom)];
+    return [import_node_path40.default.resolve(root, options.bom)];
   }
-  const configured = config2.projects?.flatMap((project) => project.bom ? [import_node_path41.default.resolve(root, project.bom)] : []).sort((a, b) => a.localeCompare(b));
+  const configured = config2.projects?.flatMap((project) => project.bom ? [import_node_path40.default.resolve(root, project.bom)] : []).sort((a, b) => a.localeCompare(b));
   if (configured && configured.length > 0) {
     return [...new Set(configured)];
   }
@@ -50181,7 +50151,7 @@ async function loadSchematicRows(root, projects) {
   const rows2 = [];
   for (const project of projects) {
     for (const schematic of project.schematicFiles) {
-      rows2.push(...(await parseSchematic(import_node_path41.default.resolve(root, schematic))).components);
+      rows2.push(...(await parseSchematic(import_node_path40.default.resolve(root, schematic))).components);
     }
   }
   return rows2;
@@ -50202,11 +50172,11 @@ function snapshotBomRow(root, row) {
   };
 }
 async function projectScopedFiles(root, projects, patterns) {
-  const files = await Promise.all(projects.map((project) => globFiles(import_node_path41.default.resolve(root, project.root), patterns)));
+  const files = await Promise.all(projects.map((project) => globFiles(import_node_path40.default.resolve(root, project.root), patterns)));
   return [...new Set(files.flat())].sort((a, b) => a.localeCompare(b));
 }
 function sourcePath(root, source) {
-  return toPosixPath(import_node_path41.default.isAbsolute(source) ? import_node_path41.default.relative(root, source) : source);
+  return toPosixPath(import_node_path40.default.isAbsolute(source) ? import_node_path40.default.relative(root, source) : source);
 }
 function compareSnapshotBomRows(left, right) {
   return left.reference.localeCompare(right.reference) || (left.sourcePath ?? "").localeCompare(right.sourcePath ?? "");
@@ -50216,7 +50186,7 @@ async function outputFromFiles(root, kind, files) {
     kind,
     files: await Promise.all(
       files.map(async (file2) => ({
-        path: toPosixPath(import_node_path41.default.relative(root, file2)),
+        path: toPosixPath(import_node_path40.default.relative(root, file2)),
         digest: await hashFile(file2)
       }))
     )
@@ -50239,6 +50209,36 @@ async function outputFromRows(kind, rows2) {
       }
     ]
   };
+}
+
+// src/rules/firmware-snapshot.ts
+var import_node_path41 = __toESM(require("node:path"), 1);
+init_path();
+async function captureFirmwareSnapshot(root) {
+  const manifests = (await globFiles(root, ["**/idf_component.yml"])).sort(compareCodePoints);
+  const dependencies = [];
+  const warnings = [];
+  for (const file2 of manifests) {
+    const manifestPath = toPosixPath(import_node_path41.default.relative(root, file2));
+    const text = await readTextFile(file2).catch(() => void 0);
+    if (text === void 0) continue;
+    const manifest = parseIdfManifest(text, manifestPath);
+    warnings.push(...manifest.warnings);
+    for (const dependency of manifest.dependencies) {
+      const identity = resolveComponentIdentity(dependency);
+      dependencies.push({
+        name: dependency.declaredName,
+        manifestPath,
+        origin: dependency.source.kind,
+        ...dependency.versionSpec === void 0 ? {} : { versionSpec: dependency.versionSpec },
+        pinned: dependency.pinned,
+        ...identity.purl === void 0 ? {} : { purl: identity.purl },
+        searchable: identity.searchable,
+        ...identity.source === void 0 ? {} : { identitySource: identity.source }
+      });
+    }
+  }
+  return { dependencies, warnings };
 }
 
 // src/core/pipeline.ts

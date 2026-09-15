@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { captureFirmwareSnapshot } from "../firmware/snapshot.js";
 import { boardReadyVersion } from "../generated/version.js";
 import { dispatchNotifications, notificationPayloadFromResult } from "../notifiers/dispatch.js";
 import { registerBuiltInRules } from "../rules/_index.js";
 import { loadBomContext } from "../rules/bom/shared.js";
 import { captureFabricationSnapshot } from "../rules/fabrication-snapshot.js";
+import { captureFirmwareSnapshot } from "../rules/firmware-snapshot.js";
 import { globFiles } from "../util/glob.js";
 import { normalizePathInput } from "../util/path.js";
 import { VENDOR_OUTPUT_KINDS, VENDOR_OUTPUT_PATTERNS } from "../vendor/outputs.js";

@@ -1,3 +1,4 @@
+import { compareCodePoints } from "../util/strings.js";
 import type { IdfDependency } from "./idf-manifest.js";
 
 /**
@@ -156,6 +157,6 @@ export function summariseIdentities(dependencies: readonly IdfDependency[]): Ide
     total: dependencies.length,
     searchable,
     unidentified: unidentifiedNames.length,
-    unidentifiedNames: unidentifiedNames.sort((a, b) => a.localeCompare(b)),
+    unidentifiedNames: unidentifiedNames.sort(compareCodePoints),
   };
 }

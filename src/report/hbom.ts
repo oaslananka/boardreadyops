@@ -1,6 +1,6 @@
 import type { FabricationSnapshot } from "../core/diff/fabrication.js";
+import type { FirmwareDependencyRecord } from "../core/firmware.js";
 import type { RunResult } from "../core/result.js";
-import type { FirmwareDependencyRecord } from "../firmware/snapshot.js";
 import { assessComponentIdentity, summariseIndexedIdentifiers } from "./component-identity.js";
 
 interface CycloneDxOrganizationalEntity {
