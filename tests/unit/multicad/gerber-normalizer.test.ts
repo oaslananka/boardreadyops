@@ -86,4 +86,74 @@ M02*
     expect(result.capabilities.hasPlatedHoles).toBe(false);
     expect(result.warnings.some((w) => w.code === "MISSING_DRILL")).toBe(true);
   });
+
+  describe("drill content, once it is actually read", () => {
+    const nonPlatedOnly = [
+      "M48",
+      "METRIC,TZ,000.000",
+      "; #@! TF.FileFunction,NonPlated,1,2,NPTH",
+      "T01C3.200",
+      "%",
+      "T01",
+      "X5000Y5000",
+      "M30",
+    ].join("\n");
+
+    it("stops claiming plated holes for a bundle that declares only non-plated ones", () => {
+      const result = normalizeGerberStackup([
+        { filename: "board.GTL" },
+        { filename: "board.GBL" },
+        { filename: "board.drl", content: nonPlatedOnly },
+      ]);
+
+      // The filename says nothing -- no `-NPTH` suffix -- and the old rule was "any drill file at
+      // all means plated holes", so this bundle used to report plated holes it does not contain.
+      // The file itself says NonPlated, and the file wins.
+      expect(result.capabilities.hasPlatedHoles).toBe(false);
+      expect(result.capabilities.hasNonPlatedHoles).toBe(true);
+    });
+
+    it("returns the holes themselves rather than an empty array", () => {
+      const result = normalizeGerberStackup([
+        { filename: "board.GTL" },
+        { filename: "board.drl", content: nonPlatedOnly },
+      ]);
+
+      expect(result.drillHoles).toEqual([{ xMm: 5, yMm: 5, diameterMm: 3.2, plated: false }]);
+    });
+
+    it("keeps the filename reading when the file declares nothing", () => {
+      const silent = ["M48", "METRIC,TZ,000.000", "T01C0.300", "%", "T01", "X1000Y1000", "M30"].join("\n");
+      const result = normalizeGerberStackup([
+        { filename: "board.GTL" },
+        { filename: "board-PTH.drl", content: silent },
+        { filename: "board-NPTH.drl", content: silent },
+      ]);
+
+      // Neither file states plating, so the suffixes are all there is to go on. That is a fallback
+      // and the result says so, rather than presenting it as read from the files.
+      expect(result.capabilities.hasPlatedHoles).toBe(true);
+      expect(result.capabilities.hasNonPlatedHoles).toBe(true);
+      expect(result.warnings.some((w) => w.code === "excellon.assumed-plating")).toBe(true);
+    });
+
+    it("says when a drill file arrived with no content to read", () => {
+      const result = normalizeGerberStackup([{ filename: "board.GTL" }, { filename: "board.drl" }]);
+
+      expect(result.drillHoles).toEqual([]);
+      const unavailable = result.warnings.find((w) => w.code === "DRILL_CONTENT_UNAVAILABLE");
+      expect(unavailable?.message).toMatch(/rests on the filename/u);
+      // Behaviour for content-less bundles is unchanged: the filename is still the only source,
+      // and it still reports plated holes. What changed is that it now admits as much.
+      expect(result.capabilities.hasPlatedHoles).toBe(true);
+    });
+
+    it("carries the parser's own assumptions up into the stackup warnings", () => {
+      const noFormat = ["M48", "METRIC", "T01C0.400", "%", "T01", "X1000Y1000", "M30"].join("\n");
+      const result = normalizeGerberStackup([{ filename: "board.drl", content: noFormat }]);
+
+      // A coordinate whose format was guessed must not look measured by the time it reaches a rule.
+      expect(result.warnings.some((w) => w.code === "excellon.assumed-coordinate-format")).toBe(true);
+    });
+  });
 });
