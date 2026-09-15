@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.62.1](https://github.com/oaslananka/boardreadyops/compare/v1.62.0...v1.62.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **web:** say why a dashboard action failed, and typecheck the app that holds it ([#810](https://github.com/oaslananka/boardreadyops/issues/810)) ([74d5b2f](https://github.com/oaslananka/boardreadyops/commit/74d5b2f2377b4a4a6ce4bfe882926804260779a6)), closes [#800](https://github.com/oaslananka/boardreadyops/issues/800)
+
 ## [1.62.0](https://github.com/oaslananka/boardreadyops/compare/v1.61.0...v1.62.0) (2026-09-15)
 
 
