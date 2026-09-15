@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.54.0](https://github.com/oaslananka/boardreadyops/compare/v1.53.0...v1.54.0) (2026-09-15)
+
+
+### Features
+
+* **cloud:** tell a supply alert which boards it affects ([#781](https://github.com/oaslananka/boardreadyops/issues/781)) ([3a34443](https://github.com/oaslananka/boardreadyops/commit/3a344438c994fcfb3853bc6e60a8e7bcc2538e67))
+
 ## [1.53.0](https://github.com/oaslananka/boardreadyops/compare/v1.52.0...v1.53.0) (2026-09-15)
 
 
