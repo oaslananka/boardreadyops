@@ -4,6 +4,18 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.64.0](https://github.com/oaslananka/boardreadyops/compare/v1.63.0...v1.64.0) (2026-09-15)
+
+
+### Features
+
+* **report:** say that the SBOM's firmware scope is the repository, not a board ([#814](https://github.com/oaslananka/boardreadyops/issues/814)) ([7e2e373](https://github.com/oaslananka/boardreadyops/commit/7e2e373b80c1bb9699fa868e4e0c169dc39634cb)), closes [#798](https://github.com/oaslananka/boardreadyops/issues/798)
+
+
+### Bug Fixes
+
+* **cloud:** name the repository in an advisory notification, not its UUID ([#815](https://github.com/oaslananka/boardreadyops/issues/815)) ([27f64b6](https://github.com/oaslananka/boardreadyops/commit/27f64b6aa010f1c8580e97bdaf1eb4f113ce5300))
+
 ## [1.63.0](https://github.com/oaslananka/boardreadyops/compare/v1.62.1...v1.63.0) (2026-09-15)
 
 
