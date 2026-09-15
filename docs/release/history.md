@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.62.0](https://github.com/oaslananka/boardreadyops/compare/v1.61.0...v1.62.0) (2026-09-15)
+
+
+### Features
+
+* **cloud:** scan firmware identifiers on a timer, and count what was not looked at ([#808](https://github.com/oaslananka/boardreadyops/issues/808)) ([53772df](https://github.com/oaslananka/boardreadyops/commit/53772dfb1f6ce130c74d1f4b05d9fd3425729510)), closes [#755](https://github.com/oaslananka/boardreadyops/issues/755) [#804](https://github.com/oaslananka/boardreadyops/issues/804)
+
 ## [1.61.0](https://github.com/oaslananka/boardreadyops/compare/v1.60.1...v1.61.0) (2026-09-15)
 
 
