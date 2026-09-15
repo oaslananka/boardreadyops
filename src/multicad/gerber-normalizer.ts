@@ -7,6 +7,7 @@ import type {
   NormalizedLayer,
   ParserWarning,
 } from "@boardreadyops/contracts";
+import { parseExcellon } from "./excellon-parser.js";
 
 export interface BundleFileEntry {
   filename: string;
@@ -24,16 +25,15 @@ export interface NormalizedStackupResult {
 interface LayerAccumulation {
   layers: NormalizedLayer[];
   outlineContent: string | undefined;
-  hasPth: boolean;
-  hasNpth: boolean;
   copperLayerCount: number;
+  /** Every drill entry, with content where the caller supplied it. Plating is decided per file. */
+  drillFiles: { filename: string; content: string | undefined }[];
 }
 
 function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
   const layers: NormalizedLayer[] = [];
+  const drillFiles: { filename: string; content: string | undefined }[] = [];
   let outlineContent: string | undefined;
-  let hasPth = false;
-  let hasNpth = false;
   let copperLayerCount = 0;
 
   for (const entry of files) {
@@ -54,12 +54,13 @@ function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
     } else if (classification.role === "outline" && entry.content) {
       outlineContent = entry.content;
     } else if (classification.role === "drill") {
-      if (/-NPTH/i.test(cleanName)) hasNpth = true;
-      else hasPth = true;
+      // Plating is not decided here. `readDrillFiles` reads each file's own attributes and only
+      // falls back to the name for the ones that stay silent.
+      drillFiles.push({ filename: entry.filename, content: entry.content });
     }
   }
 
-  return { layers, outlineContent, hasPth, hasNpth, copperLayerCount };
+  return { layers, outlineContent, copperLayerCount, drillFiles };
 }
 
 function buildStackupWarnings(hasAnyDrill: boolean, hasOutlines: boolean): ParserWarning[] {
@@ -80,10 +81,13 @@ function buildStackupWarnings(hasAnyDrill: boolean, hasOutlines: boolean): Parse
 }
 
 export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStackupResult {
-  const { layers, outlineContent, hasPth, hasNpth, copperLayerCount } = accumulateLayers(files);
+  const { layers, outlineContent, copperLayerCount, drillFiles } = accumulateLayers(files);
   const hasAnyDrill = layers.some((l) => l.role === "drill");
   const hasOutlines = layers.some((l) => l.role === "outline");
   const warnings = buildStackupWarnings(hasAnyDrill, hasOutlines);
+  const drill = readDrillFiles(drillFiles);
+
+  warnings.push(...drill.warnings);
 
   // Extract board dimensions if outline content is present
   const boardDims = outlineContent ? extractDimensionsFromGerber(outlineContent) : {};
@@ -97,8 +101,12 @@ export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStac
 
   const capabilities: IngestionCapabilities = {
     hasGerberOutlines: hasOutlines,
-    hasPlatedHoles: hasPth || hasAnyDrill,
-    hasNonPlatedHoles: hasNpth,
+    // Read from the drill files' own plating attributes where they declare them, and only from
+    // the filename where they do not. The old rule was that any drill file at all
+    // counts as plated holes", which is true often enough to look right and wrong exactly when it
+    // matters: a bundle carrying only a non-plated set reported plated holes it does not have.
+    hasPlatedHoles: drill.hasPlated,
+    hasNonPlatedHoles: drill.hasNonPlated,
     hasBomMapping: false,
     hasCentroidPlacement: false,
     hasNetlistConnectivity: false,
@@ -108,10 +116,72 @@ export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStac
   return {
     board,
     layers,
-    drillHoles: [],
+    drillHoles: drill.holes,
     capabilities,
     warnings,
   };
+}
+
+type DrillReading = {
+  holes: NormalizedDrillHole[];
+  hasPlated: boolean;
+  hasNonPlated: boolean;
+  warnings: ParserWarning[];
+};
+
+/** What a filename alone suggests about plating, used only where the file itself is silent. */
+function platingFromFilename(filename: string): "plated" | "non-plated" {
+  return /-?NPTH/i.test(filename.replaceAll("\\", "/")) ? "non-plated" : "plated";
+}
+
+/**
+ * Parses every drill file in the bundle and decides what the package actually contains.
+ *
+ * The decision is made **per file**, which is the part worth being careful about. An earlier
+ * version computed the filename reading across the whole bundle and then OR-ed it with the
+ * declarations, so a file that explicitly said `NonPlated` was overruled by its own unsuffixed
+ * name -- the exact behaviour this change set out to remove, reintroduced one layer up. A file
+ * that declares its plating decides for itself; only a silent one falls back to its name.
+ */
+function readDrillFiles(files: readonly { filename: string; content: string | undefined }[]): DrillReading {
+  const holes: NormalizedDrillHole[] = [];
+  const warnings: ParserWarning[] = [];
+  let hasPlated = false;
+  let hasNonPlated = false;
+  let filesWithoutContent = 0;
+
+  for (const file of files) {
+    if (file.content === undefined) {
+      filesWithoutContent += 1;
+      if (platingFromFilename(file.filename) === "non-plated") hasNonPlated = true;
+      else hasPlated = true;
+      continue;
+    }
+
+    const parsed = parseExcellon(file.content, file.filename);
+    holes.push(...parsed.holes);
+    warnings.push(...parsed.warnings);
+
+    if (parsed.platedEvidence === "declared") {
+      for (const tool of parsed.tools) {
+        if (tool.plated === true) hasPlated = true;
+        if (tool.plated === false) hasNonPlated = true;
+      }
+      continue;
+    }
+
+    if (platingFromFilename(file.filename) === "non-plated") hasNonPlated = true;
+    else hasPlated = true;
+  }
+
+  if (filesWithoutContent > 0) {
+    warnings.push({
+      code: "DRILL_CONTENT_UNAVAILABLE",
+      message: `${filesWithoutContent} drill file(s) were listed without content, so their holes and plating could not be read. Anything said about them rests on the filename.`,
+    });
+  }
+
+  return { holes, hasPlated, hasNonPlated, warnings };
 }
 
 interface LayerClassification {
