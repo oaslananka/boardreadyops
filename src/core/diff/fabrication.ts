@@ -1,3 +1,4 @@
+import { compareCodePoints } from "../../util/strings.js";
 import { type Finding, severityRankValue } from "../findings.js";
 
 interface FabricationBomEntry {
@@ -95,7 +96,7 @@ export function diffFabrication(
 function diffBom(previous: FabricationBomEntry[], current: FabricationBomEntry[], maxRows: number): FabricationBomDiff {
   const previousRows = new Map(previous.map((row) => [bomRowKey(row), row]));
   const currentRows = new Map(current.map((row) => [bomRowKey(row), row]));
-  const rowKeys = [...new Set([...previousRows.keys(), ...currentRows.keys()])].sort((a, b) => a.localeCompare(b));
+  const rowKeys = [...new Set([...previousRows.keys(), ...currentRows.keys()])].sort(compareCodePoints);
   const rows = rowKeys.map((rowKey) => {
     const prior = previousRows.get(rowKey);
     const next = currentRows.get(rowKey);
@@ -122,7 +123,7 @@ function diffOutputs(previous: FabricationOutput[], current: FabricationOutput[]
   const previousOutputs = new Map(previous.map((output) => [output.kind, output]));
   const currentOutputs = new Map(current.map((output) => [output.kind, output]));
   return [...new Set([...previousOutputs.keys(), ...currentOutputs.keys()])]
-    .sort((a, b) => a.localeCompare(b))
+    .sort(compareCodePoints)
     .map((kind) => outputDiff(kind, previousOutputs.get(kind), currentOutputs.get(kind)));
 }
 
@@ -184,7 +185,7 @@ function bomFingerprint(row: FabricationBomEntry): string {
 
 function compareBomDiffRows(left: FabricationBomDiffRow, right: FabricationBomDiffRow): number {
   const signalOrder = Number(left.status === "unchanged") - Number(right.status === "unchanged");
-  return signalOrder || left.reference.localeCompare(right.reference);
+  return signalOrder || compareCodePoints(left.reference, right.reference);
 }
 
 function outputDiff(
