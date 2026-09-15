@@ -19,6 +19,7 @@ function scan(overrides: Partial<DueFirmwareScan> = {}): DueFirmwareScan {
   return {
     repositoryId: "repo-1",
     installationId: "install-1",
+    repositoryFullName: "acme/gateway",
     snapshotId: "snap-1",
     commitSha: "abc123",
     scannable: [{ name: "idf", manifestPath: "fw/idf_component.yml", cpe: "cpe:2.3:a:espressif:esp-idf:5.2.1:*" }],

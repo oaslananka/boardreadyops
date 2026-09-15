@@ -230,6 +230,7 @@ describe("firmware snapshot store: advisory scan scheduling", () => {
       {
         repository_id: repositoryId,
         installation_id: "install-1",
+        repository_full_name: "acme/gateway",
         snapshot_id: "snap-1",
         commit_sha: "abc123",
         dependency_count: 40,
@@ -251,6 +252,7 @@ describe("firmware snapshot store: advisory scan scheduling", () => {
       {
         repositoryId,
         installationId: "install-1",
+        repositoryFullName: "acme/gateway",
         snapshotId: "snap-1",
         commitSha: "abc123",
         dependencyCount: 40,
@@ -267,6 +269,7 @@ describe("firmware snapshot store: advisory scan scheduling", () => {
       {
         repository_id: repositoryId,
         installation_id: "install-1",
+        repository_full_name: "acme/gateway",
         snapshot_id: "snap-1",
         commit_sha: "abc",
         dependency_count: 2,
@@ -282,12 +285,41 @@ describe("firmware snapshot store: advisory scan scheduling", () => {
     expect((await store.claimDueScans(new Date(), 5))[0]?.scannable.map((entry) => entry.name)).toEqual(["ok"]);
   });
 
+  it("selects the readable repository name, not just its id", async () => {
+    const { store, query } = executor([]);
+
+    await store.claimDueScans(new Date(), 5);
+
+    const [sql] = query.mock.calls[0] as unknown as [string, unknown[]];
+    // A notification showing a UUID where the contract promises acme/gateway is a defect the
+    // supply path already made once. The join for installation_id is already here, so the
+    // readable name costs nothing.
+    expect(sql).toContain("repositories.owner || '/' || repositories.name as repository_full_name");
+  });
+
+  it("skips a claim with no readable repository name rather than falling back to the id", async () => {
+    const { store } = executor([
+      {
+        repository_id: repositoryId,
+        installation_id: "install-1",
+        snapshot_id: "snap-1",
+        commit_sha: "abc",
+        dependency_count: 1,
+        scannable: [],
+      },
+    ]);
+
+    // Better to scan nothing than to queue a message naming a raw identifier.
+    expect(await store.claimDueScans(new Date(), 5)).toEqual([]);
+  });
+
   it("skips a claimed row missing the columns it needs", async () => {
     const { store } = executor([
       { repository_id: repositoryId, snapshot_id: "snap-1", commit_sha: "abc", scannable: [] },
       {
         repository_id: repositoryId,
         installation_id: "install-1",
+        repository_full_name: "acme/gateway",
         snapshot_id: "snap-2",
         commit_sha: "def",
         dependency_count: 0,

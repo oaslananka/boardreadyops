@@ -32,6 +32,9 @@ export type ScannableDependency = {
 export type DueFirmwareScan = {
   repositoryId: string;
   installationId: string;
+  /** `owner/name`. A notification that shows a UUID instead is a defect the supply path already
+   * made once, so the pass carries the readable name rather than leaving the caller to resolve it. */
+  repositoryFullName: string;
   snapshotId: string;
   commitSha: string;
   scannable: readonly ScannableDependency[];
