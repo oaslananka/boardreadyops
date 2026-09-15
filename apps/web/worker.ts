@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { hostname } from "node:os";
+import { createAdvisoryProvider } from "@boardreadyops/cloud-core/advisory-lookup";
 import { configuredCredentialCipher } from "@boardreadyops/cloud-core/credential-encryption";
+import { constantAdvisoryProvider, runFirmwareAdvisoryPass } from "@boardreadyops/cloud-core/firmware-advisory-watch";
 import { type RiskyComponentFinding, runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
 import { createSqlAffectedBoardsStore } from "@boardreadyops/db/affected-boards-store";
 import {
@@ -19,6 +21,7 @@ import {
   type ClaimedControlPlaneOutboxEffect,
   createSqlControlPlaneOutboxStore,
 } from "@boardreadyops/db/control-plane-outbox-store";
+import { createSqlFirmwareSnapshotStore } from "@boardreadyops/db/firmware-snapshot-store";
 import { createSqlInstallationCredentialStore } from "@boardreadyops/db/installation-credential-store";
 import { createSqlNotificationStore } from "@boardreadyops/db/notification-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
@@ -160,6 +163,18 @@ const supplyWatchIntervalMilliseconds = integerEnvironment(
   86_400_000,
 );
 const supplyWatchBoardsPerPass = integerEnvironment("BOARDREADYOPS_SUPPLY_WATCH_BOARDS_PER_PASS", 50, 1, 500);
+const firmwareAdvisoryIntervalMilliseconds = integerEnvironment(
+  "BOARDREADYOPS_FIRMWARE_ADVISORY_INTERVAL_MS",
+  3_600_000,
+  60_000,
+  86_400_000,
+);
+const firmwareAdvisoryRepositoriesPerPass = integerEnvironment(
+  "BOARDREADYOPS_FIRMWARE_ADVISORY_REPOSITORIES_PER_PASS",
+  25,
+  1,
+  200,
+);
 // Notifications are time-sensitive in a way the other maintenance passes are not: a blocked
 // board someone is waiting on is worth a minute, not an hour.
 const notificationDeliveryIntervalMilliseconds = integerEnvironment(
@@ -198,6 +213,26 @@ const retentionMaintenance = createSqlRetentionMaintenanceStore(executor, {
 });
 const operations = createSqlControlPlaneOperationsStore(executor);
 const supplyWatchStore = createSqlBoardSupplyWatchStore(executor);
+const firmwareSnapshotStore = createSqlFirmwareSnapshotStore(executor);
+/**
+ * Advisory lookups are off unless the operator opts in.
+ *
+ * Not a default, deliberately. An OSV query by PURL tells osv.dev the component list of an
+ * unreleased board, and ADR-0015 promises air-gapped operation with no external SaaS dependency
+ * to a tier that is sold on exactly that. So an unconfigured deployment resolves to undefined and
+ * every due repository completes as no_provider, recording honestly that nothing looked rather
+ * than reporting a board clean. See the constraint recorded on #755.
+ *
+ * BOARDREADYOPS_NVD_API_KEY is separate from enablement: without it NVD's unauthenticated rate
+ * limit shows up as `unavailable`, which is an honest outcome but a useless one at any scale.
+ */
+const resolveAdvisoryProvider = constantAdvisoryProvider(
+  process.env.BOARDREADYOPS_ADVISORY_LOOKUP_ENABLED === "true"
+    ? createAdvisoryProvider(
+        process.env.BOARDREADYOPS_NVD_API_KEY ? { nvdApiKey: process.env.BOARDREADYOPS_NVD_API_KEY } : {},
+      )
+    : undefined,
+);
 const affectedBoardsStore = createSqlAffectedBoardsStore(executor);
 const notifications = createSqlNotificationStore(executor);
 const notificationWorker = createNotificationWorkerDependencies(executor, workerId);
@@ -288,6 +323,7 @@ let lastSuccessfulRetentionCleanupAt: string | undefined;
 let nextMetricsAt = 0;
 let nextRetentionCleanupAt = 0;
 let nextSupplyWatchAt = 0;
+let nextFirmwareAdvisoryAt = 0;
 let nextNotificationDeliveryAt = 0;
 let nextNotificationScanAt = 0;
 let nextLifecycleReconciliationDetectionAt = 0;
@@ -526,6 +562,39 @@ async function runSupplyWatch(currentTime: number): Promise<void> {
     }
   } catch (error) {
     log("warn", "worker.supply_watch_failed", { errorClass: errorClass(error) });
+  }
+}
+
+/**
+ * Asks the advisory databases about the firmware identifiers each repository reported.
+ *
+ * Wired now with the provider off by default, following the precedent runSupplyWatch set: the
+ * schedule exists, every due repository completes as no_provider, and enabling lookups later is a
+ * configuration change rather than a control-plane change. The counters are logged even when
+ * nothing was queried, because the components nobody can look up are the standing gap and a pass
+ * that reported only advisories would hide it.
+ */
+async function runFirmwareAdvisoryWatch(currentTime: number): Promise<void> {
+  if (currentTime < nextFirmwareAdvisoryAt) return;
+  nextFirmwareAdvisoryAt = currentTime + firmwareAdvisoryIntervalMilliseconds;
+
+  try {
+    const report = await runFirmwareAdvisoryPass(
+      firmwareSnapshotStore,
+      resolveAdvisoryProvider,
+      new Date(currentTime),
+      {
+        intervalMs: firmwareAdvisoryIntervalMilliseconds,
+        maximumRepositoriesPerRun: firmwareAdvisoryRepositoriesPerPass,
+        onError: (repositoryId, error) =>
+          log("warn", "worker.firmware_advisory_repository_failed", { repositoryId, errorClass: errorClass(error) }),
+      },
+    );
+    if (report.repositoriesScanned > 0 || report.failures > 0) {
+      log("info", "worker.firmware_advisory_pass", { ...report });
+    }
+  } catch (error) {
+    log("warn", "worker.firmware_advisory_failed", { errorClass: errorClass(error) });
   }
 }
 
@@ -1011,6 +1080,7 @@ async function runMaintenanceLoop(): Promise<void> {
     await detectWorkflowReconciliationCandidates(currentTime);
     await detectCheckRunReconciliationCandidates(currentTime);
     await runSupplyWatch(currentTime);
+    await runFirmwareAdvisoryWatch(currentTime);
     await scanForTimeBasedNotifications(currentTime);
     await deliverNotifications(currentTime);
     await purgeExpiredRetentionData(currentTime);
