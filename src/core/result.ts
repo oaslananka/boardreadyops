@@ -7,7 +7,7 @@ import type { Finding, FindingSummary } from "./findings.js";
 import type { LoadedPlugin } from "./plugin-loader.js";
 import type { PolicyEvaluation } from "./policy.js";
 import type { ReadinessScore } from "./readiness.js";
-import type { RuleCategorySummary } from "./rule-registry.js";
+import type { FindingEvidenceSummary, RuleCategorySummary } from "./rule-registry.js";
 import type { WaiverStatus } from "./waivers.js";
 
 /**
@@ -66,6 +66,8 @@ export interface RunResult {
   releaseMode?: ReleaseMode | undefined;
   summary: FindingSummary;
   categoryBreakdown?: RuleCategorySummary[] | undefined;
+  /** What the findings rest on: measured versus inferred, and which inferences can block. */
+  evidence?: FindingEvidenceSummary | undefined;
   readiness?: ReadinessScore | undefined;
   bomRisk?: BomRiskSummary | undefined;
   policy?: PolicyEvaluation | undefined;
