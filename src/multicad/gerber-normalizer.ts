@@ -48,9 +48,14 @@ function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
   for (const entry of files) {
     const cleanName = entry.filename.replaceAll("\\", "/");
     const classification = classifyLayer(cleanName);
-    if (!classification) continue;
+    // A file whose name means nothing to us may still say what it is. Skipping on the filename
+    // alone -- which is what this did -- made the content-first reading conditional on the
+    // filename reading having already succeeded, so a layer under an unrecognised name was
+    // dropped however clearly it declared itself. That is the same authority-of-the-filename
+    // problem one level up.
+    if (!classification && !declaresIdentity(entry.content)) continue;
 
-    if (classification.role === "drill") {
+    if (classification?.role === "drill") {
       layers.push({ ...toLayer(classification, entry.filename) });
       // Plating is not decided here. `readDrillFiles` reads each file's own attributes and only
       // falls back to the name for the ones that stay silent.
@@ -64,12 +69,14 @@ function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
     const declared = parsed?.identity;
     if (declared) declaredIdentityCount += 1;
 
-    const role = declared?.role ?? classification.role;
+    const role = declared?.role ?? classification?.role;
+    // One of the two must have produced something: the guard above skipped the entry otherwise.
+    if (role === undefined) continue;
     const resolved: LayerClassification = declared
       ? { name: nameForRole(role, declared.side, declared.index), role, side: declared.side, index: declared.index }
-      : classification;
+      : (classification as LayerClassification);
 
-    if (declared && declared.role !== classification.role) {
+    if (declared && classification && declared.role !== classification.role) {
       warnings.push({
         code: "LAYER_ROLE_FROM_CONTENT",
         message: `${entry.filename} declares TF.FileFunction "${parsed?.fileFunction}", which is a ${declared.role} layer, while its name suggests ${classification.role}. The file's own declaration is used.`,
@@ -90,6 +97,11 @@ function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
   }
 
   return { layers, outline, copperLayerCount, drillFiles, declaredIdentityCount, warnings };
+}
+
+/** Whether a Gerber file states its own function, so an unrecognised filename is not fatal. */
+function declaresIdentity(content: string | undefined): boolean {
+  return content !== undefined && parseGerber(content).identity !== undefined;
 }
 
 function toLayer(classification: LayerClassification, filename: string): NormalizedLayer {

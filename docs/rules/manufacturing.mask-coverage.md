@@ -1,28 +1,28 @@
 ---
-id: manufacturing.drill-coverage
+id: manufacturing.mask-coverage
 severity-default: medium
 applies-to:
   - pcb
 config-keys:
-  - rules.manufacturing.drill-coverage.enabled
+  - rules.manufacturing.mask-coverage.enabled
 ---
 
-# manufacturing.drill-coverage
+# manufacturing.mask-coverage
 
 ## What It Checks
 
-Compares PCB drill sizes with the tool diameters declared in the Excellon outputs.
+Checks that each outer copper side in the Gerber package has a matching solder mask layer.
 
 ## When It Fires
 
-Fires when a PCB drill size has no matching tool diameter in the Excellon outputs.
+Fires when the Gerber package has copper on an outer side with no solder mask layer for that side. Inner copper is not checked: mask applies to the outer faces.
 
 ## Configuration Example
 
 ```yaml
 version: 1
 rules:
-  manufacturing.drill-coverage:
+  manufacturing.mask-coverage:
     enabled: true
     severity: medium
 ```
@@ -30,7 +30,7 @@ rules:
 ## JSON Finding Details Shape
 
 ```text
-{ drillSize, nearestToolMm, toolsFound }
+{ side, copperLayers, maskLayers }
 ```
 
 ## Report Context
