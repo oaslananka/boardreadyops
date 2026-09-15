@@ -26,7 +26,16 @@ describe("report formats", () => {
     const result = sampleResult();
     result.firmware = {
       dependencies: [
-        { name: "idf", manifestPath: "fw/idf_component.yml", origin: "framework", pinned: false, searchable: false },
+        {
+          name: "idf",
+          manifestPath: "fw/idf_component.yml",
+          origin: "framework",
+          versionSpec: "5.2.1",
+          pinned: true,
+          cpe: "cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*",
+          searchable: true,
+          identitySource: "NVD CPE dictionary (173 entries, majors 0-6.1)",
+        },
         {
           name: "mcuboot",
           manifestPath: "fw/idf_component.yml",

@@ -41,6 +41,7 @@ export async function captureFirmwareSnapshot(root: string): Promise<FirmwareSna
         ...(dependency.versionSpec === undefined ? {} : { versionSpec: dependency.versionSpec }),
         pinned: dependency.pinned,
         ...(identity.purl === undefined ? {} : { purl: identity.purl }),
+        ...(identity.cpe === undefined ? {} : { cpe: identity.cpe }),
         searchable: identity.searchable,
         ...(identity.source === undefined ? {} : { identitySource: identity.source }),
       });

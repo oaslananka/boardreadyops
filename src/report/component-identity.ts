@@ -81,14 +81,42 @@ export function assessComponentIdentity(purl: string): ComponentIdentityAssessme
   };
 }
 
-/** Counts how many of a document's components carry an identifier a database would match. */
-export function summariseIndexedIdentifiers(purls: readonly (string | undefined)[]): {
+/**
+ * Whether a CPE names a version a database can be queried for.
+ *
+ * A CPE with the version field left as `*` matches every release of the product. Measured against
+ * NVD, that returns 31 CVEs for esp-idf where the exact version 5.2.1 returns 2 and 6.1 returns 0 --
+ * so a wildcard is not a weaker answer, it is a wrong one. Only version-exact counts. See #785.
+ */
+function cpeNamesAVersion(cpe: string): boolean {
+  const fields = cpe.trim().split(":");
+  // cpe:2.3:part:vendor:product:version:...  -- version is field index 5.
+  if (fields.length < 6 || fields[0]?.toLowerCase() !== "cpe" || fields[1] !== "2.3") return false;
+  const version = fields[5];
+  return version !== undefined && version !== "*" && version !== "-" && version !== "";
+}
+
+/** One component's identifiers, as the SBOM carries them. */
+export type ComponentIdentifiers = {
+  purl?: string | undefined;
+  cpe?: string | undefined;
+};
+
+/**
+ * Counts how many of a document's components carry an identifier a database would match.
+ *
+ * Either identifier counts, and a component carrying both counts once: the question is whether
+ * anything could be searched for it, not how many ways.
+ */
+export function summariseIndexedIdentifiers(components: readonly ComponentIdentifiers[]): {
   total: number;
   indexed: number;
 } {
   let indexed = 0;
-  for (const purl of purls) {
-    if (purl !== undefined && assessComponentIdentity(purl).vulnerabilityIndexed) indexed += 1;
+  for (const component of components) {
+    const byPurl = component.purl !== undefined && assessComponentIdentity(component.purl).vulnerabilityIndexed;
+    const byCpe = component.cpe !== undefined && cpeNamesAVersion(component.cpe);
+    if (byPurl || byCpe) indexed += 1;
   }
-  return { total: purls.length, indexed };
+  return { total: components.length, indexed };
 }

@@ -48,7 +48,7 @@ var boardReadyVersion;
 var init_version = __esm({
   "src/generated/version.ts"() {
     "use strict";
-    boardReadyVersion = "1.58.0";
+    boardReadyVersion = "1.59.0";
   }
 });
 
@@ -46863,8 +46863,34 @@ function candidateKeys(dependency) {
   if (source.kind === "git") return [source.url];
   return [];
 }
+var frameworkCpe = {
+  vendor: "espressif",
+  product: "esp-idf",
+  source: "NVD CPE dictionary (173 entries, majors 0-6.1)"
+};
+function exactFrameworkVersion(versionSpec) {
+  const trimmed = versionSpec.trim().replace(/^v/iu, "");
+  if (!trimmed || /[\^~><!*,|\s]/u.test(trimmed)) return void 0;
+  if (/(^|\.)x($|\.)/iu.test(trimmed)) return void 0;
+  return /^\d+(\.\d+)*([.-][0-9A-Za-z.-]+)?$/u.test(trimmed) ? trimmed : void 0;
+}
+function cpeForFramework(version2) {
+  return `cpe:2.3:a:${frameworkCpe.vendor}:${frameworkCpe.product}:${version2}:*:*:*:*:*:*:*`;
+}
 function resolveComponentIdentity(dependency) {
-  if (dependency.source.kind === "local" || dependency.source.kind === "framework") {
+  if (dependency.source.kind === "framework") {
+    const version2 = dependency.versionSpec === void 0 ? void 0 : exactFrameworkVersion(dependency.versionSpec);
+    if (version2 === void 0) {
+      return { evidence: "unidentified", searchable: false };
+    }
+    return {
+      cpe: cpeForFramework(version2),
+      evidence: "reported",
+      source: frameworkCpe.source,
+      searchable: true
+    };
+  }
+  if (dependency.source.kind === "local") {
     return { evidence: "unidentified", searchable: false };
   }
   const keys = candidateKeys(dependency).map(normalise);
@@ -50256,6 +50282,7 @@ async function captureFirmwareSnapshot(root) {
         ...dependency.versionSpec === void 0 ? {} : { versionSpec: dependency.versionSpec },
         pinned: dependency.pinned,
         ...identity.purl === void 0 ? {} : { purl: identity.purl },
+        ...identity.cpe === void 0 ? {} : { cpe: identity.cpe },
         searchable: identity.searchable,
         ...identity.source === void 0 ? {} : { identitySource: identity.source }
       });
@@ -59765,12 +59792,20 @@ function assessComponentIdentity(purl) {
     confidence: 0.5
   };
 }
-function summariseIndexedIdentifiers(purls) {
+function cpeNamesAVersion(cpe) {
+  const fields = cpe.trim().split(":");
+  if (fields.length < 6 || fields[0]?.toLowerCase() !== "cpe" || fields[1] !== "2.3") return false;
+  const version2 = fields[5];
+  return version2 !== void 0 && version2 !== "*" && version2 !== "-" && version2 !== "";
+}
+function summariseIndexedIdentifiers(components) {
   let indexed = 0;
-  for (const purl of purls) {
-    if (purl !== void 0 && assessComponentIdentity(purl).vulnerabilityIndexed) indexed += 1;
+  for (const component of components) {
+    const byPurl = component.purl !== void 0 && assessComponentIdentity(component.purl).vulnerabilityIndexed;
+    const byCpe = component.cpe !== void 0 && cpeNamesAVersion(component.cpe);
+    if (byPurl || byCpe) indexed += 1;
   }
-  return { total: purls.length, indexed };
+  return { total: components.length, indexed };
 }
 
 // src/report/hbom.ts
@@ -59858,9 +59893,10 @@ function componentFromBomRow(row) {
   return component;
 }
 function metadataProperties(components) {
-  const summary = summariseIndexedIdentifiers(components.map((component) => component.purl));
+  const identifiers = (component) => ({ purl: component.purl, cpe: component.cpe });
+  const summary = summariseIndexedIdentifiers(components.map(identifiers));
   const firmware = components.filter((component) => componentClassOf(component) === "firmware");
-  const firmwareSummary = summariseIndexedIdentifiers(firmware.map((component) => component.purl));
+  const firmwareSummary = summariseIndexedIdentifiers(firmware.map(identifiers));
   return [
     // Both classes now, so the document says which it contains rather than asserting "hardware".
     { name: "boardreadyops:componentClass", value: firmware.length > 0 ? "hardware+firmware" : "hardware" },
@@ -59893,20 +59929,27 @@ function componentFromFirmwareDependency(dependency) {
   if (dependency.versionSpec) {
     component.version = dependency.versionSpec;
   }
+  const identity = [];
   if (dependency.purl) {
     component.purl = dependency.purl;
-    component.evidence = {
-      identity: [
-        {
-          field: "purl",
-          confidence: 0.5,
-          concludedValue: dependency.purl,
-          methods: [{ technique: "manifest-analysis", confidence: 0.5, value: dependency.purl }]
-        }
-      ]
-    };
+    identity.push(identityEvidence("purl", dependency.purl));
+  }
+  if (dependency.cpe) {
+    component.cpe = dependency.cpe;
+    identity.push(identityEvidence("cpe", dependency.cpe));
+  }
+  if (identity.length > 0) {
+    component.evidence = { identity };
   }
   return component;
+}
+function identityEvidence(field, value) {
+  return {
+    field,
+    confidence: 0.5,
+    concludedValue: value,
+    methods: [{ technique: "manifest-analysis", confidence: 0.5, value }]
+  };
 }
 function firmwareComponentRef(dependency) {
   return ["boardreadyops:firmware", sanitizeRef(dependency.manifestPath), sanitizeRef(dependency.name)].join(":");
@@ -60486,6 +60529,9 @@ var findings_schema_default = {
                 type: "boolean"
               },
               purl: {
+                type: "string"
+              },
+              cpe: {
                 type: "string"
               },
               searchable: {
@@ -61473,6 +61519,9 @@ var hbom_schema_default = {
         purl: {
           type: "string"
         },
+        cpe: {
+          type: "string"
+        },
         externalReferences: {
           type: "array",
           items: {
@@ -61510,7 +61559,7 @@ var hbom_schema_default = {
       required: ["field", "confidence", "concludedValue", "methods"],
       properties: {
         field: {
-          const: "purl"
+          enum: ["purl", "cpe"]
         },
         confidence: {
           type: "number",

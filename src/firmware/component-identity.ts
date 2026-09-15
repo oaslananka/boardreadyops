@@ -44,6 +44,13 @@ type IdentityEvidence =
 export type ComponentIdentity = {
   /** A PURL whose type a vulnerability database indexes, or undefined when none is known. */
   purl?: string | undefined;
+  /**
+   * A CPE 2.3 name NVD indexes, or undefined when none can be stated.
+   *
+   * Only ever version-exact. See `frameworkCpe` for why a version-wildcard CPE is worse than no
+   * CPE at all.
+   */
+  cpe?: string | undefined;
   evidence: IdentityEvidence;
   /** Where the mapping came from: an advisory id, a tool, a document. */
   source?: string | undefined;
@@ -102,14 +109,71 @@ function candidateKeys(dependency: IdfDependency): string[] {
 }
 
 /**
+ * The ESP-IDF framework in NVD's dictionary.
+ *
+ * Measured against the live NVD APIs: 173 CPE entries exist for `cpe:2.3:a:espressif:esp-idf`,
+ * spanning majors 0 through 6.1, and they carry real advisories -- 5.2.1 has CVE-2025-55297 (HIGH)
+ * and CVE-2025-66409 (CRITICAL).
+ *
+ * The version must be exact. Querying NVD with the version left open returns **31** CVEs, against
+ * 2 for 5.2.1, 5 for 5.5.4 and 0 for 6.1. So a version-wildcard CPE over-reports by six to fifteen
+ * times, and on a current release reports 31 advisories where there are none.
+ *
+ * That is the mirror image of the false clean bill this module was written to prevent, and it is
+ * the worse of the two: a reader can check a false alarm and find it wrong. Hence no CPE at all
+ * unless the manifest pinned one version.
+ */
+const frameworkCpe = {
+  vendor: "espressif",
+  product: "esp-idf",
+  source: "NVD CPE dictionary (173 entries, majors 0-6.1)",
+} as const;
+
+/**
+ * The exact framework version a spec names, or undefined when it names more than one.
+ *
+ * Deliberately more permissive than `isPinned` in one way only: a leading `v` is accepted. That
+ * function has to stay conservative because for a git dependency it cannot tell the tag `v1.2.3`
+ * from a branch of the same name, and a branch moves. The `idf` requirement is a semver expression
+ * rather than a git ref, so there is no such ambiguity here.
+ */
+function exactFrameworkVersion(versionSpec: string): string | undefined {
+  const trimmed = versionSpec.trim().replace(/^v/iu, "");
+  if (!trimmed || /[\^~><!*,|\s]/u.test(trimmed)) return undefined;
+  if (/(^|\.)x($|\.)/iu.test(trimmed)) return undefined;
+  return /^\d+(\.\d+)*([.-][0-9A-Za-z.-]+)?$/u.test(trimmed) ? trimmed : undefined;
+}
+
+function cpeForFramework(version: string): string {
+  // CPE 2.3 formatted string: cpe:2.3:part:vendor:product:version:update:edition:lang:sw_edition:
+  // target_sw:target_hw:other.
+  return `cpe:2.3:a:${frameworkCpe.vendor}:${frameworkCpe.product}:${version}:*:*:*:*:*:*:*`;
+}
+
+/**
  * The identifier for one dependency.
  *
- * Local and framework dependencies are never looked up. Local source is first-party code, not a
- * third-party component with advisories; and the framework is a different kind of thing from a
- * component, tracked by CPE rather than PURL, which this does not yet cover.
+ * Local dependencies are never looked up: first-party source in the tree is not a third-party
+ * component with advisories. The framework is looked up by CPE rather than PURL, and only when the
+ * manifest pinned an exact version.
  */
 export function resolveComponentIdentity(dependency: IdfDependency): ComponentIdentity {
-  if (dependency.source.kind === "local" || dependency.source.kind === "framework") {
+  if (dependency.source.kind === "framework") {
+    const version = dependency.versionSpec === undefined ? undefined : exactFrameworkVersion(dependency.versionSpec);
+    if (version === undefined) {
+      // A range cannot be looked up. Saying so beats reporting every advisory the framework has
+      // ever had against a version that may carry none.
+      return { evidence: "unidentified", searchable: false };
+    }
+    return {
+      cpe: cpeForFramework(version),
+      evidence: "reported",
+      source: frameworkCpe.source,
+      searchable: true,
+    };
+  }
+
+  if (dependency.source.kind === "local") {
     return { evidence: "unidentified", searchable: false };
   }
 

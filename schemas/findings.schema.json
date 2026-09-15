@@ -121,6 +121,9 @@
               "purl": {
                 "type": "string"
               },
+              "cpe": {
+                "type": "string"
+              },
               "searchable": {
                 "type": "boolean"
               },
