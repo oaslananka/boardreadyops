@@ -33,7 +33,7 @@ node:
   current: ["26"]
   tested:
     "22": "22.23.2"
-    "24": "24.20.0"
+    "24": "24.21.0"
   policy:
     "22": "Maintenance LTS. Supported from 22.14.0 upward for existing users and tested in unit and KiCad integration jobs."
     "24": "Active LTS and recommended runtime. Used by default CI jobs, binary builds, GitHub Action runtime, and KiCad 10.0 integration jobs."
