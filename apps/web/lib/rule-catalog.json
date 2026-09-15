@@ -255,6 +255,20 @@
       "vendorDependence": "none"
     },
     {
+      "id": "firmware.dependency-identification",
+      "title": "Firmware dependencies that cannot be vulnerability-checked",
+      "description": "Reports how many ESP-IDF dependencies have an identifier a vulnerability database indexes.",
+      "rationale": "A component listed in an SBOM with no advisories found, when it was never identifiable enough to look up, is a false clean bill.",
+      "defaultSeverity": "info",
+      "category": "sourcing",
+      "appliesTo": ["project"],
+      "configKeys": ["rules.firmware.dependency-identification.enabled"],
+      "tags": ["firmware", "sbom", "supply-chain"],
+      "evidenceType": "exact",
+      "fixability": "none",
+      "vendorDependence": "none"
+    },
+    {
       "id": "firmware.esp-idf-pin-contract",
       "title": "ESP-IDF firmware pin contract does not match hardware pinmap",
       "description": "Checks an ESP-IDF firmware pin contract YAML against the BoardReadyOps pinmap.",
