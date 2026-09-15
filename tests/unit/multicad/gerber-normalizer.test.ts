@@ -156,4 +156,70 @@ M02*
       expect(result.warnings.some((w) => w.code === "excellon.assumed-coordinate-format")).toBe(true);
     });
   });
+
+  describe("gerber content, once it is actually read", () => {
+    const outlineWith = (closed: boolean): string =>
+      [
+        "%FSLAX36Y36*%",
+        "%MOMM*%",
+        "%TF.FileFunction,Profile,NP*%",
+        "X0Y0D02*",
+        "X40000000Y0D01*",
+        "X40000000Y30000000D01*",
+        "X0Y30000000D01*",
+        ...(closed ? ["X0Y0D01*"] : []),
+        "M02*",
+      ].join("\n");
+
+    it("believes the file over its own name when the two disagree", () => {
+      // Named as a top solder mask, declares itself inner copper. Before anything opened the file
+      // this was a mask layer, and the stackup's copper count was short by one.
+      const misnamed = ["%FSLAX36Y36*%", "%MOMM*%", "%TF.FileFunction,Copper,L2,Inr*%", "M02*"].join("\n");
+      const result = normalizeGerberStackup([
+        {
+          filename: "board.GTL",
+          content: ["%FSLAX36Y36*%", "%MOMM*%", "%TF.FileFunction,Copper,L1,Top*%", "M02*"].join("\n"),
+        },
+        { filename: "board.GTS", content: misnamed },
+      ]);
+
+      const layer = result.layers.find((entry) => entry.filename === "board.GTS");
+      expect(layer).toMatchObject({ role: "copper", side: "inner", index: 2 });
+      expect(result.board.layerCount).toBe(2);
+      const disagreement = result.warnings.find((entry) => entry.code === "LAYER_ROLE_FROM_CONTENT");
+      expect(disagreement?.message).toMatch(/The file's own declaration is used/u);
+    });
+
+    it("keeps the filename reading for a file that declares nothing", () => {
+      const plain = ["%FSLAX36Y36*%", "%MOMM*%", "D10*", "X1000000Y1000000D03*", "M02*"].join("\n");
+      const result = normalizeGerberStackup([{ filename: "board.GTS", content: plain }]);
+
+      expect(result.layers[0]).toMatchObject({ role: "soldermask", side: "top" });
+      expect(result.warnings.some((entry) => entry.code === "LAYER_ROLE_FROM_CONTENT")).toBe(false);
+    });
+
+    it("measures the board from the outline's own artwork", () => {
+      const result = normalizeGerberStackup([{ filename: "board.gko", content: outlineWith(true) }]);
+
+      expect(result.board.widthMm).toBeCloseTo(40, 6);
+      expect(result.board.heightMm).toBeCloseTo(30, 6);
+      expect(result.warnings.some((entry) => entry.code === "OUTLINE_NOT_CLOSED")).toBe(false);
+    });
+
+    it("reports an outline that never closes, which the source-only check could not see", () => {
+      const result = normalizeGerberStackup([{ filename: "board.gko", content: outlineWith(false) }]);
+
+      const open = result.warnings.find((entry) => entry.code === "OUTLINE_NOT_CLOSED");
+      // Three sides in the exported artwork and no fourth: the fabricator has no board shape, even
+      // though the source .kicad_pcb may be perfectly closed.
+      expect(open?.message).toMatch(/never return to their start/u);
+    });
+
+    it("carries the gerber parser's assumptions up into the stackup warnings", () => {
+      const noFormat = ["%MOMM*%", "D10*", "X0Y0D02*", "X1000D01*", "M02*"].join("\n");
+      const result = normalizeGerberStackup([{ filename: "board.gko", content: noFormat }]);
+
+      expect(result.warnings.some((entry) => entry.code === "gerber.assumed-coordinate-format")).toBe(true);
+    });
+  });
 });
