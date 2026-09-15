@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.50.1](https://github.com/oaslananka/boardreadyops/compare/v1.50.0...v1.50.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **mfg:** compare drill diameters instead of matching digits in text ([#769](https://github.com/oaslananka/boardreadyops/issues/769)) ([e523cd0](https://github.com/oaslananka/boardreadyops/commit/e523cd04c303b231130a960f4178245fef11f97d))
+
 ## [1.50.0](https://github.com/oaslananka/boardreadyops/compare/v1.49.0...v1.50.0) (2026-09-15)
 
 

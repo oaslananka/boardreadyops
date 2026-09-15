@@ -142,11 +142,13 @@ const expectedClassification: Record<string, ExpectedClassification> = {
     fixability: "manual",
     vendorDependence: "profile-specific",
   },
+  // Self-consistency between a board and its own drill outputs. No manufacturer capability is
+  // consulted, so "profile-specific" claimed a vendor threshold that never existed.
   "manufacturing.drill-coverage": {
     category: "manufacturability",
     evidenceType: "exact",
     fixability: "manual",
-    vendorDependence: "profile-specific",
+    vendorDependence: "none",
   },
   "manufacturing.fab-notes": {
     category: "manufacturability",

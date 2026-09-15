@@ -79508,7 +79508,7 @@ var import_promises14 = __toESM(require("node:fs/promises"), 1);
 var import_node_path41 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
-var boardReadyVersion = "1.50.0";
+var boardReadyVersion = "1.50.1";
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);
@@ -101188,18 +101188,239 @@ var assemblySidesRule = rule(
 
 // src/rules/manufacturing/drill-coverage.ts
 var import_node_path25 = __toESM(require("node:path"), 1);
+
+// src/multicad/excellon-parser.ts
+var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
+var assumedInchFormat = { integerDigits: 2, decimalDigits: 4 };
+var inchToMm = 25.4;
+function warning2(code, message, path48) {
+  return path48 === void 0 ? { code, message } : { code, message, path: path48 };
+}
+function attributeBody(line) {
+  const match = /^;\s*#@!\s*(.+)$/u.exec(line.trim());
+  return match?.[1]?.trim();
+}
+function platedFromAttribute(value) {
+  if (/(^|,)Plated(,|$)/u.test(value)) return true;
+  if (/(^|,)NonPlated(,|$)/u.test(value)) return false;
+  return void 0;
+}
+function coordinateValue(raw, format) {
+  const negative = raw.startsWith("-");
+  const digits = raw.replace(/^[+-]/u, "");
+  if (digits.includes(".")) {
+    const parsed2 = Number.parseFloat(digits);
+    return negative ? -parsed2 : parsed2;
+  }
+  const total = format.integerDigits + format.decimalDigits;
+  const padded = format.zeroSuppression === "leading-suppressed" ? digits.padStart(total, "0") : digits.padEnd(total, "0");
+  const integerPart = padded.slice(0, format.integerDigits) || "0";
+  const decimalPart = padded.slice(format.integerDigits);
+  const parsed = Number.parseFloat(`${integerPart}.${decimalPart || "0"}`);
+  return negative ? -parsed : parsed;
+}
+function parseHeaderLine(line, state3, warnings, path48) {
+  const trimmed = line.trim();
+  const attribute = attributeBody(trimmed);
+  if (attribute) {
+    if (attribute.startsWith("TF.FileFunction")) {
+      const plated = platedFromAttribute(attribute);
+      if (plated !== void 0) state3.filePlated = plated;
+    }
+    return;
+  }
+  if (/^;\s*TYPE\s*=\s*PLATED/iu.test(trimmed)) {
+    state3.filePlated = true;
+    return;
+  }
+  if (/^;\s*TYPE\s*=\s*NON_?PLATED/iu.test(trimmed)) {
+    state3.filePlated = false;
+    return;
+  }
+  const fileFormat = /^;\s*FILE_FORMAT\s*=\s*(\d+):(\d+)/iu.exec(trimmed);
+  if (fileFormat?.[1] && fileFormat[2]) {
+    state3.integerDigits = Number.parseInt(fileFormat[1], 10);
+    state3.decimalDigits = Number.parseInt(fileFormat[2], 10);
+    return;
+  }
+  const unitsMatch = /^(METRIC|INCH)((?:,[A-Z0-9.]+)*)/u.exec(trimmed);
+  if (unitsMatch?.[1]) {
+    state3.units = unitsMatch[1] === "METRIC" ? "mm" : "inch";
+    for (const modifier of (unitsMatch[2] ?? "").split(",").filter(Boolean)) {
+      if (modifier === "TZ") state3.zeroSuppression = "leading-suppressed";
+      else if (modifier === "LZ") state3.zeroSuppression = "trailing-suppressed";
+      else {
+        const mask = /^(0*)\.(0*)$/u.exec(modifier);
+        if (mask?.[1] !== void 0 && mask[2] !== void 0) {
+          state3.integerDigits = mask[1].length;
+          state3.decimalDigits = mask[2].length;
+        } else if (modifier !== "000.000") {
+          warnings.push(
+            warning2("excellon.unknown-unit-modifier", `Ignored an unrecognised unit modifier: ${modifier}.`, path48)
+          );
+        }
+      }
+    }
+  }
+}
+function parseExcellon(content, path48) {
+  const warnings = [];
+  const state3 = {
+    units: void 0,
+    integerDigits: void 0,
+    decimalDigits: void 0,
+    zeroSuppression: void 0,
+    filePlated: void 0
+  };
+  const lines = content.split(/\r?\n/u);
+  const toolsByCode = /* @__PURE__ */ new Map();
+  const holes = [];
+  let inHeader = false;
+  let bodyStarted = false;
+  let pendingToolPlated;
+  let currentTool;
+  let slotCount = 0;
+  let format;
+  function resolvedFormat() {
+    if (format) return format;
+    const units = state3.units ?? "mm";
+    const fallback = units === "inch" ? assumedInchFormat : assumedMetricFormat;
+    const declared = state3.integerDigits !== void 0 && state3.decimalDigits !== void 0;
+    format = {
+      integerDigits: state3.integerDigits ?? fallback.integerDigits,
+      decimalDigits: state3.decimalDigits ?? fallback.decimalDigits,
+      zeroSuppression: state3.zeroSuppression ?? "leading-suppressed",
+      evidence: declared ? "declared" : "assumed"
+    };
+    if (!declared) {
+      warnings.push(
+        warning2(
+          "excellon.assumed-coordinate-format",
+          `No coordinate format declared; assumed ${format.integerDigits}.${format.decimalDigits} for ${units}. Coordinates from this file are an assumption, not a measurement.`,
+          path48
+        )
+      );
+    }
+    return format;
+  }
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed === "M48") {
+      inHeader = true;
+      continue;
+    }
+    if (trimmed === "%" || trimmed === "M95") {
+      inHeader = false;
+      bodyStarted = true;
+      continue;
+    }
+    if (trimmed === "M30" || trimmed === "M00") break;
+    const attribute = attributeBody(trimmed);
+    if (attribute?.startsWith("TA.AperFunction")) {
+      pendingToolPlated = platedFromAttribute(attribute);
+      continue;
+    }
+    const toolDefinition = /^T(\d+)C([\d.]+)/u.exec(trimmed);
+    if (toolDefinition?.[1] && toolDefinition[2]) {
+      const code = toolDefinition[1];
+      const rawDiameter = Number.parseFloat(toolDefinition[2]);
+      const diameterMm = (state3.units ?? "mm") === "inch" ? rawDiameter * inchToMm : rawDiameter;
+      if (!Number.isFinite(diameterMm) || diameterMm <= 0) {
+        warnings.push(
+          warning2("excellon.invalid-tool-diameter", `Tool T${code} declares a diameter that is not usable.`, path48)
+        );
+      } else {
+        toolsByCode.set(code, { code, diameterMm, plated: pendingToolPlated ?? state3.filePlated });
+      }
+      pendingToolPlated = void 0;
+      continue;
+    }
+    if (inHeader && !bodyStarted) {
+      parseHeaderLine(trimmed, state3, warnings, path48);
+      continue;
+    }
+    const toolSelect = /^T(\d+)\s*$/u.exec(trimmed);
+    if (toolSelect?.[1]) {
+      currentTool = toolsByCode.get(toolSelect[1]);
+      if (!currentTool) {
+        warnings.push(
+          warning2(
+            "excellon.undefined-tool",
+            `The body selects tool T${toolSelect[1]}, which the header never defines. Its holes are not counted.`,
+            path48
+          )
+        );
+      }
+      continue;
+    }
+    const coordinate = /^(?:G0[05]\s*)?X([+-]?[\d.]+)Y([+-]?[\d.]+)(.*)$/u.exec(trimmed);
+    if (!coordinate?.[1] || !coordinate[2]) continue;
+    if (!currentTool) {
+      warnings.push(warning2("excellon.hole-before-tool", "A coordinate appears before any tool is selected.", path48));
+      continue;
+    }
+    const active = resolvedFormat();
+    if (/G85/u.test(coordinate[3] ?? "")) slotCount += 1;
+    holes.push({
+      xMm: coordinateValue(coordinate[1], active) * (state3.units === "inch" ? inchToMm : 1),
+      yMm: coordinateValue(coordinate[2], active) * (state3.units === "inch" ? inchToMm : 1),
+      diameterMm: currentTool.diameterMm,
+      plated: currentTool.plated ?? true
+    });
+  }
+  const tools = [...toolsByCode.values()];
+  const platedDeclared = state3.filePlated !== void 0 || tools.some((tool) => tool.plated !== void 0);
+  if (!platedDeclared && tools.length > 0) {
+    warnings.push(
+      warning2(
+        "excellon.assumed-plating",
+        "Nothing in this file states whether its holes are plated; treated as plated. A rule must not block a release on this.",
+        path48
+      )
+    );
+  }
+  if (state3.units === void 0) {
+    warnings.push(warning2("excellon.assumed-units", "No METRIC or INCH declaration; assumed millimetres.", path48));
+  }
+  if (slotCount > 0) {
+    warnings.push(
+      warning2(
+        "excellon.slots-collapsed",
+        `${slotCount} slot(s) recorded at their start point only; slot length is not represented.`,
+        path48
+      )
+    );
+  }
+  return {
+    units: state3.units ?? "mm",
+    unitsEvidence: state3.units === void 0 ? "assumed" : "declared",
+    format: resolvedFormat(),
+    platedEvidence: platedDeclared ? "declared" : "assumed",
+    tools,
+    holes,
+    slotCount,
+    warnings
+  };
+}
+
+// src/rules/manufacturing/drill-coverage.ts
+var diameterToleranceMm = 1e-3;
 var drillCoverageRule = rule(
   {
     id: "manufacturing.drill-coverage",
     title: "Drill file does not cover PCB drill sizes",
-    description: "Compares PCB drill sizes with generated Excellon drill outputs.",
+    description: "Compares PCB drill sizes with the tool diameters declared in the Excellon outputs.",
     rationale: "Missing drill coverage can make a fabrication package incomplete or incorrect.",
     defaultSeverity: "medium",
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.drill-coverage.enabled"],
     kicadVersions: ["9", "10", "future"],
     tags: ["drill", "manufacturing", "pcb"],
-    ...RULE_CLASSIFICATIONS.manufacturabilityCapabilityThreshold
+    // Reclassified from manufacturabilityCapabilityThreshold. This is a self-consistency check
+    // between a board and its own outputs, with no manufacturer capability involved -- calling it
+    // profile-specific implied a vendor threshold that was never consulted.
+    ...RULE_CLASSIFICATIONS.manufacturabilityPresence
   },
   async (context5) => {
     if (!shouldRun(context5, "manufacturing.drill-coverage")) {
@@ -101209,30 +101430,53 @@ var drillCoverageRule = rule(
     if (drillFiles.length === 0) {
       return [];
     }
-    const drillText = (await Promise.all(drillFiles.map((file2) => readTextFile(file2).catch(() => "")))).join("\n");
+    const diameters = [];
+    for (const file2 of drillFiles) {
+      const text = await readTextFile(file2).catch(() => "");
+      if (!text) continue;
+      diameters.push(...parseExcellon(text, import_node_path25.default.relative(context5.root, file2)).tools.map((tool) => tool.diameterMm));
+    }
     const output = [];
     for (const project of context5.projects) {
       for (const board of project.boardFiles) {
         const parsed = await parsePcb(import_node_path25.default.resolve(context5.root, board));
         for (const size of parsed.drillSizes) {
-          if (!drillText.includes(size)) {
-            output.push(
-              finding(context5, {
-                ruleId: "manufacturing.drill-coverage",
-                severity: configuredSeverity(context5, "manufacturing.drill-coverage", "medium"),
-                message: `PCB drill size ${size} is not represented in drill outputs.`,
-                path: board,
-                kind: "pcb",
-                details: { drillSize: size }
-              })
-            );
-          }
+          const wanted = Number(size);
+          if (!Number.isFinite(wanted) || wanted <= 0) continue;
+          if (diameters.some((diameter) => Math.abs(diameter - wanted) <= diameterToleranceMm)) continue;
+          const nearest = nearestDiameter(diameters, wanted);
+          output.push(
+            finding(context5, {
+              ruleId: "manufacturing.drill-coverage",
+              severity: configuredSeverity(context5, "manufacturing.drill-coverage", "medium"),
+              message: nearest === void 0 ? `PCB drill size ${size} mm has no matching tool in the drill outputs.` : `PCB drill size ${size} mm has no matching tool in the drill outputs; the nearest is ${nearest} mm.`,
+              path: board,
+              kind: "pcb",
+              details: {
+                drillSize: size,
+                ...nearest === void 0 ? {} : { nearestToolMm: nearest },
+                toolsFound: diameters.length
+              }
+            })
+          );
         }
       }
     }
     return output;
   }
 );
+function nearestDiameter(diameters, wanted) {
+  let best;
+  let bestGap = Number.POSITIVE_INFINITY;
+  for (const diameter of diameters) {
+    const gap = Math.abs(diameter - wanted);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = diameter;
+    }
+  }
+  return best;
+}
 
 // src/rules/manufacturing/fab-notes.ts
 var import_node_path26 = __toESM(require("node:path"), 1);
@@ -101551,6 +101795,10 @@ function vendorOutputPatterns(kind) {
 }
 
 // src/vendor/profiles.ts
+var unverifiedProvenance = {
+  revision: "unverified-0",
+  confidence: "unverified"
+};
 var profiles = [
   {
     id: "jlcpcb",
@@ -101597,6 +101845,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.2,
       maxLayers: 6
     },
+    provenance: unverifiedProvenance,
     caveats: [
       "This profile validates package evidence only; always confirm current vendor capabilities before ordering."
     ]
@@ -101633,6 +101882,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 8
     },
+    provenance: unverifiedProvenance,
     caveats: ["Profile defaults are intentionally conservative and should be overridden for the exact service tier."]
   },
   {
@@ -101659,6 +101909,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 4
     },
+    provenance: unverifiedProvenance,
     caveats: ["OSH Park is treated as fabrication-only; assembly evidence is not required by this profile."]
   },
   {
@@ -101688,6 +101939,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 4
     },
+    provenance: unverifiedProvenance,
     caveats: ["Use project overrides for exact Aisler pool/service constraints before ordering."]
   },
   {
@@ -101717,6 +101969,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 6
     },
+    provenance: unverifiedProvenance,
     caveats: ["Profile limits are conservative defaults; override them for Seeed Fusion advanced capabilities."]
   },
   {
@@ -101742,6 +101995,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 8
     },
+    provenance: unverifiedProvenance,
     caveats: ["Treat as fabrication-only unless a separate assembly profile is selected."]
   },
   {
@@ -101773,6 +102027,7 @@ var profiles = [
         rationale: "Assembly or fabrication drawings help catch stackup and finish issues early."
       }
     ],
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset \u2014 not tuned to a specific vendor. Select a named vendor profile for production.",
       "Recommended outputs (BOM, PDF) are surfaced as warnings only."
@@ -101817,6 +102072,7 @@ var profiles = [
         rationale: "Fabrication and assembly drawings document stackup, finish, and controlled assumptions."
       }
     ],
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset \u2014 not tuned to a specific vendor. Select a named vendor profile for production.",
       "STEP and PDF are recommended; their absence lowers the readiness score but does not block."
@@ -101866,6 +102122,7 @@ var profiles = [
       minAnnularRingMm: 0.1,
       minBoardEdgeClearanceMm: 0.2
     },
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset \u2014 not tuned to a specific vendor. Select a named vendor profile for your manufacturer.",
       "All evidence kinds are required; missing any item blocks the release readiness score."
@@ -101987,6 +102244,9 @@ function cloneProfile(profile) {
       }
     } : {},
     ...profile.fabrication ? { fabrication: { ...profile.fabrication } } : {},
+    // Copied, not defaulted: hardcoding `unverifiedProvenance` here would discard a real
+    // verification record every time a profile was cloned.
+    provenance: { ...profile.provenance },
     caveats: [...profile.caveats]
   };
 }
