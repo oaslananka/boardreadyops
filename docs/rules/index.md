@@ -32,6 +32,7 @@ BoardReadyOps rules use stable `group.rule` identifiers. Each rule page records 
 - [manufacturing.fiducials](manufacturing.fiducials.md)
 - [manufacturing.jobset-outputs](manufacturing.jobset-outputs.md)
 - [manufacturing.layer-stackup](manufacturing.layer-stackup.md)
+- [manufacturing.mask-coverage](manufacturing.mask-coverage.md)
 - [manufacturing.outputs-present](manufacturing.outputs-present.md)
 - [manufacturing.package-completeness](manufacturing.package-completeness.md)
 - [manufacturing.panel-sanity](manufacturing.panel-sanity.md)

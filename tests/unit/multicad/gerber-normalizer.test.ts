@@ -221,5 +221,23 @@ M02*
 
       expect(result.warnings.some((entry) => entry.code === "gerber.assumed-coordinate-format")).toBe(true);
     });
+
+    it("classifies a file whose name means nothing but whose content does", () => {
+      const declared = ["%FSLAX36Y36*%", "%MOMM*%", "%TF.FileFunction,Copper,L1,Top*%", "M02*"].join("\n");
+      const result = normalizeGerberStackup([{ filename: "fab/top-copper.artwork", content: declared }]);
+
+      // classifyLayer has no pattern for this name, and the loop used to skip on that alone --
+      // which made the content-first reading conditional on the filename reading having already
+      // succeeded, so a layer under an unrecognised name was dropped however clearly it declared
+      // itself. The same authority-of-the-filename problem, one level up.
+      expect(result.layers).toHaveLength(1);
+      expect(result.layers[0]).toMatchObject({ role: "copper", side: "top", index: 1 });
+      expect(result.board.layerCount).toBe(1);
+    });
+
+    it("still skips a file that neither the name nor the content identifies", () => {
+      const result = normalizeGerberStackup([{ filename: "notes.artwork", content: "nothing useful" }]);
+      expect(result.layers).toEqual([]);
+    });
   });
 });

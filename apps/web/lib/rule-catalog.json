@@ -457,6 +457,20 @@
       "vendorDependence": "profile-specific"
     },
     {
+      "id": "manufacturing.mask-coverage",
+      "title": "A copper side has no solder mask",
+      "description": "Checks that each outer copper side in the Gerber package has a matching solder mask layer.",
+      "rationale": "A board built without a mask on one face leaves that whole face exposed, which bridges at assembly.",
+      "defaultSeverity": "medium",
+      "category": "manufacturability",
+      "appliesTo": ["pcb"],
+      "configKeys": ["rules.manufacturing.mask-coverage.enabled"],
+      "tags": ["fabrication", "manufacturing", "gerber", "mask"],
+      "evidenceType": "exact",
+      "fixability": "manual",
+      "vendorDependence": "none"
+    },
+    {
       "id": "manufacturing.outputs-present",
       "title": "Required manufacturing outputs are missing or stale",
       "description": "Checks required fabrication outputs and whether they are fresh relative to PCB sources.",

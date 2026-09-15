@@ -137,8 +137,13 @@ const narratives = {
     details: "{ smdCount, minimumSmdCount }",
   },
   "manufacturing.drill-coverage": {
-    fires: "Fires when a PCB drill size is absent from drill output.",
-    details: "{ missingDrills }",
+    fires: "Fires when a PCB drill size has no matching tool diameter in the Excellon outputs.",
+    details: "{ drillSize, nearestToolMm, toolsFound }",
+  },
+  "manufacturing.mask-coverage": {
+    fires:
+      "Fires when the Gerber package has copper on an outer side with no solder mask layer for that side. Inner copper is not checked: mask applies to the outer faces.",
+    details: "{ side, copperLayers, maskLayers }",
   },
   "manufacturing.fab-notes": {
     fires: "Fires when no fabrication notes file is present.",
