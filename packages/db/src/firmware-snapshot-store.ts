@@ -52,6 +52,15 @@ export type ScannableDependency = {
 export type DueFirmwareScan = {
   repositoryId: string;
   installationId: string;
+  /**
+   * `owner/name`, which is what a notification must show.
+   *
+   * Carried on the claim rather than resolved later because the query already joins
+   * `repositories` for the installation id, so it costs nothing here and saves a lookup at
+   * notification time. The supply path learned this the hard way: its event once rendered a raw
+   * board UUID where the contract promises `acme/gateway`.
+   */
+  repositoryFullName: string;
   snapshotId: string;
   commitSha: string;
   /**
@@ -235,10 +244,12 @@ export function createSqlFirmwareSnapshotStore(
         const installationId = textCell(row, "installation_id");
         const snapshotId = textCell(row, "snapshot_id");
         const commitSha = textCell(row, "commit_sha");
-        if (!repositoryId || !installationId || !snapshotId || !commitSha) continue;
+        const repositoryFullName = textCell(row, "repository_full_name");
+        if (!repositoryId || !installationId || !snapshotId || !commitSha || !repositoryFullName) continue;
         claimed.push({
           repositoryId,
           installationId,
+          repositoryFullName,
           snapshotId,
           commitSha,
           scannable: scannableFrom(row.scannable),
@@ -308,6 +319,7 @@ const CLAIM_SQL = `with due as (
          )
          select newest.repository_id,
                 repositories.installation_id,
+                repositories.owner || '/' || repositories.name as repository_full_name,
                 newest.id as snapshot_id,
                 newest.commit_sha,
                 newest.dependency_count,

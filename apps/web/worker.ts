@@ -629,7 +629,7 @@ async function announceFirmwareAdvisories(
     const queued = await notifications.enqueueEvent({
       type: "firmware.advisory_detected",
       installationId: detection.scan.installationId,
-      repositoryFullName: detection.scan.repositoryId,
+      repositoryFullName: detection.scan.repositoryFullName,
       headline: announcement.headline,
       details: announcement.details,
       // Keyed on the advisory set, so an unchanged set is one piece of news however many passes
