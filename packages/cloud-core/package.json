@@ -54,6 +54,11 @@
       "import": "./src/component-intelligence-resilience.ts",
       "default": "./src/component-intelligence-resilience.ts"
     },
+    "./advisory-lookup": {
+      "types": "./src/advisory-lookup.ts",
+      "import": "./src/advisory-lookup.ts",
+      "default": "./src/advisory-lookup.ts"
+    },
     "./supply-watch": {
       "types": "./src/supply-watch.ts",
       "import": "./src/supply-watch.ts",
