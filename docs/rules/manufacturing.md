@@ -4,7 +4,7 @@
 - [manufacturing.dfm-pin1-markers](manufacturing.dfm-pin1-markers.md): Checks that ICs and polarised connectors use recognized library footprints that include standard pin-1 markers.
 - [manufacturing.dfm-polarity-markers](manufacturing.dfm-polarity-markers.md): Checks that polarized components (diodes, LEDs, electrolytic capacitors) use recognized library footprints that include standard polarity markings.
 - [manufacturing.dfm-silkscreen-over-pad](manufacturing.dfm-silkscreen-over-pad.md): Flags boards with a high density of SMD components as a reminder to verify that silkscreen markings do not overlap solder pads.
-- [manufacturing.drill-coverage](manufacturing.drill-coverage.md): Compares PCB drill sizes with generated Excellon drill outputs.
+- [manufacturing.drill-coverage](manufacturing.drill-coverage.md): Compares PCB drill sizes with the tool diameters declared in the Excellon outputs.
 - [manufacturing.fab-notes](manufacturing.fab-notes.md): Checks known project paths for fabrication notes that travel with board outputs.
 - [manufacturing.fiducials](manufacturing.fiducials.md): Checks configured assembly jobs for a minimum number of fiducial footprints.
 - [manufacturing.jobset-outputs](manufacturing.jobset-outputs.md): Checks enabled KiCad jobset entries for their expected output files.

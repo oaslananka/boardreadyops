@@ -11,7 +11,7 @@ config-keys:
 
 ## What It Checks
 
-Compares PCB drill sizes with generated Excellon drill outputs.
+Compares PCB drill sizes with the tool diameters declared in the Excellon outputs.
 
 ## When It Fires
 

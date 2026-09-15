@@ -389,7 +389,7 @@
     {
       "id": "manufacturing.drill-coverage",
       "title": "Drill file does not cover PCB drill sizes",
-      "description": "Compares PCB drill sizes with generated Excellon drill outputs.",
+      "description": "Compares PCB drill sizes with the tool diameters declared in the Excellon outputs.",
       "rationale": "Missing drill coverage can make a fabrication package incomplete or incorrect.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
@@ -398,7 +398,7 @@
       "tags": ["drill", "manufacturing", "pcb"],
       "evidenceType": "exact",
       "fixability": "manual",
-      "vendorDependence": "profile-specific"
+      "vendorDependence": "none"
     },
     {
       "id": "manufacturing.fab-notes",
