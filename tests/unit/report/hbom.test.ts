@@ -24,6 +24,9 @@ describe("CycloneDX HBOM formatter", () => {
           { name: "boardreadyops:componentClass", value: "hardware" },
           { name: "boardreadyops:componentCount", value: "2" },
           { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "0" },
+          { name: "boardreadyops:hardwareComponentCount", value: "2" },
+          { name: "boardreadyops:firmwareComponentCount", value: "0" },
+          { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: "0" },
         ],
       },
     });
@@ -113,6 +116,81 @@ describe("CycloneDX HBOM formatter", () => {
     );
   });
 
+  it("emits firmware dependencies as components alongside the hardware", () => {
+    const hbom = createHbom(resultWithFirmware());
+
+    // Before #786 nothing read a dependency manifest and createHbom built components only from the
+    // hardware BOM -- a device SBOM with no firmware in it at all.
+    const firmware = hbom.components.filter((component) =>
+      component.properties.some((entry) => entry.name === "boardreadyops:componentClass" && entry.value === "firmware"),
+    );
+    expect(firmware.map((component) => component.name)).toEqual(["idf", "led_strip", "mcuboot"]);
+    expect(hbom.components).toHaveLength(5);
+  });
+
+  it("calls the framework a framework rather than a library that had no advisories", () => {
+    const hbom = createHbom(resultWithFirmware());
+    const byName = new Map(hbom.components.map((component) => [component.name, component]));
+
+    // The framework is tracked by CPE rather than PURL, so typing it as a library would invite a
+    // reader to treat an empty advisory result as a clean bill.
+    expect(byName.get("idf")?.type).toBe("framework");
+    expect(byName.get("led_strip")?.type).toBe("library");
+    expect(byName.get("R1")?.type ?? byName.get("RC0603FR-0710KL")?.type).toBe("device");
+  });
+
+  it("says of each firmware dependency whether it can be looked up", () => {
+    const byName = new Map(createHbom(resultWithFirmware()).components.map((c) => [c.name, c]));
+
+    const unidentified = byName.get("led_strip");
+    expect(unidentified).not.toHaveProperty("purl");
+    expect(unidentified?.properties).toEqual(
+      expect.arrayContaining([{ name: "boardreadyops:vulnerabilityIndexed", value: "false" }]),
+    );
+
+    const known = byName.get("mcuboot");
+    expect(known?.purl).toBe("pkg:golang/github.com/mcu-tools/mcuboot");
+    expect(known?.properties).toEqual(
+      expect.arrayContaining([
+        { name: "boardreadyops:vulnerabilityIndexed", value: "true" },
+        { name: "boardreadyops:identitySource", value: "OSV GO-2024-2799 (CVE-2024-32883)" },
+      ]),
+    );
+    expect(known?.evidence?.identity[0]?.concludedValue).toBe("pkg:golang/github.com/mcu-tools/mcuboot");
+  });
+
+  it("splits the identifiable counts by class so a reader knows which gap is which", () => {
+    const hbom = createHbom(resultWithFirmware());
+
+    expect(hbom.metadata.properties).toEqual(
+      expect.arrayContaining([
+        { name: "boardreadyops:componentClass", value: "hardware+firmware" },
+        { name: "boardreadyops:componentCount", value: "5" },
+        { name: "boardreadyops:hardwareComponentCount", value: "2" },
+        { name: "boardreadyops:firmwareComponentCount", value: "3" },
+        { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "1" },
+        { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: "1" },
+      ]),
+    );
+  });
+
+  it("makes the root component depend on the firmware as well as the hardware", () => {
+    const hbom = createHbom(resultWithFirmware());
+
+    // A component nothing depends on reads as unused. All five are in the device.
+    expect(hbom.dependencies[0]?.dependsOn).toEqual(hbom.components.map((component) => component["bom-ref"]));
+    expect(hbom.dependencies[0]?.dependsOn).toContain("boardreadyops:firmware:firmware.idf_component.yml:mcuboot");
+  });
+
+  it("formats a firmware-bearing document that validates against the bundled schema", () => {
+    const parsed = JSON.parse(formatHbom(resultWithFirmware()));
+    const validate = new Ajv2020({ allErrors: true }).compile(hbomSchema);
+
+    // The bundled schema pinned component type to const "device"; a firmware component would have
+    // been rejected had the schema not widened in the same change. See #768.
+    expect(validate(parsed), JSON.stringify(validate.errors, null, 2)).toBe(true);
+  });
+
   it("formats HBOM JSON that validates against the bundled schema", () => {
     const parsed = JSON.parse(formatHbom(resultWithBomRows()));
     const validate = new Ajv2020({ allErrors: true }).compile(hbomSchema);
@@ -190,6 +268,41 @@ describe("CycloneDX HBOM formatter", () => {
     expect(createHbom(result).metadata.component.name).toBe("hardware");
   });
 });
+
+function resultWithFirmware(): RunResult {
+  const result = resultWithBomRows();
+  result.firmware = {
+    dependencies: [
+      {
+        name: "idf",
+        manifestPath: "firmware/idf_component.yml",
+        origin: "framework",
+        versionSpec: ">=5.0",
+        pinned: false,
+        searchable: false,
+      },
+      {
+        name: "led_strip",
+        manifestPath: "firmware/idf_component.yml",
+        origin: "registry",
+        versionSpec: "2.4.1",
+        pinned: true,
+        searchable: false,
+      },
+      {
+        name: "mcuboot",
+        manifestPath: "firmware/idf_component.yml",
+        origin: "git",
+        pinned: false,
+        purl: "pkg:golang/github.com/mcu-tools/mcuboot",
+        searchable: true,
+        identitySource: "OSV GO-2024-2799 (CVE-2024-32883)",
+      },
+    ],
+    warnings: [],
+  };
+  return result;
+}
 
 function resultWithBomRows(): RunResult {
   const fabrication: FabricationSnapshot = {

@@ -1,4 +1,5 @@
 import * as yaml from "js-yaml";
+import { compareCodePoints } from "../util/strings.js";
 
 /**
  * Reads the dependency list out of an ESP-IDF `idf_component.yml`.
@@ -182,7 +183,7 @@ export function parseIdfManifest(content: string, path?: string): IdfManifest {
   return {
     ...(stringField(root.name) ? { name: stringField(root.name) } : {}),
     ...(stringField(root.version) ? { version: stringField(root.version) } : {}),
-    dependencies: dependencies.sort((a, b) => a.declaredName.localeCompare(b.declaredName)),
+    dependencies: dependencies.sort((a, b) => compareCodePoints(a.declaredName, b.declaredName)),
     warnings,
   };
 }

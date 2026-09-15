@@ -1,4 +1,5 @@
 import type { FabricationSnapshot } from "../core/diff/fabrication.js";
+import type { FirmwareDependencyRecord } from "../core/firmware.js";
 import type { RunResult } from "../core/result.js";
 import { assessComponentIdentity, summariseIndexedIdentifiers } from "./component-identity.js";
 
@@ -34,8 +35,18 @@ interface CycloneDxIdentityEvidence {
   methods: CycloneDxIdentityMethod[];
 }
 
+/**
+ * CycloneDX component types this document emits.
+ *
+ * `device` for a hardware part, `library` for a firmware dependency, `framework` for the firmware
+ * framework itself -- all three are spec enum values. The framework is a different kind of thing
+ * from a component and is tracked by CPE rather than PURL, so saying so keeps a consumer from
+ * treating it as a library that simply had no advisories.
+ */
+type CycloneDxComponentType = "device" | "library" | "framework";
+
 interface CycloneDxHbomComponent {
-  type: "device";
+  type: CycloneDxComponentType;
   name: string;
   version?: string | undefined;
   "bom-ref": string;
@@ -85,7 +96,10 @@ export function formatHbom(result: RunResult): string {
 
 export function createHbom(result: RunResult): CycloneDxHbom {
   const rootRef = "boardreadyops:hardware";
-  const components = result.fabrication.bom.map((row) => componentFromBomRow(row));
+  const components = [
+    ...result.fabrication.bom.map((row) => componentFromBomRow(row)),
+    ...(result.firmware?.dependencies ?? []).map((dependency) => componentFromFirmwareDependency(dependency)),
+  ];
   return {
     $schema: "https://cyclonedx.org/schema/bom-1.7.schema.json",
     bomFormat: "CycloneDX",
@@ -170,15 +184,78 @@ function componentFromBomRow(row: BomRow): CycloneDxHbomComponent {
  */
 function metadataProperties(components: readonly CycloneDxHbomComponent[]): CycloneDxProperty[] {
   const summary = summariseIndexedIdentifiers(components.map((component) => component.purl));
+  const firmware = components.filter((component) => componentClassOf(component) === "firmware");
+  const firmwareSummary = summariseIndexedIdentifiers(firmware.map((component) => component.purl));
   return [
-    { name: "boardreadyops:componentClass", value: "hardware" },
+    // Both classes now, so the document says which it contains rather than asserting "hardware".
+    { name: "boardreadyops:componentClass", value: firmware.length > 0 ? "hardware+firmware" : "hardware" },
     { name: "boardreadyops:componentCount", value: String(summary.total) },
     { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: String(summary.indexed) },
+    // Split out, because the two classes fail to be identifiable for different reasons and a
+    // reader deciding what to chase needs to know which.
+    { name: "boardreadyops:hardwareComponentCount", value: String(summary.total - firmware.length) },
+    { name: "boardreadyops:firmwareComponentCount", value: String(firmware.length) },
+    { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: String(firmwareSummary.indexed) },
   ];
+}
+
+function componentClassOf(component: CycloneDxHbomComponent): string | undefined {
+  return component.properties.find((entry) => entry.name === "boardreadyops:componentClass")?.value;
+}
+
+/**
+ * A firmware dependency as an SBOM component.
+ *
+ * Emitted with `vulnerabilityIndexed` exactly as hardware components are, and for the same reason:
+ * an unidentified dependency listed with no advisories found is a false clean bill. The difference
+ * is that here the identifier, when there is one, came from a curated mapping rather than from the
+ * manifest -- so the evidence records that, and `pinned: false` keeps the PURL off a version the
+ * manifest only expressed as a range. See #785.
+ */
+function componentFromFirmwareDependency(dependency: FirmwareDependencyRecord): CycloneDxHbomComponent {
+  const component: CycloneDxHbomComponent = {
+    type: dependency.origin === "framework" ? "framework" : "library",
+    name: dependency.name,
+    "bom-ref": firmwareComponentRef(dependency),
+    properties: [
+      { name: "boardreadyops:componentClass", value: "firmware" },
+      { name: "boardreadyops:manifestPath", value: dependency.manifestPath },
+      { name: "boardreadyops:dependencyOrigin", value: dependency.origin },
+      { name: "boardreadyops:versionPinned", value: String(dependency.pinned) },
+      { name: "boardreadyops:vulnerabilityIndexed", value: String(dependency.searchable) },
+      ...(dependency.identitySource
+        ? [{ name: "boardreadyops:identitySource", value: dependency.identitySource }]
+        : []),
+    ],
+  };
+  if (dependency.versionSpec) {
+    component.version = dependency.versionSpec;
+  }
+  if (dependency.purl) {
+    component.purl = dependency.purl;
+    component.evidence = {
+      identity: [
+        {
+          field: "purl",
+          confidence: 0.5,
+          concludedValue: dependency.purl,
+          methods: [{ technique: "manifest-analysis", confidence: 0.5, value: dependency.purl }],
+        },
+      ],
+    };
+  }
+  return component;
+}
+
+function firmwareComponentRef(dependency: FirmwareDependencyRecord): string {
+  return ["boardreadyops:firmware", sanitizeRef(dependency.manifestPath), sanitizeRef(dependency.name)].join(":");
 }
 
 function componentProperties(row: BomRow): CycloneDxProperty[] {
   return [
+    // Declared per component so a consumer can filter hardware from firmware without inferring it
+    // from the component type.
+    { name: "boardreadyops:componentClass", value: "hardware" },
     { name: "kicad:reference", value: row.reference },
     property("kicad:footprint", row.footprint),
     property("kicad:dnp", String(Boolean(row.dnp))),

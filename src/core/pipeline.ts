@@ -5,6 +5,7 @@ import { dispatchNotifications, notificationPayloadFromResult } from "../notifie
 import { registerBuiltInRules } from "../rules/_index.js";
 import { loadBomContext } from "../rules/bom/shared.js";
 import { captureFabricationSnapshot } from "../rules/fabrication-snapshot.js";
+import { captureFirmwareSnapshot } from "../rules/firmware-snapshot.js";
 import { globFiles } from "../util/glob.js";
 import { normalizePathInput } from "../util/path.js";
 import { VENDOR_OUTPUT_KINDS, VENDOR_OUTPUT_PATTERNS } from "../vendor/outputs.js";
@@ -77,6 +78,7 @@ export async function runPipeline(
     ctx,
     effectiveFindings: postProcessed.effectiveFindings,
     fabrication: postProcessed.fabrication,
+    firmware: postProcessed.firmware,
     readiness: postProcessed.readiness,
     summary: postProcessed.summary,
     waiverResult: postProcessed.waiverResult,
@@ -306,6 +308,7 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
   logFalsePositiveSignals(ctx, waiverResult.falsePositiveSignals);
   const effectiveFindings = waiverResult.findings;
   const fabrication = await captureFabricationSnapshot(ctx.root, projects, ctx.options, ctx.config);
+  const firmware = await captureFirmwareSnapshot(ctx.root);
   const readiness = await computeRunReadiness(
     ctx.root,
     ctx.config,
@@ -327,7 +330,7 @@ async function postProcessPhase(ctx: PipelineContext, findings: Finding[], proje
       })
     : undefined;
 
-  return { effectiveFindings, fabrication, readiness, summary, waiverResult, policy, boms };
+  return { effectiveFindings, fabrication, firmware, readiness, summary, waiverResult, policy, boms };
 }
 
 /**
@@ -407,6 +410,7 @@ interface AssembleRunResultOptions {
   ctx: PipelineContext;
   effectiveFindings: Finding[];
   fabrication: Awaited<ReturnType<typeof captureFabricationSnapshot>>;
+  firmware: Awaited<ReturnType<typeof captureFirmwareSnapshot>>;
   readiness: ReadinessScore;
   summary: ReturnType<typeof summarizeFindings>;
   waiverResult: ReturnType<typeof applyWaivers>;
@@ -420,6 +424,7 @@ function assembleRunResult({
   ctx,
   effectiveFindings,
   fabrication,
+  firmware,
   readiness,
   summary,
   waiverResult,
@@ -450,6 +455,9 @@ function assembleRunResult({
     boms,
     findings: effectiveFindings,
     fabrication,
+    // Absent rather than empty when the project has no firmware manifest at all, so a consumer can
+    // tell "no firmware here" from "firmware with no dependencies".
+    ...(firmware.dependencies.length > 0 || firmware.warnings.length > 0 ? { firmware } : {}),
     plugins: pluginLoad.plugins,
     generatedAt: new Date().toISOString(),
   };

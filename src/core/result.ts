@@ -4,6 +4,7 @@ import type { ProjectContext } from "./context.js";
 import type { FabricationSnapshot } from "./diff/fabrication.js";
 import type { HardwareImpactV1 } from "./diff/hardware-impact.types.js";
 import type { Finding, FindingSummary } from "./findings.js";
+import type { FirmwareSnapshot } from "./firmware.js";
 import type { LoadedPlugin } from "./plugin-loader.js";
 import type { PolicyEvaluation } from "./policy.js";
 import type { ReadinessScore } from "./readiness.js";
@@ -76,6 +77,13 @@ export interface RunResult {
   boms?: ProjectBom[] | undefined;
   findings: Finding[];
   fabrication: FabricationSnapshot;
+  /**
+   * Firmware dependencies declared in the tree, when any manifest was found.
+   *
+   * Absent rather than empty when there is no firmware in the project, so a consumer can tell "no
+   * firmware here" from "firmware with nothing in it". See #785.
+   */
+  firmware?: FirmwareSnapshot | undefined;
   hardwareImpact?: HardwareImpactV1 | undefined;
   plugins?: LoadedPlugin[] | undefined;
   generatedAt: string;
