@@ -34,6 +34,13 @@ export function formatMarkdown(
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none",
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : undefined;
+  // Computed in the pipeline, where the failure threshold lives, and carried on the result the
+  // same way `categoryBreakdown` is. Reported, never enforced: `shouldFail` remains the only
+  // authority on the verdict, so showing this cannot move a board from failing to passing.
+  const evidenceView =
+    result.evidence && result.evidence.exact + result.evidence.heuristic + result.evidence.unclassified > 0
+      ? { ...result.evidence, hasBlockingOnInference: result.evidence.blockingOnInference.length > 0 }
+      : undefined;
   const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : undefined;
   return Mustache.render(
     prCommentTemplate,
@@ -49,6 +56,8 @@ export function formatMarkdown(
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasEvidence: Boolean(evidenceView),
+      evidence: evidenceView,
       hasBomRisk: Boolean(bomRiskView),
       bomRisk: bomRiskView,
       hasReleaseMode: Boolean(releaseModeView),
@@ -103,6 +112,10 @@ function markdownLabels(locale: Locale): Record<string, string> {
     count: t("report.count", {}, locale),
     critical: t("severity.critical", {}, locale),
     current: t("report.current", {}, locale),
+    evidenceTitle: t("report.evidence.title", {}, locale),
+    evidenceMeasured: t("report.evidence.measured", {}, locale),
+    evidenceInferred: t("report.evidence.inferred", {}, locale),
+    evidenceBlocking: t("report.evidence.blocking", {}, locale),
     fabricationChanges: t("report.fabricationChanges", {}, locale),
     fix: t("report.fix", {}, locale),
     high: t("severity.high", {}, locale),

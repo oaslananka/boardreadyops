@@ -48,7 +48,7 @@ var boardReadyVersion;
 var init_version = __esm({
   "src/generated/version.ts"() {
     "use strict";
-    boardReadyVersion = "1.50.1";
+    boardReadyVersion = "1.54.0";
   }
 });
 
@@ -230,6 +230,10 @@ var init_en = __esm({
       "report.waivers.stale": "stale",
       "report.waivers.state": "State",
       "report.waivers.title": "Waivers",
+      "report.evidence.title": "What This Rests On",
+      "report.evidence.measured": "measured",
+      "report.evidence.inferred": "inferred",
+      "report.evidence.blocking": "These rules can fail the run and do not rest on a measurement. A finding inferred from a naming convention, a free-text pattern or a weighted score can be wrong about a board that is fine:",
       "report.bomRisk.title": "BOM Supply-Chain Risk",
       "report.bomRisk.overallScore": "Overall BOM risk score",
       "report.bomRisk.components": "at-risk components",
@@ -34755,7 +34759,7 @@ var init_finding_context = __esm({
 var pr_comment_default;
 var init_pr_comment = __esm({
   "src/report/templates/pr-comment.mustache"() {
-    pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
+    pr_comment_default = "<!-- boardreadyops:sticky:v1 -->\n{{> summary}}\n{{#hasReleaseMode}}\n\n> **{{labels.releaseModeTitle}}:** {{releaseModeView.badge}} \u2014 {{releaseModeView.description}}\n{{/hasReleaseMode}}\n\n{{#hasFindings}}\n## {{labels.topFindings}}\n\n{{#topFindings}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/topFindings}}\n{{/hasFindings}}\n{{^hasFindings}}\n{{labels.noFindings}}\n{{/hasFindings}}\n{{#hasFixes}}\n\n## {{labels.fix}}\n\n{{#fixFindings}}\n- `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{fix.description}}\n{{#fix.steps}}\n  1. {{.}}\n{{/fix.steps}}\n{{/fixFindings}}\n{{/hasFixes}}\n\n{{#hasFabricationDiff}}\n## {{labels.fabricationChanges}}\n\n### {{labels.bom}}\n{{#fabrication.bom.hasRows}}\n| {{labels.ref}} | {{labels.previous}} | {{labels.current}} | {{labels.status}} |\n| --- | --- | --- | --- |\n{{#fabrication.bom.rows}}\n| {{reference}} | {{previous}} | {{current}} | {{status}} |\n{{/fabrication.bom.rows}}\n{{#fabrication.bom.truncated}}\n_{{labels.bomDiffTruncated}}_\n{{/fabrication.bom.truncated}}\n{{/fabrication.bom.hasRows}}\n{{^fabrication.bom.hasRows}}\n{{labels.noBomChanges}}\n{{/fabrication.bom.hasRows}}\n\n### {{labels.manufacturingOutputs}}\n{{#fabrication.outputs}}\n- {{kind}}: {{status}}{{#summary}} ({{summary}}){{/summary}}\n{{/fabrication.outputs}}\n\n{{#fabrication.findings.hasAdded}}\n### {{labels.newFindings}}\n{{#fabrication.findings.added}}\n- **{{severity}}** `{{ruleId}}` in `{{report.location}}` (`{{report.stableId}}`): {{message}}\n{{/fabrication.findings.added}}\n{{#fabrication.findings.addedTruncated}}\n_{{fabrication.findings.addedRemainingLabel}}_\n{{/fabrication.findings.addedTruncated}}\n{{/fabrication.findings.hasAdded}}\n{{/hasFabricationDiff}}\n\n{{#hasEvidence}}\n\n## {{labels.evidenceTitle}}\n\n{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.\n\n{{#evidence.hasBlockingOnInference}}\n{{labels.evidenceBlocking}}\n\n{{#evidence.blockingOnInference}}\n- `{{.}}`\n{{/evidence.blockingOnInference}}\n{{/evidence.hasBlockingOnInference}}\n{{/hasEvidence}}\n{{#hasBomRisk}}\n\n## {{labels.bomRiskTitle}}\n\nOverall risk score: **{{bomRisk.overallRiskScore}}/100** ({{bomRisk.overallRiskLevel}}) \u2014 {{bomRisk.totalComponents}} component(s) evaluated, {{bomRisk.atRiskCount}} {{labels.bomRiskComponents}}.\n\n| Component | Risk Score | Risk Level | Factors |\n| --- | ---: | --- | --- |\n{{#bomRisk.atRiskComponents}}\n| `{{reference}}` | {{riskScore}} | {{riskLevel}} | {{factorsSummary}} |\n{{/bomRisk.atRiskComponents}}\n{{/hasBomRisk}}\n{{#hasPlugins}}\n## {{labels.plugins}}\n\n{{#plugins}}\n- `{{name}}` {{version}} from `{{specifier}}` \u2014 permissions: {{permissionsSummary}}\n{{/plugins}}\n\n{{/hasPlugins}}{{#hasArtifacts}}\n## {{labels.artifacts}}\n\n{{#artifacts}}\n- [{{label}}]({{{url}}})\n{{/artifacts}}\n{{/hasArtifacts}}\n";
   }
 });
 
@@ -34777,6 +34781,7 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
     permissionsSummary: plugin.permissions.requested.length > 0 ? plugin.permissions.requested.join(", ") : "none"
   }));
   const bomRiskView = result.bomRisk ? formatBomRisk(result.bomRisk) : void 0;
+  const evidenceView = result.evidence && result.evidence.exact + result.evidence.heuristic + result.evidence.unclassified > 0 ? { ...result.evidence, hasBlockingOnInference: result.evidence.blockingOnInference.length > 0 } : void 0;
   const releaseModeView = result.releaseMode ? formatReleaseMode(result.releaseMode, locale) : void 0;
   return mustache_default.render(
     pr_comment_default,
@@ -34792,6 +34797,8 @@ function formatMarkdown(result, artifacts = [], fabrication, locale = "en") {
       artifacts,
       hasFabricationDiff: Boolean(fabricationView),
       fabrication: fabricationView,
+      hasEvidence: Boolean(evidenceView),
+      evidence: evidenceView,
       hasBomRisk: Boolean(bomRiskView),
       bomRisk: bomRiskView,
       hasReleaseMode: Boolean(releaseModeView),
@@ -34842,6 +34849,10 @@ function markdownLabels(locale) {
     count: t("report.count", {}, locale),
     critical: t("severity.critical", {}, locale),
     current: t("report.current", {}, locale),
+    evidenceTitle: t("report.evidence.title", {}, locale),
+    evidenceMeasured: t("report.evidence.measured", {}, locale),
+    evidenceInferred: t("report.evidence.inferred", {}, locale),
+    evidenceBlocking: t("report.evidence.blocking", {}, locale),
     fabricationChanges: t("report.fabricationChanges", {}, locale),
     fix: t("report.fix", {}, locale),
     high: t("severity.high", {}, locale),
@@ -43907,6 +43918,21 @@ function categorizeFindings(findings) {
   const order = buckets.has("unclassified") ? [...knownCategories, "unclassified"] : knownCategories;
   return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
 }
+function summarizeFindingEvidence(findings, failOn) {
+  const metaById = new Map(listRules().map((rule2) => [rule2.meta.id, rule2.meta]));
+  const summary = { exact: 0, heuristic: 0, unclassified: 0 };
+  const blocking = /* @__PURE__ */ new Set();
+  const threshold = failOn === "never" ? void 0 : severityRankValue(failOn);
+  for (const finding2 of findings) {
+    const evidenceType = metaById.get(finding2.ruleId)?.evidenceType ?? "unclassified";
+    summary[evidenceType] += 1;
+    if (evidenceType === "exact" || finding2.suppressed || finding2.severity === "info") continue;
+    if (threshold !== void 0 && severityRankValue(finding2.severity) >= threshold) {
+      blocking.add(finding2.ruleId);
+    }
+  }
+  return { ...summary, blockingOnInference: [...blocking].sort((a, b) => a.localeCompare(b)) };
+}
 var CAPABILITY_REASONS = {
   hasNetlistConnectivity: "Input package does not include electrical netlist connectivity.",
   hasBomMapping: "Input package does not include BOM mapping.",
@@ -51429,6 +51455,7 @@ function assembleRunResult({
     ...releaseMode ? { releaseMode } : {},
     summary,
     categoryBreakdown: categorizeFindings(effectiveFindings),
+    evidence: summarizeFindingEvidence(effectiveFindings, ctx.options.failOn),
     readiness,
     ...bomRisk ? { bomRisk } : {},
     ...policy ? { policy } : {},
@@ -60014,9 +60041,28 @@ var findings_schema_default = {
       items: {
         $ref: "#/$defs/categoryBreakdownEntry"
       }
+    },
+    evidence: {
+      $ref: "#/$defs/evidenceSummary"
     }
   },
   $defs: {
+    evidenceSummary: {
+      type: "object",
+      description: "How many findings rest on a measurement versus an inference, and which inferred rules can fail the run.",
+      additionalProperties: false,
+      required: ["exact", "heuristic", "unclassified", "blockingOnInference"],
+      properties: {
+        exact: { type: "integer", minimum: 0 },
+        heuristic: { type: "integer", minimum: 0 },
+        unclassified: { type: "integer", minimum: 0 },
+        blockingOnInference: {
+          type: "array",
+          description: "Rule ids severe enough to fail the run that do not rest on a measurement.",
+          items: { type: "string" }
+        }
+      }
+    },
     categoryBreakdownEntry: {
       type: "object",
       additionalProperties: false,

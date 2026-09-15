@@ -1787,6 +1787,33 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         },
         "type": "array",
       },
+      "evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "blockingOnInference": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "exact": {
+            "type": "integer",
+          },
+          "heuristic": {
+            "type": "integer",
+          },
+          "unclassified": {
+            "type": "integer",
+          },
+        },
+        "required": [
+          "blockingOnInference",
+          "exact",
+          "heuristic",
+          "unclassified",
+        ],
+        "type": "object",
+      },
       "exitCode": {
         "type": "integer",
       },
