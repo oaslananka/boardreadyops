@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.60.1](https://github.com/oaslananka/boardreadyops/compare/v1.60.0...v1.60.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **core:** stop a finding's fingerprint depending on the machine's locale ([#805](https://github.com/oaslananka/boardreadyops/issues/805)) ([aae024f](https://github.com/oaslananka/boardreadyops/commit/aae024f247a889fb71a49a34e6dac072c3097362)), closes [#795](https://github.com/oaslananka/boardreadyops/issues/795)
+
 ## [1.60.0](https://github.com/oaslananka/boardreadyops/compare/v1.59.0...v1.60.0) (2026-09-15)
 
 

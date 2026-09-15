@@ -79508,7 +79508,7 @@ var import_promises14 = __toESM(require("node:fs/promises"), 1);
 var import_node_path44 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
-var boardReadyVersion = "1.60.0";
+var boardReadyVersion = "1.60.1";
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);
@@ -79519,7 +79519,7 @@ function stableStringify(value) {
     return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
   }
   if (value && typeof value === "object") {
-    return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`).join(",")}}`;
+    return `{${Object.entries(value).sort(([a], [b]) => compareCodePoints(a, b)).map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`).join(",")}}`;
   }
   return JSON.stringify(value);
 }
@@ -79604,7 +79604,7 @@ function shouldFail(findings, failOn) {
 }
 function sortFindings(findings) {
   return [...findings].sort(
-    (a, b) => compareSeverity(a.severity, b.severity) || a.ruleId.localeCompare(b.ruleId) || (a.project ?? "").localeCompare(b.project ?? "") || a.resource.path.localeCompare(b.resource.path) || a.message.localeCompare(b.message)
+    (a, b) => compareSeverity(a.severity, b.severity) || compareCodePoints(a.ruleId, b.ruleId) || compareCodePoints(a.project ?? "", b.project ?? "") || compareCodePoints(a.resource.path, b.resource.path) || compareCodePoints(a.message, b.message)
   );
 }
 
@@ -104336,7 +104336,7 @@ var import_node_path42 = __toESM(require("node:path"), 1);
 async function discoverProjects(root, explicitProject) {
   const projectFiles = explicitProject ? await explicitProjectFiles(root, explicitProject) : (await globFiles(root, ["**/*.kicad_pro"])).map((file2) => import_node_path42.default.resolve(file2));
   const contexts = [];
-  const projectFilesSorted = [...projectFiles].sort((a, b) => a.localeCompare(b));
+  const projectFilesSorted = [...projectFiles].sort(compareCodePoints);
   for (const projectFile of projectFilesSorted) {
     contexts.push(await projectContext(root, projectFile));
   }
@@ -104379,7 +104379,7 @@ async function discoverJobsets(projectRoot) {
       scoped.push(file2);
     }
   }
-  return [...new Set(scoped)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(scoped)].sort(compareCodePoints);
 }
 async function isInsideNestedProject(projectRoot, file2) {
   const stop = import_node_path42.default.resolve(projectRoot);
@@ -111951,7 +111951,7 @@ function diffFabrication(previous, current, previousFindings, currentFindings, o
 function diffBom(previous, current, maxRows) {
   const previousRows = new Map(previous.map((row) => [bomRowKey(row), row]));
   const currentRows = new Map(current.map((row) => [bomRowKey(row), row]));
-  const rowKeys = [.../* @__PURE__ */ new Set([...previousRows.keys(), ...currentRows.keys()])].sort((a, b) => a.localeCompare(b));
+  const rowKeys = [.../* @__PURE__ */ new Set([...previousRows.keys(), ...currentRows.keys()])].sort(compareCodePoints);
   const rows = rowKeys.map((rowKey) => {
     const prior = previousRows.get(rowKey);
     const next = currentRows.get(rowKey);
@@ -111976,7 +111976,7 @@ function diffBom(previous, current, maxRows) {
 function diffOutputs(previous, current) {
   const previousOutputs = new Map(previous.map((output) => [output.kind, output]));
   const currentOutputs = new Map(current.map((output) => [output.kind, output]));
-  return [.../* @__PURE__ */ new Set([...previousOutputs.keys(), ...currentOutputs.keys()])].sort((a, b) => a.localeCompare(b)).map((kind) => outputDiff(kind, previousOutputs.get(kind), currentOutputs.get(kind)));
+  return [.../* @__PURE__ */ new Set([...previousOutputs.keys(), ...currentOutputs.keys()])].sort(compareCodePoints).map((kind) => outputDiff(kind, previousOutputs.get(kind), currentOutputs.get(kind)));
 }
 function diffFindings(previous, current) {
   const previousFingerprints = new Map(previous.map((finding2) => [finding2.fingerprint, finding2]));
@@ -112028,7 +112028,7 @@ function bomFingerprint(row) {
 }
 function compareBomDiffRows(left, right) {
   const signalOrder = Number(left.status === "unchanged") - Number(right.status === "unchanged");
-  return signalOrder || left.reference.localeCompare(right.reference);
+  return signalOrder || compareCodePoints(left.reference, right.reference);
 }
 function outputDiff(kind, previous, current) {
   const priorFiles = new Map(previous?.files.map((file2) => [file2.path, file2]) ?? []);

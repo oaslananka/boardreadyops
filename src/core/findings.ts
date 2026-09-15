@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { stableStringify } from "../util/strings.js";
+import { compareCodePoints, stableStringify } from "../util/strings.js";
 
 const severityNames = ["critical", "high", "medium", "low", "info"] as const;
 export type Severity = (typeof severityNames)[number];
@@ -136,9 +136,9 @@ export function sortFindings(findings: Finding[]): Finding[] {
   return [...findings].sort(
     (a, b) =>
       compareSeverity(a.severity, b.severity) ||
-      a.ruleId.localeCompare(b.ruleId) ||
-      (a.project ?? "").localeCompare(b.project ?? "") ||
-      a.resource.path.localeCompare(b.resource.path) ||
-      a.message.localeCompare(b.message),
+      compareCodePoints(a.ruleId, b.ruleId) ||
+      compareCodePoints(a.project ?? "", b.project ?? "") ||
+      compareCodePoints(a.resource.path, b.resource.path) ||
+      compareCodePoints(a.message, b.message),
   );
 }
