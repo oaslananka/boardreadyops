@@ -2499,6 +2499,61 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "bom-ref": {
               "type": "string",
             },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "identity": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "concludedValue": {
+                        "type": "string",
+                      },
+                      "confidence": {
+                        "type": "number",
+                      },
+                      "field": {
+                        "const": "purl",
+                      },
+                      "methods": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "confidence": {
+                              "type": "number",
+                            },
+                            "technique": {
+                              "const": "manifest-analysis",
+                            },
+                            "value": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "confidence",
+                            "technique",
+                          ],
+                          "type": "object",
+                        },
+                        "type": "array",
+                      },
+                    },
+                    "required": [
+                      "concludedValue",
+                      "confidence",
+                      "field",
+                      "methods",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "identity",
+              ],
+              "type": "object",
+            },
             "externalReferences": {
               "items": {
                 "additionalProperties": false,

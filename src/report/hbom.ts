@@ -1,5 +1,6 @@
 import type { FabricationSnapshot } from "../core/diff/fabrication.js";
 import type { RunResult } from "../core/result.js";
+import { assessComponentIdentity, summariseIndexedIdentifiers } from "./component-identity.js";
 
 interface CycloneDxOrganizationalEntity {
   name: string;
@@ -15,6 +16,24 @@ interface CycloneDxExternalReference {
   url: string;
 }
 
+interface CycloneDxIdentityMethod {
+  technique: "manifest-analysis";
+  confidence: number;
+  value?: string | undefined;
+}
+
+/**
+ * CycloneDX identity evidence, which is the spec's own place to say how sure we are of an
+ * identifier and how we arrived at it. Using it rather than inventing a property, because a
+ * consumer that understands CycloneDX already knows how to read this.
+ */
+interface CycloneDxIdentityEvidence {
+  field: "purl";
+  confidence: number;
+  concludedValue: string;
+  methods: CycloneDxIdentityMethod[];
+}
+
 interface CycloneDxHbomComponent {
   type: "device";
   name: string;
@@ -24,6 +43,7 @@ interface CycloneDxHbomComponent {
   supplier?: CycloneDxOrganizationalEntity | undefined;
   purl?: string | undefined;
   externalReferences?: CycloneDxExternalReference[] | undefined;
+  evidence?: { identity: CycloneDxIdentityEvidence[] } | undefined;
   properties: CycloneDxProperty[];
 }
 
@@ -87,7 +107,7 @@ export function createHbom(result: RunResult): CycloneDxHbom {
         name: hardwareName(result),
         "bom-ref": rootRef,
       },
-      properties: [{ name: "boardreadyops:componentClass", value: "hardware" }],
+      properties: metadataProperties(components),
     },
     components,
     dependencies: [
@@ -122,8 +142,39 @@ function componentFromBomRow(row: BomRow): CycloneDxHbomComponent {
   const purl = purlFromRow(row);
   if (purl) {
     component.purl = purl;
+    const assessment = assessComponentIdentity(purl);
+    component.evidence = {
+      identity: [
+        {
+          field: "purl",
+          confidence: assessment.confidence,
+          concludedValue: purl,
+          methods: [{ technique: assessment.technique, confidence: assessment.confidence, value: purl }],
+        },
+      ],
+    };
+    // The claim a reader most needs and the spec has no field for: whether a "no advisories found"
+    // answer about this identifier would mean anything.
+    component.properties.push({
+      name: "boardreadyops:vulnerabilityIndexed",
+      value: String(assessment.vulnerabilityIndexed),
+    });
   }
   return component;
+}
+
+/**
+ * Document-level counts, so the gap is visible at the top rather than only per component.
+ *
+ * A reader who sees `0 of 42` knows the scanner result below is about coverage, not cleanliness.
+ */
+function metadataProperties(components: readonly CycloneDxHbomComponent[]): CycloneDxProperty[] {
+  const summary = summariseIndexedIdentifiers(components.map((component) => component.purl));
+  return [
+    { name: "boardreadyops:componentClass", value: "hardware" },
+    { name: "boardreadyops:componentCount", value: String(summary.total) },
+    { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: String(summary.indexed) },
+  ];
 }
 
 function componentProperties(row: BomRow): CycloneDxProperty[] {
