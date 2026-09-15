@@ -101780,6 +101780,10 @@ function vendorOutputPatterns(kind) {
 }
 
 // src/vendor/profiles.ts
+var unverifiedProvenance = {
+  revision: "unverified-0",
+  confidence: "unverified"
+};
 var profiles = [
   {
     id: "jlcpcb",
@@ -101826,6 +101830,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.2,
       maxLayers: 6
     },
+    provenance: unverifiedProvenance,
     caveats: [
       "This profile validates package evidence only; always confirm current vendor capabilities before ordering."
     ]
@@ -101862,6 +101867,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 8
     },
+    provenance: unverifiedProvenance,
     caveats: ["Profile defaults are intentionally conservative and should be overridden for the exact service tier."]
   },
   {
@@ -101888,6 +101894,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 4
     },
+    provenance: unverifiedProvenance,
     caveats: ["OSH Park is treated as fabrication-only; assembly evidence is not required by this profile."]
   },
   {
@@ -101917,6 +101924,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 4
     },
+    provenance: unverifiedProvenance,
     caveats: ["Use project overrides for exact Aisler pool/service constraints before ordering."]
   },
   {
@@ -101946,6 +101954,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 6
     },
+    provenance: unverifiedProvenance,
     caveats: ["Profile limits are conservative defaults; override them for Seeed Fusion advanced capabilities."]
   },
   {
@@ -101971,6 +101980,7 @@ var profiles = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 8
     },
+    provenance: unverifiedProvenance,
     caveats: ["Treat as fabrication-only unless a separate assembly profile is selected."]
   },
   {
@@ -102002,6 +102012,7 @@ var profiles = [
         rationale: "Assembly or fabrication drawings help catch stackup and finish issues early."
       }
     ],
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset \u2014 not tuned to a specific vendor. Select a named vendor profile for production.",
       "Recommended outputs (BOM, PDF) are surfaced as warnings only."
@@ -102046,6 +102057,7 @@ var profiles = [
         rationale: "Fabrication and assembly drawings document stackup, finish, and controlled assumptions."
       }
     ],
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset \u2014 not tuned to a specific vendor. Select a named vendor profile for production.",
       "STEP and PDF are recommended; their absence lowers the readiness score but does not block."
@@ -102095,6 +102107,7 @@ var profiles = [
       minAnnularRingMm: 0.1,
       minBoardEdgeClearanceMm: 0.2
     },
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset \u2014 not tuned to a specific vendor. Select a named vendor profile for your manufacturer.",
       "All evidence kinds are required; missing any item blocks the release readiness score."
@@ -102216,6 +102229,9 @@ function cloneProfile(profile) {
       }
     } : {},
     ...profile.fabrication ? { fabrication: { ...profile.fabrication } } : {},
+    // Copied, not defaulted: hardcoding `unverifiedProvenance` here would discard a real
+    // verification record every time a profile was cloned.
+    provenance: { ...profile.provenance },
     caveats: [...profile.caveats]
   };
 }

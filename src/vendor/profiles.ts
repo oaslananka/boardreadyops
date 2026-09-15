@@ -25,6 +25,83 @@ interface VendorFabricationLimits {
   maxLayers?: number | undefined;
 }
 
+/**
+ * How much a profile's capability values can be trusted, and on what basis.
+ *
+ * Without this a profile is nine numbers in a TypeScript file, and "is this board ready for
+ * JLCPCB?" means "does it satisfy some values a developer typed at an unknown time from an
+ * unrecorded source". That answer cannot carry a production decision, and #754 makes the point
+ * that a stale profile which *looks* authoritative is worse than an honest one.
+ *
+ * `source`, `verifiedAt` and `verifiedBy` are optional because for the profiles shipped today
+ * there is no truthful value to put in them. Inventing a verification date would fabricate the
+ * very record this type exists to provide.
+ */
+/*
+ * Not exported: `VendorProfile` and `vendorProfileAssurance` name it, and no external author
+ * constructs a profile today -- `VendorProfileConfig` has no provenance field. Export it when a
+ * caller exists, per #752.
+ */
+interface VendorProfileProvenance {
+  /** Bumped whenever a capability value changes, so a release can cite the profile it was judged against. */
+  revision: string;
+  /**
+   * - "verified": a person checked these values against the vendor's published capabilities on `verifiedAt`.
+   * - "derived": computed from observed outcomes -- accepted and rejected packages -- rather than a document.
+   * - "unverified": entered from an unrecorded source at an unknown time. Advisory only.
+   */
+  confidence: "verified" | "derived" | "unverified";
+  /** The vendor capability page, quote, or document the values came from. */
+  source?: string | undefined;
+  /** ISO date a person last checked `source` against these values. */
+  verifiedAt?: string | undefined;
+  /** Who checked. A profile with a `verifiedAt` and nobody attached to it is not verified. */
+  verifiedBy?: string | undefined;
+}
+
+/**
+ * What the profiles in this file carry today.
+ *
+ * Every value here was typed into source from a vendor page at some point nobody recorded. That
+ * is worth stating rather than dressing up: a rule may cite these numbers, and it may warn on
+ * them, but nothing should block a production release on a capability limit whose provenance is
+ * "someone wrote it down". Replacing this with a real `verified` provenance is per-profile work
+ * that needs a person and a date, not a code change.
+ */
+const unverifiedProvenance: VendorProfileProvenance = {
+  revision: "unverified-0",
+  confidence: "unverified",
+};
+
+/** Beyond this, a verified profile is old enough that the vendor may have changed capability. */
+const stalenessHorizonDays = 180;
+
+export type VendorProfileAssurance =
+  | { state: "verified"; ageDays: number; mayBlock: true }
+  | { state: "stale"; ageDays: number; mayBlock: false }
+  | { state: "unverified"; mayBlock: false };
+
+/**
+ * Whether a profile's values are current enough to stop a release.
+ *
+ * `mayBlock` is the field that matters, and it is false in two of the three states. A finding
+ * derived from an unverified or lapsed capability limit can be wrong about a board that is fine,
+ * and two of those and a team switches the gate off -- after which every other check here is
+ * worth nothing.
+ */
+export function vendorProfileAssurance(profile: VendorProfile, now: Date = new Date()): VendorProfileAssurance {
+  const { confidence, verifiedAt, verifiedBy } = profile.provenance;
+  if (confidence === "unverified" || !verifiedAt || !verifiedBy) return { state: "unverified", mayBlock: false };
+
+  const verified = new Date(verifiedAt);
+  if (Number.isNaN(verified.getTime())) return { state: "unverified", mayBlock: false };
+
+  const ageDays = Math.floor((now.getTime() - verified.getTime()) / 86_400_000);
+  return ageDays > stalenessHorizonDays
+    ? { state: "stale", ageDays, mayBlock: false }
+    : { state: "verified", ageDays, mayBlock: true };
+}
+
 export interface VendorProfile {
   id: string;
   name: string;
@@ -35,6 +112,7 @@ export interface VendorProfile {
   assembly?: VendorAssemblyAssumptions | undefined;
   fabrication?: VendorFabricationLimits | undefined;
   caveats: string[];
+  provenance: VendorProfileProvenance;
 }
 
 export interface VendorProfileConfig {
@@ -99,6 +177,7 @@ const profiles: VendorProfile[] = [
       minBoardEdgeClearanceMm: 0.2,
       maxLayers: 6,
     },
+    provenance: unverifiedProvenance,
     caveats: [
       "This profile validates package evidence only; always confirm current vendor capabilities before ordering.",
     ],
@@ -135,6 +214,7 @@ const profiles: VendorProfile[] = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 8,
     },
+    provenance: unverifiedProvenance,
     caveats: ["Profile defaults are intentionally conservative and should be overridden for the exact service tier."],
   },
   {
@@ -161,6 +241,7 @@ const profiles: VendorProfile[] = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 4,
     },
+    provenance: unverifiedProvenance,
     caveats: ["OSH Park is treated as fabrication-only; assembly evidence is not required by this profile."],
   },
   {
@@ -190,6 +271,7 @@ const profiles: VendorProfile[] = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 4,
     },
+    provenance: unverifiedProvenance,
     caveats: ["Use project overrides for exact Aisler pool/service constraints before ordering."],
   },
   {
@@ -219,6 +301,7 @@ const profiles: VendorProfile[] = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 6,
     },
+    provenance: unverifiedProvenance,
     caveats: ["Profile limits are conservative defaults; override them for Seeed Fusion advanced capabilities."],
   },
   {
@@ -244,6 +327,7 @@ const profiles: VendorProfile[] = [
       minBoardEdgeClearanceMm: 0.25,
       maxLayers: 8,
     },
+    provenance: unverifiedProvenance,
     caveats: ["Treat as fabrication-only unless a separate assembly profile is selected."],
   },
   {
@@ -276,6 +360,7 @@ const profiles: VendorProfile[] = [
         rationale: "Assembly or fabrication drawings help catch stackup and finish issues early.",
       },
     ],
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset — not tuned to a specific vendor. Select a named vendor profile for production.",
       "Recommended outputs (BOM, PDF) are surfaced as warnings only.",
@@ -321,6 +406,7 @@ const profiles: VendorProfile[] = [
         rationale: "Fabrication and assembly drawings document stackup, finish, and controlled assumptions.",
       },
     ],
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset — not tuned to a specific vendor. Select a named vendor profile for production.",
       "STEP and PDF are recommended; their absence lowers the readiness score but does not block.",
@@ -372,6 +458,7 @@ const profiles: VendorProfile[] = [
       minAnnularRingMm: 0.1,
       minBoardEdgeClearanceMm: 0.2,
     },
+    provenance: unverifiedProvenance,
     caveats: [
       "Generic preset — not tuned to a specific vendor. Select a named vendor profile for your manufacturer.",
       "All evidence kinds are required; missing any item blocks the release readiness score.",
@@ -511,6 +598,9 @@ function cloneProfile(profile: VendorProfile): VendorProfile {
         }
       : {}),
     ...(profile.fabrication ? { fabrication: { ...profile.fabrication } } : {}),
+    // Copied, not defaulted: hardcoding `unverifiedProvenance` here would discard a real
+    // verification record every time a profile was cloned.
+    provenance: { ...profile.provenance },
     caveats: [...profile.caveats],
   };
 }
