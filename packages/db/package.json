@@ -36,6 +36,11 @@
       "import": "./src/board-bom-store.ts",
       "default": "./src/board-bom-store.ts"
     },
+    "./firmware-snapshot-store": {
+      "types": "./src/firmware-snapshot-store.ts",
+      "import": "./src/firmware-snapshot-store.ts",
+      "default": "./src/firmware-snapshot-store.ts"
+    },
     "./audit-log-store": {
       "types": "./src/audit-log-store.ts",
       "import": "./src/audit-log-store.ts",

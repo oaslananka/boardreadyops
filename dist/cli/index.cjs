@@ -35954,7 +35954,7 @@ function inferredConclusion(input) {
   }
   return "neutral";
 }
-var releaseRunStatusSchema, releaseDecisionSchema, releaseRunConclusionSchema, triggerKindSchema, findingSeveritySchema, findingFingerprintSchema, createReleaseRunRequestSchema, findingCategorySchema, findingSchema, artifactStoragePathSchema, releaseRunArtifactSchema, releaseRunBomComponentSchema, releaseRunBoardBomSchema, releaseRunReportLinkSchema, releaseRunMetricsSchema, releaseRunReadinessSchema, releaseRunWaiverSchema, releaseRunWaiversSchema, hardwareImpactDomainSchema, hardwareImpactRiskDirectionSchema, hardwareImpactBaselineReasonSchema, hardwareImpactShaSchema, hardwareImpactCountSchema, hardwareImpactReadinessStatusSchema, hardwareImpactEvidenceSeveritySchema, hardwareImpactAvailableBaselineSchema, hardwareImpactUnavailableBaselineSchema, hardwareImpactEvidenceRefSchema, hardwareImpactV1Schema, releaseRunResultBaseSchema, releaseRunResultSchema, runnerTerminalResultRequestSchema;
+var releaseRunStatusSchema, releaseDecisionSchema, releaseRunConclusionSchema, triggerKindSchema, findingSeveritySchema, findingFingerprintSchema, createReleaseRunRequestSchema, findingCategorySchema, findingSchema, artifactStoragePathSchema, releaseRunArtifactSchema, releaseRunBomComponentSchema, releaseRunBoardBomSchema, releaseRunFirmwareDependencySchema, releaseRunFirmwareSchema, releaseRunReportLinkSchema, releaseRunMetricsSchema, releaseRunReadinessSchema, releaseRunWaiverSchema, releaseRunWaiversSchema, hardwareImpactDomainSchema, hardwareImpactRiskDirectionSchema, hardwareImpactBaselineReasonSchema, hardwareImpactShaSchema, hardwareImpactCountSchema, hardwareImpactReadinessStatusSchema, hardwareImpactEvidenceSeveritySchema, hardwareImpactAvailableBaselineSchema, hardwareImpactUnavailableBaselineSchema, hardwareImpactEvidenceRefSchema, hardwareImpactV1Schema, releaseRunResultBaseSchema, releaseRunResultSchema, runnerTerminalResultRequestSchema;
 var init_src = __esm({
   "packages/contracts/src/index.ts"() {
     "use strict";
@@ -36037,6 +36037,27 @@ var init_src = __esm({
     releaseRunBoardBomSchema = external_exports.object({
       project: external_exports.string().trim().min(1).max(1024),
       components: external_exports.array(releaseRunBomComponentSchema).max(5e3)
+    }).strict();
+    releaseRunFirmwareDependencySchema = external_exports.object({
+      name: external_exports.string().trim().min(1).max(256),
+      manifestPath: external_exports.string().trim().min(1).max(1024),
+      origin: external_exports.enum(["registry", "git", "local", "framework"]),
+      versionSpec: external_exports.string().trim().min(1).max(256).optional(),
+      pinned: external_exports.boolean(),
+      purl: external_exports.string().trim().startsWith("pkg:").max(512).optional(),
+      cpe: external_exports.string().trim().startsWith("cpe:2.3:").max(512).optional(),
+      searchable: external_exports.boolean(),
+      identitySource: external_exports.string().trim().min(1).max(512).optional()
+    }).strict().refine(
+      (value) => value.searchable ? value.purl !== void 0 || value.cpe !== void 0 : true,
+      "a searchable dependency must carry a purl or a cpe"
+    ).refine(
+      (value) => value.searchable ? true : value.purl === void 0 && value.cpe === void 0,
+      "an unsearchable dependency must carry no identifier"
+    );
+    releaseRunFirmwareSchema = external_exports.object({
+      dependencies: external_exports.array(releaseRunFirmwareDependencySchema).max(2e3),
+      warnings: external_exports.array(external_exports.string().trim().min(1).max(1024)).max(200)
     }).strict();
     releaseRunReportLinkSchema = external_exports.object({
       label: external_exports.string().trim().min(1).max(160),
@@ -36150,7 +36171,9 @@ var init_src = __esm({
       hardwareImpact: hardwareImpactV1Schema.optional(),
       // Optional with no default: a default would materialise the key on every legacy
       // payload and change its terminal-result digest, breaking replay detection.
-      boms: external_exports.array(releaseRunBoardBomSchema).max(50).optional()
+      boms: external_exports.array(releaseRunBoardBomSchema).max(50).optional(),
+      // Optional with no default, for the same reason as `boms` above.
+      firmware: releaseRunFirmwareSchema.optional()
     }).strict();
     releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context) => {
       const expected = inferredConclusion(value);
@@ -59265,6 +59288,16 @@ async function publishArtifacts(client, job, artifacts) {
   }
   return published;
 }
+function boundedFirmware(firmware) {
+  return {
+    dependencies: firmware.dependencies.slice(0, 2e3).map((dependency) => ({
+      ...dependency,
+      name: dependency.name.slice(0, 256),
+      manifestPath: dependency.manifestPath.slice(0, 1024)
+    })),
+    warnings: firmware.warnings.slice(0, 200).map((warning3) => warning3.slice(0, 1024))
+  };
+}
 function boundedBoms(boms) {
   return boms.slice(0, 50).map((bom) => ({
     project: bom.project.slice(0, 1024),
@@ -59330,6 +59363,9 @@ function terminalResultFromExecution(job, execution, artifacts, artifactMode) {
     // Spread an empty object when there is nothing to report so `boms` stays absent rather
     // than becoming [], which would change the terminal result digest for every legacy run.
     ...execution.report?.boms?.length ? { boms: boundedBoms(execution.report.boms) } : {},
+    // Absent rather than an empty object when the project has no firmware, so the terminal
+    // result digest of a hardware-only run is unchanged.
+    ...execution.report?.firmware?.dependencies.length ? { firmware: boundedFirmware(execution.report.firmware) } : {},
     reportLinks: []
   });
 }
@@ -59465,45 +59501,7 @@ async function executeRunnerPipeline(workspace, job, options) {
   );
   options.signal?.throwIfAborted();
   const report = await readRunReport(import_node_path68.default.join(workspace, targets[0].relative));
-  const runnerReport = report ? {
-    summary: {
-      total: report.summary.total,
-      critical: report.summary.critical,
-      high: report.summary.high,
-      medium: report.summary.medium,
-      low: report.summary.low,
-      info: report.summary.info
-    },
-    ...report.readiness ? {
-      readiness: {
-        score: report.readiness.score,
-        status: report.readiness.status,
-        blocking: report.readiness.blocking,
-        nonBlocking: report.readiness.nonBlocking,
-        missingRequired: report.readiness.missingRequired,
-        missingRecommended: report.readiness.missingRecommended,
-        warnings: report.readiness.warnings
-      }
-    } : {},
-    ...report.waivers ? { waivers: report.waivers } : {},
-    findings: report.findings.map((finding2) => {
-      const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
-      const endLine = finding2.location?.region?.endLine ?? startLine;
-      return {
-        ruleId: finding2.ruleId,
-        severity: finding2.severity,
-        message: finding2.message,
-        resource: {
-          ...finding2.resource.path === void 0 ? {} : { path: finding2.resource.path }
-        },
-        fingerprint: finding2.fingerprint,
-        ...startLine !== void 0 ? { startLine } : {},
-        ...endLine !== void 0 ? { endLine } : {},
-        ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
-        ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
-      };
-    })
-  } : void 0;
+  const runnerReport = report ? runnerReportFromResult(report) : void 0;
   const artifacts = [];
   for (const target of targets) {
     const filePath = import_node_path68.default.join(workspace, target.relative);
@@ -59527,6 +59525,54 @@ async function runnerArtifact(filePath, kind, name, role) {
     filePath,
     bytes: content.byteLength,
     sha256: (0, import_node_crypto18.createHash)("sha256").update(content).digest("hex")
+  };
+}
+function runnerReportFromResult(report) {
+  return {
+    summary: {
+      total: report.summary.total,
+      critical: report.summary.critical,
+      high: report.summary.high,
+      medium: report.summary.medium,
+      low: report.summary.low,
+      info: report.summary.info
+    },
+    ...report.readiness ? {
+      readiness: {
+        score: report.readiness.score,
+        status: report.readiness.status,
+        blocking: report.readiness.blocking,
+        nonBlocking: report.readiness.nonBlocking,
+        missingRequired: report.readiness.missingRequired,
+        missingRecommended: report.readiness.missingRecommended,
+        warnings: report.readiness.warnings
+      }
+    } : {},
+    ...report.waivers ? { waivers: report.waivers } : {},
+    // Both of these were available on the parsed report and simply not copied, so the
+    // runner never sent them: board_bom_snapshots stayed empty and resolveAffectedBoards
+    // had no input, despite the contract, the route and the migration all being in place.
+    // Neither key is part of normalizedResultForDigest, so sending them does not change a
+    // terminal result digest or affect replay detection. See #800.
+    ...report.boms?.length ? { boms: report.boms } : {},
+    ...report.firmware?.dependencies.length ? { firmware: report.firmware } : {},
+    findings: report.findings.map((finding2) => {
+      const startLine = finding2.location?.region?.startLine ?? finding2.location?.line;
+      const endLine = finding2.location?.region?.endLine ?? startLine;
+      return {
+        ruleId: finding2.ruleId,
+        severity: finding2.severity,
+        message: finding2.message,
+        resource: {
+          ...finding2.resource.path === void 0 ? {} : { path: finding2.resource.path }
+        },
+        fingerprint: finding2.fingerprint,
+        ...startLine !== void 0 ? { startLine } : {},
+        ...endLine !== void 0 ? { endLine } : {},
+        ...finding2.location?.region?.startColumn !== void 0 ? { startColumn: finding2.location.region.startColumn } : {},
+        ...finding2.location?.region?.endColumn !== void 0 ? { endColumn: finding2.location.region.endColumn } : {}
+      };
+    })
   };
 }
 async function readRunReport(filePath) {

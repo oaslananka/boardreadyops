@@ -32,6 +32,7 @@ model Repository {
   installation   Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
   runs           ReleaseRun[]
   boards         Board[]
+  firmwareSnapshots RepositoryFirmwareSnapshot[]
 
   @@unique([installationId, owner, name])
   @@map("repositories")
@@ -63,6 +64,7 @@ model ReleaseRun {
   result                    ReleaseRunResult?
   attempts                  ReleaseRunAttempt[]
   bomSnapshots              BoardBomSnapshot[]
+  firmwareSnapshots         RepositoryFirmwareSnapshot[]
 
   @@index([repositoryId, startedAt])
   @@index([commitSha])
@@ -191,4 +193,47 @@ model BoardBomComponent {
 
   @@index([snapshotId, reference], map: "board_bom_components_snapshot_idx")
   @@map("board_bom_components")
+}
+
+/// Firmware dependency snapshots are scoped to a repository at a commit, not to a board.
+/// `captureFirmwareSnapshot` globs the whole tree and the record carries a manifest path with no
+/// project association, so there is no board fact to record; guessing one from directory layout
+/// would put an invented board list into a CRA report. See the decision on #798.
+model RepositoryFirmwareSnapshot {
+  id              String                         @id @default(uuid())
+  repositoryId    String                         @map("repository_id")
+  runId           String                         @map("run_id")
+  commitSha       String                         @map("commit_sha")
+  dependencyCount Int                            @default(0) @map("dependency_count")
+  searchableCount Int                            @default(0) @map("searchable_count")
+  capturedAt      DateTime                       @default(now()) @map("captured_at")
+  repository      Repository                     @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  run             ReleaseRun                     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  dependencies    RepositoryFirmwareDependency[]
+
+  @@unique([repositoryId, runId], map: "repository_firmware_snapshots_repo_run_idx")
+  @@index([repositoryId, capturedAt(sort: Desc), id], map: "repository_firmware_snapshots_repo_captured_idx")
+  @@map("repository_firmware_snapshots")
+}
+
+model RepositoryFirmwareDependency {
+  id             String                     @id @default(uuid())
+  snapshotId     String                     @map("snapshot_id")
+  name           String
+  manifestPath   String                     @map("manifest_path")
+  origin         String
+  versionSpec    String?                    @map("version_spec")
+  pinned         Boolean                    @default(false)
+  purl           String?
+  cpe            String?
+  /// Whether a "no advisories found" answer about this dependency would mean anything. The
+  /// database refuses a row that claims searchable with no identifier, or the reverse.
+  searchable     Boolean                    @default(false)
+  identitySource String?                    @map("identity_source")
+  snapshot       RepositoryFirmwareSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, name], map: "repository_firmware_dependencies_snapshot_idx")
+  @@index([purl], map: "repository_firmware_dependencies_purl_idx")
+  @@index([cpe], map: "repository_firmware_dependencies_cpe_idx")
+  @@map("repository_firmware_dependencies")
 }

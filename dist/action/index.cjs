@@ -107907,6 +107907,27 @@ var releaseRunBoardBomSchema = external_exports.object({
   project: external_exports.string().trim().min(1).max(1024),
   components: external_exports.array(releaseRunBomComponentSchema).max(5e3)
 }).strict();
+var releaseRunFirmwareDependencySchema = external_exports.object({
+  name: external_exports.string().trim().min(1).max(256),
+  manifestPath: external_exports.string().trim().min(1).max(1024),
+  origin: external_exports.enum(["registry", "git", "local", "framework"]),
+  versionSpec: external_exports.string().trim().min(1).max(256).optional(),
+  pinned: external_exports.boolean(),
+  purl: external_exports.string().trim().startsWith("pkg:").max(512).optional(),
+  cpe: external_exports.string().trim().startsWith("cpe:2.3:").max(512).optional(),
+  searchable: external_exports.boolean(),
+  identitySource: external_exports.string().trim().min(1).max(512).optional()
+}).strict().refine(
+  (value) => value.searchable ? value.purl !== void 0 || value.cpe !== void 0 : true,
+  "a searchable dependency must carry a purl or a cpe"
+).refine(
+  (value) => value.searchable ? true : value.purl === void 0 && value.cpe === void 0,
+  "an unsearchable dependency must carry no identifier"
+);
+var releaseRunFirmwareSchema = external_exports.object({
+  dependencies: external_exports.array(releaseRunFirmwareDependencySchema).max(2e3),
+  warnings: external_exports.array(external_exports.string().trim().min(1).max(1024)).max(200)
+}).strict();
 var releaseRunReportLinkSchema = external_exports.object({
   label: external_exports.string().trim().min(1).max(160),
   url: external_exports.string().url().max(2048).refine((value) => new URL(value).protocol === "https:", "report link must use HTTPS")
@@ -108031,7 +108052,9 @@ var releaseRunResultBaseSchema = external_exports.object({
   hardwareImpact: hardwareImpactV1Schema.optional(),
   // Optional with no default: a default would materialise the key on every legacy
   // payload and change its terminal-result digest, breaking replay detection.
-  boms: external_exports.array(releaseRunBoardBomSchema).max(50).optional()
+  boms: external_exports.array(releaseRunBoardBomSchema).max(50).optional(),
+  // Optional with no default, for the same reason as `boms` above.
+  firmware: releaseRunFirmwareSchema.optional()
 }).strict();
 var releaseRunResultSchema = releaseRunResultBaseSchema.superRefine((value, context5) => {
   const expected = inferredConclusion(value);

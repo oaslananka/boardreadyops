@@ -58,6 +58,7 @@ type RunnerExecutionReport = {
   waivers?: NonNullable<ReleaseRunResult["waivers"]>;
   hardwareImpact?: NonNullable<ReleaseRunResult["hardwareImpact"]>;
   boms?: NonNullable<ReleaseRunResult["boms"]>;
+  firmware?: NonNullable<ReleaseRunResult["firmware"]>;
   findings: Array<{
     ruleId: string;
     severity: "critical" | "high" | "medium" | "low" | "info";
@@ -445,6 +446,29 @@ async function publishArtifacts(
  * reference is empty. Trimming here keeps a large workspace from failing the whole callback
  * on a schema violation the runner can resolve itself.
  */
+/**
+ * Applies the contract's bounds to the reported firmware dependencies.
+ *
+ * Trimming here rather than failing the callback, for the same reason as boundedBoms: a large
+ * tree must not lose an otherwise-complete result to a schema bound the runner can resolve.
+ *
+ * An identifier is dropped along with `searchable` rather than independently -- the contract
+ * refuses a searchable dependency with no identifier, and an unsearchable one that carries one,
+ * because the value of the distinction is that the two can never disagree.
+ */
+function boundedFirmware(
+  firmware: NonNullable<ReleaseRunResult["firmware"]>,
+): NonNullable<ReleaseRunResult["firmware"]> {
+  return {
+    dependencies: firmware.dependencies.slice(0, 2000).map((dependency) => ({
+      ...dependency,
+      name: dependency.name.slice(0, 256),
+      manifestPath: dependency.manifestPath.slice(0, 1024),
+    })),
+    warnings: firmware.warnings.slice(0, 200).map((warning) => warning.slice(0, 1024)),
+  };
+}
+
 function boundedBoms(boms: NonNullable<ReleaseRunResult["boms"]>): NonNullable<ReleaseRunResult["boms"]> {
   return boms.slice(0, 50).map((bom) => ({
     project: bom.project.slice(0, 1024),
@@ -530,6 +554,11 @@ function terminalResultFromExecution(
     // Spread an empty object when there is nothing to report so `boms` stays absent rather
     // than becoming [], which would change the terminal result digest for every legacy run.
     ...(execution.report?.boms?.length ? { boms: boundedBoms(execution.report.boms) } : {}),
+    // Absent rather than an empty object when the project has no firmware, so the terminal
+    // result digest of a hardware-only run is unchanged.
+    ...(execution.report?.firmware?.dependencies.length
+      ? { firmware: boundedFirmware(execution.report.firmware) }
+      : {}),
     reportLinks: [],
   });
 }
