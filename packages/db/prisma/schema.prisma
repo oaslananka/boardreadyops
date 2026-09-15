@@ -33,6 +33,7 @@ model Repository {
   runs           ReleaseRun[]
   boards         Board[]
   firmwareSnapshots RepositoryFirmwareSnapshot[]
+  firmwareAdvisoryWatch RepositoryFirmwareAdvisoryWatch?
 
   @@unique([installationId, owner, name])
   @@map("repositories")
@@ -236,4 +237,26 @@ model RepositoryFirmwareDependency {
   @@index([purl], map: "repository_firmware_dependencies_purl_idx")
   @@index([cpe], map: "repository_firmware_dependencies_cpe_idx")
   @@map("repository_firmware_dependencies")
+}
+
+/// Schedule state for advisory scanning, keyed by repository rather than by snapshot.
+///
+/// Every run appends a snapshot, so a per-snapshot schedule would rescan the same dependencies
+/// once per run and spend a rate-limited NVD budget learning nothing. Separate from the snapshot
+/// rows because a snapshot is evidence and must not change, while when it was last scanned is
+/// mutable -- the same split board_supply_watch made. See #804.
+model RepositoryFirmwareAdvisoryWatch {
+  repositoryId          String     @id @map("repository_id")
+  enabled               Boolean    @default(true)
+  nextDueAt             DateTime   @default(now()) @map("next_due_at")
+  lastScannedAt         DateTime?  @map("last_scanned_at")
+  lastScannedSnapshotId String?    @map("last_scanned_snapshot_id")
+  /// One of answered, rejected, unavailable, no_provider, nothing_searchable, failed. Collapsing
+  /// a refusal or an outage into "answered" is the false clean bill, made durable.
+  lastOutcome           String?    @map("last_outcome")
+  consecutiveFailures   Int        @default(0) @map("consecutive_failures")
+  repository            Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@index([nextDueAt, repositoryId], map: "repository_firmware_advisory_watch_due_idx")
+  @@map("repository_firmware_advisory_watch")
 }

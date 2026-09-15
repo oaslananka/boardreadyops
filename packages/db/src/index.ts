@@ -14,6 +14,7 @@ export const cloudDatabaseModels = [
   "BoardBomComponent",
   "RepositoryFirmwareSnapshot",
   "RepositoryFirmwareDependency",
+  "RepositoryFirmwareAdvisoryWatch",
   "BoardSupplyWatch",
   "BoardSupplyFinding",
   "ComponentLifecycleObservation",
