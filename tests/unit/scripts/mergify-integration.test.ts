@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import * as yaml from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const mergify = readFileSync(".mergify.yml", "utf8");
@@ -73,6 +74,22 @@ describe("Mergify integration contract", () => {
     expect(mergify).toContain("files ~= ^\\.github/workflows/security");
     expect(mergify).toContain("files ~= ^docs/");
     expect(mergify).not.toContain('files ~= "^');
+  });
+
+  it("only labels a pull request as documentation when it changes nothing but documentation", () => {
+    const config = yaml.load(mergify) as {
+      pull_request_rules: Array<{ name: string; conditions: string[] }>;
+    };
+    const rule = config.pull_request_rules.find((entry) => entry.name === "label documentation changes");
+    if (!rule) throw new Error("Expected a documentation labelling rule.");
+
+    // Rule docs under docs/rules/ are generated, so every new-rule pull request touches docs/ as a
+    // side effect -- #775 added a manufacturing rule and came out labelled "documentation". The
+    // label has to stay docs-only or it stops carrying information.
+    expect(rule.conditions).toContain("files ~= ^docs/");
+    for (const codePath of ["^src/", "^packages/", "^apps/", "^tests/", "^scripts/"]) {
+      expect(rule.conditions, codePath).toContain(`-files ~= ${codePath}`);
+    }
   });
 
   it("keeps queue scopes in Mergify without replacing the repository CI risk profile", () => {

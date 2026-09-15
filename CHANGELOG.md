@@ -4,6 +4,30 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.56.0](https://github.com/oaslananka/boardreadyops/compare/v1.55.0...v1.56.0) (2026-09-15)
+
+
+### Features
+
+* **report:** say whether an SBOM component's identifier can be looked up ([#790](https://github.com/oaslananka/boardreadyops/issues/790)) ([538e961](https://github.com/oaslananka/boardreadyops/commit/538e96187fe4391052bfcd18d366270d3d10f9d6)), closes [#785](https://github.com/oaslananka/boardreadyops/issues/785)
+
+
+### Bug Fixes
+
+* **governance:** keep the documentation label on documentation changes ([#791](https://github.com/oaslananka/boardreadyops/issues/791)) ([a968b0c](https://github.com/oaslananka/boardreadyops/commit/a968b0cd511ae4db6b71a2282fe83f8d5fcbae57))
+
+## [1.55.0](https://github.com/oaslananka/boardreadyops/compare/v1.54.0...v1.55.0) (2026-09-15)
+
+
+### Features
+
+* **rules:** read ESP-IDF dependencies and say which cannot be looked up ([#786](https://github.com/oaslananka/boardreadyops/issues/786)) ([a7ff772](https://github.com/oaslananka/boardreadyops/commit/a7ff772fea33f24fef369085716e8d6bfd60cab5)), closes [#785](https://github.com/oaslananka/boardreadyops/issues/785)
+
+
+### Bug Fixes
+
+* **ci:** give the supply-chain trust check room to finish its fetches ([#789](https://github.com/oaslananka/boardreadyops/issues/789)) ([49a0964](https://github.com/oaslananka/boardreadyops/commit/49a096430c0c874bec0ad8ea088deb1cd4e37dd1)), closes [#787](https://github.com/oaslananka/boardreadyops/issues/787)
+
 ## [1.54.0](https://github.com/oaslananka/boardreadyops/compare/v1.53.0...v1.54.0) (2026-09-15)
 
 

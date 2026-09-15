@@ -20,7 +20,11 @@ describe("CycloneDX HBOM formatter", () => {
           type: "device",
           name: "safe-basic",
         },
-        properties: [{ name: "boardreadyops:componentClass", value: "hardware" }],
+        properties: [
+          { name: "boardreadyops:componentClass", value: "hardware" },
+          { name: "boardreadyops:componentCount", value: "2" },
+          { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "0" },
+        ],
       },
     });
     expect(hbom.components).toHaveLength(2);
@@ -52,6 +56,61 @@ describe("CycloneDX HBOM formatter", () => {
       "boardreadyops:component:bom.csv:R1",
       "boardreadyops:component:bom.csv:C1",
     ]);
+  });
+
+  it("says of every component whether its identifier can be looked up", () => {
+    const hbom = createHbom(resultWithBomRows());
+
+    for (const component of hbom.components) {
+      // The identifier we emit is pkg:generic, which OSV accepts and never matches. Saying so per
+      // component is what stops a scanner's empty answer reading as a clean bill. See #785.
+      expect(component.purl, component.name).toMatch(/^pkg:generic\//u);
+      expect(component.properties, component.name).toEqual(
+        expect.arrayContaining([{ name: "boardreadyops:vulnerabilityIndexed", value: "false" }]),
+      );
+      expect(component.evidence, component.name).toEqual({
+        identity: [
+          {
+            field: "purl",
+            confidence: 0.5,
+            concludedValue: component.purl,
+            methods: [{ technique: "manifest-analysis", confidence: 0.5, value: component.purl }],
+          },
+        ],
+      });
+    }
+  });
+
+  it("counts the identifiable components at the top of the document", () => {
+    // A reader has to see the gap without walking every component.
+    const hbom = createHbom(resultWithBomRows());
+
+    expect(hbom.metadata.properties).toEqual(
+      expect.arrayContaining([
+        { name: "boardreadyops:componentCount", value: "2" },
+        { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "0" },
+      ]),
+    );
+  });
+
+  it("claims nothing about identity for a component with no identifier", () => {
+    const result = resultWithBomRows();
+    const [row] = result.fabrication.bom;
+    if (!row) throw new Error("Expected fixture BOM row.");
+    result.fabrication.bom = [{ ...row, manufacturer: undefined, mpn: undefined }];
+
+    const [component] = createHbom(result).components;
+    // No PURL means no identity evidence and no indexed property -- an absent claim rather than a
+    // false one. The component still counts in the total.
+    expect(component).not.toHaveProperty("purl");
+    expect(component).not.toHaveProperty("evidence");
+    expect(component?.properties.map((entry) => entry.name)).not.toContain("boardreadyops:vulnerabilityIndexed");
+    expect(createHbom(result).metadata.properties).toEqual(
+      expect.arrayContaining([
+        { name: "boardreadyops:componentCount", value: "1" },
+        { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "0" },
+      ]),
+    );
   });
 
   it("formats HBOM JSON that validates against the bundled schema", () => {
