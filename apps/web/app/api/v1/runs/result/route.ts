@@ -3,6 +3,7 @@ import { planLimits, planTierOf } from "@boardreadyops/cloud-core/entitlements";
 import { findingsToCheckRunAnnotations } from "@boardreadyops/cloud-core/lifecycle-executor";
 import { type ReleaseRunResult, releaseRunResultSchema } from "@boardreadyops/contracts";
 import { createSqlBoardBomStore } from "@boardreadyops/db/board-bom-store";
+import { createSqlFirmwareSnapshotStore } from "@boardreadyops/db/firmware-snapshot-store";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { verifyGitHubActionsOidcToken } from "../../../../../lib/github-actions-oidc.js";
@@ -503,6 +504,45 @@ async function recordBoardBomSnapshots(
     return undefined;
   } catch {
     return "Board BOM snapshot could not be recorded for this run.";
+  }
+}
+
+/**
+ * Records the run's firmware dependency snapshot, scoped to the repository at this commit.
+ *
+ * Not per board: the snapshot carries manifest paths and no project association, so there is no
+ * board fact to record and guessing one from directory layout would put an invented board list
+ * into a CRA report. See the decision on #798.
+ *
+ * Unique per (repository, run), so a replayed result is a no-op. Like the BOM snapshot, a failure
+ * here is a warning rather than a rejection: the runner has already done its work and cannot
+ * usefully retry.
+ */
+async function recordFirmwareSnapshot(
+  executor: ResultQueryExecutor,
+  dependencies: ResultRouteDependencies,
+  input: ParsedResultRequest,
+  row: QueryRow,
+): Promise<string | undefined> {
+  const firmware = input.result.firmware;
+  if (!firmware || firmware.dependencies.length === 0) return undefined;
+
+  const repositoryId = stringCell(row, "repository_id");
+  const commitSha = stringCell(row, "commit_sha");
+  if (!repositoryId || !commitSha) {
+    return "Firmware dependency snapshot skipped: run repository or commit is unavailable.";
+  }
+
+  try {
+    await createSqlFirmwareSnapshotStore(executor, { now: dependencies.now }).recordSnapshot({
+      runId: input.runId,
+      repositoryId,
+      commitSha,
+      dependencies: firmware.dependencies,
+    });
+    return undefined;
+  } catch {
+    return "Firmware dependency snapshot could not be recorded for this run.";
   }
 }
 
@@ -1318,6 +1358,7 @@ export async function handleResultRequest(
   await announceRunOutcome(executor, dependencies, requestRead.value, persisted.row, persistenceOutcome);
 
   const snapshotWarning = await recordBoardBomSnapshots(executor, dependencies, requestRead.value, persisted.row);
+  const firmwareWarning = await recordFirmwareSnapshot(executor, dependencies, requestRead.value, persisted.row);
 
   const publication = await publishTerminalResult(
     executor,
@@ -1329,6 +1370,7 @@ export async function handleResultRequest(
   if (publication.response) return publication.response;
 
   if (snapshotWarning) publication.publicationWarnings.push(snapshotWarning);
+  if (firmwareWarning) publication.publicationWarnings.push(firmwareWarning);
 
   const responseStatus = persistenceOutcome === "replayed" ? "replayed" : "accepted";
   return Response.json(

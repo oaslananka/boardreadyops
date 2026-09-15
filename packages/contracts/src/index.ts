@@ -118,6 +118,50 @@ export const releaseRunBoardBomSchema = z
   })
   .strict();
 
+/**
+ * One firmware dependency as the run reports it.
+ *
+ * `searchable` says whether a "no advisories found" answer about this dependency would mean
+ * anything, and an identifier may only appear alongside it -- the refine below enforces that,
+ * because the whole value of the distinction is that the two are never confusable. Most
+ * dependencies today are unsearchable, which is the honest state rather than a gap to paper over.
+ * See #785.
+ */
+export const releaseRunFirmwareDependencySchema = z
+  .object({
+    name: z.string().trim().min(1).max(256),
+    manifestPath: z.string().trim().min(1).max(1024),
+    origin: z.enum(["registry", "git", "local", "framework"]),
+    versionSpec: z.string().trim().min(1).max(256).optional(),
+    pinned: z.boolean(),
+    purl: z.string().trim().startsWith("pkg:").max(512).optional(),
+    cpe: z.string().trim().startsWith("cpe:2.3:").max(512).optional(),
+    searchable: z.boolean(),
+    identitySource: z.string().trim().min(1).max(512).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => (value.searchable ? value.purl !== undefined || value.cpe !== undefined : true),
+    "a searchable dependency must carry a purl or a cpe",
+  )
+  .refine(
+    (value) => (value.searchable ? true : value.purl === undefined && value.cpe === undefined),
+    "an unsearchable dependency must carry no identifier",
+  );
+
+/**
+ * Firmware dependencies are scoped to the repository at this commit, not to a board.
+ *
+ * The run reports manifest paths and no project association, so there is no board fact to send.
+ * See the decision on #798.
+ */
+export const releaseRunFirmwareSchema = z
+  .object({
+    dependencies: z.array(releaseRunFirmwareDependencySchema).max(2000),
+    warnings: z.array(z.string().trim().min(1).max(1024)).max(200),
+  })
+  .strict();
+
 export const releaseRunReportLinkSchema = z.object({
   label: z.string().trim().min(1).max(160),
   url: z
@@ -292,6 +336,8 @@ const releaseRunResultBaseSchema = z
     // Optional with no default: a default would materialise the key on every legacy
     // payload and change its terminal-result digest, breaking replay detection.
     boms: z.array(releaseRunBoardBomSchema).max(50).optional(),
+    // Optional with no default, for the same reason as `boms` above.
+    firmware: releaseRunFirmwareSchema.optional(),
   })
   .strict();
 

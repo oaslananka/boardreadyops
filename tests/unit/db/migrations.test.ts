@@ -18,6 +18,8 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("Board");
     expect(cloudDatabaseModels).toContain("BoardBomSnapshot");
     expect(cloudDatabaseModels).toContain("BoardBomComponent");
+    expect(cloudDatabaseModels).toContain("RepositoryFirmwareSnapshot");
+    expect(cloudDatabaseModels).toContain("RepositoryFirmwareDependency");
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -112,7 +114,34 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0065_setup_incomplete_release_runs.sql",
       "0066_notifications.sql",
       "0067_notification_email_channels.sql",
+      "0068_repository_firmware_snapshots.sql",
     ]);
+  });
+
+  it("scopes firmware snapshots to a repository and refuses a searchable row with no identifier in schema v68", async () => {
+    const sql = (await readFile(join(migrationsDir, "0068_repository_firmware_snapshots.sql"), "utf8")).toLowerCase();
+
+    // Repository-scoped on purpose: the run reports manifest paths with no project association,
+    // so there is no board fact to record and guessing one would put an invented board list into
+    // a CRA report. See the decision on #798.
+    expect(sql).toContain("create table if not exists repository_firmware_snapshots");
+    expect(sql).toContain("repository_id text not null references repositories(id) on delete cascade");
+    expect(sql).toContain("run_id text not null references release_runs(id) on delete cascade");
+    expect(sql).not.toContain("references boards(id)");
+    expect(sql).toContain("repository_firmware_snapshots_repo_run_idx");
+
+    // The searchable flag and the identifiers can never disagree: an identifier on an
+    // unsearchable dependency is the false clean bill this whole line of work exists to prevent.
+    expect(sql).toContain("repository_firmware_dependencies_searchable_valid");
+    expect(sql).toContain("(searchable and (purl is not null or cpe is not null))");
+    expect(sql).toContain("(not searchable and purl is null and cpe is null)");
+
+    expect(sql).toContain("repository_firmware_dependencies_origin_valid");
+    expect(sql).toContain("origin in ('registry', 'git', 'local', 'framework')");
+    // The two advisory lookup paths.
+    expect(sql).toContain("repository_firmware_dependencies_purl_idx");
+    expect(sql).toContain("repository_firmware_dependencies_cpe_idx");
+    expect(sql).toContain("searchable_count between 0 and dependency_count");
   });
 
   it("adds a nullable rule-category column to findings in schema v62", async () => {
