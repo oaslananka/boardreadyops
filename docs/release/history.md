@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.51.0](https://github.com/oaslananka/boardreadyops/compare/v1.50.1...v1.51.0) (2026-09-15)
+
+
+### Features
+
+* **vendors:** make a manufacturing profile say where its numbers came from ([#773](https://github.com/oaslananka/boardreadyops/issues/773)) ([e8bc4c3](https://github.com/oaslananka/boardreadyops/commit/e8bc4c3c6edf039e7db5ad0682b6030f6d0cee43))
+
 ## [1.50.1](https://github.com/oaslananka/boardreadyops/compare/v1.50.0...v1.50.1) (2026-09-15)
 
 
