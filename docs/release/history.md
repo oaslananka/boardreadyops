@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.52.0](https://github.com/oaslananka/boardreadyops/compare/v1.51.0...v1.52.0) (2026-09-15)
+
+
+### Features
+
+* **report:** show whether the verdict was measured or inferred ([#768](https://github.com/oaslananka/boardreadyops/issues/768)) ([b4ac1f3](https://github.com/oaslananka/boardreadyops/commit/b4ac1f38cbfef17bab756905c0c2d87484ff3964))
+
 ## [1.51.0](https://github.com/oaslananka/boardreadyops/compare/v1.50.1...v1.51.0) (2026-09-15)
 
 
