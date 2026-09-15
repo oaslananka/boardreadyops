@@ -101,6 +101,9 @@ describe("CLI integration", () => {
       expect.arrayContaining([
         { name: "boardreadyops:componentClass", value: "hardware+firmware" },
         { name: "boardreadyops:firmwareComponentCount", value: "2" },
+        // The scope has to survive to the written document, not just the formatter: the
+        // dependencies are repository-scoped and nothing may imply a board attribution. See #798.
+        { name: "boardreadyops:firmwareScope", value: "repository" },
       ]),
     );
   });

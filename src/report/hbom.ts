@@ -122,7 +122,7 @@ export function createHbom(result: RunResult): CycloneDxHbom {
         name: hardwareName(result),
         "bom-ref": rootRef,
       },
-      properties: metadataProperties(components),
+      properties: metadataProperties(components, result.projects.length),
     },
     components,
     dependencies: [
@@ -183,7 +183,7 @@ function componentFromBomRow(row: BomRow): CycloneDxHbomComponent {
  *
  * A reader who sees `0 of 42` knows the scanner result below is about coverage, not cleanliness.
  */
-function metadataProperties(components: readonly CycloneDxHbomComponent[]): CycloneDxProperty[] {
+function metadataProperties(components: readonly CycloneDxHbomComponent[], projectCount: number): CycloneDxProperty[] {
   const identifiers = (component: CycloneDxHbomComponent) => ({ purl: component.purl, cpe: component.cpe });
   const summary = summariseIndexedIdentifiers(components.map(identifiers));
   const firmware = components.filter((component) => componentClassOf(component) === "firmware");
@@ -198,6 +198,35 @@ function metadataProperties(components: readonly CycloneDxHbomComponent[]): Cycl
     { name: "boardreadyops:hardwareComponentCount", value: String(summary.total - firmware.length) },
     { name: "boardreadyops:firmwareComponentCount", value: String(firmware.length) },
     { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: String(firmwareSummary.indexed) },
+    ...firmwareScopeProperties(firmware.length, projectCount),
+  ];
+}
+
+/**
+ * States that the firmware components are scoped to the repository, not to a board.
+ *
+ * `captureFirmwareSnapshot` globs the whole tree and each record carries a manifest path with no
+ * project association, so there is no board fact to report. For a single-project repository the
+ * repository and the board coincide and the document reads correctly either way -- but a reader
+ * must not have to *infer* that from the project count, and for a workspace the coincidence is
+ * false: every board in the tree would otherwise be implicitly associated with every firmware
+ * dependency found anywhere in it.
+ *
+ * Saying so is the honest version of the decision on #798, where path-proximity attribution was
+ * rejected because a guessed board list is indistinguishable from a real one by the time it
+ * reaches a regulator.
+ */
+function firmwareScopeProperties(firmwareCount: number, projectCount: number): CycloneDxProperty[] {
+  if (firmwareCount === 0) return [];
+  return [
+    { name: "boardreadyops:firmwareScope", value: "repository" },
+    {
+      name: "boardreadyops:firmwareScopeNote",
+      value:
+        projectCount > 1
+          ? `These firmware dependencies are scoped to the repository, not to one board. This document covers ${projectCount} projects and the dependencies are not attributed to any single one of them.`
+          : "These firmware dependencies are scoped to the repository. This document covers one project, so the repository and the board coincide.",
+    },
   ];
 }
 

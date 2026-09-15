@@ -220,6 +220,50 @@ describe("CycloneDX HBOM formatter", () => {
     );
   });
 
+  it("states that the firmware components are scoped to the repository", () => {
+    const hbom = createHbom(resultWithFirmware());
+
+    // captureFirmwareSnapshot globs the whole tree and each record carries a manifest path with
+    // no project association, so there is no board fact to report. A reader must not have to
+    // infer the scope from the project count. See the decision on #798.
+    expect(hbom.metadata.properties).toEqual(
+      expect.arrayContaining([{ name: "boardreadyops:firmwareScope", value: "repository" }]),
+    );
+  });
+
+  it("says the repository and the board coincide for a single-project document", () => {
+    const note = createHbom(resultWithFirmware()).metadata.properties.find(
+      (entry) => entry.name === "boardreadyops:firmwareScopeNote",
+    );
+
+    expect(note?.value).toContain("covers one project");
+    expect(note?.value).toContain("coincide");
+  });
+
+  it("says the dependencies are attributed to no single board in a workspace document", () => {
+    const result = resultWithFirmware();
+    const [project] = result.projects;
+    if (!project) throw new Error("Expected fixture project.");
+    result.projects = [project, { ...project, projectFile: "second.kicad_pro" }];
+
+    const hbom = createHbom(result);
+    const note = hbom.metadata.properties.find((entry) => entry.name === "boardreadyops:firmwareScopeNote");
+
+    // This is the case where repository scope and board scope genuinely differ: without the note
+    // every board in the tree reads as carrying every firmware dependency found anywhere in it.
+    expect(hbom.metadata.component.name).toBe("boardreadyops-hardware-workspace");
+    expect(note?.value).toContain("covers 2 projects");
+    expect(note?.value).toContain("not attributed to any single one");
+  });
+
+  it("claims no firmware scope at all for a hardware-only document", () => {
+    const names = createHbom(resultWithBomRows()).metadata.properties.map((entry) => entry.name);
+
+    // An absent claim rather than a vacuous one: a board with no firmware has no firmware scope.
+    expect(names).not.toContain("boardreadyops:firmwareScope");
+    expect(names).not.toContain("boardreadyops:firmwareScopeNote");
+  });
+
   it("formats a firmware-bearing document that validates against the bundled schema", () => {
     const parsed = JSON.parse(formatHbom(resultWithFirmware()));
     const validate = new Ajv2020({ allErrors: true }).compile(hbomSchema);
