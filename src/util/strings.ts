@@ -1,10 +1,23 @@
+/**
+ * Serialises a value with object keys in a fixed order, for hashing.
+ *
+ * The key order must not depend on the machine, because this feeds `fingerprintFor` and a
+ * finding's fingerprint is what baselines and waivers match on. It used to sort with
+ * `localeCompare`, and the real rule detail keys do reorder: under `lt-LT`
+ * `missingCategory` sorts before `missingCategories`, and under `az-AZ` `fix` sorts before
+ * `filename`. A waiver keyed by fingerprint would silently stop matching on such a machine.
+ *
+ * `compareCodePoints` reproduces the en-US order exactly for those keys, so this change
+ * preserves every fingerprint computed on a common locale or in CI while correcting the ones
+ * that were already diverging. See #795.
+ */
 export function stableStringify(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map((entry) => stableStringify(entry)).join(",")}]`;
   }
   if (value && typeof value === "object") {
     return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => compareCodePoints(a, b))
       .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
       .join(",")}}`;
   }

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { globFiles } from "../util/glob.js";
 import { normalizePathInput, normalizeRelative } from "../util/path.js";
+import { compareCodePoints } from "../util/strings.js";
 import type { ProjectContext } from "./context.js";
 
 export async function discoverProjects(root: string, explicitProject?: string): Promise<ProjectContext[]> {
@@ -9,7 +10,7 @@ export async function discoverProjects(root: string, explicitProject?: string): 
     ? await explicitProjectFiles(root, explicitProject)
     : (await globFiles(root, ["**/*.kicad_pro"])).map((file) => path.resolve(file));
   const contexts: ProjectContext[] = [];
-  const projectFilesSorted = [...projectFiles].sort((a, b) => a.localeCompare(b));
+  const projectFilesSorted = [...projectFiles].sort(compareCodePoints);
   for (const projectFile of projectFilesSorted) {
     contexts.push(await projectContext(root, projectFile));
   }
@@ -60,7 +61,7 @@ async function discoverJobsets(projectRoot: string): Promise<string[]> {
       scoped.push(file);
     }
   }
-  return [...new Set(scoped)].sort((left, right) => left.localeCompare(right));
+  return [...new Set(scoped)].sort(compareCodePoints);
 }
 
 async function isInsideNestedProject(projectRoot: string, file: string): Promise<boolean> {
