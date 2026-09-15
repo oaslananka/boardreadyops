@@ -21,7 +21,11 @@ const installationId = "7c000000-0000-4000-8000-000000000001";
 const otherInstallationId = "7c000000-0000-4000-8000-000000000011";
 const repositoryId = "7c000000-0000-4000-8000-000000000002";
 const otherRepositoryId = "7c000000-0000-4000-8000-000000000012";
-const runId = "7c000000-0000-4000-8000-000000000003";
+const earlierRunId = "7c000000-0000-4000-8000-000000000003";
+// A second run, because board_bom_snapshots is unique on (board_id, run_id): one run captures
+// a board once. Two snapshots per board therefore need two runs, and my first version of this
+// fixture reused one and failed to seed at all.
+const laterRunId = "7c000000-0000-4000-8000-000000000023";
 const otherRunId = "7c000000-0000-4000-8000-000000000013";
 const currentBoardId = "7c000000-0000-4000-8000-000000000004";
 const supersededBoardId = "7c000000-0000-4000-8000-000000000005";
@@ -31,6 +35,14 @@ const otherTenantBoardId = "7c000000-0000-4000-8000-000000000016";
 function database() {
   if (!executor) throw new Error("DATABASE_URL is required");
   return executor;
+}
+
+async function seedRun(run: string, repository: string, sha: string) {
+  await database().query(
+    `insert into release_runs (id, repository_id, commit_sha, ref, trigger_kind, status, decision)
+     values ($1, $2, $3, 'refs/heads/main', 'pr', 'completed', 'pass')`,
+    [run, repository, sha],
+  );
 }
 
 async function seedTenant(id: string, repository: string, run: string, githubId: number, login: string) {
@@ -44,11 +56,7 @@ async function seedTenant(id: string, repository: string, run: string, githubId:
      values ($1, $2, $3, 'acme', $4, 'main')`,
     [repository, id, githubId + 1, login],
   );
-  await database().query(
-    `insert into release_runs (id, repository_id, commit_sha, ref, trigger_kind, status, decision)
-     values ($1, $2, $3, 'refs/heads/main', 'pr', 'completed', 'pass')`,
-    [run, repository, "d".repeat(40)],
-  );
+  await seedRun(run, repository, "d".repeat(40));
 }
 
 beforeAll(async () => {
@@ -57,7 +65,8 @@ beforeAll(async () => {
     await database().query("delete from installations where id = $1", [id]);
   }
 
-  await seedTenant(installationId, repositoryId, runId, 47201, "affected");
+  await seedTenant(installationId, repositoryId, earlierRunId, 47201, "affected");
+  await seedRun(laterRunId, repositoryId, "e".repeat(40));
   await seedTenant(otherInstallationId, otherRepositoryId, otherRunId, 47301, "othertenant");
 
   await database().query(
@@ -75,14 +84,16 @@ beforeAll(async () => {
 
   // `current` carries the part in its newest snapshot. `superseded` carried it in an older one and
   // designed it out. Both have to come back, told apart.
+  // Older snapshots belong to the earlier run, newer ones to the later run, so no board is
+  // captured twice by the same run.
   await database().query(
     `insert into board_bom_snapshots (id, board_id, run_id, commit_sha, component_count, captured_at)
-     values ('7c000000-0000-4000-8000-000000000101', $1, $4, $5, 2, now() - interval '30 days'),
-            ('7c000000-0000-4000-8000-000000000102', $1, $4, $5, 2, now() - interval '1 day'),
-            ('7c000000-0000-4000-8000-000000000103', $2, $4, $5, 2, now() - interval '60 days'),
-            ('7c000000-0000-4000-8000-000000000104', $2, $4, $5, 1, now() - interval '2 days'),
-            ('7c000000-0000-4000-8000-000000000105', $3, $4, $5, 1, now() - interval '5 days')`,
-    [currentBoardId, supersededBoardId, archivedBoardId, runId, "d".repeat(40)],
+     values ('7c000000-0000-4000-8000-000000000101', $1, $4, $6, 2, now() - interval '30 days'),
+            ('7c000000-0000-4000-8000-000000000102', $1, $5, $6, 2, now() - interval '1 day'),
+            ('7c000000-0000-4000-8000-000000000103', $2, $4, $6, 2, now() - interval '60 days'),
+            ('7c000000-0000-4000-8000-000000000104', $2, $5, $6, 1, now() - interval '2 days'),
+            ('7c000000-0000-4000-8000-000000000105', $3, $4, $6, 1, now() - interval '5 days')`,
+    [currentBoardId, supersededBoardId, archivedBoardId, earlierRunId, laterRunId, "d".repeat(40)],
   );
   await database().query(
     `insert into board_bom_snapshots (id, board_id, run_id, commit_sha, component_count)
