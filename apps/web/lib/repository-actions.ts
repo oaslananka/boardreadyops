@@ -12,6 +12,7 @@ import { createSqlRepositorySetupStore, type RepositorySetupContext } from "@boa
 import { authenticateApiRequest, resolveRepositoryApiContext } from "./api-auth.js";
 import { readBoundedRequestBody } from "./bounded-request-body.js";
 import { createInstallationCapabilitiesDependencies } from "./installation-capabilities.js";
+import { databaseErrorCode, emitRepositoryActionTelemetry, errorClassOf } from "./repository-action-telemetry.js";
 import { handleRepositorySetupCreatePrForActor } from "./repository-setup-routes.js";
 
 /**
@@ -355,6 +356,11 @@ export async function handleRepositoryAction(
       receivedAt: dependencies.now(),
     });
 
+    emitRepositoryActionTelemetry({
+      action: parsed.action,
+      outcome: accepted.outcome === "accepted" ? "accepted" : "duplicate",
+    });
+
     return json(
       {
         ok: true,
@@ -365,7 +371,18 @@ export async function handleRepositoryAction(
       },
       accepted.outcome === "accepted" ? 202 : 200,
     );
-  } catch {
+  } catch (error) {
+    // The caller still gets a generic message: an internal error must not reach a browser. But
+    // the cause is recorded, which it was not before -- this block used to be a bare `catch {}`,
+    // so a failing dashboard button was undiagnosable from the deployment. The database's own
+    // error code is the field worth having: 42883 undefined function, 42P01 undefined table,
+    // 23505 unique violation, 28000 failed authorisation.
+    emitRepositoryActionTelemetry({
+      action: parsed.action,
+      outcome: "failed",
+      errorClass: errorClassOf(error),
+      errorCode: databaseErrorCode(error),
+    });
     return json({ ok: false, error: "The action could not be queued. Please try again." }, 503);
   } finally {
     await scope.executor.close();
