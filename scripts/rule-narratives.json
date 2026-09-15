@@ -67,6 +67,10 @@
     "fires": "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
     "details": "{ firmware, hardware, sources }"
   },
+  "firmware.dependency-identification": {
+    "fires": "Always reports, informationally, when an ESP-IDF component manifest declares dependencies. States how many have an identifier a vulnerability database indexes and names the ones that do not, so a reader cannot mistake \"not vulnerability-indexed\" for \"no advisories found\".",
+    "details": "{ total, searchable, unidentified, unidentifiedNames }"
+  },
   "firmware.esp-idf-pin-contract": {
     "fires": "Fires when firmware assigns a signal to the wrong hardware pin/net, adds a signal not in hardware, or omits a hardware firmware signal.",
     "details": "{ firmware, hardware, sources }"

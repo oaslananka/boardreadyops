@@ -112,6 +112,12 @@ const expectedClassification: Record<string, ExpectedClassification> = {
     fixability: "manual",
     vendorDependence: "none",
   },
+  "firmware.dependency-identification": {
+    category: "sourcing",
+    evidenceType: "exact",
+    fixability: "none",
+    vendorDependence: "none",
+  },
   "firmware.esp-idf-pin-contract": {
     category: "electrical",
     evidenceType: "exact",

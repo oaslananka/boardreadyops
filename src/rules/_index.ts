@@ -16,6 +16,7 @@ import { uniqueReferencesRule } from "./design/unique-references.js";
 import { runDrcRule } from "./drc/run-drc.js";
 import { runErcRule } from "./erc/run-erc.js";
 import { arduinoPinContractRule } from "./firmware/arduino-pin-contract.js";
+import { dependencyIdentificationRule } from "./firmware/dependency-identification.js";
 import { espIdfPinContractRule } from "./firmware/esp-idf-pin-contract.js";
 import { platformioPinContractRule } from "./firmware/platformio-pin-contract.js";
 import { stm32CubeMxPinContractRule } from "./firmware/stm32cubemx-pin-contract.js";
@@ -72,6 +73,7 @@ export function registerBuiltInRules(): void {
     pinmapNetLabelRule,
     platformioPinContractRule,
     arduinoPinContractRule,
+    dependencyIdentificationRule,
     zephyrPinContractRule,
     espIdfPinContractRule,
     stm32CubeMxPinContractRule,

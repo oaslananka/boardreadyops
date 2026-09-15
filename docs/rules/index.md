@@ -19,6 +19,7 @@ BoardReadyOps rules use stable `group.rule` identifiers. Each rule page records 
 - [drc.kicad](drc.kicad.md)
 - [erc.kicad](erc.kicad.md)
 - [firmware.arduino-pin-contract](firmware.arduino-pin-contract.md)
+- [firmware.dependency-identification](firmware.dependency-identification.md)
 - [firmware.esp-idf-pin-contract](firmware.esp-idf-pin-contract.md)
 - [firmware.platformio-pin-contract](firmware.platformio-pin-contract.md)
 - [firmware.stm32cubemx-pin-contract](firmware.stm32cubemx-pin-contract.md)
