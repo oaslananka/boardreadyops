@@ -68,6 +68,61 @@ describe("CLI integration", () => {
     });
   });
 
+  it("carries firmware dependencies from an idf_component.yml through to the SBOM", async () => {
+    const temp = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-hbom-fw-"));
+    await fs.cp(path.join(fixtureRoot, "safe-basic"), temp, { recursive: true });
+    await fs.mkdir(path.join(temp, "firmware"), { recursive: true });
+    await fs.writeFile(
+      path.join(temp, "firmware/idf_component.yml"),
+      ["dependencies:", '  idf: ">=5.0"', '  led_strip: "2.4.1"'].join("\n"),
+      "utf8",
+    );
+    const streams = captureStreams();
+
+    const code = await runCli(["sbom", temp, "--output", "build/hbom.json"], streams);
+
+    expect(code).toBe(0);
+    const hbom = JSON.parse(await fs.readFile(path.join(temp, "build/hbom.json"), "utf8"));
+    const firmware = hbom.components.filter((component: { properties: Array<{ name: string; value: string }> }) =>
+      component.properties.some((entry) => entry.name === "boardreadyops:componentClass" && entry.value === "firmware"),
+    );
+
+    // The unit tests prove createHbom emits firmware given the data. This proves the pipeline
+    // actually collects it and the CLI actually writes it -- the gap that let RuleEvidenceType and
+    // drillHoles ship wired to nothing. See #785.
+    expect(firmware.map((component: { name: string }) => component.name)).toEqual(["idf", "led_strip"]);
+    expect(firmware.map((component: { type: string }) => component.type)).toEqual(["framework", "library"]);
+    for (const component of firmware) {
+      expect(component.properties).toEqual(
+        expect.arrayContaining([{ name: "boardreadyops:vulnerabilityIndexed", value: "false" }]),
+      );
+    }
+    expect(hbom.metadata.properties).toEqual(
+      expect.arrayContaining([
+        { name: "boardreadyops:componentClass", value: "hardware+firmware" },
+        { name: "boardreadyops:firmwareComponentCount", value: "2" },
+      ]),
+    );
+  });
+
+  it("leaves the SBOM free of firmware components when the project has none", async () => {
+    const temp = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-hbom-nofw-"));
+    await fs.cp(path.join(fixtureRoot, "safe-basic"), temp, { recursive: true });
+    const streams = captureStreams();
+
+    expect(await runCli(["sbom", temp, "--output", "build/hbom.json"], streams)).toBe(0);
+    const hbom = JSON.parse(await fs.readFile(path.join(temp, "build/hbom.json"), "utf8"));
+
+    // A hardware-only board must not sprout an empty firmware section or claim a class it has not.
+    expect(hbom.metadata.properties).toEqual(
+      expect.arrayContaining([
+        { name: "boardreadyops:componentClass", value: "hardware" },
+        { name: "boardreadyops:firmwareComponentCount", value: "0" },
+      ]),
+    );
+    expect(hbom.components.every((component: { type: string }) => component.type === "device")).toBe(true);
+  });
+
   it("writes CycloneDX HBOM to stdout when sbom output is '-'", async () => {
     const streams = captureStreams();
 

@@ -2074,6 +2074,67 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         },
         "type": "array",
       },
+      "firmware": {
+        "additionalProperties": false,
+        "properties": {
+          "dependencies": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "identitySource": {
+                  "type": "string",
+                },
+                "manifestPath": {
+                  "type": "string",
+                },
+                "name": {
+                  "type": "string",
+                },
+                "origin": {
+                  "enum": [
+                    "framework",
+                    "git",
+                    "local",
+                    "registry",
+                  ],
+                },
+                "pinned": {
+                  "type": "boolean",
+                },
+                "purl": {
+                  "type": "string",
+                },
+                "searchable": {
+                  "type": "boolean",
+                },
+                "versionSpec": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "manifestPath",
+                "name",
+                "origin",
+                "pinned",
+                "searchable",
+              ],
+              "type": "object",
+            },
+            "type": "array",
+          },
+          "warnings": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+        },
+        "required": [
+          "dependencies",
+          "warnings",
+        ],
+        "type": "object",
+      },
       "generatedAt": {
         "type": "string",
       },
@@ -2627,7 +2688,11 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "object",
             },
             "type": {
-              "const": "device",
+              "enum": [
+                "device",
+                "framework",
+                "library",
+              ],
             },
             "version": {
               "type": "string",

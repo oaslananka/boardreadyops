@@ -147,7 +147,7 @@
       "required": ["type", "name", "bom-ref", "properties"],
       "properties": {
         "type": {
-          "const": "device"
+          "enum": ["device", "library", "framework"]
         },
         "name": {
           "type": "string"

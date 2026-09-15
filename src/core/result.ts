@@ -1,3 +1,4 @@
+import type { FirmwareSnapshot } from "../firmware/snapshot.js";
 import type { BomRiskSummary } from "./bom-risk.js";
 import type { ReleaseMode } from "./config.types.js";
 import type { ProjectContext } from "./context.js";
@@ -76,6 +77,13 @@ export interface RunResult {
   boms?: ProjectBom[] | undefined;
   findings: Finding[];
   fabrication: FabricationSnapshot;
+  /**
+   * Firmware dependencies declared in the tree, when any manifest was found.
+   *
+   * Absent rather than empty when there is no firmware in the project, so a consumer can tell "no
+   * firmware here" from "firmware with nothing in it". See #785.
+   */
+  firmware?: FirmwareSnapshot | undefined;
   hardwareImpact?: HardwareImpactV1 | undefined;
   plugins?: LoadedPlugin[] | undefined;
   generatedAt: string;

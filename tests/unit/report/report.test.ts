@@ -16,6 +16,39 @@ describe("report formats", () => {
     expect(validate(payload), JSON.stringify(validate.errors)).toBe(true);
   });
 
+  it("validates JSON output carrying a firmware section against the findings schema", () => {
+    // findings.schema.json is additionalProperties: false, so a new RunResult field it does not
+    // declare is rejected. #768 shipped `evidence` without updating it and went red on main --
+    // and test:unit missed it because the only schema check lived in tests/integration. This
+    // keeps the check where the change is.
+    const ajv = new Ajv2020({ allErrors: true });
+    const validate = ajv.compile(findingsSchema);
+    const result = sampleResult();
+    result.firmware = {
+      dependencies: [
+        { name: "idf", manifestPath: "fw/idf_component.yml", origin: "framework", pinned: false, searchable: false },
+        {
+          name: "mcuboot",
+          manifestPath: "fw/idf_component.yml",
+          origin: "git",
+          versionSpec: "v2.0.0",
+          pinned: false,
+          purl: "pkg:golang/github.com/mcu-tools/mcuboot",
+          searchable: true,
+          identitySource: "OSV GO-2024-2799 (CVE-2024-32883)",
+        },
+      ],
+      warnings: [],
+    };
+    const payload = JSON.parse(formatJson(result));
+    expect(payload.firmware.dependencies).toHaveLength(2);
+    expect(validate(payload), JSON.stringify(validate.errors)).toBe(true);
+
+    // Negative control: without this the origin enum could be decorative and the test vacuous.
+    payload.firmware.dependencies[0].origin = "carrier-pigeon";
+    expect(validate(payload)).toBe(false);
+  });
+
   it("emits SARIF 2.1.0 matching the local SARIF structural schema", () => {
     const ajv = new Ajv2020({ allErrors: true });
     const validate = ajv.compile(sarifSchema);
