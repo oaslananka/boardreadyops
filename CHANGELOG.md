@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.61.0](https://github.com/oaslananka/boardreadyops/compare/v1.60.1...v1.61.0) (2026-09-15)
+
+
+### Features
+
+* **cloud:** ask OSV and NVD, without letting three answers become one ([#803](https://github.com/oaslananka/boardreadyops/issues/803)) ([47deb14](https://github.com/oaslananka/boardreadyops/commit/47deb14ddafed7359ac62807020f023b3316b2ff))
+
 ## [1.60.1](https://github.com/oaslananka/boardreadyops/compare/v1.60.0...v1.60.1) (2026-09-15)
 
 
