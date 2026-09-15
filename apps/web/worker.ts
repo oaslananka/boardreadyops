@@ -3,7 +3,12 @@ import { createServer } from "node:http";
 import { hostname } from "node:os";
 import { createAdvisoryProvider } from "@boardreadyops/cloud-core/advisory-lookup";
 import { configuredCredentialCipher } from "@boardreadyops/cloud-core/credential-encryption";
-import { constantAdvisoryProvider, runFirmwareAdvisoryPass } from "@boardreadyops/cloud-core/firmware-advisory-watch";
+import {
+  constantAdvisoryProvider,
+  type DependencyAdvisoryResult,
+  type DueFirmwareScan,
+  runFirmwareAdvisoryPass,
+} from "@boardreadyops/cloud-core/firmware-advisory-watch";
 import { type RiskyComponentFinding, runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
 import { createSqlAffectedBoardsStore } from "@boardreadyops/db/affected-boards-store";
 import {
@@ -45,6 +50,7 @@ import {
   workerScopeFromOutboxEffect,
   workerScopeFromReconciliationItem,
 } from "./lib/control-plane-worker-runtime.js";
+import { advisoryDedupeKey, composeFirmwareAdvisoryAnnouncement } from "./lib/firmware-advisory-announcement.js";
 import { createGitHubAppCheckRunClient } from "./lib/github-app-check-run-client.js";
 import { createProductionGitHubCommandLifecycleExecutor } from "./lib/github-command-executor.js";
 import { createGitHubWorkflowReconciliationClient } from "./lib/github-workflow-reconciliation-client.js";
@@ -588,6 +594,7 @@ async function runFirmwareAdvisoryWatch(currentTime: number): Promise<void> {
         maximumRepositoriesPerRun: firmwareAdvisoryRepositoriesPerPass,
         onError: (repositoryId, error) =>
           log("warn", "worker.firmware_advisory_repository_failed", { repositoryId, errorClass: errorClass(error) }),
+        onAdvisoriesFound: (detection) => announceFirmwareAdvisories(detection, currentTime),
       },
     );
     if (report.repositoriesScanned > 0 || report.failures > 0) {
@@ -595,6 +602,53 @@ async function runFirmwareAdvisoryWatch(currentTime: number): Promise<void> {
     }
   } catch (error) {
     log("warn", "worker.firmware_advisory_failed", { errorClass: errorClass(error) });
+  }
+}
+
+/**
+ * Turns found advisories into a notification.
+ *
+ * The coverage line is why this is composed rather than templated inline: a message naming two
+ * CVEs out of forty components must also say that the other thirty-eight were never searchable,
+ * or a reader takes the two as the whole picture. Composition lives in
+ * firmware-advisory-announcement.ts where it can be tested.
+ */
+async function announceFirmwareAdvisories(
+  detection: { scan: DueFirmwareScan; results: readonly DependencyAdvisoryResult[] },
+  currentTime: number,
+): Promise<void> {
+  const announcement = composeFirmwareAdvisoryAnnouncement(detection.results, {
+    dependencyCount: detection.scan.dependencyCount,
+    queried: detection.scan.scannable.length,
+  });
+  if (!announcement) return;
+
+  const digest = createHash("sha256").update(advisoryDedupeKey(detection.results)).digest("hex").slice(0, 32);
+
+  try {
+    const queued = await notifications.enqueueEvent({
+      type: "firmware.advisory_detected",
+      installationId: detection.scan.installationId,
+      repositoryFullName: detection.scan.repositoryId,
+      headline: announcement.headline,
+      details: announcement.details,
+      // Keyed on the advisory set, so an unchanged set is one piece of news however many passes
+      // find it, and a new CVE appearing is a new message.
+      dedupeKey: `firmware-advisory:${detection.scan.installationId}:${digest}`,
+      occurredAt: new Date(currentTime).toISOString(),
+    });
+    if (queued > 0) {
+      log("info", "worker.firmware_advisory_announced", {
+        queued,
+        advisories: announcement.advisoryCount,
+        queried: detection.scan.scannable.length,
+        dependencies: detection.scan.dependencyCount,
+      });
+    }
+  } catch (error) {
+    // Never fail the pass for a notification: the scan outcome is the durable record and the next
+    // pass re-derives the same dedupe key, so the news is not lost.
+    log("warn", "worker.firmware_advisory_announce_failed", { errorClass: errorClass(error) });
   }
 }
 
