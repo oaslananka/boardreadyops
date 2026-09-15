@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.58.0](https://github.com/oaslananka/boardreadyops/compare/v1.57.0...v1.58.0) (2026-09-15)
+
+
+### Features
+
+* **report:** put firmware dependencies in the device SBOM ([#793](https://github.com/oaslananka/boardreadyops/issues/793)) ([3ed040f](https://github.com/oaslananka/boardreadyops/commit/3ed040fbcc82cd7307694ebec95f17cb2d67028b)), closes [#785](https://github.com/oaslananka/boardreadyops/issues/785)
+
 ## [1.57.0](https://github.com/oaslananka/boardreadyops/compare/v1.56.0...v1.57.0) (2026-09-15)
 
 
