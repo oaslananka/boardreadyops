@@ -82,9 +82,28 @@
       "items": {
         "$ref": "#/$defs/categoryBreakdownEntry"
       }
+    },
+    "evidence": {
+      "$ref": "#/$defs/evidenceSummary"
     }
   },
   "$defs": {
+    "evidenceSummary": {
+      "type": "object",
+      "description": "How many findings rest on a measurement versus an inference, and which inferred rules can fail the run.",
+      "additionalProperties": false,
+      "required": ["exact", "heuristic", "unclassified", "blockingOnInference"],
+      "properties": {
+        "exact": { "type": "integer", "minimum": 0 },
+        "heuristic": { "type": "integer", "minimum": 0 },
+        "unclassified": { "type": "integer", "minimum": 0 },
+        "blockingOnInference": {
+          "type": "array",
+          "description": "Rule ids severe enough to fail the run that do not rest on a measurement.",
+          "items": { "type": "string" }
+        }
+      }
+    },
     "categoryBreakdownEntry": {
       "type": "object",
       "additionalProperties": false,
