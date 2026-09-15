@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.63.0](https://github.com/oaslananka/boardreadyops/compare/v1.62.1...v1.63.0) (2026-09-15)
+
+
+### Features
+
+* **cloud:** tell someone when a firmware advisory is found ([#812](https://github.com/oaslananka/boardreadyops/issues/812)) ([f4194b7](https://github.com/oaslananka/boardreadyops/commit/f4194b796badfa266a7d0acdea5edd5db03d88c4))
+
 ## [1.62.1](https://github.com/oaslananka/boardreadyops/compare/v1.62.0...v1.62.1) (2026-09-15)
 
 
