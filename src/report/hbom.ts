@@ -29,7 +29,7 @@ interface CycloneDxIdentityMethod {
  * consumer that understands CycloneDX already knows how to read this.
  */
 interface CycloneDxIdentityEvidence {
-  field: "purl";
+  field: "purl" | "cpe";
   confidence: number;
   concludedValue: string;
   methods: CycloneDxIdentityMethod[];
@@ -53,6 +53,7 @@ interface CycloneDxHbomComponent {
   manufacturer?: CycloneDxOrganizationalEntity | undefined;
   supplier?: CycloneDxOrganizationalEntity | undefined;
   purl?: string | undefined;
+  cpe?: string | undefined;
   externalReferences?: CycloneDxExternalReference[] | undefined;
   evidence?: { identity: CycloneDxIdentityEvidence[] } | undefined;
   properties: CycloneDxProperty[];
@@ -183,9 +184,10 @@ function componentFromBomRow(row: BomRow): CycloneDxHbomComponent {
  * A reader who sees `0 of 42` knows the scanner result below is about coverage, not cleanliness.
  */
 function metadataProperties(components: readonly CycloneDxHbomComponent[]): CycloneDxProperty[] {
-  const summary = summariseIndexedIdentifiers(components.map((component) => component.purl));
+  const identifiers = (component: CycloneDxHbomComponent) => ({ purl: component.purl, cpe: component.cpe });
+  const summary = summariseIndexedIdentifiers(components.map(identifiers));
   const firmware = components.filter((component) => componentClassOf(component) === "firmware");
-  const firmwareSummary = summariseIndexedIdentifiers(firmware.map((component) => component.purl));
+  const firmwareSummary = summariseIndexedIdentifiers(firmware.map(identifiers));
   return [
     // Both classes now, so the document says which it contains rather than asserting "hardware".
     { name: "boardreadyops:componentClass", value: firmware.length > 0 ? "hardware+firmware" : "hardware" },
@@ -231,20 +233,35 @@ function componentFromFirmwareDependency(dependency: FirmwareDependencyRecord): 
   if (dependency.versionSpec) {
     component.version = dependency.versionSpec;
   }
+  const identity: CycloneDxIdentityEvidence[] = [];
   if (dependency.purl) {
     component.purl = dependency.purl;
-    component.evidence = {
-      identity: [
-        {
-          field: "purl",
-          confidence: 0.5,
-          concludedValue: dependency.purl,
-          methods: [{ technique: "manifest-analysis", confidence: 0.5, value: dependency.purl }],
-        },
-      ],
-    };
+    identity.push(identityEvidence("purl", dependency.purl));
+  }
+  if (dependency.cpe) {
+    component.cpe = dependency.cpe;
+    identity.push(identityEvidence("cpe", dependency.cpe));
+  }
+  if (identity.length > 0) {
+    component.evidence = { identity };
   }
   return component;
+}
+
+/**
+ * One identity claim, at the coarse confidence #790 settled on.
+ *
+ * 0.5 stands for "the manifest declared this and nothing cross-checked it". For a CPE that is if
+ * anything generous: the vendor and product come from NVD's dictionary, but that the pinned version
+ * is what actually gets built rests entirely on the manifest.
+ */
+function identityEvidence(field: "purl" | "cpe", value: string): CycloneDxIdentityEvidence {
+  return {
+    field,
+    confidence: 0.5,
+    concludedValue: value,
+    methods: [{ technique: "manifest-analysis", confidence: 0.5, value }],
+  };
 }
 
 function firmwareComponentRef(dependency: FirmwareDependencyRecord): string {

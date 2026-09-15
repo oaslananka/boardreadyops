@@ -167,6 +167,9 @@
         "purl": {
           "type": "string"
         },
+        "cpe": {
+          "type": "string"
+        },
         "externalReferences": {
           "type": "array",
           "items": {
@@ -204,7 +207,7 @@
       "required": ["field", "confidence", "concludedValue", "methods"],
       "properties": {
         "field": {
-          "const": "purl"
+          "enum": ["purl", "cpe"]
         },
         "confidence": {
           "type": "number",

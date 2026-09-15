@@ -105,6 +105,31 @@ describe("CLI integration", () => {
     );
   });
 
+  it("gives a pinned ESP-IDF version a CPE in the SBOM and a ranged one none", async () => {
+    const cases = [
+      { spec: '"5.2.1"', cpe: "cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*", indexed: "true" },
+      { spec: '">=5.0"', cpe: undefined, indexed: "false" },
+    ];
+
+    for (const { spec, cpe, indexed } of cases) {
+      const temp = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-cpe-"));
+      await fs.cp(path.join(fixtureRoot, "safe-basic"), temp, { recursive: true });
+      await fs.writeFile(path.join(temp, "idf_component.yml"), ["dependencies:", `  idf: ${spec}`].join("\n"), "utf8");
+      const streams = captureStreams();
+
+      expect(await runCli(["sbom", temp, "--output", "build/hbom.json"], streams), spec).toBe(0);
+      const hbom = JSON.parse(await fs.readFile(path.join(temp, "build/hbom.json"), "utf8"));
+      const idf = hbom.components.find((component: { name: string }) => component.name === "idf");
+
+      // A range must not become a version-wildcard CPE: NVD answers the open query with 31 CVEs
+      // against 2 for 5.2.1 and 0 for 6.1, so the wildcard is wrong rather than merely weaker.
+      expect(idf?.cpe, spec).toBe(cpe);
+      expect(idf?.properties, spec).toEqual(
+        expect.arrayContaining([{ name: "boardreadyops:vulnerabilityIndexed", value: indexed }]),
+      );
+    }
+  });
+
   it("leaves the SBOM free of firmware components when the project has none", async () => {
     const temp = await fs.mkdtemp(path.join(os.tmpdir(), "boardreadyops-hbom-nofw-"));
     await fs.cp(path.join(fixtureRoot, "safe-basic"), temp, { recursive: true });
