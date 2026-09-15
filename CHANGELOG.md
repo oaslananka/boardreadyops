@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.59.0](https://github.com/oaslananka/boardreadyops/compare/v1.58.0...v1.59.0) (2026-09-15)
+
+
+### Features
+
+* **report:** give a pinned ESP-IDF version a CPE in the device SBOM ([#797](https://github.com/oaslananka/boardreadyops/issues/797)) ([d89fd63](https://github.com/oaslananka/boardreadyops/commit/d89fd6333a3aab68ab923c7dd05f8739d32fbbe2)), closes [#785](https://github.com/oaslananka/boardreadyops/issues/785)
+
 ## [1.58.0](https://github.com/oaslananka/boardreadyops/compare/v1.57.0...v1.58.0) (2026-09-15)
 
 
