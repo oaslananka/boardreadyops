@@ -193,6 +193,120 @@ describe("advisory provider: NVD by CPE", () => {
   });
 });
 
+describe("advisory provider: parser edges", () => {
+  it("survives a 200 whose body is not an object", async () => {
+    // A proxy or error page can return valid JSON that is not the shape we expect. That is an
+    // answer of none rather than a crash -- but it must not become a crash either.
+    for (const body of [null, "a string", 42, []]) {
+      const { provider } = responder(200, body);
+      expect(await provider.findByPurl("pkg:npm/x"), JSON.stringify(body)).toEqual({
+        status: "answered",
+        advisories: [],
+      });
+    }
+  });
+
+  it("survives an NVD 200 whose body is not an object either", async () => {
+    for (const body of [null, "a string", []]) {
+      const { provider } = responder(200, body);
+      expect(await provider.findByCpe("cpe:2.3:a:v:p:1.0:*:*:*:*:*:*:*"), JSON.stringify(body)).toEqual({
+        status: "answered",
+        advisories: [],
+      });
+    }
+  });
+
+  it("carries an OSV severity when the record states one", async () => {
+    const { provider } = responder(200, {
+      vulns: [{ id: "GHSA-x", aliases: [], database_specific: { severity: "HIGH" } }],
+    });
+
+    const outcome = await provider.findByPurl("pkg:npm/x");
+
+    expect(outcome.status === "answered" && outcome.advisories[0]?.severity).toBe("HIGH");
+  });
+
+  it("reads an NVD severity from each CVSS version, newest first", async () => {
+    const cases = [
+      { key: "cvssMetricV40", expected: "LOW" },
+      { key: "cvssMetricV31", expected: "MEDIUM" },
+      { key: "cvssMetricV30", expected: "HIGH" },
+      { key: "cvssMetricV2", expected: "CRITICAL" },
+    ];
+    for (const { key, expected } of cases) {
+      const { provider } = responder(200, {
+        vulnerabilities: [{ cve: { id: "CVE-1", metrics: { [key]: [{ cvssData: { baseSeverity: expected } }] } } }],
+      });
+      const outcome = await provider.findByCpe("cpe:2.3:a:v:p:1.0:*:*:*:*:*:*:*");
+      expect(outcome.status === "answered" && outcome.advisories[0]?.severity, key).toBe(expected);
+    }
+  });
+
+  it("prefers the newest CVSS version when a record carries several", async () => {
+    const { provider } = responder(200, {
+      vulnerabilities: [
+        {
+          cve: {
+            id: "CVE-1",
+            metrics: {
+              cvssMetricV31: [{ cvssData: { baseSeverity: "MEDIUM" } }],
+              cvssMetricV40: [{ cvssData: { baseSeverity: "CRITICAL" } }],
+            },
+          },
+        },
+      ],
+    });
+
+    const outcome = await provider.findByCpe("cpe:2.3:a:v:p:1.0:*:*:*:*:*:*:*");
+
+    expect(outcome.status === "answered" && outcome.advisories[0]?.severity).toBe("CRITICAL");
+  });
+
+  it("omits severity rather than inventing one when NVD states none", async () => {
+    const { provider } = responder(200, {
+      vulnerabilities: [
+        { cve: { id: "CVE-1" } },
+        { cve: { id: "CVE-2", metrics: {} } },
+        { cve: { id: "CVE-3", metrics: { cvssMetricV31: [] } } },
+        { cve: { id: "CVE-4", metrics: { cvssMetricV31: [{ cvssData: {} }] } } },
+        { cve: { id: "CVE-5", metrics: "not-an-object" } },
+      ],
+    });
+
+    const outcome = await provider.findByCpe("cpe:2.3:a:v:p:1.0:*:*:*:*:*:*:*");
+
+    expect(outcome.status === "answered" && outcome.advisories.map((a) => a.severity)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("skips an NVD entry with no cve id", async () => {
+    const { provider } = responder(200, {
+      vulnerabilities: [{ notACve: true }, { cve: null }, { cve: { noId: 1 } }, { cve: { id: "CVE-ok" } }],
+    });
+
+    const outcome = await provider.findByCpe("cpe:2.3:a:v:p:1.0:*:*:*:*:*:*:*");
+
+    expect(outcome.status === "answered" && outcome.advisories.map((a) => a.id)).toEqual(["CVE-ok"]);
+  });
+
+  it("describes a thrown non-Error as an unknown error", async () => {
+    const provider = createAdvisoryProvider({
+      fetch: async () => {
+        throw "a bare string";
+      },
+    });
+
+    // A rejected promise that is not an Error still has to produce a reason, or the outcome
+    // reads as an outage with nothing to diagnose.
+    expect(await provider.findByPurl("pkg:npm/x")).toEqual({ status: "unavailable", reason: "unknown error" });
+  });
+});
+
 describe("cpeNamesAnExactVersion", () => {
   it("accepts a version and refuses a wildcard or a malformed name", () => {
     expect(cpeNamesAnExactVersion("cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*")).toBe(true);
