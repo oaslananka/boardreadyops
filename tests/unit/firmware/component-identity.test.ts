@@ -46,12 +46,35 @@ describe("resolveComponentIdentity", () => {
     expect(identity).toEqual({ evidence: "unidentified", searchable: false });
   });
 
-  it("never looks up the framework", () => {
-    const identity = first(["dependencies:", '  idf: ">=5.0"'].join("\n"));
+  it("gives a pinned framework a version-exact CPE", () => {
+    const identity = first(["dependencies:", '  idf: "5.2.1"'].join("\n"));
 
-    // The framework is tracked by CPE rather than PURL, which this does not cover yet. Saying so
-    // is better than mapping it to something that matches nothing.
-    expect(identity).toEqual({ evidence: "unidentified", searchable: false });
+    // Measured against NVD: 173 CPE entries exist for espressif:esp-idf, and 5.2.1 carries
+    // CVE-2025-55297 (HIGH) and CVE-2025-66409 (CRITICAL). This is the single most actionable
+    // thing this line of work can surface. See #785.
+    expect(identity.cpe).toBe("cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*");
+    expect(identity.searchable).toBe(true);
+    expect(identity.evidence).toBe("reported");
+    expect(identity.purl).toBeUndefined();
+  });
+
+  it("strips a leading v from the framework version", () => {
+    // NVD's dictionary carries the version without it, so "v5.2.1" would match nothing.
+    expect(first(["dependencies:", '  idf: "v5.2.1"'].join("\n")).cpe).toBe(
+      "cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*",
+    );
+  });
+
+  it("refuses a CPE for a framework the manifest only gave a range for", () => {
+    for (const spec of ['">=5.0"', '"^5.2.1"', '"~5.2"', '"*"', '"5.x"']) {
+      const identity = first(["dependencies:", `  idf: ${spec}`].join("\n"));
+
+      // Querying NVD with the version left open returns 31 CVEs, against 2 for 5.2.1 and 0 for
+      // 6.1. A wildcard CPE over-reports six to fifteen times and would report 31 advisories
+      // against a current release that has none -- the mirror image of the false clean bill, and
+      // the worse of the two, because a reader can check a false alarm and find it wrong.
+      expect(identity, spec).toEqual({ evidence: "unidentified", searchable: false });
+    }
   });
 
   it("resolves a component the curated mapping actually knows", () => {
@@ -130,6 +153,14 @@ describe("summariseIdentities", () => {
     // A reader has to be able to tell "eleven of twelve were not vulnerability-indexed" from
     // "twelve of twelve had no advisories".
     expect(summary.unidentifiedNames).toEqual(["alpha", "zeta"]);
+  });
+
+  it("counts a pinned framework as searchable and a ranged one as not", () => {
+    const pinned = summariseIdentities(dependencies(["dependencies:", '  idf: "5.2.1"'].join("\n")));
+    expect(pinned).toEqual({ total: 1, searchable: 1, unidentified: 0, unidentifiedNames: [] });
+
+    const ranged = summariseIdentities(dependencies(["dependencies:", '  idf: ">=5.0"'].join("\n")));
+    expect(ranged).toEqual({ total: 1, searchable: 0, unidentified: 1, unidentifiedNames: ["idf"] });
   });
 
   it("returns zeroes for an empty dependency list", () => {

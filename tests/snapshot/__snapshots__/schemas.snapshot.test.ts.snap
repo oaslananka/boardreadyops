@@ -2081,6 +2081,9 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "items": {
               "additionalProperties": false,
               "properties": {
+                "cpe": {
+                  "type": "string",
+                },
                 "identitySource": {
                   "type": "string",
                 },
@@ -2560,6 +2563,9 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "bom-ref": {
               "type": "string",
             },
+            "cpe": {
+              "type": "string",
+            },
             "evidence": {
               "additionalProperties": false,
               "properties": {
@@ -2574,7 +2580,10 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                         "type": "number",
                       },
                       "field": {
-                        "const": "purl",
+                        "enum": [
+                          "cpe",
+                          "purl",
+                        ],
                       },
                       "methods": {
                         "items": {

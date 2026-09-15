@@ -168,8 +168,8 @@ describe("CycloneDX HBOM formatter", () => {
         { name: "boardreadyops:componentCount", value: "5" },
         { name: "boardreadyops:hardwareComponentCount", value: "2" },
         { name: "boardreadyops:firmwareComponentCount", value: "3" },
-        { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "1" },
-        { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: "1" },
+        { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "2" },
+        { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: "2" },
       ]),
     );
   });
@@ -180,6 +180,44 @@ describe("CycloneDX HBOM formatter", () => {
     // A component nothing depends on reads as unused. All five are in the device.
     expect(hbom.dependencies[0]?.dependsOn).toEqual(hbom.components.map((component) => component["bom-ref"]));
     expect(hbom.dependencies[0]?.dependsOn).toContain("boardreadyops:firmware:firmware.idf_component.yml:mcuboot");
+  });
+
+  it("carries a CPE for a pinned framework and identity evidence for it", () => {
+    const byName = new Map(createHbom(resultWithFirmware()).components.map((c) => [c.name, c]));
+    const idf = byName.get("idf");
+
+    // NVD returns 2 CVEs for esp-idf 5.2.1, one of them CRITICAL. The CPE is what makes that
+    // question answerable at all. See #785.
+    expect(idf?.cpe).toBe("cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*");
+    expect(idf?.properties).toEqual(
+      expect.arrayContaining([{ name: "boardreadyops:vulnerabilityIndexed", value: "true" }]),
+    );
+    expect(idf?.evidence?.identity).toEqual([
+      {
+        field: "cpe",
+        confidence: 0.5,
+        concludedValue: "cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*",
+        methods: [
+          {
+            technique: "manifest-analysis",
+            confidence: 0.5,
+            value: "cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("counts a CPE-identified component toward the identifiable totals", () => {
+    const hbom = createHbom(resultWithFirmware());
+
+    // Two searchable now: mcuboot by PURL and the framework by CPE.
+    expect(hbom.metadata.properties).toEqual(
+      expect.arrayContaining([
+        { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: "2" },
+        { name: "boardreadyops:vulnerabilityIndexedFirmwareCount", value: "2" },
+      ]),
+    );
   });
 
   it("formats a firmware-bearing document that validates against the bundled schema", () => {
@@ -277,9 +315,11 @@ function resultWithFirmware(): RunResult {
         name: "idf",
         manifestPath: "firmware/idf_component.yml",
         origin: "framework",
-        versionSpec: ">=5.0",
-        pinned: false,
-        searchable: false,
+        versionSpec: "5.2.1",
+        pinned: true,
+        cpe: "cpe:2.3:a:espressif:esp-idf:5.2.1:*:*:*:*:*:*:*",
+        searchable: true,
+        identitySource: "NVD CPE dictionary (173 entries, majors 0-6.1)",
       },
       {
         name: "led_strip",
