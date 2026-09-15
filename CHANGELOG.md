@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.50.0](https://github.com/oaslananka/boardreadyops/compare/v1.49.0...v1.50.0) (2026-09-15)
+
+
+### Features
+
+* **mfg:** let a gerber file say what it is, instead of reading its name ([#766](https://github.com/oaslananka/boardreadyops/issues/766)) ([05a63e0](https://github.com/oaslananka/boardreadyops/commit/05a63e0676a3d2cff402b1267db40497d90291b8))
+
 ## [1.49.0](https://github.com/oaslananka/boardreadyops/compare/v1.48.0...v1.49.0) (2026-09-15)
 
 
