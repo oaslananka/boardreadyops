@@ -42,7 +42,7 @@
     "hook:commitlint": "commitlint",
     "hook:lint-staged": "lint-staged",
     "i18n:check": "node scripts/check-i18n.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json && corepack pnpm run qa:typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.json && corepack pnpm run qa:typecheck && corepack pnpm --filter @boardreadyops/web run typecheck",
     "qa:typecheck": "tsc --noEmit -p tests/e2e/tsconfig.json",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",

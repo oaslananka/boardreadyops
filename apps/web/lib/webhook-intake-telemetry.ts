@@ -6,7 +6,14 @@ export type WebhookIntakeTelemetry = {
 
 type Write = (line: string) => unknown;
 
-function boundedErrorClass(value: string | undefined): string | undefined {
+/**
+ * Strips a value down to what is safe to put in a log line.
+ *
+ * Exported so `repository-action-telemetry` reuses it: a thrown value's name or a database error
+ * code both arrive from outside and neither should be able to inject a newline into a
+ * line-delimited log stream.
+ */
+export function boundedErrorClass(value: string | undefined): string | undefined {
   const normalized = value?.trim().replace(/[^A-Za-z0-9_.:-]/gu, "");
   return normalized ? normalized.slice(0, 100) : undefined;
 }
