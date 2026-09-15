@@ -188,3 +188,131 @@ describe("firmware snapshot store", () => {
     });
   });
 });
+
+describe("firmware snapshot store: advisory scan scheduling", () => {
+  it("enrols the repository for advisory scanning when a snapshot is written", async () => {
+    const { store, query } = executor([{ snapshots_written: 1, dependencies_written: 1, run_matches: 1 }]);
+
+    await store.recordSnapshot({ runId, repositoryId, commitSha: "abc", dependencies: [dependency] });
+
+    const [sql] = query.mock.calls[0] as unknown as [string, unknown[]];
+    // A snapshot is only ever recorded here, so this is the one place that can enrol the
+    // repository. Without it a repository whose firmware first appeared after the watch
+    // migration would never become due and the whole scan would sit built and unused.
+    expect(sql).toContain("insert into repository_firmware_advisory_watch");
+    expect(sql).toContain("where exists (select 1 from inserted_snapshot)");
+    // New dependency data pulls the due time forward rather than pushing it back.
+    expect(sql).toContain("least(repository_firmware_advisory_watch.next_due_at, excluded.next_due_at)");
+  });
+
+  it("claims only the newest snapshot per due repository", async () => {
+    const { store, query } = executor([]);
+
+    await store.claimDueScans(new Date("2026-09-15T00:00:00.000Z"), 10);
+
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    // Scanning an older snapshot would ask about dependencies the project has already moved off.
+    expect(sql).toContain("select distinct on (snapshot.repository_id)");
+    expect(sql).toContain("order by snapshot.repository_id, snapshot.captured_at desc, snapshot.id desc");
+    expect(sql).toContain("and dependency.searchable");
+    expect(params[1]).toBe(10);
+  });
+
+  it("asks for nothing when the limit is not positive", async () => {
+    const { store, query } = executor([]);
+
+    expect(await store.claimDueScans(new Date(), 0)).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("reads the aggregated identifiers back", async () => {
+    const { store } = executor([
+      {
+        repository_id: repositoryId,
+        installation_id: "install-1",
+        snapshot_id: "snap-1",
+        commit_sha: "abc123",
+        dependency_count: 40,
+        scannable: [
+          { name: "idf", manifestPath: "fw/idf_component.yml", cpe: "cpe:2.3:a:espressif:esp-idf:5.2.1:*", purl: null },
+          {
+            name: "mcuboot",
+            manifestPath: "fw/idf_component.yml",
+            purl: "pkg:golang/github.com/mcu-tools/mcuboot",
+            cpe: null,
+          },
+        ],
+      },
+    ]);
+
+    const claimed = await store.claimDueScans(new Date(), 5);
+
+    expect(claimed).toEqual([
+      {
+        repositoryId,
+        installationId: "install-1",
+        snapshotId: "snap-1",
+        commitSha: "abc123",
+        dependencyCount: 40,
+        scannable: [
+          { name: "idf", manifestPath: "fw/idf_component.yml", cpe: "cpe:2.3:a:espressif:esp-idf:5.2.1:*" },
+          { name: "mcuboot", manifestPath: "fw/idf_component.yml", purl: "pkg:golang/github.com/mcu-tools/mcuboot" },
+        ],
+      },
+    ]);
+  });
+
+  it("drops a row that claims to be searchable but carries no identifier", async () => {
+    const { store } = executor([
+      {
+        repository_id: repositoryId,
+        installation_id: "install-1",
+        snapshot_id: "snap-1",
+        commit_sha: "abc",
+        dependency_count: 2,
+        scannable: [
+          { name: "broken", manifestPath: "fw/idf_component.yml", purl: null, cpe: null },
+          { name: "ok", manifestPath: "fw/idf_component.yml", purl: "pkg:npm/x", cpe: null },
+        ],
+      },
+    ]);
+
+    // The 0068 constraint makes this impossible, so reaching it means the invariant broke.
+    // Skipping beats querying on an empty string and recording the answer.
+    expect((await store.claimDueScans(new Date(), 5))[0]?.scannable.map((entry) => entry.name)).toEqual(["ok"]);
+  });
+
+  it("skips a claimed row missing the columns it needs", async () => {
+    const { store } = executor([
+      { repository_id: repositoryId, snapshot_id: "snap-1", commit_sha: "abc", scannable: [] },
+      {
+        repository_id: repositoryId,
+        installation_id: "install-1",
+        snapshot_id: "snap-2",
+        commit_sha: "def",
+        dependency_count: 0,
+        scannable: [],
+      },
+    ]);
+
+    expect((await store.claimDueScans(new Date(), 5)).map((entry) => entry.snapshotId)).toEqual(["snap-2"]);
+  });
+
+  it("resets the failure count only for an outcome that actually completed", async () => {
+    const { store, query } = executor([]);
+
+    await store.completeScan({
+      repositoryId,
+      snapshotId: "snap-1",
+      outcome: "unavailable",
+      scannedAt: new Date("2026-09-15T00:00:00.000Z"),
+      nextDueAt: new Date("2026-09-15T01:00:00.000Z"),
+    });
+
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    // Only answered and nothing_searchable mean the repository was actually looked at.
+    expect(sql).toContain("when $4 in ('answered', 'nothing_searchable') then 0");
+    expect(sql).toContain("else repository_firmware_advisory_watch.consecutive_failures + 1");
+    expect(params[3]).toBe("unavailable");
+  });
+});

@@ -54,6 +54,11 @@
       "import": "./src/component-intelligence-resilience.ts",
       "default": "./src/component-intelligence-resilience.ts"
     },
+    "./firmware-advisory-watch": {
+      "types": "./src/firmware-advisory-watch.ts",
+      "import": "./src/firmware-advisory-watch.ts",
+      "default": "./src/firmware-advisory-watch.ts"
+    },
     "./advisory-lookup": {
       "types": "./src/advisory-lookup.ts",
       "import": "./src/advisory-lookup.ts",

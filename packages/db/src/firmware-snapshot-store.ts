@@ -40,8 +40,52 @@ export type RecordFirmwareSnapshotResult = {
   runMatched: boolean;
 };
 
+/** One identifier worth asking a database about, and where it came from. */
+export type ScannableDependency = {
+  name: string;
+  manifestPath: string;
+  purl?: string | undefined;
+  cpe?: string | undefined;
+};
+
+/** A repository due for advisory scanning, with its newest snapshot's searchable identifiers. */
+export type DueFirmwareScan = {
+  repositoryId: string;
+  installationId: string;
+  snapshotId: string;
+  commitSha: string;
+  /**
+   * Only the dependencies carrying an identifier a database indexes.
+   *
+   * The rest are excluded before any query: OSV answers a `pkg:generic` lookup with `{}`, so
+   * asking would spend a rate-limited budget to learn nothing and risk recording that empty
+   * answer as clean.
+   */
+  scannable: readonly ScannableDependency[];
+  /** How many dependencies the snapshot holds in total, including the unsearchable ones. */
+  dependencyCount: number;
+};
+
+export type FirmwareScanOutcome =
+  | "answered"
+  | "rejected"
+  | "unavailable"
+  | "no_provider"
+  | "nothing_searchable"
+  | "failed";
+
 export type FirmwareSnapshotStore = {
   recordSnapshot(input: RecordFirmwareSnapshotInput): Promise<RecordFirmwareSnapshotResult>;
+  /** Repositories whose advisory scan is due. */
+  claimDueScans(now: Date, limit: number): Promise<DueFirmwareScan[]>;
+  /** Records the outcome and when to look again. */
+  completeScan(input: {
+    repositoryId: string;
+    snapshotId: string;
+    outcome: FirmwareScanOutcome;
+    scannedAt: Date;
+    nextDueAt: Date;
+  }): Promise<void>;
 };
 
 type StoreOptions = {
@@ -127,6 +171,23 @@ export function createSqlFirmwareSnapshotStore(
            on conflict (repository_id, run_id) do nothing
            returning repository_firmware_snapshots.id
          ),
+         enrolled_watch as (
+           -- A snapshot is only ever recorded here, so this is the one place that can enrol the
+           -- repository for advisory scanning. Without it a repository whose firmware first
+           -- appeared after the watch migration would never become due and would silently go
+           -- unscanned -- which, given the scan is what turns an identifier into an answer,
+           -- would leave the whole chain built and never used.
+           --
+           -- New dependency data makes it due immediately rather than waiting out the interval.
+           insert into repository_firmware_advisory_watch (repository_id, next_due_at)
+           select run_scope.repository_id, $5::timestamptz
+           from run_scope
+           where exists (select 1 from inserted_snapshot)
+           on conflict (repository_id) do update
+             set next_due_at = least(repository_firmware_advisory_watch.next_due_at, excluded.next_due_at),
+                 enabled = true
+           returning repository_firmware_advisory_watch.repository_id
+         ),
          inserted_dependencies as (
            insert into repository_firmware_dependencies (
              snapshot_id, name, manifest_path, origin, version_spec,
@@ -146,7 +207,8 @@ export function createSqlFirmwareSnapshotStore(
            cross join payload
            returning repository_firmware_dependencies.id, repository_firmware_dependencies.searchable
          )
-         select (select count(*) from inserted_snapshot)::int as snapshots_written,
+         select (select count(*) from enrolled_watch)::int as repositories_enrolled,
+                (select count(*) from inserted_snapshot)::int as snapshots_written,
                 (select count(*) from inserted_dependencies)::int as dependencies_written,
                 (select count(*) from inserted_dependencies where inserted_dependencies.searchable)::int
                   as searchable_written,
@@ -162,14 +224,135 @@ export function createSqlFirmwareSnapshotStore(
         runMatched: numberCell(row, "run_matches") > 0,
       };
     },
+
+    async claimDueScans(nowAt, limit) {
+      if (limit <= 0) return [];
+      const result = await executor.query(CLAIM_SQL, [nowAt.toISOString(), limit]);
+
+      const claimed: DueFirmwareScan[] = [];
+      for (const row of rows(result)) {
+        const repositoryId = textCell(row, "repository_id");
+        const installationId = textCell(row, "installation_id");
+        const snapshotId = textCell(row, "snapshot_id");
+        const commitSha = textCell(row, "commit_sha");
+        if (!repositoryId || !installationId || !snapshotId || !commitSha) continue;
+        claimed.push({
+          repositoryId,
+          installationId,
+          snapshotId,
+          commitSha,
+          scannable: scannableFrom(row.scannable),
+          dependencyCount: numberCell(row, "dependency_count"),
+        });
+      }
+      return claimed;
+    },
+
+    async completeScan(input) {
+      await executor.query(COMPLETE_SQL, [
+        input.repositoryId,
+        input.scannedAt.toISOString(),
+        input.snapshotId,
+        input.outcome,
+        input.nextDueAt.toISOString(),
+      ]);
+    },
   };
 }
+
+/**
+ * Reads the aggregated identifier rows, dropping anything that lost both identifiers.
+ *
+ * A row marked searchable always carries one of the two -- the database constraint in 0068
+ * enforces it -- so a row with neither means the invariant broke. Skipping it beats querying on
+ * an empty string and recording the answer.
+ */
+function scannableFrom(value: unknown): readonly ScannableDependency[] {
+  if (!Array.isArray(value)) return [];
+  const scannable: ScannableDependency[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    const name = typeof record.name === "string" ? record.name : undefined;
+    const manifestPath = typeof record.manifestPath === "string" ? record.manifestPath : undefined;
+    if (name === undefined || manifestPath === undefined) continue;
+    const purl = typeof record.purl === "string" ? record.purl : undefined;
+    const cpe = typeof record.cpe === "string" ? record.cpe : undefined;
+    if (purl === undefined && cpe === undefined) continue;
+    scannable.push({
+      name,
+      manifestPath,
+      ...(purl === undefined ? {} : { purl }),
+      ...(cpe === undefined ? {} : { cpe }),
+    });
+  }
+  return scannable;
+}
+
+const CLAIM_SQL = `with due as (
+           select watch.repository_id
+           from repository_firmware_advisory_watch as watch
+           where watch.enabled
+             and watch.next_due_at <= $1::timestamptz
+           order by watch.next_due_at, watch.repository_id
+           limit $2::int
+         ),
+         newest as (
+           -- The latest snapshot per due repository. Scanning an older one would ask about
+           -- dependencies the project has already moved off.
+           select distinct on (snapshot.repository_id)
+                  snapshot.id, snapshot.repository_id, snapshot.commit_sha, snapshot.dependency_count
+           from repository_firmware_snapshots as snapshot
+           join due on due.repository_id = snapshot.repository_id
+           order by snapshot.repository_id, snapshot.captured_at desc, snapshot.id desc
+         )
+         select newest.repository_id,
+                repositories.installation_id,
+                newest.id as snapshot_id,
+                newest.commit_sha,
+                newest.dependency_count,
+                coalesce(
+                  (
+                    select jsonb_agg(
+                             jsonb_build_object(
+                               'name', dependency.name,
+                               'manifestPath', dependency.manifest_path,
+                               'purl', dependency.purl,
+                               'cpe', dependency.cpe
+                             )
+                             order by dependency.name, dependency.manifest_path
+                           )
+                    from repository_firmware_dependencies as dependency
+                    where dependency.snapshot_id = newest.id
+                      and dependency.searchable
+                  ),
+                  '[]'::jsonb
+                ) as scannable
+         from newest
+         join repositories on repositories.id = newest.repository_id
+         order by newest.repository_id`;
+
+const COMPLETE_SQL = `update repository_firmware_advisory_watch
+            set last_scanned_at = $2::timestamptz,
+                last_scanned_snapshot_id = $3,
+                last_outcome = $4,
+                next_due_at = $5::timestamptz,
+                consecutive_failures = case
+                  when $4 in ('answered', 'nothing_searchable') then 0
+                  else repository_firmware_advisory_watch.consecutive_failures + 1
+                end
+          where repository_id = $1`;
 
 /** The executor's return is untyped by design; narrow it the same way board-bom-store does. */
 function rows(result: unknown): readonly Record<string, unknown>[] {
   if (typeof result !== "object" || result === null || !("rows" in result)) return [];
   const value = (result as SqlQueryResult).rows;
   return Array.isArray(value) ? value : [];
+}
+
+function textCell(row: Record<string, unknown>, column: string): string | undefined {
+  const value = row[column];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function numberCell(row: Record<string, unknown> | undefined, column: string): number {

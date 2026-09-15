@@ -20,6 +20,7 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(cloudDatabaseModels).toContain("BoardBomComponent");
     expect(cloudDatabaseModels).toContain("RepositoryFirmwareSnapshot");
     expect(cloudDatabaseModels).toContain("RepositoryFirmwareDependency");
+    expect(cloudDatabaseModels).toContain("RepositoryFirmwareAdvisoryWatch");
     expect(cloudDatabaseModels).toContain("RunnerRegistration");
     expect(cloudDatabaseModels).toContain("RunnerRegistrationEnrollment");
     expect(cloudDatabaseModels).toContain("RunnerExecutionPolicy");
@@ -115,6 +116,7 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0066_notifications.sql",
       "0067_notification_email_channels.sql",
       "0068_repository_firmware_snapshots.sql",
+      "0069_firmware_advisory_watch.sql",
     ]);
   });
 
@@ -142,6 +144,24 @@ describe("BoardReadyOps Cloud migrations", () => {
     expect(sql).toContain("repository_firmware_dependencies_purl_idx");
     expect(sql).toContain("repository_firmware_dependencies_cpe_idx");
     expect(sql).toContain("searchable_count between 0 and dependency_count");
+  });
+
+  it("keys the firmware advisory schedule by repository and records all six outcomes in schema v69", async () => {
+    const sql = (await readFile(join(migrationsDir, "0069_firmware_advisory_watch.sql"), "utf8")).toLowerCase();
+
+    // Keyed by repository, not snapshot: every run appends a snapshot, so a per-snapshot
+    // schedule would rescan the same dependencies once per run against a rate-limited API.
+    expect(sql).toContain("create table if not exists repository_firmware_advisory_watch");
+    expect(sql).toContain("repository_id text primary key references repositories(id) on delete cascade");
+
+    // The outcome must keep the three answers distinct once persisted; collapsing a refusal or
+    // an outage into "answered" is the false clean bill made durable.
+    expect(sql).toContain("repository_firmware_advisory_watch_outcome_valid");
+    for (const outcome of ["answered", "rejected", "unavailable", "no_provider", "nothing_searchable", "failed"]) {
+      expect(sql, outcome).toContain(`'${outcome}'`);
+    }
+
+    expect(sql).toContain("repository_firmware_advisory_watch_due_idx");
   });
 
   it("adds a nullable rule-category column to findings in schema v62", async () => {
