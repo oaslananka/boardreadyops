@@ -174,6 +174,11 @@ export const en = {
   "report.waivers.stale": "stale",
   "report.waivers.state": "State",
   "report.waivers.title": "Waivers",
+  "report.evidence.title": "What This Rests On",
+  "report.evidence.measured": "measured",
+  "report.evidence.inferred": "inferred",
+  "report.evidence.blocking":
+    "These rules can fail the run and do not rest on a measurement. A finding inferred from a naming convention, a free-text pattern or a weighted score can be wrong about a board that is fine:",
   "report.bomRisk.title": "BOM Supply-Chain Risk",
   "report.bomRisk.overallScore": "Overall BOM risk score",
   "report.bomRisk.components": "at-risk components",

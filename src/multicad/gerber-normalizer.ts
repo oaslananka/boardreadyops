@@ -7,6 +7,8 @@ import type {
   NormalizedLayer,
   ParserWarning,
 } from "@boardreadyops/contracts";
+import { parseExcellon } from "./excellon-parser.js";
+import { parseGerber } from "./gerber-parser.js";
 
 export interface BundleFileEntry {
   filename: string;
@@ -23,43 +25,97 @@ export interface NormalizedStackupResult {
 
 interface LayerAccumulation {
   layers: NormalizedLayer[];
-  outlineContent: string | undefined;
-  hasPth: boolean;
-  hasNpth: boolean;
+  /** Board extents and outline closure, read from the profile layer's own artwork. */
+  outline: { boundingBoxMm: BoundingBoxMm | undefined; closed: boolean; openContours: number } | undefined;
   copperLayerCount: number;
+  /** Every drill entry, with content where the caller supplied it. Plating is decided per file. */
+  drillFiles: { filename: string; content: string | undefined }[];
+  /** Layers whose role came from the file's own TF.FileFunction rather than its name. */
+  declaredIdentityCount: number;
+  warnings: ParserWarning[];
 }
+
+type BoundingBoxMm = { minX: number; maxX: number; minY: number; maxY: number };
 
 function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
   const layers: NormalizedLayer[] = [];
-  let outlineContent: string | undefined;
-  let hasPth = false;
-  let hasNpth = false;
+  const drillFiles: { filename: string; content: string | undefined }[] = [];
+  const warnings: ParserWarning[] = [];
+  let outline: LayerAccumulation["outline"];
   let copperLayerCount = 0;
+  let declaredIdentityCount = 0;
 
   for (const entry of files) {
     const cleanName = entry.filename.replaceAll("\\", "/");
     const classification = classifyLayer(cleanName);
     if (!classification) continue;
 
-    layers.push({
-      name: classification.name,
-      role: classification.role,
-      side: classification.side,
-      index: classification.index,
-      filename: entry.filename,
-    });
+    if (classification.role === "drill") {
+      layers.push({ ...toLayer(classification, entry.filename) });
+      // Plating is not decided here. `readDrillFiles` reads each file's own attributes and only
+      // falls back to the name for the ones that stay silent.
+      drillFiles.push({ filename: entry.filename, content: entry.content });
+      continue;
+    }
 
-    if (classification.role === "copper") {
-      copperLayerCount++;
-    } else if (classification.role === "outline" && entry.content) {
-      outlineContent = entry.content;
-    } else if (classification.role === "drill") {
-      if (/-NPTH/i.test(cleanName)) hasNpth = true;
-      else hasPth = true;
+    // Where the artwork states what it is, that is what it is. The filename is the fallback.
+    const parsed = entry.content ? parseGerber(entry.content, entry.filename) : undefined;
+    warnings.push(...(parsed?.warnings ?? []));
+    const declared = parsed?.identity;
+    if (declared) declaredIdentityCount += 1;
+
+    const role = declared?.role ?? classification.role;
+    const resolved: LayerClassification = declared
+      ? { name: nameForRole(role, declared.side, declared.index), role, side: declared.side, index: declared.index }
+      : classification;
+
+    if (declared && declared.role !== classification.role) {
+      warnings.push({
+        code: "LAYER_ROLE_FROM_CONTENT",
+        message: `${entry.filename} declares TF.FileFunction "${parsed?.fileFunction}", which is a ${declared.role} layer, while its name suggests ${classification.role}. The file's own declaration is used.`,
+        path: entry.filename,
+      });
+    }
+
+    layers.push(toLayer(resolved, entry.filename));
+
+    if (resolved.role === "copper") copperLayerCount++;
+    if (resolved.role === "outline" && parsed) {
+      outline = {
+        boundingBoxMm: parsed.boundingBoxMm,
+        closed: parsed.hasClosedContour,
+        openContours: parsed.openContourCount,
+      };
     }
   }
 
-  return { layers, outlineContent, hasPth, hasNpth, copperLayerCount };
+  return { layers, outline, copperLayerCount, drillFiles, declaredIdentityCount, warnings };
+}
+
+function toLayer(classification: LayerClassification, filename: string): NormalizedLayer {
+  return {
+    name: classification.name,
+    role: classification.role,
+    side: classification.side,
+    index: classification.index,
+    filename,
+  };
+}
+
+/** A readable name for a role the file declared, matching the wording the filename path produces. */
+function nameForRole(role: LayerRole, side: LayerSide, index: number | undefined): string {
+  const position =
+    side === "top" ? "Top" : side === "bottom" ? "Bottom" : side === "inner" ? `Inner ${index ?? ""}`.trim() : "";
+  const label: Record<string, string> = {
+    copper: "Copper",
+    soldermask: "Solder Mask",
+    silkscreen: "Silkscreen",
+    solderpaste: "Paste",
+    outline: "Board Outline",
+    drill: "Drill",
+  };
+  const base = label[role] ?? role;
+  return position ? `${position} ${base}` : base;
 }
 
 function buildStackupWarnings(hasAnyDrill: boolean, hasOutlines: boolean): ParserWarning[] {
@@ -80,25 +136,44 @@ function buildStackupWarnings(hasAnyDrill: boolean, hasOutlines: boolean): Parse
 }
 
 export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStackupResult {
-  const { layers, outlineContent, hasPth, hasNpth, copperLayerCount } = accumulateLayers(files);
+  const accumulated = accumulateLayers(files);
+  const { layers, outline, copperLayerCount, drillFiles } = accumulated;
   const hasAnyDrill = layers.some((l) => l.role === "drill");
   const hasOutlines = layers.some((l) => l.role === "outline");
   const warnings = buildStackupWarnings(hasAnyDrill, hasOutlines);
+  const drill = readDrillFiles(drillFiles);
 
-  // Extract board dimensions if outline content is present
-  const boardDims = outlineContent ? extractDimensionsFromGerber(outlineContent) : {};
+  warnings.push(...accumulated.warnings, ...drill.warnings);
 
+  // An outline whose contour never closes is the single most expensive thing in a fabrication
+  // package to get wrong: the fabricator has no board shape. It was previously invisible here,
+  // because nothing opened the file.
+  if (outline && !outline.closed) {
+    warnings.push({
+      code: "OUTLINE_NOT_CLOSED",
+      message:
+        outline.openContours > 0
+          ? `The board outline draws ${outline.openContours} contour(s) that never return to their start, so it does not describe a closed shape.`
+          : "The board outline layer contains no closed contour, so it does not describe a board shape.",
+    });
+  }
+
+  const box = outline?.boundingBoxMm;
   const board: NormalizedBoardMetadata = {
     name: "Board",
     layerCount: copperLayerCount > 0 ? copperLayerCount : undefined,
-    ...(boardDims.widthMm ? { widthMm: boardDims.widthMm } : {}),
-    ...(boardDims.heightMm ? { heightMm: boardDims.heightMm } : {}),
+    ...(box && box.maxX > box.minX ? { widthMm: box.maxX - box.minX } : {}),
+    ...(box && box.maxY > box.minY ? { heightMm: box.maxY - box.minY } : {}),
   };
 
   const capabilities: IngestionCapabilities = {
     hasGerberOutlines: hasOutlines,
-    hasPlatedHoles: hasPth || hasAnyDrill,
-    hasNonPlatedHoles: hasNpth,
+    // Read from the drill files' own plating attributes where they declare them, and only from
+    // the filename where they do not. The old rule was that any drill file at all
+    // counts as plated holes", which is true often enough to look right and wrong exactly when it
+    // matters: a bundle carrying only a non-plated set reported plated holes it does not have.
+    hasPlatedHoles: drill.hasPlated,
+    hasNonPlatedHoles: drill.hasNonPlated,
     hasBomMapping: false,
     hasCentroidPlacement: false,
     hasNetlistConnectivity: false,
@@ -108,17 +183,79 @@ export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStac
   return {
     board,
     layers,
-    drillHoles: [],
+    drillHoles: drill.holes,
     capabilities,
     warnings,
   };
+}
+
+type DrillReading = {
+  holes: NormalizedDrillHole[];
+  hasPlated: boolean;
+  hasNonPlated: boolean;
+  warnings: ParserWarning[];
+};
+
+/** What a filename alone suggests about plating, used only where the file itself is silent. */
+function platingFromFilename(filename: string): "plated" | "non-plated" {
+  return /-?NPTH/i.test(filename.replaceAll("\\", "/")) ? "non-plated" : "plated";
+}
+
+/**
+ * Parses every drill file in the bundle and decides what the package actually contains.
+ *
+ * The decision is made **per file**, which is the part worth being careful about. An earlier
+ * version computed the filename reading across the whole bundle and then OR-ed it with the
+ * declarations, so a file that explicitly said `NonPlated` was overruled by its own unsuffixed
+ * name -- the exact behaviour this change set out to remove, reintroduced one layer up. A file
+ * that declares its plating decides for itself; only a silent one falls back to its name.
+ */
+function readDrillFiles(files: readonly { filename: string; content: string | undefined }[]): DrillReading {
+  const holes: NormalizedDrillHole[] = [];
+  const warnings: ParserWarning[] = [];
+  let hasPlated = false;
+  let hasNonPlated = false;
+  let filesWithoutContent = 0;
+
+  for (const file of files) {
+    if (file.content === undefined) {
+      filesWithoutContent += 1;
+      if (platingFromFilename(file.filename) === "non-plated") hasNonPlated = true;
+      else hasPlated = true;
+      continue;
+    }
+
+    const parsed = parseExcellon(file.content, file.filename);
+    holes.push(...parsed.holes);
+    warnings.push(...parsed.warnings);
+
+    if (parsed.platedEvidence === "declared") {
+      for (const tool of parsed.tools) {
+        if (tool.plated === true) hasPlated = true;
+        if (tool.plated === false) hasNonPlated = true;
+      }
+      continue;
+    }
+
+    if (platingFromFilename(file.filename) === "non-plated") hasNonPlated = true;
+    else hasPlated = true;
+  }
+
+  if (filesWithoutContent > 0) {
+    warnings.push({
+      code: "DRILL_CONTENT_UNAVAILABLE",
+      message: `${filesWithoutContent} drill file(s) were listed without content, so their holes and plating could not be read. Anything said about them rests on the filename.`,
+    });
+  }
+
+  return { holes, hasPlated, hasNonPlated, warnings };
 }
 
 interface LayerClassification {
   name: string;
   role: LayerRole;
   side: LayerSide;
-  index?: number;
+  index?: number | undefined;
 }
 
 function classifyLayer(filename: string): LayerClassification | null {
@@ -193,66 +330,4 @@ function classifyLayer(filename: string): LayerClassification | null {
   }
 
   return null;
-}
-
-function gerberCoordinateScale(content: string): number {
-  const isInch = /%MOIN\*%/.test(content) && !/%MOMM\*%/.test(content);
-
-  let divisor = 100000;
-  const decimalsStr = /%FSLAX(\d)(\d)Y(\d)(\d)\*%/u.exec(content)?.[2];
-  if (decimalsStr) {
-    divisor = 10 ** Number.parseInt(decimalsStr, 10);
-  }
-
-  return isInch ? 25.4 / divisor : 1 / divisor;
-}
-
-interface GerberBoundingBox {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  count: number;
-}
-
-function gerberCoordinateBoundingBox(content: string): GerberBoundingBox {
-  const coordRegex = /X(-?\d+)Y(-?\d+)/g;
-  const box: GerberBoundingBox = {
-    minX: Number.POSITIVE_INFINITY,
-    maxX: Number.NEGATIVE_INFINITY,
-    minY: Number.POSITIVE_INFINITY,
-    maxY: Number.NEGATIVE_INFINITY,
-    count: 0,
-  };
-
-  let match = coordRegex.exec(content);
-  while (match !== null) {
-    const [, xStr, yStr] = match;
-    if (xStr !== undefined && yStr !== undefined) {
-      const x = Number.parseInt(xStr, 10);
-      const y = Number.parseInt(yStr, 10);
-      box.minX = Math.min(box.minX, x);
-      box.maxX = Math.max(box.maxX, x);
-      box.minY = Math.min(box.minY, y);
-      box.maxY = Math.max(box.maxY, y);
-      box.count += 1;
-    }
-    match = coordRegex.exec(content);
-  }
-
-  return box;
-}
-
-function extractDimensionsFromGerber(content: string): { widthMm?: number; heightMm?: number } {
-  const scale = gerberCoordinateScale(content);
-  const box = gerberCoordinateBoundingBox(content);
-
-  if (box.count >= 2 && Number.isFinite(box.minX) && Number.isFinite(box.maxX)) {
-    return {
-      widthMm: (box.maxX - box.minX) * scale,
-      heightMm: (box.maxY - box.minY) * scale,
-    };
-  }
-
-  return {};
 }

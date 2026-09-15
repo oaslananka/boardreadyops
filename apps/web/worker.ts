@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { hostname } from "node:os";
 import { configuredCredentialCipher } from "@boardreadyops/cloud-core/credential-encryption";
 import { type RiskyComponentFinding, runSupplyWatchPass } from "@boardreadyops/cloud-core/supply-watch";
+import { createSqlAffectedBoardsStore } from "@boardreadyops/db/affected-boards-store";
 import {
   type ClaimedArtifactDeletion,
   createSqlArtifactDeletionStore,
@@ -54,6 +55,7 @@ import { runRetentionMaintenanceCleanup } from "./lib/retention-maintenance-work
 import { createRunnerClient } from "./lib/runner-client.js";
 import { runnerModeSummary, runnerWorkflowDispatchClient } from "./lib/runner-mode.js";
 import { sendSentryEvent } from "./lib/sentry-worker-client.js";
+import { type AffectedBoardsResult, affectedPartKeys, composeSupplyAnnouncement } from "./lib/supply-announcement.js";
 
 // Opt-in only: sends nothing unless SENTRY_DSN is set. See lib/sentry-worker-client.ts.
 const sentryDsn = process.env.SENTRY_DSN?.trim();
@@ -196,6 +198,7 @@ const retentionMaintenance = createSqlRetentionMaintenanceStore(executor, {
 });
 const operations = createSqlControlPlaneOperationsStore(executor);
 const supplyWatchStore = createSqlBoardSupplyWatchStore(executor);
+const affectedBoardsStore = createSqlAffectedBoardsStore(executor);
 const notifications = createSqlNotificationStore(executor);
 const notificationWorker = createNotificationWorkerDependencies(executor, workerId);
 // Each installation's lookups run under its own licence, so the provider is resolved per
@@ -529,24 +532,35 @@ async function runSupplyWatch(currentTime: number): Promise<void> {
 /**
  * Turns a supply-watch detection into a notification.
  *
- * One event per board rather than per part: a BOM refresh that marks six parts end-of-life at
- * once is one piece of news, and six messages would be the fastest possible way to get the
- * channel muted. The dedupe key names the board and every part in the batch, so a later pass
- * that finds the same set announces nothing while a pass that finds a seventh part announces
- * again.
+ * One event per part set rather than per part: a BOM refresh that marks six parts end-of-life at
+ * once is one piece of news, and six messages would be the fastest way to get the channel muted.
+ *
+ * The event is scoped to the installation rather than the scanned board, which is the change that
+ * makes it worth reading. The watch runs board-first, so this used to fire once per board with the
+ * text "and is on this board" -- the same part producing one message per board that carries it,
+ * each naming only itself, none answering the question a reader actually has. Now the dedupe key
+ * covers the installation and the part set, so the first board scanned announces the whole picture
+ * and the rest are duplicates of it.
+ *
+ * The message itself is composed in `supply-announcement.ts`, where it can be tested.
  */
 async function announceSupplyRisk(
   detection: { board: { boardId: string; installationId: string }; findings: readonly RiskyComponentFinding[] },
   currentTime: number,
 ): Promise<void> {
-  const parts = [...detection.findings].sort((a, b) => a.mpn.localeCompare(b.mpn));
-  if (parts.length === 0) return;
-  const worst = parts.find((part) => part.severity === "critical") ?? parts[0];
-  if (!worst) return;
+  if (detection.findings.length === 0) return;
 
-  const occurredAt = new Date(currentTime).toISOString();
+  const affected = await resolveAffected(detection.board.installationId, detection.findings);
+  const announcement = composeSupplyAnnouncement(detection.findings, affected);
+  if (!announcement) return;
+
   const digest = createHash("sha256")
-    .update(parts.map((part) => `${part.mpn}:${part.status}`).join("|"))
+    .update(
+      [...detection.findings]
+        .sort((a, b) => a.mpn.localeCompare(b.mpn))
+        .map((part) => `${part.mpn}:${part.status}`)
+        .join("|"),
+    )
     .digest("hex")
     .slice(0, 32);
 
@@ -554,24 +568,46 @@ async function announceSupplyRisk(
     const queued = await notifications.enqueueEvent({
       type: "supply.risk_detected",
       installationId: detection.board.installationId,
-      repositoryFullName: detection.board.boardId,
-      headline:
-        parts.length === 1
-          ? `${worst.mpn} is ${worst.status.toUpperCase()} and is on this board`
-          : `${parts.length} parts on this board are end-of-life or NRND`,
-      details: parts.map(
-        (part) =>
-          `${part.mpn}${part.reference ? ` (${part.reference})` : ""} — ${part.status.toUpperCase()}, ${part.severity} risk`,
-      ),
+      // This field previously carried a board UUID, which rendered a raw identifier where the
+      // contract promises `acme/gateway`. The board id remains the fallback when nothing resolved.
+      repositoryFullName: announcement.repositoryFullName ?? detection.board.boardId,
+      headline: announcement.headline,
+      details: announcement.details,
       ...(publicUrl ? { url: `${publicUrl}/parts` } : {}),
-      dedupeKey: `supply:${detection.board.boardId}:${digest}`,
-      occurredAt,
+      dedupeKey: `supply:${detection.board.installationId}:${digest}`,
+      occurredAt: new Date(currentTime).toISOString(),
     });
-    if (queued > 0) log("info", "worker.supply_risk_announced", { queued, parts: parts.length });
+    if (queued > 0) {
+      log("info", "worker.supply_risk_announced", {
+        queued,
+        parts: detection.findings.length,
+        affectedBoards: affected.boards.length,
+        stillBuilt: announcement.stillBuilt,
+      });
+    }
   } catch (error) {
-    // Never fail the pass for a notification: the finding row is the durable record and the
-    // next pass re-derives the same dedupe key, so the news is not lost.
+    // Never fail the pass for a notification: the finding row is the durable record and the next
+    // pass re-derives the same dedupe key, so the news is not lost.
     log("warn", "worker.supply_risk_announce_failed", { errorClass: errorClass(error) });
+  }
+}
+
+/**
+ * Resolves which boards carry the risky parts, degrading to saying nothing about boards rather
+ * than dropping the alert.
+ *
+ * The lifecycle news is the durable part. A recipient told a part is end-of-life but not told
+ * where it sits has still been told the thing that matters.
+ */
+async function resolveAffected(
+  installationId: string,
+  parts: readonly RiskyComponentFinding[],
+): Promise<AffectedBoardsResult> {
+  try {
+    return await affectedBoardsStore.resolveAffectedBoards(installationId, affectedPartKeys(parts));
+  } catch (error) {
+    log("warn", "worker.supply_affected_boards_failed", { errorClass: errorClass(error) });
+    return { boards: [], truncated: false };
   }
 }
 

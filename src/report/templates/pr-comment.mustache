@@ -61,6 +61,20 @@ _{{fabrication.findings.addedRemainingLabel}}_
 {{/fabrication.findings.hasAdded}}
 {{/hasFabricationDiff}}
 
+{{#hasEvidence}}
+
+## {{labels.evidenceTitle}}
+
+{{evidence.exact}} {{labels.evidenceMeasured}}, {{evidence.heuristic}} {{labels.evidenceInferred}}.
+
+{{#evidence.hasBlockingOnInference}}
+{{labels.evidenceBlocking}}
+
+{{#evidence.blockingOnInference}}
+- `{{.}}`
+{{/evidence.blockingOnInference}}
+{{/evidence.hasBlockingOnInference}}
+{{/hasEvidence}}
 {{#hasBomRisk}}
 
 ## {{labels.bomRiskTitle}}

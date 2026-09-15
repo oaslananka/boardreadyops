@@ -4,6 +4,60 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.54.0](https://github.com/oaslananka/boardreadyops/compare/v1.53.0...v1.54.0) (2026-09-15)
+
+
+### Features
+
+* **cloud:** tell a supply alert which boards it affects ([#781](https://github.com/oaslananka/boardreadyops/issues/781)) ([3a34443](https://github.com/oaslananka/boardreadyops/commit/3a344438c994fcfb3853bc6e60a8e7bcc2538e67))
+
+## [1.53.0](https://github.com/oaslananka/boardreadyops/compare/v1.52.0...v1.53.0) (2026-09-15)
+
+
+### Features
+
+* **db:** answer which shipped boards contain a part ([#778](https://github.com/oaslananka/boardreadyops/issues/778)) ([771c3d2](https://github.com/oaslananka/boardreadyops/commit/771c3d20577d7e3e5521ee38b99bb6b05304505e))
+
+
+### Bug Fixes
+
+* **report:** add the evidence summary to the findings schema ([#777](https://github.com/oaslananka/boardreadyops/issues/777)) ([4bd2829](https://github.com/oaslananka/boardreadyops/commit/4bd2829d5a8a54370fba6d7c0d35de71ae775283))
+
+## [1.52.0](https://github.com/oaslananka/boardreadyops/compare/v1.51.0...v1.52.0) (2026-09-15)
+
+
+### Features
+
+* **report:** show whether the verdict was measured or inferred ([#768](https://github.com/oaslananka/boardreadyops/issues/768)) ([b4ac1f3](https://github.com/oaslananka/boardreadyops/commit/b4ac1f38cbfef17bab756905c0c2d87484ff3964))
+
+## [1.51.0](https://github.com/oaslananka/boardreadyops/compare/v1.50.1...v1.51.0) (2026-09-15)
+
+
+### Features
+
+* **vendors:** make a manufacturing profile say where its numbers came from ([#773](https://github.com/oaslananka/boardreadyops/issues/773)) ([e8bc4c3](https://github.com/oaslananka/boardreadyops/commit/e8bc4c3c6edf039e7db5ad0682b6030f6d0cee43))
+
+## [1.50.1](https://github.com/oaslananka/boardreadyops/compare/v1.50.0...v1.50.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **mfg:** compare drill diameters instead of matching digits in text ([#769](https://github.com/oaslananka/boardreadyops/issues/769)) ([e523cd0](https://github.com/oaslananka/boardreadyops/commit/e523cd04c303b231130a960f4178245fef11f97d))
+
+## [1.50.0](https://github.com/oaslananka/boardreadyops/compare/v1.49.0...v1.50.0) (2026-09-15)
+
+
+### Features
+
+* **mfg:** let a gerber file say what it is, instead of reading its name ([#766](https://github.com/oaslananka/boardreadyops/issues/766)) ([05a63e0](https://github.com/oaslananka/boardreadyops/commit/05a63e0676a3d2cff402b1267db40497d90291b8))
+
+## [1.49.0](https://github.com/oaslananka/boardreadyops/compare/v1.48.0...v1.49.0) (2026-09-15)
+
+
+### Features
+
+* **mfg:** read the drill files instead of trusting their names ([#764](https://github.com/oaslananka/boardreadyops/issues/764)) ([79482a3](https://github.com/oaslananka/boardreadyops/commit/79482a3cfffb5a80bdc0e5979f3de77e75888097))
+
 ## [1.48.0](https://github.com/oaslananka/boardreadyops/compare/v1.47.1...v1.48.0) (2026-09-14)
 
 

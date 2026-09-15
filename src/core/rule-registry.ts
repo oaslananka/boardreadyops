@@ -1,6 +1,6 @@
 import type { IngestionCapabilities } from "@boardreadyops/contracts";
 import type { RuleContext } from "./context.js";
-import type { Finding, Severity } from "./findings.js";
+import { type FailOn, type Finding, type Severity, severityRankValue } from "./findings.js";
 
 /**
  * What a rule protects against, grounded in this repo's own rule-group split
@@ -279,6 +279,51 @@ export function categorizeFindings(findings: readonly Finding[]): RuleCategorySu
 
   const order = buckets.has("unclassified") ? [...knownCategories, "unclassified" as const] : knownCategories;
   return order.map((category) => buckets.get(category) ?? emptyCategorySummary(category));
+}
+
+export interface FindingEvidenceSummary {
+  exact: number;
+  heuristic: number;
+  unclassified: number;
+  /**
+   * Rule ids whose findings are severe enough to fail this run, but which do not rest on a
+   * measurement. This is the number a reviewer needs and could not previously get: "three
+   * findings can stop your release and none of them is something we measured."
+   */
+  blockingOnInference: readonly string[];
+}
+
+/**
+ * Splits findings by the kind of evidence their rule rests on.
+ *
+ * `RuleEvidenceType` has been declared on every built-in rule for some time, carefully documented,
+ * and read by nothing except a telemetry field on waiver signals. `shouldFail` looks at severity
+ * and suppression alone, so a heuristic finding blocks a release exactly as an exact one does --
+ * which is the behaviour #753 argues decides whether a team keeps the gate switched on.
+ *
+ * This does not change what blocks. It makes the distinction visible first, because flipping the
+ * threshold silently would move boards from failing to passing, and nobody should discover that
+ * from a release that went out. What a reviewer can see, a team can then decide to enforce.
+ */
+export function summarizeFindingEvidence(findings: readonly Finding[], failOn: FailOn): FindingEvidenceSummary {
+  const metaById = new Map(listRules().map((rule) => [rule.meta.id, rule.meta]));
+  const summary = { exact: 0, heuristic: 0, unclassified: 0 };
+  const blocking = new Set<string>();
+  const threshold = failOn === "never" ? undefined : severityRankValue(failOn);
+
+  for (const finding of findings) {
+    const evidenceType = metaById.get(finding.ruleId)?.evidenceType ?? "unclassified";
+    summary[evidenceType] += 1;
+
+    if (evidenceType === "exact" || finding.suppressed || finding.severity === "info") continue;
+    // A waived or informational finding cannot fail the run, so it is not the reviewer's problem
+    // here however it was derived.
+    if (threshold !== undefined && severityRankValue(finding.severity) >= threshold) {
+      blocking.add(finding.ruleId);
+    }
+  }
+
+  return { ...summary, blockingOnInference: [...blocking].sort((a, b) => a.localeCompare(b)) };
 }
 
 const CAPABILITY_REASONS: Record<keyof IngestionCapabilities, string> = {

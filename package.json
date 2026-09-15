@@ -1,6 +1,6 @@
 {
   "name": "boardreadyops",
-  "version": "1.48.0",
+  "version": "1.54.0",
   "description": "BoardReadyOps checks KiCad hardware repositories for production readiness before fabrication.",
   "type": "module",
   "license": "PolyForm-Noncommercial-1.0.0",
