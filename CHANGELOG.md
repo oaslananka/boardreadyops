@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.60.0](https://github.com/oaslananka/boardreadyops/compare/v1.59.0...v1.60.0) (2026-09-15)
+
+
+### Features
+
+* **db:** persist firmware dependencies, and send the BOMs that never arrived ([#801](https://github.com/oaslananka/boardreadyops/issues/801)) ([46040a4](https://github.com/oaslananka/boardreadyops/commit/46040a4b130bf9c5ec735d773342623d5af201d2)), closes [#800](https://github.com/oaslananka/boardreadyops/issues/800)
+
 ## [1.59.0](https://github.com/oaslananka/boardreadyops/compare/v1.58.0...v1.59.0) (2026-09-15)
 
 
