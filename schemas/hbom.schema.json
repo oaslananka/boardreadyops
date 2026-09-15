@@ -173,10 +173,67 @@
             "$ref": "#/$defs/externalReference"
           }
         },
+        "evidence": {
+          "$ref": "#/$defs/componentEvidence"
+        },
         "properties": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/property"
+          }
+        }
+      }
+    },
+    "componentEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity"],
+      "properties": {
+        "identity": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/identityEvidence"
+          }
+        }
+      }
+    },
+    "identityEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "confidence", "concludedValue", "methods"],
+      "properties": {
+        "field": {
+          "const": "purl"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "concludedValue": {
+          "type": "string"
+        },
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["technique", "confidence"],
+            "properties": {
+              "technique": {
+                "const": "manifest-analysis"
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "value": {
+                "type": "string"
+              }
+            }
           }
         }
       }

@@ -105327,6 +105327,42 @@ function escapeProperty2(value) {
   return escapeData2(value).replaceAll(":", "%3A").replaceAll(",", "%2C");
 }
 
+// src/report/component-identity.ts
+var indexedPurlTypes = /* @__PURE__ */ new Set([
+  "cargo",
+  "composer",
+  "cran",
+  "gem",
+  "golang",
+  "hackage",
+  "hex",
+  "maven",
+  "npm",
+  "nuget",
+  "pub",
+  "pypi",
+  "swift"
+]);
+function purlType(purl) {
+  const match = /^pkg:([^/@#?]+)\//iu.exec(purl.trim());
+  return match?.[1]?.toLowerCase();
+}
+function assessComponentIdentity(purl) {
+  const type = purlType(purl);
+  return {
+    vulnerabilityIndexed: type !== void 0 && indexedPurlTypes.has(type),
+    technique: "manifest-analysis",
+    confidence: 0.5
+  };
+}
+function summariseIndexedIdentifiers(purls) {
+  let indexed = 0;
+  for (const purl of purls) {
+    if (purl !== void 0 && assessComponentIdentity(purl).vulnerabilityIndexed) indexed += 1;
+  }
+  return { total: purls.length, indexed };
+}
+
 // src/report/hbom.ts
 function formatHbom(result) {
   return `${JSON.stringify(createHbom(result), null, 2)}
@@ -105356,7 +105392,7 @@ function createHbom(result) {
         name: hardwareName(result),
         "bom-ref": rootRef
       },
-      properties: [{ name: "boardreadyops:componentClass", value: "hardware" }]
+      properties: metadataProperties(components)
     },
     components,
     dependencies: [
@@ -105390,8 +105426,31 @@ function componentFromBomRow(row) {
   const purl = purlFromRow(row);
   if (purl) {
     component.purl = purl;
+    const assessment = assessComponentIdentity(purl);
+    component.evidence = {
+      identity: [
+        {
+          field: "purl",
+          confidence: assessment.confidence,
+          concludedValue: purl,
+          methods: [{ technique: assessment.technique, confidence: assessment.confidence, value: purl }]
+        }
+      ]
+    };
+    component.properties.push({
+      name: "boardreadyops:vulnerabilityIndexed",
+      value: String(assessment.vulnerabilityIndexed)
+    });
   }
   return component;
+}
+function metadataProperties(components) {
+  const summary2 = summariseIndexedIdentifiers(components.map((component) => component.purl));
+  return [
+    { name: "boardreadyops:componentClass", value: "hardware" },
+    { name: "boardreadyops:componentCount", value: String(summary2.total) },
+    { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: String(summary2.indexed) }
+  ];
 }
 function componentProperties(row) {
   return [
