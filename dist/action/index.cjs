@@ -82143,7 +82143,7 @@ async function captureFirmwareSnapshot(root) {
 }
 
 // src/generated/version.ts
-var boardReadyVersion = "1.55.0";
+var boardReadyVersion = "1.56.0";
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);
