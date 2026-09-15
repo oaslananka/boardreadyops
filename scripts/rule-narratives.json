@@ -104,8 +104,8 @@
     "details": "{ smdCount, minimumSmdCount }"
   },
   "manufacturing.drill-coverage": {
-    "fires": "Fires when a PCB drill size is absent from drill output.",
-    "details": "{ missingDrills }"
+    "fires": "Fires when a PCB drill size has no matching tool diameter in the Excellon outputs.",
+    "details": "{ drillSize, nearestToolMm, toolsFound }"
   },
   "manufacturing.fab-notes": {
     "fires": "Fires when no fabrication notes file is present.",
@@ -122,6 +122,10 @@
   "manufacturing.layer-stackup": {
     "fires": "Fires when the stackup block contains a different copper layer count than expected.",
     "details": "{ expectedLayers, stackupLayers }"
+  },
+  "manufacturing.mask-coverage": {
+    "fires": "Fires when the Gerber package has copper on an outer side with no solder mask layer for that side. Inner copper is not checked: mask applies to the outer faces.",
+    "details": "{ side, copperLayers, maskLayers }"
   },
   "manufacturing.outputs-present": {
     "fires": "Fires when a configured or vendor-profile required output is missing or older than the PCB.",

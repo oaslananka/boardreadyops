@@ -9,6 +9,7 @@
 - [manufacturing.fiducials](manufacturing.fiducials.md): Checks configured assembly jobs for a minimum number of fiducial footprints.
 - [manufacturing.jobset-outputs](manufacturing.jobset-outputs.md): Checks enabled KiCad jobset entries for their expected output files.
 - [manufacturing.layer-stackup](manufacturing.layer-stackup.md): Compares the parsed PCB stackup layer count with configured expectations.
+- [manufacturing.mask-coverage](manufacturing.mask-coverage.md): Checks that each outer copper side in the Gerber package has a matching solder mask layer.
 - [manufacturing.outputs-present](manufacturing.outputs-present.md): Checks required fabrication outputs and whether they are fresh relative to PCB sources.
 - [manufacturing.package-completeness](manufacturing.package-completeness.md): Validates that the release package includes all required manufacturing output categories. Base categories (gerbers, drill, BOM, CPL) are required for every release. Production categories (fab notes, assembly notes, board PDF) are required when releaseMode is production.
 - [manufacturing.panel-sanity](manufacturing.panel-sanity.md): Checks panelized manufacturing configurations for panel output files.

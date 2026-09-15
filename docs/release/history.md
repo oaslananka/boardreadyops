@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.57.0](https://github.com/oaslananka/boardreadyops/compare/v1.56.0...v1.57.0) (2026-09-15)
+
+
+### Features
+
+* **mfg:** flag a copper side with no solder mask ([#775](https://github.com/oaslananka/boardreadyops/issues/775)) ([58fb82a](https://github.com/oaslananka/boardreadyops/commit/58fb82aaad02474909788cc1b1a820e25ce8714b))
+
 ## [1.56.0](https://github.com/oaslananka/boardreadyops/compare/v1.55.0...v1.56.0) (2026-09-15)
 
 

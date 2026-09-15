@@ -156,6 +156,12 @@ const expectedClassification: Record<string, ExpectedClassification> = {
     fixability: "manual",
     vendorDependence: "none",
   },
+  "manufacturing.mask-coverage": {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
   "manufacturing.fab-notes": {
     category: "manufacturability",
     evidenceType: "exact",
