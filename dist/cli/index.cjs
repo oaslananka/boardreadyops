@@ -59216,6 +59216,42 @@ function safeMessage(error51) {
 var import_node_path68 = __toESM(require("node:path"), 1);
 init_t();
 
+// src/report/component-identity.ts
+var indexedPurlTypes = /* @__PURE__ */ new Set([
+  "cargo",
+  "composer",
+  "cran",
+  "gem",
+  "golang",
+  "hackage",
+  "hex",
+  "maven",
+  "npm",
+  "nuget",
+  "pub",
+  "pypi",
+  "swift"
+]);
+function purlType(purl) {
+  const match = /^pkg:([^/@#?]+)\//iu.exec(purl.trim());
+  return match?.[1]?.toLowerCase();
+}
+function assessComponentIdentity(purl) {
+  const type = purlType(purl);
+  return {
+    vulnerabilityIndexed: type !== void 0 && indexedPurlTypes.has(type),
+    technique: "manifest-analysis",
+    confidence: 0.5
+  };
+}
+function summariseIndexedIdentifiers(purls) {
+  let indexed = 0;
+  for (const purl of purls) {
+    if (purl !== void 0 && assessComponentIdentity(purl).vulnerabilityIndexed) indexed += 1;
+  }
+  return { total: purls.length, indexed };
+}
+
 // src/report/hbom.ts
 function formatHbom(result) {
   return `${JSON.stringify(createHbom(result), null, 2)}
@@ -59245,7 +59281,7 @@ function createHbom(result) {
         name: hardwareName(result),
         "bom-ref": rootRef
       },
-      properties: [{ name: "boardreadyops:componentClass", value: "hardware" }]
+      properties: metadataProperties(components)
     },
     components,
     dependencies: [
@@ -59279,8 +59315,31 @@ function componentFromBomRow(row) {
   const purl = purlFromRow(row);
   if (purl) {
     component.purl = purl;
+    const assessment = assessComponentIdentity(purl);
+    component.evidence = {
+      identity: [
+        {
+          field: "purl",
+          confidence: assessment.confidence,
+          concludedValue: purl,
+          methods: [{ technique: assessment.technique, confidence: assessment.confidence, value: purl }]
+        }
+      ]
+    };
+    component.properties.push({
+      name: "boardreadyops:vulnerabilityIndexed",
+      value: String(assessment.vulnerabilityIndexed)
+    });
   }
   return component;
+}
+function metadataProperties(components) {
+  const summary = summariseIndexedIdentifiers(components.map((component) => component.purl));
+  return [
+    { name: "boardreadyops:componentClass", value: "hardware" },
+    { name: "boardreadyops:componentCount", value: String(summary.total) },
+    { name: "boardreadyops:vulnerabilityIndexedComponentCount", value: String(summary.indexed) }
+  ];
 }
 function componentProperties(row) {
   return [
@@ -60797,10 +60856,67 @@ var hbom_schema_default = {
             $ref: "#/$defs/externalReference"
           }
         },
+        evidence: {
+          $ref: "#/$defs/componentEvidence"
+        },
         properties: {
           type: "array",
           items: {
             $ref: "#/$defs/property"
+          }
+        }
+      }
+    },
+    componentEvidence: {
+      type: "object",
+      additionalProperties: false,
+      required: ["identity"],
+      properties: {
+        identity: {
+          type: "array",
+          minItems: 1,
+          items: {
+            $ref: "#/$defs/identityEvidence"
+          }
+        }
+      }
+    },
+    identityEvidence: {
+      type: "object",
+      additionalProperties: false,
+      required: ["field", "confidence", "concludedValue", "methods"],
+      properties: {
+        field: {
+          const: "purl"
+        },
+        confidence: {
+          type: "number",
+          minimum: 0,
+          maximum: 1
+        },
+        concludedValue: {
+          type: "string"
+        },
+        methods: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["technique", "confidence"],
+            properties: {
+              technique: {
+                const: "manifest-analysis"
+              },
+              confidence: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              },
+              value: {
+                type: "string"
+              }
+            }
           }
         }
       }
