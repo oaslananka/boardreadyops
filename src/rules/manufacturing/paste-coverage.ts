@@ -1,10 +1,6 @@
-import path from "node:path";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
-import { normalizeGerberStackup } from "../../multicad/gerber-normalizer.js";
-import { readTextFile } from "../../util/fs.js";
-import { globFiles } from "../../util/glob.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
-import { assemblyFootprints, footprintSide, parsedBoards } from "./shared.js";
+import { assemblyFootprints, footprintSide, loadNormalizedGerberStackup, parsedBoards } from "./shared.js";
 
 /**
  * A side with surface-mount assembly components needs a solder paste layer in the Gerber package.
@@ -18,20 +14,6 @@ import { assemblyFootprints, footprintSide, parsedBoards } from "./shared.js";
  *
  * Part of #770.
  */
-
-const gerberPatterns = [
-  "**/*.gbr",
-  "**/*.gtl",
-  "**/*.gbl",
-  "**/*.gts",
-  "**/*.gbs",
-  "**/*.gto",
-  "**/*.gbo",
-  "**/*.gtp",
-  "**/*.gbp",
-  "**/*.gko",
-  "**/*.gm1",
-];
 
 export const pasteCoverageRule = rule(
   {
@@ -58,19 +40,11 @@ export const pasteCoverageRule = rule(
       return [];
     }
 
-    const files = await globFiles(context.root, gerberPatterns);
-    if (files.length === 0) {
-      // Missing Gerber outputs as a whole is handled by manufacturing.outputs-present.
+    const loaded = await loadNormalizedGerberStackup(context);
+    if (!loaded) {
       return [];
     }
-
-    const entries = await Promise.all(
-      files.map(async (file) => ({
-        filename: path.relative(context.root, file),
-        content: (await readTextFile(file).catch(() => undefined)) ?? undefined,
-      })),
-    );
-    const stackup = normalizeGerberStackup(entries);
+    const { stackup } = loaded;
 
     const findings = [];
 
