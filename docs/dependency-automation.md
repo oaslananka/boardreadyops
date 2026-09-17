@@ -48,6 +48,11 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 - After the workflow reached `main`, manual workflow run `29767533207` completed both `renovate / validate` and `renovate / run` successfully.
 - The authenticated run created Dependency Dashboard issue `#196` and populated pending-approval, awaiting-schedule, status-check, abandoned-dependency, and detected-dependency sections.
 - No update branches or pull requests were created outside the configured schedule or approval policy.
+- On September 17, 2026, the shared `oaslananka/.github` preset was verified at commit `c44946c82eeb6c5041dbc94f371c55015679cbe0` (`renovate-config.json` blob `6ad5d7c7232908a686a4b9e0404fb30f4d30c2da`).
+- BoardReadyOps implementation PR `#819` merged through Mergify's `default` queue after the `main` Ruleset conditions, including `ci / risk-profile` and `security / gate`, were satisfied.
+- Post-merge manual Renovate workflow run `35251461740` ran against merge commit `6e5a7b020a335a19b57ec251969d4dd8f84efa20`; both `renovate / validate` and `renovate / run` completed successfully.
+- Dependency Dashboard `#196` updated at `2026-09-17T17:16:35Z`. No Renovate or Dependabot PR remained open after the run; routine developer-tooling, type-definition, and lockfile updates were awaiting their schedule while major updates remained pending approval.
+- No representative low-risk dependency PR auto-entered Mergify during this verification because the run created no PR outside the configured schedule. The next naturally eligible low-risk Renovate PR remains the live queue/merge acceptance sample.
 
 ## Operations
 
