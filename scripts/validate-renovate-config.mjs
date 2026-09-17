@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 
 const RENOVATE_VALIDATOR_IMAGE =
-  "renovate/renovate@sha256:62a5af4b26c18336b0ff5bc69f2e956337b6696e493b0de57a0d71c9d637da20";
+  "renovate/renovate:44.97.2@sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86";
 
 const args = [
   "run",

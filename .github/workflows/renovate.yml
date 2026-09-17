@@ -31,7 +31,6 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  RENOVATE_VERSION: 43.272.4
 
 jobs:
   validate:
@@ -75,4 +74,4 @@ jobs:
         with:
           token: ${{ secrets.GH_AUTH_TOKEN }}
           configurationFile: renovate.json
-          renovate-version: 43.272.4
+          renovate-version: 44.97.2
