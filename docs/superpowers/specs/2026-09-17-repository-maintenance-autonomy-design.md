@@ -1,7 +1,7 @@
 # Exception-Based Repository Maintenance
 
-**Date:** 2026-09-17  
-**Status:** Approved for implementation  
+**Date:** 2026-09-17
+**Status:** Approved for implementation
 **Scope:** `oaslananka` public repositories, starting with `boardreadyops`
 
 ## Problem
