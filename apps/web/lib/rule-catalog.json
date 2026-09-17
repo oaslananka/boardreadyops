@@ -8,9 +8,21 @@
       "rationale": "Non-compliant or undocumented parts create regulatory and shipment risk for the assembled product.",
       "defaultSeverity": "high",
       "category": "sourcing",
-      "appliesTo": ["bom"],
-      "configKeys": ["rules.bom.compliance.enabled", "rules.bom.compliance.require", "rules.bom.compliance.severity"],
-      "tags": ["bom", "compliance", "rohs", "reach", "sourcing"],
+      "appliesTo": [
+        "bom"
+      ],
+      "configKeys": [
+        "rules.bom.compliance.enabled",
+        "rules.bom.compliance.require",
+        "rules.bom.compliance.severity"
+      ],
+      "tags": [
+        "bom",
+        "compliance",
+        "rohs",
+        "reach",
+        "sourcing"
+      ],
       "evidenceType": "heuristic",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -22,9 +34,18 @@
       "rationale": "A BOM and PCB population mismatch can fabricate or assemble the wrong variant.",
       "defaultSeverity": "medium",
       "category": "assembly",
-      "appliesTo": ["bom", "pcb"],
-      "configKeys": ["rules.bom.dnp-consistency.severity"],
-      "tags": ["bom", "pcb", "variant"],
+      "appliesTo": [
+        "bom",
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.bom.dnp-consistency.severity"
+      ],
+      "tags": [
+        "bom",
+        "pcb",
+        "variant"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -36,9 +57,17 @@
       "rationale": "End-of-life components create sourcing and redesign risk before fabrication.",
       "defaultSeverity": "high",
       "category": "sourcing",
-      "appliesTo": ["bom"],
-      "configKeys": ["rules.bom.eol-detection.severity"],
-      "tags": ["bom", "lifecycle", "sourcing"],
+      "appliesTo": [
+        "bom"
+      ],
+      "configKeys": [
+        "rules.bom.eol-detection.severity"
+      ],
+      "tags": [
+        "bom",
+        "lifecycle",
+        "sourcing"
+      ],
       "evidenceType": "heuristic",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -50,9 +79,18 @@
       "rationale": "Footprint mismatches can make sourced parts incompatible with the fabricated board.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
-      "appliesTo": ["bom", "pcb"],
-      "configKeys": ["rules.bom.footprint-mismatch.severity"],
-      "tags": ["bom", "footprint", "pcb"],
+      "appliesTo": [
+        "bom",
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.bom.footprint-mismatch.severity"
+      ],
+      "tags": [
+        "bom",
+        "footprint",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -64,9 +102,18 @@
       "rationale": "Conflicting component identities produce ambiguous sourcing decisions and unreliable release diffs. A stable, consistent identity ensures every tool in the release pipeline references the same part.",
       "defaultSeverity": "high",
       "category": "assembly",
-      "appliesTo": ["bom", "schematic"],
-      "configKeys": ["rules.bom.identity-conflicts.severity"],
-      "tags": ["bom", "identity", "sourcing"],
+      "appliesTo": [
+        "bom",
+        "schematic"
+      ],
+      "configKeys": [
+        "rules.bom.identity-conflicts.severity"
+      ],
+      "tags": [
+        "bom",
+        "identity",
+        "sourcing"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -78,9 +125,17 @@
       "rationale": "Lifecycle risk should be visible before teams commit to parts and fab outputs.",
       "defaultSeverity": "medium",
       "category": "sourcing",
-      "appliesTo": ["bom"],
-      "configKeys": ["rules.bom.lifecycle.db"],
-      "tags": ["bom", "lifecycle", "sourcing"],
+      "appliesTo": [
+        "bom"
+      ],
+      "configKeys": [
+        "rules.bom.lifecycle.db"
+      ],
+      "tags": [
+        "bom",
+        "lifecycle",
+        "sourcing"
+      ],
       "evidenceType": "heuristic",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -92,9 +147,18 @@
       "rationale": "Assembly sourcing needs stable part numbers to avoid ambiguous substitutions.",
       "defaultSeverity": "high",
       "category": "sourcing",
-      "appliesTo": ["bom", "schematic"],
-      "configKeys": ["rules.bom.missing-mpn.ignore-refs"],
-      "tags": ["bom", "mpn", "sourcing"],
+      "appliesTo": [
+        "bom",
+        "schematic"
+      ],
+      "configKeys": [
+        "rules.bom.missing-mpn.ignore-refs"
+      ],
+      "tags": [
+        "bom",
+        "mpn",
+        "sourcing"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -106,7 +170,9 @@
       "rationale": "Individual per-row rules catch specific issues, but a scoring approach lets teams set a single policy gate that blocks production releases when the overall BOM quality falls below an acceptable threshold.",
       "defaultSeverity": "medium",
       "category": "sourcing",
-      "appliesTo": ["bom"],
+      "appliesTo": [
+        "bom"
+      ],
       "configKeys": [
         "rules.bom.risk-score.severity",
         "rules.bom.risk-score.critical-severity",
@@ -119,7 +185,12 @@
         "rules.bom.risk-score.weights.single-source-no-alternates",
         "bom.alternates"
       ],
-      "tags": ["bom", "risk", "sourcing", "supply-chain"],
+      "tags": [
+        "bom",
+        "risk",
+        "sourcing",
+        "supply-chain"
+      ],
       "evidenceType": "heuristic",
       "fixability": "none",
       "vendorDependence": "none"
@@ -131,9 +202,18 @@
       "rationale": "Single-source parts increase procurement risk when a supplier changes availability.",
       "defaultSeverity": "medium",
       "category": "sourcing",
-      "appliesTo": ["bom"],
-      "configKeys": ["rules.bom.single-source.severity", "bom.alternates"],
-      "tags": ["bom", "sourcing", "supplier"],
+      "appliesTo": [
+        "bom"
+      ],
+      "configKeys": [
+        "rules.bom.single-source.severity",
+        "bom.alternates"
+      ],
+      "tags": [
+        "bom",
+        "sourcing",
+        "supplier"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -145,9 +225,18 @@
       "rationale": "Teams often assume a missing lifecycle field means the part is active. Surfacing unknown status makes the gap explicit so reviewers can decide whether to accept the risk.",
       "defaultSeverity": "info",
       "category": "sourcing",
-      "appliesTo": ["bom"],
-      "configKeys": ["rules.bom.unknown-lifecycle.severity", "rules.bom.unknown-lifecycle.db"],
-      "tags": ["bom", "lifecycle", "sourcing"],
+      "appliesTo": [
+        "bom"
+      ],
+      "configKeys": [
+        "rules.bom.unknown-lifecycle.severity",
+        "rules.bom.unknown-lifecycle.db"
+      ],
+      "tags": [
+        "bom",
+        "lifecycle",
+        "sourcing"
+      ],
       "evidenceType": "exact",
       "fixability": "none",
       "vendorDependence": "none"
@@ -159,9 +248,19 @@
       "rationale": "Variant BOM drift can populate components that a selected hardware variant excludes.",
       "defaultSeverity": "high",
       "category": "assembly",
-      "appliesTo": ["bom", "project"],
-      "configKeys": ["projects.variants", "rules.bom.variant-consistency.enabled"],
-      "tags": ["bom", "variant", "kicad"],
+      "appliesTo": [
+        "bom",
+        "project"
+      ],
+      "configKeys": [
+        "projects.variants",
+        "rules.bom.variant-consistency.enabled"
+      ],
+      "tags": [
+        "bom",
+        "variant",
+        "kicad"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -173,9 +272,17 @@
       "rationale": "Fabricators need a closed outline to route the intended physical board shape.",
       "defaultSeverity": "high",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.design.board-outline.enabled"],
-      "tags": ["design", "edge-cuts", "pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.design.board-outline.enabled"
+      ],
+      "tags": [
+        "design",
+        "edge-cuts",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -187,9 +294,17 @@
       "rationale": "Low copper coverage can flag process and board-quality risks before release.",
       "defaultSeverity": "low",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.design.copper-balance.min-coverage-percent"],
-      "tags": ["copper", "design", "pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.design.copper-balance.min-coverage-percent"
+      ],
+      "tags": [
+        "copper",
+        "design",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
@@ -201,9 +316,18 @@
       "rationale": "Duplicate reference designators make BOM, placement, and assembly mapping ambiguous.",
       "defaultSeverity": "high",
       "category": "assembly",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.design.unique-references.enabled", "rules.design.unique-references.ignore-refs"],
-      "tags": ["design", "dfm", "pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.design.unique-references.enabled",
+        "rules.design.unique-references.ignore-refs"
+      ],
+      "tags": [
+        "design",
+        "dfm",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -215,9 +339,19 @@
       "rationale": "KiCad DRC findings expose layout violations that should be reviewed before fabrication.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["pcb"],
-      "configKeys": ["kicad-cli", "require-kicad", "rules.drc"],
-      "tags": ["drc", "kicad", "pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "kicad-cli",
+        "require-kicad",
+        "rules.drc"
+      ],
+      "tags": [
+        "drc",
+        "kicad",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "assisted",
       "vendorDependence": "none"
@@ -229,9 +363,19 @@
       "rationale": "ERC diagnostics catch schematic connectivity and electrical intent problems early.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["schematic"],
-      "configKeys": ["kicad-cli", "require-kicad", "rules.erc"],
-      "tags": ["erc", "kicad", "schematic"],
+      "appliesTo": [
+        "schematic"
+      ],
+      "configKeys": [
+        "kicad-cli",
+        "require-kicad",
+        "rules.erc"
+      ],
+      "tags": [
+        "erc",
+        "kicad",
+        "schematic"
+      ],
       "evidenceType": "exact",
       "fixability": "assisted",
       "vendorDependence": "none"
@@ -243,13 +387,21 @@
       "rationale": "Firmware pin macros that drift from the hardware pinmap can ship boards whose code drives the wrong net or component pin.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["firmware", "pinmap"],
+      "appliesTo": [
+        "firmware",
+        "pinmap"
+      ],
       "configKeys": [
         "firmware.arduino.pinAssignments",
         "projects.firmware.arduino.pinAssignments",
         "rules.firmware.arduino-pin-contract.file"
       ],
-      "tags": ["firmware", "pinmap", "arduino", "contract"],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "arduino",
+        "contract"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -261,9 +413,17 @@
       "rationale": "A component listed in an SBOM with no advisories found, when it was never identifiable enough to look up, is a false clean bill.",
       "defaultSeverity": "info",
       "category": "sourcing",
-      "appliesTo": ["project"],
-      "configKeys": ["rules.firmware.dependency-identification.enabled"],
-      "tags": ["firmware", "sbom", "supply-chain"],
+      "appliesTo": [
+        "project"
+      ],
+      "configKeys": [
+        "rules.firmware.dependency-identification.enabled"
+      ],
+      "tags": [
+        "firmware",
+        "sbom",
+        "supply-chain"
+      ],
       "evidenceType": "exact",
       "fixability": "none",
       "vendorDependence": "none"
@@ -275,13 +435,21 @@
       "rationale": "Firmware pin assignments that drift from the hardware pinmap can ship boards whose code drives the wrong net or component pin.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["firmware", "pinmap"],
+      "appliesTo": [
+        "firmware",
+        "pinmap"
+      ],
       "configKeys": [
         "firmware.esp-idf.pinAssignments",
         "projects.firmware.esp-idf.pinAssignments",
         "rules.firmware.esp-idf-pin-contract.file"
       ],
-      "tags": ["firmware", "pinmap", "esp-idf", "contract"],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "esp-idf",
+        "contract"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -293,13 +461,21 @@
       "rationale": "Firmware pin assignments that drift from the hardware pinmap can ship boards whose code drives the wrong net or component pin.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["firmware", "pinmap"],
+      "appliesTo": [
+        "firmware",
+        "pinmap"
+      ],
       "configKeys": [
         "firmware.platformio.pinAssignments",
         "projects.firmware.platformio.pinAssignments",
         "rules.firmware.platformio-pin-contract.file"
       ],
-      "tags": ["firmware", "pinmap", "platformio", "contract"],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "platformio",
+        "contract"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -311,14 +487,23 @@
       "rationale": "STM32CubeMX GPIO labels that drift from the hardware pinmap can ship boards whose code drives the wrong net or component pin.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["firmware", "pinmap"],
+      "appliesTo": [
+        "firmware",
+        "pinmap"
+      ],
       "configKeys": [
         "firmware.stm32cubemx.project",
         "projects.firmware.stm32cubemx.project",
         "rules.firmware.stm32cubemx-pin-contract.file",
         "rules.firmware.stm32cubemx-pin-contract.mcu-designator"
       ],
-      "tags": ["firmware", "pinmap", "stm32", "stm32cubemx", "contract"],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "stm32",
+        "stm32cubemx",
+        "contract"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -330,13 +515,21 @@
       "rationale": "Firmware pin assignments that drift from the hardware pinmap can ship boards whose code drives the wrong net or component pin.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["firmware", "pinmap"],
+      "appliesTo": [
+        "firmware",
+        "pinmap"
+      ],
       "configKeys": [
         "firmware.zephyr.pinAssignments",
         "projects.firmware.zephyr.pinAssignments",
         "rules.firmware.zephyr-pin-contract.file"
       ],
-      "tags": ["firmware", "pinmap", "zephyr", "contract"],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "zephyr",
+        "contract"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -348,12 +541,19 @@
       "rationale": "Bottom-side placement adds a second assembly pass and stencil; flag it when single-side assembly is expected.",
       "defaultSeverity": "low",
       "category": "assembly",
-      "appliesTo": ["pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
       "configKeys": [
         "rules.manufacturing.assembly-sides.enabled",
         "rules.manufacturing.assembly-sides.allow-bottom-side"
       ],
-      "tags": ["assembly", "dfa", "manufacturing", "pcb"],
+      "tags": [
+        "assembly",
+        "dfa",
+        "manufacturing",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
@@ -365,9 +565,20 @@
       "rationale": "Without a clear pin-1 marker, components can be placed 180° rotated, causing immediate board failure and difficult rework.",
       "defaultSeverity": "low",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.dfm-pin1-markers"],
-      "tags": ["assembly", "dfa", "dfm", "manufacturing", "pcb", "pin1"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.dfm-pin1-markers"
+      ],
+      "tags": [
+        "assembly",
+        "dfa",
+        "dfm",
+        "manufacturing",
+        "pcb",
+        "pin1"
+      ],
       "evidenceType": "heuristic",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -379,9 +590,20 @@
       "rationale": "Missing or ambiguous polarity marks cause assembly errors and can permanently damage polarized components on the first power-on.",
       "defaultSeverity": "low",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.dfm-polarity-markers"],
-      "tags": ["assembly", "dfa", "dfm", "manufacturing", "pcb", "polarity"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.dfm-polarity-markers"
+      ],
+      "tags": [
+        "assembly",
+        "dfa",
+        "dfm",
+        "manufacturing",
+        "pcb",
+        "polarity"
+      ],
       "evidenceType": "heuristic",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -393,9 +615,20 @@
       "rationale": "Silkscreen ink on solder pads can cause poor solder joints and tombstoning. Dense SMD layouts are particularly at risk. KiCad DRC includes a silkscreen clearance check that should be enabled for production boards.",
       "defaultSeverity": "info",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.dfm-silkscreen-over-pad.minimum-smd-count"],
-      "tags": ["assembly", "dfa", "dfm", "manufacturing", "pcb", "silkscreen"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.dfm-silkscreen-over-pad.minimum-smd-count"
+      ],
+      "tags": [
+        "assembly",
+        "dfa",
+        "dfm",
+        "manufacturing",
+        "pcb",
+        "silkscreen"
+      ],
       "evidenceType": "heuristic",
       "fixability": "none",
       "vendorDependence": "none"
@@ -407,9 +640,17 @@
       "rationale": "Missing drill coverage can make a fabrication package incomplete or incorrect.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.drill-coverage.enabled"],
-      "tags": ["drill", "manufacturing", "pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.drill-coverage.enabled"
+      ],
+      "tags": [
+        "drill",
+        "manufacturing",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -421,9 +662,17 @@
       "rationale": "Fabrication notes preserve process assumptions that output files alone do not encode.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
-      "appliesTo": ["manifest"],
-      "configKeys": ["rules.manufacturing.fab-notes.enabled"],
-      "tags": ["documentation", "fabrication", "manufacturing"],
+      "appliesTo": [
+        "manifest"
+      ],
+      "configKeys": [
+        "rules.manufacturing.fab-notes.enabled"
+      ],
+      "tags": [
+        "documentation",
+        "fabrication",
+        "manufacturing"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -435,9 +684,18 @@
       "rationale": "Fiducials help assembly equipment align the board reliably before pick-and-place.",
       "defaultSeverity": "medium",
       "category": "assembly",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.fiducials.minimum"],
-      "tags": ["assembly", "dfa", "manufacturing", "pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.fiducials.minimum"
+      ],
+      "tags": [
+        "assembly",
+        "dfa",
+        "manufacturing",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
@@ -449,9 +707,17 @@
       "rationale": "Jobset definitions are only useful when the released outputs they promise exist.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
-      "appliesTo": ["manifest"],
-      "configKeys": ["rules.manufacturing.jobset-outputs.enabled"],
-      "tags": ["jobset", "kicad", "manufacturing"],
+      "appliesTo": [
+        "manifest"
+      ],
+      "configKeys": [
+        "rules.manufacturing.jobset-outputs.enabled"
+      ],
+      "tags": [
+        "jobset",
+        "kicad",
+        "manufacturing"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -463,9 +729,17 @@
       "rationale": "Stackup mismatches change fabrication cost and electrical assumptions.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.layer-stackup.expected-layers"],
-      "tags": ["manufacturing", "pcb", "stackup"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.layer-stackup.expected-layers"
+      ],
+      "tags": [
+        "manufacturing",
+        "pcb",
+        "stackup"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
@@ -477,9 +751,18 @@
       "rationale": "A board built without a mask on one face leaves that whole face exposed, which bridges at assembly.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.mask-coverage.enabled"],
-      "tags": ["fabrication", "manufacturing", "gerber", "mask"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.mask-coverage.enabled"
+      ],
+      "tags": [
+        "fabrication",
+        "manufacturing",
+        "gerber",
+        "mask"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -491,9 +774,19 @@
       "rationale": "A release without current manufacturing outputs is not ready to send to a fab.",
       "defaultSeverity": "high",
       "category": "manufacturability",
-      "appliesTo": ["pcb", "manifest"],
-      "configKeys": ["rules.manufacturing.outputs-present.required", "rules.manufacturing.outputs-present.patterns"],
-      "tags": ["fabrication", "manufacturing", "outputs"],
+      "appliesTo": [
+        "pcb",
+        "manifest"
+      ],
+      "configKeys": [
+        "rules.manufacturing.outputs-present.required",
+        "rules.manufacturing.outputs-present.patterns"
+      ],
+      "tags": [
+        "fabrication",
+        "manufacturing",
+        "outputs"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "manufacturer-specific"
@@ -505,9 +798,19 @@
       "rationale": "An incomplete manufacturing package prevents hand-off to fabrication or assembly suppliers. Structured completeness checks enable downstream tools and dashboards to track release readiness.",
       "defaultSeverity": "high",
       "category": "manufacturability",
-      "appliesTo": ["pcb", "manifest"],
-      "configKeys": ["rules.manufacturing.package-completeness.severity"],
-      "tags": ["completeness", "fabrication", "manufacturing", "release"],
+      "appliesTo": [
+        "pcb",
+        "manifest"
+      ],
+      "configKeys": [
+        "rules.manufacturing.package-completeness.severity"
+      ],
+      "tags": [
+        "completeness",
+        "fabrication",
+        "manufacturing",
+        "release"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -519,12 +822,44 @@
       "rationale": "Panelized jobs need the panel artifacts the assembler and fabricator expect.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
-      "appliesTo": ["manifest"],
-      "configKeys": ["rules.manufacturing.panel-sanity.panelized"],
-      "tags": ["manufacturing", "panel", "outputs"],
+      "appliesTo": [
+        "manifest"
+      ],
+      "configKeys": [
+        "rules.manufacturing.panel-sanity.panelized"
+      ],
+      "tags": [
+        "manufacturing",
+        "panel",
+        "outputs"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
+    },
+    {
+      "id": "manufacturing.paste-coverage",
+      "title": "An assembly side with SMT components has no solder paste layer",
+      "description": "Checks that each board side containing surface-mount assembly components has a matching solder paste layer in the Gerber package.",
+      "rationale": "Surface-mount assembly requires a stencil paste layer (F.Paste / B.Paste) to deposit solder paste on SMT pads.",
+      "defaultSeverity": "high",
+      "category": "manufacturability",
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.paste-coverage.enabled"
+      ],
+      "tags": [
+        "fabrication",
+        "manufacturing",
+        "gerber",
+        "paste",
+        "assembly"
+      ],
+      "evidenceType": "exact",
+      "fixability": "manual",
+      "vendorDependence": "none"
     },
     {
       "id": "manufacturing.position-coverage",
@@ -533,9 +868,20 @@
       "rationale": "Pick-and-place data must cover populated components so assembly review does not miss placements.",
       "defaultSeverity": "medium",
       "category": "assembly",
-      "appliesTo": ["pcb", "manifest"],
-      "configKeys": ["rules.manufacturing.position-coverage.patterns"],
-      "tags": ["assembly", "cpl", "dfa", "manufacturing", "position"],
+      "appliesTo": [
+        "pcb",
+        "manifest"
+      ],
+      "configKeys": [
+        "rules.manufacturing.position-coverage.patterns"
+      ],
+      "tags": [
+        "assembly",
+        "cpl",
+        "dfa",
+        "manufacturing",
+        "position"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
@@ -547,9 +893,20 @@
       "rationale": "Accessible test points let assembly and QA validate power and key nets without reworking the board.",
       "defaultSeverity": "low",
       "category": "testability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.test-points.enabled", "rules.manufacturing.test-points.minimum"],
-      "tags": ["assembly", "dfa", "manufacturing", "pcb", "test"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.test-points.enabled",
+        "rules.manufacturing.test-points.minimum"
+      ],
+      "tags": [
+        "assembly",
+        "dfa",
+        "manufacturing",
+        "pcb",
+        "test"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
@@ -561,9 +918,19 @@
       "rationale": "Tooling holes help fixture, panel, and assembly workflows locate the board mechanically.",
       "defaultSeverity": "medium",
       "category": "assembly",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.tooling-holes.minimum"],
-      "tags": ["assembly", "dfa", "dfm", "manufacturing", "pcb"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.manufacturing.tooling-holes.minimum"
+      ],
+      "tags": [
+        "assembly",
+        "dfa",
+        "dfm",
+        "manufacturing",
+        "pcb"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "profile-specific"
@@ -575,9 +942,18 @@
       "rationale": "Pinmap collisions make hardware-to-firmware mappings ambiguous.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["pinmap"],
-      "configKeys": ["pinmap", "projects.pinmap"],
-      "tags": ["firmware", "pinmap", "validation"],
+      "appliesTo": [
+        "pinmap"
+      ],
+      "configKeys": [
+        "pinmap",
+        "projects.pinmap"
+      ],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "validation"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -589,9 +965,20 @@
       "rationale": "Pinmap entries without matching schematic labels are easy to miswire in firmware.",
       "defaultSeverity": "medium",
       "category": "electrical",
-      "appliesTo": ["pinmap", "schematic"],
-      "configKeys": ["pinmap", "projects.pinmap", "rules.pinmap.net-label.enabled"],
-      "tags": ["firmware", "pinmap", "schematic"],
+      "appliesTo": [
+        "pinmap",
+        "schematic"
+      ],
+      "configKeys": [
+        "pinmap",
+        "projects.pinmap",
+        "rules.pinmap.net-label.enabled"
+      ],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "schematic"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -603,9 +990,19 @@
       "rationale": "Connected pins omitted from a pinmap leave firmware-facing interfaces undocumented.",
       "defaultSeverity": "medium",
       "category": "electrical",
-      "appliesTo": ["pinmap", "schematic"],
-      "configKeys": ["pinmap", "projects.pinmap"],
-      "tags": ["firmware", "pinmap", "schematic"],
+      "appliesTo": [
+        "pinmap",
+        "schematic"
+      ],
+      "configKeys": [
+        "pinmap",
+        "projects.pinmap"
+      ],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "schematic"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -617,9 +1014,19 @@
       "rationale": "A pinmap that references absent nets cannot safely guide firmware integration.",
       "defaultSeverity": "high",
       "category": "electrical",
-      "appliesTo": ["pinmap", "schematic"],
-      "configKeys": ["pinmap", "projects.pinmap"],
-      "tags": ["firmware", "pinmap", "schematic"],
+      "appliesTo": [
+        "pinmap",
+        "schematic"
+      ],
+      "configKeys": [
+        "pinmap",
+        "projects.pinmap"
+      ],
+      "tags": [
+        "firmware",
+        "pinmap",
+        "schematic"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -631,9 +1038,17 @@
       "rationale": "Released hardware needs revision notes that reviewers and manufacturers can trace.",
       "defaultSeverity": "medium",
       "category": "release",
-      "appliesTo": ["manifest"],
-      "configKeys": ["rules.release.changelog-present.enabled"],
-      "tags": ["changelog", "release", "traceability"],
+      "appliesTo": [
+        "manifest"
+      ],
+      "configKeys": [
+        "rules.release.changelog-present.enabled"
+      ],
+      "tags": [
+        "changelog",
+        "release",
+        "traceability"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -645,9 +1060,17 @@
       "rationale": "Boards without stable revisions are difficult to fabricate, review, and reproduce.",
       "defaultSeverity": "high",
       "category": "release",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.release.revision-set.enabled"],
-      "tags": ["pcb", "release", "revision"],
+      "appliesTo": [
+        "pcb"
+      ],
+      "configKeys": [
+        "rules.release.revision-set.enabled"
+      ],
+      "tags": [
+        "pcb",
+        "release",
+        "revision"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -659,9 +1082,18 @@
       "rationale": "Release tags should identify the exact board revision being fabricated.",
       "defaultSeverity": "high",
       "category": "release",
-      "appliesTo": ["pcb", "manifest"],
-      "configKeys": ["GITHUB_REF_NAME"],
-      "tags": ["git", "release", "revision"],
+      "appliesTo": [
+        "pcb",
+        "manifest"
+      ],
+      "configKeys": [
+        "GITHUB_REF_NAME"
+      ],
+      "tags": [
+        "git",
+        "release",
+        "revision"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"
@@ -673,9 +1105,18 @@
       "rationale": "Consistent version formats keep hardware revisions searchable and automatable.",
       "defaultSeverity": "low",
       "category": "release",
-      "appliesTo": ["pcb", "schematic"],
-      "configKeys": ["rules.release.version-format.pattern"],
-      "tags": ["release", "revision", "versioning"],
+      "appliesTo": [
+        "pcb",
+        "schematic"
+      ],
+      "configKeys": [
+        "rules.release.version-format.pattern"
+      ],
+      "tags": [
+        "release",
+        "revision",
+        "versioning"
+      ],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"

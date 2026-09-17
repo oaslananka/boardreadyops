@@ -28,6 +28,7 @@ import { fiducialsRule } from "./manufacturing/fiducials.js";
 import { jobsetOutputsRule } from "./manufacturing/jobset-outputs.js";
 import { layerStackupRule } from "./manufacturing/layer-stackup.js";
 import { maskCoverageRule } from "./manufacturing/mask-coverage.js";
+import { pasteCoverageRule } from "./manufacturing/paste-coverage.js";
 import { outputsPresentRule } from "./manufacturing/outputs-present.js";
 import { packageCompletenessRule } from "./manufacturing/package-completeness.js";
 import { panelSanityRule } from "./manufacturing/panel-sanity.js";
@@ -85,6 +86,7 @@ export function registerBuiltInRules(): void {
     drillCoverageRule,
     layerStackupRule,
     maskCoverageRule,
+    pasteCoverageRule,
     fiducialsRule,
     testPointsRule,
     assemblySidesRule,

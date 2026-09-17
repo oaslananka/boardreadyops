@@ -37,6 +37,7 @@ BoardReadyOps rules use stable `group.rule` identifiers. Each rule page records 
 - [manufacturing.outputs-present](manufacturing.outputs-present.md)
 - [manufacturing.package-completeness](manufacturing.package-completeness.md)
 - [manufacturing.panel-sanity](manufacturing.panel-sanity.md)
+- [manufacturing.paste-coverage](manufacturing.paste-coverage.md)
 - [manufacturing.position-coverage](manufacturing.position-coverage.md)
 - [manufacturing.test-points](manufacturing.test-points.md)
 - [manufacturing.tooling-holes](manufacturing.tooling-holes.md)

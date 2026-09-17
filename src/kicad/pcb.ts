@@ -16,6 +16,7 @@ import type { SexprListNode } from "./sexpr.js";
 export interface PcbFootprint {
   reference: string;
   footprint: string;
+  mountType: "surface-mount" | "through-hole" | "mixed" | "unknown";
   dnp: boolean;
   boardOnly: boolean;
   layers: string[];
@@ -59,6 +60,40 @@ export async function parsePcb(file: string): Promise<ParsedPcb> {
   };
 }
 
+function footprintMountType(footprint: SexprListNode, attributes: Set<string>): PcbFootprint["mountType"] {
+  const padLists = findKiCadLists(footprint, "pad");
+  let hasSmd = false;
+  let hasThruHole = false;
+
+  for (const pad of padLists) {
+    const padType = listValue(pad, 2);
+    if (padType === "smd") {
+      hasSmd = true;
+    } else if (padType === "thru_hole" || padType === "np_thru_hole") {
+      hasThruHole = true;
+    }
+  }
+
+  if (hasSmd && hasThruHole) {
+    return "mixed";
+  }
+  if (hasSmd) {
+    return "surface-mount";
+  }
+  if (hasThruHole) {
+    return "through-hole";
+  }
+
+  if (attributes.has("smd")) {
+    return "surface-mount";
+  }
+  if (attributes.has("through_hole") || attributes.has("thru_hole")) {
+    return "through-hole";
+  }
+
+  return "unknown";
+}
+
 function footprints(model: KiCadDocumentModel): PcbFootprint[] {
   const parsed: PcbFootprint[] = [];
   for (const footprint of findKiCadLists(model, "footprint")) {
@@ -70,6 +105,7 @@ function footprints(model: KiCadDocumentModel): PcbFootprint[] {
     parsed.push({
       reference,
       footprint: listValue(footprint) ?? "",
+      mountType: footprintMountType(footprint, attributes),
       dnp: attributes.has("dnp") || /not\s+populated/i.test(sourceText(model, footprint)),
       boardOnly: attributes.has("board_only"),
       layers: findKiCadLists(footprint, "layer")
