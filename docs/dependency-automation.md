@@ -11,17 +11,27 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 - Post-upgrade command execution is restricted through `RENOVATE_ALLOWED_COMMANDS` to the exact `corepack pnpm run renovate:post-upgrade` entry point. That repository-controlled script creates an isolated temporary pnpm store for the dependency install, native rebuild, `NOTICE` refresh, and committed `dist/` rebuild, then removes the store. This prevents shared-runner pnpm store metadata from breaking `pnpm licenses list` while keeping Renovate unable to execute arbitrary post-upgrade commands.
 - Renovate itself never runs on a pull-request event, so untrusted pull-request code cannot obtain the automation token.
 
-## Policy
+## Policy layers
 
-- Renovate owns npm workspace updates, GitHub Actions updates, Dockerfile updates, and Docker Compose updates.
-- Generated output, dependency trees, and test fixtures are ignored.
-- Dependency branches regenerate `NOTICE` and the committed `dist/` bundles through the allowlisted post-upgrade task, so license inventory and shipped CLI/Action bundle changes remain visible and reviewable in the pull request.
-- GitHub repository security alerts and security update PRs remain enabled in repository security settings.
-- Major upgrades require Dependency Dashboard approval and manual review.
-- Core runtime and GitHub integration dependencies use exact manifest versions so unrelated lockfile refreshes cannot advance them implicitly; their updates, plus GitHub Actions, Dockerfile, and Docker Compose updates, require manual review.
-- Low-risk development dependency and `@types/*` minor/patch updates wait at least seven days, receive the `automerge` label, and may be squash-merged by Mergify after all required checks pass.
-- TypeScript compiler updates wait at least seven days and always require manual review.
-- GitHub Actions and container references remain digest-pinned.
+`renovate.json` extends `github>oaslananka/.github:renovate-config`. The shared preset owns the seven-day routine release quarantine, strict internal age filtering, two new PRs per hour, five concurrent PRs, digest pinning, weekly lockfile maintenance defaults, and Dependency Dashboard approval for major upgrades.
+
+BoardReadyOps owns its weekday schedule, managed package managers, generated `NOTICE`/`dist/` refresh, protected package groups, vulnerability-PR policy, and merge routing. Generated output, dependency trees, and test fixtures remain excluded from discovery.
+
+## Automatic path
+
+Low-risk development dependency and `@types/*` non-major updates remain eligible for the normal Mergify queue. Same-version GitHub Action digest refreshes are also eligible when they do not touch security, release, provenance, publication, container-release, or binary-release workflows.
+
+Eligibility never bypasses GitHub Rulesets. Required checks must pass before queue admission and again before merge. The `automerge` label on low-risk dependency groups is classification metadata; BoardReadyOps does not enable Renovate's own `automerge: true` path.
+
+## Exception path
+
+Major updates, TypeScript, core runtime/GitHub integration dependencies, vulnerability-remediation PRs, non-digest GitHub Action updates, Actions changes in protected workflows, and Dockerfile/Docker Compose updates carry `manual-review` and remain outside the automatic queue until a maintainer clears the exception.
+
+GitHub Actions and container references remain digest-pinned. Security vulnerability remediation bypasses the routine schedule and release-age wait, requests the lowest known-safe version, and remains manual-review only.
+
+## Pull-request creation
+
+Routine minimum-age waiting is enforced by Renovate's strict internal checks before branch creation. BoardReadyOps CI begins on `pull_request`, not on bare Renovate branches, so the repository does not use `prCreation: not-pending`; otherwise a dependency branch can wait for checks that cannot start until the pull request exists.
 
 ## Files
 
@@ -41,7 +51,11 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 
 ## Operations
 
-1. Confirm the `renovate / validate` job passes after configuration changes.
-2. Run the workflow manually after first installation or credential rotation.
-3. Confirm that the `Dependency Dashboard` issue exists and that the workflow can create or update Renovate branches.
-4. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly.
+1. Confirm the shared preset resolves successfully.
+2. Run `corepack pnpm run renovate:validate` after policy changes.
+3. Confirm `security-automation-config.test.ts` and `mergify-integration.test.ts` pass.
+4. Confirm `manual-review` is present on protected updates and absent from an eligible low-risk update.
+5. Confirm the PR receives the repository's required Ruleset checks before Mergify admits it.
+6. Treat any low-risk PR that stays open after green required checks as an automation defect.
+7. Run the Renovate workflow manually after first installation or credential rotation and confirm the Dependency Dashboard can be updated.
+8. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly.

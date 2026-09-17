@@ -41,8 +41,17 @@ TEMP/
 /.unlighthouse/
 /control-plane-run-listing-benchmark-report.json
 
-# Private agent planning artifacts
-/docs/superpowers/
+# Private agent planning artifacts. Keep the intentionally versioned plans/specs
+# visible to Git tooling so format hooks can update and restage them.
+/docs/superpowers/*
+!/docs/superpowers/plans/
+!/docs/superpowers/specs/
+/docs/superpowers/plans/*
+/docs/superpowers/specs/*
+!/docs/superpowers/plans/2026-09-09-auto-probe-after-setup-merge.md
+!/docs/superpowers/plans/2026-09-17-repository-maintenance-autonomy.md
+!/docs/superpowers/specs/2026-09-09-auto-probe-after-setup-merge-design.md
+!/docs/superpowers/specs/2026-09-17-repository-maintenance-autonomy-design.md
 /.superpowers/
 /task_tracker.md
 /walkthrough.md

@@ -1,27 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices",
-    "security:openssf-scorecard",
-    ":dependencyDashboard",
-    ":semanticCommits",
-    ":separatePatchReleases"
-  ],
+  "extends": ["github>oaslananka/.github:renovate-config", "security:openssf-scorecard", ":separatePatchReleases"],
   "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose"],
-  "timezone": "Europe/Istanbul",
   "schedule": ["after 5am and before 8am every weekday"],
-  "minimumReleaseAge": "7 days",
-  "dependencyDashboardTitle": "Dependency Dashboard",
   "ignorePaths": ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**", "tmp/**"],
   "labels": ["dependencies"],
   "rangeStrategy": "replace",
-  "pinDigests": true,
   "rebaseWhen": "conflicted",
-  "prCreation": "not-pending",
-  "internalChecksFilter": "strict",
-  "prHourlyLimit": 3,
-  "prConcurrentLimit": 8,
-  "branchConcurrentLimit": 10,
   "postUpdateOptions": ["pnpmDedupe"],
   "postUpgradeTasks": {
     "commands": ["corepack pnpm run renovate:post-upgrade"],
@@ -31,6 +16,7 @@
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 6am on monday"],
+    "automerge": false,
     "addLabels": ["lockfile-maintenance"]
   },
   "packageRules": [
@@ -38,14 +24,12 @@
       "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "minimumReleaseAge": "7 days",
       "groupName": "developer tooling (non-major)",
       "addLabels": ["automerge"]
     },
     {
       "description": "Treat TypeScript compiler updates as manual because they can change type-checking behavior.",
       "matchPackageNames": ["typescript"],
-      "minimumReleaseAge": "7 days",
       "automerge": false,
       "addLabels": ["manual-review"]
     },
@@ -53,7 +37,6 @@
       "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
       "matchPackageNames": ["/^@types\\//"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "minimumReleaseAge": "7 days",
       "groupName": "type definitions (non-major)",
       "addLabels": ["types", "automerge"]
     },
@@ -72,24 +55,51 @@
         "@actions/exec"
       ],
       "automerge": false,
-      "addLabels": ["manual-review"],
-      "minimumReleaseAge": "7 days"
+      "addLabels": ["manual-review"]
     },
     {
       "description": "Require explicit Dependency Dashboard approval for major upgrades.",
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true,
       "automerge": false,
-      "addLabels": ["breaking-change", "manual-review"],
-      "minimumReleaseAge": "7 days"
+      "addLabels": ["breaking-change", "manual-review"]
     },
     {
-      "description": "Keep GitHub Actions and container updates visible and manually reviewed.",
-      "matchManagers": ["github-actions", "dockerfile", "docker-compose"],
+      "description": "Allow same-version GitHub Action digest refreshes outside protected workflows after required checks pass.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "automerge": false,
+      "addLabels": ["supply-chain"]
+    },
+    {
+      "description": "Require manual review for non-digest GitHub Action updates.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major", "minor", "patch", "pin", "pinDigest", "rollback", "bump", "replacement"],
+      "automerge": false,
+      "addLabels": ["supply-chain", "manual-review"]
+    },
+    {
+      "description": "Require manual review for Actions changes in security, release, provenance, and publication workflows.",
+      "matchManagers": ["github-actions"],
+      "matchFileNames": [
+        ".github/workflows/security.yml",
+        ".github/workflows/osv.yml",
+        ".github/workflows/trivy.yml",
+        ".github/workflows/release-please.yml",
+        ".github/workflows/provenance.yml",
+        ".github/workflows/container-build.yml",
+        ".github/workflows/publish-npm.yml",
+        ".github/workflows/binary-build.yml"
+      ],
+      "automerge": false,
+      "addLabels": ["supply-chain", "manual-review"]
+    },
+    {
+      "description": "Keep container base-image updates in the manual exception path.",
+      "matchManagers": ["dockerfile", "docker-compose"],
       "pinDigests": true,
       "automerge": false,
-      "addLabels": ["supply-chain", "manual-review"],
-      "minimumReleaseAge": "7 days"
+      "addLabels": ["supply-chain", "manual-review"]
     }
   ],
   "vulnerabilityAlerts": {

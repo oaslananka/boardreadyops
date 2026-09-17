@@ -56,6 +56,17 @@ function lowestResolved(value: string): string {
   return value.replace(/^[>=~^\s]+/u, "").trim();
 }
 
+type RenovateRule = {
+  description?: string;
+  matchManagers?: string[];
+  matchUpdateTypes?: string[];
+  matchFileNames?: string[];
+  addLabels?: string[];
+  automerge?: boolean;
+  dependencyDashboardApproval?: boolean;
+  minimumReleaseAge?: string | false;
+};
+
 describe("dependency and security automation configuration", () => {
   it("verifies NOTICE compliance without mutating the CI checkout", async () => {
     const workflow = await repositoryFile(".github/workflows/ci.yml");
@@ -146,16 +157,23 @@ describe("dependency and security automation configuration", () => {
     expect(webPackageJson.dependencies?.["@octokit/auth-app"]).toBe("8.2.0");
     expect(webPackageJson.dependencies?.["@octokit/auth-app"]).not.toBe("latest");
     expect(renovate.extends).toEqual(
-      expect.arrayContaining(["config:best-practices", ":dependencyDashboard", ":semanticCommits"]),
+      expect.arrayContaining([
+        "github>oaslananka/.github:renovate-config",
+        "security:openssf-scorecard",
+        ":separatePatchReleases",
+      ]),
     );
+    expect(renovate.extends).not.toEqual(expect.arrayContaining(["config:best-practices"]));
+    expect(renovate.prHourlyLimit).toBeUndefined();
+    expect(renovate.prConcurrentLimit).toBeUndefined();
+    expect(renovate.branchConcurrentLimit).toBeUndefined();
+    expect(renovate.minimumReleaseAge).toBeUndefined();
+    expect(renovate.internalChecksFilter).toBeUndefined();
+    expect(renovate.prCreation).toBeUndefined();
     expect(renovate.enabledManagers).toEqual(
       expect.arrayContaining(["npm", "github-actions", "dockerfile", "docker-compose"]),
     );
-    expect(renovate.timezone).toBe("Europe/Istanbul");
     expect(renovate.schedule).toEqual(["after 5am and before 8am every weekday"]);
-    expect(renovate.minimumReleaseAge).toBe("7 days");
-    expect(await repositoryFile("renovate.json")).not.toContain("3 days");
-    expect(renovate.pinDigests).toBe(true);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
     expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
@@ -167,6 +185,36 @@ describe("dependency and security automation configuration", () => {
     });
     expect(renovate.ignorePaths).toEqual(
       expect.arrayContaining(["**/.next/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**"]),
+    );
+
+    const rules = (renovate.packageRules ?? []) as RenovateRule[];
+    const byDescription = (description: string) => rules.find((rule) => rule.description === description);
+
+    expect(
+      byDescription(
+        "Allow same-version GitHub Action digest refreshes outside protected workflows after required checks pass.",
+      ),
+    ).toMatchObject({
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["digest"],
+      automerge: false,
+    });
+    expect(
+      byDescription(
+        "Allow same-version GitHub Action digest refreshes outside protected workflows after required checks pass.",
+      )?.addLabels,
+    ).not.toContain("manual-review");
+
+    expect(byDescription("Require manual review for non-digest GitHub Action updates.")?.addLabels).toContain(
+      "manual-review",
+    );
+    expect(
+      byDescription(
+        "Require manual review for Actions changes in security, release, provenance, and publication workflows.",
+      )?.addLabels,
+    ).toContain("manual-review");
+    expect(byDescription("Keep container base-image updates in the manual exception path.")?.addLabels).toContain(
+      "manual-review",
     );
   });
 
@@ -201,7 +249,7 @@ describe("dependency and security automation configuration", () => {
       overrides?: Record<string, string>;
     };
     const renovate = JSON.parse(await repositoryFile("renovate.json")) as {
-      packageRules?: Array<{ minimumReleaseAge?: string | false }>;
+      packageRules?: RenovateRule[];
       vulnerabilityAlerts?: {
         enabled?: boolean;
         labels?: string[];
@@ -320,8 +368,9 @@ describe("dependency and security automation configuration", () => {
       expect.arrayContaining(["security", "dependencies", "manual-review"]),
     );
     expect(renovate.packageRules).not.toHaveLength(0);
-    for (const rule of renovate.packageRules ?? []) {
-      expect(rule.minimumReleaseAge).toBe("7 days");
+    const rules = renovate.packageRules ?? [];
+    for (const rule of rules) {
+      expect(rule.minimumReleaseAge).toBeUndefined();
     }
   });
 
