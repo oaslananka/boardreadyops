@@ -4,7 +4,8 @@ BoardReadyOps uses Renovate as the single source of truth for routine version-up
 
 ## Execution
 
-- `.github/workflows/renovate.yml` validates `renovate.json` on pull requests and changes to `main`. Validation runs the official Renovate image by immutable digest, with the repository mounted read-only and container networking disabled, so validation cannot drift through dynamically resolved `pnpm dlx` transitives.
+- `.github/workflows/renovate.yml` validates `renovate.json` on pull requests and changes to `main`. Validation runs the official Renovate image by immutable tagged digest, with the repository mounted read-only and container networking disabled, so validation cannot drift through dynamically resolved `pnpm dlx` transitives.
+- The workflow `renovate-version` input is the self-hosted runtime version source of truth. A `custom.regex` manager tracks the validator image tag and digest, and both self-hosted Renovate dependencies are grouped into a `manual-review` exception PR instead of entering the automatic path.
 - The pinned Renovate runner executes at 06:17 Europe/Istanbul on weekdays and can also be started manually.
 - The runner is explicitly scoped to `oaslananka/boardreadyops`; repository autodiscovery and onboarding are disabled.
 - The workflow uses the `GH_AUTH_TOKEN` repository secret. That credential must belong to a dedicated automation identity with the minimum repository permissions required to create branches, pull requests, labels, and issues.
@@ -25,7 +26,7 @@ Eligibility never bypasses GitHub Rulesets. Required checks must pass before que
 
 ## Exception path
 
-Major updates, TypeScript, core runtime/GitHub integration dependencies, vulnerability-remediation PRs, non-digest GitHub Action updates, Actions changes in protected workflows, and Dockerfile/Docker Compose updates carry `manual-review` and remain outside the automatic queue until a maintainer clears the exception.
+Major updates, TypeScript, core runtime/GitHub integration dependencies, self-hosted Renovate runtime/validator upgrades, vulnerability-remediation PRs, non-digest GitHub Action updates, Actions changes in protected workflows, and Dockerfile/Docker Compose updates carry `manual-review` and remain outside the automatic queue until a maintainer clears the exception.
 
 GitHub Actions and container references remain digest-pinned. Security vulnerability remediation bypasses the routine schedule and release-age wait, requests the lowest known-safe version, and remains manual-review only.
 

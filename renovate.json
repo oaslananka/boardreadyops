@@ -1,7 +1,18 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>oaslananka/.github:renovate-config", "security:openssf-scorecard", ":separatePatchReleases"],
-  "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose"],
+  "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose", "custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the immutable self-hosted Renovate validator image.",
+      "managerFilePatterns": ["/^scripts\\/validate-renovate-config\\.mjs$/"],
+      "matchStrings": ["renovate/renovate:(?<currentValue>[^@\"\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"],
+      "depNameTemplate": "renovate/renovate",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
   "schedule": ["after 5am and before 8am every weekday"],
   "ignorePaths": ["**/.next/**", "**/node_modules/**", "**/dist/**", "**/coverage/**", "tests/fixtures/**", "tmp/**"],
   "labels": ["dependencies"],
@@ -98,6 +109,13 @@
       "description": "Keep container base-image updates in the manual exception path.",
       "matchManagers": ["dockerfile", "docker-compose"],
       "pinDigests": true,
+      "automerge": false,
+      "addLabels": ["supply-chain", "manual-review"]
+    },
+    {
+      "description": "Require manual review for self-hosted Renovate runtime and validator upgrades.",
+      "matchPackageNames": ["ghcr.io/renovatebot/renovate", "renovate/renovate"],
+      "groupName": "self-hosted Renovate",
       "automerge": false,
       "addLabels": ["supply-chain", "manual-review"]
     }

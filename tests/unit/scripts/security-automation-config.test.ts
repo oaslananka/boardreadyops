@@ -61,6 +61,8 @@ type RenovateRule = {
   matchManagers?: string[];
   matchUpdateTypes?: string[];
   matchFileNames?: string[];
+  matchPackageNames?: string[];
+  groupName?: string;
   addLabels?: string[];
   automerge?: boolean;
   dependencyDashboardApproval?: boolean;
@@ -171,10 +173,32 @@ describe("dependency and security automation configuration", () => {
     expect(renovate.internalChecksFilter).toBeUndefined();
     expect(renovate.prCreation).toBeUndefined();
     expect(renovate.enabledManagers).toEqual(
-      expect.arrayContaining(["npm", "github-actions", "dockerfile", "docker-compose"]),
+      expect.arrayContaining(["npm", "github-actions", "dockerfile", "docker-compose", "custom.regex"]),
     );
     expect(renovate.schedule).toEqual(["after 5am and before 8am every weekday"]);
     expect(renovate.postUpdateOptions).toContain("pnpmDedupe");
+    expect(renovate.customManagers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          customType: "regex",
+          managerFilePatterns: ["/^scripts\\/validate-renovate-config\\.mjs$/"],
+          depNameTemplate: "renovate/renovate",
+          datasourceTemplate: "docker",
+        }),
+      ]),
+    );
+    const validatorManager = (
+      renovate.customManagers as Array<{
+        description?: string;
+        matchStrings?: string[];
+      }>
+    ).find(({ description }) => description === "Track the immutable self-hosted Renovate validator image.");
+    const validatorImage = await repositoryFile("scripts/validate-renovate-config.mjs");
+    const validatorMatch = new RegExp(validatorManager?.matchStrings?.[0] ?? "(?!)", "u").exec(validatorImage);
+    expect(validatorMatch?.groups).toMatchObject({
+      currentValue: "44.97.2",
+      currentDigest: "sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86",
+    });
     expect(packageJson.scripts?.["deps:install-renovate"]).toBeUndefined();
     expect(packageJson.scripts?.["renovate:post-upgrade"]).toBe("node scripts/renovate-post-upgrade.mjs");
     expect(renovateWorkflow.jobs?.renovate?.env?.CI).toBe("true");
@@ -216,6 +240,14 @@ describe("dependency and security automation configuration", () => {
     expect(byDescription("Keep container base-image updates in the manual exception path.")?.addLabels).toContain(
       "manual-review",
     );
+    expect(
+      byDescription("Require manual review for self-hosted Renovate runtime and validator upgrades."),
+    ).toMatchObject({
+      matchPackageNames: ["ghcr.io/renovatebot/renovate", "renovate/renovate"],
+      groupName: "self-hosted Renovate",
+      automerge: false,
+      addLabels: expect.arrayContaining(["supply-chain", "manual-review"]),
+    });
   });
 
   it("validates Renovate with an immutable network-isolated container", async () => {
@@ -229,7 +261,7 @@ describe("dependency and security automation configuration", () => {
     expect(packageJson.scripts?.["renovate:validate"]).toBe("node scripts/validate-renovate-config.mjs");
     expect(packageJson.scripts?.["renovate:validate"]).not.toContain("dlx");
     expect(validator).toContain(
-      "renovate/renovate@sha256:62a5af4b26c18336b0ff5bc69f2e956337b6696e493b0de57a0d71c9d637da20",
+      "renovate/renovate:44.97.2@sha256:b9b32d70f395ec78b9c2a29633079ce4d249049e51018ad3f086417dadf96b86",
     );
     expect(validator).toContain('"--network=none"');
     expect(validator).toContain("readonly");
@@ -397,7 +429,9 @@ describe("dependency and security automation configuration", () => {
     expect(workflow).toContain("schedule:");
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("renovatebot/github-action@3064367f740a1a91cca218698a63902689cce200");
-    expect(workflow).toContain("renovate-version: 43.272.4");
+    expect(workflow).not.toContain("RENOVATE_VERSION:");
+    expect(workflow).toContain("renovate-version: 44.97.2");
+    expect(workflow).not.toContain("43.272.4");
     expect(workflow).toContain("pnpm run renovate:validate");
     expect(workflow).not.toContain("npx ");
     expect(workflow).toContain("RENOVATE_REPOSITORIES: '[\"oaslananka/boardreadyops\"]'");
