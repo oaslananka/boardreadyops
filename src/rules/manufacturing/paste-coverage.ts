@@ -79,18 +79,14 @@ export const pasteCoverageRule = rule(
 
       for (const side of ["top", "bottom"] as const) {
         const smtFootprintsOnSide = activeAssembly.filter(
-          (f) =>
-            footprintSide(f) === side &&
-            (f.mountType === "surface-mount" || f.mountType === "mixed"),
+          (f) => footprintSide(f) === side && (f.mountType === "surface-mount" || f.mountType === "mixed"),
         );
 
         if (smtFootprintsOnSide.length === 0) {
           continue;
         }
 
-        const hasPasteLayer = stackup.layers.some(
-          (layer) => layer.role === "solderpaste" && layer.side === side,
-        );
+        const hasPasteLayer = stackup.layers.some((layer) => layer.role === "solderpaste" && layer.side === side);
 
         if (!hasPasteLayer) {
           findings.push(
