@@ -1,7 +1,7 @@
 # Exception-Based Repository Maintenance
 
 **Date:** 2026-09-17  
-**Status:** Proposed for rollout  
+**Status:** Approved for implementation  
 **Scope:** `oaslananka` public repositories, starting with `boardreadyops`
 
 ## Problem
@@ -56,7 +56,7 @@ Create a public `oaslananka/.github` repository and restore the existing preset 
 "github>oaslananka/.github:renovate-config"
 ```
 
-The canonical shared file is `.github/renovate-config.json` at repository root. Renovate's current hosted-preset contract resolves the named preset above to `renovate-config.json` in `oaslananka/.github`.
+The canonical shared file is `renovate-config.json` at the root of the `oaslananka/.github` repository. Renovate resolves the named preset above to that root-level file.
 
 This identifier is already referenced by repositories including `fovux-kit`, and Fovux's validator expects inherited labels including `automerge`, `ci`, `dependencies`, `docker`, `github-actions`, `javascript`, `lockfile`, `major`, `python`, `requires-review`, `runtime`, and `security`. The first restored preset therefore has to be backward-compatible and conservative.
 
