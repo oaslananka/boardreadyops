@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.65.0](https://github.com/oaslananka/boardreadyops/compare/v1.64.0...v1.65.0) (2026-09-18)
+
+
+### Features
+
+* **manufacturing:** implement footprint mount-type parsing and paste coverage rule ([#784](https://github.com/oaslananka/boardreadyops/issues/784), [#770](https://github.com/oaslananka/boardreadyops/issues/770)) ([#822](https://github.com/oaslananka/boardreadyops/issues/822)) ([10785fa](https://github.com/oaslananka/boardreadyops/commit/10785fa7da30078d9bce91a22f2fdd0c5da19493))
+
 ## [1.64.0](https://github.com/oaslananka/boardreadyops/compare/v1.63.0...v1.64.0) (2026-09-15)
 
 
