@@ -46605,24 +46605,7 @@ async function buildSchematicNetGraph(rootFiles) {
     visited.add(file2);
     await processSheetQueueItem(file2, next, sheets, missingSheets, unresolvedSheetPins, queue);
   }
-  const rootSet = new Set(normalizedRoots);
-  const visibleNetLabels = /* @__PURE__ */ new Set();
-  const allNetLabels = /* @__PURE__ */ new Set();
-  for (const sheet of sheets) {
-    addAll(allNetLabels, sheet.localLabels);
-    addAll(allNetLabels, sheet.globalLabels);
-    addAll(allNetLabels, sheet.hierarchicalLabels);
-    addAll(visibleNetLabels, sheet.globalLabels);
-    if (rootSet.has(sheet.file)) {
-      addAll(visibleNetLabels, sheet.localLabels);
-      addAll(visibleNetLabels, sheet.hierarchicalLabels);
-    }
-    for (const pin of sheet.sheetPins) {
-      if (sheet.hierarchicalLabels.has(pin)) {
-        visibleNetLabels.add(pin);
-      }
-    }
-  }
+  const { visibleNetLabels, allNetLabels } = aggregateLabels(normalizedRoots, sheets);
   return { rootFiles: normalizedRoots, sheets, visibleNetLabels, allNetLabels, missingSheets, unresolvedSheetPins };
 }
 async function processSheetQueueItem(file2, next, sheets, missingSheets, unresolvedSheetPins, queue) {
@@ -46672,6 +46655,27 @@ function addAll(target, source) {
   for (const value of source) {
     target.add(value);
   }
+}
+function aggregateLabels(rootFiles, sheets) {
+  const rootSet = new Set(rootFiles);
+  const visibleNetLabels = /* @__PURE__ */ new Set();
+  const allNetLabels = /* @__PURE__ */ new Set();
+  for (const sheet of sheets) {
+    addAll(allNetLabels, sheet.localLabels);
+    addAll(allNetLabels, sheet.globalLabels);
+    addAll(allNetLabels, sheet.hierarchicalLabels);
+    addAll(visibleNetLabels, sheet.globalLabels);
+    if (rootSet.has(sheet.file)) {
+      addAll(visibleNetLabels, sheet.localLabels);
+      addAll(visibleNetLabels, sheet.hierarchicalLabels);
+    }
+    for (const pin of sheet.sheetPins) {
+      if (sheet.hierarchicalLabels.has(pin)) {
+        visibleNetLabels.add(pin);
+      }
+    }
+  }
+  return { visibleNetLabels, allNetLabels };
 }
 async function fileExists(file2) {
   try {
