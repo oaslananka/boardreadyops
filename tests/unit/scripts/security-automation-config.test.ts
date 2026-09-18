@@ -169,7 +169,7 @@ describe("dependency and security automation configuration", () => {
     expect(renovate.prHourlyLimit).toBeUndefined();
     expect(renovate.prConcurrentLimit).toBeUndefined();
     expect(renovate.branchConcurrentLimit).toBeUndefined();
-    expect(renovate.minimumReleaseAge).toBeUndefined();
+    expect(renovate.minimumReleaseAge).toBe("3 days");
     expect(renovate.internalChecksFilter).toBeUndefined();
     expect(renovate.prCreation).toBeUndefined();
     expect(renovate.enabledManagers).toEqual(

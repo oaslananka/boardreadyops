@@ -1,3 +1,4 @@
+/* biome-ignore lint/suspicious/noTemplateCurlyInString: workflow bash expressions in strings */
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 

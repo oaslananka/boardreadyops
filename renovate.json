@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>oaslananka/.github:renovate-config", "security:openssf-scorecard", ":separatePatchReleases"],
+  "minimumReleaseAge": "3 days",
   "enabledManagers": ["npm", "github-actions", "dockerfile", "docker-compose", "custom.regex"],
   "customManagers": [
     {
