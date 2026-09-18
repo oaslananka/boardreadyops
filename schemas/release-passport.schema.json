@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oaslananka/boardreadyops/schemas/release-passport.schema.json",
+  "title": "BoardReadyOps Release Passport",
+  "description": "A verifiable, tamper-evident identity document that binds the exact source Git SHA, hardware artifact digests, BOM/firmware state, policy/tool versions, approvals, waivers, and evidence references for a production release.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "type",
+    "tool",
+    "generatedAt",
+    "release",
+    "artifacts",
+    "policy",
+    "context",
+    "decision",
+    "approvals",
+    "waivers",
+    "evidence",
+    "verification"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "description": "Schema version. Always 1 for this format."
+    },
+    "type": {
+      "const": "release-passport",
+      "description": "Document type discriminator."
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "boardreadyops" },
+        "version": { "type": "string" }
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "description": "ISO 8601 UTC timestamp of passport generation."
+    },
+    "release": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable release identifier (e.g. git tag, semver, or commit SHA)."
+        },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sha": {
+              "type": "string",
+              "description": "Full commit SHA (40 or 64 hex chars)."
+            },
+            "dirty": {
+              "type": "boolean",
+              "description": "Whether the working tree was dirty at generation time."
+            },
+            "branch": {
+              "type": "string",
+              "description": "Git branch name, when determinable."
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["hardware", "bom", "firmware"],
+      "additionalProperties": false,
+      "properties": {
+        "hardware": {
+          "type": "object",
+          "required": ["gerbers", "drill"],
+          "additionalProperties": false,
+          "properties": {
+            "gerbers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "sha256", "bytes"],
+                "additionalProperties": false,
+                "properties": {
+                  "path": { "type": "string" },
+                  "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                  "bytes": { "type": "integer", "minimum": 0 }
+                }
+              },
+              "description": "Gerber fabrication artwork digests."
+            },
+            "drill": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "sha256", "bytes"],
+                "additionalProperties": false,
+                "properties": {
+                  "path": { "type": "string" },
+                  "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                  "bytes": { "type": "integer", "minimum": 0 }
+                }
+              },
+              "description": "Excellon drill file digests."
+            }
+          }
+        },
+        "bom": {
+          "type": "object",
+          "required": ["present"],
+          "additionalProperties": false,
+          "properties": {
+            "present": {
+              "type": "boolean",
+              "description": "Whether BOM artifacts were found in the evidence bundle."
+            },
+            "format": {
+              "type": ["string", "null"],
+              "description": "BOM format identifier (e.g. 'csv', 'cyclonedx-1.7'). Null when absent."
+            },
+            "hash": {
+              "type": ["string", "null"],
+              "pattern": "^([a-f0-9]{64})?$",
+              "description": "SHA-256 hex digest of the canonical BOM content. Null when absent."
+            },
+            "componentCount": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Number of components in the BOM. Null when absent."
+            }
+          }
+        },
+        "firmware": {
+          "type": "object",
+          "required": ["present"],
+          "additionalProperties": false,
+          "properties": {
+            "present": {
+              "type": "boolean",
+              "description": "Whether firmware dependencies were found."
+            },
+            "hash": {
+              "type": ["string", "null"],
+              "pattern": "^([a-f0-9]{64})?$",
+              "description": "SHA-256 hex digest of firmware state. Null when absent."
+            },
+            "componentCount": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Number of firmware components. Null when absent."
+            }
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "required": ["rulesetHash", "failOn", "ruleCount"],
+      "additionalProperties": false,
+      "properties": {
+        "rulesetHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hex digest of the canonicalized active ruleset configuration."
+        },
+        "failOn": {
+          "type": "string",
+          "description": "The fail-on severity threshold active during evaluation."
+        },
+        "ruleCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of active rules in the ruleset."
+        },
+        "rules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Identifiers of active rules."
+        },
+        "policyStatus": {
+          "type": "string",
+          "enum": ["pass", "fail", "not-evaluated"],
+          "description": "Outcome of policy evaluation, if performed."
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "required": ["engineVersion", "platform", "nodeVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "engineVersion": {
+          "type": "string",
+          "description": "BoardReadyOps engine version."
+        },
+        "kicadVersion": {
+          "type": ["string", "null"],
+          "description": "kicad-cli version, when detected."
+        },
+        "nodeVersion": {
+          "type": "string",
+          "description": "Node.js version used."
+        },
+        "platform": {
+          "type": "string",
+          "description": "OS platform (e.g. linux, darwin, win32)."
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["status", "reasons"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": ["pass", "fail"],
+          "description": "Overall release decision."
+        },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Human-readable reasons for the decision."
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["approverId", "status", "timestamp"],
+        "additionalProperties": false,
+        "properties": {
+          "approverId": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["approved", "changes_requested"],
+            "description": "Approval verdict."
+          },
+          "reason": { "type": "string" },
+          "isBreakGlass": { "type": "boolean" },
+          "timestamp": { "type": "string" }
+        }
+      },
+      "description": "Approval records binding humans or automation to the release decision."
+    },
+    "waivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fingerprint", "disposition", "reason", "owner"],
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "disposition": { "type": "string" },
+          "reason": { "type": "string" },
+          "owner": { "type": "string" },
+          "expiresAt": { "type": ["string", "null"] }
+        }
+      },
+      "description": "Active risk waivers in effect at release time."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["bundlePath"],
+      "additionalProperties": false,
+      "properties": {
+        "bundlePath": {
+          "type": "string",
+          "description": "Relative path to the evidence bundle directory."
+        },
+        "manifestHash": {
+          "type": ["string", "null"],
+          "pattern": "^([a-f0-9]{64})?$",
+          "description": "SHA-256 hex digest of the evidence bundle's manifest.json. Null when not verified."
+        },
+        "ledgerPath": {
+          "type": ["string", "null"],
+          "description": "Relative path to the review evidence ledger, when present."
+        },
+        "ledgerDigest": {
+          "type": ["string", "null"],
+          "pattern": "^([a-f0-9]{64})?$",
+          "description": "Evidence ledger digest. Null when not present."
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": ["algorithm", "passportDigest"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "sha256",
+          "description": "Hash algorithm used for the passport digest."
+        },
+        "passportDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 hex digest of the canonicalized passport (all fields except verification)."
+        }
+      }
+    }
+  }
+}

@@ -3013,6 +3013,393 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
     ],
     "type": "object",
   },
+  "release-passport.schema.json": {
+    "additionalProperties": false,
+    "properties": {
+      "approvals": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "approverId": {
+              "type": "string",
+            },
+            "isBreakGlass": {
+              "type": "boolean",
+            },
+            "reason": {
+              "type": "string",
+            },
+            "status": {
+              "enum": [
+                "approved",
+                "changes_requested",
+              ],
+            },
+            "timestamp": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "approverId",
+            "status",
+            "timestamp",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "artifacts": {
+        "additionalProperties": false,
+        "properties": {
+          "bom": {
+            "additionalProperties": false,
+            "properties": {
+              "componentCount": {
+                "type": [
+                  "integer",
+                  "null",
+                ],
+              },
+              "format": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "hash": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "present": {
+                "type": "boolean",
+              },
+            },
+            "required": [
+              "present",
+            ],
+            "type": "object",
+          },
+          "firmware": {
+            "additionalProperties": false,
+            "properties": {
+              "componentCount": {
+                "type": [
+                  "integer",
+                  "null",
+                ],
+              },
+              "hash": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "present": {
+                "type": "boolean",
+              },
+            },
+            "required": [
+              "present",
+            ],
+            "type": "object",
+          },
+          "hardware": {
+            "additionalProperties": false,
+            "properties": {
+              "drill": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                    },
+                    "path": {
+                      "type": "string",
+                    },
+                    "sha256": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "bytes",
+                    "path",
+                    "sha256",
+                  ],
+                  "type": "object",
+                },
+                "type": "array",
+              },
+              "gerbers": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                    },
+                    "path": {
+                      "type": "string",
+                    },
+                    "sha256": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "bytes",
+                    "path",
+                    "sha256",
+                  ],
+                  "type": "object",
+                },
+                "type": "array",
+              },
+            },
+            "required": [
+              "drill",
+              "gerbers",
+            ],
+            "type": "object",
+          },
+        },
+        "required": [
+          "bom",
+          "firmware",
+          "hardware",
+        ],
+        "type": "object",
+      },
+      "context": {
+        "additionalProperties": false,
+        "properties": {
+          "engineVersion": {
+            "type": "string",
+          },
+          "kicadVersion": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "nodeVersion": {
+            "type": "string",
+          },
+          "platform": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "engineVersion",
+          "nodeVersion",
+          "platform",
+        ],
+        "type": "object",
+      },
+      "decision": {
+        "additionalProperties": false,
+        "properties": {
+          "reasons": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "status": {
+            "enum": [
+              "fail",
+              "pass",
+            ],
+          },
+        },
+        "required": [
+          "reasons",
+          "status",
+        ],
+        "type": "object",
+      },
+      "evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "bundlePath": {
+            "type": "string",
+          },
+          "ledgerDigest": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "ledgerPath": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "manifestHash": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+        },
+        "required": [
+          "bundlePath",
+        ],
+        "type": "object",
+      },
+      "generatedAt": {
+        "type": "string",
+      },
+      "policy": {
+        "additionalProperties": false,
+        "properties": {
+          "failOn": {
+            "type": "string",
+          },
+          "policyStatus": {
+            "enum": [
+              "fail",
+              "not-evaluated",
+              "pass",
+            ],
+            "type": "string",
+          },
+          "ruleCount": {
+            "type": "integer",
+          },
+          "rules": {
+            "items": {
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "rulesetHash": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "failOn",
+          "ruleCount",
+          "rulesetHash",
+        ],
+        "type": "object",
+      },
+      "release": {
+        "additionalProperties": false,
+        "properties": {
+          "git": {
+            "additionalProperties": false,
+            "properties": {
+              "branch": {
+                "type": "string",
+              },
+              "dirty": {
+                "type": "boolean",
+              },
+              "sha": {
+                "type": "string",
+              },
+            },
+            "type": "object",
+          },
+          "id": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+        ],
+        "type": "object",
+      },
+      "schemaVersion": {
+        "const": 1,
+      },
+      "tool": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "boardreadyops",
+          },
+          "version": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "version",
+        ],
+        "type": "object",
+      },
+      "type": {
+        "const": "release-passport",
+      },
+      "verification": {
+        "additionalProperties": false,
+        "properties": {
+          "algorithm": {
+            "const": "sha256",
+          },
+          "passportDigest": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "algorithm",
+          "passportDigest",
+        ],
+        "type": "object",
+      },
+      "waivers": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "type": "string",
+            },
+            "expiresAt": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+            "fingerprint": {
+              "type": "string",
+            },
+            "owner": {
+              "type": "string",
+            },
+            "reason": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "disposition",
+            "fingerprint",
+            "owner",
+            "reason",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+    },
+    "required": [
+      "approvals",
+      "artifacts",
+      "context",
+      "decision",
+      "evidence",
+      "generatedAt",
+      "policy",
+      "release",
+      "schemaVersion",
+      "tool",
+      "type",
+      "verification",
+      "waivers",
+    ],
+    "type": "object",
+  },
   "rule-pack.schema.json": {
     "additionalProperties": false,
     "properties": {
