@@ -9,13 +9,13 @@ import type { ReleaseEvidenceManifest } from "./evidence.js";
 // Types
 // ---------------------------------------------------------------------------
 
-export interface PassportArtifactDigest {
+interface PassportArtifactDigest {
   path: string;
   sha256: string;
   bytes: number;
 }
 
-export interface PassportHardwareArtifacts {
+interface PassportHardwareArtifacts {
   gerbers: PassportArtifactDigest[];
   drill: PassportArtifactDigest[];
 }
@@ -33,7 +33,7 @@ export interface PassportFirmwareState {
   componentCount?: number | null | undefined;
 }
 
-export interface PassportPolicy {
+interface PassportPolicy {
   rulesetHash: string;
   failOn: string;
   ruleCount: number;
@@ -41,19 +41,19 @@ export interface PassportPolicy {
   policyStatus?: "pass" | "fail" | "not-evaluated" | undefined;
 }
 
-export interface PassportContext {
+interface PassportContext {
   engineVersion: string;
   kicadVersion?: string | null | undefined;
   nodeVersion: string;
   platform: string;
 }
 
-export interface PassportDecision {
+interface PassportDecision {
   status: "pass" | "fail";
   reasons: string[];
 }
 
-export interface PassportApproval {
+interface PassportApproval {
   approverId: string;
   status: "approved" | "changes_requested";
   reason?: string | undefined;
@@ -61,7 +61,7 @@ export interface PassportApproval {
   timestamp: string;
 }
 
-export interface PassportWaiver {
+interface PassportWaiver {
   fingerprint: string;
   disposition: string;
   reason: string;
@@ -69,7 +69,7 @@ export interface PassportWaiver {
   expiresAt?: string | null | undefined;
 }
 
-export interface PassportEvidence {
+interface PassportEvidence {
   bundlePath: string;
   manifestHash?: string | null | undefined;
   ledgerPath?: string | null | undefined;
@@ -221,7 +221,7 @@ export function buildReleasePassport(options: PassportGenerateOptions): ReleaseP
 // Verification
 // ---------------------------------------------------------------------------
 
-export type PassportErrorCode =
+type PassportErrorCode =
   | "SCHEMA_MISMATCH"
   | "DIGEST_MISMATCH"
   | "MANIFEST_HASH_MISMATCH"
@@ -346,6 +346,22 @@ export function computeRulesetHash(ruleset: unknown): string {
 // Human-readable rendering
 // ---------------------------------------------------------------------------
 
+function formatDecisionSummary(status: string, reasons: string[]): string {
+  const suffix = reasons.length > 0 ? ` (${reasons.join("; ")})` : "";
+  return `  Decision:        ${status.toUpperCase()}${suffix}`;
+}
+
+function formatBomSummary(present: boolean, format: string | null | undefined): string {
+  const status = present ? "present" : "ABSENT";
+  const fmt = format ? ` (${format})` : "";
+  return `  BOM:             ${status}${fmt}`;
+}
+
+function formatWaiverLine(waiver: PassportWaiver): string {
+  const expiry = waiver.expiresAt ? ` (expires ${waiver.expiresAt})` : "";
+  return `    - ${waiver.disposition}: ${waiver.reason.slice(0, 60)}… [${waiver.owner}]${expiry}`;
+}
+
 export function formatPassportText(passport: ReleasePassport): string {
   const lines: string[] = [
     "",
@@ -362,11 +378,11 @@ export function formatPassportText(passport: ReleasePassport): string {
   }
 
   lines.push(
-    `  Decision:        ${passport.decision.status.toUpperCase()}${passport.decision.reasons.length > 0 ? ` (${passport.decision.reasons.join("; ")})` : ""}`,
+    formatDecisionSummary(passport.decision.status, passport.decision.reasons),
     `  Policy:          ${passport.policy.policyStatus ?? "not-evaluated"} (${passport.policy.ruleCount} rules, fail-on=${passport.policy.failOn})`,
     `  Gerber files:    ${passport.artifacts.hardware.gerbers.length}`,
     `  Drill files:     ${passport.artifacts.hardware.drill.length}`,
-    `  BOM:             ${passport.artifacts.bom.present ? "present" : "ABSENT"}${passport.artifacts.bom.format ? ` (${passport.artifacts.bom.format})` : ""}`,
+    formatBomSummary(passport.artifacts.bom.present, passport.artifacts.bom.format),
     `  Firmware:        ${passport.artifacts.firmware.present ? "present" : "not declared"}`,
     `  Approvals:       ${passport.approvals.length}`,
     `  Active waivers:  ${passport.waivers.length}`,
@@ -386,8 +402,7 @@ export function formatPassportText(passport: ReleasePassport): string {
   if (passport.waivers.length > 0) {
     lines.push("  Active waivers:");
     for (const waiver of passport.waivers) {
-      const expiry = waiver.expiresAt ? ` (expires ${waiver.expiresAt})` : "";
-      lines.push(`    - ${waiver.disposition}: ${waiver.reason.slice(0, 60)}… [${waiver.owner}]${expiry}`);
+      lines.push(formatWaiverLine(waiver));
     }
     lines.push("");
   }
