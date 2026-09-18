@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.66.0](https://github.com/oaslananka/boardreadyops/compare/v1.65.1...v1.66.0) (2026-09-18)
+
+
+### Features
+
+* **release:** add verifiable hardware release passport v1 ([#448](https://github.com/oaslananka/boardreadyops/issues/448)) ([#827](https://github.com/oaslananka/boardreadyops/issues/827)) ([ca84ca7](https://github.com/oaslananka/boardreadyops/commit/ca84ca703ec304501a878c3c0538ad934500a0a5))
+
 ## [1.65.1](https://github.com/oaslananka/boardreadyops/compare/v1.65.0...v1.65.1) (2026-09-18)
 
 
