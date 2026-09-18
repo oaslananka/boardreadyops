@@ -60,6 +60,9 @@ export async function buildSchematicNetGraph(rootFiles: string[]): Promise<Schem
   const normalizedRoots = [...new Set(rootFiles.map((file) => path.resolve(file)))].sort((left, right) =>
     left.localeCompare(right),
   );
+  if (normalizedRoots.length > MAX_SCHEMATIC_SHEETS) {
+    throw new HostileInputError(`Schematic sheet hierarchy exceeds maximum of ${MAX_SCHEMATIC_SHEETS} sheets`);
+  }
   const queue: PendingSheet[] = normalizedRoots.map((file) => ({ file, sheetPins: [] }));
   const visited = new Set<string>();
   const sheets: SchematicGraphSheet[] = [];
