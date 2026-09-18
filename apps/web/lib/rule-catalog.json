@@ -527,20 +527,6 @@
       "vendorDependence": "profile-specific"
     },
     {
-      "id": "manufacturing.paste-coverage",
-      "title": "An assembly side with SMT components has no solder paste layer",
-      "description": "Checks that each board side containing surface-mount assembly components has a matching solder paste layer in the Gerber package.",
-      "rationale": "Surface-mount assembly requires a stencil paste layer (F.Paste / B.Paste) to deposit solder paste on SMT pads.",
-      "defaultSeverity": "high",
-      "category": "manufacturability",
-      "appliesTo": ["pcb"],
-      "configKeys": ["rules.manufacturing.paste-coverage.enabled"],
-      "tags": ["fabrication", "manufacturing", "gerber", "paste", "assembly"],
-      "evidenceType": "exact",
-      "fixability": "manual",
-      "vendorDependence": "none"
-    },
-    {
       "id": "manufacturing.position-coverage",
       "title": "Position output does not cover populated assembly references",
       "description": "Checks configured assembly jobs for position/CPL output coverage of populated PCB references.",

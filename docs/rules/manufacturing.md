@@ -13,7 +13,6 @@
 - [manufacturing.outputs-present](manufacturing.outputs-present.md): Checks required fabrication outputs and whether they are fresh relative to PCB sources.
 - [manufacturing.package-completeness](manufacturing.package-completeness.md): Validates that the release package includes all required manufacturing output categories. Base categories (gerbers, drill, BOM, CPL) are required for every release. Production categories (fab notes, assembly notes, board PDF) are required when releaseMode is production.
 - [manufacturing.panel-sanity](manufacturing.panel-sanity.md): Checks panelized manufacturing configurations for panel output files.
-- [manufacturing.paste-coverage](manufacturing.paste-coverage.md): Checks that each board side containing surface-mount assembly components has a matching solder paste layer in the Gerber package.
 - [manufacturing.position-coverage](manufacturing.position-coverage.md): Checks configured assembly jobs for position/CPL output coverage of populated PCB references.
 - [manufacturing.test-points](manufacturing.test-points.md): Checks for a configured minimum number of test point footprints for in-circuit or functional test.
 - [manufacturing.tooling-holes](manufacturing.tooling-holes.md): Checks configured fabrication/assembly jobs for a minimum number of tooling or mounting holes.

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -202,5 +201,3 @@ Use this finding to decide whether the design package is ready for review, fabri
 function title(value) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
-
-execFileSync("npx", ["biome", "format", "--write", "apps/web/lib/rule-catalog.json"], { stdio: "ignore" });

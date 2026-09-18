@@ -1,7 +1,6 @@
 import path from "node:path";
 import type { RuleContext } from "../../core/context.js";
 import { type PcbFootprint, parsePcb } from "../../kicad/pcb.js";
-import { normalizeGerberStackup } from "../../multicad/gerber-normalizer.js";
 import { readTextFile } from "../../util/fs.js";
 import { globFiles } from "../../util/glob.js";
 
@@ -99,32 +98,4 @@ export function missingReferences(text: string, references: string[]): string[] 
     found.add(match[2] ?? "");
   }
   return uniqueReferences.filter((reference) => !found.has(reference));
-}
-
-const GERBER_PATTERNS = [
-  "**/*.gbr",
-  "**/*.gtl",
-  "**/*.gbl",
-  "**/*.gts",
-  "**/*.gbs",
-  "**/*.gto",
-  "**/*.gbo",
-  "**/*.gtp",
-  "**/*.gbp",
-  "**/*.gko",
-  "**/*.gm1",
-];
-
-export async function loadNormalizedGerberStackup(context: RuleContext) {
-  const files = await globFiles(context.root, GERBER_PATTERNS);
-  if (files.length === 0) {
-    return undefined;
-  }
-  const entries = await Promise.all(
-    files.map(async (file) => ({
-      filename: path.relative(context.root, file),
-      content: (await readTextFile(file).catch(() => undefined)) ?? undefined,
-    })),
-  );
-  return { stackup: normalizeGerberStackup(entries), entries };
 }

@@ -31,7 +31,6 @@ import { maskCoverageRule } from "./manufacturing/mask-coverage.js";
 import { outputsPresentRule } from "./manufacturing/outputs-present.js";
 import { packageCompletenessRule } from "./manufacturing/package-completeness.js";
 import { panelSanityRule } from "./manufacturing/panel-sanity.js";
-import { pasteCoverageRule } from "./manufacturing/paste-coverage.js";
 import { pin1MarkersRule } from "./manufacturing/pin1-markers.js";
 import { polarityMarkersRule } from "./manufacturing/polarity-markers.js";
 import { positionCoverageRule } from "./manufacturing/position-coverage.js";
@@ -86,7 +85,6 @@ export function registerBuiltInRules(): void {
     drillCoverageRule,
     layerStackupRule,
     maskCoverageRule,
-    pasteCoverageRule,
     fiducialsRule,
     testPointsRule,
     assemblySidesRule,
