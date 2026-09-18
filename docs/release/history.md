@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.65.1](https://github.com/oaslananka/boardreadyops/compare/v1.65.0...v1.65.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* **kicad:** stabilize full-suite flaky specs ([#763](https://github.com/oaslananka/boardreadyops/issues/763)) ([#824](https://github.com/oaslananka/boardreadyops/issues/824)) ([43d653b](https://github.com/oaslananka/boardreadyops/commit/43d653b0fb8ec0b33974c61d01b80631c012d33e))
+
 ## [1.65.0](https://github.com/oaslananka/boardreadyops/compare/v1.64.0...v1.65.0) (2026-09-18)
 
 
