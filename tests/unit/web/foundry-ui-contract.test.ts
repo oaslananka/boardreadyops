@@ -1,5 +1,8 @@
 import { readFile } from "node:fs/promises";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { Panel } from "../../../apps/web/components/ui.js";
 
 const css = await readFile("apps/web/app/globals.css", "utf8");
 
@@ -53,10 +56,7 @@ describe("Graphite & Iris UI contract", () => {
     }
   });
 
-  it("renders panel tone variants with stable accessibility semantics", async () => {
-    const { createElement } = await import("react");
-    const { renderToStaticMarkup } = await import("react-dom/server");
-    const { Panel } = await import("../../../apps/web/components/ui.js");
+  it("renders panel tone variants with stable accessibility semantics", () => {
     const markup = renderToStaticMarkup(
       createElement(Panel, { title: "Gate Check", id: "gate", tone: "section" }, "content"),
     );
