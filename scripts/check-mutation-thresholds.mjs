@@ -27,11 +27,21 @@ export const defaultMutationThresholds = Object.freeze([
 
 const detectedStatuses = new Set(["Killed", "Timeout"]);
 const undetectedStatuses = new Set(["Survived", "NoCoverage"]);
-const coreMutationExcludes = new Set(["src/core/context.ts", "src/core/result.ts"]);
+const coreMutationExcludes = new Set([
+  "src/core/context.ts",
+  "src/core/result.ts",
+  "src/core/firmware.ts",
+  "src/core/history.ts",
+]);
 
 export function isExecutableMutationFile(file) {
   const normalized = normalizeFile(file);
-  return !coreMutationExcludes.has(normalized) && !normalized.endsWith(".d.ts") && !normalized.endsWith(".types.ts");
+  return (
+    !coreMutationExcludes.has(normalized) &&
+    !normalized.endsWith(".d.ts") &&
+    !normalized.endsWith(".types.ts") &&
+    !normalized.endsWith("/types.ts")
+  );
 }
 const parserModelMutationFiles = new Set([
   "src/kicad/sexpr.ts",

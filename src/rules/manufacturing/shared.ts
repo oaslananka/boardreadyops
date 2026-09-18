@@ -101,7 +101,7 @@ export function missingReferences(text: string, references: string[]): string[] 
   return uniqueReferences.filter((reference) => !found.has(reference));
 }
 
-export const GERBER_PATTERNS = [
+const GERBER_PATTERNS = [
   "**/*.gbr",
   "**/*.gtl",
   "**/*.gbl",
