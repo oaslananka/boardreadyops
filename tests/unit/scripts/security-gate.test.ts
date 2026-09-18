@@ -35,7 +35,7 @@ describe("security aggregate gate", () => {
     expect(result.ok).toBe(true);
     expect(result.summary).toContain("Security merge gate: passed");
     expect(result.summary).toContain("| CodeQL | Required | success |");
-    expect(result.summary).toContain("| OSV dependency diff | Required | success |");
+    expect(result.summary).toContain("| OSV pull request scan | Required | success |");
   });
 
   it.each(["failure", "cancelled", "skipped"] as const)(
@@ -66,7 +66,7 @@ describe("security aggregate gate", () => {
           semgrep: "skipped",
           gitleaks: "success",
           dependencyReview: "skipped",
-          osvPullRequest: "skipped",
+          osvPullRequest: "success",
           osvFull: "skipped",
           compliance: "skipped",
           sbom: "skipped",
@@ -78,6 +78,29 @@ describe("security aggregate gate", () => {
     expect(result.summary).toContain("| CodeQL | Not applicable | skipped |");
     expect(result.summary).toContain("No executable or workflow changes");
     expect(result.summary).toContain("| Gitleaks | Required | success |");
+  });
+
+  it("requires the OSV PR scan even when dependency inventory is unchanged", () => {
+    const input = passingInput({
+      policy: {
+        codeScan: false,
+        dependencyScan: false,
+        compliance: false,
+        sbom: false,
+      },
+    });
+    input.results.codeql = "skipped";
+    input.results.semgrep = "skipped";
+    input.results.dependencyReview = "skipped";
+    input.results.osvPullRequest = "skipped";
+    input.results.compliance = "skipped";
+    input.results.sbom = "skipped";
+
+    const result = evaluateSecurityGate(input);
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("OSV pull request scan: skipped");
+    expect(result.summary).toContain("| OSV pull request scan | Required | skipped |");
   });
 
   it("treats CodeQL as explicitly non-applicable for fork pull requests", () => {
@@ -99,7 +122,7 @@ describe("security aggregate gate", () => {
 
     expect(result.ok).toBe(true);
     expect(result.summary).toContain("| OSV full scan | Required | success |");
-    expect(result.summary).not.toContain("OSV dependency diff");
+    expect(result.summary).not.toContain("OSV pull request scan");
   });
 
   it("delegates scheduled OSV advisories to the specialist workflow", () => {

@@ -51,10 +51,10 @@ export function evaluateSecurityGate(input) {
   if (pullRequest) {
     addRow(
       rows,
-      "OSV dependency diff",
-      input.policy.dependencyScan,
+      "OSV pull request scan",
+      true,
       input.results.osvPullRequest,
-      "No dependency inventory changes",
+      "Mandatory on every pull request; compares the base and proposed revision",
     );
   } else {
     const aggregateFullScan = input.eventName === "push" || input.eventName === "workflow_dispatch";
