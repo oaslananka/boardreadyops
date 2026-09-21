@@ -2,6 +2,7 @@ import { appendFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import glob from "fast-glob";
+import ts from "typescript";
 
 export const defaultMutationThresholds = Object.freeze([
   { name: "overall", minimum: 60, filePattern: "all files", matches: () => true },
@@ -29,9 +30,33 @@ const detectedStatuses = new Set(["Killed", "Timeout"]);
 const undetectedStatuses = new Set(["Survived", "NoCoverage"]);
 const coreMutationExcludes = new Set(["src/core/context.ts", "src/core/result.ts"]);
 
-export function isExecutableMutationFile(file) {
+export function isTypeOnlySource(content) {
+  if (!content?.trim()) return true;
+  const transpiled = ts.transpileModule(content, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ESNext,
+      verbatimModuleSyntax: true,
+    },
+  });
+  const js = transpiled.outputText
+    .replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "")
+    .replace(/export\s*\{\s*\};?/g, "")
+    .trim();
+  return js === "";
+}
+
+export function isExecutableMutationFile(file, content) {
   const normalized = normalizeFile(file);
-  return !coreMutationExcludes.has(normalized) && !normalized.endsWith(".d.ts") && !normalized.endsWith(".types.ts");
+  if (coreMutationExcludes.has(normalized) || normalized.endsWith(".d.ts") || normalized.endsWith(".types.ts")) {
+    return false;
+  }
+  if (content !== undefined && content !== null) {
+    if (isTypeOnlySource(content)) {
+      return false;
+    }
+  }
+  return true;
 }
 const parserModelMutationFiles = new Set([
   "src/kicad/sexpr.ts",
@@ -149,10 +174,21 @@ export function formatFailures(results) {
 
 export async function expectedCoreMutationFiles(root = process.cwd()) {
   const files = await glob("src/core/**/*.ts", { cwd: root, onlyFiles: true });
-  return files
-    .map(normalizeFile)
-    .filter(isExecutableMutationFile)
-    .sort((a, b) => a.localeCompare(b));
+  const result = [];
+  for (const file of files) {
+    const normalized = normalizeFile(file);
+    const fullPath = path.resolve(root, file);
+    let content;
+    try {
+      content = await readFile(fullPath, "utf8");
+    } catch {
+      // ignore
+    }
+    if (isExecutableMutationFile(normalized, content)) {
+      result.push(normalized);
+    }
+  }
+  return result.sort((a, b) => a.localeCompare(b));
 }
 
 export function missingMutationFiles(report, expectedFiles) {

@@ -10,12 +10,20 @@ import {
   formatFailures,
   formatMissingMutationFiles,
   formatMutationSummary,
+  isTypeOnlySource,
   main,
   missingMutationFiles,
   missingRequiredMutationFiles,
 } from "../../../scripts/check-mutation-thresholds.mjs";
 
 describe("check-mutation-thresholds", () => {
+  it("identifies interface and type declarations as type-only source", () => {
+    expect(isTypeOnlySource("export interface FirmwareSnapshot { dependencies: string[]; }")).toBe(true);
+    expect(isTypeOnlySource("export type DependencyOrigin = 'registry' | 'git';")).toBe(true);
+    expect(isTypeOnlySource("export const x = 42;")).toBe(false);
+    expect(isTypeOnlySource("export function foo() { return 1; }")).toBe(false);
+  });
+
   it("calculates Stryker mutation score from valid mutant statuses", () => {
     const report = reportWithFiles({
       "src/core/pipeline.ts": ["Killed", "Timeout", "Survived", "NoCoverage", "Ignored", "RuntimeError"],
@@ -73,6 +81,10 @@ describe("check-mutation-thresholds", () => {
     await writeFile(path.join(root, "src", "core", "config.types.ts"), "export interface Config {}\n");
     await writeFile(path.join(root, "src", "core", "context.ts"), "export const context = true;\n");
     await writeFile(path.join(root, "src", "core", "result.ts"), "export const result = true;\n");
+    await writeFile(
+      path.join(root, "src", "core", "firmware.ts"),
+      "export interface FirmwareSnapshot { dependencies: string[]; }\n",
+    );
 
     await expect(expectedCoreMutationFiles(root)).resolves.toEqual(["src/core/pipeline.ts"]);
   });
