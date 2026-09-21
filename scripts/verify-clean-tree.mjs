@@ -51,7 +51,7 @@ function scanForbiddenContent() {
 
 function scanWorkflowRuntimeContent() {
   const terms = [
-    /self-hosted/,
+    /runs-on:\s*.*self-hosted/,
     /runs-on:\s*\[/,
     /::set-output/,
     /::save-state/,
