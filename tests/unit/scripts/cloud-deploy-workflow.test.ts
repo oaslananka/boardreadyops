@@ -7,9 +7,9 @@ const deploymentDocsPath = "docs/deployment/self-hosted.md";
 describe("cloud-deploy topology preflight", () => {
   it("fails closed before mutating a stale or uncommissioned deployment checkout", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
-    const repoDir = `$` + "{repo_dir}";
+    const repoDir = "$" + "{repo_dir}";
     const checkoutPreflight = workflow.indexOf(`test -d "${repoDir}/.git"`);
-    const deployRoot = `$` + "{deploy_root}";
+    const deployRoot = "$" + "{deploy_root}";
     const runbookPreflight = workflow.indexOf(`test -x "${deployRoot}/deploy.sh"`);
     const fetch = workflow.indexOf("git fetch origin --prune");
 
@@ -23,16 +23,22 @@ describe("cloud-deploy topology preflight", () => {
   it("caps BuildKit cache by size before a low-space build and after every build", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
+    const buildCacheMaxUsedSpace = "$" + "{build_cache_max_used_space}";
+    const availableMib = "$" + "{available_mib}";
+    const requiredMib = "$" + "{required_mib}";
+    const repoDir = "$" + "{repo_dir}";
+    const deployArgs = "$" + "{deploy_args}";
+
     expect(workflow).toContain("build_cache_max_used_space=3GB");
     expect(workflow).toContain(
-      'docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true',
+      `docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}" || true`,
     );
     expect(workflow).not.toContain("--filter until=168h");
 
-    const lowSpaceCheck = workflow.indexOf('if [ "${available_mib}" -lt "${required_mib}" ]; then');
+    const lowSpaceCheck = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`);
     const preflightTrim = workflow.indexOf("            trim_build_cache", lowSpaceCheck);
-    const checkout = workflow.indexOf('cd "${repo_dir}"');
-    const caseStart = workflow.indexOf('case "${deploy_args}" in');
+    const checkout = workflow.indexOf(`cd "${repoDir}"`);
+    const caseStart = workflow.indexOf(`case "${deployArgs}" in`);
     const caseEnd = workflow.indexOf("          esac", caseStart);
     const finalTrim = workflow.indexOf("          trim_build_cache", caseEnd);
 

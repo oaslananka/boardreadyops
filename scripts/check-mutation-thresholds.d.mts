@@ -50,3 +50,6 @@ export function formatMissingMutationFiles(missingFiles: readonly string[], scop
 export function missingRequiredMutationFiles(report: MutationReport): string[];
 
 export function main(argv?: string[], env?: NodeJS.ProcessEnv, root?: string): Promise<void>;
+
+export function isTypeOnlySource(content: string): boolean;
+export function isExecutableMutationFile(file: string, content?: string): boolean;
