@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.66.1](https://github.com/oaslananka/boardreadyops/compare/v1.66.0...v1.66.1) (2026-09-21)
+
+
+### Bug Fixes
+
+* **ci:** classify type-only mutation targets semantically ([#829](https://github.com/oaslananka/boardreadyops/issues/829)) ([ad11cd7](https://github.com/oaslananka/boardreadyops/commit/ad11cd7e95f7fe9cf9d818e95419b5095d13e9da))
+
 ## [1.66.0](https://github.com/oaslananka/boardreadyops/compare/v1.65.1...v1.66.0) (2026-09-18)
 
 
