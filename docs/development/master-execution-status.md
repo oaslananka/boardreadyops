@@ -217,7 +217,7 @@ Phase 8: Moat & Predictive Intelligence [P3, Data-Triggered] (W36)
 
 ### W22 — Enterprise Trust: SSO, SCIM, Customer-Hosted Agent
 - **Status:** `Partial`
-- **Remaining:** SSO (OIDC/SAML), SCIM provisioning, customer-managed keys, and SIEM export are all in-memory stub adapters with no wired API routes, honestly labeled 'Proposed / Blueprint (planned upon enterprise customer commitment)' in ADR-0015. Only the customer-hosted execution agent (enrollment/lease/heartbeat/revocation) is production-grade.
+- **Remaining:** SSO (OIDC/SAML), SCIM provisioning, customer-managed keys, and SIEM export are all in-memory stub adapters with no wired API routes, honestly labeled 'Proposed / Blueprint (planned upon enterprise customer commitment)' in ADR-0015. Only the customer-hosted execution agent (enrollment/lease/heartbeat/revocation) is production-hardened.
 - **Scope:** Enterprise governance architecture (ADR-0015), customer-hosted execution agent protocol, and KMS residency isolation.
 - **Code & Test Evidence:** `ADR-0015`, `packages/contracts/src/runner-protocol.ts`, `packages/db/src/runner-registration-enrollment-store.ts`.
 

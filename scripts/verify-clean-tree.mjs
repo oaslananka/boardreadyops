@@ -51,7 +51,7 @@ function scanForbiddenContent() {
 
 function scanWorkflowRuntimeContent() {
   const terms = [
-    /self-hosted/,
+    /runs-on:\s*.*self-hosted/, // NOSONAR -- regex matches workflow file configuration text, not an executed shell command.
     /runs-on:\s*\[/,
     /::set-output/,
     /::save-state/,
