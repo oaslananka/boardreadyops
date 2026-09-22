@@ -4,6 +4,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.67.0](https://github.com/oaslananka/boardreadyops/compare/v1.66.1...v1.67.0) (2026-09-22)
+
+
+### Features
+
+* **mfg:** complete trustworthy release gate validation rules ([#832](https://github.com/oaslananka/boardreadyops/issues/832)) ([f643d0f](https://github.com/oaslananka/boardreadyops/commit/f643d0f1daaeace1807539586bf350a8ca57120c))
+
 ## [1.66.1](https://github.com/oaslananka/boardreadyops/compare/v1.66.0...v1.66.1) (2026-09-21)
 
 
