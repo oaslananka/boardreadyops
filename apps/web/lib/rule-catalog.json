@@ -359,6 +359,23 @@
       "vendorDependence": "profile-specific"
     },
     {
+      "id": "manufacturing.board-edge-clearance",
+      "title": "Copper features are too close to the board edge",
+      "description": "Checks that copper features in the Gerber package maintain the required minimum clearance from the board edge.",
+      "rationale": "Copper placed too close to the PCB boundary risks exposure, burrs, or shorts during board routing or V-scoring.",
+      "defaultSeverity": "medium",
+      "category": "manufacturability",
+      "appliesTo": ["pcb"],
+      "configKeys": [
+        "rules.manufacturing.board-edge-clearance.enabled",
+        "rules.manufacturing.board-edge-clearance.min-clearance-mm"
+      ],
+      "tags": ["dfm", "fabrication", "gerber", "manufacturing", "pcb"],
+      "evidenceType": "exact",
+      "fixability": "manual",
+      "vendorDependence": "manufacturer-specific"
+    },
+    {
       "id": "manufacturing.dfm-pin1-markers",
       "title": "IC or connector may lack a clear pin-1 marker",
       "description": "Checks that ICs and polarised connectors use recognized library footprints that include standard pin-1 markers.",
@@ -527,6 +544,20 @@
       "vendorDependence": "profile-specific"
     },
     {
+      "id": "manufacturing.paste-coverage",
+      "title": "An assembly side with SMT components has no solder paste layer",
+      "description": "Checks that each side with SMT components in the Gerber package has a matching solder paste layer.",
+      "rationale": "Surface-mount assembly requires a stencil layer to apply solder paste to pads before component placement.",
+      "defaultSeverity": "medium",
+      "category": "manufacturability",
+      "appliesTo": ["pcb"],
+      "configKeys": ["rules.manufacturing.paste-coverage.enabled"],
+      "tags": ["assembly", "dfa", "fabrication", "gerber", "manufacturing", "paste"],
+      "evidenceType": "exact",
+      "fixability": "manual",
+      "vendorDependence": "none"
+    },
+    {
       "id": "manufacturing.position-coverage",
       "title": "Position output does not cover populated assembly references",
       "description": "Checks configured assembly jobs for position/CPL output coverage of populated PCB references.",
@@ -620,6 +651,20 @@
       "appliesTo": ["pinmap", "schematic"],
       "configKeys": ["pinmap", "projects.pinmap"],
       "tags": ["firmware", "pinmap", "schematic"],
+      "evidenceType": "exact",
+      "fixability": "manual",
+      "vendorDependence": "none"
+    },
+    {
+      "id": "release.artifact-provenance",
+      "title": "Exported manufacturing artifacts lack valid source provenance",
+      "description": "Checks that exported Gerber and drill artifacts match the current source revision and have an authentic export provenance manifest.",
+      "rationale": "Manufacturing outputs exported from an older commit or modified after export risk fabricating obsolete hardware.",
+      "defaultSeverity": "high",
+      "category": "release",
+      "appliesTo": ["pcb"],
+      "configKeys": ["rules.release.artifact-provenance.enabled", "rules.release.artifact-provenance.manifest-path"],
+      "tags": ["fabrication", "manufacturing", "provenance", "release"],
       "evidenceType": "exact",
       "fixability": "manual",
       "vendorDependence": "none"

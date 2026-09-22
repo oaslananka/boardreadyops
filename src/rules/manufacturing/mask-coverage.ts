@@ -1,9 +1,7 @@
-import path from "node:path";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
-import { normalizeGerberStackup } from "../../multicad/gerber-normalizer.js";
-import { readTextFile } from "../../util/fs.js";
 import { globFiles } from "../../util/glob.js";
 import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
+import { DEFAULT_GERBER_PATTERNS, loadGerberStackup } from "./shared.js";
 
 /**
  * Every side with copper needs a solder mask on that side.
@@ -26,20 +24,6 @@ import { configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
  * Part of #770.
  */
 
-const gerberPatterns = [
-  "**/*.gbr",
-  "**/*.gtl",
-  "**/*.gbl",
-  "**/*.gts",
-  "**/*.gbs",
-  "**/*.gto",
-  "**/*.gbo",
-  "**/*.gtp",
-  "**/*.gbp",
-  "**/*.gko",
-  "**/*.gm1",
-];
-
 export const maskCoverageRule = rule(
   {
     id: "manufacturing.mask-coverage",
@@ -58,20 +42,12 @@ export const maskCoverageRule = rule(
       return [];
     }
 
-    const files = await globFiles(context.root, gerberPatterns);
+    const files = await globFiles(context.root, DEFAULT_GERBER_PATTERNS);
     if (files.length === 0) {
-      // Whether a Gerber set should exist at all is manufacturing.outputs-present's question.
-      // Answering it here too would report one problem twice.
       return [];
     }
 
-    const entries = await Promise.all(
-      files.map(async (file) => ({
-        filename: path.relative(context.root, file),
-        content: (await readTextFile(file).catch(() => undefined)) ?? undefined,
-      })),
-    );
-    const stackup = normalizeGerberStackup(entries);
+    const { entries, stackup } = await loadGerberStackup(context.root, files);
 
     const output = [];
     for (const side of ["top", "bottom"] as const) {

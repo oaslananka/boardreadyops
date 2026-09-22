@@ -18,6 +18,7 @@ export interface PcbFootprint {
   footprint: string;
   dnp: boolean;
   boardOnly: boolean;
+  mountType?: "smd" | "through_hole" | "virtual" | "unknown" | undefined;
   layers: string[];
   at?:
     | {
@@ -67,11 +68,21 @@ function footprints(model: KiCadDocumentModel): PcbFootprint[] {
       continue;
     }
     const attributes = new Set(directChildLists(footprint, "attr").flatMap((attr) => descendantScalars(attr).slice(1)));
+    let mountType: PcbFootprint["mountType"] = "unknown";
+    if (attributes.has("smd")) {
+      mountType = "smd";
+    } else if (attributes.has("through_hole")) {
+      mountType = "through_hole";
+    } else if (attributes.has("virtual")) {
+      mountType = "virtual";
+    }
+
     parsed.push({
       reference,
       footprint: listValue(footprint) ?? "",
       dnp: attributes.has("dnp") || /not\s+populated/i.test(sourceText(model, footprint)),
       boardOnly: attributes.has("board_only"),
+      mountType,
       layers: findKiCadLists(footprint, "layer")
         .map((layer) => listValue(layer) ?? "")
         .filter(Boolean),
