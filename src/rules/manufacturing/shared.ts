@@ -99,3 +99,29 @@ export function missingReferences(text: string, references: string[]): string[] 
   }
   return uniqueReferences.filter((reference) => !found.has(reference));
 }
+
+export const DEFAULT_GERBER_PATTERNS = [
+  "**/*.gbr",
+  "**/*.gtl",
+  "**/*.gbl",
+  "**/*.gts",
+  "**/*.gbs",
+  "**/*.gto",
+  "**/*.gbo",
+  "**/*.gtp",
+  "**/*.gbp",
+  "**/*.gko",
+  "**/*.gm1",
+];
+
+import { normalizeGerberStackup } from "../../multicad/gerber-normalizer.js";
+
+export async function loadGerberStackup(root: string, files: string[]) {
+  const entries = await Promise.all(
+    files.map(async (file) => ({
+      filename: path.relative(root, file),
+      content: (await readTextFile(file).catch(() => undefined)) ?? undefined,
+    })),
+  );
+  return { entries, stackup: normalizeGerberStackup(entries) };
+}

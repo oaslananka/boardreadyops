@@ -156,7 +156,19 @@ const expectedClassification: Record<string, ExpectedClassification> = {
     fixability: "manual",
     vendorDependence: "none",
   },
+  "manufacturing.board-edge-clearance": {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "manufacturer-specific",
+  },
   "manufacturing.mask-coverage": {
+    category: "manufacturability",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
+  "manufacturing.paste-coverage": {
     category: "manufacturability",
     evidenceType: "exact",
     fixability: "manual",
@@ -249,6 +261,12 @@ const expectedClassification: Record<string, ExpectedClassification> = {
     vendorDependence: "none",
   },
   "pinmap.net-label": { category: "electrical", evidenceType: "exact", fixability: "manual", vendorDependence: "none" },
+  "release.artifact-provenance": {
+    category: "release",
+    evidenceType: "exact",
+    fixability: "manual",
+    vendorDependence: "none",
+  },
   "release.changelog-present": {
     category: "release",
     evidenceType: "exact",

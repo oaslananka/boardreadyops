@@ -91,6 +91,10 @@
     "fires": "Fires when assembly components are on the bottom side and bottom-side placement is not allowed.",
     "details": "{ bottomSideCount, references }"
   },
+  "manufacturing.board-edge-clearance": {
+    "fires": "Fires when copper features in the Gerber artwork are closer to the board outline than the required minimum edge clearance.",
+    "details": "{ measuredClearanceMm, minClearanceMm, confidence, layer, profileRevision }"
+  },
   "manufacturing.dfm-pin1-markers": {
     "fires": "Fires for each IC or polarised connector whose footprint is not a recognized library footprint carrying a standard pin-1 marker.",
     "details": "{ reference, footprint }"
@@ -139,6 +143,10 @@
     "fires": "Fires when panelization is enabled but no panel output is present.",
     "details": "{ panelized }"
   },
+  "manufacturing.paste-coverage": {
+    "fires": "Fires when the board has SMT components on an outer side but the Gerber package lacks a solder paste stencil layer for that side. Through-hole components and DNP footprints do not require paste.",
+    "details": "{ side, pasteLayers }"
+  },
   "manufacturing.position-coverage": {
     "fires": "Fires when no position output exists or populated references are missing from position/CPL output text.",
     "details": "{ missingRefs, totalMissingRefs, positionFiles? }"
@@ -166,6 +174,10 @@
   "pinmap.verify": {
     "fires": "Fires when a pinmap entry points at a net not present in the schematic.",
     "details": "{ entry }"
+  },
+  "release.artifact-provenance": {
+    "fires": "Fires when exported manufacturing artifacts in the repository lack a valid provenance manifest or when source files have been modified since the exports were generated.",
+    "details": "{ status, reasons, sourceFingerprintMatch, artifactMismatches }"
   },
   "release.changelog-present": {
     "fires": "Fires when CHANGELOG.md is missing or lacks the current revision entry.",
