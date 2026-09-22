@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.68.0](https://github.com/oaslananka/boardreadyops/compare/v1.67.0...v1.68.0) (2026-09-22)
+
+
+### Features
+
+* complete 2026-09-22 assurance hardening program ([#835](https://github.com/oaslananka/boardreadyops/issues/835)) ([2b26d04](https://github.com/oaslananka/boardreadyops/commit/2b26d04c71232ad26f648bbeea103dda0ace9173))
+
 ## [1.67.0](https://github.com/oaslananka/boardreadyops/compare/v1.66.1...v1.67.0) (2026-09-22)
 
 
