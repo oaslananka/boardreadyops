@@ -67,6 +67,10 @@ export class ApiTokenStore {
     createdBy?: string;
     durationDays?: number;
   }): Promise<{ token: string; record: ApiTokenRecord }> {
+    if (!params.scopes || params.scopes.length === 0) {
+      throw new Error("Explicit scopes are required to create an API token.");
+    }
+
     const rawSecret = randomBytes(24).toString("hex");
     const token = `bro_live_${rawSecret}`;
     const tokenPrefix = token.slice(0, 16);
@@ -77,7 +81,7 @@ export class ApiTokenStore {
     const expiresAt = params.durationDays
       ? new Date(now.getTime() + params.durationDays * 86400 * 1000).toISOString()
       : null;
-    const scopes = params.scopes ?? ["runs:write", "reviews:read", "reviews:write"];
+    const scopes = params.scopes;
     const createdBy = params.createdBy ?? "system";
 
     const result = await this.db.query(

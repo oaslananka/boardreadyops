@@ -4,8 +4,10 @@ import path from "node:path";
 import { computeEvidenceDigest } from "@boardreadyops/cloud-core";
 import type { SnapshotArtifact, UploadMode } from "@boardreadyops/contracts";
 import { mapFindingsForCloud } from "../../core/cloud-findings.js";
+import { evaluateCloudUploadPolicy } from "../../core/cloud-upload-policy.js";
 import { loadConfig } from "../../core/config.js";
 import { runPipeline } from "../../core/pipeline.js";
+import { boardReadyVersion } from "../../generated/version.js";
 import { generateSnapshots } from "../../kicad/snapshots.js";
 import { resolveGitExecutable } from "../../util/git-resolver.js";
 import type { CommonCliOptions } from "./run.js";
@@ -56,12 +58,17 @@ export async function reviewPublishCommand(
   const headSha = options.head ?? getGitCommitSha("HEAD");
   const baseSha = options.base ? getGitCommitSha(options.base) : undefined;
   const repositoryId = options.repo ?? getGitOriginRepo() ?? "local-repo";
-  const uploadMode: UploadMode = options.upload ?? "metadata";
+  const uploadMode: UploadMode | undefined = options.upload;
   const server = (options.server ?? process.env.BOARDREADYOPS_SERVER_URL ?? "https://app.boardreadyops.com").replace(
     /\/$/,
     "",
   );
   const token = options.token ?? process.env.BOARDREADYOPS_TOKEN;
+
+  const policy = evaluateCloudUploadPolicy({
+    uploadMode,
+    hasToken: Boolean(token),
+  });
 
   streams.stdout.write(`\n🔍 Analyzing hardware preflight evidence in ${root}...\n`);
 
@@ -81,13 +88,14 @@ export async function reviewPublishCommand(
   const configDigest = createHash("sha256").update(JSON.stringify(config)).digest("hex");
 
   const evidenceDigest = computeEvidenceDigest({
-    toolVersion: "1.34.0",
+    toolVersion: boardReadyVersion,
     rulePackDigest,
     configDigest,
     headCommitSha: headSha,
     ...(baseSha ? { baseCommitSha: baseSha } : {}),
     findingFingerprints: findings.map((f) => f.fingerprint),
     artifactDigests: [],
+    uploadMode: uploadMode ?? "unset",
   });
 
   streams.stdout.write(`📊 Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)\n`);
@@ -97,30 +105,30 @@ export async function reviewPublishCommand(
     streams.stdout.write(`  Repository: ${repositoryId}\n`);
     streams.stdout.write(`  Commit:     ${headSha.slice(0, 8)}\n`);
     if (baseSha) streams.stdout.write(`  Base:       ${baseSha.slice(0, 8)}\n`);
-    streams.stdout.write(`  Upload Mode: ${uploadMode}\n`);
+    streams.stdout.write(`  Upload Mode: ${uploadMode ?? "unset"}\n`);
     streams.stdout.write(`  Findings:   ${findings.length}\n`);
     streams.stdout.write(`  Digest:     ${evidenceDigest}\n`);
     streams.stdout.write(`✔ Dry run completed successfully without network transmission.\n`);
     return 0;
   }
 
-  if (!token) {
-    streams.stderr.write(
-      `❌ Error: BOARDREADYOPS_TOKEN is required for review publish. Pass --token or set env var.\n`,
-    );
+  if (!policy.shouldPublish) {
+    streams.stderr.write(`❌ Error: ${policy.reason}\n`);
     return 1;
   }
 
-  const snapshots: SnapshotArtifact[] = await generateSnapshots({
-    schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f))),
-    pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f))),
-    findings: findings.map((f) => ({
-      fingerprint: f.fingerprint,
-      ruleId: f.ruleId,
-      severity: f.severity,
-      message: f.message,
-    })),
-  });
+  const snapshots: SnapshotArtifact[] = policy.allowSnapshots
+    ? await generateSnapshots({
+        schematicFiles: result.projects.flatMap((p) => p.schematicFiles.map((f) => path.resolve(root, f))),
+        pcbFiles: result.projects.flatMap((p) => p.boardFiles.map((f) => path.resolve(root, f))),
+        findings: findings.map((f) => ({
+          fingerprint: f.fingerprint,
+          ruleId: f.ruleId,
+          severity: f.severity,
+          message: f.message,
+        })),
+      })
+    : [];
 
   streams.stdout.write(`🚀 Publishing review to ${server}...\n`);
 

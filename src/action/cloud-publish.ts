@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import { computeEvidenceDigest } from "@boardreadyops/cloud-core";
 import { mapFindingsForCloud } from "../core/cloud-findings.js";
+import { evaluateCloudUploadPolicy } from "../core/cloud-upload-policy.js";
 import type { Logger } from "../core/logger.js";
 import type { RunResult } from "../core/result.js";
+import { boardReadyVersion } from "../generated/version.js";
 import type { ActionInputs } from "./inputs.js";
 
 export interface CloudPublishResult {
@@ -18,8 +20,15 @@ export async function publishActionRunToCloud(
   logger: Logger,
 ): Promise<CloudPublishResult> {
   const token = process.env.BOARDREADYOPS_TOKEN;
-  const isRequested = Boolean(inputs.cloudUpload || token);
-  if (!isRequested) {
+  const policy = evaluateCloudUploadPolicy({
+    uploadMode: inputs.cloudUpload,
+    hasToken: Boolean(token),
+  });
+
+  if (!policy.shouldPublish) {
+    if (policy.reason) {
+      logger.info("action.cloud.skip", { reason: policy.reason });
+    }
     return {};
   }
 
@@ -42,17 +51,13 @@ export async function publishActionRunToCloud(
     .digest("hex");
 
   const evidenceDigest = computeEvidenceDigest({
-    toolVersion: "1.34.0",
+    toolVersion: boardReadyVersion,
     rulePackDigest,
     configDigest,
     headCommitSha: commitSha,
     findingFingerprints: findings.map((f) => f.fingerprint),
+    uploadMode: inputs.cloudUpload,
   });
-
-  if (!token) {
-    logger.info("action.cloud.skip", { reason: "cloud-upload requested but BOARDREADYOPS_TOKEN is not set" });
-    return { evidencePackId: evidenceDigest };
-  }
 
   try {
     const response = await fetch(`${server}/api/v1/runs`, {

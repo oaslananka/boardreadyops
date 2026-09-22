@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { compareCodePoints, stableStringify } from "../util/strings.js";
+import { listRules } from "./rule-registry.js";
 
 const severityNames = ["critical", "high", "medium", "low", "info"] as const;
 export type Severity = (typeof severityNames)[number];
@@ -101,7 +102,11 @@ export function fingerprintFor(input: Omit<Finding, "fingerprint">): string {
   return crypto.createHash("sha256").update(stable).digest("hex");
 }
 
-export function summarizeFindings(findings: Finding[], failOn: FailOn): FindingSummary {
+export function summarizeFindings(
+  findings: Finding[],
+  failOn: FailOn,
+  options?: { allowHeuristicBlock?: boolean },
+): FindingSummary {
   const summary: FindingSummary = {
     total: findings.length,
     critical: 0,
@@ -118,18 +123,28 @@ export function summarizeFindings(findings: Finding[], failOn: FailOn): FindingS
       summary.maxSeverity = finding.severity;
     }
   }
-  summary.failed = shouldFail(findings, failOn);
+  summary.failed = shouldFail(findings, failOn, options);
   return summary;
 }
 
-export function shouldFail(findings: Finding[], failOn: FailOn): boolean {
+export function shouldFail(findings: Finding[], failOn: FailOn, options?: { allowHeuristicBlock?: boolean }): boolean {
   if (failOn === "never") {
     return false;
   }
   const threshold = severityRank[failOn];
-  return findings.some(
-    (finding) => !finding.suppressed && finding.severity !== "info" && severityRank[finding.severity] >= threshold,
-  );
+  const allowHeuristicBlock = options?.allowHeuristicBlock ?? false;
+  const metaById = new Map(listRules().map((rule) => [rule.meta.id, rule.meta]));
+
+  return findings.some((finding) => {
+    if (finding.suppressed || finding.severity === "info") return false;
+    if (severityRank[finding.severity] < threshold) return false;
+
+    const evidenceType = metaById.get(finding.ruleId)?.evidenceType ?? "exact";
+    if (evidenceType === "heuristic" && !allowHeuristicBlock) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export function sortFindings(findings: Finding[]): Finding[] {

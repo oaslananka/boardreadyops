@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
@@ -36,10 +37,15 @@ verifyControlPlaneWorkerBoundary(workerBuild.metafile);
 const migrationsDirectory = join(root, "packages/db/migrations");
 const migrationFiles = (await readdir(migrationsDirectory)).filter((file) => /^\d+_.+\.sql$/u.test(file)).sort();
 const migrations = await Promise.all(
-  migrationFiles.map(async (file) => ({
-    version: file.replace(/\.sql$/u, ""),
-    sql: await readFile(join(migrationsDirectory, file), "utf8"),
-  })),
+  migrationFiles.map(async (file) => {
+    const sql = await readFile(join(migrationsDirectory, file), "utf8");
+    const sha256 = createHash("sha256").update(sql, "utf8").digest("hex");
+    return {
+      version: file.replace(/\.sql$/u, ""),
+      sql,
+      sha256,
+    };
+  }),
 );
 
 const migrationEntry = String.raw`
@@ -54,19 +60,40 @@ async function applyMigrations() {
   const client = await pool.connect();
   try {
     await client.query(
-      "create table if not exists cloud_schema_migrations (version text primary key, applied_at timestamptz not null default now())",
+      "create table if not exists cloud_schema_migrations (version text primary key, applied_at timestamptz not null default now(), checksum text)",
     );
-    const appliedResult = await client.query("select version from cloud_schema_migrations order by version asc");
-    const applied = new Set(appliedResult.rows.map((row) => String(row.version)));
-    const pending = migrations.filter((migration) => !applied.has(migration.version));
+    // Add checksum column if missing on older deployments
+    await client.query("alter table cloud_schema_migrations add column if not exists checksum text");
+
+    const appliedResult = await client.query("select version, checksum from cloud_schema_migrations order by version asc");
+    const appliedMap = new Map(appliedResult.rows.map((row) => [String(row.version), row.checksum ? String(row.checksum) : null]));
+
+    for (const migration of migrations) {
+      if (appliedMap.has(migration.version)) {
+        const storedChecksum = appliedMap.get(migration.version);
+        if (storedChecksum && storedChecksum !== migration.sha256) {
+          throw new Error(
+            "Applied migration checksum mutation detected for " +
+              migration.version +
+              ": stored " +
+              storedChecksum.slice(0, 12) +
+              "..., current " +
+              migration.sha256.slice(0, 12) +
+              "..."
+          );
+        }
+      }
+    }
+
+    const pending = migrations.filter((migration) => !appliedMap.has(migration.version));
     for (const migration of pending) {
       process.stdout.write(JSON.stringify({ event: "migration.applying", version: migration.version }) + "\n");
       await client.query("begin");
       try {
         await client.query(migration.sql);
         await client.query(
-          "insert into cloud_schema_migrations (version) values ($1) on conflict (version) do nothing",
-          [migration.version],
+          "insert into cloud_schema_migrations (version, checksum) values ($1, $2) on conflict (version) do update set checksum = excluded.checksum",
+          [migration.version, migration.sha256],
         );
         await client.query("commit");
       } catch (error) {
