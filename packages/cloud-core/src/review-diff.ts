@@ -25,20 +25,14 @@ export interface FindingDiffResult {
 }
 
 export interface EvidenceDigestInput {
-  schemaVersion?: string | undefined;
   toolVersion: string;
-  toolBuildCommit?: string | undefined;
-  kicadVersion?: string | undefined;
+  kicadVersion?: string;
   rulePackDigest: string;
   configDigest: string;
-  policyDigest?: string | undefined;
   headCommitSha: string;
-  baseCommitSha?: string | undefined;
+  baseCommitSha?: string;
   findingFingerprints: readonly string[];
-  artifactDigests?: readonly { name: string; sha256: string }[] | undefined;
-  snapshotDigests?: readonly { name: string; sha256: string }[] | undefined;
-  executionMode?: string | undefined;
-  uploadMode?: string | undefined;
+  artifactDigests?: readonly { name: string; sha256: string }[];
 }
 
 const severityRank: Record<string, number> = {
@@ -168,23 +162,16 @@ function ordinalCompare(a: string, b: string): number {
 export function computeEvidenceDigest(input: EvidenceDigestInput): string {
   const sortedFingerprints = [...input.findingFingerprints].sort(ordinalCompare);
   const sortedArtifacts = [...(input.artifactDigests ?? [])].sort((a, b) => ordinalCompare(a.name, b.name));
-  const sortedSnapshots = [...(input.snapshotDigests ?? [])].sort((a, b) => ordinalCompare(a.name, b.name));
 
   const canonicalPayload = JSON.stringify({
-    schemaVersion: input.schemaVersion ?? "1.0",
     toolVersion: input.toolVersion,
-    toolBuildCommit: input.toolBuildCommit ?? "",
     kicadVersion: input.kicadVersion ?? "",
     rulePackDigest: input.rulePackDigest,
     configDigest: input.configDigest,
-    policyDigest: input.policyDigest ?? "",
     headCommitSha: input.headCommitSha,
     baseCommitSha: input.baseCommitSha ?? "",
     findings: sortedFingerprints,
     artifacts: sortedArtifacts,
-    snapshots: sortedSnapshots,
-    executionMode: input.executionMode ?? "",
-    uploadMode: input.uploadMode ?? "",
   });
 
   return createHash("sha256").update(canonicalPayload).digest("hex");

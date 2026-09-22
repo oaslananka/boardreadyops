@@ -1,9 +1,7 @@
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { verifyExportProvenance } from "../../core/provenance.js";
 import { RULE_CLASSIFICATIONS } from "../../core/rule-registry.js";
 import { readTextFile } from "../../util/fs.js";
-import { resolveGitExecutable } from "../../util/git-resolver.js";
 import { globFiles } from "../../util/glob.js";
 import { configFor, configuredSeverity, finding, rule, shouldRun } from "../helpers.js";
 
@@ -28,20 +26,6 @@ const MANIFEST_CANDIDATES = [
   "manifest.json",
   "provenance.json",
 ];
-
-function getCurrentGitSha(root: string): string | undefined {
-  try {
-    const gitExec = resolveGitExecutable();
-    const sha = execFileSync(gitExec, ["rev-parse", "HEAD"], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    return sha || undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export const artifactProvenanceRule = rule(
   {
@@ -108,8 +92,7 @@ export const artifactProvenanceRule = rule(
       ];
     }
 
-    const currentGitSha = getCurrentGitSha(context.root);
-    const result = await verifyExportProvenance(context.root, manifestRelPath, { currentGitSha });
+    const result = await verifyExportProvenance(context.root, manifestRelPath);
 
     if (result.status === "verified") {
       return [];
@@ -118,8 +101,6 @@ export const artifactProvenanceRule = rule(
     let message = "Exported manufacturing artifacts failed provenance verification.";
     if (result.sourceFingerprintMatch === false) {
       message = "Exported manufacturing artifacts are stale: source files have changed since exports were generated.";
-    } else if (result.gitShaMatch === false) {
-      message = "Exported manufacturing artifacts were generated from a different Git commit SHA.";
     } else if (result.artifactMismatches && result.artifactMismatches.length > 0) {
       message = `Exported manufacturing artifacts were modified after export: ${result.artifactMismatches.join(", ")}.`;
     } else if (result.reasons.length > 0) {
