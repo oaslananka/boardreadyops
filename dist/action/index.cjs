@@ -79508,7 +79508,7 @@ var import_promises15 = __toESM(require("node:fs/promises"), 1);
 var import_node_path46 = __toESM(require("node:path"), 1);
 
 // src/generated/version.ts
-var boardReadyVersion = "1.68.0";
+var boardReadyVersion = "1.68.1";
 
 // src/core/findings.ts
 var import_node_crypto2 = __toESM(require("node:crypto"), 1);

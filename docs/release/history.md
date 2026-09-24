@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.68.1](https://github.com/oaslananka/boardreadyops/compare/v1.68.0...v1.68.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* resolve issue [#839](https://github.com/oaslananka/boardreadyops/issues/839) ([#840](https://github.com/oaslananka/boardreadyops/issues/840)) ([bc09198](https://github.com/oaslananka/boardreadyops/commit/bc09198b6c4f475a7e07ca6351f6eee021b9b0d9))
+
 ## [1.68.0](https://github.com/oaslananka/boardreadyops/compare/v1.67.0...v1.68.0) (2026-09-22)
 
 
