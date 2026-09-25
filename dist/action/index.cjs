@@ -102002,7 +102002,13 @@ var DEFAULT_GERBER_PATTERNS = [
 async function loadGerberStackup(root, files) {
   const entries = await Promise.all(
     files.map(async (file2) => ({
-      filename: import_node_path25.default.relative(root, file2),
+      // A layer filename is report text, not a path this process opens again, and every report
+      // surface in the product -- `finding()`'s own `resource.path` included -- already states a
+      // slash-normalized relative path. `path.relative` alone did not: on Windows it handed
+      // `fab\bottom-paste.gbr` to `details.pasteLayerFiles`, so the same package produced a
+      // different auditable path per platform. `normalizeRelative` is what the rest of the report
+      // contract already uses, so the stackup cannot reintroduce the platform separator here.
+      filename: normalizeRelative(root, file2),
       content: await readTextFile(file2).catch(() => void 0) ?? void 0
     }))
   );
@@ -114899,7 +114905,7 @@ function internalArtifactTwirpClient(options) {
 
 // node_modules/@actions/artifact/lib/internal/upload/upload-zip-specification.js
 var fs19 = __toESM(require("fs"), 1);
-var import_path12 = require("path");
+var import_path13 = require("path");
 function validateRootDirectory(rootDirectory) {
   if (!fs19.existsSync(rootDirectory)) {
     throw new Error(`The provided rootDirectory ${rootDirectory} does not exist`);
@@ -114911,16 +114917,16 @@ function validateRootDirectory(rootDirectory) {
 }
 function getUploadZipSpecification(filesToZip, rootDirectory) {
   const specification = [];
-  rootDirectory = (0, import_path12.normalize)(rootDirectory);
-  rootDirectory = (0, import_path12.resolve)(rootDirectory);
+  rootDirectory = (0, import_path13.normalize)(rootDirectory);
+  rootDirectory = (0, import_path13.resolve)(rootDirectory);
   for (let file2 of filesToZip) {
     const stats = fs19.lstatSync(file2, { throwIfNoEntry: false });
     if (!stats) {
       throw new Error(`File ${file2} does not exist`);
     }
     if (!stats.isDirectory()) {
-      file2 = (0, import_path12.normalize)(file2);
-      file2 = (0, import_path12.resolve)(file2);
+      file2 = (0, import_path13.normalize)(file2);
+      file2 = (0, import_path13.resolve)(file2);
       if (!file2.startsWith(rootDirectory)) {
         throw new Error(`The rootDirectory: ${rootDirectory} is not a parent directory of the file: ${file2}`);
       }

@@ -3,6 +3,7 @@ import type { RuleContext } from "../../core/context.js";
 import { type PcbFootprint, parsePcb } from "../../kicad/pcb.js";
 import { readTextFile } from "../../util/fs.js";
 import { globFiles } from "../../util/glob.js";
+import { normalizeRelative } from "../../util/path.js";
 
 export function positiveInteger(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
@@ -119,7 +120,13 @@ import { normalizeGerberStackup } from "../../multicad/gerber-normalizer.js";
 export async function loadGerberStackup(root: string, files: string[]) {
   const entries = await Promise.all(
     files.map(async (file) => ({
-      filename: path.relative(root, file),
+      // A layer filename is report text, not a path this process opens again, and every report
+      // surface in the product -- `finding()`'s own `resource.path` included -- already states a
+      // slash-normalized relative path. `path.relative` alone did not: on Windows it handed
+      // `fab\bottom-paste.gbr` to `details.pasteLayerFiles`, so the same package produced a
+      // different auditable path per platform. `normalizeRelative` is what the rest of the report
+      // contract already uses, so the stackup cannot reintroduce the platform separator here.
+      filename: normalizeRelative(root, file),
       content: (await readTextFile(file).catch(() => undefined)) ?? undefined,
     })),
   );
