@@ -35,12 +35,14 @@
       "description": "Allow Mergify to auto-merge low-risk development dependency updates after required checks pass.",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "minimumReleaseAge": "7 days",
       "groupName": "developer tooling (non-major)",
       "addLabels": ["automerge"]
     },
     {
       "description": "Treat TypeScript compiler updates as manual because they can change type-checking behavior.",
       "matchPackageNames": ["typescript"],
+      "minimumReleaseAge": "7 days",
       "automerge": false,
       "addLabels": ["manual-review"]
     },
@@ -48,6 +50,7 @@
       "description": "Allow Mergify to auto-merge non-breaking type package updates after required checks pass.",
       "matchPackageNames": ["/^@types\\//"],
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "minimumReleaseAge": "7 days",
       "groupName": "type definitions (non-major)",
       "addLabels": ["types", "automerge"]
     },
@@ -65,6 +68,7 @@
         "@actions/github",
         "@actions/exec"
       ],
+      "minimumReleaseAge": "7 days",
       "automerge": false,
       "addLabels": ["manual-review"]
     },
@@ -115,6 +119,7 @@
     {
       "description": "Require manual review for self-hosted Renovate runtime and validator upgrades.",
       "matchPackageNames": ["ghcr.io/renovatebot/renovate", "renovate/renovate"],
+      "minimumReleaseAge": "7 days",
       "groupName": "self-hosted Renovate",
       "automerge": false,
       "addLabels": ["supply-chain", "manual-review"]
