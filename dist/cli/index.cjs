@@ -44704,25 +44704,36 @@ function footprints(model) {
       continue;
     }
     const attributes = new Set(directChildLists(footprint, "attr").flatMap((attr2) => descendantScalars(attr2).slice(1)));
-    let mountType = "unknown";
-    if (attributes.has("smd")) {
-      mountType = "smd";
-    } else if (attributes.has("through_hole")) {
-      mountType = "through_hole";
-    } else if (attributes.has("virtual")) {
-      mountType = "virtual";
-    }
     parsed.push({
       reference,
       footprint: listValue(footprint) ?? "",
       dnp: attributes.has("dnp") || /not\s+populated/i.test(sourceText(model, footprint)),
       boardOnly: attributes.has("board_only"),
-      mountType,
+      mountType: footprintMountType(footprint, attributes),
       layers: findKiCadLists(footprint, "layer").map((layer) => listValue(layer) ?? "").filter(Boolean),
       at: footprintPosition(footprint)
     });
   }
   return parsed;
+}
+function footprintMountType(footprint, attributes) {
+  const padTypes = findKiCadLists(footprint, "pad").map((pad) => listValue(pad, 2));
+  if (padTypes.includes("smd")) {
+    return "smd";
+  }
+  if (padTypes.some((type) => type === "thru_hole" || type === "np_thru_hole")) {
+    return "through_hole";
+  }
+  if (attributes.has("smd")) {
+    return "smd";
+  }
+  if (attributes.has("through_hole")) {
+    return "through_hole";
+  }
+  if (attributes.has("virtual")) {
+    return "virtual";
+  }
+  return "unknown";
 }
 function footprintPosition(footprint) {
   const at = directChildLists(footprint, "at")[0];
