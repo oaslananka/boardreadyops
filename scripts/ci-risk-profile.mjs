@@ -62,6 +62,9 @@ const RULE_PATTERNS = [
 const PARSER_MODEL_PATTERNS = [/^src\/kicad\//, /^tests\/unit\/kicad\//];
 const SECURITY_PATTERNS = [
   /^SECURITY\.md$/,
+  /^renovate\.json$/,
+  /^\.semgrep(?:ignore|\.ya?ml)$/,
+  /^\.github\/dependabot\.ya?ml$/,
   /^\.github\/workflows\/(security|trivy|provenance|publish-npm)\.ya?ml$/,
   /^scripts\/(build-notice|check-licenses|check-reuse|check-scorecard-baseline|docs-agent-edge-worker|generate-sbom)\.mjs$/,
   /^package\.json$/,
@@ -70,6 +73,12 @@ const SECURITY_PATTERNS = [
   /^LICENSES\//,
   /^REUSE\.toml$/,
 ];
+const SAST_POLICY_PATTERNS = [
+  /^renovate\.json$/,
+  /^\.semgrep(?:ignore|\.ya?ml)$/,
+  /^\.github\/dependabot\.ya?ml$/,
+];
+
 const PACKAGE_PATTERNS = [
   /^dist\//,
   /^scripts\/build\.mjs$/,
@@ -128,6 +137,7 @@ export function classifyChangedFiles(files, options = {}) {
   const ruleChanged = forceFull || changedFiles.some((file) => matchesAny(file, RULE_PATTERNS));
   const parserModelChanged = forceFull || changedFiles.some((file) => matchesAny(file, PARSER_MODEL_PATTERNS));
   const securityChanged = forceFull || changedFiles.some((file) => matchesAny(file, SECURITY_PATTERNS));
+  const sastPolicyChanged = forceFull || changedFiles.some((file) => matchesAny(file, SAST_POLICY_PATTERNS));
   const packageChanged = forceFull || changedFiles.some((file) => matchesAny(file, PACKAGE_PATTERNS));
   const pathSensitiveChanged = forceFull || changedFiles.some((file) => matchesAny(file, PATH_PATTERNS));
   const reportChanged = forceFull || changedFiles.some((file) => matchesAny(file, REPORT_PATTERNS));
@@ -173,6 +183,7 @@ export function classifyChangedFiles(files, options = {}) {
     needs_coverage: coverageCritical,
     needs_mutation: mutationCritical,
     needs_security: releaseCritical || securityChanged,
+    needs_sast: forceFull || codeChanged || sastPolicyChanged,
     needs_sbom: forceFull || dependencyChanged || securityChanged,
     needs_docs: docsChanged,
     full_run: forceFull,
