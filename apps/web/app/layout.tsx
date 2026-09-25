@@ -29,6 +29,17 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://boardreadyops.com"),
   title: { default: "BoardReadyOps Cloud", template: "%s · BoardReadyOps" },
   description: "Checks whether a hardware board is ready to fabricate, on every pull request.",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   openGraph: {
     title: "BoardReadyOps — Know what stands between your board and production.",
     description:
