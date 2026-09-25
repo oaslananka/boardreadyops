@@ -9,7 +9,7 @@ const NOT_APPLICABLE = "Not applicable";
  * @typedef {object} SecurityGateInput
  * @property {string} eventName
  * @property {boolean} forkPullRequest
- * @property {{codeScan: boolean, dependencyScan: boolean, compliance: boolean, sbom: boolean}} policy
+ * @property {{codeScan: boolean, semgrepScan: boolean, dependencyScan: boolean, compliance: boolean, sbom: boolean}} policy
  * @property {{
  *   policy: string,
  *   codeql: string,
@@ -36,7 +36,13 @@ export function evaluateSecurityGate(input) {
     ? "Fork pull request uses a read-only token; CodeQL SARIF publication is evaluated after merge"
     : "No executable or workflow changes";
   addRow(rows, "CodeQL", input.policy.codeScan && !input.forkPullRequest, input.results.codeql, codeReason);
-  addRow(rows, "Semgrep", input.policy.codeScan, input.results.semgrep, "No executable or workflow changes");
+  addRow(
+    rows,
+    "Semgrep",
+    input.policy.semgrepScan,
+    input.results.semgrep,
+    "No executable, workflow, or SAST policy changes",
+  );
   addRow(rows, "Gitleaks", true, input.results.gitleaks, "Secret scanning is mandatory for every run");
 
   const pullRequest = input.eventName === "pull_request";
