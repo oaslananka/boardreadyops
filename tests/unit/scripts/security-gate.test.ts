@@ -9,6 +9,7 @@ function passingInput(overrides: Partial<GateInput> = {}): GateInput {
     forkPullRequest: false,
     policy: {
       codeScan: true,
+      semgrepScan: true,
       dependencyScan: true,
       compliance: true,
       sbom: true,
@@ -56,6 +57,7 @@ describe("security aggregate gate", () => {
       passingInput({
         policy: {
           codeScan: false,
+          semgrepScan: false,
           dependencyScan: false,
           compliance: false,
           sbom: false,
@@ -80,10 +82,32 @@ describe("security aggregate gate", () => {
     expect(result.summary).toContain("| Gitleaks | Required | success |");
   });
 
+  it("requires Semgrep for SAST policy changes without requiring CodeQL", () => {
+    const input = passingInput({
+      policy: {
+        codeScan: false,
+        semgrepScan: true,
+        dependencyScan: false,
+        compliance: true,
+        sbom: false,
+      },
+    });
+    input.results.codeql = "skipped";
+    input.results.dependencyReview = "skipped";
+    input.results.sbom = "skipped";
+
+    const result = evaluateSecurityGate(input);
+
+    expect(result.ok).toBe(true);
+    expect(result.summary).toContain("| CodeQL | Not applicable | skipped |");
+    expect(result.summary).toContain("| Semgrep | Required | success |");
+  });
+
   it("requires the OSV PR scan even when dependency inventory is unchanged", () => {
     const input = passingInput({
       policy: {
         codeScan: false,
+        semgrepScan: false,
         dependencyScan: false,
         compliance: false,
         sbom: false,
