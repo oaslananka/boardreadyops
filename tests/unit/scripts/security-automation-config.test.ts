@@ -59,9 +59,11 @@ function lowestResolved(value: string): string {
 type RenovateRule = {
   description?: string;
   matchManagers?: string[];
+  matchDepTypes?: string[];
   matchUpdateTypes?: string[];
   matchFileNames?: string[];
   matchPackageNames?: string[];
+  matchPackagePatterns?: string[];
   groupName?: string;
   addLabels?: string[];
   automerge?: boolean;
@@ -403,9 +405,12 @@ describe("dependency and security automation configuration", () => {
       expect.arrayContaining(["security", "dependencies", "manual-review"]),
     );
     expect(renovate.packageRules).not.toHaveLength(0);
-    const rules = renovate.packageRules ?? [];
-    for (const rule of rules) {
-      expect(rule.minimumReleaseAge).toBeUndefined();
+    const packageSelectorRules = (renovate.packageRules ?? []).filter(
+      (rule) => rule.matchDepTypes || rule.matchPackageNames || rule.matchPackagePatterns,
+    );
+    expect(packageSelectorRules).not.toHaveLength(0);
+    for (const rule of packageSelectorRules) {
+      expect(rule.minimumReleaseAge).toBe("7 days");
     }
   });
 
