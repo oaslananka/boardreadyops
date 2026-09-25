@@ -52,6 +52,16 @@ describe("ci-risk-profile", () => {
     }
   });
 
+  it("runs SAST for security configuration changes without treating them as executable code", () => {
+    for (const file of ["renovate.json", ".semgrep.yml", ".semgrepignore", ".github/dependabot.yml"]) {
+      const profile = classifyChangedFiles([file], { eventName: "pull_request" });
+
+      expect(profile.needs_sast, file).toBe(true);
+      expect(profile.needs_security, file).toBe(true);
+      expect(profile.code_changed, file).toBe(false);
+    }
+  });
+
   it("runs package and action gates for dist or action changes", () => {
     const profile = classifyChangedFiles(["action.yml", "dist/action/index.cjs"], {
       eventName: "pull_request",

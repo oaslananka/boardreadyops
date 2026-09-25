@@ -41,6 +41,7 @@ jobs:
       code_changed: ${{ steps.classify.outputs.code_changed }}
       dependency_changed: ${{ steps.classify.outputs.dependency_changed }}
       needs_security: ${{ steps.classify.outputs.needs_security }}
+      needs_sast: ${{ steps.classify.outputs.needs_sast }}
       needs_sbom: ${{ steps.classify.outputs.needs_sbom }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
     steps:
@@ -179,7 +180,7 @@ jobs:
 
   semgrep:
     needs: policy
-    if: needs.policy.outputs.code_changed == 'true'
+    if: needs.policy.outputs.needs_sast == 'true'
     name: security / semgrep
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -330,5 +331,5 @@ jobs:
       - name: Evaluate mandatory security results
         env:
           SECURITY_GATE_INPUT: >-
-            {"eventName":"${{ github.event_name }}","forkPullRequest":${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }},"policy":{"codeScan":${{ needs.policy.outputs.code_changed == 'true' }},"dependencyScan":${{ needs.policy.outputs.dependency_changed == 'true' }},"compliance":${{ needs.policy.outputs.needs_security == 'true' }},"sbom":${{ needs.policy.outputs.needs_sbom == 'true' }}},"results":{"policy":"${{ needs.policy.result }}","codeql":"${{ needs.codeql.result }}","semgrep":"${{ needs.semgrep.result }}","gitleaks":"${{ needs.gitleaks.result }}","dependencyReview":"${{ needs.dependency-review.result }}","osvPullRequest":"${{ needs.osv-pull-request.result }}","osvFull":"${{ needs.osv-full.result }}","compliance":"${{ needs.compliance.result }}","sbom":"${{ needs.sbom.result }}"}}
+            {"eventName":"${{ github.event_name }}","forkPullRequest":${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }},"policy":{"codeScan":${{ needs.policy.outputs.code_changed == 'true' }},"semgrepScan":${{ needs.policy.outputs.needs_sast == 'true' }},"dependencyScan":${{ needs.policy.outputs.dependency_changed == 'true' }},"compliance":${{ needs.policy.outputs.needs_security == 'true' }},"sbom":${{ needs.policy.outputs.needs_sbom == 'true' }}},"results":{"policy":"${{ needs.policy.result }}","codeql":"${{ needs.codeql.result }}","semgrep":"${{ needs.semgrep.result }}","gitleaks":"${{ needs.gitleaks.result }}","dependencyReview":"${{ needs.dependency-review.result }}","osvPullRequest":"${{ needs.osv-pull-request.result }}","osvFull":"${{ needs.osv-full.result }}","compliance":"${{ needs.compliance.result }}","sbom":"${{ needs.sbom.result }}"}}
         run: node scripts/security-gate.mjs

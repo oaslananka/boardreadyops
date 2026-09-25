@@ -3,6 +3,7 @@ export interface SecurityGateInput {
   forkPullRequest: boolean;
   policy: {
     codeScan: boolean;
+    semgrepScan: boolean;
     dependencyScan: boolean;
     compliance: boolean;
     sbom: boolean;

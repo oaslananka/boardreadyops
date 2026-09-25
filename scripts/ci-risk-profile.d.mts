@@ -31,6 +31,7 @@ export interface CiRiskProfile {
   readonly needs_coverage: boolean;
   readonly needs_mutation: boolean;
   readonly needs_security: boolean;
+  readonly needs_sast: boolean;
   readonly needs_sbom: boolean;
   readonly needs_docs: boolean;
   readonly full_run: boolean;
