@@ -8,6 +8,13 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.68.2](https://github.com/oaslananka/boardreadyops/compare/v1.68.1...v1.68.2) (2026-09-25)
+
+
+### Bug Fixes
+
+* **web:** allow full Google preview snippets ([#845](https://github.com/oaslananka/boardreadyops/issues/845)) ([d5014e6](https://github.com/oaslananka/boardreadyops/commit/d5014e6176da2497a7b9d9b304bee2a30c8ce642))
+
 ## [1.68.1](https://github.com/oaslananka/boardreadyops/compare/v1.68.0...v1.68.1) (2026-09-24)
 
 
