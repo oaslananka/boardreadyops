@@ -68,21 +68,13 @@ function footprints(model: KiCadDocumentModel): PcbFootprint[] {
       continue;
     }
     const attributes = new Set(directChildLists(footprint, "attr").flatMap((attr) => descendantScalars(attr).slice(1)));
-    let mountType: PcbFootprint["mountType"] = "unknown";
-    if (attributes.has("smd")) {
-      mountType = "smd";
-    } else if (attributes.has("through_hole")) {
-      mountType = "through_hole";
-    } else if (attributes.has("virtual")) {
-      mountType = "virtual";
-    }
 
     parsed.push({
       reference,
       footprint: listValue(footprint) ?? "",
       dnp: attributes.has("dnp") || /not\s+populated/i.test(sourceText(model, footprint)),
       boardOnly: attributes.has("board_only"),
-      mountType,
+      mountType: footprintMountType(footprint, attributes),
       layers: findKiCadLists(footprint, "layer")
         .map((layer) => listValue(layer) ?? "")
         .filter(Boolean),
@@ -90,6 +82,26 @@ function footprints(model: KiCadDocumentModel): PcbFootprint[] {
     });
   }
   return parsed;
+}
+
+function footprintMountType(footprint: SexprListNode, attributes: Set<string>): PcbFootprint["mountType"] {
+  const padTypes = findKiCadLists(footprint, "pad").map((pad) => listValue(pad, 2));
+  if (padTypes.includes("smd")) {
+    return "smd";
+  }
+  if (padTypes.some((type) => type === "thru_hole" || type === "np_thru_hole")) {
+    return "through_hole";
+  }
+  if (attributes.has("smd")) {
+    return "smd";
+  }
+  if (attributes.has("through_hole")) {
+    return "through_hole";
+  }
+  if (attributes.has("virtual")) {
+    return "virtual";
+  }
+  return "unknown";
 }
 
 function footprintPosition(footprint: SexprListNode): PcbFootprint["at"] {
