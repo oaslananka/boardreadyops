@@ -17,9 +17,10 @@ import { DEFAULT_GERBER_PATTERNS, loadGerberStackup } from "./shared.js";
  *
  * Severity is medium rather than high, so it warns rather than blocks at the default threshold.
  * Layer roles come from each file's own `TF.FileFunction` where it declares one and from the
- * filename otherwise, and the normalizer does not yet report which of the two it used per layer.
- * Blocking a release on a classification that may have come from a filename is the mistake #753
- * argues turns the gate off; this can move to high once layer identity carries its provenance.
+ * filename otherwise, and the normalizer now reports which of the two it used per layer, which
+ * `manufacturing.paste-coverage` reads before it lets a missing layer block anything. This check
+ * still stays at medium: blocking a release on a classification that may have come from a filename
+ * is the mistake #753 argues turns the gate off.
  *
  * Part of #770.
  */

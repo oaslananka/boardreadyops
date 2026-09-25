@@ -546,8 +546,8 @@
     {
       "id": "manufacturing.paste-coverage",
       "title": "An assembly side with SMT components has no solder paste layer",
-      "description": "Checks that each side with SMT components in the Gerber package has a matching solder paste layer.",
-      "rationale": "Surface-mount assembly requires a stencil layer to apply solder paste to pads before component placement.",
+      "description": "Checks that each side carrying surface-mount assembly in the Gerber package has a matching solder paste layer.",
+      "rationale": "Surface-mount assembly requires a stencil layer to apply solder paste to pads before component placement. A missing layer may only block when every file in the package declares its own TF.FileFunction; otherwise the finding is advisory, its severity is capped at low, and the severity that was configured is reported in details.configuredSeverity.",
       "defaultSeverity": "medium",
       "category": "manufacturability",
       "appliesTo": ["pcb"],

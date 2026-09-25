@@ -8,66 +8,108 @@ import type {
   ParserWarning,
 } from "@boardreadyops/contracts";
 import { parseExcellon } from "./excellon-parser.js";
-import { parseGerber } from "./gerber-parser.js";
+import { type GerberEvidence, parseGerber } from "./gerber-parser.js";
 
 export interface BundleFileEntry {
   filename: string;
   content?: string | undefined;
 }
 
+/**
+ * A stackup layer together with the evidence its own identity rests on.
+ *
+ * Not exported: every consumer reads the identity off the layer `normalizeGerberStackup` hands
+ * back, and the provenance question a rule asks is answered by `LayerIdentitySummary` beside it.
+ */
+interface IdentifiedLayer extends NormalizedLayer {
+  /**
+   * `"declared"` when the file stated its function in `TF.FileFunction`, `"assumed"` when the role
+   * was read from its filename. A rule may require a layer on a declared identity; it may not
+   * declare a layer *missing* on an assumed one.
+   */
+  identitySource: GerberEvidence;
+}
+
+/**
+ * How much of a package's layer inventory the files themselves account for.
+ *
+ * A caller that has to decide whether a layer is *absent* -- as opposed to merely absent from the
+ * list of things it recognised -- needs both halves of that. `declared` and `assumed` say what the
+ * identified files claimed about themselves, and `unidentified` says whether the package holds
+ * files this reader could not place at all, any one of which could be the layer in question.
+ *
+ * Drill files are counted in neither artwork tally. A `.drl` is an Excellon program, read on its
+ * own terms by `readDrillFiles`, and not a Gerbers layer a fabricator would mistake for a stencil.
+ */
+export interface LayerIdentitySummary {
+  /** Gerber artwork layers whose role came from the file's own `TF.FileFunction`. */
+  declared: number;
+  /** Artwork layers identified only by their filename, which carries no authority. */
+  assumed: number;
+  /** Bundle files that neither their filename nor their content identified as any layer. */
+  unidentified: number;
+}
+
 export interface NormalizedStackupResult {
   board: NormalizedBoardMetadata;
-  layers: NormalizedLayer[];
+  layers: IdentifiedLayer[];
   drillHoles: NormalizedDrillHole[];
   capabilities: IngestionCapabilities;
   warnings: ParserWarning[];
+  identity: LayerIdentitySummary;
 }
 
 interface LayerAccumulation {
-  layers: NormalizedLayer[];
+  layers: IdentifiedLayer[];
   /** Board extents and outline closure, read from the profile layer's own artwork. */
   outline: { boundingBoxMm: BoundingBoxMm | undefined; closed: boolean; openContours: number } | undefined;
   copperLayerCount: number;
   /** Every drill entry, with content where the caller supplied it. Plating is decided per file. */
   drillFiles: { filename: string; content: string | undefined }[];
-  /** Layers whose role came from the file's own TF.FileFunction rather than its name. */
-  declaredIdentityCount: number;
+  identity: LayerIdentitySummary;
   warnings: ParserWarning[];
 }
 
 type BoundingBoxMm = { minX: number; maxX: number; minY: number; maxY: number };
 
 function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
-  const layers: NormalizedLayer[] = [];
+  const layers: IdentifiedLayer[] = [];
   const drillFiles: { filename: string; content: string | undefined }[] = [];
   const warnings: ParserWarning[] = [];
+  const identity: LayerIdentitySummary = { declared: 0, assumed: 0, unidentified: 0 };
   let outline: LayerAccumulation["outline"];
   let copperLayerCount = 0;
-  let declaredIdentityCount = 0;
 
   for (const entry of files) {
     const cleanName = entry.filename.replaceAll("\\", "/");
     const classification = classifyLayer(cleanName);
+    const parsed = entry.content ? parseGerber(entry.content, entry.filename) : undefined;
     // A file whose name means nothing to us may still say what it is. Skipping on the filename
     // alone -- which is what this did -- made the content-first reading conditional on the
     // filename reading having already succeeded, so a layer under an unrecognised name was
     // dropped however clearly it declared itself. That is the same authority-of-the-filename
     // problem one level up.
-    if (!classification && !declaresIdentity(entry.content)) continue;
+    if (!classification && !parsed?.identity) {
+      identity.unidentified += 1;
+      continue;
+    }
 
-    if (classification?.role === "drill") {
-      layers.push({ ...toLayer(classification, entry.filename) });
+    // A file is drilled when nothing inside it says otherwise, and a `.drl` is an Excellon program
+    // rather than Gerbers artwork. Where such a file *does* declare a Gerbers function, the
+    // declaration still wins: a paste layer exported under a drill filename is a paste layer, and
+    // reading it as a drill file would make this report it absent from the stackup.
+    if (!parsed?.identity && classification?.role === "drill") {
+      layers.push(toLayer(classification, entry.filename, "assumed"));
       // Plating is not decided here. `readDrillFiles` reads each file's own attributes and only
       // falls back to the name for the ones that stay silent.
       drillFiles.push({ filename: entry.filename, content: entry.content });
       continue;
     }
 
-    // Where the artwork states what it is, that is what it is. The filename is the fallback.
-    const parsed = entry.content ? parseGerber(entry.content, entry.filename) : undefined;
     warnings.push(...(parsed?.warnings ?? []));
     const declared = parsed?.identity;
-    if (declared) declaredIdentityCount += 1;
+    if (declared) identity.declared += 1;
+    else identity.assumed += 1;
 
     const role = declared?.role ?? classification?.role;
     // One of the two must have produced something: the guard above skipped the entry otherwise.
@@ -84,7 +126,7 @@ function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
       });
     }
 
-    layers.push(toLayer(resolved, entry.filename));
+    layers.push(toLayer(resolved, entry.filename, declared ? "declared" : "assumed"));
 
     if (resolved.role === "copper") copperLayerCount++;
     if (resolved.role === "outline" && parsed) {
@@ -96,21 +138,21 @@ function accumulateLayers(files: BundleFileEntry[]): LayerAccumulation {
     }
   }
 
-  return { layers, outline, copperLayerCount, drillFiles, declaredIdentityCount, warnings };
+  return { layers, outline, copperLayerCount, drillFiles, identity, warnings };
 }
 
-/** Whether a Gerber file states its own function, so an unrecognised filename is not fatal. */
-function declaresIdentity(content: string | undefined): boolean {
-  return content !== undefined && parseGerber(content).identity !== undefined;
-}
-
-function toLayer(classification: LayerClassification, filename: string): NormalizedLayer {
+function toLayer(
+  classification: LayerClassification,
+  filename: string,
+  identitySource: GerberEvidence,
+): IdentifiedLayer {
   return {
     name: classification.name,
     role: classification.role,
     side: classification.side,
     index: classification.index,
     filename,
+    identitySource,
   };
 }
 
@@ -149,7 +191,7 @@ function buildStackupWarnings(hasAnyDrill: boolean, hasOutlines: boolean): Parse
 
 export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStackupResult {
   const accumulated = accumulateLayers(files);
-  const { layers, outline, copperLayerCount, drillFiles } = accumulated;
+  const { layers, outline, copperLayerCount, drillFiles, identity } = accumulated;
   const hasAnyDrill = layers.some((l) => l.role === "drill");
   const hasOutlines = layers.some((l) => l.role === "outline");
   const warnings = buildStackupWarnings(hasAnyDrill, hasOutlines);
@@ -198,6 +240,7 @@ export function normalizeGerberStackup(files: BundleFileEntry[]): NormalizedStac
     drillHoles: drill.holes,
     capabilities,
     warnings,
+    identity,
   };
 }
 
