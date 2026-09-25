@@ -411,6 +411,23 @@ describe("manufacturing.paste-coverage", () => {
       });
     });
 
+    it("spells the paste-layer evidence the same way the finding's own path is spelled", async () => {
+      const result = await run(await mountTypeBoard("mixed.kicad_pcb"), {
+        ...declaredPackage,
+        "fab/bottom-paste.gbr": layer("Paste,Bot"),
+      });
+
+      // This rule's evidence is report text a reader has to be able to match against a file. It
+      // used to carry whatever separator the run platform produced -- `fab\bottom-paste.gbr` on
+      // Windows -- while `resource.path` stayed slash-normalized, so one finding named the same
+      // file two ways. Stating the invariant here guards the run platform this assertion is
+      // checked on, whatever the pipeline hands the stackup.
+      const findings = expectRule(result, "manufacturing.paste-coverage", 1);
+      const evidence = findings[0]?.details?.pasteLayerFiles as string[];
+      expect(evidence).toEqual(["fab/bottom-paste.gbr"]);
+      expect(evidence.join(" ")).not.toContain("\\");
+    });
+
     it("does not report a cap on a severity the cap did not lower", async () => {
       const result = await run(
         await mountTypeBoard("surface-mount.kicad_pcb"),

@@ -47376,6 +47376,7 @@ function resolveContract3(context) {
 
 // src/rules/manufacturing/shared.ts
 var import_node_path26 = __toESM(require("node:path"), 1);
+init_path();
 
 // src/multicad/excellon-parser.ts
 var assumedMetricFormat = { integerDigits: 3, decimalDigits: 3 };
@@ -48045,7 +48046,13 @@ var DEFAULT_GERBER_PATTERNS = [
 async function loadGerberStackup(root, files) {
   const entries = await Promise.all(
     files.map(async (file2) => ({
-      filename: import_node_path26.default.relative(root, file2),
+      // A layer filename is report text, not a path this process opens again, and every report
+      // surface in the product -- `finding()`'s own `resource.path` included -- already states a
+      // slash-normalized relative path. `path.relative` alone did not: on Windows it handed
+      // `fab\bottom-paste.gbr` to `details.pasteLayerFiles`, so the same package produced a
+      // different auditable path per platform. `normalizeRelative` is what the rest of the report
+      // contract already uses, so the stackup cannot reintroduce the platform separator here.
+      filename: normalizeRelative(root, file2),
       content: await readTextFile(file2).catch(() => void 0) ?? void 0
     }))
   );
