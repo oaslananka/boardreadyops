@@ -17,8 +17,14 @@ import type { LayerRole, LayerSide, ParserWarning } from "@boardreadyops/contrac
  * release on what a file declares, never on what its name suggests. See issue #753.
  */
 
-/** Where a piece of information came from, which decides whether a rule may block on it. */
-type GerberEvidence = "declared" | "assumed";
+/**
+ * Where a piece of information came from, which decides whether a rule may block on it.
+ *
+ * Exported because the normalizer now reports it per layer: a rule that has to decide whether a
+ * layer is *absent* from a package cannot do that from a filename, and it cannot ask that question
+ * of a value it is not allowed to name.
+ */
+export type GerberEvidence = "declared" | "assumed";
 
 type GerberCoordinateFormat = {
   integerDigits: number;

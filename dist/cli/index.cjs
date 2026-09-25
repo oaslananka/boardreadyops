@@ -47747,22 +47747,26 @@ function accumulateLayers(files) {
   const layers = [];
   const drillFiles = [];
   const warnings = [];
+  const identity = { declared: 0, assumed: 0, unidentified: 0 };
   let outline;
   let copperLayerCount = 0;
-  let declaredIdentityCount = 0;
   for (const entry of files) {
     const cleanName = entry.filename.replaceAll("\\", "/");
     const classification = classifyLayer(cleanName);
-    if (!classification && !declaresIdentity(entry.content)) continue;
-    if (classification?.role === "drill") {
-      layers.push({ ...toLayer(classification, entry.filename) });
+    const parsed = entry.content ? parseGerber(entry.content, entry.filename) : void 0;
+    if (!classification && !parsed?.identity) {
+      identity.unidentified += 1;
+      continue;
+    }
+    if (!parsed?.identity && classification?.role === "drill") {
+      layers.push(toLayer(classification, entry.filename, "assumed"));
       drillFiles.push({ filename: entry.filename, content: entry.content });
       continue;
     }
-    const parsed = entry.content ? parseGerber(entry.content, entry.filename) : void 0;
     warnings.push(...parsed?.warnings ?? []);
     const declared = parsed?.identity;
-    if (declared) declaredIdentityCount += 1;
+    if (declared) identity.declared += 1;
+    else identity.assumed += 1;
     const role = declared?.role ?? classification?.role;
     if (role === void 0) continue;
     const resolved = declared ? { name: nameForRole(role, declared.side, declared.index), role, side: declared.side, index: declared.index } : classification;
@@ -47773,7 +47777,7 @@ function accumulateLayers(files) {
         path: entry.filename
       });
     }
-    layers.push(toLayer(resolved, entry.filename));
+    layers.push(toLayer(resolved, entry.filename, declared ? "declared" : "assumed"));
     if (resolved.role === "copper") copperLayerCount++;
     if (resolved.role === "outline" && parsed) {
       outline = {
@@ -47783,18 +47787,16 @@ function accumulateLayers(files) {
       };
     }
   }
-  return { layers, outline, copperLayerCount, drillFiles, declaredIdentityCount, warnings };
+  return { layers, outline, copperLayerCount, drillFiles, identity, warnings };
 }
-function declaresIdentity(content) {
-  return content !== void 0 && parseGerber(content).identity !== void 0;
-}
-function toLayer(classification, filename) {
+function toLayer(classification, filename, identitySource) {
   return {
     name: classification.name,
     role: classification.role,
     side: classification.side,
     index: classification.index,
-    filename
+    filename,
+    identitySource
   };
 }
 function nameForRole(role, side, index) {
@@ -47828,7 +47830,7 @@ function buildStackupWarnings(hasAnyDrill, hasOutlines) {
 }
 function normalizeGerberStackup(files) {
   const accumulated = accumulateLayers(files);
-  const { layers, outline, copperLayerCount, drillFiles } = accumulated;
+  const { layers, outline, copperLayerCount, drillFiles, identity } = accumulated;
   const hasAnyDrill = layers.some((l) => l.role === "drill");
   const hasOutlines = layers.some((l) => l.role === "outline");
   const warnings = buildStackupWarnings(hasAnyDrill, hasOutlines);
@@ -47865,7 +47867,8 @@ function normalizeGerberStackup(files) {
     layers,
     drillHoles: drill.holes,
     capabilities,
-    warnings
+    warnings,
+    identity
   };
 }
 function platingFromFilename(filename) {
@@ -49443,12 +49446,14 @@ var panelSanityRule = rule(
 );
 
 // src/rules/manufacturing/paste-coverage.ts
+var sides = ["top", "bottom"];
+var referenceSampleLimit = 20;
 var pasteCoverageRule = rule(
   {
     id: "manufacturing.paste-coverage",
     title: "An assembly side with SMT components has no solder paste layer",
-    description: "Checks that each side with SMT components in the Gerber package has a matching solder paste layer.",
-    rationale: "Surface-mount assembly requires a stencil layer to apply solder paste to pads before component placement.",
+    description: "Checks that each side carrying surface-mount assembly in the Gerber package has a matching solder paste layer.",
+    rationale: "Surface-mount assembly requires a stencil layer to apply solder paste to pads before component placement. A missing layer may only block when every file in the package declares its own TF.FileFunction; otherwise the finding is advisory, its severity is capped at low, and the severity that was configured is reported in details.configuredSeverity.",
     defaultSeverity: "medium",
     appliesTo: ["pcb"],
     configKeys: ["rules.manufacturing.paste-coverage.enabled"],
@@ -49465,53 +49470,116 @@ var pasteCoverageRule = rule(
       return [];
     }
     const boards = await parsedBoards(context);
-    const topSmt = boards.some(
-      (board) => assemblyFootprints(board.footprints).some(
-        (fp) => footprintSide(fp) === "top" && fp.mountType !== "through_hole" && fp.mountType !== "virtual"
-      )
-    );
-    const bottomSmt = boards.some(
-      (board) => assemblyFootprints(board.footprints).some(
-        (fp) => footprintSide(fp) === "bottom" && fp.mountType !== "through_hole" && fp.mountType !== "virtual"
-      )
-    );
-    if (!topSmt && !bottomSmt) {
+    const footprints2 = boards.flatMap((board) => board.footprints);
+    const inScope = sides.map((side) => ({ side, evidence: sideAssembly(footprints2, side) })).filter(({ evidence }) => evidence.smd.length > 0 || evidence.unknown.length > 0);
+    if (inScope.length === 0) {
       return [];
     }
     const { entries, stackup } = await loadGerberStackup(context.root, files);
+    const identity = stackup.identity;
+    const pasteLayers = stackup.layers.filter((layer) => layer.role === "solderpaste");
+    const configured = configuredSeverity(context, "manufacturing.paste-coverage", "medium");
     const output = [];
-    const sidesToCheck = [];
-    if (topSmt) sidesToCheck.push("top");
-    if (bottomSmt) sidesToCheck.push("bottom");
-    for (const side of sidesToCheck) {
-      const hasPaste = stackup.layers.some((layer) => layer.role === "solderpaste" && layer.side === side);
-      if (!hasPaste) {
-        output.push(
-          finding(context, {
-            ruleId: "manufacturing.paste-coverage",
-            severity: configuredSeverity(context, "manufacturing.paste-coverage", "medium"),
-            message: `The board has SMT assembly on the ${side} side, but the Gerber package lacks a ${side} solder paste stencil layer.`,
-            path: entries[0]?.filename ?? ".",
-            kind: "pcb",
-            details: {
-              side,
-              pasteLayers: stackup.layers.filter((layer) => layer.role === "solderpaste").length
-            },
-            fix: {
-              description: `Export the ${side} solder paste layer (${side === "top" ? "F.Paste" : "B.Paste"}) and include it in the Gerber package.`,
-              steps: [
-                "In KiCad, open File > Fabrication Outputs > Gerbers.",
-                `Tick ${side === "top" ? "F.Paste" : "B.Paste"} in the layer list.`,
-                "Re-export and update the package."
-              ]
-            }
-          })
-        );
-      }
+    for (const { side, evidence } of inScope) {
+      if (pasteLayers.some((layer) => layer.side === side)) continue;
+      const reasons = unprovenReasons(evidence, identity, side);
+      const blocking = reasons.length === 0;
+      const severity = blocking ? configured : advisorySeverity(configured);
+      output.push(
+        finding(context, {
+          ruleId: "manufacturing.paste-coverage",
+          severity,
+          message: coverageMessage(side, evidence, blocking),
+          // The absence is read from the files when `blocking`, and is an inference about names
+          // when it is not. Reporting it as equally certain either way is the reporting half of the
+          // same mistake, so the finding carries the difference rather than leaving it in `details`.
+          confidence: blocking ? "high" : "low",
+          path: entries[0]?.filename ?? ".",
+          kind: "pcb",
+          details: {
+            side,
+            severity,
+            configuredSeverity: configured,
+            severityCapped: severity !== configured,
+            blocking,
+            rationale: blocking ? `Every Gerber file in the package declares TF.FileFunction, so the absence of a ${side} solder paste layer is read from the files.` : reasons.join(" "),
+            smdFootprints: evidence.smd.length,
+            throughHoleFootprints: evidence.throughHole.length,
+            unknownMountTypeFootprints: evidence.unknown.length,
+            smdReferences: evidence.smd.slice(0, referenceSampleLimit),
+            unknownMountTypeReferences: evidence.unknown.slice(0, referenceSampleLimit),
+            pasteLayers: pasteLayers.length,
+            pasteLayerFiles: pasteLayers.map((layer) => layer.filename),
+            layerIdentity: layerIdentity(identity),
+            unidentifiedFiles: identity.unidentified,
+            assumedIdentityFiles: identity.assumed
+          },
+          fix: {
+            description: `Export the ${side} solder paste layer (${side === "top" ? "F.Paste" : "B.Paste"}) and include it in the Gerber package.`,
+            steps: [
+              "In KiCad, open File > Fabrication Outputs > Gerbers.",
+              `Tick ${side === "top" ? "F.Paste" : "B.Paste"} in the layer list.`,
+              "Re-export and update the package."
+            ]
+          }
+        })
+      );
     }
     return output;
   }
 );
+function sideAssembly(footprints2, side) {
+  const evidence = { smd: [], throughHole: [], unknown: [] };
+  for (const footprint of assemblyFootprints(footprints2)) {
+    if (footprintSide(footprint) !== side) continue;
+    if (footprint.mountType === "smd") evidence.smd.push(footprint.reference);
+    else if (footprint.mountType === "through_hole") evidence.throughHole.push(footprint.reference);
+    else if (footprint.mountType !== "virtual") evidence.unknown.push(footprint.reference);
+  }
+  for (const references of [evidence.smd, evidence.throughHole, evidence.unknown]) {
+    references.sort((left, right) => left.localeCompare(right));
+  }
+  return evidence;
+}
+function layerIdentity(identity) {
+  if (identity.unidentified > 0) return "unidentified";
+  if (identity.assumed > 0 || identity.declared === 0) return "assumed";
+  return "declared";
+}
+function unprovenReasons(evidence, identity, side) {
+  const reasons = [];
+  if (evidence.smd.length === 0) {
+    reasons.push(
+      `No footprint on the ${side} side states an SMD mount type, and ${evidence.unknown.length} of them state none at all, so whether that side needs a stencil is unproven.`
+    );
+  }
+  if (identity.unidentified > 0) {
+    reasons.push(
+      `${identity.unidentified} file(s) in the package are not a layer this reader can identify at all, and one of them may be the missing stencil.`
+    );
+  } else if (identity.assumed > 0) {
+    reasons.push(
+      `${identity.assumed} layer(s) in the package are identified by filename alone, and a filename cannot prove that a layer is absent.`
+    );
+  } else if (identity.declared === 0) {
+    reasons.push(
+      "No Gerber file in the package declares TF.FileFunction, so every layer identity rests on a filename."
+    );
+  }
+  return reasons;
+}
+function coverageMessage(side, evidence, blocking) {
+  if (evidence.smd.length === 0) {
+    return `The board has ${evidence.unknown.length} assembly footprint(s) of unknown mount type on the ${side} side, so the Gerber package may be missing a ${side} solder paste stencil layer.`;
+  }
+  if (!blocking) {
+    return `The board has SMT assembly on the ${side} side, but no ${side} solder paste layer could be established in the Gerber package, so the ${side} side may be missing a stencil.`;
+  }
+  return `The board has SMT assembly on the ${side} side, but the Gerber package lacks a ${side} solder paste stencil layer.`;
+}
+function advisorySeverity(configured) {
+  return severityRankValue(configured) > severityRankValue("low") ? "low" : configured;
+}
 
 // src/rules/manufacturing/pin1-markers.ts
 function needsPin1Marker(footprint) {

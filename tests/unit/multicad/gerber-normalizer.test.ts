@@ -240,4 +240,57 @@ M02*
       expect(result.layers).toEqual([]);
     });
   });
+
+  describe("what the package's own files account for", () => {
+    const declared = (fileFunction: string): string =>
+      ["%FSLAX36Y36*%", "%MOMM*%", `%TF.FileFunction,${fileFunction}*%`, "M02*"].join("\n");
+    const plain = ["%FSLAX36Y36*%", "%MOMM*%", "D10*", "X1000000Y1000000D03*", "M02*"].join("\n");
+
+    it("marks each layer with where its identity came from", () => {
+      const result = normalizeGerberStackup([
+        { filename: "board.gtl", content: declared("Copper,L1,Top") },
+        { filename: "board.gts", content: plain },
+      ]);
+
+      // A rule deciding whether a layer is *absent* has to tell the two apart: it may require a
+      // layer on a declared identity, never on a filename.
+      expect(result.layers.find((entry) => entry.filename === "board.gtl")?.identitySource).toBe("declared");
+      expect(result.layers.find((entry) => entry.filename === "board.gts")?.identitySource).toBe("assumed");
+      expect(result.identity).toEqual({ declared: 1, assumed: 1, unidentified: 0 });
+    });
+
+    it("counts a file it could not place at all, which is where a missing layer may be hiding", () => {
+      const result = normalizeGerberStackup([
+        { filename: "board.gtl", content: declared("Copper,L1,Top") },
+        { filename: "notes.artwork", content: "nothing useful" },
+      ]);
+
+      // A layer under a name this reader does not recognise is invisible to it, so the package's
+      // inventory is incomplete even though everything it did read was declared.
+      expect(result.identity).toEqual({ declared: 1, assumed: 0, unidentified: 1 });
+    });
+
+    it("does not count a drill file against the artwork inventory", () => {
+      const result = normalizeGerberStackup([
+        { filename: "board.gtl", content: declared("Copper,L1,Top") },
+        { filename: "board.gts", content: declared("Soldermask,Top") },
+        { filename: "board.drl", content: "M48\nMETRIC,TZ,000.000\nT01C0.300\n%\nT01\nX1000Y1000\nM30" },
+      ]);
+
+      // A `.drl` is an Excellon program, read on its own terms by the drill reader, and not a
+      // Gerbers layer a fabricator would mistake for a stencil. Counting it would mean no real
+      // package could ever prove a Gerbers layer absent.
+      expect(result.identity).toEqual({ declared: 2, assumed: 0, unidentified: 0 });
+      expect(result.layers.find((entry) => entry.filename === "board.drl")?.identitySource).toBe("assumed");
+    });
+
+    it("believes a drill-named file that declares itself a Gerbers layer", () => {
+      const result = normalizeGerberStackup([{ filename: "board.drl", content: declared("Paste,Top") }]);
+
+      // The drill branch used to run first and the declaration was never read, so a paste layer
+      // exported under a drill filename counted as a drill file and as no paste layer at all.
+      expect(result.identity).toEqual({ declared: 1, assumed: 0, unidentified: 0 });
+      expect(result.layers).toMatchObject([{ filename: "board.drl", role: "solderpaste", side: "top" }]);
+    });
+  });
 });
