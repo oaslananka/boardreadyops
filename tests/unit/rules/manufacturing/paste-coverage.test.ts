@@ -21,6 +21,8 @@ const mountTypeBoard = (file: string) => fs.readFile(path.join(fixtureRoot, file
 const enabled = "version: 1\nrules:\n  manufacturing.paste-coverage:\n    enabled: true\nfail-on: never\n";
 const blockingConfig =
   "version: 1\nrules:\n  manufacturing.paste-coverage:\n    enabled: true\n    severity: high\nfail-on: never\n";
+const advisoryConfig =
+  "version: 1\nrules:\n  manufacturing.paste-coverage:\n    enabled: true\n    severity: low\nfail-on: never\n";
 
 const header = ["%FSLAX36Y36*%", "%MOMM*%"];
 const layer = (fileFunction: string) =>
@@ -247,6 +249,25 @@ describe("manufacturing.paste-coverage", () => {
 
       expect(expectRule(result, "manufacturing.paste-coverage", 0)).toEqual([]);
     });
+
+    it("reports the references behind the evidence in a stable order", async () => {
+      const pcb = `(kicad_pcb
+        (footprint "Lib:R_0805" (layer "F.Cu") (at 1 1) (attr smd) (property "Reference" "R2"))
+        (footprint "Lib:R_0805" (layer "F.Cu") (at 3 1) (attr smd) (property "Reference" "R10"))
+        (footprint "Lib:Resistor_THT" (layer "F.Cu") (at 5 1) (attr through_hole) (property "Reference" "J1"))
+      )`;
+      const result = await run(pcb, declaredPackage);
+
+      // The references are read in board order, which is not a stable order for a report: the
+      // same board has to produce the same finding twice for the evidence to be auditable.
+      const findings = expectRule(result, "manufacturing.paste-coverage", 1);
+      expect(findings[0]?.details).toMatchObject({
+        side: "top",
+        smdFootprints: 2,
+        smdReferences: ["R10", "R2"],
+        throughHoleFootprints: 1,
+      });
+    });
   });
 
   describe("whether a missing paste layer may block", () => {
@@ -387,6 +408,28 @@ describe("manufacturing.paste-coverage", () => {
         side: "top",
         pasteLayers: 1,
         pasteLayerFiles: ["fab/bottom-paste.gbr"],
+      });
+    });
+
+    it("does not report a cap on a severity the cap did not lower", async () => {
+      const result = await run(
+        await mountTypeBoard("surface-mount.kicad_pcb"),
+        { "fab/board.gtl": plainLayer, "fab/board.gts": plainLayer, "fab/board.gko": plainLayer },
+        advisoryConfig,
+      );
+
+      // `low` is the floor the cap enforces, so a project already configured at it has nothing
+      // lowered. Saying `severityCapped` here would report an override that did not happen, which
+      // is the same false statement in the other direction.
+      const findings = expectRule(result, "manufacturing.paste-coverage", 1);
+      expect(findings[0]?.severity).toBe("low");
+      expect(findings[0]?.confidence).toBe("low");
+      expect(findings[0]?.details).toMatchObject({
+        blocking: false,
+        severity: "low",
+        configuredSeverity: "low",
+        severityCapped: false,
+        layerIdentity: "assumed",
       });
     });
   });

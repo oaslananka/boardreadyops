@@ -15,8 +15,13 @@ export interface BundleFileEntry {
   content?: string | undefined;
 }
 
-/** A stackup layer together with the evidence its own identity rests on. */
-export interface IdentifiedLayer extends NormalizedLayer {
+/**
+ * A stackup layer together with the evidence its own identity rests on.
+ *
+ * Not exported: every consumer reads the identity off the layer `normalizeGerberStackup` hands
+ * back, and the provenance question a rule asks is answered by `LayerIdentitySummary` beside it.
+ */
+interface IdentifiedLayer extends NormalizedLayer {
   /**
    * `"declared"` when the file stated its function in `TF.FileFunction`, `"assumed"` when the role
    * was read from its filename. A rule may require a layer on a declared identity; it may not
