@@ -73,11 +73,7 @@ const SECURITY_PATTERNS = [
   /^LICENSES\//,
   /^REUSE\.toml$/,
 ];
-const SAST_POLICY_PATTERNS = [
-  /^renovate\.json$/,
-  /^\.semgrep(?:ignore|\.ya?ml)$/,
-  /^\.github\/dependabot\.ya?ml$/,
-];
+const SAST_POLICY_PATTERNS = [/^renovate\.json$/, /^\.semgrep(?:ignore|\.ya?ml)$/, /^\.github\/dependabot\.ya?ml$/];
 
 const PACKAGE_PATTERNS = [
   /^dist\//,
