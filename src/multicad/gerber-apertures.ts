@@ -233,15 +233,30 @@ export function applyApertureExtended(ledger: ApertureLedger, compact: string): 
 }
 
 /**
+ * The aperture a word command selects, or undefined when the command selects none.
+ *
+ * `D01`, `D02` and `D03` are operations rather than selections, so a D-code below 10 names no
+ * aperture. The threshold lives here rather than in each caller because a second walk over the same
+ * command list has to reach the same conclusion about which D-codes are selections: two readers of
+ * one file that disagree about that disagree about what every plotted object was drawn with.
+ */
+export function readApertureSelection(compact: string): number | undefined {
+  const selected = apertureSelection.exec(compact)?.[1];
+  if (selected === undefined) return undefined;
+  const code = Number.parseInt(selected, 10);
+  return code >= firstApertureCode ? code : undefined;
+}
+
+/**
  * Applies one word command of file scope: a selection, or an operation drawn with what is selected.
  *
  * Block bodies do not come through here: their Dnn selections and D01/D02/D03 operations build the
  * block and are handled by `applyApertureBlockWord` instead of mutating file-scope graphics state.
  */
 export function applyApertureWord(ledger: ApertureLedger, compact: string): void {
-  const selection = apertureSelection.exec(compact);
-  if (selection?.[1] && Number.parseInt(selection[1], 10) >= firstApertureCode) {
-    selectAperture(ledger, Number.parseInt(selection[1], 10));
+  const selection = readApertureSelection(compact);
+  if (selection !== undefined) {
+    selectAperture(ledger, selection);
     return;
   }
   // Only a flash puts a whole aperture onto the layer, so it is the only operation that can place
@@ -257,11 +272,8 @@ export function applyApertureWord(ledger: ApertureLedger, compact: string): void
  * in block scope so it cannot leak into the file-level graphics state after `%AB*%`.
  */
 export function applyApertureBlockWord(ledger: ApertureLedger, compact: string): void {
-  const selection = apertureSelection.exec(compact);
-  if (selection?.[1] === undefined) return;
-
-  const code = Number.parseInt(selection[1], 10);
-  if (code < firstApertureCode) return;
+  const code = readApertureSelection(compact);
+  if (code === undefined) return;
 
   if (ledger.block !== undefined) ledger.block.selected = code;
   referenceBlockAperture(ledger, code);

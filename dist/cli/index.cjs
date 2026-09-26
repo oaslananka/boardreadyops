@@ -47644,19 +47644,23 @@ function applyApertureExtended(ledger, compact) {
   };
   return true;
 }
+function readApertureSelection(compact) {
+  const selected = apertureSelection.exec(compact)?.[1];
+  if (selected === void 0) return void 0;
+  const code = Number.parseInt(selected, 10);
+  return code >= firstApertureCode ? code : void 0;
+}
 function applyApertureWord(ledger, compact) {
-  const selection = apertureSelection.exec(compact);
-  if (selection?.[1] && Number.parseInt(selection[1], 10) >= firstApertureCode) {
-    selectAperture(ledger, Number.parseInt(selection[1], 10));
+  const selection = readApertureSelection(compact);
+  if (selection !== void 0) {
+    selectAperture(ledger, selection);
     return;
   }
   if (flashOperation.test(compact)) noteFlash(ledger);
 }
 function applyApertureBlockWord(ledger, compact) {
-  const selection = apertureSelection.exec(compact);
-  if (selection?.[1] === void 0) return;
-  const code = Number.parseInt(selection[1], 10);
-  if (code < firstApertureCode) return;
+  const code = readApertureSelection(compact);
+  if (code === void 0) return;
   if (ledger.block !== void 0) ledger.block.selected = code;
   referenceBlockAperture(ledger, code);
 }
@@ -47985,6 +47989,128 @@ function warning2(code, message, path72) {
   return path72 === void 0 ? { code, message } : { code, message, path: path72 };
 }
 
+// src/multicad/gerber-geometry.ts
+function readGerberCoordinate(raw, format) {
+  const negative = raw.startsWith("-");
+  const digits = raw.replace(/^[+-]/u, "");
+  const total = format.integerDigits + format.decimalDigits;
+  const padded = format.zeroOmission === "leading" ? digits.padStart(total, "0") : digits.padEnd(total, "0");
+  const value = Number.parseFloat(
+    `${padded.slice(0, format.integerDigits) || "0"}.${padded.slice(format.integerDigits) || "0"}`
+  );
+  return negative ? -value : value;
+}
+var mirrorTransform = /^LM[NXY]*\*$/u;
+var rotationTransform = /^LR(?:[ABIJQ]?[+-]?\d+(?:\.\d+)?)*\*$/u;
+var scaleTransform = /^LS(?:[XY]?[+-]?\d+(?:\.\d+)?)*\*$/u;
+var stepAndRepeatTransform = /^SR(?:(?:X(\d+(?:\.\d+)?))?(?:Y(\d+(?:\.\d+)?))?(?:I([+-]?\d+(?:\.\d+)?))?(?:J([+-]?\d+(?:\.\d+)?))?|(\d+(?:\.\d+)?))?\*$/u;
+var stepAndRepeatStatement = /^SR[^*]*\*$/u;
+var transformUncertainty = {
+  mirror: "object-transform",
+  rotation: "object-transform",
+  scale: "object-transform",
+  "step-and-repeat": "step-and-repeat"
+};
+function readGerberTransform(compact) {
+  if (mirrorTransform.test(compact)) return "mirror";
+  if (rotationTransform.test(compact)) return "rotation";
+  if (stepAndRepeatStatement.test(compact)) return repeatsAnything(compact) ? "step-and-repeat" : void 0;
+  if (scaleTransform.test(compact)) return "scale";
+  return void 0;
+}
+function repeatsAnything(compact) {
+  const declared = stepAndRepeatTransform.exec(compact);
+  if (declared === null) return true;
+  const [xCount, yCount, xOffset, yOffset, copiesInBoth] = declared.slice(1);
+  if (copiesInBoth !== void 0) return Number(copiesInBoth) > 1;
+  const copiesX = xCount === void 0 ? 1 : Number(xCount);
+  const copiesY = yCount === void 0 ? 1 : Number(yCount);
+  const offsetX = xOffset === void 0 ? 0 : Number(xOffset);
+  const offsetY = yOffset === void 0 ? 0 : Number(yOffset);
+  return copiesX > 1 || copiesY > 1 || offsetX !== 0 || offsetY !== 0;
+}
+var maxGeometryPrimitives = 25e3;
+function createGerberGeometryCollector(input) {
+  const apertures = new Map(input.apertures.map((aperture) => [aperture.code, aperture]));
+  const primitives = [];
+  const uncertainty = /* @__PURE__ */ new Set();
+  if (input.incremental) uncertainty.add("incremental-coordinates");
+  if (input.clearPolarity) uncertainty.add("clear-polarity");
+  for (const transform2 of input.transforms) uncertainty.add(transformUncertainty[transform2]);
+  function resolve(code) {
+    if (code === void 0) return { kind: "undefined" };
+    const definition = apertures.get(code);
+    if (definition === void 0) return { kind: "undefined" };
+    return isModelled(definition) ? { kind: "modelled", aperture: definition } : { kind: "unsupported" };
+  }
+  function reserve() {
+    if (primitives.length < maxGeometryPrimitives) return true;
+    uncertainty.add("primitive-limit");
+    return false;
+  }
+  function recordApertureUncertainty(resolved) {
+    if (resolved.kind === "unsupported") uncertainty.add("unsupported-aperture");
+    if (resolved.kind === "undefined") uncertainty.add("undefined-aperture");
+  }
+  return {
+    segment(from, to, context) {
+      const resolved = context.inRegion ? void 0 : resolve(context.apertureCode);
+      if (resolved !== void 0) recordApertureUncertainty(resolved);
+      if (!reserve()) return;
+      primitives.push(
+        Object.freeze({
+          kind: "segment",
+          from: frozenPoint(from),
+          to: frozenPoint(to),
+          inRegion: context.inRegion,
+          apertureCode: context.apertureCode,
+          widthMm: resolved?.kind === "modelled" ? sweptWidthMm(resolved.aperture) : void 0
+        })
+      );
+    },
+    flash(at, context) {
+      const resolved = resolve(context.apertureCode);
+      recordApertureUncertainty(resolved);
+      if (!reserve()) return;
+      primitives.push(
+        Object.freeze({
+          kind: "flash",
+          at: frozenPoint(at),
+          inRegion: context.inRegion,
+          apertureCode: context.apertureCode,
+          aperture: resolved.kind === "modelled" ? frozenAperture(resolved.aperture) : void 0
+        })
+      );
+    },
+    uncertain(reason) {
+      uncertainty.add(reason);
+    },
+    evidence() {
+      const reasons = Object.freeze([...uncertainty]);
+      return Object.freeze({
+        primitives: Object.freeze(primitives.slice()),
+        incomplete: reasons.length > 0,
+        uncertainty: reasons
+      });
+    }
+  };
+}
+function isModelled(definition) {
+  return definition.shape === "circle" || definition.shape === "rectangle" || definition.shape === "obround" || definition.shape === "polygon";
+}
+function frozenAperture(aperture) {
+  return Object.freeze({
+    ...aperture,
+    hole: aperture.hole === void 0 ? void 0 : Object.freeze({ ...aperture.hole })
+  });
+}
+function frozenPoint(point) {
+  return Object.freeze({ x: point.x, y: point.y });
+}
+function sweptWidthMm(aperture) {
+  return aperture.shape === "circle" ? aperture.diameterMm : void 0;
+}
+
 // src/multicad/gerber-parser.ts
 var inchToMm2 = 25.4;
 var closureToleranceMm = 2e-3;
@@ -48104,16 +48230,6 @@ function identityFromFileFunction(value) {
   }
   return void 0;
 }
-function coordinateValue2(raw, format) {
-  const negative = raw.startsWith("-");
-  const digits = raw.replace(/^[+-]/u, "");
-  const total = format.integerDigits + format.decimalDigits;
-  const padded = format.zeroOmission === "leading" ? digits.padStart(total, "0") : digits.padEnd(total, "0");
-  const value = Number.parseFloat(
-    `${padded.slice(0, format.integerDigits) || "0"}.${padded.slice(format.integerDigits) || "0"}`
-  );
-  return negative ? -value : value;
-}
 var gerberOrigin = { x: 0, y: 0 };
 function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
@@ -48128,6 +48244,8 @@ function snapshotFileState(state, apertures) {
     format: state.declaredFormat,
     legacyCoordinateMode: state.legacyCoordinateMode,
     fileFunction: state.fileFunction,
+    transforms: state.transforms,
+    plottedUnderClearPolarity: state.plottedUnderClearPolarity,
     wordCommands: state.wordCommands,
     apertures
   };
@@ -48152,9 +48270,16 @@ function applyExtendedFileStateCommand(command, state, apertures) {
     };
     return;
   }
+  const polarityMatch = /^LP([DC])\*$/u.exec(compact);
+  if (polarityMatch) {
+    state.polarity = polarityMatch[1] === "C" ? "clear" : "dark";
+    return;
+  }
   if (state.fileFunction === void 0) {
     state.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
   }
+  const transform2 = readGerberTransform(compact);
+  if (transform2 !== void 0 && !state.transforms.includes(transform2)) state.transforms.push(transform2);
 }
 function applyWordFileStateCommand(command, state, apertures) {
   const compact = compactCommand(command.body);
@@ -48167,6 +48292,7 @@ function applyWordFileStateCommand(command, state, apertures) {
   if (compact === "M02") return true;
   applyApertureWord(apertures, compact);
   state.wordCommands.push(compact);
+  if (state.polarity === "clear" && plottedOperation.test(compact)) state.plottedUnderClearPolarity = true;
   if (gCode === 70) state.legacyUnits = "inch";
   else if (gCode === 71) state.legacyUnits = "mm";
   else if (gCode === 90) state.legacyCoordinateMode = "absolute";
@@ -48180,6 +48306,9 @@ function readFileState(commands, unterminated) {
     declaredFormat: void 0,
     legacyCoordinateMode: void 0,
     fileFunction: void 0,
+    transforms: [],
+    polarity: "dark",
+    plottedUnderClearPolarity: false,
     wordCommands: []
   };
   const apertures = createApertureLedger();
@@ -48246,6 +48375,12 @@ function parseGerber(content, path72) {
   const scale = units === "inch" ? inchToMm2 : 1;
   const apertureEvidence = readApertureEvidence(state.apertures, scale, path72);
   warnings.push(...apertureEvidence.warnings);
+  const collector = createGerberGeometryCollector({
+    apertures: apertureEvidence.apertures,
+    incremental,
+    clearPolarity: state.plottedUnderClearPolarity,
+    transforms: state.transforms
+  });
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -48256,6 +48391,8 @@ function parseGerber(content, path72) {
   let current;
   let contourStart;
   let contourSegments = 0;
+  let selectedAperture;
+  let interpolation = "linear";
   let inRegion = false;
   function recordPlottedPoint(point) {
     minX = Math.min(minX, point.x);
@@ -48274,6 +48411,8 @@ function parseGerber(content, path72) {
   }
   if (!incremental) {
     for (const command of state.wordCommands) {
+      const selection = readApertureSelection(command);
+      if (selection !== void 0) selectedAperture = selection;
       const gCode = leadingGCode(command);
       if (gCode === 36) {
         finishContour();
@@ -48282,6 +48421,8 @@ function parseGerber(content, path72) {
         if (inRegion) finishContour();
         inRegion = false;
       }
+      if (gCode === 1) interpolation = "linear";
+      else if (gCode === 2 || gCode === 3) interpolation = "arc";
       const operation = plottedOperation.exec(command);
       if (!operation) continue;
       const rawX = operation[1];
@@ -48289,8 +48430,8 @@ function parseGerber(content, path72) {
       const code = operation[3]?.replace(/^0/u, "");
       if (rawX === void 0 && rawY === void 0) continue;
       const point = {
-        x: rawX !== void 0 ? coordinateValue2(rawX, format) * scale : current?.x ?? gerberOrigin.x,
-        y: rawY !== void 0 ? coordinateValue2(rawY, format) * scale : current?.y ?? gerberOrigin.y
+        x: rawX !== void 0 ? readGerberCoordinate(rawX, format) * scale : current?.x ?? gerberOrigin.x,
+        y: rawY !== void 0 ? readGerberCoordinate(rawY, format) * scale : current?.y ?? gerberOrigin.y
       };
       if (code === "2") {
         finishContour();
@@ -48305,8 +48446,12 @@ function parseGerber(content, path72) {
             contourStart = current;
           }
         }
+        if (interpolation === "arc") collector.uncertain("unsupported-interpolation");
+        else collector.segment(current ?? gerberOrigin, point, { inRegion, apertureCode: selectedAperture });
         contourSegments += 1;
         current = point;
+      } else if (code === "3") {
+        collector.flash(point, { inRegion, apertureCode: selectedAperture });
       }
       recordPlottedPoint(point);
     }
@@ -48322,6 +48467,7 @@ function parseGerber(content, path72) {
     hasClosedContour,
     openContourCount,
     apertures: apertureEvidence.apertures,
+    geometry: collector.evidence(),
     warnings
   };
 }
