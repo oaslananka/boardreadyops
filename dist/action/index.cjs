@@ -102070,6 +102070,7 @@ function coordinateValue2(raw, format) {
   );
   return negative ? -value : value;
 }
+var gerberOrigin = { x: 0, y: 0 };
 function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
@@ -102083,7 +102084,6 @@ function snapshotFileState(state3, apertures) {
     format: state3.declaredFormat,
     legacyCoordinateMode: state3.legacyCoordinateMode,
     fileFunction: state3.fileFunction,
-    regionInFileScope: state3.regionInFileScope,
     wordCommands: state3.wordCommands,
     apertures
   };
@@ -102123,10 +102123,6 @@ function applyWordFileStateCommand(command, state3, apertures) {
   if (compact === "M02") return true;
   applyApertureWord(apertures, compact);
   state3.wordCommands.push(compact);
-  if (gCode === 36) {
-    state3.regionInFileScope = true;
-    return false;
-  }
   if (gCode === 70) state3.legacyUnits = "inch";
   else if (gCode === 71) state3.legacyUnits = "mm";
   else if (gCode === 90) state3.legacyCoordinateMode = "absolute";
@@ -102140,7 +102136,6 @@ function readFileState(commands, unterminated) {
     declaredFormat: void 0,
     legacyCoordinateMode: void 0,
     fileFunction: void 0,
-    regionInFileScope: false,
     wordCommands: []
   };
   const apertures = createApertureLedger();
@@ -102218,6 +102213,13 @@ function parseGerber(content, path53) {
   let contourStart;
   let contourSegments = 0;
   let inRegion = false;
+  function recordPlottedPoint(point) {
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minY = Math.min(minY, point.y);
+    maxY = Math.max(maxY, point.y);
+    plotted += 1;
+  }
   function finishContour() {
     if (contourStart && current && contourSegments > 0) {
       if (inRegion || samePoint2(contourStart, current)) hasClosedContour = true;
@@ -102228,6 +102230,14 @@ function parseGerber(content, path53) {
   }
   if (!incremental) {
     for (const command of state3.wordCommands) {
+      const gCode = leadingGCode(command);
+      if (gCode === 36) {
+        finishContour();
+        inRegion = true;
+      } else if (gCode === 37) {
+        if (inRegion) finishContour();
+        inRegion = false;
+      }
       const operation = plottedOperation.exec(command);
       if (!operation) continue;
       const rawX = operation[1];
@@ -102235,26 +102245,26 @@ function parseGerber(content, path53) {
       const code = operation[3]?.replace(/^0/u, "");
       if (rawX === void 0 && rawY === void 0) continue;
       const point = {
-        x: rawX !== void 0 ? coordinateValue2(rawX, format) * scale : current?.x ?? 0,
-        y: rawY !== void 0 ? coordinateValue2(rawY, format) * scale : current?.y ?? 0
+        x: rawX !== void 0 ? coordinateValue2(rawX, format) * scale : current?.x ?? gerberOrigin.x,
+        y: rawY !== void 0 ? coordinateValue2(rawY, format) * scale : current?.y ?? gerberOrigin.y
       };
       if (code === "2") {
         finishContour();
         contourStart = point;
+        current = point;
       } else if (code === "1") {
-        if (!contourStart) contourStart = current ?? point;
+        if (contourStart === void 0) {
+          if (current === void 0) {
+            contourStart = gerberOrigin;
+            recordPlottedPoint(gerberOrigin);
+          } else {
+            contourStart = current;
+          }
+        }
         contourSegments += 1;
+        current = point;
       }
-      current = point;
-      minX = Math.min(minX, point.x);
-      maxX = Math.max(maxX, point.x);
-      minY = Math.min(minY, point.y);
-      maxY = Math.max(maxY, point.y);
-      plotted += 1;
-    }
-    if (state3.regionInFileScope) {
-      inRegion = true;
-      hasClosedContour = true;
+      recordPlottedPoint(point);
     }
     finishContour();
   }
