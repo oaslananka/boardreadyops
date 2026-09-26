@@ -367,95 +367,116 @@ type GerberFileState = {
  * -- so units, coordinate mode, region state and the end of the file are read only outside a block,
  * and a command that was never terminated is evidence rather than a command to interpret.
  */
-function readFileState(commands: GerberCommand[], unterminated: UnterminatedByShape): GerberFileState {
-  let declaredUnits: "mm" | "inch" | undefined;
-  let legacyUnits: "mm" | "inch" | undefined;
-  let declaredFormat: DeclaredCoordinateFormat | undefined;
-  let legacyCoordinateMode: "absolute" | "incremental" | undefined;
-  let fileFunction: string | undefined;
-  let regionInFileScope = false;
-  let apertureBlockDepth = 0;
-  const wordCommands: string[] = [];
+type GerberFileStateAccumulator = {
+  declaredUnits: "mm" | "inch" | undefined;
+  legacyUnits: "mm" | "inch" | undefined;
+  declaredFormat: DeclaredCoordinateFormat | undefined;
+  legacyCoordinateMode: "absolute" | "incremental" | undefined;
+  fileFunction: string | undefined;
+  regionInFileScope: boolean;
+  apertureBlockDepth: number;
+  wordCommands: string[];
+};
 
-  const fileState = (): GerberFileState => ({
-    units: declaredUnits ?? legacyUnits,
-    format: declaredFormat,
-    legacyCoordinateMode,
-    fileFunction,
-    regionInFileScope,
-    wordCommands,
-  });
+function snapshotFileState(state: GerberFileStateAccumulator): GerberFileState {
+  return {
+    units: state.declaredUnits ?? state.legacyUnits,
+    format: state.declaredFormat,
+    legacyCoordinateMode: state.legacyCoordinateMode,
+    fileFunction: state.fileFunction,
+    regionInFileScope: state.regionInFileScope,
+    wordCommands: state.wordCommands,
+  };
+}
+
+function applyExtendedFileStateCommand(
+  command: Extract<GerberCommand, { kind: "extended" }>,
+  state: GerberFileStateAccumulator,
+): void {
+  const compact = compactCommand(command.body);
+  if (compact.startsWith("AM")) return;
+
+  if (compact.startsWith("AB")) {
+    if (compact === "AB*") state.apertureBlockDepth = Math.max(0, state.apertureBlockDepth - 1);
+    else state.apertureBlockDepth += 1;
+    return;
+  }
+
+  const unitsMatch = /^MO(MM|IN)\*$/u.exec(compact);
+  if (unitsMatch) {
+    state.declaredUnits ??= unitsMatch[1] === "IN" ? "inch" : "mm";
+    return;
+  }
+
+  const formatMatch = /^FS([LT])([AI])X(\d)(\d)Y(\d)(\d)\*$/u.exec(compact);
+  if (formatMatch) {
+    state.declaredFormat ??= {
+      integerDigits: Number.parseInt(formatMatch[3] ?? "3", 10),
+      decimalDigits: Number.parseInt(formatMatch[4] ?? "5", 10),
+      zeroOmission: formatMatch[1] === "T" ? "trailing" : "leading",
+      coordinateMode: formatMatch[2] === "I" ? "incremental" : "absolute",
+    };
+    return;
+  }
+
+  if (state.fileFunction === undefined) {
+    state.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
+  }
+}
+
+function applyWordFileStateCommand(
+  command: Extract<GerberCommand, { kind: "word" }>,
+  state: GerberFileStateAccumulator,
+): boolean {
+  const compact = compactCommand(command.body);
+  const gCode = leadingGCode(compact);
+
+  if (gCode === 4 || state.apertureBlockDepth > 0) return false;
+  if (compact === "M02") return true;
+
+  state.wordCommands.push(compact);
+  if (gCode === 36) {
+    state.regionInFileScope = true;
+    return false;
+  }
+
+  if (gCode === 70) state.legacyUnits = "inch";
+  else if (gCode === 71) state.legacyUnits = "mm";
+  else if (gCode === 90) state.legacyCoordinateMode = "absolute";
+  else if (gCode === 91) state.legacyCoordinateMode = "incremental";
+
+  return false;
+}
+
+/**
+ * The file-level state walk.
+ *
+ * Commands are consumed in source order. Extended and word command mutation lives in focused
+ * helpers so this loop only owns command-kind dispatch, malformed-command evidence, and file end.
+ */
+function readFileState(commands: GerberCommand[], unterminated: UnterminatedByShape): GerberFileState {
+  const state: GerberFileStateAccumulator = {
+    declaredUnits: undefined,
+    legacyUnits: undefined,
+    declaredFormat: undefined,
+    legacyCoordinateMode: undefined,
+    fileFunction: undefined,
+    regionInFileScope: false,
+    apertureBlockDepth: 0,
+    wordCommands: [],
+  };
 
   for (const command of commands) {
     if (command.kind === "unterminated") {
       recordUnterminated(unterminated[command.shape], command.body);
-      continue;
+    } else if (command.kind === "extended") {
+      applyExtendedFileStateCommand(command, state);
+    } else if (applyWordFileStateCommand(command, state)) {
+      break;
     }
-
-    if (command.kind === "extended") {
-      const compact = compactCommand(command.body);
-      // `%AMname*%` is a macro definition: a body of numbers this walk does not read.
-      if (compact.startsWith("AM")) continue;
-      // `%AB D12*%` opens an aperture block, `%AB*%` closes it.
-      if (compact.startsWith("AB")) {
-        if (compact === "AB*") apertureBlockDepth = Math.max(0, apertureBlockDepth - 1);
-        else apertureBlockDepth += 1;
-        continue;
-      }
-
-      // `%MOMM*%` -- a file states its units once; a second declaration is noise, not a change.
-      const unitsMatch = /^MO(MM|IN)\*$/u.exec(compact);
-      if (unitsMatch) {
-        declaredUnits ??= unitsMatch[1] === "IN" ? "inch" : "mm";
-        continue;
-      }
-
-      // `%FSLAX35Y35*%` -- omission mode, coordinate mode, then digit counts per axis.
-      const formatMatch = /^FS([LT])([AI])X(\d)(\d)Y(\d)(\d)\*$/u.exec(compact);
-      if (formatMatch && !declaredFormat) {
-        declaredFormat = {
-          integerDigits: Number.parseInt(formatMatch[3] ?? "3", 10),
-          decimalDigits: Number.parseInt(formatMatch[4] ?? "5", 10),
-          zeroOmission: formatMatch[1] === "T" ? "trailing" : "leading",
-          coordinateMode: formatMatch[2] === "I" ? "incremental" : "absolute",
-        };
-        continue;
-      }
-
-      if (fileFunction === undefined) {
-        // Read uncompacted: this value is quoted back in reports, so its own spacing is content.
-        fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
-      }
-      continue;
-    }
-
-    const compact = compactCommand(command.body);
-    const gCode = leadingGCode(compact);
-    // G04, and the deprecated one-digit `G4`, carry a comment. Its payload is text: a `D10*` or an
-    // `X..Y..D01*` written inside one is neither an aperture select nor a plotted point.
-    if (gCode === 4) continue;
-    // Nothing inside an aperture block is in file scope, so nothing there changes the file.
-    if (apertureBlockDepth > 0) continue;
-    // `M02` ends the file, and the artwork after it is not artwork. Inside an aperture block it is
-    // part of the block, not the end of it.
-    if (compact === "M02") return fileState();
-    wordCommands.push(compact);
-
-    // A region between G36 and G37 is closed by definition.
-    if (gCode === 36) {
-      regionInFileScope = true;
-      continue;
-    }
-    // The deprecated file-level commands, still emitted by older CAM tools. `%MO%` and `%FS%` are
-    // what the format asks for, so these are honoured only where the file states neither.
-    if (gCode === 70) legacyUnits = "inch";
-    else if (gCode === 71) legacyUnits = "mm";
-    else if (gCode === 90) legacyCoordinateMode = "absolute";
-    else if (gCode === 91) legacyCoordinateMode = "incremental";
-    // G01/G02/G03 and every other G-code are recognised, and change no file state read here.
   }
 
-  return fileState();
+  return snapshotFileState(state);
 }
 
 export function parseGerber(content: string, path?: string): GerberParseResult {
