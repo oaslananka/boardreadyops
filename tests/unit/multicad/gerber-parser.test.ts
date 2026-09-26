@@ -184,6 +184,200 @@ describe("parseGerber", () => {
   });
 
   /**
+   * A contour is a chain of state transitions, and the file writes them in an order that means
+   * something: a draw starts where the current point is, a move puts the current point somewhere
+   * else, a flash leaves it alone, and a region applies to the commands between its `G36` and `G37`
+   * and to no others. Reading any of that out of order is how a drawn line lost its start.
+   */
+  describe("draw and region state, in the order the file wrote it", () => {
+    it("reads a first draw as a line out of the Gerber origin", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "D10*", "X10000000Y0D01*", "M02*"].join("\n"),
+      );
+
+      // The current point sits at the origin until the file moves it, so this is a 10 mm line and
+      // not a point at 10 mm. Reading the contour as starting where it ends drops the origin, and
+      // the layer is then reported a centimetre narrower than the file drew.
+      expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 0 });
+      expect(result.hasClosedContour).toBe(false);
+      expect(result.openContourCount).toBe(1);
+
+      // Drawn back to where it started, that same line is a closed contour.
+      const returned = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "D10*", "X10000000Y0D01*", "X0Y0D01*", "M02*"].join("\n"),
+      );
+      expect(returned.hasClosedContour).toBe(true);
+      expect(returned.openContourCount).toBe(0);
+    });
+
+    it("reads a draw after a move as a line from where the move landed", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "X0Y0D02*", "X5000000Y0D01*", "X0Y0D02*", "X5000000Y5000000D01*", "M02*"].join(
+          "\n",
+        ),
+      );
+
+      // Each move ends the contour before it and starts another, so this is two open contours and
+      // not one contour with a stray point in the middle of it.
+      expect(result.openContourCount).toBe(2);
+      expect(result.hasClosedContour).toBe(false);
+    });
+
+    it("closes every contour of a region, not only the last", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "G36*",
+          "X0Y0D02*",
+          "X5000000Y0D01*",
+          "X5000000Y5000000D01*",
+          "X0Y5000000D02*",
+          "X1000000Y1000000D01*",
+          "X1000000Y2000000D01*",
+          "G37*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // A region states that each of its contours returns to its start. Reading only the contour in
+      // progress at `G37` as closed calls the earlier one open, which reports a filled area as
+      // artwork that was never finished.
+      expect(result.openContourCount).toBe(0);
+      expect(result.hasClosedContour).toBe(true);
+    });
+
+    it("does not let a region close a contour the file drew before it", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "X0Y0D02*",
+          "X5000000Y5000000D01*",
+          "G36*",
+          "X0Y0D02*",
+          "X1000000Y1000000D01*",
+          "G37*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // The first contour never returns to where it started and is judged on that, whichever region
+      // the file opens afterwards; the region's own contour is the closed one.
+      expect(result.openContourCount).toBe(1);
+      expect(result.hasClosedContour).toBe(true);
+    });
+
+    it("judges a contour drawn after G37 on its own geometry", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "G36*",
+          "X0Y0D02*",
+          "X1000000Y1000000D01*",
+          "G37*",
+          "X0Y0D02*",
+          "X5000000Y5000000D01*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // `G37` closed the region, so the contour that follows it is a drawn line again rather than
+      // the tail of a region.
+      expect(result.openContourCount).toBe(1);
+      expect(result.hasClosedContour).toBe(true);
+    });
+
+    it("keeps a block-local region out of the file's region state", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.1*%",
+          "D10*",
+          "X0Y0D02*",
+          "X0Y10000000D01*",
+          "%AB D12*%",
+          "G36*",
+          "X0Y0D02*",
+          "X5000000Y5000000D01*",
+          "G37*",
+          "%AB*%",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // The region belongs to the block, and the block's own operations never join the outer
+      // artwork. Letting its `G36` reach the file's contour would close artwork the file drew
+      // outside any region, which is exactly the leak a block scope exists to prevent.
+      expect(result.openContourCount).toBe(1);
+      expect(result.hasClosedContour).toBe(false);
+    });
+
+    it("keeps a flash off the contour it lands between two draws", () => {
+      const flashed = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "D10*", "X9000000Y9000000D03*", "X10000000Y0D01*", "M02*"].join(
+          "\n",
+        ),
+      );
+
+      // A flash places a whole aperture and does not move the current point, so the draw that
+      // follows it starts at the origin. Taking the flash point as the start would drop the origin
+      // from the artwork, and the pad at (9, 9) is a point on the layer rather than a vertex of the
+      // line that happens to pass it.
+      expect(flashed.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 9 });
+      expect(flashed.openContourCount).toBe(1);
+
+      const betweenDraws = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.1*%",
+          "D10*",
+          "X0Y0D02*",
+          "X5000000Y0D01*",
+          "X9000000Y9000000D03*",
+          "X0Y0D01*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // The flash is in the box because a feature really is there, and the contour is the line the
+      // file drew: it returns to its start, so it is closed.
+      expect(betweenDraws.boundingBoxMm).toEqual({ minX: 0, maxX: 9, minY: 0, maxY: 9 });
+      expect(betweenDraws.hasClosedContour).toBe(true);
+      expect(betweenDraws.openContourCount).toBe(0);
+    });
+
+    it("keeps a flash at a point where the aperture's own shape is unmodelled", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%AMDONUT*%",
+          "1,1,$1,0,0*",
+          "%",
+          "%ADD11DONUT,0.5*%",
+          "D11*",
+          "X2000000Y2000000D03*",
+          "X0Y0D02*",
+          "X10000000Y0D01*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // What the file did define about the aperture still says the aperture is a macro, and what it
+      // did not define is not made up here: the flash contributes its point and no shape, the
+      // contour is the open line the file drew, and nothing is claimed about either of them.
+      expect(result.apertures).toEqual([{ code: 11, shape: "macro", macroName: "DONUT" }]);
+      expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 2 });
+      expect(result.hasClosedContour).toBe(false);
+      expect(result.openContourCount).toBe(1);
+    });
+  });
+
+  /**
    * A file is a sequence of commands, and where its whitespace falls is not a decision the reader
    * gets to make. These hold the stream: what one command is, what is not a command at all, and
    * what the file states about itself as the stream is read.

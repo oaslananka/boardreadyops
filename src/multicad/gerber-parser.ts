@@ -42,6 +42,14 @@ import {
  * block that has been closed is itself an aperture, selected and placed like any other. Those
  * distinctions are read in `./gerber-apertures`, and what cannot be followed is reported rather than
  * guessed at. What a placed block *covers* is measured in #856; the semantics are #859.
+ *
+ * A stream is also what makes the artwork's own state readable. A `D01` draws from wherever the
+ * current point is, which is the Gerber origin until the file moves it; a `D02` puts the current
+ * point somewhere else and ends the contour being drawn; a `D03` places a whole aperture and leaves
+ * the current point alone; and a `G36`/`G37` region says that the contours between them return to
+ * their start. Each of those is a transition that means something only where the file wrote it, and
+ * applying one out of order -- a region reaching back to close a contour drawn before it, a draw
+ * starting somewhere the file never went -- loses geometry that is in the file. See issue #860.
  */
 
 /**
@@ -80,11 +88,15 @@ export type GerberParseResult = {
   identity: GerberLayerIdentity | undefined;
   /** The raw attribute value, kept so a report can quote what the file actually said. */
   fileFunction: string | undefined;
-  /** Bounding box of every plotted coordinate, in millimetres. Undefined when nothing was plotted. */
+  /** Bounding box of every plotted coordinate, in millimetres. Undefined when fewer than two were. */
   boundingBoxMm: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
   /**
    * Whether any drawn contour returns to where it started. Only meaningful on a profile layer,
    * where an open contour means the fabricator has no board shape.
+   *
+   * A contour drawn between `G36` and `G37` returns to its start by definition -- the region states
+   * the closing transition rather than the file drawing it -- so every contour in a region counts
+   * as closed, and a contour the file drew outside the region is judged on its own geometry.
    */
   hasClosedContour: boolean;
   /** Contours that were drawn but never closed, which is what makes an outline unusable. */
@@ -342,6 +354,15 @@ function coordinateValue(raw: string, format: GerberCoordinateFormat): number {
 
 type Point = { x: number; y: number };
 
+/**
+ * Where the current point sits in a Gerber file before its first operation.
+ *
+ * The current point is defined from the top of the file, not from the first command that names one,
+ * so a file that opens with `X1000000Y0D01*` draws a line from here rather than teleporting to
+ * (1, 0). Reading that first draw as starting at its own endpoint loses the whole segment.
+ */
+const gerberOrigin: Point = { x: 0, y: 0 };
+
 function samePoint(a: Point, b: Point): boolean {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
@@ -376,8 +397,6 @@ type GerberFileState = {
   /** From the deprecated `G90`/`G91`, read only where the file states no `%FS%` of its own. */
   legacyCoordinateMode: "absolute" | "incremental" | undefined;
   fileFunction: string | undefined;
-  /** Whether a `G36` in file scope opens a region, whose contour is closed by definition. */
-  regionInFileScope: boolean;
   /**
    * The file's own word commands, in source order and with their whitespace dropped: no comment,
    * no aperture-block body, and nothing from an `M02` onwards, because none of those is a command
@@ -402,7 +421,6 @@ type GerberFileStateAccumulator = {
   declaredFormat: DeclaredCoordinateFormat | undefined;
   legacyCoordinateMode: "absolute" | "incremental" | undefined;
   fileFunction: string | undefined;
-  regionInFileScope: boolean;
   wordCommands: string[];
 };
 
@@ -412,7 +430,6 @@ function snapshotFileState(state: GerberFileStateAccumulator, apertures: Apertur
     format: state.declaredFormat,
     legacyCoordinateMode: state.legacyCoordinateMode,
     fileFunction: state.fileFunction,
-    regionInFileScope: state.regionInFileScope,
     wordCommands: state.wordCommands,
     apertures,
   };
@@ -475,11 +492,9 @@ function applyWordFileStateCommand(
   if (compact === "M02") return true;
 
   applyApertureWord(apertures, compact);
+  // `G36` and `G37` are artwork commands like any other: they reach the second walk in source order
+  // so that a region applies to the contours around it and to no contour before it.
   state.wordCommands.push(compact);
-  if (gCode === 36) {
-    state.regionInFileScope = true;
-    return false;
-  }
 
   if (gCode === 70) state.legacyUnits = "inch";
   else if (gCode === 71) state.legacyUnits = "mm";
@@ -502,7 +517,6 @@ function readFileState(commands: GerberCommand[], unterminated: UnterminatedBySh
     declaredFormat: undefined,
     legacyCoordinateMode: undefined,
     fileFunction: undefined,
-    regionInFileScope: false,
     wordCommands: [],
   };
   const apertures = createApertureLedger();
@@ -596,9 +610,29 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
   let current: Point | undefined;
   let contourStart: Point | undefined;
   let contourSegments = 0;
-  // A region between G36 and G37 is closed by definition, so its contour never counts as open.
+  /**
+   * Whether the commands being read are inside a `G36`/`G37` region, where a contour is closed by
+   * definition rather than by its own geometry. Read where the file writes it, so a region reaches
+   * the contours around it and neither the contour before it nor the one after it.
+   */
   let inRegion = false;
 
+  function recordPlottedPoint(point: Point): void {
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minY = Math.min(minY, point.y);
+    maxY = Math.max(maxY, point.y);
+    plotted += 1;
+  }
+
+  /**
+   * Ends the contour being drawn, if one is, in the mode it was drawn in.
+   *
+   * `inRegion` is read here, at the point where the contour ends, which is what keeps a `G36` from
+   * reaching back to close a contour the file drew before it. A region states that each of its
+   * contours returns to its start, so the implied closing transition is preserved for every contour
+   * in the region and not only for the one that happened to be in progress when the region ended.
+   */
   function finishContour(): void {
     if (contourStart && current && contourSegments > 0) {
       if (inRegion || samePoint(contourStart, current)) hasClosedContour = true;
@@ -615,6 +649,19 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
      * opens nothing and a `G40` that is not a comment cannot turn into plotted geometry.
      */
     for (const command of state.wordCommands) {
+      // Region state transitions in source order. A `G36` ends the object being drawn and opens a
+      // region for what follows; a `G37` closes the region, and the contour in progress is closed by
+      // that statement rather than by anything it drew. A command may carry both -- `G36X0Y0D02*`
+      // opens the region and moves in the same breath -- so the operation below is read either way.
+      const gCode = leadingGCode(command);
+      if (gCode === 36) {
+        finishContour();
+        inRegion = true;
+      } else if (gCode === 37) {
+        if (inRegion) finishContour();
+        inRegion = false;
+      }
+
       const operation = plottedOperation.exec(command);
       if (!operation) continue;
       const rawX = operation[1];
@@ -625,33 +672,40 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
       if (rawX === undefined && rawY === undefined) continue;
 
       const point: Point = {
-        x: rawX !== undefined ? coordinateValue(rawX, format) * scale : (current?.x ?? 0),
-        y: rawY !== undefined ? coordinateValue(rawY, format) * scale : (current?.y ?? 0),
+        x: rawX !== undefined ? coordinateValue(rawX, format) * scale : (current?.x ?? gerberOrigin.x),
+        y: rawY !== undefined ? coordinateValue(rawY, format) * scale : (current?.y ?? gerberOrigin.y),
       };
 
       if (code === "2") {
-        // A move ends whatever contour was being drawn and starts a new one.
+        // A move ends whatever contour was being drawn and starts a new one from where it lands.
         finishContour();
         contourStart = point;
+        current = point;
       } else if (code === "1") {
-        if (!contourStart) contourStart = current ?? point;
+        if (contourStart === undefined) {
+          if (current === undefined) {
+            // The current point sits at the Gerber origin until the file says otherwise, so a file
+            // whose first operation is a draw draws a line out of it. That transition is a drawn
+            // one: reading the contour as starting at its own endpoint loses the whole segment, and
+            // with it the origin the file actually drew from.
+            contourStart = gerberOrigin;
+            recordPlottedPoint(gerberOrigin);
+          } else {
+            contourStart = current;
+          }
+        }
         contourSegments += 1;
+        current = point;
       }
-
-      current = point;
-      minX = Math.min(minX, point.x);
-      maxX = Math.max(maxX, point.x);
-      minY = Math.min(minY, point.y);
-      maxY = Math.max(maxY, point.y);
-      plotted += 1;
+      // A flash places a whole aperture rather than a segment of the path the current point is on,
+      // so it has no branch of its own: it neither starts, continues nor closes a contour, and it
+      // leaves the current point where the file last moved or drew it. Its point is on the layer
+      // all the same, and it is still only a point: what an aperture covers is measured in #856, and
+      // what the file did say about that aperture keeps saying so in `./gerber-apertures`.
+      recordPlottedPoint(point);
     }
 
-    // Region state is applied after the sweep because G36/G37 interleave with operations; a file
-    // containing any region has at least one closed contour by definition.
-    if (state.regionInFileScope) {
-      inRegion = true;
-      hasClosedContour = true;
-    }
+    // A file whose last word leaves a contour open ends it here, in whichever mode it was drawn in.
     finishContour();
   }
 
