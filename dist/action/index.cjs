@@ -101552,8 +101552,98 @@ function parseExcellon(content, path53) {
 // src/multicad/gerber-parser.ts
 var inchToMm2 = 25.4;
 var closureToleranceMm = 2e-3;
-function warning3(code, message, path53) {
-  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
+var maxExcerptLength = 80;
+var whitespaceCharacters = /* @__PURE__ */ new Set([" ", "	", "\f", "\v", "\r", "\n"]);
+var lineBreakCharacters = /* @__PURE__ */ new Set(["\r", "\n"]);
+function endOfExtendedCommand(content, start, spansLines) {
+  for (let index = start + 1; index < content.length; index += 1) {
+    const char = content.charAt(index);
+    if (char === "%") return { terminated: true, end: index };
+    if (!spansLines && lineBreakCharacters.has(char)) return { terminated: false, stoppedAt: index };
+  }
+  return { terminated: false, stoppedAt: nextLineBreak(content, start) };
+}
+function endOfWordCommand(content, start) {
+  for (let index = start; index < content.length; index += 1) {
+    const char = content.charAt(index);
+    if (char === "*") return { terminated: true, end: index };
+    if (char === "%" || lineBreakCharacters.has(char)) return { terminated: false, stoppedAt: index };
+  }
+  return { terminated: false, stoppedAt: content.length };
+}
+function nextLineBreak(content, start) {
+  for (let index = start; index < content.length; index += 1) {
+    if (lineBreakCharacters.has(content.charAt(index))) return index;
+  }
+  return content.length;
+}
+function tokenizeGerber(content) {
+  const commands = [];
+  let index = 0;
+  while (index < content.length) {
+    while (index < content.length && whitespaceCharacters.has(content.charAt(index))) index += 1;
+    if (index >= content.length) break;
+    if (content.charAt(index) === "%") {
+      const spansLines = /^[aA][mM]/u.test(content.slice(index + 1, index + 3));
+      const end2 = endOfExtendedCommand(content, index, spansLines);
+      if (end2.terminated) {
+        commands.push({ kind: "extended", body: content.slice(index + 1, end2.end) });
+        index = end2.end + 1;
+        continue;
+      }
+      commands.push({ kind: "unterminated", shape: "extended", body: content.slice(index, end2.stoppedAt) });
+      index = end2.stoppedAt;
+      continue;
+    }
+    const end = endOfWordCommand(content, index);
+    if (end.terminated) {
+      commands.push({ kind: "word", body: content.slice(index, end.end) });
+      index = end.end + 1;
+      continue;
+    }
+    commands.push({ kind: "unterminated", shape: "word", body: content.slice(index, end.stoppedAt) });
+    index = end.stoppedAt;
+  }
+  return commands;
+}
+function compactCommand(body2) {
+  return body2.replace(/\s+/gu, "");
+}
+function leadingGCode(command) {
+  const digits = /^G(\d+)/u.exec(command)?.[1];
+  return digits === void 0 ? void 0 : Number.parseInt(digits, 10);
+}
+function boundedExcerpt(body2) {
+  const text = body2.replace(/\s+$/u, "");
+  return text.length <= maxExcerptLength ? text : `${text.slice(0, maxExcerptLength)}...`;
+}
+function recordUnterminated(evidence, body2) {
+  if (evidence.count === 0) evidence.excerpt = boundedExcerpt(body2);
+  evidence.count += 1;
+}
+function unterminatedWarnings(unterminated, path53) {
+  const warnings = [];
+  const extended = unterminated.extended;
+  if (extended.count > 0) {
+    warnings.push(
+      warning3(
+        "gerber.unterminated-extended-command",
+        `An extended command is not closed by "%". There ${extended.count === 1 ? "is 1" : `are ${extended.count}`} of them, the first reading "${extended.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
+        path53
+      )
+    );
+  }
+  const word = unterminated.word;
+  if (word.count > 0) {
+    warnings.push(
+      warning3(
+        "gerber.unterminated-word-command",
+        `A command is not terminated by "*". There ${word.count === 1 ? "is 1" : `are ${word.count}`} of them, the first reading "${word.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
+        path53
+      )
+    );
+  }
+  return warnings;
 }
 function identityFromFileFunction(value) {
   const parts = value.split(",").map((part) => part.trim());
@@ -101591,21 +101681,99 @@ function coordinateValue2(raw, format) {
 function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
-function parseGerber(content, path53) {
-  const warnings = [];
-  const unitsMatch = /%MO(MM|IN)\*%/u.exec(content);
-  const units = unitsMatch?.[1] === "IN" ? "inch" : "mm";
-  if (!unitsMatch) {
-    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path53));
+var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])$/u;
+function warning3(code, message, path53) {
+  return path53 === void 0 ? { code, message } : { code, message, path: path53 };
+}
+function readFileState(commands, unterminated) {
+  let declaredUnits;
+  let legacyUnits;
+  let declaredFormat;
+  let legacyCoordinateMode;
+  let fileFunction;
+  let regionInFileScope = false;
+  let apertureBlockDepth = 0;
+  const wordCommands = [];
+  const fileState = () => ({
+    units: declaredUnits ?? legacyUnits,
+    format: declaredFormat,
+    legacyCoordinateMode,
+    fileFunction,
+    regionInFileScope,
+    wordCommands
+  });
+  for (const command of commands) {
+    if (command.kind === "unterminated") {
+      recordUnterminated(unterminated[command.shape], command.body);
+      continue;
+    }
+    if (command.kind === "extended") {
+      const compact2 = compactCommand(command.body);
+      if (compact2.startsWith("AM")) continue;
+      if (compact2.startsWith("AB")) {
+        if (compact2 === "AB*") apertureBlockDepth = Math.max(0, apertureBlockDepth - 1);
+        else apertureBlockDepth += 1;
+        continue;
+      }
+      const unitsMatch = /^MO(MM|IN)\*$/u.exec(compact2);
+      if (unitsMatch) {
+        declaredUnits ??= unitsMatch[1] === "IN" ? "inch" : "mm";
+        continue;
+      }
+      const formatMatch = /^FS([LT])([AI])X(\d)(\d)Y(\d)(\d)\*$/u.exec(compact2);
+      if (formatMatch && !declaredFormat) {
+        declaredFormat = {
+          integerDigits: Number.parseInt(formatMatch[3] ?? "3", 10),
+          decimalDigits: Number.parseInt(formatMatch[4] ?? "5", 10),
+          zeroOmission: formatMatch[1] === "T" ? "trailing" : "leading",
+          coordinateMode: formatMatch[2] === "I" ? "incremental" : "absolute"
+        };
+        continue;
+      }
+      if (fileFunction === void 0) {
+        fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
+      }
+      continue;
+    }
+    const compact = compactCommand(command.body);
+    const gCode = leadingGCode(compact);
+    if (gCode === 4) continue;
+    if (apertureBlockDepth > 0) continue;
+    if (compact === "M02") return fileState();
+    wordCommands.push(compact);
+    if (gCode === 36) {
+      regionInFileScope = true;
+      continue;
+    }
+    if (gCode === 70) legacyUnits = "inch";
+    else if (gCode === 71) legacyUnits = "mm";
+    else if (gCode === 90) legacyCoordinateMode = "absolute";
+    else if (gCode === 91) legacyCoordinateMode = "incremental";
   }
-  const formatMatch = /%FS([LT])([AI])X(\d)(\d)Y(\d)(\d)\*%/u.exec(content);
-  const format = formatMatch ? {
-    integerDigits: Number.parseInt(formatMatch[3] ?? "3", 10),
-    decimalDigits: Number.parseInt(formatMatch[4] ?? "5", 10),
-    zeroOmission: formatMatch[1] === "T" ? "trailing" : "leading",
+  return fileState();
+}
+function parseGerber(content, path53) {
+  const commands = tokenizeGerber(content);
+  const unterminated = {
+    extended: { count: 0, excerpt: void 0 },
+    word: { count: 0, excerpt: void 0 }
+  };
+  const state3 = readFileState(commands, unterminated);
+  const units = state3.units;
+  const declaredFormat = state3.format;
+  const format = declaredFormat ? {
+    integerDigits: declaredFormat.integerDigits,
+    decimalDigits: declaredFormat.decimalDigits,
+    zeroOmission: declaredFormat.zeroOmission,
     evidence: "declared"
   } : { integerDigits: 3, decimalDigits: 5, zeroOmission: "leading", evidence: "assumed" };
-  if (!formatMatch) {
+  const incremental = (declaredFormat?.coordinateMode ?? state3.legacyCoordinateMode) === "incremental";
+  const identity = state3.fileFunction ? identityFromFileFunction(state3.fileFunction) : void 0;
+  const warnings = [];
+  if (units === void 0) {
+    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path53));
+  }
+  if (!declaredFormat) {
     warnings.push(
       warning3(
         "gerber.assumed-coordinate-format",
@@ -101613,7 +101781,8 @@ function parseGerber(content, path53) {
         path53
       )
     );
-  } else if (formatMatch[2] === "I") {
+  }
+  if (incremental) {
     warnings.push(
       warning3(
         "gerber.incremental-coordinates",
@@ -101622,19 +101791,16 @@ function parseGerber(content, path53) {
       )
     );
   }
-  const incremental = formatMatch?.[2] === "I";
-  const fileFunctionMatch = /%TF\.FileFunction,([^*]+)\*%/u.exec(content);
-  const fileFunction = fileFunctionMatch?.[1]?.trim();
-  const identity = fileFunction ? identityFromFileFunction(fileFunction) : void 0;
-  if (fileFunction && !identity) {
+  if (state3.fileFunction && !identity) {
     warnings.push(
       warning3(
         "gerber.unmodelled-file-function",
-        `The file declares TF.FileFunction "${fileFunction}", which is not a stackup layer; its role comes from the filename.`,
+        `The file declares TF.FileFunction "${state3.fileFunction}", which is not a stackup layer; its role comes from the filename.`,
         path53
       )
     );
   }
+  warnings.push(...unterminatedWarnings(unterminated, path53));
   const scale = units === "inch" ? inchToMm2 : 1;
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
@@ -101656,11 +101822,12 @@ function parseGerber(content, path53) {
     contourSegments = 0;
   }
   if (!incremental) {
-    const operation = /(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])\*/gu;
-    for (const match of content.matchAll(operation)) {
-      const rawX = match[1];
-      const rawY = match[2];
-      const code = match[3]?.replace(/^0/u, "");
+    for (const command of state3.wordCommands) {
+      const operation = plottedOperation.exec(command);
+      if (!operation) continue;
+      const rawX = operation[1];
+      const rawY = operation[2];
+      const code = operation[3]?.replace(/^0/u, "");
       if (rawX === void 0 && rawY === void 0) continue;
       const point = {
         x: rawX !== void 0 ? coordinateValue2(rawX, format) * scale : current?.x ?? 0,
@@ -101680,18 +101847,18 @@ function parseGerber(content, path53) {
       maxY = Math.max(maxY, point.y);
       plotted += 1;
     }
-    if (/G36\*/u.test(content)) {
+    if (state3.regionInFileScope) {
       inRegion = true;
       hasClosedContour = true;
     }
     finishContour();
   }
   return {
-    units,
-    unitsEvidence: unitsMatch ? "declared" : "assumed",
+    units: units ?? "mm",
+    unitsEvidence: units === void 0 ? "assumed" : "declared",
     format,
     identity,
-    fileFunction,
+    fileFunction: state3.fileFunction,
     boundingBoxMm: plotted >= 2 && Number.isFinite(minX) ? { minX, maxX, minY, maxY } : void 0,
     hasClosedContour,
     openContourCount,
