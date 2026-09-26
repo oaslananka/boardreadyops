@@ -507,18 +507,29 @@ function applyExtendedFileStateCommand(
     return;
   }
 
-  // `%LPD*%` and `%LPC*%` say whether what is plotted after them lands on the layer or lifts off it.
-  // The polarity is read here only to record that the file erases copper somewhere, which is what the
-  // geometry has to be told: a `%LPC*%` command is a polarity, never a transformation, and reading it
-  // as one would report the layer as transformed when the file never moved anything.
+  if (state.fileFunction === undefined) {
+    state.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
+  }
+
+  recordUnappliedGraphicsState(compact, state);
+}
+
+/**
+ * Records the two things a file can state that this reader does not apply.
+ *
+ * A polarity and an object transformation are the two graphics statements whose effect is to change
+ * what lands on the layer, and neither is applied here: `%LPC*%` erases copper that nothing composes
+ * against the dark objects around it, and nothing in this module moves, turns or scales a plotted
+ * object. Both are therefore recorded as facts about the file for the geometry evidence to carry,
+ * rather than as state this module acts on, and they are read apart because a `%LPC*%` is a polarity
+ * and a `%LN<name>*%` is a name -- reading either as a transformation would report the layer as
+ * transformed when the file never moved anything.
+ */
+function recordUnappliedGraphicsState(compact: string, state: GerberFileStateAccumulator): void {
   const polarityMatch = /^LP([DC])\*$/u.exec(compact);
   if (polarityMatch) {
     state.polarity = polarityMatch[1] === "C" ? "clear" : "dark";
     return;
-  }
-
-  if (state.fileFunction === undefined) {
-    state.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
   }
 
   // An object transformation moves, rotates, scales or repeats whatever is plotted after it, and

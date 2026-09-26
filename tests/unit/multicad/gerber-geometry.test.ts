@@ -150,6 +150,56 @@ describe("readGerberTransform", () => {
     expect(readGerberTransform("SRQ2*")).toBe("step-and-repeat");
     expect(readGerberTransform("SRX2Y2J*")).toBe("step-and-repeat");
   });
+
+  it("answers a repetition from the one thing each of its values can say", () => {
+    // A count of one and an offset of zero is the identity, however the file spells the numbers:
+    // `%SRX1.0Y1.0I0.0J0.0*%` copies nothing, and so does a signed zero, which displaces nothing.
+    expect(readGerberTransform("SRX1.0Y1.0I0.0J0.0*")).toBeUndefined();
+    expect(readGerberTransform("SRI-0.0*")).toBeUndefined();
+
+    // An offset of one is not an identity: a second copy displaced by a unit is a panel, and
+    // publishing it as the artwork drawn once is the measurement this whole module refuses to make.
+    expect(readGerberTransform("SRI1*")).toBe("step-and-repeat");
+    expect(readGerberTransform("SRJ1.0*")).toBe("step-and-repeat");
+    expect(readGerberTransform("SRX1Y1I0J0I5.0*")).toBe("step-and-repeat");
+
+    // A count of zero is not an identity either, and it is the case that is easiest to get wrong: it
+    // says the file plots no copy on that axis at all, so the objects inside the block are copper it
+    // said it would not lay down. Every primitive collected would really have been plotted, which is
+    // exactly why publishing them as the layer is an absence reported as a measurement.
+    expect(readGerberTransform("SRX0*")).toBe("step-and-repeat");
+    expect(readGerberTransform("SRX0.0Y1*")).toBe("step-and-repeat");
+    expect(readGerberTransform("SR0*")).toBe("step-and-repeat");
+  });
+
+  it("stays roughly linear time on a long adversarial body (ReDoS guard)", () => {
+    // A run of digits splits between consecutive numbers in as many ways as there are digits, and
+    // the body that turns out not to match is where a grammar of numbers walks every one of them:
+    // sixty-four digits is 2^64 of them, and the file chooses how long its body is. The bodies below
+    // are the ones such a grammar could not answer -- one with nothing after the digits, one with a
+    // letter that is not a parameter, and one that does match -- and the bound is deliberately far
+    // above the microseconds reading them costs and far below the years the arithmetic would take.
+    const rotation = `LR${"1".repeat(64)}`;
+    const startedAt = performance.now();
+    expect(readGerberTransform(rotation)).toBeUndefined();
+    expect(readGerberTransform(`${rotation}Z*`)).toBeUndefined();
+    expect(readGerberTransform(`${rotation}*`)).toBe("rotation");
+    expect(readGerberTransform(`SR${"1".repeat(64)}*`)).toBe("step-and-repeat");
+    expect(performance.now() - startedAt).toBeLessThan(1_000);
+  });
+
+  it("reads a malformed body as the transformation it is trying to state, rather than as none", () => {
+    // A body made of its own family's parameter characters *is* that family stating the
+    // transformation, however impossible its decimal points and signs are in the middle. The bodies
+    // below are the ones a structure of numbers would have refused, and refusing them would report
+    // a layer as exactly measured on the strength of a spelling that could not be parsed.
+    expect(readGerberTransform("LR1.2.3*")).toBe("rotation");
+    expect(readGerberTransform("LS.5*")).toBe("scale");
+    // A letter from outside the family is still not a parameter, which is what keeps `%LPD*%`,
+    // `%LN<name>*%` and `%LRX2*%` out of this.
+    expect(readGerberTransform("LRX2*")).toBeUndefined();
+    expect(readGerberTransform("LSZ3*")).toBeUndefined();
+  });
 });
 
 describe("createGerberGeometryCollector", () => {
@@ -256,14 +306,19 @@ describe("createGerberGeometryCollector", () => {
     collector.segment({ x: 0, y: 0 }, { x: 4, y: 0 }, { inRegion: true, apertureCode: 10 });
     collector.segment({ x: 4, y: 0 }, { x: 4, y: 4 }, { inRegion: true, apertureCode: 14 });
     collector.segment({ x: 4, y: 4 }, { x: 0, y: 4 }, { inRegion: true, apertureCode: undefined });
+    // A `D03` between `G36` and `G37` is a degenerate contour the format collapses to the point it
+    // names, not a pad, so the same aperture covers a point here exactly as little as it covers an
+    // edge. Publishing the 0.2 mm disc would be copper the file never laid down, and a downstream
+    // rule measuring clearance to it would be measuring a pad that is not on the layer.
+    collector.flash({ x: 2, y: 2 }, { inRegion: true, apertureCode: 10 });
 
-    // A circle and a macro are both refused the same way, and neither is a doubt: a region edge is
-    // the line the file stated, whatever was selected while it stated it.
+    // A circle, a macro and a flash are all refused the same way, and none of them is a doubt: a
+    // region is the line the file stated, whatever was selected while it stated it.
     expect(
       collector
         .evidence()
-        .primitives.map((primitive) => (primitive.kind === "segment" ? primitive.widthMm : "not a segment")),
-    ).toEqual([undefined, undefined, undefined]);
+        .primitives.map((primitive) => ("widthMm" in primitive ? primitive.widthMm : primitive.aperture)),
+    ).toEqual([undefined, undefined, undefined, undefined]);
     expect(collector.evidence()).toMatchObject({ incomplete: false, uncertainty: [] });
   });
 
@@ -662,6 +717,14 @@ describe("geometry read through parseGerber", () => {
     const identity = parseGerber(gerber("X0Y0D02*", "X4000000Y0D01*").replace("%ADD11R,1.6X0.8*%", "%SRX1Y1I0J0*%"));
     expect(identity.geometry.uncertainty).toEqual([]);
     expect(identity.geometry.incomplete).toBe(false);
+
+    // A count of zero is not an identity, and the file has to say so because the geometry cannot: the
+    // objects inside the block really were plotted, so a complete list of them is a complete account
+    // of artwork the file never put down.
+    const unplotted = parseGerber(gerber("X0Y0D02*", "X4000000Y0D01*").replace("%ADD11R,1.6X0.8*%", "%SRX0Y0*%"));
+    expect(unplotted.geometry.primitives).toHaveLength(1);
+    expect(unplotted.geometry.uncertainty).toEqual(["step-and-repeat"]);
+    expect(unplotted.geometry.incomplete).toBe(true);
   });
 
   it("reads a command that both opens a region and selects an aperture", () => {
@@ -683,6 +746,33 @@ describe("geometry read through parseGerber", () => {
         widthMm: undefined,
       },
     ]);
+    expect(result.geometry.incomplete).toBe(false);
+  });
+
+  it("publishes a flash inside a region as the point it is, not as a pad", () => {
+    // A `D03` between `G36` and `G37` is a degenerate contour, which the format collapses to the
+    // point the file named. The aperture in force across the fill covers a point exactly as little
+    // as it covers a region edge, so the flash answers the same way the edge above does.
+    const result = parseGerber(
+      gerber("G36*", `X${mm(1)}Y0D02*`, `X${mm(1)}Y${mm(1)}D01*`, `X${mm(2)}Y${mm(2)}D03*`, "G37*", `X${mm(5)}Y0D03*`),
+    );
+
+    const [edge, inside, outside] = result.geometry.primitives;
+    expect(edge).toMatchObject({ kind: "segment", inRegion: true, widthMm: undefined });
+    // The point is still a point the file plotted and is still on the layer; what it is not is a
+    // 0.2 mm disc, so nothing here is claimed about the copper around it.
+    expect(inside).toEqual({
+      kind: "flash",
+      at: { x: 2, y: 2 },
+      inRegion: true,
+      apertureCode: 10,
+      aperture: undefined,
+    });
+    // The same `D03` after `G37` is an ordinary pad, which is what makes the difference observable
+    // at all: one D-code, one aperture, and the region is the only thing that changed the answer.
+    expect(outside).toMatchObject({ kind: "flash", inRegion: false, aperture: { shape: "circle", diameterMm: 0.2 } });
+    // Neither the point nor the pad is a doubt, so a file that does this is not reported incomplete.
+    expect(result.geometry.uncertainty).toEqual([]);
     expect(result.geometry.incomplete).toBe(false);
   });
 

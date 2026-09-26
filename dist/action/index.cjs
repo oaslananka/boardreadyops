@@ -101957,9 +101957,11 @@ function readGerberCoordinate(raw, format) {
   return negative ? -value : value;
 }
 var mirrorTransform = /^LM[NXY]*\*$/u;
-var rotationTransform = /^LR(?:[ABIJQ]?[+-]?\d+(?:\.\d+)?)*\*$/u;
-var scaleTransform = /^LS(?:[XY]?[+-]?\d+(?:\.\d+)?)*\*$/u;
-var stepAndRepeatTransform = /^SR(?:(?:X(\d+(?:\.\d+)?))?(?:Y(\d+(?:\.\d+)?))?(?:I([+-]?\d+(?:\.\d+)?))?(?:J([+-]?\d+(?:\.\d+)?))?|(\d+(?:\.\d+)?))?\*$/u;
+var rotationTransform = /^LR[ABIJQ+\-.0-9]*\*$/u;
+var scaleTransform = /^LS[XY+\-.0-9]*\*$/u;
+var stepAndRepeatAxes = /([XYIJ])/u;
+var copiesAtMostOnce = /^1(?:\.0+)?$/u;
+var copiesWithoutOffset = /^[+-]?0(?:\.0+)?$/u;
 var stepAndRepeatStatement = /^SR[^*]*\*$/u;
 var transformUncertainty = {
   mirror: "object-transform",
@@ -101975,15 +101977,17 @@ function readGerberTransform(compact) {
   return void 0;
 }
 function repeatsAnything(compact) {
-  const declared = stepAndRepeatTransform.exec(compact);
-  if (declared === null) return true;
-  const [xCount, yCount, xOffset, yOffset, copiesInBoth] = declared.slice(1);
-  if (copiesInBoth !== void 0) return Number(copiesInBoth) > 1;
-  const copiesX = xCount === void 0 ? 1 : Number(xCount);
-  const copiesY = yCount === void 0 ? 1 : Number(yCount);
-  const offsetX = xOffset === void 0 ? 0 : Number(xOffset);
-  const offsetY = yOffset === void 0 ? 0 : Number(yOffset);
-  return copiesX > 1 || copiesY > 1 || offsetX !== 0 || offsetY !== 0;
+  const [head, ...labelled] = compact.slice(2, -1).split(stepAndRepeatAxes);
+  const unlabelled = head ?? "";
+  if (unlabelled !== "" && !copiesAtMostOnce.test(unlabelled)) return true;
+  for (let index = 0; index < labelled.length; index += 2) {
+    const axis = labelled[index];
+    const value = labelled[index + 1];
+    if (axis === void 0 || value === void 0) return true;
+    const statesIdentity = axis === "I" || axis === "J" ? copiesWithoutOffset : copiesAtMostOnce;
+    if (!statesIdentity.test(value)) return true;
+  }
+  return false;
 }
 var maxGeometryPrimitives = 25e3;
 function createGerberGeometryCollector(input) {
@@ -102025,8 +102029,8 @@ function createGerberGeometryCollector(input) {
       );
     },
     flash(at, context5) {
-      const resolved = resolve2(context5.apertureCode);
-      recordApertureUncertainty(resolved);
+      const resolved = context5.inRegion ? void 0 : resolve2(context5.apertureCode);
+      if (resolved !== void 0) recordApertureUncertainty(resolved);
       if (!reserve()) return;
       primitives.push(
         Object.freeze({
@@ -102034,7 +102038,7 @@ function createGerberGeometryCollector(input) {
           at: frozenPoint(at),
           inRegion: context5.inRegion,
           apertureCode: context5.apertureCode,
-          aperture: resolved.kind === "modelled" ? frozenAperture(resolved.aperture) : void 0
+          aperture: resolved?.kind === "modelled" ? frozenAperture(resolved.aperture) : void 0
         })
       );
     },
@@ -102226,13 +102230,16 @@ function applyExtendedFileStateCommand(command, state3, apertures) {
     };
     return;
   }
+  if (state3.fileFunction === void 0) {
+    state3.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
+  }
+  recordUnappliedGraphicsState(compact, state3);
+}
+function recordUnappliedGraphicsState(compact, state3) {
   const polarityMatch = /^LP([DC])\*$/u.exec(compact);
   if (polarityMatch) {
     state3.polarity = polarityMatch[1] === "C" ? "clear" : "dark";
     return;
-  }
-  if (state3.fileFunction === void 0) {
-    state3.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
   }
   const transform2 = readGerberTransform(compact);
   if (transform2 !== void 0 && !state3.transforms.includes(transform2)) state3.transforms.push(transform2);

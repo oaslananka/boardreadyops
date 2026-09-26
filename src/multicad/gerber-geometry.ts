@@ -136,6 +136,10 @@ type GerberTraceSegment = {
  * reader cannot measure faithfully -- a macro, a block, a definition it could not read, or one the
  * file selected without ever defining. The flash is still real in all of those cases: its position
  * is on the layer, and its extent is not known here.
+ *
+ * It is also undefined for a flash `inRegion`, where there is no extent to know: a `D03` between
+ * `G36` and `G37` is a degenerate contour the format collapses to the single point the file stated
+ * and not a pad, so the aperture in force across the fill covers nothing. See the collector.
  */
 type GerberFlash = {
   readonly kind: "flash";
@@ -209,35 +213,64 @@ export type GerberFileTransform = "mirror" | "rotation" | "scale" | "step-and-re
  * single-number spelling; and `%SRX2Y3I5.0J4.0*%` opens a step and repeat, which copies everything
  * drawn inside it, with `%SRX2Y3*%` and `%SR2*%` the older forms.
  *
- * Each match is anchored at both ends and after its family letters, and each body is a grammar
- * rather than a wildcard, because `L` and `S` are not only transformation families: `%LPD*%` and
- * `%LPC*%` state a polarity, `%LN<name>*%` names a saved image and `%LP<name>*%` selects it. A
- * reader that took any `L*` or `S*` command for a transformation would read all of those as a
- * transform it had failed to apply, which is the false-uncertainty twin of the false measurement
- * this module exists to prevent: a report that refuses to act on a layer for a reason the file never
- * gave is a report nobody can act on at all.
+ * Each match is anchored at both ends and after its family letters, and each body is spelled out
+ * character by character rather than waved through, because `L` and `S` are not only transformation
+ * families: `%LPD*%` and `%LPC*%` state a polarity, `%LN<name>*%` names a saved image and
+ * `%LP<name>*%` selects it. A reader that took any `L*` or `S*` command for a transformation would
+ * read all of those as a transform it had failed to apply, which is the false-uncertainty twin of
+ * the false measurement this module exists to prevent: a report that refuses to act on a layer for a
+ * reason the file never gave is a report nobody can act on at all.
  *
- * Every number each family takes is optional after the family letters because the spec's *simplest*
- * spelling of each is the bare one -- `%LR90*%` rather than `%LRA90*%`, `%LS2*%` rather than
- * `%LSX2*%`. A grammar that required a modifier letter would read the commonest way of writing a
- * rotation as no rotation at all, which is the more dangerous of the two mistakes: an unmodelled
- * transform the file never stated becomes a layer reported as exact.
+ * Each body is matched as the alphabet its parameters are written in -- an axis letter from that
+ * family's own set, a sign, digits, decimal points -- and never as a structure of repeated numbers.
+ * A structure of repeated `\d+` groups cannot be matched in time bounded by the length of what it
+ * reads, because a run of digits splits between consecutive groups in as many ways as there are
+ * digits, and a body that turns out not to match is where the engine walks every one of those ways:
+ * `%LR` followed by sixty digits and no terminator is a statement a file this repository does not
+ * control can write, and an exponential grammar spends the whole review on it.
+ *
+ * The alphabet is a decision rather than a shortcut. A body made of nothing but its own family's
+ * parameter characters *is* that family stating the transformation, and a body that cannot be read
+ * as one is a body whose decimal points and signs are in impossible places -- which is exactly the
+ * malformed input this reader has to answer for, and the answer that fails in the safe direction.
+ * Answering "no transformation" for one of those would report a layer as exactly measured on the
+ * strength of a spelling that could not be parsed, and a confidently wrong measurement is read as a
+ * measurement by whatever consumes it. That is why the structure a family's numbers have is read
+ * where it decides something -- see `repeatsAnything` -- and only there.
  */
 const mirrorTransform = /^LM[NXY]*\*$/u;
-const rotationTransform = /^LR(?:[ABIJQ]?[+-]?\d+(?:\.\d+)?)*\*$/u;
-const scaleTransform = /^LS(?:[XY]?[+-]?\d+(?:\.\d+)?)*\*$/u;
+const rotationTransform = /^LR[ABIJQ+\-.0-9]*\*$/u;
+const scaleTransform = /^LS[XY+\-.0-9]*\*$/u;
 
 /**
- * `%SRX2Y3I5.0J4.0*%`, plus the forms that leave out what they do not change.
+ * The axis letters a step and repeat names its parameters with, which is what splits its body.
  *
- * `X` and `Y` count the copies on each axis and `I`/`J` offset them, and the spec lets each of the
- * four be omitted independently -- `%SRX2*%`, `%SRY3*%` and `%SRX2Y2J5.0*%` are all legal -- while
- * the pre-X2 `%SR2*%` states one count for both directions. Anything that grammar cannot read is
- * caught by `stepAndRepeatStatement` rather than by this one, so that the decision below is only
- * ever made about a repetition whose parameters were actually read.
+ * `X` and `Y` count the copies on each axis and `I`/`J` offset them, and the pre-X2 `%SR2*%` states
+ * one count for both directions without naming either. The letters are captured rather than dropped,
+ * which is what leaves every value beside the axis it applies to: `X1Y1I0J0` splits into an empty
+ * head, then `X`, `1`, `Y`, `1`, `I`, `0`, `J`, `0`, and a value the file wrote no axis for is left in
+ * front of the list.
  */
-const stepAndRepeatTransform =
-  /^SR(?:(?:X(\d+(?:\.\d+)?))?(?:Y(\d+(?:\.\d+)?))?(?:I([+-]?\d+(?:\.\d+)?))?(?:J([+-]?\d+(?:\.\d+)?))?|(\d+(?:\.\d+)?))?\*$/u;
+const stepAndRepeatAxes = /([XYIJ])/u;
+
+/**
+ * A count that copies nothing, which is what a repetition with one copy on an axis states:
+ * `%SRX1*%` and `%SRX1.0*%` both draw the artwork once.
+ *
+ * A count of zero is deliberately not in here, though no count is lower than it. Zero states that the
+ * file plots no copy on that axis at all, so the `D01` and `D03` objects between the `%SR*%` and the
+ * `%SR*%` that closes it are copper the file said it would not lay down. Reading those as the layer
+ * would publish artwork that is not on it, and an absence published as a measurement is the one wrong
+ * answer here that nothing downstream can flag, because every primitive collected really was plotted.
+ */
+const copiesAtMostOnce = /^1(?:\.0+)?$/u;
+
+/**
+ * An offset that copies nothing, and only a literal zero is one. `%SRI1*%` still copies: it draws a
+ * second layer of artwork displaced by one unit, which is a panel rather than an identity. The sign
+ * the spec lets an offset carry is read and discarded here, because a signed zero displaces nothing.
+ */
+const copiesWithoutOffset = /^[+-]?0(?:\.0+)?$/u;
 
 /**
  * Any file-scope statement of a step and repeat, however it is spelled.
@@ -277,24 +310,37 @@ export function readGerberTransform(compact: string): GerberFileTransform | unde
 /**
  * Whether a step and repeat has anything to repeat.
  *
- * Two spellings reach here and both have to be answered the same way. A command this grammar cannot
+ * Two spellings reach here and both have to be answered the same way. A command this reader cannot
  * read is a repetition this reader did not apply, so it counts: reading `%SRX2*%` as no repetition
  * at all would publish a panel's untransformed artwork as though the file had drawn it once. A
  * command that states one copy in each direction with no offset copies nothing: `%SRX1Y1I0J0*%` is
  * what ordinary CAM output writes on every layer it exports, and reading it as a transformation
  * would mark every honest board incomplete for a repetition that was never going to happen.
+ *
+ * So each value is read against the one thing it is able to say -- a count of exactly one, an offset
+ * of zero -- and anything else counts as a repetition: a count of two, a count of zero, an offset of
+ * one, a value that is not a number at all, and a bare axis letter with no value behind it.
  */
 function repeatsAnything(compact: string): boolean {
-  const declared = stepAndRepeatTransform.exec(compact);
-  if (declared === null) return true;
+  // `stepAndRepeatStatement` has already established that this is a step-and-repeat statement, so
+  // the body is whatever the file wrote between the `SR` and the `*`. Splitting leaves what came
+  // before the first axis letter in front of the list -- empty when the file opened with one, and
+  // the pre-X2 `%SR2*%`'s count when it did not.
+  const [head, ...labelled] = compact.slice(2, -1).split(stepAndRepeatAxes);
+  const unlabelled = head ?? "";
 
-  const [xCount, yCount, xOffset, yOffset, copiesInBoth] = declared.slice(1);
-  if (copiesInBoth !== undefined) return Number(copiesInBoth) > 1;
-  const copiesX = xCount === undefined ? 1 : Number(xCount);
-  const copiesY = yCount === undefined ? 1 : Number(yCount);
-  const offsetX = xOffset === undefined ? 0 : Number(xOffset);
-  const offsetY = yOffset === undefined ? 0 : Number(yOffset);
-  return copiesX > 1 || copiesY > 1 || offsetX !== 0 || offsetY !== 0;
+  // A value with no axis in front of it is a count rather than an offset: `%SR2*%` states one count
+  // for both directions, and a count this cannot answer is a repetition it did not apply.
+  if (unlabelled !== "" && !copiesAtMostOnce.test(unlabelled)) return true;
+
+  for (let index = 0; index < labelled.length; index += 2) {
+    const axis = labelled[index];
+    const value = labelled[index + 1];
+    if (axis === undefined || value === undefined) return true;
+    const statesIdentity = axis === "I" || axis === "J" ? copiesWithoutOffset : copiesAtMostOnce;
+    if (!statesIdentity.test(value)) return true;
+  }
+  return false;
 }
 
 /**
@@ -451,8 +497,14 @@ export function createGerberGeometryCollector(input: GerberGeometryInput): Gerbe
     },
 
     flash(at, context) {
-      const resolved = resolve(context.apertureCode);
-      recordApertureUncertainty(resolved);
+      // A flash inside a region is a degenerate contour rather than a pad: the format collapses it to
+      // the single point the file stated and ends the contour there, and the aperture in force across
+      // the fill has no copper to cover. Claiming that aperture's dimensions would publish a disc of
+      // copper the file never laid down, and doubting the aperture would refuse an ordinary region
+      // for a reason the file never gave -- the same two mistakes a region edge would make, and
+      // answered the same way a region edge is.
+      const resolved = context.inRegion ? undefined : resolve(context.apertureCode);
+      if (resolved !== undefined) recordApertureUncertainty(resolved);
       if (!reserve()) return;
       primitives.push(
         Object.freeze({
@@ -460,7 +512,7 @@ export function createGerberGeometryCollector(input: GerberGeometryInput): Gerbe
           at: frozenPoint(at),
           inRegion: context.inRegion,
           apertureCode: context.apertureCode,
-          aperture: resolved.kind === "modelled" ? frozenAperture(resolved.aperture) : undefined,
+          aperture: resolved?.kind === "modelled" ? frozenAperture(resolved.aperture) : undefined,
         }),
       );
     },
@@ -544,7 +596,9 @@ export function pointToSegmentDistanceMm(point: GerberPoint, segment: GerberTrac
   if (lengthSquared === 0) return distanceMm(point, segment.from);
 
   const along = ((point.x - segment.from.x) * dx + (point.y - segment.from.y) * dy) / lengthSquared;
-  const fraction = along < 0 ? 0 : along > 1 ? 1 : along;
+  // Clamped into the path's own extent, because the nearest point on a path is inside it: a
+  // projection past either end has to land on that end rather than beyond it.
+  const fraction = Math.min(1, Math.max(0, along));
   return distanceMm(point, { x: segment.from.x + fraction * dx, y: segment.from.y + fraction * dy });
 }
 
