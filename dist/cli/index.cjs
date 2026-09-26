@@ -47729,72 +47729,80 @@ var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?
 function warning2(code, message, path72) {
   return path72 === void 0 ? { code, message } : { code, message, path: path72 };
 }
+function snapshotFileState(state) {
+  return {
+    units: state.declaredUnits ?? state.legacyUnits,
+    format: state.declaredFormat,
+    legacyCoordinateMode: state.legacyCoordinateMode,
+    fileFunction: state.fileFunction,
+    regionInFileScope: state.regionInFileScope,
+    wordCommands: state.wordCommands
+  };
+}
+function applyExtendedFileStateCommand(command, state) {
+  const compact = compactCommand(command.body);
+  if (compact.startsWith("AM")) return;
+  if (compact.startsWith("AB")) {
+    if (compact === "AB*") state.apertureBlockDepth = Math.max(0, state.apertureBlockDepth - 1);
+    else state.apertureBlockDepth += 1;
+    return;
+  }
+  const unitsMatch = /^MO(MM|IN)\*$/u.exec(compact);
+  if (unitsMatch) {
+    state.declaredUnits ??= unitsMatch[1] === "IN" ? "inch" : "mm";
+    return;
+  }
+  const formatMatch = /^FS([LT])([AI])X(\d)(\d)Y(\d)(\d)\*$/u.exec(compact);
+  if (formatMatch) {
+    state.declaredFormat ??= {
+      integerDigits: Number.parseInt(formatMatch[3] ?? "3", 10),
+      decimalDigits: Number.parseInt(formatMatch[4] ?? "5", 10),
+      zeroOmission: formatMatch[1] === "T" ? "trailing" : "leading",
+      coordinateMode: formatMatch[2] === "I" ? "incremental" : "absolute"
+    };
+    return;
+  }
+  if (state.fileFunction === void 0) {
+    state.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
+  }
+}
+function applyWordFileStateCommand(command, state) {
+  const compact = compactCommand(command.body);
+  const gCode = leadingGCode(compact);
+  if (gCode === 4 || state.apertureBlockDepth > 0) return false;
+  if (compact === "M02") return true;
+  state.wordCommands.push(compact);
+  if (gCode === 36) {
+    state.regionInFileScope = true;
+    return false;
+  }
+  if (gCode === 70) state.legacyUnits = "inch";
+  else if (gCode === 71) state.legacyUnits = "mm";
+  else if (gCode === 90) state.legacyCoordinateMode = "absolute";
+  else if (gCode === 91) state.legacyCoordinateMode = "incremental";
+  return false;
+}
 function readFileState(commands, unterminated) {
-  let declaredUnits;
-  let legacyUnits;
-  let declaredFormat;
-  let legacyCoordinateMode;
-  let fileFunction;
-  let regionInFileScope = false;
-  let apertureBlockDepth = 0;
-  const wordCommands = [];
-  const fileState = () => ({
-    units: declaredUnits ?? legacyUnits,
-    format: declaredFormat,
-    legacyCoordinateMode,
-    fileFunction,
-    regionInFileScope,
-    wordCommands
-  });
+  const state = {
+    declaredUnits: void 0,
+    legacyUnits: void 0,
+    declaredFormat: void 0,
+    legacyCoordinateMode: void 0,
+    fileFunction: void 0,
+    regionInFileScope: false,
+    apertureBlockDepth: 0,
+    wordCommands: []
+  };
   for (const command of commands) {
     if (command.kind === "unterminated") {
       recordUnterminated(unterminated[command.shape], command.body);
-      continue;
+    } else if (command.kind === "extended") {
+      applyExtendedFileStateCommand(command, state);
+    } else if (applyWordFileStateCommand(command, state)) {
+      break;
     }
-    if (command.kind === "extended") {
-      const compact2 = compactCommand(command.body);
-      if (compact2.startsWith("AM")) continue;
-      if (compact2.startsWith("AB")) {
-        if (compact2 === "AB*") apertureBlockDepth = Math.max(0, apertureBlockDepth - 1);
-        else apertureBlockDepth += 1;
-        continue;
-      }
-      const unitsMatch = /^MO(MM|IN)\*$/u.exec(compact2);
-      if (unitsMatch) {
-        declaredUnits ??= unitsMatch[1] === "IN" ? "inch" : "mm";
-        continue;
-      }
-      const formatMatch = /^FS([LT])([AI])X(\d)(\d)Y(\d)(\d)\*$/u.exec(compact2);
-      if (formatMatch && !declaredFormat) {
-        declaredFormat = {
-          integerDigits: Number.parseInt(formatMatch[3] ?? "3", 10),
-          decimalDigits: Number.parseInt(formatMatch[4] ?? "5", 10),
-          zeroOmission: formatMatch[1] === "T" ? "trailing" : "leading",
-          coordinateMode: formatMatch[2] === "I" ? "incremental" : "absolute"
-        };
-        continue;
-      }
-      if (fileFunction === void 0) {
-        fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
-      }
-      continue;
-    }
-    const compact = compactCommand(command.body);
-    const gCode = leadingGCode(compact);
-    if (gCode === 4) continue;
-    if (apertureBlockDepth > 0) continue;
-    if (compact === "M02") return fileState();
-    wordCommands.push(compact);
-    if (gCode === 36) {
-      regionInFileScope = true;
-      continue;
-    }
-    if (gCode === 70) legacyUnits = "inch";
-    else if (gCode === 71) legacyUnits = "mm";
-    else if (gCode === 90) legacyCoordinateMode = "absolute";
-    else if (gCode === 91) legacyCoordinateMode = "incremental";
   }
-  return fileState();
+  return snapshotFileState(state);
 }
 function parseGerber(content, path72) {
   const commands = tokenizeGerber(content);
