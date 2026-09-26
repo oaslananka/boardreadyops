@@ -424,43 +424,91 @@ describe("parseGerber", () => {
 
   describe("aperture blocks, whose bodies are not in file scope", () => {
     it("keeps a legacy units command inside a block out of the file state", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "G71*", "%ADD10C,0.1*%", "D10*",
-        "%AB D12*%", "D10*", "X0Y0D02*", "X1000000Y0D01*", "G70*", "%AB*%",
-        "X0Y0D02*", "X10000000Y0D01*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "G71*",
+          "%ADD10C,0.1*%",
+          "D10*",
+          "%AB D12*%",
+          "D10*",
+          "X0Y0D02*",
+          "X1000000Y0D01*",
+          "G70*",
+          "%AB*%",
+          "X0Y0D02*",
+          "X10000000Y0D01*",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.units).toBe("mm");
       expect(result.unitsEvidence).toBe("declared");
       expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 0 });
     });
 
     it("keeps a legacy coordinate mode inside a block out of the file state", () => {
-      const result = parseGerber([
-        "G90*", "%ADD10C,0.1*%", "D10*",
-        "%AB D12*%", "D10*", "X0Y0D02*", "X1000000Y0D01*", "G91*", "%AB*%",
-        "X0Y0D02*", "X01000000Y0D01*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "G90*",
+          "%ADD10C,0.1*%",
+          "D10*",
+          "%AB D12*%",
+          "D10*",
+          "X0Y0D02*",
+          "X1000000Y0D01*",
+          "G91*",
+          "%AB*%",
+          "X0Y0D02*",
+          "X01000000Y0D01*",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 0 });
       expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.incremental-coordinates");
     });
 
     it("does not end the outer file walk at M02 inside a block", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "D10*", "X0Y0D02*",
-        "%AB D12*%", "D10*", "X0Y0D02*", "X1000000Y0D01*", "M02*", "%AB*%",
-        "X10000000Y0D01*", "X0Y10000000D01*", "X0Y0D01*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.1*%",
+          "D10*",
+          "X0Y0D02*",
+          "%AB D12*%",
+          "D10*",
+          "X0Y0D02*",
+          "X1000000Y0D01*",
+          "M02*",
+          "%AB*%",
+          "X10000000Y0D01*",
+          "X0Y10000000D01*",
+          "X0Y0D01*",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 10 });
       expect(result.hasClosedContour).toBe(true);
       expect(result.openContourCount).toBe(0);
     });
 
     it("keeps block-local word operations out of outer artwork", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "D10*",
-        "X0Y0D02*", "X0Y10000000D01*",
-        "%AB D12*%", "D10*", "X0Y0D02*", "X0Y0D01*", "%AB*%", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.1*%",
+          "D10*",
+          "X0Y0D02*",
+          "X0Y10000000D01*",
+          "%AB D12*%",
+          "D10*",
+          "X0Y0D02*",
+          "X0Y0D01*",
+          "%AB*%",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 0, minY: 0, maxY: 10 });
       expect(result.hasClosedContour).toBe(false);
       expect(result.openContourCount).toBe(1);
@@ -542,10 +590,17 @@ describe("parseGerber", () => {
     });
 
     it("treats hole modifiers as literal diameters even when a matching D-code exists", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "%ADD11C,0.2X0.05*%",
-        "%ADD14C,0.03*%", "%ADD12C,20X14*%", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.1*%",
+          "%ADD11C,0.2X0.05*%",
+          "%ADD14C,0.03*%",
+          "%ADD12C,20X14*%",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.apertures).toEqual([
         { code: 10, shape: "circle", diameterMm: 0.1, hole: undefined },
         { code: 11, shape: "circle", diameterMm: 0.2, hole: { kind: "diameter", diameterMm: 0.05 } },
@@ -722,10 +777,21 @@ describe("parseGerber", () => {
     });
 
     it("reports the same D-code once per scope, in file scope and inside a block", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "D13*", "%AB D12*%", "D13*",
-        "X0Y0D02*", "X1000000Y0D01*", "%AB*%", "D12*", "X0Y0D02*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "D13*",
+          "%AB D12*%",
+          "D13*",
+          "X0Y0D02*",
+          "X1000000Y0D01*",
+          "%AB*%",
+          "D12*",
+          "X0Y0D02*",
+          "M02*",
+        ].join("\n"),
+      );
       const undefinedApertures = result.warnings.filter((entry) => entry.code === "gerber.undefined-aperture");
       expect(undefinedApertures).toHaveLength(2);
       expect(undefinedApertures[0]?.message).toMatch(/selects D13/u);
@@ -733,10 +799,22 @@ describe("parseGerber", () => {
     });
 
     it("keeps a block-local aperture definition and selection out of file scope", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "%AB D12*%", "%ADD13C,0.2*%", "D13*",
-        "X0Y0D02*", "X1000000Y0D03*", "%AB*%", "D12*", "D13*", "X0Y0D03*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%AB D12*%",
+          "%ADD13C,0.2*%",
+          "D13*",
+          "X0Y0D02*",
+          "X1000000Y0D03*",
+          "%AB*%",
+          "D12*",
+          "D13*",
+          "X0Y0D03*",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.apertures).toEqual([{ code: 12, shape: "block" }]);
       const undefinedApertures = result.warnings.filter((entry) => entry.code === "gerber.undefined-aperture");
       expect(undefinedApertures).toHaveLength(1);
@@ -744,11 +822,22 @@ describe("parseGerber", () => {
     });
 
     it("selects and places a defined block without calling it undefined", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "%AB D12*%", "%ADD13C,0.2*%", "D13*",
-        "X0Y0D02*", "X1000000Y1000000D03*", "%AB*%", "D12*",
-        "X1000000Y1000000D03*", "X2000000Y2000000D03*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%AB D12*%",
+          "%ADD13C,0.2*%",
+          "D13*",
+          "X0Y0D02*",
+          "X1000000Y1000000D03*",
+          "%AB*%",
+          "D12*",
+          "X1000000Y1000000D03*",
+          "X2000000Y2000000D03*",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.undefined-aperture");
       const placement = result.warnings.find((entry) => entry.code === "gerber.unmodelled-aperture-block");
       expect(placement?.message).toContain("D12");
@@ -758,11 +847,25 @@ describe("parseGerber", () => {
     });
 
     it("lets a block select a file-scope aperture without leaking a block-local one", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.2X0.05*%", "%AB D12*%",
-        "D10*", "X0Y0D02*", "X1000000Y0D01*", "%ADD13C,0.4*%", "D13*",
-        "X2000000Y0D03*", "%AB*%", "D12*", "X0Y0D03*", "D13*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.2X0.05*%",
+          "%AB D12*%",
+          "D10*",
+          "X0Y0D02*",
+          "X1000000Y0D01*",
+          "%ADD13C,0.4*%",
+          "D13*",
+          "X2000000Y0D03*",
+          "%AB*%",
+          "D12*",
+          "X0Y0D03*",
+          "D13*",
+          "M02*",
+        ].join("\n"),
+      );
       expect(result.apertures).toEqual([
         { code: 10, shape: "circle", diameterMm: 0.2, hole: { kind: "diameter", diameterMm: 0.05 } },
         { code: 12, shape: "block" },
@@ -773,10 +876,9 @@ describe("parseGerber", () => {
     });
 
     it("does not register a block that was never closed", () => {
-      const result = parseGerber([
-        "%FSLAX36Y36*%", "%MOMM*%", "%AB D12*%", "%ADD13C,0.2*%",
-        "D13*", "X0Y0D03*", "D12*", "M02*",
-      ].join("\n"));
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%AB D12*%", "%ADD13C,0.2*%", "D13*", "X0Y0D03*", "D12*", "M02*"].join("\n"),
+      );
       expect(result.apertures).toEqual([]);
       expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.unmodelled-aperture-block");
     });

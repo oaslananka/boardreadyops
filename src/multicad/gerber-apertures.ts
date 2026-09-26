@@ -170,7 +170,9 @@ function unsupported<T>(code: number, detail: string): Reading<T> {
 export type ApertureLedger = {
   file: Map<number, ApertureDefinition>;
   /** The block being defined, with the aperture table that belongs to it alone. */
-  block: { code: number | undefined; apertures: Map<number, ApertureDefinition>; selected: number | undefined } | undefined;
+  block:
+    | { code: number | undefined; apertures: Map<number, ApertureDefinition>; selected: number | undefined }
+    | undefined;
   /** The D-code the file has selected, which is what everything plotted after it is drawn with. */
   selected: number | undefined;
   /** Flashes performed with an aperture block selected, and the blocks they placed. */
@@ -326,12 +328,7 @@ function defineAperture(ledger: ApertureLedger, compact: string): void {
     return;
   }
 
-  const reading = readApertureDefinition(
-    code,
-    declared[2] ?? "",
-    declared[3] ?? "",
-    declared[4],
-  );
+  const reading = readApertureDefinition(code, declared[2] ?? "", declared[3] ?? "", declared[4]);
   if (!reading.ok) {
     recordProblem(ledger, reading.problem);
     scope.set(code, { shape: "unmodelled" });
@@ -379,11 +376,7 @@ function readCircle(code: number, parts: readonly string[]): Reading<ApertureDef
   return successfulReading({ shape: "circle", diameter: diameter.value, hole: hole.value });
 }
 
-function readBox(
-  code: number,
-  parts: readonly string[],
-  shape: "rectangle" | "obround",
-): Reading<ApertureDefinition> {
+function readBox(code: number, parts: readonly string[], shape: "rectangle" | "obround"): Reading<ApertureDefinition> {
   if (parts.length > 3) return malformed(code, `gives a ${shape} more than a width, a height and a hole`);
   const width = readSize(code, "width", parts[0]);
   if (!width.ok) return width;

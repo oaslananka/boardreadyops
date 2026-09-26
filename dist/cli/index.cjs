@@ -17119,7 +17119,7 @@ var require_async = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
-    function read2(path72, settings, callback) {
+    function read(path72, settings, callback) {
       settings.fs.lstat(path72, (lstatError, lstat3) => {
         if (lstatError !== null) {
           callFailureCallback(callback, lstatError);
@@ -17145,7 +17145,7 @@ var require_async = __commonJS({
         });
       });
     }
-    exports2.read = read2;
+    exports2.read = read;
     function callFailureCallback(callback, error51) {
       callback(error51);
     }
@@ -17161,7 +17161,7 @@ var require_sync = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.read = void 0;
-    function read2(path72, settings) {
+    function read(path72, settings) {
       const lstat3 = settings.fs.lstatSync(path72);
       if (!lstat3.isSymbolicLink() || !settings.followSymbolicLink) {
         return lstat3;
@@ -17179,7 +17179,7 @@ var require_sync = __commonJS({
         throw error51;
       }
     }
-    exports2.read = read2;
+    exports2.read = read;
   }
 });
 
@@ -17403,14 +17403,14 @@ var require_async2 = __commonJS({
     var constants_1 = require_constants3();
     var utils = require_utils5();
     var common = require_common2();
-    function read2(directory, settings, callback) {
+    function read(directory, settings, callback) {
       if (!settings.stats && constants_1.IS_SUPPORT_READDIR_WITH_FILE_TYPES) {
         readdirWithFileTypes(directory, settings, callback);
         return;
       }
       readdir2(directory, settings, callback);
     }
-    exports2.read = read2;
+    exports2.read = read;
     function readdirWithFileTypes(directory, settings, callback) {
       settings.fs.readdir(directory, { withFileTypes: true }, (readdirError, dirents) => {
         if (readdirError !== null) {
@@ -17512,13 +17512,13 @@ var require_sync2 = __commonJS({
     var constants_1 = require_constants3();
     var utils = require_utils5();
     var common = require_common2();
-    function read2(directory, settings) {
+    function read(directory, settings) {
       if (!settings.stats && constants_1.IS_SUPPORT_READDIR_WITH_FILE_TYPES) {
         return readdirWithFileTypes(directory, settings);
       }
       return readdir2(directory, settings);
     }
-    exports2.read = read2;
+    exports2.read = read;
     function readdirWithFileTypes(directory, settings) {
       const dirents = settings.fs.readdirSync(directory, { withFileTypes: true });
       return dirents.map((dirent) => {
@@ -47594,18 +47594,16 @@ function parseExcellon(content, path72) {
 }
 
 // src/multicad/gerber-apertures.ts
-var gerberNumber = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u;
 var wholeNumber = /^\d+$/u;
 var apertureDefinitionCommand = /^ADD(\d+)([A-Za-z])([A-Za-z0-9_]*)(?:,([^*]*))?\*$/u;
 var apertureDefinitionPrefix = /^ADD(\d+)/u;
 var apertureBlockOpenCommand = /^ABD(\d+)\*$/u;
 var apertureSelection = /^(?:G\d+)?D(\d+)$/u;
 var flashOperation = /D0?3$/u;
-var blockStatementAperture = /^D(\d+)$/u;
 var firstApertureCode = 10;
 var maxListedApertureCodes = 5;
 var maxDefinitionWarnings = 5;
-function read(value) {
+function successfulReading(value) {
   return { ok: true, value };
 }
 function malformed(code, detail) {
@@ -47639,7 +47637,11 @@ function applyApertureExtended(ledger, compact) {
     return true;
   }
   const code = apertureBlockOpenCommand.exec(compact)?.[1];
-  ledger.block = { code: code === void 0 ? void 0 : Number.parseInt(code, 10), apertures: /* @__PURE__ */ new Map() };
+  ledger.block = {
+    code: code === void 0 ? void 0 : Number.parseInt(code, 10),
+    apertures: /* @__PURE__ */ new Map(),
+    selected: void 0
+  };
   return true;
 }
 function applyApertureWord(ledger, compact) {
@@ -47650,13 +47652,13 @@ function applyApertureWord(ledger, compact) {
   }
   if (flashOperation.test(compact)) noteFlash(ledger);
 }
-function applyApertureBlockStatement(ledger, compact) {
-  for (const field of compact.split(",")) {
-    const declared = blockStatementAperture.exec(field)?.[1];
-    if (declared === void 0) continue;
-    const code = Number.parseInt(declared, 10);
-    if (code >= firstApertureCode) referenceBlockAperture(ledger, code);
-  }
+function applyApertureBlockWord(ledger, compact) {
+  const selection = apertureSelection.exec(compact);
+  if (selection?.[1] === void 0) return;
+  const code = Number.parseInt(selection[1], 10);
+  if (code < firstApertureCode) return;
+  if (ledger.block !== void 0) ledger.block.selected = code;
+  referenceBlockAperture(ledger, code);
 }
 function readApertureEvidence(ledger, scale, path72) {
   return {
@@ -47693,13 +47695,7 @@ function defineAperture(ledger, compact) {
     });
     return;
   }
-  const reading = readApertureDefinition(
-    code,
-    declared[2] ?? "",
-    declared[3] ?? "",
-    declared[4],
-    holeScope(ledger, scope)
-  );
+  const reading = readApertureDefinition(code, declared[2] ?? "", declared[3] ?? "", declared[4]);
   if (!reading.ok) {
     recordProblem(ledger, reading.problem);
     scope.set(code, { shape: "unmodelled" });
@@ -47707,41 +47703,36 @@ function defineAperture(ledger, compact) {
   }
   scope.set(code, reading.value);
 }
-function holeScope(ledger, scope) {
-  const file2 = ledger.file;
-  if (scope === file2) return file2;
-  return { has: (code) => scope.has(code) || file2.has(code) };
-}
-function readApertureDefinition(code, template, name, tail, holes) {
-  if (name !== "") return read({ shape: "macro", macroName: `${template}${name}` });
+function readApertureDefinition(code, template, name, tail) {
+  if (name !== "") return successfulReading({ shape: "macro", macroName: `${template}${name}` });
   if (tail === void 0) return malformed(code, "declares a shape with no parameters");
   const parts = tail.split("X");
   const shape = template.toUpperCase();
-  if (shape === "C") return readCircle(code, parts, holes);
-  if (shape === "R") return readBox(code, parts, "rectangle", holes);
-  if (shape === "O") return readBox(code, parts, "obround", holes);
-  if (shape === "P") return readPolygon(code, parts, holes);
+  if (shape === "C") return readCircle(code, parts);
+  if (shape === "R") return readBox(code, parts, "rectangle");
+  if (shape === "O") return readBox(code, parts, "obround");
+  if (shape === "P") return readPolygon(code, parts);
   return unsupported(code, `declares the shape "${template}", which is not one this reader knows`);
 }
-function readCircle(code, parts, holes) {
+function readCircle(code, parts) {
   if (parts.length > 2) return malformed(code, "gives a circle more than a diameter and a hole");
   const diameter = readSize(code, "circle diameter", parts[0]);
   if (!diameter.ok) return diameter;
-  const hole = readHole(code, parts[1], holes);
+  const hole = readHole(code, parts[1]);
   if (!hole.ok) return hole;
   const tooLarge = oversizedHole(diameter.value, hole.value);
   if (tooLarge !== void 0) {
     return unsupported(code, `puts a ${tooLarge} hole in a circle of ${diameter.value}`);
   }
-  return read({ shape: "circle", diameter: diameter.value, hole: hole.value });
+  return successfulReading({ shape: "circle", diameter: diameter.value, hole: hole.value });
 }
-function readBox(code, parts, shape, holes) {
+function readBox(code, parts, shape) {
   if (parts.length > 3) return malformed(code, `gives a ${shape} more than a width, a height and a hole`);
   const width = readSize(code, "width", parts[0]);
   if (!width.ok) return width;
   const height = readSize(code, "height", parts[1]);
   if (!height.ok) return height;
-  const hole = readHole(code, parts[2], holes);
+  const hole = readHole(code, parts[2]);
   if (!hole.ok) return hole;
   const tooLarge = oversizedHole(Math.min(width.value, height.value), hole.value);
   if (tooLarge !== void 0) {
@@ -47750,9 +47741,9 @@ function readBox(code, parts, shape, holes) {
       `puts a ${tooLarge} hole in a ${shape} of ${width.value}x${height.value}, which does not fit inside it`
     );
   }
-  return read({ shape, width: width.value, height: height.value, hole: hole.value });
+  return successfulReading({ shape, width: width.value, height: height.value, hole: hole.value });
 }
-function readPolygon(code, parts, holes) {
+function readPolygon(code, parts) {
   if (parts.length > 4) {
     return malformed(code, "gives a polygon more than a diameter, a vertex count, a rotation and a hole");
   }
@@ -47762,13 +47753,13 @@ function readPolygon(code, parts, holes) {
   if (!vertices.ok) return vertices;
   const rotation = readRotation(code, parts[2]);
   if (!rotation.ok) return rotation;
-  const hole = readHole(code, parts[3], holes);
+  const hole = readHole(code, parts[3]);
   if (!hole.ok) return hole;
   const tooLarge = oversizedHole(diameter.value, hole.value);
   if (tooLarge !== void 0) {
     return unsupported(code, `puts a ${tooLarge} hole in a polygon of ${diameter.value}`);
   }
-  return read({
+  return successfulReading({
     shape: "polygon",
     diameter: diameter.value,
     vertices: vertices.value,
@@ -47781,44 +47772,54 @@ function readSize(code, label, raw) {
   const value = readNumber(raw);
   if (value === void 0) return malformed(code, `gives "${raw}" as ${label}, which is not a number`);
   if (value <= 0) return unsupported(code, `gives ${raw} as ${label}, which is not a size`);
-  return read(value);
+  return successfulReading(value);
 }
 function readVertices(code, raw) {
   if (raw === void 0 || raw === "") return malformed(code, "gives no vertex count");
   if (!wholeNumber.test(raw)) return malformed(code, `gives "${raw}" as its vertex count, which is not a whole number`);
   const vertices = Number.parseInt(raw, 10);
-  if (vertices < 3) return unsupported(code, `gives a polygon of ${vertices} vertices, which cannot be drawn`);
-  return read(vertices);
+  if (vertices < 3 || vertices > 12) {
+    return unsupported(code, `gives a polygon of ${vertices} vertices; Gerber polygons require 3 to 12 vertices`);
+  }
+  return successfulReading(vertices);
 }
 function readRotation(code, raw) {
-  if (raw === void 0) return read(void 0);
+  if (raw === void 0) return successfulReading(void 0);
   const rotation = readNumber(raw);
   if (rotation === void 0) return malformed(code, `gives "${raw}" as its rotation, which is not an angle`);
-  return read(rotation);
+  return successfulReading(rotation);
 }
-function readHole(code, raw, holes) {
-  if (raw === void 0) return read(void 0);
+function readHole(code, raw) {
+  if (raw === void 0) return successfulReading(void 0);
   if (raw === "") return malformed(code, "gives an empty hole");
-  const referenced = wholeNumber.test(raw) ? Number.parseInt(raw, 10) : void 0;
-  if (referenced !== void 0 && referenced >= firstApertureCode) {
-    if (holes.has(referenced)) return read({ kind: "code", code: referenced });
-    return unsupported(
-      code,
-      `refers to aperture D${referenced} as its hole, and no aperture D${referenced} is defined for it to borrow, so whether this file means a hole that size or D${referenced}'s own hole cannot be told from this file`
-    );
-  }
   const diameter = readNumber(raw);
-  if (diameter === void 0) {
-    return malformed(code, `gives "${raw}" as its hole, which is neither a diameter nor an aperture code`);
-  }
-  if (diameter < 0) return unsupported(code, `gives ${raw} as its hole diameter, which is not a size`);
-  return read({ kind: "diameter", diameter });
+  if (diameter === void 0) return malformed(code, `gives "${raw}" as its hole diameter, which is not a decimal`);
+  if (diameter <= 0) return unsupported(code, `gives ${raw} as its hole diameter, which must be greater than zero`);
+  return successfulReading({ kind: "diameter", diameter });
 }
 function oversizedHole(outer, hole) {
   return hole?.kind === "diameter" && hole.diameter >= outer ? hole.diameter : void 0;
 }
 function readNumber(raw) {
-  return gerberNumber.test(raw) ? Number.parseFloat(raw) : void 0;
+  if (raw === "") return void 0;
+  let index = raw.startsWith("+") || raw.startsWith("-") ? 1 : 0;
+  let digits = 0;
+  let decimalPoints = 0;
+  for (; index < raw.length; index += 1) {
+    const char = raw.charCodeAt(index);
+    if (char >= 48 && char <= 57) {
+      digits += 1;
+      continue;
+    }
+    if (char === 46 && decimalPoints === 0) {
+      decimalPoints += 1;
+      continue;
+    }
+    return void 0;
+  }
+  if (digits === 0) return void 0;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : void 0;
 }
 function closeApertureBlock(ledger) {
   const code = ledger.block?.code;
@@ -47909,8 +47910,7 @@ function inMillimetres(code, definition, scale) {
   }
 }
 function holeInMillimetres(hole, scale) {
-  if (hole === void 0) return void 0;
-  return hole.kind === "diameter" ? { kind: "diameter", diameterMm: hole.diameter * scale } : { kind: "code", code: hole.code };
+  return hole === void 0 ? void 0 : { kind: "diameter", diameterMm: hole.diameter * scale };
 }
 function definitionWarnings(ledger, path72) {
   const shown = ledger.problems.slice(0, maxDefinitionWarnings);
@@ -48161,7 +48161,7 @@ function applyWordFileStateCommand(command, state, apertures) {
   const gCode = leadingGCode(compact);
   if (gCode === 4) return false;
   if (isInsideApertureBlock(apertures)) {
-    applyApertureBlockStatement(apertures, compact);
+    applyApertureBlockWord(apertures, compact);
     return false;
   }
   if (compact === "M02") return true;
@@ -57894,14 +57894,14 @@ async function readBundleManifestAndSignature(bundleDir) {
   return { present: true, bytes, signature };
 }
 async function verifyReleaseBundleSignature(bundleDir, trustedPublicKeyPem) {
-  const read2 = await readBundleManifestAndSignature(bundleDir);
-  if (!read2.present || !read2.bytes || !read2.signature) {
-    if (read2.error) {
-      return { ok: false, present: true, ...read2.error };
+  const read = await readBundleManifestAndSignature(bundleDir);
+  if (!read.present || !read.bytes || !read.signature) {
+    if (read.error) {
+      return { ok: false, present: true, ...read.error };
     }
-    return { ok: false, present: read2.present, errors: [], errorCodes: [] };
+    return { ok: false, present: read.present, errors: [], errorCodes: [] };
   }
-  return { present: true, ...verifyManifestSignature(read2.bytes, read2.signature, trustedPublicKeyPem) };
+  return { present: true, ...verifyManifestSignature(read.bytes, read.signature, trustedPublicKeyPem) };
 }
 function loadKey(pem, kind) {
   return kind === "private" ? (0, import_node_crypto10.createPrivateKey)(pem) : (0, import_node_crypto10.createPublicKey)(pem);
@@ -57967,16 +57967,16 @@ async function loadTrustStore(filePath) {
   return parsed;
 }
 async function verifyReleaseBundleSignatureAgainstTrustStore(bundleDir, trustStore, verifiedAt) {
-  const read2 = await readBundleManifestAndSignature(bundleDir);
-  if (!read2.present || !read2.bytes || !read2.signature) {
-    if (read2.error) {
-      return { ok: false, present: true, ...read2.error };
+  const read = await readBundleManifestAndSignature(bundleDir);
+  if (!read.present || !read.bytes || !read.signature) {
+    if (read.error) {
+      return { ok: false, present: true, ...read.error };
     }
-    return { ok: false, present: read2.present, errors: [], errorCodes: [] };
+    return { ok: false, present: read.present, errors: [], errorCodes: [] };
   }
   return {
     present: true,
-    ...verifyManifestSignatureAgainstTrustStore(read2.bytes, read2.signature, trustStore, verifiedAt)
+    ...verifyManifestSignatureAgainstTrustStore(read.bytes, read.signature, trustStore, verifiedAt)
   };
 }
 
