@@ -20,11 +20,9 @@ import type { ParserWarning } from "@boardreadyops/contracts";
  *   is then selected with `D12*` and placed by a flash. Reading that selection as a reference to
  *   an undefined standard aperture reports a file as broken for using the block syntax as intended.
  *
- * And one thing is easy to get *plausibly* wrong, which is worse than getting it obviously wrong: a
- * hole is either a diameter or a reference to another aperture's hole, and the two are written the
- * same way. A hole code is therefore a reference only where the code is an aperture the file has
- * actually defined by the time it is needed; anywhere else the definition is refused, because a
- * number this reader cannot resolve must not be reported as a size.
+ * Standard-aperture modifiers are literal decimal values. In particular, an integer-looking hole
+ * modifier remains a diameter even when the same number is also used as an aperture D-code; these
+ * two namespaces must not be conflated.
  *
  * What a block contains is still not modelled, so a placement is reported as a placement and
  * nothing more: measuring placed geometry is #856, and the semantics this module holds are #859.
@@ -72,7 +70,6 @@ const maxDefinitionWarnings = 5;
 /** A hole in the file's own units, as `%ADD10C,0.1X0.05*%` declares it. */
 type ApertureHole = { kind: "diameter"; diameter: number };
 
-/** The aperture table a definition is written into, which is also the table its references resolve in. */
 /**
  * An aperture as the file defined it, with every number still in the file's own units.
  *
@@ -95,7 +92,7 @@ type ApertureDefinition =
   | { shape: "block" }
   | { shape: "unmodelled" };
 
-/** A hole in millimetres, or the D-code of another aperture whose hole it borrows. */
+/** A standard-aperture round-hole diameter in millimetres. */
 type GerberApertureHole = { kind: "diameter"; diameterMm: number };
 
 /**
@@ -236,8 +233,8 @@ export function applyApertureExtended(ledger: ApertureLedger, compact: string): 
 /**
  * Applies one word command of file scope: a selection, or an operation drawn with what is selected.
  *
- * Block bodies do not come through here -- a `D01` in one is a circle primitive of a macro, not a
- * plotted point -- and neither do comments, which the caller drops first.
+ * Block bodies do not come through here: their Dnn selections and D01/D02/D03 operations build the
+ * block and are handled by `applyApertureBlockWord` instead of mutating file-scope graphics state.
  */
 export function applyApertureWord(ledger: ApertureLedger, compact: string): void {
   const selection = apertureSelection.exec(compact);
@@ -449,8 +446,7 @@ function readSize(code: number, label: string, raw: string | undefined): Reading
 }
 
 /**
- * The vertex count of a polygon, which has to be a whole number of at least three: fewer than three
- * vertices is not a polygon, and no reader can honestly report the shape the file asked for.
+ * The vertex count of a standard Gerber polygon, which must be a whole number from 3 through 12.
  */
 function readVertices(code: number, raw: string | undefined): Reading<number> {
   if (raw === undefined || raw === "") return malformed(code, "gives no vertex count");
