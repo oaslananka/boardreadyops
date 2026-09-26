@@ -12,6 +12,7 @@ const closedSquare = [
   "%FSLAX36Y36*%",
   "%MOMM*%",
   "%TF.FileFunction,Profile,NP*%",
+  "%ADD10C,0.1*%",
   "D10*",
   "X0Y0D02*",
   "X10000000Y0D01*",
@@ -49,7 +50,7 @@ describe("parseGerber", () => {
     });
 
     it("leaves identity undefined when the file carries no attribute", () => {
-      const result = parseGerber(["%FSLAX36Y36*%", "%MOMM*%", "D10*", "X0Y0D03*", "M02*"].join("\n"));
+      const result = parseGerber(["%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "D10*", "X0Y0D03*", "M02*"].join("\n"));
 
       // Plain RS-274X says nothing about itself, which is not an error -- it is the reason the
       // filename reading still exists. What matters is that the parser does not invent an answer.
@@ -105,7 +106,7 @@ describe("parseGerber", () => {
     });
 
     it("says so when it had to assume the format, rather than presenting a guess as a measurement", () => {
-      const result = parseGerber(["%MOMM*%", "D10*", "X0Y0D02*", "X1000D01*", "M02*"].join("\n"));
+      const result = parseGerber(["%MOMM*%", "%ADD10C,0.1*%", "D10*", "X0Y0D02*", "X1000D01*", "M02*"].join("\n"));
 
       expect(result.format.evidence).toBe("assumed");
       const assumed = result.warnings.find((entry) => entry.code === "gerber.assumed-coordinate-format");
@@ -164,9 +165,15 @@ describe("parseGerber", () => {
     });
 
     it("does not call a bare flash an open contour", () => {
-      const flashes = ["%FSLAX36Y36*%", "%MOMM*%", "D10*", "X1000000Y1000000D03*", "X2000000Y2000000D03*", "M02*"].join(
-        "\n",
-      );
+      const flashes = [
+        "%FSLAX36Y36*%",
+        "%MOMM*%",
+        "%ADD10C,0.1*%",
+        "D10*",
+        "X1000000Y1000000D03*",
+        "X2000000Y2000000D03*",
+        "M02*",
+      ].join("\n");
 
       const result = parseGerber(flashes);
       // Pads are flashes, not contours. Counting them as unclosed would make every copper layer
@@ -219,7 +226,7 @@ describe("parseGerber", () => {
           "%FSLAX36Y36*%",
           "%MOMM*%",
           "G75*",
-          "%ADD11C,0.100*%",
+          "%ADD11DONUT*%",
           "%AMDONUT*",
           "1,1,$1,0,0*",
           "1,0,$2,0,0*",
@@ -280,6 +287,10 @@ describe("parseGerber", () => {
         [
           "%FSLAX36Y36*%",
           "%MOMM*%",
+          "%ADD36C,0.1*%",
+          "%ADD70C,0.1*%",
+          "%ADD90C,0.1*%",
+          "%ADD91C,0.1*%",
           "D36*",
           "D70*",
           "D90*",
@@ -392,7 +403,9 @@ describe("parseGerber", () => {
 
   describe("the deprecated commands older CAM tools still write", () => {
     it("honours a file-level G70, in inches, where the file states no %MO%", () => {
-      const result = parseGerber(["%FSLAX24Y24*%", "G70*", "D10*", "X0Y0D02*", "X10000Y0D01*", "M02*"].join("\n"));
+      const result = parseGerber(
+        ["%FSLAX24Y24*%", "G70*", "%ADD10C,0.1*%", "D10*", "X0Y0D02*", "X10000Y0D01*", "M02*"].join("\n"),
+      );
 
       expect(result.units).toBe("inch");
       expect(result.unitsEvidence).toBe("declared");
@@ -400,7 +413,7 @@ describe("parseGerber", () => {
     });
 
     it("reads no geometry from a file-level G91 that runs to its M02", () => {
-      const result = parseGerber(["G91*", "D10*", "X0Y0D02*", "X01000000Y0D01*", "M02*"].join("\n"));
+      const result = parseGerber(["G91*", "%ADD10C,0.1*%", "D10*", "X0Y0D02*", "X01000000Y0D01*", "M02*"].join("\n"));
 
       // The state walk ends at the `M02`, and it has to carry what it learned on the way there:
       // dropping the coordinate mode with the commands would read an incremental file as absolute.
@@ -415,6 +428,7 @@ describe("parseGerber", () => {
         [
           "%FSLAX36Y36*%",
           "G71*",
+          "%ADD10C,0.1*%",
           "D10*",
           "%AB D12*%",
           "G70*",
@@ -435,9 +449,18 @@ describe("parseGerber", () => {
 
     it("keeps a legacy coordinate mode inside a block out of the file's state", () => {
       const result = parseGerber(
-        ["G90*", "D10*", "%AB D12*%", "G91*", "1,1,0,0,0.5*", "%AB*%", "X0Y0D02*", "X01000000Y0D01*", "M02*"].join(
-          "\n",
-        ),
+        [
+          "G90*",
+          "%ADD10C,0.1*%",
+          "D10*",
+          "%AB D12*%",
+          "G91*",
+          "1,1,0,0,0.5*",
+          "%AB*%",
+          "X0Y0D02*",
+          "X01000000Y0D01*",
+          "M02*",
+        ].join("\n"),
       );
 
       // The file states no %FS%, so the G90 in file scope is the only account of its coordinate
@@ -452,6 +475,7 @@ describe("parseGerber", () => {
         [
           "%FSLAX36Y36*%",
           "%MOMM*%",
+          "%ADD10C,0.1*%",
           "D10*",
           "X0Y0D02*",
           "%AB D12*%",
@@ -477,6 +501,7 @@ describe("parseGerber", () => {
         [
           "%FSLAX36Y36*%",
           "%MOMM*%",
+          "%ADD10C,0.1*%",
           "D10*",
           "X0Y0D02*",
           "X0Y10000000D01*",
@@ -528,6 +553,359 @@ describe("parseGerber", () => {
 
       expect(result.format).toMatchObject({ integerDigits: 2, decimalDigits: 5, evidence: "declared" });
       expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.assumed-coordinate-format");
+    });
+  });
+
+  /**
+   * An aperture is a definition, a selection, and -- for a block -- a place on the layer. They are
+   * three commands with three grammars, and which of them a command is decides whether a file is
+   * drawing a 0.1 mm pad or a 2.54 mm one, or whether it is broken at all.
+   */
+  describe("apertures, and the scope each one belongs to", () => {
+    it("reads the four standard templates in the units the file declares", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.1*%",
+          "%ADD11R,1.0X2.0*%",
+          "%ADD12O,1.0X2.0*%",
+          "%ADD13P,0.5X6X30*%",
+          "D10*",
+          "X0Y0D03*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      expect(result.apertures).toEqual([
+        { code: 10, shape: "circle", diameterMm: 0.1, hole: undefined },
+        { code: 11, shape: "rectangle", widthMm: 1, heightMm: 2, hole: undefined },
+        { code: 12, shape: "obround", widthMm: 1, heightMm: 2, hole: undefined },
+        { code: 13, shape: "polygon", diameterMm: 0.5, vertices: 6, rotationDegrees: 30, hole: undefined },
+      ]);
+      expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.malformed-aperture-definition");
+      expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.unsupported-aperture-definition");
+    });
+
+    it("converts a definition with the file's units rather than with millimetres", () => {
+      const result = parseGerber(["%FSLAX24Y24*%", "%MOIN*%", "%ADD10C,0.1*%", "M02*"].join("\n"));
+
+      // 0.1 inch is 2.54 mm. Reading the number as millimetres would put the pad 25.4 times too
+      // small, and every consumer of the number would believe it.
+      expect(result.apertures).toEqual([{ code: 10, shape: "circle", diameterMm: 2.54, hole: undefined }]);
+    });
+
+    it("reads a hole where the file states one, and no hole where it does not", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.1*%",
+          "%ADD11C,0.2X0.05*%",
+          "%ADD14C,0.03*%",
+          // A hole may also be the hole of another aperture, which is a code and not a length. The
+          // code is read as a reference because D14 is an aperture this file has already defined.
+          "%ADD12C,0.2X14*%",
+          "M02*",
+        ].join("\n"),
+      );
+
+      expect(result.apertures).toEqual([
+        { code: 10, shape: "circle", diameterMm: 0.1, hole: undefined },
+        { code: 11, shape: "circle", diameterMm: 0.2, hole: { kind: "diameter", diameterMm: 0.05 } },
+        { code: 14, shape: "circle", diameterMm: 0.03, hole: undefined },
+        { code: 12, shape: "circle", diameterMm: 0.2, hole: { kind: "code", code: 14 } },
+      ]);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it("refuses a hole that names an aperture the file never defines", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "%ADD12C,0.2X15*%", "%ADD13C,12X17*%", "M02*"].join("\n"),
+      );
+
+      // `X15` and `X17` are both written the way a hole code is written, and neither D15 nor D17 is
+      // an aperture this file defined. Reading either as a hole diameter would report a 15 hole in a
+      // 0.2 circle; reading them as references would publish a hole whose size exists nowhere in the
+      // file. Neither is a size, so neither is read.
+      const unsupported = result.warnings.filter((entry) => entry.code === "gerber.unsupported-aperture-definition");
+      expect(unsupported).toHaveLength(2);
+      expect(unsupported[0]?.message).toContain("D15");
+      expect(unsupported[1]?.message).toContain("D17");
+      expect(result.apertures).toEqual([
+        { code: 10, shape: "circle", diameterMm: 0.1, hole: undefined },
+        { code: 12, shape: "unmodelled" },
+        { code: 13, shape: "unmodelled" },
+      ]);
+    });
+
+    it("reads a whole-number hole as a diameter where no aperture of that code exists", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%ADD10C,0.1*%", "%ADD11C,10X5*%", "%ADD12C,4X5*%", "M02*"].join("\n"),
+      );
+
+      // A hole below ten cannot be a D-code, whatever else the file does with the number, and a
+      // whole-number hole that is too large for its aperture is caught by the same check as any
+      // other: the check runs on the number, not on how the number got read.
+      expect(result.apertures).toEqual([
+        { code: 10, shape: "circle", diameterMm: 0.1, hole: undefined },
+        { code: 11, shape: "circle", diameterMm: 10, hole: { kind: "diameter", diameterMm: 5 } },
+        { code: 12, shape: "unmodelled" },
+      ]);
+      const unsupported = result.warnings.filter((entry) => entry.code === "gerber.unsupported-aperture-definition");
+      expect(unsupported).toHaveLength(1);
+      expect(unsupported[0]?.message).toContain("5 hole in a circle of 4");
+    });
+
+    it("reports a definition no reader can use once, whatever the file repeats it as", () => {
+      const broken = Array.from({ length: 9 }, (_unused, index) => `%ADD1${index}C,0.1mm*%`);
+      const result = parseGerber(["%MOMM*%", ...broken, "M02*"].join("\n"));
+
+      // A file with a broken `%AD%` in every code it has would otherwise produce a warning per code.
+      const malformed = result.warnings.filter((entry) => entry.code === "gerber.malformed-aperture-definition");
+      expect(malformed).toHaveLength(5);
+      const counted = result.warnings.find((entry) => entry.code === "gerber.unreadable-aperture-definition");
+      expect(counted?.message).toContain("4 further definitions");
+    });
+
+    it("refuses a malformed number rather than reading the prefix it can", () => {
+      const result = parseGerber(["%MOMM*%", "%ADD10C,0.1mm*%", "D10*", "X0Y0D03*", "M02*"].join("\n"));
+
+      const malformed = result.warnings.find((entry) => entry.code === "gerber.malformed-aperture-definition");
+      expect(malformed?.message).toContain("0.1mm");
+      // `parseFloat("0.1mm")` is 0.1, and a 0.1 mm pad is indistinguishable from a measured one.
+      expect(result.apertures).toEqual([{ code: 10, shape: "unmodelled" }]);
+    });
+
+    it("counts a definition the grammar cannot read as defined, so selecting it is not a missing one", () => {
+      const result = parseGerber(["%FSLAX36Y36*%", "%MOMM*%", "%ADD10C-1*%", "D10*", "X0Y0D03*", "M02*"].join("\n"));
+
+      // `%ADD10C-1*%` is not a definition the format allows, so nothing at all is read from it. The
+      // file did still assign D10 an aperture, and calling the later `D10*` an undefined one would
+      // report a file with two problems where it has the one it wrote.
+      const malformed = result.warnings.find((entry) => entry.code === "gerber.malformed-aperture-definition");
+      expect(malformed?.message).toContain("ADD10C-1*");
+      expect(result.apertures).toEqual([{ code: 10, shape: "unmodelled" }]);
+      expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.undefined-aperture");
+    });
+
+    it("requires the numbers a template cannot do without", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10R,1.0*%",
+          "%ADD11C*%",
+          "%ADD12C,0.1X0.2X0.3*%",
+          "%ADD13C,0.1X*%",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // A rectangle needs a width and a height, a circle needs a diameter, and neither takes a third
+      // number where no third number belongs. Each rejection says which number is the problem,
+      // because "malformed" on its own would not be an actionable report.
+      const malformed = result.warnings.filter((entry) => entry.code === "gerber.malformed-aperture-definition");
+      expect(malformed.map((entry) => entry.message)).toEqual([
+        expect.stringContaining("gives no height"),
+        expect.stringContaining("no parameters"),
+        expect.stringContaining("more than a diameter and a hole"),
+        expect.stringContaining("empty hole"),
+      ]);
+      expect(result.apertures.map((entry) => entry.shape)).toEqual([
+        "unmodelled",
+        "unmodelled",
+        "unmodelled",
+        "unmodelled",
+      ]);
+    });
+
+    it("keeps its uncertainty explicit where a definition cannot be what it says", () => {
+      const result = parseGerber(
+        [
+          "%MOMM*%",
+          "%ADD10C,0.1X0.2*%",
+          "%ADD11P,0.5X2*%",
+          "%ADD12G,1.0*%",
+          "%ADD13C*%",
+          "D10*",
+          "D11*",
+          "D12*",
+          "D13*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // A hole bigger than its circle, a polygon of two vertices and a template this reader does not
+      // know are all things the file states and no reader can act on. Saying so is the point.
+      const unsupported = result.warnings.filter((entry) => entry.code === "gerber.unsupported-aperture-definition");
+      expect(unsupported).toHaveLength(3);
+      expect(unsupported.map((entry) => entry.message)).toEqual([
+        expect.stringContaining("0.2 hole in a circle of 0.1"),
+        expect.stringContaining("2 vertices"),
+        expect.stringContaining('"G"'),
+      ]);
+      // The file did assign these codes an aperture, which is not the same thing as having described
+      // one this reader can use, so they are defined and not undefined.
+      expect(result.apertures.map((entry) => entry.code)).toEqual([10, 11, 12, 13]);
+      expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.undefined-aperture");
+    });
+
+    it("records a macro aperture as defined without claiming what its body draws", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%AMDONUT*%", "1,1,$1,0,0*", "%", "%ADD11DONUT,0.5*%", "D11*", "M02*"].join("\n"),
+      );
+
+      // A macro body is a statement list this parser does not model, but the aperture the file
+      // defined is real: D11 exists, and nothing here says the file failed to define it.
+      expect(result.apertures).toEqual([{ code: 11, shape: "macro", macroName: "DONUT" }]);
+      expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.undefined-aperture");
+    });
+
+    it("reads a selection as a selection and an operation as an operation", () => {
+      const operations = parseGerber(["%FSLAX36Y36*%", "%MOMM*%", "X0Y0D02*", "X10000000Y0D01*", "M02*"].join("\n"));
+
+      // `D02` and `D01` are operations. They do not name an aperture, so a file that never selects
+      // one is not a file that selected a missing one.
+      expect(operations.warnings.map((entry) => entry.code)).not.toContain("gerber.undefined-aperture");
+      expect(operations.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 0 });
+
+      const selection = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "G36*", "D36*", "X0Y0D02*", "G37*", "M02*"].join("\n"),
+      );
+
+      // A D-code at or above ten is a selection, and this one names something the file never defined.
+      const undefinedApertures = selection.warnings.filter((entry) => entry.code === "gerber.undefined-aperture");
+      expect(undefinedApertures).toHaveLength(1);
+      expect(undefinedApertures[0]?.message).toContain("D36");
+    });
+
+    it("reports an aperture the file selects but never defines, once however often it selects it", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "D12*", "X0Y0D02*", "X1000000Y0D01*", "D12*", "X2000000Y0D01*", "M02*"].join("\n"),
+      );
+
+      const undefinedApertures = result.warnings.filter((entry) => entry.code === "gerber.undefined-aperture");
+      expect(undefinedApertures).toHaveLength(1);
+      expect(undefinedApertures[0]?.message).toContain("D12");
+      // The artwork is still read: an undefined aperture does not mean the file plotted nothing.
+      expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 2, minY: 0, maxY: 0 });
+    });
+
+    it("reports the same D-code once per scope, in file scope and inside a block", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "D13*", "%AB D12*%", "1,1,D13,0,0*", "%AB*%", "D12*", "X0Y0D02*", "M02*"].join(
+          "\n",
+        ),
+      );
+
+      // D13 is undefined in both scopes, and those are two mistakes by two different parts of the
+      // file. Deduplicating across them would report a file with two problems as having one.
+      const undefinedApertures = result.warnings.filter((entry) => entry.code === "gerber.undefined-aperture");
+      expect(undefinedApertures).toHaveLength(2);
+      expect(undefinedApertures[0]?.message).toMatch(/selects D13/u);
+      expect(undefinedApertures[1]?.message).toMatch(/D13 \(in block D12\)/u);
+    });
+
+    it("keeps a block's own definitions out of file scope", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%AB D12*%",
+          "%ADD13C,0.2*%",
+          "1,1,D13,0,0*",
+          "4,1,2,D13,0,0,0.5,0,0.5*",
+          "%AB*%",
+          "D12*",
+          "D13*",
+          "X0Y0D03*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // D13 is a pad the block draws with. The closed block is one of the file's apertures; D13 is
+      // not, and the file selecting it afterwards is selecting something it never defined for itself.
+      expect(result.apertures).toEqual([{ code: 12, shape: "block" }]);
+      const undefinedApertures = result.warnings.filter((entry) => entry.code === "gerber.undefined-aperture");
+      expect(undefinedApertures).toHaveLength(1);
+      expect(undefinedApertures[0]?.message).toMatch(/selects D13/u);
+    });
+
+    it("selects and places a defined block without calling it undefined", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%AB D12*%",
+          "%ADD13C,0.2*%",
+          "1,1,D13,0,0*",
+          "4,1,2,D13,0,0,0.5,0,0.5*",
+          "%AB*%",
+          "D12*",
+          "X1000000Y1000000D03*",
+          "X2000000Y2000000D03*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // `D12*` after `%AB*%` is how a block is placed: it is an aperture the file defined, so
+      // reporting it as an undefined one would call a correct file broken.
+      expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.undefined-aperture");
+      // What it cannot claim is the shape: the block's own geometry is not modelled, so each
+      // placement contributes its flash point and the file's geometry is incomplete.
+      const placement = result.warnings.find((entry) => entry.code === "gerber.unmodelled-aperture-block");
+      expect(placement?.message).toContain("D12");
+      expect(placement?.message).toContain("2 times");
+      expect(placement?.message).toMatch(/flash point only/u);
+      expect(result.boundingBoxMm).toEqual({ minX: 1, maxX: 2, minY: 1, maxY: 2 });
+    });
+
+    it("lets a block borrow a file-scope hole without letting the file borrow a block one", () => {
+      const result = parseGerber(
+        [
+          "%FSLAX36Y36*%",
+          "%MOMM*%",
+          "%ADD10C,0.2X0.05*%",
+          "%AB D12*%",
+          "%ADD13C,0.4X10*%",
+          "1,1,D13,0,0*",
+          "%AB*%",
+          "%ADD14C,0.4X13*%",
+          "D12*",
+          "D14*",
+          "M02*",
+        ].join("\n"),
+      );
+
+      // A block statement may draw with an aperture the file defined before the block was opened --
+      // the block body above already does exactly that with D13 -- and a hole is one of the things a
+      // definition can borrow, so D13 inside the block may name the hole of file-scope D10. Refusing
+      // it would report a correct file as broken.
+      //
+      // The other direction has no such licence: D14 is written in file scope, and nothing outside a
+      // block may name anything inside one, so a hole reference there cannot reach D13. A block-local
+      // code becoming a file-scope hole is the one leak the two tables exist to prevent.
+      expect(result.apertures).toEqual([
+        { code: 10, shape: "circle", diameterMm: 0.2, hole: { kind: "diameter", diameterMm: 0.05 } },
+        { code: 12, shape: "block" },
+        { code: 14, shape: "unmodelled" },
+      ]);
+      const unsupported = result.warnings.filter((entry) => entry.code === "gerber.unsupported-aperture-definition");
+      expect(unsupported).toHaveLength(1);
+      expect(unsupported[0]?.message).toContain("D13");
+    });
+
+    it("does not register a block that was never closed", () => {
+      const result = parseGerber(
+        ["%FSLAX36Y36*%", "%MOMM*%", "%AB D12*%", "1,1,0,0,0.5*", "D12*", "X0Y0D03*", "M02*"].join("\n"),
+      );
+
+      // An `%AB D12*%` with no `%AB*%` leaves the rest of the file in block scope, where `D12*` is
+      // a statement fragment rather than a selection. The file never closed what it opened, and the
+      // code it named is not an aperture any of this file can place.
+      expect(result.apertures).toEqual([]);
+      expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.unmodelled-aperture-block");
     });
   });
 });
