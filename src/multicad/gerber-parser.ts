@@ -1,7 +1,7 @@
 import type { LayerRole, LayerSide, ParserWarning } from "@boardreadyops/contracts";
 import {
   type ApertureLedger,
-  applyApertureBlockStatement,
+  applyApertureBlockWord,
   applyApertureExtended,
   applyApertureWord,
   createApertureLedger,
@@ -391,11 +391,10 @@ type GerberFileState = {
 /**
  * The file-level state walk.
  *
- * An aperture block is the one place where a command is not in file scope: a block body carries
- * codes that mean something else there -- a `D01` in it is a circle primitive, not a plotted point,
- * and a `D10` in it names an aperture the block has to define itself -- so units, coordinate mode,
- * region state and the end of the file are read only outside a block, and a command that was never
- * terminated is evidence rather than a command to interpret.
+ * An aperture block is the one place where a command is not in file scope: its body is a normal
+ * Gerber command stream whose Dnn aperture selections and operations build the block rather than the
+ * outer file artwork. Units, coordinate mode, region state and the end of the outer file are read
+ * only outside a block, and an unterminated command remains evidence rather than an interpreted command.
  */
 type GerberFileStateAccumulator = {
   declaredUnits: "mm" | "inch" | undefined;
@@ -468,9 +467,9 @@ function applyWordFileStateCommand(
 
   if (gCode === 4) return false;
   if (isInsideApertureBlock(apertures)) {
-    // A block body is a list of statements, and the only thing to read in one is the apertures it
-    // names. Nothing here is a command of this file, so nothing here joins the artwork.
-    applyApertureBlockStatement(apertures, compact);
+    // AB bodies use normal Gerber word commands, but those commands build the block and must not join
+    // the outer file artwork or mutate its file-scope aperture selection.
+    applyApertureBlockWord(apertures, compact);
     return false;
   }
   if (compact === "M02") return true;
