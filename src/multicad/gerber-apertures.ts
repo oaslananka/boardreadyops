@@ -31,13 +31,9 @@ import type { ParserWarning } from "@boardreadyops/contracts";
  */
 
 /**
- * A Gerber number: an optional sign, and digits with an optional fractional part.
- *
- * No exponent and no unit suffix, because the format has neither. A number that does not match is
- * not a number this reader will act on.
+ * Gerber decimals are parsed by the linear scanner in readNumber rather than an ambiguity-heavy
+ * regular expression. This keeps validation bounded for malformed, attacker-controlled input.
  */
-const gerberNumber = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u;
-
 /** A whole number with no sign and no decimal point, which is what a D-code and a vertex count are. */
 const wholeNumber = /^\d+$/u;
 
@@ -55,9 +51,6 @@ const apertureSelection = /^(?:G\d+)?D(\d+)$/u;
 
 /** The operation a word command ends with: `D03` is a flash, and the only operation that places a whole aperture. */
 const flashOperation = /D0?3$/u;
-
-/** A D-code named as a field of a statement inside an aperture block, where it means "an aperture". */
-const blockStatementAperture = /^D(\d+)$/u;
 
 /**
  * The lowest D-code that can name an aperture. 1 to 3 are the operation codes, so `D01*` is a draw
@@ -77,22 +70,9 @@ const maxListedApertureCodes = 5;
 const maxDefinitionWarnings = 5;
 
 /** A hole in the file's own units, as `%ADD10C,0.1X0.05*%` declares it. */
-type ApertureHole = { kind: "diameter"; diameter: number } | { kind: "code"; code: number };
+type ApertureHole = { kind: "diameter"; diameter: number };
 
 /** The aperture table a definition is written into, which is also the table its references resolve in. */
-type ApertureTable = ReadonlyMap<number, ApertureDefinition>;
-
-/**
- * The tables a hole D-code may be resolved in, which is not quite the table the definition lands in.
- *
- * A block's statements may draw with an aperture the file defined before the block was opened, and
- * a hole is one of the things a statement uses, so a definition written inside a block may borrow a
- * file-scope hole. That is the only direction scope crosses in: a definition written in file scope
- * never reaches into a block, because a block-local code becoming a file-scope hole is exactly the
- * leak the two tables exist to prevent.
- */
-type HoleScope = { has(code: number): boolean };
-
 /**
  * An aperture as the file defined it, with every number still in the file's own units.
  *
@@ -116,7 +96,7 @@ type ApertureDefinition =
   | { shape: "unmodelled" };
 
 /** A hole in millimetres, or the D-code of another aperture whose hole it borrows. */
-type GerberApertureHole = { kind: "diameter"; diameterMm: number } | { kind: "code"; code: number };
+type GerberApertureHole = { kind: "diameter"; diameterMm: number };
 
 /**
  * One aperture the file defined in file scope, with every dimension in millimetres.
@@ -171,7 +151,7 @@ type ScopedApertureProblem = ApertureProblem & { inBlock: boolean; blockCode: nu
 /** Either a value that could be read, or the evidence that it could not. */
 type Reading<T> = { ok: true; value: T } | { ok: false; problem: ApertureProblem };
 
-function read<T>(value: T): Reading<T> {
+function successfulReading<T>(value: T): Reading<T> {
   return { ok: true, value };
 }
 
@@ -193,7 +173,7 @@ function unsupported<T>(code: number, detail: string): Reading<T> {
 export type ApertureLedger = {
   file: Map<number, ApertureDefinition>;
   /** The block being defined, with the aperture table that belongs to it alone. */
-  block: { code: number | undefined; apertures: Map<number, ApertureDefinition> } | undefined;
+  block: { code: number | undefined; apertures: Map<number, ApertureDefinition>; selected: number | undefined } | undefined;
   /** The D-code the file has selected, which is what everything plotted after it is drawn with. */
   selected: number | undefined;
   /** Flashes performed with an aperture block selected, and the blocks they placed. */
@@ -245,7 +225,11 @@ export function applyApertureExtended(ledger: ApertureLedger, compact: string): 
   // the file has left block scope and everything up to the matching `%AB*%` is block body -- but a
   // block nothing can select is never registered as an aperture.
   const code = apertureBlockOpenCommand.exec(compact)?.[1];
-  ledger.block = { code: code === undefined ? undefined : Number.parseInt(code, 10), apertures: new Map() };
+  ledger.block = {
+    code: code === undefined ? undefined : Number.parseInt(code, 10),
+    apertures: new Map(),
+    selected: undefined,
+  };
   return true;
 }
 
@@ -267,20 +251,22 @@ export function applyApertureWord(ledger: ApertureLedger, compact: string): void
 }
 
 /**
- * Applies one word command of a block body, where a D-code names an aperture the block must define.
+ * Applies one standard Gerber word command inside an aperture block.
  *
- * A statement's fields are what name apertures -- `1,1,D10,0,0` is a circle primitive drawn with
- * aperture D10 -- so a field is read as a code and nothing else in the statement is interpreted.
+ * An AB body is a normal Gerber command stream. A Dnn command (nn >= 10) selects the current
+ * aperture for the block; D01/D02/D03 remain plot/move/flash operations. The block selection stays
+ * in block scope so it cannot leak into the file-level graphics state after `%AB*%`.
  */
-export function applyApertureBlockStatement(ledger: ApertureLedger, compact: string): void {
-  for (const field of compact.split(",")) {
-    const declared = blockStatementAperture.exec(field)?.[1];
-    if (declared === undefined) continue;
-    const code = Number.parseInt(declared, 10);
-    if (code >= firstApertureCode) referenceBlockAperture(ledger, code);
-  }
-}
+export function applyApertureBlockWord(ledger: ApertureLedger, compact: string): void {
+  const selection = apertureSelection.exec(compact);
+  if (selection?.[1] === undefined) return;
 
+  const code = Number.parseInt(selection[1], 10);
+  if (code < firstApertureCode) return;
+
+  if (ledger.block !== undefined) ledger.block.selected = code;
+  referenceBlockAperture(ledger, code);
+}
 /**
  * What the file's aperture state amounts to: the definitions it published, and its own evidence.
  *
@@ -348,7 +334,6 @@ function defineAperture(ledger: ApertureLedger, compact: string): void {
     declared[2] ?? "",
     declared[3] ?? "",
     declared[4],
-    holeScope(ledger, scope),
   );
   if (!reading.ok) {
     recordProblem(ledger, reading.problem);
@@ -359,75 +344,55 @@ function defineAperture(ledger: ApertureLedger, compact: string): void {
 }
 
 /**
- * Where this definition's hole D-code may resolve: its own table, plus the file's if it is a block's.
- *
- * The file's table is only ever added, never preferred over the block's, and only for a definition
- * written inside a block. That asymmetry is the whole point: a block may use what the file already
- * defined, and a file-scope definition may not reach into a block, so no block-local code can ever
- * become something the file outside the block means.
- */
-function holeScope(ledger: ApertureLedger, scope: ApertureTable): HoleScope {
-  const file = ledger.file;
-  if (scope === file) return file;
-  return { has: (code) => scope.has(code) || file.has(code) };
-}
-
-/**
  * Reads one `%AD%` definition.
  *
  * The templates are `C`, `R`, `O` and `P`; anything longer than one letter is the name of an
  * aperture macro, whose body is a statement list this reader does not model. The macro is recorded
  * as the aperture the file defined, because it is one, and its shape is left unclaimed.
  *
- * `holes` is where this definition's hole D-code resolves, which for a block-local definition
- * includes the file's own table: a block may borrow the hole of an aperture the file defined before
- * the block was opened. A file-scope definition gets the file's table alone, because nothing outside
- * a block may name anything inside one.
  */
 function readApertureDefinition(
   code: number,
   template: string,
   name: string,
   tail: string | undefined,
-  holes: HoleScope,
 ): Reading<ApertureDefinition> {
-  if (name !== "") return read({ shape: "macro", macroName: `${template}${name}` });
+  if (name !== "") return successfulReading({ shape: "macro", macroName: `${template}${name}` });
   if (tail === undefined) return malformed(code, "declares a shape with no parameters");
 
   const parts = tail.split("X");
   const shape = template.toUpperCase();
-  if (shape === "C") return readCircle(code, parts, holes);
-  if (shape === "R") return readBox(code, parts, "rectangle", holes);
-  if (shape === "O") return readBox(code, parts, "obround", holes);
-  if (shape === "P") return readPolygon(code, parts, holes);
+  if (shape === "C") return readCircle(code, parts);
+  if (shape === "R") return readBox(code, parts, "rectangle");
+  if (shape === "O") return readBox(code, parts, "obround");
+  if (shape === "P") return readPolygon(code, parts);
   return unsupported(code, `declares the shape "${template}", which is not one this reader knows`);
 }
 
-function readCircle(code: number, parts: readonly string[], holes: HoleScope): Reading<ApertureDefinition> {
+function readCircle(code: number, parts: readonly string[]): Reading<ApertureDefinition> {
   if (parts.length > 2) return malformed(code, "gives a circle more than a diameter and a hole");
   const diameter = readSize(code, "circle diameter", parts[0]);
   if (!diameter.ok) return diameter;
-  const hole = readHole(code, parts[1], holes);
+  const hole = readHole(code, parts[1]);
   if (!hole.ok) return hole;
   const tooLarge = oversizedHole(diameter.value, hole.value);
   if (tooLarge !== undefined) {
     return unsupported(code, `puts a ${tooLarge} hole in a circle of ${diameter.value}`);
   }
-  return read({ shape: "circle", diameter: diameter.value, hole: hole.value });
+  return successfulReading({ shape: "circle", diameter: diameter.value, hole: hole.value });
 }
 
 function readBox(
   code: number,
   parts: readonly string[],
   shape: "rectangle" | "obround",
-  holes: HoleScope,
 ): Reading<ApertureDefinition> {
   if (parts.length > 3) return malformed(code, `gives a ${shape} more than a width, a height and a hole`);
   const width = readSize(code, "width", parts[0]);
   if (!width.ok) return width;
   const height = readSize(code, "height", parts[1]);
   if (!height.ok) return height;
-  const hole = readHole(code, parts[2], holes);
+  const hole = readHole(code, parts[2]);
   if (!hole.ok) return hole;
   const tooLarge = oversizedHole(Math.min(width.value, height.value), hole.value);
   if (tooLarge !== undefined) {
@@ -436,14 +401,14 @@ function readBox(
       `puts a ${tooLarge} hole in a ${shape} of ${width.value}x${height.value}, which does not fit inside it`,
     );
   }
-  return read({ shape, width: width.value, height: height.value, hole: hole.value });
+  return successfulReading({ shape, width: width.value, height: height.value, hole: hole.value });
 }
 
 /**
  * A polygon, whose parameters are the one place where the third number is not the hole: a diameter,
  * a vertex count, an optional rotation, and then an optional hole, in that order.
  */
-function readPolygon(code: number, parts: readonly string[], holes: HoleScope): Reading<ApertureDefinition> {
+function readPolygon(code: number, parts: readonly string[]): Reading<ApertureDefinition> {
   if (parts.length > 4) {
     return malformed(code, "gives a polygon more than a diameter, a vertex count, a rotation and a hole");
   }
@@ -453,13 +418,13 @@ function readPolygon(code: number, parts: readonly string[], holes: HoleScope): 
   if (!vertices.ok) return vertices;
   const rotation = readRotation(code, parts[2]);
   if (!rotation.ok) return rotation;
-  const hole = readHole(code, parts[3], holes);
+  const hole = readHole(code, parts[3]);
   if (!hole.ok) return hole;
   const tooLarge = oversizedHole(diameter.value, hole.value);
   if (tooLarge !== undefined) {
     return unsupported(code, `puts a ${tooLarge} hole in a polygon of ${diameter.value}`);
   }
-  return read({
+  return successfulReading({
     shape: "polygon",
     diameter: diameter.value,
     vertices: vertices.value,
@@ -480,7 +445,7 @@ function readSize(code: number, label: string, raw: string | undefined): Reading
   const value = readNumber(raw);
   if (value === undefined) return malformed(code, `gives "${raw}" as ${label}, which is not a number`);
   if (value <= 0) return unsupported(code, `gives ${raw} as ${label}, which is not a size`);
-  return read(value);
+  return successfulReading(value);
 }
 
 /**
@@ -491,51 +456,34 @@ function readVertices(code: number, raw: string | undefined): Reading<number> {
   if (raw === undefined || raw === "") return malformed(code, "gives no vertex count");
   if (!wholeNumber.test(raw)) return malformed(code, `gives "${raw}" as its vertex count, which is not a whole number`);
   const vertices = Number.parseInt(raw, 10);
-  if (vertices < 3) return unsupported(code, `gives a polygon of ${vertices} vertices, which cannot be drawn`);
-  return read(vertices);
+  if (vertices < 3 || vertices > 12) {
+    return unsupported(code, `gives a polygon of ${vertices} vertices; Gerber polygons require 3 to 12 vertices`);
+  }
+  return successfulReading(vertices);
 }
 
 function readRotation(code: number, raw: string | undefined): Reading<number | undefined> {
-  if (raw === undefined) return read(undefined);
+  if (raw === undefined) return successfulReading(undefined);
   const rotation = readNumber(raw);
   if (rotation === undefined) return malformed(code, `gives "${raw}" as its rotation, which is not an angle`);
-  return read(rotation);
+  return successfulReading(rotation);
 }
 
 /**
- * The optional hole of a definition, which is either a diameter or a reference to another
- * aperture's hole.
+ * The optional round-hole diameter of a standard aperture.
  *
- * The two are written the same way, and the only thing that tells them apart is that a hole code is
- * a D-code: a whole number at or above ten is a reference, and anything else has to be a diameter to
- * be usable. But syntax alone is not enough to act on, because a reference that resolves to nothing
- * is not a hole -- it is a hole-sized number this reader would have to guess at. So the number is a
- * reference only where `holes` has already defined that code, and where it does not, the definition
- * is refused rather than reported as a hole of that size: guessing wrong puts a 15 mm hole in a
- * 0.2 mm pad, and puts a code the file never defined into a report as though it named a size
- * somewhere.
+ * Standard-aperture modifiers are literal decimal values. A whole number such as `14` is therefore
+ * a 14-unit hole diameter even when aperture D14 exists; the modifier never dereferences D14.
  */
-function readHole(code: number, raw: string | undefined, holes: HoleScope): Reading<ApertureHole | undefined> {
-  if (raw === undefined) return read(undefined);
+function readHole(code: number, raw: string | undefined): Reading<ApertureHole | undefined> {
+  if (raw === undefined) return successfulReading(undefined);
   if (raw === "") return malformed(code, "gives an empty hole");
 
-  const referenced = wholeNumber.test(raw) ? Number.parseInt(raw, 10) : undefined;
-  if (referenced !== undefined && referenced >= firstApertureCode) {
-    if (holes.has(referenced)) return read({ kind: "code", code: referenced });
-    return unsupported(
-      code,
-      `refers to aperture D${referenced} as its hole, and no aperture D${referenced} is defined for it to borrow, so whether this file means a hole that size or D${referenced}'s own hole cannot be told from this file`,
-    );
-  }
-
   const diameter = readNumber(raw);
-  if (diameter === undefined) {
-    return malformed(code, `gives "${raw}" as its hole, which is neither a diameter nor an aperture code`);
-  }
-  if (diameter < 0) return unsupported(code, `gives ${raw} as its hole diameter, which is not a size`);
-  return read({ kind: "diameter", diameter });
+  if (diameter === undefined) return malformed(code, `gives "${raw}" as its hole diameter, which is not a decimal`);
+  if (diameter <= 0) return unsupported(code, `gives ${raw} as its hole diameter, which must be greater than zero`);
+  return successfulReading({ kind: "diameter", diameter });
 }
-
 /** The hole diameter, when the hole is not smaller than the aperture it sits in. */
 function oversizedHole(outer: number, hole: ApertureHole | undefined): number | undefined {
   return hole?.kind === "diameter" && hole.diameter >= outer ? hole.diameter : undefined;
@@ -548,7 +496,27 @@ function oversizedHole(outer: number, hole: ApertureHole | undefined): number | 
  * becomes a plausible one, and a plausible one is what gets printed.
  */
 function readNumber(raw: string): number | undefined {
-  return gerberNumber.test(raw) ? Number.parseFloat(raw) : undefined;
+  if (raw === "") return undefined;
+
+  let index = raw.startsWith("+") || raw.startsWith("-") ? 1 : 0;
+  let digits = 0;
+  let decimalPoints = 0;
+  for (; index < raw.length; index += 1) {
+    const char = raw.charCodeAt(index);
+    if (char >= 48 && char <= 57) {
+      digits += 1;
+      continue;
+    }
+    if (char === 46 && decimalPoints === 0) {
+      decimalPoints += 1;
+      continue;
+    }
+    return undefined;
+  }
+  if (digits === 0) return undefined;
+
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function closeApertureBlock(ledger: ApertureLedger): void {
@@ -658,12 +626,8 @@ function inMillimetres(code: number, definition: ApertureDefinition, scale: numb
   }
 }
 
-/** A hole code is a reference and stays a code; only a diameter is a length and needs converting. */
 function holeInMillimetres(hole: ApertureHole | undefined, scale: number): GerberApertureHole | undefined {
-  if (hole === undefined) return undefined;
-  return hole.kind === "diameter"
-    ? { kind: "diameter", diameterMm: hole.diameter * scale }
-    : { kind: "code", code: hole.code };
+  return hole === undefined ? undefined : { kind: "diameter", diameterMm: hole.diameter * scale };
 }
 
 /**
