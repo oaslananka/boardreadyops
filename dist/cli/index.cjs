@@ -47593,6 +47593,398 @@ function parseExcellon(content, path72) {
   };
 }
 
+// src/multicad/gerber-apertures.ts
+var wholeNumber = /^\d+$/u;
+var apertureDefinitionCommand = /^ADD(\d+)([A-Za-z])([A-Za-z0-9_]*)(?:,([^*]*))?\*$/u;
+var apertureDefinitionPrefix = /^ADD(\d+)/u;
+var apertureBlockOpenCommand = /^ABD(\d+)\*$/u;
+var apertureSelection = /^(?:G\d+)?D(\d+)$/u;
+var flashOperation = /D0?3$/u;
+var firstApertureCode = 10;
+var maxListedApertureCodes = 5;
+var maxDefinitionWarnings = 5;
+function successfulReading(value) {
+  return { ok: true, value };
+}
+function malformed(code, detail) {
+  return { ok: false, problem: { code, kind: "malformed", detail } };
+}
+function unsupported(code, detail) {
+  return { ok: false, problem: { code, kind: "unsupported", detail } };
+}
+function createApertureLedger() {
+  return {
+    file: /* @__PURE__ */ new Map(),
+    block: void 0,
+    selected: void 0,
+    placements: { count: 0, codes: [] },
+    undefinedInFileScope: [],
+    undefinedInBlockScope: [],
+    problems: []
+  };
+}
+function isInsideApertureBlock(ledger) {
+  return ledger.block !== void 0;
+}
+function applyApertureExtended(ledger, compact) {
+  if (compact.startsWith("AD")) {
+    defineAperture(ledger, compact);
+    return true;
+  }
+  if (!compact.startsWith("AB")) return false;
+  if (compact === "AB*") {
+    closeApertureBlock(ledger);
+    return true;
+  }
+  const code = apertureBlockOpenCommand.exec(compact)?.[1];
+  ledger.block = {
+    code: code === void 0 ? void 0 : Number.parseInt(code, 10),
+    apertures: /* @__PURE__ */ new Map(),
+    selected: void 0
+  };
+  return true;
+}
+function applyApertureWord(ledger, compact) {
+  const selection = apertureSelection.exec(compact);
+  if (selection?.[1] && Number.parseInt(selection[1], 10) >= firstApertureCode) {
+    selectAperture(ledger, Number.parseInt(selection[1], 10));
+    return;
+  }
+  if (flashOperation.test(compact)) noteFlash(ledger);
+}
+function applyApertureBlockWord(ledger, compact) {
+  const selection = apertureSelection.exec(compact);
+  if (selection?.[1] === void 0) return;
+  const code = Number.parseInt(selection[1], 10);
+  if (code < firstApertureCode) return;
+  if (ledger.block !== void 0) ledger.block.selected = code;
+  referenceBlockAperture(ledger, code);
+}
+function readApertureEvidence(ledger, scale, path72) {
+  return {
+    apertures: [...ledger.file].map(([code, definition]) => inMillimetres(code, definition, scale)),
+    warnings: [
+      ...definitionWarnings(ledger, path72),
+      ...undefinedApertureWarnings(ledger, path72),
+      ...placementWarnings(ledger, path72)
+    ]
+  };
+}
+function defineAperture(ledger, compact) {
+  const scope = ledger.block?.apertures ?? ledger.file;
+  const declared = apertureDefinitionCommand.exec(compact);
+  if (!declared) {
+    const raw = apertureDefinitionPrefix.exec(compact)?.[1];
+    if (raw !== void 0) {
+      const code2 = Number.parseInt(raw, 10);
+      recordProblem(ledger, {
+        code: code2,
+        kind: "malformed",
+        detail: `declares an aperture that cannot be read: "${compact}"`
+      });
+      if (code2 >= firstApertureCode) scope.set(code2, { shape: "unmodelled" });
+    }
+    return;
+  }
+  const code = Number.parseInt(declared[1] ?? "0", 10);
+  if (code < firstApertureCode) {
+    recordProblem(ledger, {
+      code,
+      kind: "malformed",
+      detail: "is defined as a D-code below 10, which is an operation code rather than an aperture code"
+    });
+    return;
+  }
+  const reading = readApertureDefinition(code, declared[2] ?? "", declared[3] ?? "", declared[4]);
+  if (!reading.ok) {
+    recordProblem(ledger, reading.problem);
+    scope.set(code, { shape: "unmodelled" });
+    return;
+  }
+  scope.set(code, reading.value);
+}
+function readApertureDefinition(code, template, name, tail) {
+  if (name !== "") return successfulReading({ shape: "macro", macroName: `${template}${name}` });
+  if (tail === void 0) return malformed(code, "declares a shape with no parameters");
+  const parts = tail.split("X");
+  const shape = template.toUpperCase();
+  if (shape === "C") return readCircle(code, parts);
+  if (shape === "R") return readBox(code, parts, "rectangle");
+  if (shape === "O") return readBox(code, parts, "obround");
+  if (shape === "P") return readPolygon(code, parts);
+  return unsupported(code, `declares the shape "${template}", which is not one this reader knows`);
+}
+function readCircle(code, parts) {
+  if (parts.length > 2) return malformed(code, "gives a circle more than a diameter and a hole");
+  const diameter = readSize(code, "circle diameter", parts[0]);
+  if (!diameter.ok) return diameter;
+  const hole = readHole(code, parts[1]);
+  if (!hole.ok) return hole;
+  const tooLarge = oversizedHole(diameter.value, hole.value);
+  if (tooLarge !== void 0) {
+    return unsupported(code, `puts a ${tooLarge} hole in a circle of ${diameter.value}`);
+  }
+  return successfulReading({ shape: "circle", diameter: diameter.value, hole: hole.value });
+}
+function readBox(code, parts, shape) {
+  if (parts.length > 3) return malformed(code, `gives a ${shape} more than a width, a height and a hole`);
+  const width = readSize(code, "width", parts[0]);
+  if (!width.ok) return width;
+  const height = readSize(code, "height", parts[1]);
+  if (!height.ok) return height;
+  const hole = readHole(code, parts[2]);
+  if (!hole.ok) return hole;
+  const tooLarge = oversizedHole(Math.min(width.value, height.value), hole.value);
+  if (tooLarge !== void 0) {
+    return unsupported(
+      code,
+      `puts a ${tooLarge} hole in a ${shape} of ${width.value}x${height.value}, which does not fit inside it`
+    );
+  }
+  return successfulReading({ shape, width: width.value, height: height.value, hole: hole.value });
+}
+function readPolygon(code, parts) {
+  if (parts.length > 4) {
+    return malformed(code, "gives a polygon more than a diameter, a vertex count, a rotation and a hole");
+  }
+  const diameter = readSize(code, "polygon diameter", parts[0]);
+  if (!diameter.ok) return diameter;
+  const vertices = readVertices(code, parts[1]);
+  if (!vertices.ok) return vertices;
+  const rotation = readRotation(code, parts[2]);
+  if (!rotation.ok) return rotation;
+  const hole = readHole(code, parts[3]);
+  if (!hole.ok) return hole;
+  const tooLarge = oversizedHole(diameter.value, hole.value);
+  if (tooLarge !== void 0) {
+    return unsupported(code, `puts a ${tooLarge} hole in a polygon of ${diameter.value}`);
+  }
+  return successfulReading({
+    shape: "polygon",
+    diameter: diameter.value,
+    vertices: vertices.value,
+    rotation: rotation.value,
+    hole: hole.value
+  });
+}
+function readSize(code, label, raw) {
+  if (raw === void 0 || raw === "") return malformed(code, `gives no ${label}`);
+  const value = readNumber(raw);
+  if (value === void 0) return malformed(code, `gives "${raw}" as ${label}, which is not a number`);
+  if (value <= 0) return unsupported(code, `gives ${raw} as ${label}, which is not a size`);
+  return successfulReading(value);
+}
+function readVertices(code, raw) {
+  if (raw === void 0 || raw === "") return malformed(code, "gives no vertex count");
+  if (!wholeNumber.test(raw)) return malformed(code, `gives "${raw}" as its vertex count, which is not a whole number`);
+  const vertices = Number.parseInt(raw, 10);
+  if (vertices < 3 || vertices > 12) {
+    return unsupported(code, `gives a polygon of ${vertices} vertices; Gerber polygons require 3 to 12 vertices`);
+  }
+  return successfulReading(vertices);
+}
+function readRotation(code, raw) {
+  if (raw === void 0) return successfulReading(void 0);
+  const rotation = readNumber(raw);
+  if (rotation === void 0) return malformed(code, `gives "${raw}" as its rotation, which is not an angle`);
+  return successfulReading(rotation);
+}
+function readHole(code, raw) {
+  if (raw === void 0) return successfulReading(void 0);
+  if (raw === "") return malformed(code, "gives an empty hole");
+  const diameter = readNumber(raw);
+  if (diameter === void 0) return malformed(code, `gives "${raw}" as its hole diameter, which is not a decimal`);
+  if (diameter <= 0) return unsupported(code, `gives ${raw} as its hole diameter, which must be greater than zero`);
+  return successfulReading({ kind: "diameter", diameter });
+}
+function oversizedHole(outer, hole) {
+  return hole?.kind === "diameter" && hole.diameter >= outer ? hole.diameter : void 0;
+}
+function readNumber(raw) {
+  if (raw === "") return void 0;
+  let index = raw.startsWith("+") || raw.startsWith("-") ? 1 : 0;
+  let digits = 0;
+  let decimalPoints = 0;
+  for (; index < raw.length; index += 1) {
+    const char = raw.charCodeAt(index);
+    if (char >= 48 && char <= 57) {
+      digits += 1;
+      continue;
+    }
+    if (char === 46 && decimalPoints === 0) {
+      decimalPoints += 1;
+      continue;
+    }
+    return void 0;
+  }
+  if (digits === 0) return void 0;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : void 0;
+}
+function closeApertureBlock(ledger) {
+  const code = ledger.block?.code;
+  ledger.block = void 0;
+  if (code === void 0) return;
+  if (code < firstApertureCode) {
+    recordProblem(ledger, {
+      code,
+      kind: "malformed",
+      detail: "is defined as an aperture block with a D-code below 10, which is an operation code rather than an aperture code"
+    });
+    return;
+  }
+  ledger.file.set(code, { shape: "block" });
+}
+function selectAperture(ledger, code) {
+  ledger.selected = code;
+  if (!ledger.file.has(code) && !ledger.undefinedInFileScope.includes(code)) {
+    ledger.undefinedInFileScope.push(code);
+  }
+}
+function referenceBlockAperture(ledger, code) {
+  if (ledger.block?.apertures.has(code) === true || ledger.file.has(code)) return;
+  const already = ledger.undefinedInBlockScope.some(
+    (entry) => entry.code === code && entry.blockCode === ledger.block?.code
+  );
+  if (!already) ledger.undefinedInBlockScope.push({ blockCode: ledger.block?.code, code });
+}
+function noteFlash(ledger) {
+  const selected = ledger.selected;
+  if (selected === void 0 || !ledger.file.has(selected)) return;
+  if (ledger.file.get(selected)?.shape !== "block") return;
+  ledger.placements.count += 1;
+  if (!ledger.placements.codes.includes(selected)) ledger.placements.codes.push(selected);
+}
+function recordProblem(ledger, problem) {
+  const scoped = {
+    ...problem,
+    inBlock: ledger.block !== void 0,
+    blockCode: ledger.block?.code
+  };
+  const already = ledger.problems.some(
+    (entry) => entry.code === scoped.code && entry.inBlock === scoped.inBlock && entry.blockCode === scoped.blockCode
+  );
+  if (already) return;
+  ledger.problems.push(scoped);
+}
+function inMillimetres(code, definition, scale) {
+  switch (definition.shape) {
+    case "circle":
+      return {
+        code,
+        shape: "circle",
+        diameterMm: definition.diameter * scale,
+        hole: holeInMillimetres(definition.hole, scale)
+      };
+    case "rectangle":
+      return {
+        code,
+        shape: "rectangle",
+        widthMm: definition.width * scale,
+        heightMm: definition.height * scale,
+        hole: holeInMillimetres(definition.hole, scale)
+      };
+    case "obround":
+      return {
+        code,
+        shape: "obround",
+        widthMm: definition.width * scale,
+        heightMm: definition.height * scale,
+        hole: holeInMillimetres(definition.hole, scale)
+      };
+    case "polygon":
+      return {
+        code,
+        shape: "polygon",
+        diameterMm: definition.diameter * scale,
+        vertices: definition.vertices,
+        rotationDegrees: definition.rotation,
+        hole: holeInMillimetres(definition.hole, scale)
+      };
+    case "macro":
+      return { code, shape: "macro", macroName: definition.macroName };
+    case "block":
+      return { code, shape: "block" };
+    case "unmodelled":
+      return { code, shape: "unmodelled" };
+  }
+}
+function holeInMillimetres(hole, scale) {
+  return hole === void 0 ? void 0 : { kind: "diameter", diameterMm: hole.diameter * scale };
+}
+function definitionWarnings(ledger, path72) {
+  const shown = ledger.problems.slice(0, maxDefinitionWarnings);
+  const warnings = shown.map(
+    (problem) => warning2(
+      problem.kind === "malformed" ? "gerber.malformed-aperture-definition" : "gerber.unsupported-aperture-definition",
+      `${problemSubject(problem)}, but ${problem.detail}; ${problem.kind === "malformed" ? "nothing is read from that definition." : "its shape is not read from this file. The numbers are the file's own, in whatever units it declares."}`,
+      path72
+    )
+  );
+  const rest = ledger.problems.length - shown.length;
+  if (rest > 0) {
+    warnings.push(
+      warning2(
+        "gerber.unreadable-aperture-definition",
+        `There ${rest === 1 ? "is 1 further definition" : `are ${rest} further definitions`} this reader could not use, which ${rest === 1 ? "is" : "are"} not listed here.`,
+        path72
+      )
+    );
+  }
+  return warnings;
+}
+function problemSubject(problem) {
+  if (!problem.inBlock) return `The file defines aperture D${problem.code}`;
+  const block = problem.blockCode === void 0 ? "An unnamed aperture block" : `Aperture block D${problem.blockCode}`;
+  return `${block} defines aperture D${problem.code}`;
+}
+function undefinedApertureWarnings(ledger, path72) {
+  const warnings = [];
+  if (ledger.undefinedInFileScope.length > 0) {
+    warnings.push(
+      warning2(
+        "gerber.undefined-aperture",
+        `The file selects ${listApertureCodes(ledger.undefinedInFileScope.map((code) => ({ code })))}, which it never defines; what is plotted with it cannot be read from this file.`,
+        path72
+      )
+    );
+  }
+  if (ledger.undefinedInBlockScope.length > 0) {
+    warnings.push(
+      warning2(
+        "gerber.undefined-aperture",
+        `An aperture block uses ${listApertureCodes(
+          ledger.undefinedInBlockScope.map((entry) => ({
+            code: entry.code,
+            qualifier: entry.blockCode === void 0 ? void 0 : `(in block D${entry.blockCode})`
+          }))
+        )}, which the block never defines; what those blocks draw cannot be read from this file.`,
+        path72
+      )
+    );
+  }
+  return warnings;
+}
+function placementWarnings(ledger, path72) {
+  if (ledger.placements.count === 0) return [];
+  const codes = listApertureCodes(ledger.placements.codes.map((code) => ({ code })));
+  return [
+    warning2(
+      "gerber.unmodelled-aperture-block",
+      `Aperture block ${codes} is placed ${ledger.placements.count === 1 ? "once" : `${ledger.placements.count} times`}. A block's own shape is not modelled, so each placement contributes its flash point only and the geometry read from this file is incomplete.`,
+      path72
+    )
+  ];
+}
+function listApertureCodes(codes) {
+  const shown = codes.slice(0, maxListedApertureCodes).map((entry) => entry.qualifier === void 0 ? `D${entry.code}` : `D${entry.code} ${entry.qualifier}`).join(", ");
+  const rest = codes.length - maxListedApertureCodes;
+  return rest > 0 ? `${shown} and ${rest} more` : shown;
+}
+function warning2(code, message, path72) {
+  return path72 === void 0 ? { code, message } : { code, message, path: path72 };
+}
+
 // src/multicad/gerber-parser.ts
 var inchToMm2 = 25.4;
 var closureToleranceMm = 2e-3;
@@ -47670,7 +48062,7 @@ function unterminatedWarnings(unterminated, path72) {
   const extended = unterminated.extended;
   if (extended.count > 0) {
     warnings.push(
-      warning2(
+      warning3(
         "gerber.unterminated-extended-command",
         `An extended command is not closed by "%". There ${extended.count === 1 ? "is 1" : `are ${extended.count}`} of them, the first reading "${extended.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
         path72
@@ -47680,7 +48072,7 @@ function unterminatedWarnings(unterminated, path72) {
   const word = unterminated.word;
   if (word.count > 0) {
     warnings.push(
-      warning2(
+      warning3(
         "gerber.unterminated-word-command",
         `A command is not terminated by "*". There ${word.count === 1 ? "is 1" : `are ${word.count}`} of them, the first reading "${word.excerpt}". The commands after it are still read, but this file's structure is not verified.`,
         path72
@@ -47726,27 +48118,25 @@ function samePoint2(a, b) {
   return Math.abs(a.x - b.x) <= closureToleranceMm && Math.abs(a.y - b.y) <= closureToleranceMm;
 }
 var plottedOperation = /^(?:G\d+)?(?:X([+-]?\d+))?(?:Y([+-]?\d+))?(?:I[+-]?\d+)?(?:J[+-]?\d+)?D(0?[123])$/u;
-function warning2(code, message, path72) {
+function warning3(code, message, path72) {
   return path72 === void 0 ? { code, message } : { code, message, path: path72 };
 }
-function snapshotFileState(state) {
+function snapshotFileState(state, apertures) {
   return {
     units: state.declaredUnits ?? state.legacyUnits,
     format: state.declaredFormat,
     legacyCoordinateMode: state.legacyCoordinateMode,
     fileFunction: state.fileFunction,
     regionInFileScope: state.regionInFileScope,
-    wordCommands: state.wordCommands
+    wordCommands: state.wordCommands,
+    apertures
   };
 }
-function applyExtendedFileStateCommand(command, state) {
+function applyExtendedFileStateCommand(command, state, apertures) {
   const compact = compactCommand(command.body);
   if (compact.startsWith("AM")) return;
-  if (compact.startsWith("AB")) {
-    if (compact === "AB*") state.apertureBlockDepth = Math.max(0, state.apertureBlockDepth - 1);
-    else state.apertureBlockDepth += 1;
-    return;
-  }
+  if (applyApertureExtended(apertures, compact)) return;
+  if (isInsideApertureBlock(apertures)) return;
   const unitsMatch = /^MO(MM|IN)\*$/u.exec(compact);
   if (unitsMatch) {
     state.declaredUnits ??= unitsMatch[1] === "IN" ? "inch" : "mm";
@@ -47766,11 +48156,16 @@ function applyExtendedFileStateCommand(command, state) {
     state.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
   }
 }
-function applyWordFileStateCommand(command, state) {
+function applyWordFileStateCommand(command, state, apertures) {
   const compact = compactCommand(command.body);
   const gCode = leadingGCode(compact);
-  if (gCode === 4 || state.apertureBlockDepth > 0) return false;
+  if (gCode === 4) return false;
+  if (isInsideApertureBlock(apertures)) {
+    applyApertureBlockWord(apertures, compact);
+    return false;
+  }
   if (compact === "M02") return true;
+  applyApertureWord(apertures, compact);
   state.wordCommands.push(compact);
   if (gCode === 36) {
     state.regionInFileScope = true;
@@ -47790,19 +48185,19 @@ function readFileState(commands, unterminated) {
     legacyCoordinateMode: void 0,
     fileFunction: void 0,
     regionInFileScope: false,
-    apertureBlockDepth: 0,
     wordCommands: []
   };
+  const apertures = createApertureLedger();
   for (const command of commands) {
     if (command.kind === "unterminated") {
       recordUnterminated(unterminated[command.shape], command.body);
     } else if (command.kind === "extended") {
-      applyExtendedFileStateCommand(command, state);
-    } else if (applyWordFileStateCommand(command, state)) {
+      applyExtendedFileStateCommand(command, state, apertures);
+    } else if (applyWordFileStateCommand(command, state, apertures)) {
       break;
     }
   }
-  return snapshotFileState(state);
+  return snapshotFileState(state, apertures);
 }
 function parseGerber(content, path72) {
   const commands = tokenizeGerber(content);
@@ -47823,11 +48218,11 @@ function parseGerber(content, path72) {
   const identity = state.fileFunction ? identityFromFileFunction(state.fileFunction) : void 0;
   const warnings = [];
   if (units === void 0) {
-    warnings.push(warning2("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path72));
+    warnings.push(warning3("gerber.assumed-units", "No %MO% units declaration; assumed millimetres.", path72));
   }
   if (!declaredFormat) {
     warnings.push(
-      warning2(
+      warning3(
         "gerber.assumed-coordinate-format",
         "No %FS% format specification; assumed 3.5 with leading zeros omitted. Coordinates from this file are an assumption, not a measurement.",
         path72
@@ -47836,7 +48231,7 @@ function parseGerber(content, path72) {
   }
   if (incremental) {
     warnings.push(
-      warning2(
+      warning3(
         "gerber.incremental-coordinates",
         "This file uses incremental coordinates, which are not interpreted; no geometry was read from it.",
         path72
@@ -47845,7 +48240,7 @@ function parseGerber(content, path72) {
   }
   if (state.fileFunction && !identity) {
     warnings.push(
-      warning2(
+      warning3(
         "gerber.unmodelled-file-function",
         `The file declares TF.FileFunction "${state.fileFunction}", which is not a stackup layer; its role comes from the filename.`,
         path72
@@ -47854,6 +48249,8 @@ function parseGerber(content, path72) {
   }
   warnings.push(...unterminatedWarnings(unterminated, path72));
   const scale = units === "inch" ? inchToMm2 : 1;
+  const apertureEvidence = readApertureEvidence(state.apertures, scale, path72);
+  warnings.push(...apertureEvidence.warnings);
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -47914,6 +48311,7 @@ function parseGerber(content, path72) {
     boundingBoxMm: plotted >= 2 && Number.isFinite(minX) ? { minX, maxX, minY, maxY } : void 0,
     hasClosedContour,
     openContourCount,
+    apertures: apertureEvidence.apertures,
     warnings
   };
 }
@@ -53514,7 +53912,7 @@ function renderReadinessSection(readiness, locale) {
   const warnings = readiness.warnings.length > 0 ? `<div class="panel">
           <h3>${escapeHtml2(t("report.readiness.warnings", {}, locale))}</h3>
           <ul>
-            ${readiness.warnings.map((warning3) => `<li>${escapeHtml2(warning3)}</li>`).join("\n            ")}
+            ${readiness.warnings.map((warning4) => `<li>${escapeHtml2(warning4)}</li>`).join("\n            ")}
           </ul>
         </div>` : "";
   return `<section aria-labelledby="readiness-heading">
@@ -59984,7 +60382,7 @@ function boundedFirmware(firmware) {
       name: dependency.name.slice(0, 256),
       manifestPath: dependency.manifestPath.slice(0, 1024)
     })),
-    warnings: firmware.warnings.slice(0, 200).map((warning3) => warning3.slice(0, 1024))
+    warnings: firmware.warnings.slice(0, 200).map((warning4) => warning4.slice(0, 1024))
   };
 }
 function boundedBoms(boms) {

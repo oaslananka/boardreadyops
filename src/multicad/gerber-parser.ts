@@ -1,4 +1,14 @@
 import type { LayerRole, LayerSide, ParserWarning } from "@boardreadyops/contracts";
+import {
+  type ApertureLedger,
+  applyApertureBlockWord,
+  applyApertureExtended,
+  applyApertureWord,
+  createApertureLedger,
+  type GerberApertureDefinition,
+  isInsideApertureBlock,
+  readApertureEvidence,
+} from "./gerber-apertures.js";
 
 /**
  * Reads a Gerber file's own account of itself.
@@ -24,6 +34,14 @@ import type { LayerRole, LayerSide, ParserWarning } from "@boardreadyops/contrac
  * terminated from a command that runs to the end of the file. A stream can, and a parser that has
  * read a stream knows exactly which commands it did not read. That is what the rest of this module
  * is for; geometry semantics are a later step. See issues #855 and #858.
+ *
+ * A stream is also what makes an *aperture* readable. `%ADD10C,0.1*%` defines a circle, `D10*`
+ * selects it, and everything plotted after that selection is drawn with it -- three kinds of command
+ * with three grammars, which a text search happily conflates. It is also what makes *scope*
+ * readable: a definition written between `%AB D12*%` and `%AB*%` belongs to that block alone, and a
+ * block that has been closed is itself an aperture, selected and placed like any other. Those
+ * distinctions are read in `./gerber-apertures`, and what cannot be followed is reported rather than
+ * guessed at. What a placed block *covers* is measured in #856; the semantics are #859.
  */
 
 /**
@@ -71,6 +89,15 @@ export type GerberParseResult = {
   hasClosedContour: boolean;
   /** Contours that were drawn but never closed, which is what makes an outline unusable. */
   openContourCount: number;
+  /**
+   * Every aperture the file defined in file scope, one entry per D-code, in the order it declared
+   * them, with dimensions in millimetres.
+   *
+   * A table of what the file says its apertures are, not a list of where it used them: an aperture
+   * defined inside an aperture block is not here, because until that block is placed it is not one
+   * of the file's apertures.
+   */
+  apertures: readonly GerberApertureDefinition[];
   warnings: readonly ParserWarning[];
 };
 
@@ -357,15 +384,17 @@ type GerberFileState = {
    * of this file. The artwork is read from exactly this list.
    */
   wordCommands: readonly string[];
+  /** What the file defined, selected and placed, kept per scope. */
+  apertures: ApertureLedger;
 };
 
 /**
  * The file-level state walk.
  *
- * An aperture block is the one place where a command is not in file scope: a macro body carries
- * codes that mean something else there -- a `D01` in it is a circle primitive, not a plotted point
- * -- so units, coordinate mode, region state and the end of the file are read only outside a block,
- * and a command that was never terminated is evidence rather than a command to interpret.
+ * An aperture block is the one place where a command is not in file scope: its body is a normal
+ * Gerber command stream whose Dnn aperture selections and operations build the block rather than the
+ * outer file artwork. Units, coordinate mode, region state and the end of the outer file are read
+ * only outside a block, and an unterminated command remains evidence rather than an interpreted command.
  */
 type GerberFileStateAccumulator = {
   declaredUnits: "mm" | "inch" | undefined;
@@ -374,11 +403,10 @@ type GerberFileStateAccumulator = {
   legacyCoordinateMode: "absolute" | "incremental" | undefined;
   fileFunction: string | undefined;
   regionInFileScope: boolean;
-  apertureBlockDepth: number;
   wordCommands: string[];
 };
 
-function snapshotFileState(state: GerberFileStateAccumulator): GerberFileState {
+function snapshotFileState(state: GerberFileStateAccumulator, apertures: ApertureLedger): GerberFileState {
   return {
     units: state.declaredUnits ?? state.legacyUnits,
     format: state.declaredFormat,
@@ -386,21 +414,26 @@ function snapshotFileState(state: GerberFileStateAccumulator): GerberFileState {
     fileFunction: state.fileFunction,
     regionInFileScope: state.regionInFileScope,
     wordCommands: state.wordCommands,
+    apertures,
   };
 }
 
 function applyExtendedFileStateCommand(
   command: Extract<GerberCommand, { kind: "extended" }>,
   state: GerberFileStateAccumulator,
+  apertures: ApertureLedger,
 ): void {
   const compact = compactCommand(command.body);
   if (compact.startsWith("AM")) return;
 
-  if (compact.startsWith("AB")) {
-    if (compact === "AB*") state.apertureBlockDepth = Math.max(0, state.apertureBlockDepth - 1);
-    else state.apertureBlockDepth += 1;
-    return;
-  }
+  // `%AD%` and `%AB%` say what the file can draw with, and which of it belongs to a block. They are
+  // read before the block check below, because a definition inside a block is the one command that
+  // means something different in each scope rather than nothing at all.
+  if (applyApertureExtended(apertures, compact)) return;
+
+  // What is left states something about the file itself, and a file-level parameter written inside
+  // a block body belongs to that block: reading it as the file's would rescale the whole layer.
+  if (isInsideApertureBlock(apertures)) return;
 
   const unitsMatch = /^MO(MM|IN)\*$/u.exec(compact);
   if (unitsMatch) {
@@ -427,13 +460,21 @@ function applyExtendedFileStateCommand(
 function applyWordFileStateCommand(
   command: Extract<GerberCommand, { kind: "word" }>,
   state: GerberFileStateAccumulator,
+  apertures: ApertureLedger,
 ): boolean {
   const compact = compactCommand(command.body);
   const gCode = leadingGCode(compact);
 
-  if (gCode === 4 || state.apertureBlockDepth > 0) return false;
+  if (gCode === 4) return false;
+  if (isInsideApertureBlock(apertures)) {
+    // AB bodies use normal Gerber word commands, but those commands build the block and must not join
+    // the outer file artwork or mutate its file-scope aperture selection.
+    applyApertureBlockWord(apertures, compact);
+    return false;
+  }
   if (compact === "M02") return true;
 
+  applyApertureWord(apertures, compact);
   state.wordCommands.push(compact);
   if (gCode === 36) {
     state.regionInFileScope = true;
@@ -462,21 +503,21 @@ function readFileState(commands: GerberCommand[], unterminated: UnterminatedBySh
     legacyCoordinateMode: undefined,
     fileFunction: undefined,
     regionInFileScope: false,
-    apertureBlockDepth: 0,
     wordCommands: [],
   };
+  const apertures = createApertureLedger();
 
   for (const command of commands) {
     if (command.kind === "unterminated") {
       recordUnterminated(unterminated[command.shape], command.body);
     } else if (command.kind === "extended") {
-      applyExtendedFileStateCommand(command, state);
-    } else if (applyWordFileStateCommand(command, state)) {
+      applyExtendedFileStateCommand(command, state, apertures);
+    } else if (applyWordFileStateCommand(command, state, apertures)) {
       break;
     }
   }
 
-  return snapshotFileState(state);
+  return snapshotFileState(state, apertures);
 }
 
 export function parseGerber(content: string, path?: string): GerberParseResult {
@@ -538,6 +579,12 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
   warnings.push(...unterminatedWarnings(unterminated, path));
 
   const scale = units === "inch" ? inchToMm : 1;
+  // Aperture dimensions are the file's own numbers, so they are converted with the same unit the
+  // coordinates are: an inch pad read as a millimetre one is 25.4 times too small, and nothing
+  // downstream would know.
+  const apertureEvidence = readApertureEvidence(state.apertures, scale, path);
+  warnings.push(...apertureEvidence.warnings);
+
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -617,6 +664,7 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
     boundingBoxMm: plotted >= 2 && Number.isFinite(minX) ? { minX, maxX, minY, maxY } : undefined,
     hasClosedContour,
     openContourCount,
+    apertures: apertureEvidence.apertures,
     warnings,
   };
 }
