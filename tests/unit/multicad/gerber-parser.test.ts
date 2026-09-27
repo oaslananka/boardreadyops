@@ -22,6 +22,18 @@ const closedSquare = [
   "M02*",
 ].join("\n");
 
+function expectUndefinedApertureGeometry(
+  result: ReturnType<typeof parseGerber>,
+  primitiveKind: "segment" | "flash",
+  primitiveCount: number,
+): void {
+  expect(result.geometry.primitives).toHaveLength(primitiveCount);
+  expect(result.geometry.primitives.every((primitive) => primitive.kind === primitiveKind)).toBe(true);
+  expect(result.geometry.uncertainty).toEqual(["undefined-aperture"]);
+  expect(result.geometry.incomplete).toBe(true);
+  expect(result.warnings.filter((entry) => entry.code === "gerber.undefined-aperture")).toHaveLength(1);
+}
+
 describe("parseGerber", () => {
   describe("what the file says it is", () => {
     it("reads copper identity, side and ordinal from TF.FileFunction", () => {
@@ -411,6 +423,9 @@ describe("parseGerber", () => {
       expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 10, minY: 0, maxY: 2 });
       expect(result.hasClosedContour).toBe(false);
       expect(result.openContourCount).toBe(1);
+      expect(result.geometry.primitives).toHaveLength(2);
+      expect(result.geometry.uncertainty).toEqual(["unsupported-aperture"]);
+      expect(result.geometry.incomplete).toBe(true);
     });
   });
 
@@ -563,6 +578,9 @@ describe("parseGerber", () => {
       expect(unterminated?.message).not.toContain(noise);
       expect(unterminated?.message.length).toBeLessThan(400);
       expect(unterminated?.message).toContain("...");
+      // The unterminated comment is evidence about the stream, not artwork. It must not synthesize
+      // a primitive from the coordinates that appear after the comment marker.
+      expect(result.geometry.primitives).toEqual([]);
     });
 
     it("counts malformed commands instead of listing every one of them", () => {
@@ -757,6 +775,11 @@ describe("parseGerber", () => {
       expect(result.boundingBoxMm).toEqual({ minX: 0, maxX: 0.4, minY: 0, maxY: 0.3 });
       // The file declares no %MO%, so units are assumed and the result has to say so.
       expect(result.unitsEvidence).toBe("assumed");
+
+      // This real fixture also never defines D11. The path is still measurable as four straight
+      // segments, but its stroke extent is not: geometry must keep the useful coordinates and mark
+      // the missing aperture once rather than claiming an exact board-edge distance from them.
+      expectUndefinedApertureGeometry(result, "segment", 4);
     });
 
     it("reads the EasyEDA copper layer, which declares no function", async () => {
@@ -767,6 +790,10 @@ describe("parseGerber", () => {
       expect(result.units).toBe("mm");
       expect(result.unitsEvidence).toBe("declared");
       expect(result.format).toMatchObject({ integerDigits: 3, decimalDigits: 5, evidence: "declared" });
+
+      // Both pads are real flashes, but this small fixture intentionally omits its D10 definition.
+      // One uncertainty reason and one bounded warning cover the whole file, however many flashes use it.
+      expectUndefinedApertureGeometry(result, "flash", 2);
     });
 
     it("reads the Fusion copper layer's declared format", async () => {
@@ -778,6 +805,11 @@ describe("parseGerber", () => {
 
       expect(result.format).toMatchObject({ integerDigits: 2, decimalDigits: 5, evidence: "declared" });
       expect(result.warnings.map((entry) => entry.code)).not.toContain("gerber.assumed-coordinate-format");
+
+      // The Fusion fixture has the same honest limitation as the EasyEDA copper fixture: it plots
+      // two flashes with an undefined D10. The new geometry surface must expose both positions while
+      // refusing to invent the aperture's dimensions.
+      expectUndefinedApertureGeometry(result, "flash", 2);
     });
   });
 
@@ -918,6 +950,45 @@ describe("parseGerber", () => {
         expect.stringContaining("no parameters"),
         expect.stringContaining("more than a diameter and a hole"),
         expect.stringContaining("empty hole"),
+      ]);
+      expect(result.apertures.map((entry) => entry.shape)).toEqual([
+        "unmodelled",
+        "unmodelled",
+        "unmodelled",
+        "unmodelled",
+      ]);
+    });
+
+    it("reports the required rectangle, obround and polygon parameters when they are missing", () => {
+      const result = parseGerber(["%MOMM*%", "%ADD10R,1.0*%", "%ADD11O,1.0*%", "%ADD12P,0.5*%", "M02*"].join("\n"));
+
+      const malformed = result.warnings.filter((entry) => entry.code === "gerber.malformed-aperture-definition");
+      expect(malformed.map((entry) => entry.message)).toEqual([
+        expect.stringContaining("gives no height"),
+        expect.stringContaining("gives no height"),
+        expect.stringContaining("gives no vertex count"),
+      ]);
+      expect(result.apertures).toEqual([
+        { code: 10, shape: "unmodelled" },
+        { code: 11, shape: "unmodelled" },
+        { code: 12, shape: "unmodelled" },
+      ]);
+    });
+
+    it("rejects an invalid required parameter in every standard aperture template", () => {
+      const result = parseGerber(
+        ["%MOMM*%", "%ADD10C,nope*%", "%ADD11R,1.0Xnope*%", "%ADD12O,nopeX1.0*%", "%ADD13P,0.5Xsix*%", "M02*"].join(
+          "\n",
+        ),
+      );
+
+      const malformed = result.warnings.filter((entry) => entry.code === "gerber.malformed-aperture-definition");
+      expect(malformed).toHaveLength(4);
+      expect(malformed.map((entry) => entry.message)).toEqual([
+        expect.stringContaining('"nope" as circle diameter'),
+        expect.stringContaining('"nope" as height'),
+        expect.stringContaining('"nope" as width'),
+        expect.stringContaining('"six" as its vertex count'),
       ]);
       expect(result.apertures.map((entry) => entry.shape)).toEqual([
         "unmodelled",
