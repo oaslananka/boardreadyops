@@ -243,10 +243,21 @@ describe("manufacturing.board-edge-clearance", () => {
   });
 
   it("keeps an unverified vendor-profile limit advisory even with exact geometry", async () => {
-    const result = await run({
-      "fab/outline.gko": squareOutline,
-      "fab/top.gtl": traceGerber({ x: 0.25, y: 1 }, { x: 0.25, y: 9 }),
-    });
+    const vendorConfig = `version: 1
+vendor:
+  profile: jlcpcb
+rules:
+  manufacturing.board-edge-clearance:
+    enabled: true
+fail-on: never
+`;
+    const result = await run(
+      {
+        "fab/outline.gko": squareOutline,
+        "fab/top.gtl": traceGerber({ x: 0.25, y: 1 }, { x: 0.25, y: 9 }),
+      },
+      vendorConfig,
+    );
 
     const finding = expectRule(result, "manufacturing.board-edge-clearance", 1)[0];
     expect(finding?.severity).toBe("low");
