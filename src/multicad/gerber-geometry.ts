@@ -291,19 +291,39 @@ const transformUncertainty: Record<GerberFileTransform, GerberGeometryUncertaint
 };
 
 /**
- * The transformation a file-scope extended command states, or undefined when it states none.
+ * Whether a numeric transform is one of the standard identity/reset values.
  *
- * A transformation with every parameter omitted is still reported: `%LM*%` moves nothing, but a
- * reader that cannot tell a no-op from a transform it skipped must not claim to have applied it.
- * The one exception is the step and repeat, whose identity form is the exception that matters in
- * practice -- see `repeatsAnything`. The caller decides what the answer means for the file's
- * geometry; this only says what it wrote.
+ * The family recognizers deliberately remain fail-closed for malformed bodies. Only a body that
+ * JavaScript can read as one finite number may be treated as an identity, so inputs such as
+ * `LR1.2.3*` stay uncertain instead of being mistaken for a harmless reset.
+ */
+function numericTransformIsIdentity(compact: string, prefix: "LR" | "LS", identity: number): boolean {
+  const body = compact.slice(prefix.length, -1);
+  if (body === "") return false;
+  const value = Number(body);
+  return Number.isFinite(value) && value === identity;
+}
+
+/**
+ * The non-identity transformation a file-scope extended command states, or undefined when it states
+ * no transformation that changes geometry.
+ *
+ * Gerber's explicit graphics-state identities are `LMN` (no mirroring), `LR0` (zero rotation), and
+ * `LS1` (unity scale). They reset state rather than changing geometry, so reporting them as
+ * unapplied transforms would turn an exactly measurable layer into a false uncertainty. Malformed or
+ * unsupported transform-family statements still fail closed, and step-and-repeat keeps its separate
+ * identity handling in `repeatsAnything`.
  */
 export function readGerberTransform(compact: string): GerberFileTransform | undefined {
+  if (compact === "LMN*") return undefined;
   if (mirrorTransform.test(compact)) return "mirror";
-  if (rotationTransform.test(compact)) return "rotation";
+  if (rotationTransform.test(compact)) {
+    return numericTransformIsIdentity(compact, "LR", 0) ? undefined : "rotation";
+  }
   if (stepAndRepeatStatement.test(compact)) return repeatsAnything(compact) ? "step-and-repeat" : undefined;
-  if (scaleTransform.test(compact)) return "scale";
+  if (scaleTransform.test(compact)) {
+    return numericTransformIsIdentity(compact, "LS", 1) ? undefined : "scale";
+  }
   return undefined;
 }
 

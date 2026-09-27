@@ -81,7 +81,6 @@ describe("readGerberTransform", () => {
     expect(readGerberTransform("LMX*")).toBe("mirror");
     expect(readGerberTransform("LMY*")).toBe("mirror");
     expect(readGerberTransform("LMXY*")).toBe("mirror");
-    expect(readGerberTransform("LMN*")).toBe("mirror");
     // `%LR90*%` is the spec's simplest rotation and `%LS2*%` its simplest scale. A grammar that
     // demanded a modifier letter would read the commonest way of writing either as no transform at
     // all, and a layer whose aperture is rotated would be reported as exactly measured.
@@ -97,6 +96,20 @@ describe("readGerberTransform", () => {
     // The pre-X2 spellings of a step and repeat repeat, and are not applied here either.
     expect(readGerberTransform("SRX2Y3*")).toBe("step-and-repeat");
     expect(readGerberTransform("SR3*")).toBe("step-and-repeat");
+  });
+
+  it("leaves the Gerber graphics-state identity resets uncalled", () => {
+    expect(readGerberTransform("LMN*")).toBeUndefined();
+    for (const command of ["LR0*", "LR0.0*", "LR-0.0*", "LR+0.0*"]) {
+      expect(readGerberTransform(command), command).toBeUndefined();
+    }
+    for (const command of ["LS1*", "LS1.0*", "LS+1.0*"]) {
+      expect(readGerberTransform(command), command).toBeUndefined();
+    }
+
+    // A malformed transform-family body still fails closed instead of being mistaken for identity.
+    expect(readGerberTransform("LR0.0.0*")).toBe("rotation");
+    expect(readGerberTransform("LS1.0.0*")).toBe("scale");
   });
 
   it("does not read a polarity, a saved image or a name as a transformation", () => {
@@ -711,6 +724,14 @@ describe("geometry read through parseGerber", () => {
 
     const repeated = parseGerber(gerber("X0Y0D02*", "X4000000Y0D01*").replace("%ADD11R,1.6X0.8*%", "%SRX2Y2I5.0J0*%"));
     expect(repeated.geometry.uncertainty).toEqual(["step-and-repeat"]);
+
+    // Gerber's explicit no-mirror, zero-rotation and unity-scale commands are graphics-state resets,
+    // not unapplied transforms. They must not turn an otherwise exact layer into false uncertainty.
+    const identityTransforms = parseGerber(
+      gerber("%LMN*%", "%LR0.0*%", "%LS1.0*%", "X0Y0D02*", "X4000000Y0D01*"),
+    );
+    expect(identityTransforms.geometry.uncertainty).toEqual([]);
+    expect(identityTransforms.geometry.incomplete).toBe(false);
 
     // The identity repetition ordinary CAM output writes on every layer copies nothing, and a file
     // that states it is still measured.
