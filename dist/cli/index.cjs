@@ -48013,11 +48013,22 @@ var transformUncertainty = {
   scale: "object-transform",
   "step-and-repeat": "step-and-repeat"
 };
+function numericTransformIsIdentity(compact, prefix, identity) {
+  const body = compact.slice(prefix.length, -1);
+  if (body === "") return false;
+  const value = Number(body);
+  return Number.isFinite(value) && value === identity;
+}
 function readGerberTransform(compact) {
+  if (compact === "LMN*") return void 0;
   if (mirrorTransform.test(compact)) return "mirror";
-  if (rotationTransform.test(compact)) return "rotation";
+  if (rotationTransform.test(compact)) {
+    return numericTransformIsIdentity(compact, "LR", 0) ? void 0 : "rotation";
+  }
   if (stepAndRepeatStatement.test(compact)) return repeatsAnything(compact) ? "step-and-repeat" : void 0;
-  if (scaleTransform.test(compact)) return "scale";
+  if (scaleTransform.test(compact)) {
+    return numericTransformIsIdentity(compact, "LS", 1) ? void 0 : "scale";
+  }
   return void 0;
 }
 function repeatsAnything(compact) {
