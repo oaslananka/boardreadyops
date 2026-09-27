@@ -975,14 +975,9 @@ describe("parseGerber", () => {
 
     it("rejects an invalid required parameter in every standard aperture template", () => {
       const result = parseGerber(
-        [
-          "%MOMM*%",
-          "%ADD10C,nope*%",
-          "%ADD11R,1.0Xnope*%",
-          "%ADD12O,nopeX1.0*%",
-          "%ADD13P,0.5Xsix*%",
-          "M02*",
-        ].join("\n"),
+        ["%MOMM*%", "%ADD10C,nope*%", "%ADD11R,1.0Xnope*%", "%ADD12O,nopeX1.0*%", "%ADD13P,0.5Xsix*%", "M02*"].join(
+          "\n",
+        ),
       );
 
       const malformed = result.warnings.filter((entry) => entry.code === "gerber.malformed-aperture-definition");
