@@ -727,9 +727,7 @@ describe("geometry read through parseGerber", () => {
 
     // Gerber's explicit no-mirror, zero-rotation and unity-scale commands are graphics-state resets,
     // not unapplied transforms. They must not turn an otherwise exact layer into false uncertainty.
-    const identityTransforms = parseGerber(
-      gerber("%LMN*%", "%LR0.0*%", "%LS1.0*%", "X0Y0D02*", "X4000000Y0D01*"),
-    );
+    const identityTransforms = parseGerber(gerber("%LMN*%", "%LR0.0*%", "%LS1.0*%", "X0Y0D02*", "X4000000Y0D01*"));
     expect(identityTransforms.geometry.uncertainty).toEqual([]);
     expect(identityTransforms.geometry.incomplete).toBe(false);
 
