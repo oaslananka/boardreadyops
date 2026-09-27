@@ -58,6 +58,43 @@ describe("parseGerber", () => {
       expect(result.fileFunction).toBeUndefined();
     });
 
+    it("reads a polarity and a file function out of one file, in either order", () => {
+      // Both are file-scope statements read in the same pass, and neither may swallow the other: a
+      // polarity that ended the pass before the attribute would leave an honest layer unclassified,
+      // and an attribute read that had to run first would be re-run against every command in the
+      // file. They answer two unrelated questions, so both are read and both survive the other's
+      // presence -- which is the property worth holding, not the order they happen to be read in.
+      const withPolarityFirst = [
+        "%FSLAX36Y36*%",
+        "%MOMM*%",
+        "%LPC*%",
+        "%TF.FileFunction,Copper,L2,Top*%",
+        "%ADD10C,0.1*%",
+        "D10*",
+        "X0Y0D03*",
+        "M02*",
+      ].join("\n");
+      const withAttributeFirst = [
+        "%FSLAX36Y36*%",
+        "%MOMM*%",
+        "%TF.FileFunction,Copper,L2,Top*%",
+        "%LPC*%",
+        "%ADD10C,0.1*%",
+        "D10*",
+        "X0Y0D03*",
+        "M02*",
+      ].join("\n");
+
+      for (const content of [withPolarityFirst, withAttributeFirst]) {
+        const result = parseGerber(content);
+        expect(result.fileFunction, content).toBe("Copper,L2,Top");
+        expect(result.identity, content).toEqual({ role: "copper", side: "top", index: 2 });
+        // The clear polarity is still noticed even though an attribute went by in between, so copper
+        // the file removed is still named rather than published as what the layer holds.
+        expect(result.geometry.uncertainty, content).toEqual(["clear-polarity"]);
+      }
+    });
+
     it("keeps the raw value, and says so, for a function that is not a stackup layer", () => {
       const result = parseGerber(
         ["%FSLAX36Y36*%", "%MOMM*%", "%TF.FileFunction,AssemblyDrawing,Top*%", "M02*"].join("\n"),

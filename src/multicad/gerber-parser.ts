@@ -8,7 +8,17 @@ import {
   type GerberApertureDefinition,
   isInsideApertureBlock,
   readApertureEvidence,
+  readApertureSelection,
 } from "./gerber-apertures.js";
+import {
+  createGerberGeometryCollector,
+  type GerberFileTransform,
+  type GerberFormatSpec,
+  type GerberGeometry,
+  type GerberGeometryCollector,
+  readGerberCoordinate,
+  readGerberTransform,
+} from "./gerber-geometry.js";
 
 /**
  * Reads a Gerber file's own account of itself.
@@ -41,7 +51,8 @@ import {
  * readable: a definition written between `%AB D12*%` and `%AB*%` belongs to that block alone, and a
  * block that has been closed is itself an aperture, selected and placed like any other. Those
  * distinctions are read in `./gerber-apertures`, and what cannot be followed is reported rather than
- * guessed at. What a placed block *covers* is measured in #856; the semantics are #859.
+ * guessed at. What a placed block *covers* is measured in `./gerber-geometry`; the semantics are
+ * #859.
  *
  * A stream is also what makes the artwork's own state readable. A `D01` draws from wherever the
  * current point is, which is the Gerber origin until the file moves it; a `D02` puts the current
@@ -50,6 +61,14 @@ import {
  * their start. Each of those is a transition that means something only where the file wrote it, and
  * applying one out of order -- a region reaching back to close a contour drawn before it, a draw
  * starting somewhere the file never went -- loses geometry that is in the file. See issue #860.
+ *
+ * That second walk produces two things from one pass. It decides the facts a file is judged on -- its
+ * extents, whether its contours close -- and it hands `./gerber-geometry` what each command was
+ * worth, so the geometry that comes back is measured against the same current point, the same region
+ * state and the same selected aperture the extents were read with. What a plotted object covers,
+ * whether its aperture can be measured at all, and when there has been enough of it are decided
+ * there, under a budget of its own: this walk reads a stream, and is not the place where everything
+ * the stream contains accumulates.
  */
 
 /**
@@ -61,11 +80,8 @@ import {
  */
 export type GerberEvidence = "declared" | "assumed";
 
-type GerberCoordinateFormat = {
-  integerDigits: number;
-  decimalDigits: number;
-  /** `L` omits leading zeros, `T` omits trailing. Absolute vs incremental is tracked separately. */
-  zeroOmission: "leading" | "trailing";
+type GerberCoordinateFormat = GerberFormatSpec & {
+  /** Whether the file declared its own format, which is what decides whether a rule may act on a coordinate. */
   evidence: GerberEvidence;
 };
 
@@ -110,6 +126,19 @@ export type GerberParseResult = {
    * of the file's apertures.
    */
   apertures: readonly GerberApertureDefinition[];
+  /**
+   * The measurable geometry read from this file's artwork: the straight traces it drew, the apertures
+   * it flashed, and which of them were drawn inside a `G36`/`G37` region.
+   *
+   * `geometry.incomplete` is the part a consumer has to read before it measures anything, because it
+   * is set -- with the reason named in `geometry.uncertainty` -- by every one of the things this
+   * reader will not model: an aperture whose copper it cannot describe, an aperture the file never
+   * defined, an arc, an object transformation, a step and repeat, copper erased under a clear
+   * polarity, a coordinate mode it refuses, and a file with more plotted objects than it is willing
+   * to hold. An incomplete geometry is a true measurement of part of a layer, and never of the layer
+   * itself.
+   */
+  geometry: GerberGeometry;
   warnings: readonly ParserWarning[];
 };
 
@@ -341,17 +370,6 @@ function identityFromFileFunction(value: string): GerberLayerIdentity | undefine
   return undefined;
 }
 
-function coordinateValue(raw: string, format: GerberCoordinateFormat): number {
-  const negative = raw.startsWith("-");
-  const digits = raw.replace(/^[+-]/u, "");
-  const total = format.integerDigits + format.decimalDigits;
-  const padded = format.zeroOmission === "leading" ? digits.padStart(total, "0") : digits.padEnd(total, "0");
-  const value = Number.parseFloat(
-    `${padded.slice(0, format.integerDigits) || "0"}.${padded.slice(format.integerDigits) || "0"}`,
-  );
-  return negative ? -value : value;
-}
-
 type Point = { x: number; y: number };
 
 /**
@@ -398,6 +416,20 @@ type GerberFileState = {
   legacyCoordinateMode: "absolute" | "incremental" | undefined;
   fileFunction: string | undefined;
   /**
+   * The object transformations the file states in file scope, deduplicated in the order it wrote
+   * them. A transformation is not applied by anything in this module, so this is the fact the
+   * geometry evidence has to be told about rather than a piece of graphics state.
+   */
+  transforms: GerberFileTransform[];
+  /**
+   * Whether the file plotted anything under `%LPC*%`, which erases copper rather than adding it.
+   *
+   * Also a fact for the geometry rather than a piece of graphics state: nothing here composes a clear
+   * operation against the dark ones around it, so the geometry cannot be a complete account of a
+   * layer that erases copper onto itself.
+   */
+  plottedUnderClearPolarity: boolean;
+  /**
    * The file's own word commands, in source order and with their whitespace dropped: no comment,
    * no aperture-block body, and nothing from an `M02` onwards, because none of those is a command
    * of this file. The artwork is read from exactly this list.
@@ -421,6 +453,10 @@ type GerberFileStateAccumulator = {
   declaredFormat: DeclaredCoordinateFormat | undefined;
   legacyCoordinateMode: "absolute" | "incremental" | undefined;
   fileFunction: string | undefined;
+  transforms: GerberFileTransform[];
+  /** The polarity in force, which `%LPD*%` and `%LPC*%` each replace for the objects after them. */
+  polarity: "dark" | "clear";
+  plottedUnderClearPolarity: boolean;
   wordCommands: string[];
 };
 
@@ -430,6 +466,8 @@ function snapshotFileState(state: GerberFileStateAccumulator, apertures: Apertur
     format: state.declaredFormat,
     legacyCoordinateMode: state.legacyCoordinateMode,
     fileFunction: state.fileFunction,
+    transforms: state.transforms,
+    plottedUnderClearPolarity: state.plottedUnderClearPolarity,
     wordCommands: state.wordCommands,
     apertures,
   };
@@ -472,6 +510,35 @@ function applyExtendedFileStateCommand(
   if (state.fileFunction === undefined) {
     state.fileFunction = /^TF\.FileFunction,([^*]*)\*$/u.exec(command.body.trim())?.[1]?.trim();
   }
+
+  recordUnappliedGraphicsState(compact, state);
+}
+
+/**
+ * Records the two things a file can state that this reader does not apply.
+ *
+ * A polarity and an object transformation are the two graphics statements whose effect is to change
+ * what lands on the layer, and neither is applied here: `%LPC*%` erases copper that nothing composes
+ * against the dark objects around it, and nothing in this module moves, turns or scales a plotted
+ * object. Both are therefore recorded as facts about the file for the geometry evidence to carry,
+ * rather than as state this module acts on, and they are read apart because a `%LPC*%` is a polarity
+ * and a `%LN<name>*%` is a name -- reading either as a transformation would report the layer as
+ * transformed when the file never moved anything.
+ */
+function recordUnappliedGraphicsState(compact: string, state: GerberFileStateAccumulator): void {
+  const polarityMatch = /^LP([DC])\*$/u.exec(compact);
+  if (polarityMatch) {
+    state.polarity = polarityMatch[1] === "C" ? "clear" : "dark";
+    return;
+  }
+
+  // An object transformation moves, rotates, scales or repeats whatever is plotted after it, and
+  // nothing in this module applies one. A file that states one is therefore not read as measured
+  // geometry: the geometry says so, rather than publishing paths in the place the untransformed
+  // aperture would have put them. One entry per kind of transformation keeps a file that states the
+  // same one on every line from turning into a list as long as the file.
+  const transform = readGerberTransform(compact);
+  if (transform !== undefined && !state.transforms.includes(transform)) state.transforms.push(transform);
 }
 
 function applyWordFileStateCommand(
@@ -496,6 +563,12 @@ function applyWordFileStateCommand(
   // so that a region applies to the contours around it and to no contour before it.
   state.wordCommands.push(compact);
 
+  // A `D01` or a `D03` under `%LPC*%` erases copper rather than adding it, and nothing in this module
+  // composes that against the dark objects around it. Recording that the file did so once, here where
+  // the polarity and the operations meet in source order, is what keeps the geometry from publishing a
+  // list of plotted objects as though it were a layer of copper.
+  if (state.polarity === "clear" && plottedOperation.test(compact)) state.plottedUnderClearPolarity = true;
+
   if (gCode === 70) state.legacyUnits = "inch";
   else if (gCode === 71) state.legacyUnits = "mm";
   else if (gCode === 90) state.legacyCoordinateMode = "absolute";
@@ -517,6 +590,9 @@ function readFileState(commands: GerberCommand[], unterminated: UnterminatedBySh
     declaredFormat: undefined,
     legacyCoordinateMode: undefined,
     fileFunction: undefined,
+    transforms: [],
+    polarity: "dark",
+    plottedUnderClearPolarity: false,
     wordCommands: [],
   };
   const apertures = createApertureLedger();
@@ -599,6 +675,16 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
   const apertureEvidence = readApertureEvidence(state.apertures, scale, path);
   warnings.push(...apertureEvidence.warnings);
 
+  // The geometry is collected from the same walk that reads the extents below, and both are given the
+  // same facts about the file: the unit its numbers are in, the aperture table its definitions were
+  // converted with, and whether its coordinates are ones this reader can read at all.
+  const collector: GerberGeometryCollector = createGerberGeometryCollector({
+    apertures: apertureEvidence.apertures,
+    incremental,
+    clearPolarity: state.plottedUnderClearPolarity,
+    transforms: state.transforms,
+  });
+
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -610,6 +696,14 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
   let current: Point | undefined;
   let contourStart: Point | undefined;
   let contourSegments = 0;
+  /** The aperture the file has selected, which is what every object plotted after it is drawn with. */
+  let selectedAperture: number | undefined;
+  /**
+   * The interpolation mode the file is in, which is modal: `G01`, `G02` and `G03` each stay in force
+   * until the next of them replaces it, so the mode a draw is made in is the one the file last stated
+   * rather than the one that draw happens to carry.
+   */
+  let interpolation: "linear" | "arc" = "linear";
   /**
    * Whether the commands being read are inside a `G36`/`G37` region, where a contour is closed by
    * definition rather than by its own geometry. Read where the file writes it, so a region reaches
@@ -649,6 +743,20 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
      * opens nothing and a `G40` that is not a comment cannot turn into plotted geometry.
      */
     for (const command of state.wordCommands) {
+      // A `Dnn` names what everything plotted after it is drawn with and plots nothing itself. It is
+      // read here, in the same walk and the same order as the operations it applies to, so the
+      // geometry is measured with the aperture the file had selected at that command rather than
+      // with one the file selected somewhere else.
+      //
+      // It is read without ending the command: a word command may carry both a G-code and a
+      // selection, and `G36D10*` opens a region and names the aperture in one breath. Treating such a
+      // command as nothing but a selection would drop the `G36` and mark every contour after it as
+      // traced rather than drawn as a region edge -- the opposite of what the file wrote, and the
+      // one thing the region flag is read in source order to get right. The selection cannot be a
+      // plotted operation either, so nothing below this line is reached for it.
+      const selection = readApertureSelection(command);
+      if (selection !== undefined) selectedAperture = selection;
+
       // Region state transitions in source order. A `G36` ends the object being drawn and opens a
       // region for what follows; a `G37` closes the region, and the contour in progress is closed by
       // that statement rather than by anything it drew. A command may carry both -- `G36X0Y0D02*`
@@ -662,6 +770,13 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
         inRegion = false;
       }
 
+      // `G01`, `G02` and `G03` state the interpolation mode for everything plotted after them until
+      // one of them states another, so the mode is read as file state here rather than off the draw
+      // itself: a legal file writes `G02*` on a line of its own, and a draw that carried no
+      // G-code at all would otherwise be read as the straight line it is not.
+      if (gCode === 1) interpolation = "linear";
+      else if (gCode === 2 || gCode === 3) interpolation = "arc";
+
       const operation = plottedOperation.exec(command);
       if (!operation) continue;
       const rawX = operation[1];
@@ -672,8 +787,8 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
       if (rawX === undefined && rawY === undefined) continue;
 
       const point: Point = {
-        x: rawX !== undefined ? coordinateValue(rawX, format) * scale : (current?.x ?? gerberOrigin.x),
-        y: rawY !== undefined ? coordinateValue(rawY, format) * scale : (current?.y ?? gerberOrigin.y),
+        x: rawX !== undefined ? readGerberCoordinate(rawX, format) * scale : (current?.x ?? gerberOrigin.x),
+        y: rawY !== undefined ? readGerberCoordinate(rawY, format) * scale : (current?.y ?? gerberOrigin.y),
       };
 
       if (code === "2") {
@@ -694,14 +809,26 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
             contourStart = current;
           }
         }
+        // A draw made in an interpolation mode is an arc, and the straight line between its two ends
+        // is a chord rather than the path: the copper bulges away from it, so publishing that chord
+        // as a measured trace would hand a clearance rule a line the fabricator never cut. The arc
+        // itself is not published either -- a geometry that lists the chord as a trace and separately
+        // says it is unsure would leave the wrong one in the list to be measured. The contour state
+        // above still advances, because the object really was drawn between those two points, and the
+        // extents below still cover both of them.
+        if (interpolation === "arc") collector.uncertain("unsupported-interpolation");
+        else collector.segment(current ?? gerberOrigin, point, { inRegion, apertureCode: selectedAperture });
         contourSegments += 1;
         current = point;
+      } else if (code === "3") {
+        // A flash places a whole aperture rather than a segment of the path the current point is on,
+        // so it has no contour of its own: it neither starts, continues nor closes one, and it
+        // leaves the current point where the file last moved or drew it. What the aperture covers is
+        // measured in `./gerber-geometry`, which is also where an aperture that cannot be measured
+        // says so rather than publishing a size.
+        collector.flash(point, { inRegion, apertureCode: selectedAperture });
       }
-      // A flash places a whole aperture rather than a segment of the path the current point is on,
-      // so it has no branch of its own: it neither starts, continues nor closes a contour, and it
-      // leaves the current point where the file last moved or drew it. Its point is on the layer
-      // all the same, and it is still only a point: what an aperture covers is measured in #856, and
-      // what the file did say about that aperture keeps saying so in `./gerber-apertures`.
+
       recordPlottedPoint(point);
     }
 
@@ -719,6 +846,7 @@ export function parseGerber(content: string, path?: string): GerberParseResult {
     hasClosedContour,
     openContourCount,
     apertures: apertureEvidence.apertures,
+    geometry: collector.evidence(),
     warnings,
   };
 }
