@@ -12,7 +12,8 @@ minimumReleaseAgeExclude:
   - 'nanoid@3.3.17 || 3.3.18'
   - 'hono@4.13.5'
   - 'ip-address@10.3.1'
-  - 'undici@8.9.0'
+  # Renovate security update: undici@8.10.2
+  - 'undici@8.9.0 || 8.10.2'
   - 'valibot@1.4.2'
   - 'fast-uri@3.1.6'
   - 'qs@6.16.0'
@@ -55,7 +56,7 @@ overrides:
   esbuild@<=0.24.2: '>=0.25.0'
   glob@>=10.0.0 <13.0.6: 13.0.6
   'qs@>=6.11.1 <6.16.0': 6.16.0
-  'undici@<8.9.0': 8.9.0
+  'undici@<8.9.0': 8.10.2
   vite@<=6.4.1: '>=6.4.2'
   vite@^8.0.0: '8.0.16'
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
