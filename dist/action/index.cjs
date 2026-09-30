@@ -46482,14 +46482,17 @@ var require_dist3 = __commonJS({
       return result;
     }
     function parse8(header, options) {
+      const stopChar = options?.comma === true ? COMMA : 65536;
       const len = header.length;
-      let index = skipOWS(header, 0, len);
+      let index = skipOWS(header, options?.start ?? 0, len);
       const valueStart = index;
-      index = skipValue(header, index, len);
+      index = skipValue(header, index, len, stopChar);
       const valueEnd = trailingOWS(header, valueStart, index);
       const type = header.slice(valueStart, valueEnd).toLowerCase();
-      const parameters = options?.parameters === false ? new NullObject() : parseParameters(header, index, len);
-      return { type, parameters };
+      if (options?.parameters === false) {
+        return { type, index, parameters: new NullObject() };
+      }
+      return parseParameters(header, type, index, len, stopChar);
     }
     var SP = 32;
     var HTAB = 9;
@@ -46497,13 +46500,18 @@ var require_dist3 = __commonJS({
     var EQ = 61;
     var DQUOTE = 34;
     var BSLASH = 92;
-    function parseParameters(header, index, len) {
+    var COMMA = 44;
+    function parseParameters(header, type, index, len, stopChar) {
       const parameters = new NullObject();
       parameter: while (index < len) {
+        if (header.charCodeAt(index) === stopChar)
+          break;
         index = skipOWS(header, index + 1, len);
         const keyStart = index;
         while (index < len) {
           const code = header.charCodeAt(index);
+          if (code === stopChar)
+            break parameter;
           if (code === SEMI)
             continue parameter;
           if (code === EQ) {
@@ -46516,7 +46524,7 @@ var require_dist3 = __commonJS({
               while (index < len) {
                 const code2 = header.charCodeAt(index++);
                 if (code2 === DQUOTE) {
-                  index = skipValue(header, index, len);
+                  index = skipValue(header, index, len, stopChar);
                   if (parameters[key] === void 0)
                     parameters[key] = value;
                   break;
@@ -46530,7 +46538,7 @@ var require_dist3 = __commonJS({
               continue parameter;
             }
             const valueStart = index;
-            index = skipValue(header, index, len);
+            index = skipValue(header, index, len, stopChar);
             if (parameters[key] === void 0) {
               const valueEnd = trailingOWS(header, valueStart, index);
               parameters[key] = header.slice(valueStart, valueEnd);
@@ -46540,12 +46548,12 @@ var require_dist3 = __commonJS({
           index++;
         }
       }
-      return parameters;
+      return { type, index, parameters };
     }
-    function skipValue(str, index, len) {
+    function skipValue(str, index, len, stopChar) {
       while (index < len) {
-        const char = str.charCodeAt(index);
-        if (char === SEMI)
+        const code = str.charCodeAt(index);
+        if (code === SEMI || code === stopChar)
           break;
         index++;
       }
@@ -52236,7 +52244,7 @@ var require_commonjs4 = __commonJS({
   "node_modules/brace-expansion/dist/commonjs/index.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.EXPANSION_MAX_LENGTH = exports2.EXPANSION_MAX = void 0;
+    exports2.EXPANSION_MAX_REWRITES = exports2.EXPANSION_MAX_DEPTH = exports2.EXPANSION_MAX_LENGTH = exports2.EXPANSION_MAX = void 0;
     exports2.expand = expand2;
     var balanced_match_1 = require_commonjs3();
     var escSlash = "\0SLASH" + Math.random() + "\0";
@@ -52256,6 +52264,8 @@ var require_commonjs4 = __commonJS({
     var periodPattern = /\\\./g;
     exports2.EXPANSION_MAX = 1e5;
     exports2.EXPANSION_MAX_LENGTH = 4e6;
+    exports2.EXPANSION_MAX_DEPTH = 1e3;
+    exports2.EXPANSION_MAX_REWRITES = 1e3;
     function numeric(str) {
       return !isNaN(str) ? parseInt(str, 10) : str.charCodeAt(0);
     }
@@ -52265,36 +52275,44 @@ var require_commonjs4 = __commonJS({
     function unescapeBraces(str) {
       return str.replace(escSlashPattern, "\\").replace(escOpenPattern, "{").replace(escClosePattern, "}").replace(escCommaPattern, ",").replace(escPeriodPattern, ".");
     }
+    function pushAll(target, items) {
+      for (let i = 0; i < items.length; i++) {
+        target.push(items[i]);
+      }
+    }
     function parseCommaParts(str) {
-      if (!str) {
-        return [""];
-      }
       const parts = [];
-      const m = (0, balanced_match_1.balanced)("{", "}", str);
-      if (!m) {
-        return str.split(",");
+      let carry = "";
+      for (; ; ) {
+        const m = (0, balanced_match_1.balanced)("{", "}", str);
+        if (!m) {
+          const tail = str.split(",");
+          tail[0] = carry + tail[0];
+          pushAll(parts, tail);
+          return parts;
+        }
+        const { pre, body: body2, post } = m;
+        const p = pre.split(",");
+        p[0] = carry + p[0];
+        p[p.length - 1] += "{" + body2 + "}";
+        if (!post.length) {
+          pushAll(parts, p);
+          return parts;
+        }
+        carry = p.pop();
+        pushAll(parts, p);
+        str = post;
       }
-      const { pre, body: body2, post } = m;
-      const p = pre.split(",");
-      p[p.length - 1] += "{" + body2 + "}";
-      const postParts = parseCommaParts(post);
-      if (post.length) {
-        ;
-        p[p.length - 1] += postParts.shift();
-        p.push.apply(p, postParts);
-      }
-      parts.push.apply(parts, p);
-      return parts;
     }
     function expand2(str, options = {}) {
       if (!str) {
         return [];
       }
-      const { max = exports2.EXPANSION_MAX, maxLength = exports2.EXPANSION_MAX_LENGTH } = options;
+      const { max = exports2.EXPANSION_MAX, maxLength = exports2.EXPANSION_MAX_LENGTH, maxDepth = exports2.EXPANSION_MAX_DEPTH, maxRewrites = exports2.EXPANSION_MAX_REWRITES } = options;
       if (str.slice(0, 2) === "{}") {
         str = "\\{\\}" + str.slice(2);
       }
-      return expand_(escapeBraces(str), max, maxLength, true).map(unescapeBraces);
+      return expand_(escapeBraces(str), max, maxLength, maxDepth, 0, maxRewrites, true).map(unescapeBraces);
     }
     function embrace(str) {
       return "{" + str + "}";
@@ -52372,8 +52390,12 @@ var require_commonjs4 = __commonJS({
       }
       return N;
     }
-    function expand_(str, max, maxLength, isTop) {
+    function expand_(str, max, maxLength, maxDepth, depth, maxRewrites, isTop) {
+      if (depth > maxDepth) {
+        return [str];
+      }
       let acc = [""];
+      let rewrites = 0;
       let dropEmpties = false;
       let firstGroup = true;
       for (; ; ) {
@@ -52395,7 +52417,8 @@ var require_commonjs4 = __commonJS({
         const isSequence = isNumericSequence || isAlphaSequence;
         const isOptions = m.body.indexOf(",") >= 0;
         if (!isSequence && !isOptions) {
-          if (m.post.match(/,(?!,).*\}/)) {
+          if (rewrites < maxRewrites && m.post.match(/,(?!,).*\}/)) {
+            rewrites++;
             str = m.pre + "{" + m.body + escClose + m.post;
             isTop = true;
             continue;
@@ -52412,7 +52435,7 @@ var require_commonjs4 = __commonJS({
         } else {
           let n = parseCommaParts(m.body);
           if (n.length === 1 && n[0] !== void 0) {
-            n = expand_(n[0], max, maxLength, false).map(embrace);
+            n = expand_(n[0], max, maxLength, maxDepth, depth + 1, maxRewrites, false).map(embrace);
             if (n.length === 1) {
               acc = combine(acc, pre + n[0], [""], max, maxLength, dropEmpties && !m.post.length);
               if (!m.post.length)
@@ -52430,7 +52453,7 @@ var require_commonjs4 = __commonJS({
           values = [];
           let valuesLength = 0;
           outer: for (let j = 0; j < n.length; j++) {
-            const expanded = expand_(n[j], max, maxLength, false);
+            const expanded = expand_(n[j], max, maxLength, maxDepth, depth + 1, maxRewrites, false);
             for (let k = 0; k < expanded.length; k++) {
               const v = expanded[k];
               if (dropsEmpties && !v)
