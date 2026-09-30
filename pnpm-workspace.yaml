@@ -11,7 +11,8 @@ minimumReleaseAgeExclude:
   # OSV security update: nanoid@3.3.17 || 3.3.18
   - 'nanoid@3.3.17 || 3.3.18'
   - 'hono@4.13.5'
-  - 'ip-address@10.3.1'
+  # Renovate security update: ip-address@10.7.1
+  - 'ip-address@10.3.1 || 10.7.1'
   - 'undici@8.9.0'
   - 'valibot@1.4.2'
   - 'fast-uri@3.1.6'
@@ -62,7 +63,7 @@ overrides:
   'brace-expansion@>=5 <5.0.9': 5.0.9
   'fast-uri@>=3 <3.1.6': 3.1.6
   'hono@<4.13.5': 4.13.5
-  'ip-address@<10.3.1': 10.3.1
+  'ip-address@<10.3.1': 10.7.1
   'nanoid@<3.3.17': 3.3.18
   js-yaml@>=4 <4.3.2: 4.3.2
   linkify-it@>=5 <5.0.2: 5.0.2
