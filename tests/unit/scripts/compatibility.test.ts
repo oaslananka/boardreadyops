@@ -79,7 +79,7 @@ describe("compatibility matrix", () => {
     expect(config.node.supported).toEqual(["22", "24"]);
     expect(config.node.current).toEqual(["26"]);
     expect(config.node.tested).toEqual({
-      "22": "22.23.2",
+      "22": "22.23.3",
       "24": "24.21.0",
     });
     expect(toolchain.node.preferred).toBe("24.21.0");
