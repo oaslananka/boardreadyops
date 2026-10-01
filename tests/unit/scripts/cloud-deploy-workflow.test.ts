@@ -43,6 +43,7 @@ describe("cloud-deploy topology preflight", () => {
   it("verifies exactly one live consumer and parses release-policy mounts line by line", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const containerPolicyPath = "$" + "{container_policy_path}";
+    const configuredFile = "$" + "{configured_file}";
     const ids = "$" + "{ids}";
     const count = "$" + "{count}";
 
@@ -56,7 +57,7 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain('{{range .Mounts}}{{printf "%s|%s\\n" .Source .Destination}}{{end}}');
     expect(workflow).not.toContain('{{range .Mounts}}{{printf "%s|%s\\\\n" .Source .Destination}}{{end}}');
     expect(workflow).toContain(`-v destination="${containerPolicyPath}"`);
-    expect(workflow).toContain(`test "${configured_file}" = "${containerPolicyPath}"`);
+    expect(workflow).toContain(`test "${configuredFile}" = "${containerPolicyPath}"`);
   });
 
   it("caps BuildKit cache by size before a low-space build and after every build", () => {
