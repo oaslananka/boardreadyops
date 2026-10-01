@@ -75,10 +75,7 @@ describe("cloud-deploy topology preflight", () => {
 
     const cacheReclaim = workflow.indexOf("docker image prune --force || true");
     const optInCheck = workflow.indexOf(`if [ "${retireOptIn}" = "1" ]; then`, cacheReclaim);
-    const capacityFailure = workflow.indexOf(
-      `if [ "${availableMib}" -lt "${requiredMib}" ]; then`,
-      optInCheck,
-    );
+    const capacityFailure = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`, optInCheck);
 
     expect(cacheReclaim).toBeGreaterThan(0);
     expect(optInCheck).toBeGreaterThan(cacheReclaim);
