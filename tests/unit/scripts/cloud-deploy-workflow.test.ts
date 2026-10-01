@@ -23,11 +23,13 @@ describe("cloud-deploy topology preflight", () => {
   it("keeps a commissioned release-policy override attached on every future deploy", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    const deployRoot = "$" + "{deploy_root}";
+    const policyOverrideFile = "$" + "{policy_override_file}";
 
-    expect(workflow).toContain('policy_override_file="${deploy_root}/compose.release-policy.yml"');
+    expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
     expect(workflow).toContain("run_deploy()");
-    expect(workflow).toContain('if [ -f "${policy_override_file}" ]; then');
-    expect(workflow).toContain('./deploy.sh -f "${policy_override_file}" "$@"');
+    expect(workflow).toContain(`if [ -f "${policyOverrideFile}" ]; then`);
+    expect(workflow).toContain(`./deploy.sh -f "${policyOverrideFile}" "$@"`);
     expect(workflow).toContain('./deploy.sh "$@"');
     expect(workflow).toContain("run_deploy build migrate web worker");
     expect(workflow).toContain("run_deploy up -d --build migrate web worker");
