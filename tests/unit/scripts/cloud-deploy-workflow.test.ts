@@ -88,16 +88,18 @@ describe("cloud-deploy topology preflight", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
 
+    const preflightKeep = "$" + "{preflight_rollback_images_to_keep}";
+
     expect(workflow).toContain("rollback_images_to_keep:");
     expect(workflow).toContain('default: "3"');
     expect(workflow).toContain('- "1"');
     expect(workflow).toContain('- "2"');
     expect(workflow).toContain('- "3"');
     expect(workflow).toContain('preflight_rollback_images_to_keep="$3"');
-    expect(workflow).toContain('retire_superseded_runtime_images "${preflight_rollback_images_to_keep}"');
+    expect(workflow).toContain(`retire_superseded_runtime_images "${preflightKeep}"`);
     expect(workflow).toContain('retire_superseded_runtime_images "3"');
     expect(workflow).toContain('local retain="$1"');
-    expect(workflow).toContain('1|2|3)');
+    expect(workflow).toContain("1|2|3)");
     expect(workflow).not.toContain('rollback_images_to_keep: "0"');
 
     expect(documentation).toContain("defaults to three rollback images");
