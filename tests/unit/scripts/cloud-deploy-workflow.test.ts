@@ -57,23 +57,26 @@ describe("cloud-deploy topology preflight", () => {
     const availableMib = "$" + "{available_mib}";
     const requiredMib = "$" + "{required_mib}";
     const retireOptIn = "$" + "{retire_superseded_images}";
+    const shellImage = "$" + "{image}";
+    const bashPid = "$" + "{BASHPID}";
 
     expect(workflow).toContain("retire_superseded_images:");
     expect(workflow).toContain("default: false");
     expect(workflow).toContain('retire_superseded_images="$2"');
-    expect(workflow).toContain('if [ "' + retireOptIn + '" = "1" ]; then');
+    expect(workflow).toContain(`if [ "${retireOptIn}" = "1" ]; then`);
     expect(workflow).toContain("retain=3");
     expect(workflow).toContain("docker compose -p boardreadyops-cloud images");
     expect(workflow).toContain("grep -vxF");
     expect(workflow).toContain('tail -n +$((retain + 1))');
-    expect(workflow).toContain('docker image rm "' + "function () { [native code] }" + '"');
+    expect(workflow).toContain(`docker image rm "${shellImage}"`);
+    expect(workflow).toContain(`/tmp/boardreadyops-running-images.${bashPid}`);
     expect(workflow).not.toContain("docker system prune");
     expect(workflow).not.toContain("docker volume prune");
 
     const cacheReclaim = workflow.indexOf("docker image prune --force || true");
-    const optInCheck = workflow.indexOf('if [ "' + retireOptIn + '" = "1" ]; then', cacheReclaim);
+    const optInCheck = workflow.indexOf(`if [ "${retireOptIn}" = "1" ]; then`, cacheReclaim);
     const capacityFailure = workflow.indexOf(
-      'if [ "' + availableMib + '" -lt "' + requiredMib + '" ]; then',
+      `if [ "${availableMib}" -lt "${requiredMib}" ]; then`,
       optInCheck,
     );
 
