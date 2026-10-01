@@ -130,7 +130,7 @@ jobs:
             docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
           }
           retire_superseded_runtime_images() {
-            local running_images_file="/tmp/boardreadyops-running-images.$"
+            local running_images_file="/tmp/boardreadyops-running-images.${BASHPID}"
             local superseded
 
             (
@@ -189,12 +189,18 @@ jobs:
           fi
 
           if [ "${available_mib}" -lt "${required_mib}" ]; then
-            printf '%s\n' \
-              "cloud-deploy preflight: only ${available_mib} MiB free on ${docker_root}, need ${required_mib} MiB." \
-              'Build cache and dangling layers have already been reclaimed, so the space is held by' \
-              'tagged images, volumes or logs. Retiring superseded runtime images is an operator' \
-              'decision because they are the rollback targets -- see the disk section of' \
-              'docs/deployment/self-hosted.md -- so this run stops here rather than choosing for you.' >&2
+            if [ "${retire_superseded_images}" = "1" ]; then
+              printf '%s\n' \
+                "cloud-deploy preflight: only ${available_mib} MiB free on ${docker_root}, need ${required_mib} MiB after bounded runtime-image retirement." \
+                'The running image and three newest rollback targets were preserved; remaining space' \
+                'is held by retained images, volumes or logs and needs a separate operator decision.' >&2
+            else
+              printf '%s\n' \
+                "cloud-deploy preflight: only ${available_mib} MiB free on ${docker_root}, need ${required_mib} MiB." \
+                'Build cache and dangling layers have already been reclaimed. Tagged runtime images' \
+                'remain untouched because rollback retirement requires explicit operator opt-in;' \
+                'otherwise volumes or logs need a separate operator decision.' >&2
+            fi
             exit 78
           fi
 
