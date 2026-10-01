@@ -46,6 +46,11 @@ describe("run investigation routes", () => {
     }
   });
 
+  it("blocks run actions when the deployment rollout excludes the repository", () => {
+    expect(component).toContain("releaseRepositoryDispatchAvailability(run.repository)");
+    expect(component).toContain("{...(dispatch.enabled ? {} : { dispatchBlockedReason: dispatch.reason })}");
+  });
+
   it("uses flat summary sections for first-pass run evidence", () => {
     expect(component).toMatch(/<Panel[^>]*title="Run summary"[^>]*tone="section"[^>]*>/u);
     expect(component).toMatch(/<Panel[^>]*title="Source and runtime"[^>]*tone="section"[^>]*>/u);

@@ -151,6 +151,12 @@ function normalizeRepositoryFullName(fullName: string): string | undefined {
   return normalized.includes("/") ? normalized : undefined;
 }
 
+export function releaseRepositoryEnabled(fullName: string, policy: ReleaseRepositoryRolloutPolicy): boolean {
+  if (policy.allowAllRepositories === true) return true;
+  const normalized = normalizeRepositoryFullName(fullName);
+  return normalized ? new Set(policy.repositories ?? []).has(normalized) : false;
+}
+
 export function parseReleaseRepositoryRolloutPolicy(input: string | undefined): ReleaseRepositoryRolloutPolicy {
   const tokens = (input ?? "")
     .split(/[\s,]+/)
