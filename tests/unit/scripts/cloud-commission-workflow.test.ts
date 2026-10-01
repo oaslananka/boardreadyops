@@ -24,6 +24,11 @@ describe("cloud repository commissioning workflow", () => {
   it("bootstraps a legacy inline rollout only with explicit opt-in and a pinned running image", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    const deployRoot = "$" + "{deploy_root}";
+    const deployRunbook = "$" + "{deploy_runbook}";
+    const policyOverrideFile = "$" + "{policy_override_file}";
+    const runningImageTag = "$" + "{running_image_tag}";
+    const recreateAttempted = "$" + "{recreate_attempted}";
 
     expect(workflow).toContain("bootstrap_legacy_inline:");
     expect(workflow).toContain("default: false");
@@ -34,22 +39,22 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES");
     expect(workflow).toContain("legacy inline rollout differs between web and worker");
     expect(workflow).toContain("legacy inline rollout is empty");
-    expect(workflow).toContain("docker-compose.override.yml");
-    expect(workflow).toContain("compose.override.yaml");
-    expect(workflow).toContain("operator-managed Compose override already exists");
-    expect(workflow).toContain("standard Compose base file is missing");
-    expect(workflow).toContain("break");
-    expect(workflow).not.toContain("expected exactly one standard Compose base file");
-
+    expect(workflow).toContain(`deploy_runbook="${deployRoot}/deploy.sh"`);
+    expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
+    expect(workflow).toContain("policy override already exists without a policy file");
     expect(workflow).toContain("release-repositories:/run/policies/repositories:ro");
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories");
     expect(workflow).toContain("boardreadyops-web-runtime:");
     expect(workflow).toContain("legacy consumers are not running the same runtime image");
-    expect(workflow).toContain('BOARDREADYOPS_IMAGE_TAG="${running_image_tag}"');
-    expect(workflow).toContain("up -d --no-deps --force-recreate web worker");
+    expect(workflow).toContain(`BOARDREADYOPS_IMAGE_TAG="${runningImageTag}"`);
+    expect(workflow).toContain(`"${deployRunbook}" -f "${policyOverrideFile}" config --quiet`);
+    expect(workflow).toContain(
+      `"${deployRunbook}" -f "${policyOverrideFile}" up -d --no-deps --force-recreate web worker`,
+    );
+    expect(workflow).toContain(`"${deployRunbook}" up -d --no-deps --force-recreate web worker`);
     expect(workflow).toContain("legacy bootstrap failed readiness; restoring legacy topology");
     expect(workflow).toContain("bootstrap_abort");
-    expect(workflow).toContain('if [ "${recreate_attempted}" = "1" ]');
+    expect(workflow).toContain(`if [ "${recreateAttempted}" = "1" ]`);
     expect(workflow).not.toContain("cat runtime-env");
     expect(workflow).not.toContain("grep BOARDREADYOPS_RELEASE_REPOSITORIES runtime-env");
     expect(documentation).toContain("bootstrap_legacy_inline");
@@ -59,6 +64,7 @@ describe("cloud repository commissioning workflow", () => {
   it("updates only the non-secret rollout policy and restarts the consumers fail-closed", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    const deployRoot = "$" + "{deploy_root}";
     const policyFile = "$" + "{policy_file}";
     const nextPolicy = "$" + "{next_policy}";
 
@@ -73,11 +79,11 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("mktemp");
     expect(workflow).toContain("sort -u");
     expect(workflow).toContain(`cmp -s "${policyFile}" "${nextPolicy}"`);
-    expect(workflow).toContain("docker compose -p boardreadyops-cloud");
-    expect(workflow).toContain("restart web worker");
+    expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
+    expect(workflow).toContain("docker restart");
     expect(workflow).toContain("consumers failed to restart; restoring previous rollout policy");
     expect(workflow).toContain("consumers failed readiness; restoring previous rollout policy");
-    expect(workflow).toContain("ps web worker");
+    expect(workflow).toContain("container_for_service");
     expect(workflow).toContain("http://127.0.0.1:3000/api/health/ready");
     expect(workflow).toContain("http://127.0.0.1:3001/health/ready");
     expect(workflow).not.toContain("runtime-env");

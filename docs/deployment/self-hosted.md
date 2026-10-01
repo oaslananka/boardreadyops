@@ -249,6 +249,8 @@ One-time setup before the workflow can be used:
 
 To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to run `./deploy.sh build migrate web worker` — this builds the image from the fast-forwarded checkout and exercises the Doppler/SSH/Tailscale path without touching the running containers. Set it to `false` to run `./deploy.sh up -d --build migrate web worker`, the real deploy. `retire_superseded_images` is a separate, default-off safety valve for a low-disk preflight: enable it only as an explicit operator opt-in after reviewing the rollback policy below. `rollback_images_to_keep` defaults to `3` and is consulted only by that opted-in preflight retirement; it can be reduced to `1` or `2` without changing the normal post-deploy retention of three rollback images. `deploy.sh` has no canary or automatic rollback of its own: a failed build fails the workflow before anything is replaced, but a failed `up` can leave the stack partially replaced — check `docker compose -p boardreadyops-cloud ps` on the host afterward if a real-deploy run fails.
 
+When repository rollout has been commissioned into the non-secret policy-file topology, the host also contains `/home/ubuntu/boardreadyops-cloud/compose.release-policy.yml`. `cloud-deploy` automatically reuses that file as an additional `-f` argument to the existing `deploy.sh` wrapper for rehearsals and real deploys, and verifies the web/worker mount after a real deploy. The workflow does not rewrite `deploy.sh`, `compose.cloudflared.yml`, or the secret-bearing runtime configuration.
+
 ## Disk on the build host
 
 Every deploy builds a new `boardreadyops-web-runtime:<commit-sha>` image on the host and leaves
