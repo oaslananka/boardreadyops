@@ -27,8 +27,24 @@ describe("cloud repository commissioning workflow", () => {
 
     expect(workflow).toContain('repository="$1"');
     expect(workflow).toContain('policy_file="/opt/boardreadyops-cloud/release-repositories"');
-    expect(workflow).toContain('^[a-z0-9_.-]+/[a-z0-9_.-]+$');
+    expect(workflow).toContain('container_policy_path="/run/policies/repositories"');
+    expect(workflow).toContain('^[a-z0-9_.-]+/[a-z0-9_.-]+    expect(workflow).toContain("mktemp");
+    expect(workflow).toContain("sort -u");
+    expect(workflow).toContain('cmp -s "${policy_file}" "${next_policy}"');
+    expect(workflow).toContain('docker compose -p boardreadyops-cloud restart web worker');
+    expect(workflow).toContain('docker compose -p boardreadyops-cloud ps web worker');
+    expect(workflow).toContain("http://127.0.0.1:3000/api/health/ready");
+    expect(workflow).toContain("http://127.0.0.1:3001/health/ready");
+    expect(workflow).not.toContain("runtime-env");
+    expect(workflow).not.toContain("docker system prune");
+    expect(documentation).toContain("cloud-commission-repository");
+    expect(documentation).toContain("non-secret rollout policy");
+  });
+});
+);
     expect(workflow).toContain('tr "[:upper:]" "[:lower:]"');
+    expect(workflow).toContain('BOARDREADYOPS_RELEASE_REPOSITORIES_FILE');
+    expect(workflow).toContain('docker inspect');
     expect(workflow).toContain('test -f "${policy_file}"');
     expect(workflow).toContain("mktemp");
     expect(workflow).toContain("sort -u");
