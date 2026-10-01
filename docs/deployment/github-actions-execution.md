@@ -108,6 +108,8 @@ BOARDREADYOPS_RELEASE_REPOSITORIES=owner/repository
 
 To keep the rollout allow-list outside the secret-bearing runtime environment, store one repository per line in a non-secret policy file and deploy with `BOARDREADYOPS_CLOUD_RELEASE_REPOSITORIES_FILE=/opt/boardreadyops-cloud/release-repositories`. The deployer mounts it read-only as `BOARDREADYOPS_RELEASE_REPOSITORIES_FILE`; a configured file takes precedence and fails closed if it cannot be read or exceeds 64 KiB.
 
+Production repository commissioning is handled by the manual **cloud-commission-repository** workflow. It accepts only an explicit `owner/repository`, serializes with `cloud-deploy`, verifies that both live consumers are already using the non-secret rollout policy mount, updates that policy atomically and idempotently, restarts only `web` and `worker`, and verifies their local readiness endpoints. If the policy file or mount is not already commissioned, the workflow fails before mutation instead of falling back to the secret-bearing runtime environment.
+
 Repositories containing multiple KiCad fixtures or projects can set the non-secret repository variable `BOARDREADYOPS_PROJECT` to one project directory or `.kicad_pro` path. Repositories whose configuration file is not at the root can set `BOARDREADYOPS_CONFIG` to that file. When unset, BoardReadyOps scans every discovered project and uses `boardreadyops.yml`.
 
 Do not configure a central dispatch repository. The control plane always dispatches the workflow in the repository associated with the release run and uses that repository's persisted default branch.
