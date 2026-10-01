@@ -113,6 +113,7 @@ jobs:
           repo_dir="${deploy_root}/repo"
           policy_file="/opt/boardreadyops-cloud/release-repositories"
           policy_override_file="${deploy_root}/compose.release-policy.yml"
+          container_policy_path="/run/policies/repositories"
           deploy_args="$1"
           retire_superseded_images="$2"
           preflight_rollback_images_to_keep="$3"
@@ -147,11 +148,21 @@ jobs:
 
           container_for_service() {
             local service="$1"
-            docker ps \
-              --filter 'label=com.docker.compose.project=boardreadyops-cloud' \
-              --filter "label=com.docker.compose.service=${service}" \
-              --format '{{.ID}}' \
-              | awk 'NF { print; exit }'
+            local ids
+            local count
+            ids="$(
+              docker ps \
+                --filter 'label=com.docker.compose.project=boardreadyops-cloud' \
+                --filter "label=com.docker.compose.service=${service}" \
+                --format '{{.ID}}'
+            )"
+            count="$(printf '%s\n' "${ids}" | awk 'NF { count += 1 } END { print count + 0 }')"
+            test "${count}" = "1" || {
+              printf 'cloud-deploy policy: expected exactly one running %s container, found %s\n' \
+                "${service}" "${count}" >&2
+              return 78
+            }
+            printf '%s\n' "${ids}" | awk 'NF { print; exit }'
           }
 
           verify_release_policy_mount() {
@@ -172,10 +183,10 @@ jobs:
                   | awk -F= '$1 == "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE" {sub(/^[^=]*=/, ""); print; exit}'
               )"
               mount_source="$(
-                docker inspect "${container}" --format '{{range .Mounts}}{{printf "%s|%s\\n" .Source .Destination}}{{end}}' \
-                  | awk -F'|' '$2 == "/run/policies/repositories" {print $1; exit}'
+                docker inspect "${container}" --format '{{range .Mounts}}{{printf "%s|%s\n" .Source .Destination}}{{end}}' \
+                  | awk -F'|' -v destination="${container_policy_path}" '$2 == destination {print $1; exit}'
               )"
-              test "${configured_file}" = "/run/policies/repositories" \
+              test "${configured_file}" = "${container_policy_path}" \
                 && test "${mount_source}" = "${policy_file}" || {
                   printf 'cloud-deploy policy: %s is missing the commissioned release-policy mount\n' "${service}" >&2
                   return 78

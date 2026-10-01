@@ -40,6 +40,26 @@ describe("cloud-deploy topology preflight", () => {
     expect(documentation).toContain("automatically reuses");
   });
 
+  it("verifies exactly one live consumer and parses release-policy mounts line by line", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const containerPolicyPath = "$" + "{container_policy_path}";
+    const configuredFile = "$" + "{configured_file}";
+    const ids = "$" + "{ids}";
+    const count = "$" + "{count}";
+
+    expect(workflow).toContain('container_policy_path="/run/policies/repositories"');
+    expect(workflow).toContain("local ids");
+    expect(workflow).toContain("local count");
+    expect(workflow).toContain('ids="$(');
+    expect(workflow).toContain(`count="$(printf '%s\\n' "${ids}" | awk 'NF { count += 1 } END { print count + 0 }')"`);
+    expect(workflow).toContain(`test "${count}" = "1"`);
+    expect(workflow).toContain("expected exactly one running");
+    expect(workflow).toContain('{{range .Mounts}}{{printf "%s|%s\\n" .Source .Destination}}{{end}}');
+    expect(workflow).not.toContain('{{range .Mounts}}{{printf "%s|%s\\\\n" .Source .Destination}}{{end}}');
+    expect(workflow).toContain(`-v destination="${containerPolicyPath}"`);
+    expect(workflow).toContain(`test "${configuredFile}" = "${containerPolicyPath}"`);
+  });
+
   it("caps BuildKit cache by size before a low-space build and after every build", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
