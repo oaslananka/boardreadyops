@@ -7,6 +7,11 @@ on:
         description: Repository to add to the production release-readiness rollout (owner/repository).
         required: true
         type: string
+      bootstrap_legacy_inline:
+        description: One-time, default-off migration from a consistent live inline rollout to the non-secret policy-file mount.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: cloud-deploy
@@ -70,6 +75,7 @@ jobs:
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
           REPOSITORY: ${{ inputs.repository }}
+          BOOTSTRAP_LEGACY_INLINE: ${{ inputs.bootstrap_legacy_inline && '1' || '0' }}
         run: |
           set -euo pipefail
 
@@ -86,10 +92,11 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            "bash -s -- '${repository}'" <<'REMOTE_COMMISSION'
+            "bash -s -- '${repository}' '${BOOTSTRAP_LEGACY_INLINE}'" <<'REMOTE_COMMISSION'
           set -euo pipefail
 
           repository="$1"
+          bootstrap_legacy_inline="$2"
           deploy_root="/home/ubuntu/boardreadyops-cloud"
           policy_file="/opt/boardreadyops-cloud/release-repositories"
           container_policy_path="/run/policies/repositories"
@@ -102,6 +109,257 @@ jobs:
 
           test -d "${deploy_root}" || fail "deployment root is not commissioned"
           cd "${deploy_root}"
+
+          case "${bootstrap_legacy_inline}" in
+            0|1) ;;
+            *) fail "invalid legacy bootstrap flag" ;;
+          esac
+
+          inspect_env_value() {
+            local container="$1"
+            local key="$2"
+            docker inspect "${container}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+              | awk -F= -v key="${key}" '$1 == key {sub(/^[^=]*=/, ""); print; exit}'
+          }
+
+          rollout_source() {
+            local container="$1"
+            local configured_file
+            local inline_policy
+            configured_file="$(inspect_env_value "${container}" BOARDREADYOPS_RELEASE_REPOSITORIES_FILE)"
+            inline_policy="$(inspect_env_value "${container}" BOARDREADYOPS_RELEASE_REPOSITORIES)"
+            if [ -n "${configured_file}" ]; then
+              printf '%s' file
+            elif [ -n "${inline_policy}" ]; then
+              printf '%s' inline
+            else
+              printf '%s' none
+            fi
+          }
+
+          bootstrap_legacy_rollout() {
+            local web_container
+            local worker_container
+            local web_source
+            local worker_source
+            local web_inline
+            local worker_inline
+            local web_image_ref
+            local worker_image_ref
+            local web_image_id
+            local worker_image_id
+            local tagged_image_id
+            local running_image_tag
+            local base_count=0
+            local base_file=""
+            local override_file=""
+            local entry
+            local candidate
+            local policy_dir
+            local policy_tmp=""
+            local override_tmp=""
+            local created_policy_dir=0
+            local created_policy=0
+            local created_override=0
+            local recreate_attempted=0
+            local healthy=0
+
+            if [ "${bootstrap_legacy_inline}" != "1" ]; then
+              fail "non-secret rollout policy file is missing; legacy rollout bootstrap is disabled"
+            fi
+
+            web_container="$("${compose[@]}" ps -q web)"
+            worker_container="$("${compose[@]}" ps -q worker)"
+            test -n "${web_container}" || fail "web container is not running"
+            test -n "${worker_container}" || fail "worker container is not running"
+
+            web_source="$(rollout_source "${web_container}")"
+            worker_source="$(rollout_source "${worker_container}")"
+            printf 'cloud-commission: rollout source web=%s worker=%s\n' "${web_source}" "${worker_source}"
+            test "${web_source}" = inline || fail "web is not using the legacy inline rollout"
+            test "${worker_source}" = inline || fail "worker is not using the legacy inline rollout"
+
+            web_inline="$(inspect_env_value "${web_container}" BOARDREADYOPS_RELEASE_REPOSITORIES)"
+            worker_inline="$(inspect_env_value "${worker_container}" BOARDREADYOPS_RELEASE_REPOSITORIES)"
+            test -n "${web_inline}" || fail "legacy inline rollout is empty"
+            test -n "${worker_inline}" || fail "legacy inline rollout is empty"
+            test "${web_inline}" = "${worker_inline}" \
+              || fail "legacy inline rollout differs between web and worker"
+
+            web_image_ref="$(docker inspect "${web_container}" --format '{{.Config.Image}}')"
+            worker_image_ref="$(docker inspect "${worker_container}" --format '{{.Config.Image}}')"
+            web_image_id="$(docker inspect "${web_container}" --format '{{.Image}}')"
+            worker_image_id="$(docker inspect "${worker_container}" --format '{{.Image}}')"
+            test "${web_image_ref}" = "${worker_image_ref}" \
+              || fail "legacy consumers are not running the same runtime image"
+            test "${web_image_id}" = "${worker_image_id}" \
+              || fail "legacy consumers are not running the same runtime image"
+            case "${web_image_ref}" in
+              boardreadyops-web-runtime:*) ;;
+              *) fail "legacy consumers are not running a BoardReadyOps runtime image" ;;
+            esac
+            running_image_tag="${web_image_ref#boardreadyops-web-runtime:}"
+            test -n "${running_image_tag}" || fail "running runtime image tag is empty"
+            tagged_image_id="$(docker image inspect "${web_image_ref}" --format '{{.Id}}' 2>/dev/null || true)"
+            test "${tagged_image_id}" = "${web_image_id}" \
+              || fail "running runtime image tag does not resolve to the live image"
+
+            for entry in \
+              "compose.yaml:compose.override.yaml" \
+              "compose.yml:compose.override.yml" \
+              "docker-compose.yaml:docker-compose.override.yaml" \
+              "docker-compose.yml:docker-compose.override.yml"; do
+              if [ -f "${entry%%:*}" ]; then
+                base_count=$((base_count + 1))
+                base_file="${entry%%:*}"
+                override_file="${entry#*:}"
+              fi
+            done
+            test "${base_count}" = "1" || fail "expected exactly one standard Compose base file"
+
+            for candidate in \
+              compose.override.yaml compose.override.yml \
+              docker-compose.override.yaml docker-compose.override.yml; do
+              test ! -e "${candidate}" || fail "operator-managed Compose override already exists"
+            done
+
+            # Validate the legacy base before creating any bootstrap files.
+            BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" "${compose[@]}" config --quiet \
+              || fail "legacy Compose configuration is invalid"
+
+            policy_dir="$(dirname "${policy_file}")"
+
+            rollback_legacy_bootstrap() {
+              rm -f "${policy_tmp}" "${override_tmp}" >/dev/null 2>&1 || true
+              policy_tmp=""
+              override_tmp=""
+              if [ "${created_override}" = "1" ]; then
+                rm -f "${override_file}" >/dev/null 2>&1 || true
+                created_override=0
+              fi
+              if [ "${created_policy}" = "1" ]; then
+                rm -f "${policy_file}" >/dev/null 2>&1 || true
+                created_policy=0
+              fi
+              if [ "${created_policy_dir}" = "1" ]; then
+                rmdir "${policy_dir}" >/dev/null 2>&1 || true
+                created_policy_dir=0
+              fi
+              if [ "${recreate_attempted}" = "1" ]; then
+                BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
+                  "${compose[@]}" up -d --no-deps --force-recreate web worker >/dev/null || true
+              fi
+            }
+
+            bootstrap_abort() {
+              printf 'cloud-commission: %s; restoring legacy topology\n' "$1" >&2
+              rollback_legacy_bootstrap
+              exit 1
+            }
+
+            if [ ! -d "${policy_dir}" ]; then
+              created_policy_dir=1
+              sudo -n install -d -m 0755 -o "$(id -u)" -g "$(id -g)" "${policy_dir}" \
+                || bootstrap_abort "cannot create the non-secret rollout policy directory"
+            fi
+            test -w "${policy_dir}" \
+              || bootstrap_abort "rollout policy directory is not writable by the deploy account"
+
+            policy_tmp="$(mktemp "${policy_dir}/.release-repositories.bootstrap.XXXXXX")" \
+              || bootstrap_abort "cannot create rollout policy staging file"
+            if ! {
+              printf '%s\n' "${web_inline}" \
+                | tr ',' '\n' \
+                | awk '{ for (i = 1; i <= NF; i += 1) print tolower($i) }'
+            } | awk 'NF' | sort -u > "${policy_tmp}"; then
+              bootstrap_abort "cannot normalize legacy inline rollout"
+            fi
+            test -s "${policy_tmp}" || bootstrap_abort "legacy inline rollout is empty"
+            test "$(stat -c '%s' "${policy_tmp}")" -le 65536 \
+              || bootstrap_abort "legacy inline rollout exceeds 64 KiB"
+            chmod 0644 "${policy_tmp}" || bootstrap_abort "cannot set rollout policy permissions"
+            mv "${policy_tmp}" "${policy_file}" || bootstrap_abort "cannot install rollout policy file"
+            policy_tmp=""
+            created_policy=1
+
+            override_tmp="$(mktemp "${override_file}.next.XXXXXX")" \
+              || bootstrap_abort "cannot create Compose override staging file"
+            if ! cat > "${override_tmp}" <<'ROLL_OUT_OVERRIDE'
+          services:
+            web:
+              environment:
+                BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
+              volumes:
+                - /opt/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro
+            worker:
+              environment:
+                BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories
+              volumes:
+                - /opt/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro
+          ROLL_OUT_OVERRIDE
+            then
+              bootstrap_abort "cannot render Compose rollout override"
+            fi
+            mv "${override_tmp}" "${override_file}" || bootstrap_abort "cannot install Compose rollout override"
+            override_tmp=""
+            created_override=1
+
+            if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" "${compose[@]}" config --quiet; then
+              printf '%s\n' 'cloud-commission: policy override is invalid; restoring legacy topology' >&2
+              rollback_legacy_bootstrap
+              exit 1
+            fi
+
+            recreate_attempted=1
+            if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
+              "${compose[@]}" up -d --no-deps --force-recreate web worker >/dev/null; then
+              printf '%s\n' 'cloud-commission: legacy bootstrap recreate failed; restoring legacy topology' >&2
+              rollback_legacy_bootstrap
+              exit 1
+            fi
+
+            for service in web worker; do
+              local container
+              local image_id
+              container="$("${compose[@]}" ps -q "${service}")"
+              test -n "${container}" || {
+                printf 'cloud-commission: %s missing after legacy bootstrap; restoring legacy topology\n' "${service}" >&2
+                rollback_legacy_bootstrap
+                exit 1
+              }
+              image_id="$(docker inspect "${container}" --format '{{.Image}}')"
+              if [ "${image_id}" != "${web_image_id}" ]; then
+                printf '%s\n' 'cloud-commission: legacy bootstrap changed the runtime image; restoring legacy topology' >&2
+                rollback_legacy_bootstrap
+                exit 1
+              fi
+            done
+
+            for _ in $(seq 1 30); do
+              if "${compose[@]}" exec -T web node -e \
+                "fetch('http://127.0.0.1:3000/api/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
+                >/dev/null 2>&1 \
+                && "${compose[@]}" exec -T worker node -e \
+                "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
+                >/dev/null 2>&1; then
+                healthy=1
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "${healthy}" != "1" ]; then
+              printf '%s\n' 'cloud-commission: legacy bootstrap failed readiness; restoring legacy topology' >&2
+              rollback_legacy_bootstrap
+              exit 1
+            fi
+
+            printf 'cloud-commission: legacy inline rollout migrated using %s and current runtime image\n' "${base_file}"
+          }
+
+          if [ ! -f "${policy_file}" ]; then
+            bootstrap_legacy_rollout
+          fi
 
           test -f "${policy_file}" || fail "non-secret rollout policy file is missing"
           test ! -L "${policy_file}" || fail "rollout policy file must not be a symlink"

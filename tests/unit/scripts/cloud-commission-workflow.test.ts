@@ -21,6 +21,37 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("contents: read");
   });
 
+  it("bootstraps a legacy inline rollout only with explicit opt-in and a pinned running image", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+
+    expect(workflow).toContain("bootstrap_legacy_inline:");
+    expect(workflow).toContain("default: false");
+    expect(workflow).toContain("type: boolean");
+    expect(workflow).toContain("BOOTSTRAP_LEGACY_INLINE");
+    expect(workflow).toContain('bootstrap_legacy_inline="$2"');
+    expect(workflow).toContain("legacy rollout bootstrap is disabled");
+    expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES");
+    expect(workflow).toContain("legacy inline rollout differs between web and worker");
+    expect(workflow).toContain("legacy inline rollout is empty");
+    expect(workflow).toContain("docker-compose.override.yml");
+    expect(workflow).toContain("compose.override.yaml");
+    expect(workflow).toContain("operator-managed Compose override already exists");
+    expect(workflow).toContain("release-repositories:/run/policies/repositories:ro");
+    expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories");
+    expect(workflow).toContain("boardreadyops-web-runtime:");
+    expect(workflow).toContain("legacy consumers are not running the same runtime image");
+    expect(workflow).toContain('BOARDREADYOPS_IMAGE_TAG="${running_image_tag}"');
+    expect(workflow).toContain("up -d --no-deps --force-recreate web worker");
+    expect(workflow).toContain("legacy bootstrap failed readiness; restoring legacy topology");
+    expect(workflow).toContain("bootstrap_abort");
+    expect(workflow).toContain('if [ "${recreate_attempted}" = "1" ]');
+    expect(workflow).not.toContain("cat runtime-env");
+    expect(workflow).not.toContain("grep BOARDREADYOPS_RELEASE_REPOSITORIES runtime-env");
+    expect(documentation).toContain("bootstrap_legacy_inline");
+    expect(documentation).toContain("default-off");
+  });
+
   it("updates only the non-secret rollout policy and restarts the consumers fail-closed", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
