@@ -24,7 +24,7 @@ function compareVersions(left: string, right: string): number {
  * The package an override key selects.
  *
  * A key reads [parent>]*name[@range], and both halves can contain the other's delimiter --
- * 'archiver>readdir-glob' selects through a parent, 'fast-uri@>=3 <3.1.5' carries a range with
+ * 'archiver>readdir-glob' selects through a parent, 'fast-uri@>=3 <3.1.8' carries a range with
  * its own > inside. So the range comes off first, or the last > lands in the middle of it. A
  * range always opens with an @ following the name; the only other @ is a scope marker, which
  * sits at the start or straight after a > separator.
@@ -511,7 +511,8 @@ describe("dependency and security automation configuration", () => {
     for (const override of [
       "'archiver>readdir-glob':",
       "'brace-expansion@>=5 <5.0.9':",
-      "'fast-uri@>=3 <3.1.6':",
+      "'fast-uri@>=3 <3.1.8':",
+      "'ip-address@<10.7.1':",
       "'qs@>=6.11.1 <6.16.0':",
       "js-yaml@>=4 <4.3.2:",
       "linkify-it@>=5 <5.0.2:",

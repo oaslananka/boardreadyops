@@ -12,10 +12,11 @@ minimumReleaseAgeExclude:
   - 'nanoid@3.3.17 || 3.3.18'
   - 'hono@4.13.5'
   # Renovate security update: ip-address@10.7.1
-  - 'ip-address@10.3.1 || 10.7.1'
+  - 'ip-address@10.7.1'
   - 'undici@8.9.0'
   - 'valibot@1.4.2'
-  - 'fast-uri@3.1.6'
+  # Renovate security update: fast-uri@3.1.8
+  - 'fast-uri@3.1.8'
   - 'qs@6.16.0'
   - 'renovate@43.272.4'
 trustPolicy: no-downgrade
@@ -61,9 +62,9 @@ overrides:
   vite@^8.0.0: '8.0.16'
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
   'brace-expansion@>=5 <5.0.9': 5.0.9
-  'fast-uri@>=3 <3.1.6': 3.1.6
+  'fast-uri@>=3 <3.1.8': 3.1.8
   'hono@<4.13.5': 4.13.5
-  'ip-address@<10.3.1': 10.7.1
+  'ip-address@<10.7.1': 10.7.1
   'nanoid@<3.3.17': 3.3.18
   js-yaml@>=4 <4.3.2: 4.3.2
   linkify-it@>=5 <5.0.2: 5.0.2
