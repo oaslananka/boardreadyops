@@ -31,7 +31,7 @@ describe("dependency security overrides", () => {
     expect(workspace.overrides?.["fast-uri@>=3 <3.1.8"]).toBe("3.1.8");
     expect(workspace.overrides?.["qs@>=6.11.1 <6.16.0"]).toBe("6.16.0");
     expect(workspace.minimumReleaseAgeExclude).toEqual(
-      expect.arrayContaining(["fast-uri@3.1.6 || 3.1.8", "qs@6.16.0"]),
+      expect.arrayContaining(["fast-uri@3.1.8", "qs@6.16.0"]),
     );
     expect(lockfile).not.toContain("fast-uri@3.1.5");
     expect(lockfile).not.toContain("fast-uri@3.1.6");
