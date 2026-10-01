@@ -67,7 +67,7 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("retain=3");
     expect(workflow).toContain("docker compose -p boardreadyops-cloud images");
     expect(workflow).toContain("grep -vxF");
-    expect(workflow).toContain('tail -n +$((retain + 1))');
+    expect(workflow).toContain("tail -n +$((retain + 1))");
     expect(workflow).toContain(`docker image rm "${shellImage}"`);
     expect(workflow).toContain(`/tmp/boardreadyops-running-images.${bashPid}`);
     expect(workflow).not.toContain("docker system prune");
