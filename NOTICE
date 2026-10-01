@@ -3005,7 +3005,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `underscore@1.13.8`
   - Description: JavaScript's functional programming helper library.
   - Homepage: https://underscorejs.org
-- `undici@8.10.2`
+- `undici@8.11.0`
   - Description: An HTTP/1.1 client, written from scratch for Node.js
   - Homepage: https://undici.nodejs.org
 - `undici-types@7.18.2`

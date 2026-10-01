@@ -513,7 +513,7 @@ describe("dependency and security automation configuration", () => {
       "'brace-expansion@>=5 <5.0.9':",
       "'fast-uri@>=3 <3.1.8':",
       "'ip-address@<10.7.1':",
-      "'undici@>=8.0.0 <8.10.2':",
+      "'undici@>=8.0.0 <8.11.0':",
       "'qs@>=6.11.1 <6.16.0':",
       "js-yaml@>=4 <4.3.2:",
       "linkify-it@>=5 <5.0.2:",
