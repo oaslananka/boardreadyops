@@ -247,7 +247,7 @@ One-time setup before the workflow can be used:
 3. Create a Doppler service token scoped to project `boardreadyops`, config `deploy`, and store it as the single GitHub Actions repository secret `DOPPLER_TOKEN`.
 4. Create a `production` GitHub Environment (Settings → Environments) so the workflow's `environment: production` reference resolves and the run appears in the deployments audit trail.
 
-To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to run `./deploy.sh build migrate web worker` — this builds the image from the fast-forwarded checkout and exercises the Doppler/SSH/Tailscale path without touching the running containers. Set it to `false` to run `./deploy.sh up -d --build migrate web worker`, the real deploy. `deploy.sh` has no canary or automatic rollback of its own: a failed build fails the workflow before anything is replaced, but a failed `up` can leave the stack partially replaced — check `docker compose -p boardreadyops-cloud ps` on the host afterward if a real-deploy run fails.
+To use it: open the Actions tab, select **cloud-deploy**, click **Run workflow**. Leave `dry_run` at its default `true` to run `./deploy.sh build migrate web worker` — this builds the image from the fast-forwarded checkout and exercises the Doppler/SSH/Tailscale path without touching the running containers. Set it to `false` to run `./deploy.sh up -d --build migrate web worker`, the real deploy. `retire_superseded_images` is a separate, default-off safety valve for a low-disk preflight: enable it only as an explicit operator opt-in after reviewing the rollback policy below. `deploy.sh` has no canary or automatic rollback of its own: a failed build fails the workflow before anything is replaced, but a failed `up` can leave the stack partially replaced — check `docker compose -p boardreadyops-cloud ps` on the host afterward if a real-deploy run fails.
 
 ## Disk on the build host
 
@@ -269,8 +269,12 @@ The same 3 GB cache cap runs after every successful build, including `dry_run`, 
 rehearsals still build on the production host. This keeps useful recent cache without allowing a
 burst of same-day builds to consume the host. Tagged runtime images are
 not touched by cache GC and remain governed by the rollback retention policy below. If the host is
-still short after safe reclaim, the run stops with exit 78: the remaining space is held by tagged
-images, volumes or logs, and choosing which of those to retire is an operator decision.
+still short after safe reclaim, the default behavior remains fail-closed with exit 78. An operator
+may explicitly enable `retire_superseded_images`; that bounded path keeps the running image and the
+three newest rollback targets, then removes only older `boardreadyops-web-runtime:<sha>` images.
+An image still referenced by a stopped container is kept. The workflow never broad-prunes volumes
+or arbitrary Docker images. If the host is still below the 12 GiB floor afterward, the run stops
+with exit 78 so volumes, logs, or the retained rollback set remain an explicit operator decision.
 
 To see what is holding the space:
 

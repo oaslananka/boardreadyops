@@ -50,6 +50,40 @@ describe("cloud-deploy topology preflight", () => {
     expect(finalTrim).toBeGreaterThan(caseEnd);
   });
 
+  it("retires tagged runtime images before a blocked build only after explicit operator opt-in", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+
+    const availableMib = "$" + "{available_mib}";
+    const requiredMib = "$" + "{required_mib}";
+    const retireOptIn = "$" + "{retire_superseded_images}";
+    const shellImage = "$" + "{image}";
+    const bashPid = "$" + "{BASHPID}";
+
+    expect(workflow).toContain("retire_superseded_images:");
+    expect(workflow).toContain("default: false");
+    expect(workflow).toContain('retire_superseded_images="$2"');
+    expect(workflow).toContain(`if [ "${retireOptIn}" = "1" ]; then`);
+    expect(workflow).toContain("retain=3");
+    expect(workflow).toContain("docker compose -p boardreadyops-cloud images");
+    expect(workflow).toContain("grep -vxF");
+    expect(workflow).toContain("tail -n +$((retain + 1))");
+    expect(workflow).toContain(`docker image rm "${shellImage}"`);
+    expect(workflow).toContain(`/tmp/boardreadyops-running-images.${bashPid}`);
+    expect(workflow).not.toContain("docker system prune");
+    expect(workflow).not.toContain("docker volume prune");
+
+    const cacheReclaim = workflow.indexOf("docker image prune --force || true");
+    const optInCheck = workflow.indexOf(`if [ "${retireOptIn}" = "1" ]; then`, cacheReclaim);
+    const capacityFailure = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`, optInCheck);
+
+    expect(cacheReclaim).toBeGreaterThan(0);
+    expect(optInCheck).toBeGreaterThan(cacheReclaim);
+    expect(capacityFailure).toBeGreaterThan(optInCheck);
+    expect(documentation).toContain("explicit operator opt-in");
+    expect(documentation).toMatch(/keeps the running image and the\s+three newest rollback targets/);
+  });
+
   it("documents the remote path as a commissioned contract, not a permanently live host claim", () => {
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
 
