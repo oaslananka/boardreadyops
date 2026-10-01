@@ -35,7 +35,7 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("run_deploy up -d --build migrate web worker");
     expect(workflow).toContain("verify_release_policy_mount");
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE");
-    expect(workflow).not.toContain('sed -i');
+    expect(workflow).not.toContain("sed -i");
     expect(documentation).toContain("compose.release-policy.yml");
     expect(documentation).toContain("automatically reuses");
   });
