@@ -24,15 +24,19 @@ describe("dependency security overrides", () => {
     expect(lockfile).not.toContain("esbuild@0.27.7");
   });
 
-  it("keeps full OSV scans on the patched fast-uri and qs security releases", async () => {
+  it("keeps full OSV scans on patched fast-uri, ip-address, and qs releases", async () => {
     const workspace = yaml.load(await readFile("pnpm-workspace.yaml", "utf8")) as WorkspacePolicy;
     const lockfile = await readFile("pnpm-lock.yaml", "utf8");
 
     expect(workspace.overrides?.["fast-uri@>=3 <3.1.8"]).toBe("3.1.8");
+    expect(workspace.overrides?.["ip-address@<10.7.1"]).toBe("10.7.1");
     expect(workspace.overrides?.["qs@>=6.11.1 <6.16.0"]).toBe("6.16.0");
-    expect(workspace.minimumReleaseAgeExclude).toEqual(expect.arrayContaining(["fast-uri@3.1.8", "qs@6.16.0"]));
+    expect(workspace.minimumReleaseAgeExclude).toEqual(
+      expect.arrayContaining(["fast-uri@3.1.8", "ip-address@10.7.1", "qs@6.16.0"]),
+    );
     expect(lockfile).not.toContain("fast-uri@3.1.5");
     expect(lockfile).not.toContain("fast-uri@3.1.6");
+    expect(lockfile).not.toContain("ip-address@10.3.1");
     expect(lockfile).not.toContain("qs@6.15.3");
   });
 });

@@ -512,6 +512,7 @@ describe("dependency and security automation configuration", () => {
       "'archiver>readdir-glob':",
       "'brace-expansion@>=5 <5.0.9':",
       "'fast-uri@>=3 <3.1.8':",
+      "'ip-address@<10.7.1':",
       "'qs@>=6.11.1 <6.16.0':",
       "js-yaml@>=4 <4.3.2:",
       "linkify-it@>=5 <5.0.2:",

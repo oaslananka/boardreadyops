@@ -2200,7 +2200,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `import-meta-resolve@4.2.0`
   - Description: Resolve things like Node.js — ponyfill for `import.meta.resolve`
   - Homepage: https://github.com/wooorm/import-meta-resolve#readme
-- `ip-address@10.3.1`
+- `ip-address@10.7.1`
   - Description: A library for parsing IPv4 and IPv6 IP addresses in node and the browser.
   - Homepage: https://github.com/beaugunderson/ip-address#readme
 - `ipaddr.js@1.9.1`
