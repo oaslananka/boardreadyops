@@ -46,6 +46,7 @@ describe("dependency security overrides", () => {
     expect(lockfile).not.toContain("fast-uri@3.1.5");
     expect(lockfile).not.toContain("fast-uri@3.1.6");
     expect(lockfile).not.toContain("ip-address@10.3.1");
+    expect(lockfile).not.toContain("js-yaml@5.3.0");
     expect(lockfile).not.toContain("undici@8.9.0");
     expect(lockfile).not.toContain("undici@8.10.2");
     expect(actionBundle).not.toContain(

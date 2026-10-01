@@ -500,12 +500,12 @@ describe("dependency and security automation configuration", () => {
     const securityDocs = await repositoryFile("docs/security-automation.md");
     const workspace = await repositoryFile("pnpm-workspace.yaml");
 
-    // Pinned exactly rather than to a range, and never below the release the override for the
-    // same package calls safe. The version itself is free to move; the quarantine test above
-    // holds every override to its own declared-safe floor.
+    // The direct devDependency is pinned exactly and must remain at or above the latest
+    // advisory-safe v5 floor. Transitive v4 consumers stay on their separately patched 4.3.2
+    // override until they can move major versions safely.
     const jsYaml = packageJson.devDependencies?.["js-yaml"] ?? "";
     expect(jsYaml).toMatch(/^\d+\.\d+\.\d+$/u);
-    expect(compareVersions(jsYaml, "4.3.2")).toBeGreaterThanOrEqual(0);
+    expect(compareVersions(jsYaml, "5.4.1")).toBeGreaterThanOrEqual(0);
 
     expect(workspace).not.toContain("brace-expansion@>=2 <2.1.2: 2.1.2");
     for (const override of [
