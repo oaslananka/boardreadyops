@@ -9,10 +9,19 @@ on:
         default: true
         type: boolean
       retire_superseded_images:
-        description: On low disk only, retire BoardReadyOps runtime images older than the running image plus three newest rollback targets.
+        description: On low disk only, retire BoardReadyOps runtime images older than the running image plus the selected rollback keep-set.
         required: false
         default: false
         type: boolean
+      rollback_images_to_keep:
+        description: Number of non-running rollback images to preserve during opted-in low-space preflight retirement.
+        required: false
+        default: "3"
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
 
 concurrency:
   group: cloud-deploy
@@ -86,6 +95,7 @@ jobs:
           # container) instead of the real `up -d --build` (replaces web/worker/migrate).
           DEPLOY_ARGS: ${{ inputs.dry_run && 'build migrate web worker' || 'up -d --build migrate web worker' }}
           RETIRE_SUPERSEDED_IMAGES: ${{ inputs.retire_superseded_images && '1' || '0' }}
+          ROLLBACK_IMAGES_TO_KEEP: ${{ inputs.rollback_images_to_keep }}
         run: |
           set -euo pipefail
           # Fetched fresh here instead of exported via an earlier step: this value is only
@@ -97,12 +107,13 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            "bash -s -- '${DEPLOY_ARGS}' '${RETIRE_SUPERSEDED_IMAGES}'" <<'REMOTE_DEPLOY'
+            "bash -s -- '${DEPLOY_ARGS}' '${RETIRE_SUPERSEDED_IMAGES}' '${ROLLBACK_IMAGES_TO_KEEP}'" <<'REMOTE_DEPLOY'
           set -euo pipefail
           deploy_root=/home/ubuntu/boardreadyops-cloud
           repo_dir="${deploy_root}/repo"
           deploy_args="$1"
           retire_superseded_images="$2"
+          preflight_rollback_images_to_keep="$3"
 
           test -d "${repo_dir}/.git" || {
             printf '%s\n' 'cloud-deploy preflight: deployment checkout is not commissioned; follow docs/deployment/self-hosted.md before retrying' >&2
@@ -125,7 +136,6 @@ jobs:
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
           build_cache_max_used_space=3GB
-          retain=3
           trim_build_cache() {
             docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
           }
@@ -160,8 +170,17 @@ jobs:
           }
 
           retire_superseded_runtime_images() {
+            local retain="$1"
             local running_images_file="/tmp/boardreadyops-running-images.${BASHPID}"
             local superseded
+
+            case "${retain}" in
+              1|2|3) ;;
+              *)
+                printf 'cloud-deploy retention: invalid rollback keep-set: %s\n' "${retain}" >&2
+                return 64
+                ;;
+            esac
 
             (
               cd "${deploy_root}"
@@ -210,7 +229,7 @@ jobs:
           if [ "${available_mib}" -lt "${required_mib}" ]; then
             if [ "${retire_superseded_images}" = "1" ]; then
               printf '%s\n' 'cloud-deploy preflight: operator opted in to bounded superseded-runtime retirement'
-              retire_superseded_runtime_images
+              retire_superseded_runtime_images "${preflight_rollback_images_to_keep}"
               available_mib="$(free_mib "${docker_root}")"
               printf 'cloud-deploy preflight: %s MiB free after bounded runtime-image retirement\n' "${available_mib}"
             else
@@ -250,7 +269,7 @@ jobs:
 
               # Apply the same bounded policy after a successful real deploy. The running image is
               # excluded and the newest three non-running images remain rollback targets.
-              retire_superseded_runtime_images
+              retire_superseded_runtime_images "3"
               ;;
             *)
               printf '%s\n' 'cloud-deploy preflight: unexpected deploy argument set' >&2
