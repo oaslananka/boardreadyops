@@ -8,6 +8,11 @@ on:
         required: false
         default: true
         type: boolean
+      retire_superseded_images:
+        description: On low disk only, retire BoardReadyOps runtime images older than the running image plus three newest rollback targets.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: cloud-deploy
@@ -80,6 +85,7 @@ jobs:
           # documented `build`-only usage (builds the image, touches no running
           # container) instead of the real `up -d --build` (replaces web/worker/migrate).
           DEPLOY_ARGS: ${{ inputs.dry_run && 'build migrate web worker' || 'up -d --build migrate web worker' }}
+          RETIRE_SUPERSEDED_IMAGES: ${{ inputs.retire_superseded_images && '1' || '0' }}
         run: |
           set -euo pipefail
           # Fetched fresh here instead of exported via an earlier step: this value is only
@@ -91,11 +97,12 @@ jobs:
             -o StrictHostKeyChecking=accept-new \
             -o ConnectTimeout=15 \
             "ubuntu@${ssh_host}" \
-            "bash -s -- '${DEPLOY_ARGS}'" <<'REMOTE_DEPLOY'
+            "bash -s -- '${DEPLOY_ARGS}' '${RETIRE_SUPERSEDED_IMAGES}'" <<'REMOTE_DEPLOY'
           set -euo pipefail
           deploy_root=/home/ubuntu/boardreadyops-cloud
           repo_dir="${deploy_root}/repo"
           deploy_args="$1"
+          retire_superseded_images="$2"
 
           test -d "${repo_dir}/.git" || {
             printf '%s\n' 'cloud-deploy preflight: deployment checkout is not commissioned; follow docs/deployment/self-hosted.md before retrying' >&2
@@ -118,8 +125,40 @@ jobs:
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
           build_cache_max_used_space=3GB
+          retain=3
           trim_build_cache() {
             docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
+          }
+          retire_superseded_runtime_images() {
+            local running_images_file="/tmp/boardreadyops-running-images.$"
+            local superseded
+
+            (
+              cd "${deploy_root}"
+              docker compose -p boardreadyops-cloud images --format '{{.Repository}}:{{.Tag}}'
+            ) 2>/dev/null > "${running_images_file}" || : > "${running_images_file}"
+
+            superseded="$(
+              docker image ls 'boardreadyops-web-runtime:*' \
+                --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' 2>/dev/null \
+                | sort -r \
+                | cut -f2 \
+                | grep -vxF -f "${running_images_file}" \
+                | tail -n +$((retain + 1)) || true
+            )"
+            rm -f "${running_images_file}"
+
+            if [ -n "${superseded}" ]; then
+              printf 'cloud-deploy retention: retiring %s superseded runtime image(s), keeping the running image and newest %s rollback targets\n' \
+                "$(printf '%s\n' "${superseded}" | wc -l | tr -d ' ')" "${retain}"
+              printf '%s\n' "${superseded}" | while IFS= read -r image; do
+                [ -n "${image}" ] || continue
+                docker image rm "${image}" >/dev/null 2>&1 || printf '  kept (still referenced): %s\n' "${image}"
+              done
+              printf 'cloud-deploy retention: %s MiB free after retiring\n' "$(free_mib "${docker_root}")"
+            else
+              printf '%s\n' 'cloud-deploy retention: nothing superseded to retire'
+            fi
           }
 
           available_mib="$(free_mib "${docker_root}")"
@@ -136,6 +175,17 @@ jobs:
             docker image prune --force || true
             available_mib="$(free_mib "${docker_root}")"
             printf 'cloud-deploy preflight: %s MiB free after reclaim\n' "${available_mib}"
+          fi
+
+          if [ "${available_mib}" -lt "${required_mib}" ]; then
+            if [ "${retire_superseded_images}" = "1" ]; then
+              printf '%s\n' 'cloud-deploy preflight: operator opted in to bounded superseded-runtime retirement'
+              retire_superseded_runtime_images
+              available_mib="$(free_mib "${docker_root}")"
+              printf 'cloud-deploy preflight: %s MiB free after bounded runtime-image retirement\n' "${available_mib}"
+            else
+              printf '%s\n' 'cloud-deploy preflight: tagged runtime-image retirement is disabled; rerun with retire_superseded_images=true after reviewing the rollback policy'
+            fi
           fi
 
           if [ "${available_mib}" -lt "${required_mib}" ]; then
@@ -161,43 +211,9 @@ jobs:
             "up -d --build migrate web worker")
               ./deploy.sh up -d --build migrate web worker
 
-              # Retention, and only after a real deploy succeeded. Every deploy leaves another
-              # `boardreadyops-web-runtime:<sha>` behind. The preflight above reclaims build cache
-              # and dangling layers, which is why the host still grew: the tagged images are what
-              # accumulates, and they are exactly what a rollback needs, so they cannot simply be
-              # pruned. Keep the newest few and retire the rest.
-              #
-              # Never a candidate: whatever the stack is running right now, whatever its age.
-              # Ordering is by image creation time; two images built in the same second fall back
-              # to tag order, which for commit SHAs is arbitrary -- harmless here, because the
-              # running image is excluded outright and three are kept either way.
-              retain=3
-              docker compose -p boardreadyops-cloud images --format '{{.Repository}}:{{.Tag}}' \
-                2>/dev/null > /tmp/boardreadyops-running-images || : > /tmp/boardreadyops-running-images
-
-              superseded="$(
-                docker image ls 'boardreadyops-web-runtime:*' \
-                  --format '{{.CreatedAt}}\t{{.Repository}}:{{.Tag}}' 2>/dev/null \
-                  | sort -r \
-                  | cut -f2 \
-                  | grep -vxF -f /tmp/boardreadyops-running-images \
-                  | tail -n +$((retain + 1)) || true
-              )"
-              rm -f /tmp/boardreadyops-running-images
-
-              if [ -n "${superseded}" ]; then
-                printf 'cloud-deploy retention: retiring %s superseded runtime image(s), keeping the newest %s as rollback targets\n' \
-                  "$(printf '%s\n' "${superseded}" | wc -l | tr -d ' ')" "${retain}"
-                # A loop rather than `xargs`, so one image that cannot be removed -- a stopped
-                # container still references it -- does not decide the fate of the rest.
-                printf '%s\n' "${superseded}" | while IFS= read -r image; do
-                  [ -n "${image}" ] || continue
-                  docker image rm "${image}" >/dev/null 2>&1 || printf '  kept (still referenced): %s\n' "${image}"
-                done
-                printf 'cloud-deploy retention: %s MiB free after retiring\n' "$(free_mib "${docker_root}")"
-              else
-                printf '%s\n' 'cloud-deploy retention: nothing superseded to retire'
-              fi
+              # Apply the same bounded policy after a successful real deploy. The running image is
+              # excluded and the newest three non-running images remain rollback targets.
+              retire_superseded_runtime_images
               ;;
             *)
               printf '%s\n' 'cloud-deploy preflight: unexpected deploy argument set' >&2
