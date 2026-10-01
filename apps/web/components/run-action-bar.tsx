@@ -30,7 +30,7 @@ type ActionState =
   | { status: "idle" }
   | { status: "working"; action: string }
   | { status: "done"; message: string }
-  | { status: "error"; message: string; manageUrl?: string };
+  | { status: "error"; message: string; manageUrl?: string; requestId?: string };
 
 const labels: Record<string, { pending: string; done: string }> = {
   rerun: { pending: "Queueing re-run…", done: "Re-run queued. The new run appears in this repository's history." },
@@ -63,6 +63,7 @@ export function RunActionBar({
             status: "error",
             message: typeof data.error === "string" ? data.error : "The request could not be completed.",
             ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
+            ...(typeof data.requestId === "string" ? { requestId: data.requestId } : {}),
           });
           return;
         }
@@ -111,6 +112,14 @@ export function RunActionBar({
           }`}
         >
           {state.message}
+          {state.status === "error" && state.requestId ? (
+            <>
+              {" "}
+              <span className="text-meta text-muted-foreground">
+                Reference: <code>{state.requestId}</code>
+              </span>
+            </>
+          ) : null}
           {state.status === "error" && state.manageUrl ? (
             <>
               {" "}

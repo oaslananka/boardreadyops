@@ -55,7 +55,7 @@ describe("emitRepositoryActionTelemetry", () => {
     const { lines, write } = capture();
 
     emitRepositoryActionTelemetry(
-      { action: "rerun", outcome: "failed", errorClass: "error", errorCode: "42883" },
+      { action: "rerun", outcome: "failed", errorClass: "error", errorCode: "42883", requestId: "ui-rerun-123" },
       write,
     );
 
@@ -67,6 +67,7 @@ describe("emitRepositoryActionTelemetry", () => {
       outcome: "failed",
       errorClass: "error",
       errorCode: "42883",
+      requestId: "ui-rerun-123",
     });
   });
 
@@ -101,6 +102,7 @@ describe("emitRepositoryActionTelemetry", () => {
         outcome: "failed",
         errorClass: "Err\nor",
         errorCode: "4288\n3",
+        requestId: "req\nforged",
       },
       write,
     );
@@ -110,6 +112,7 @@ describe("emitRepositoryActionTelemetry", () => {
     expect(parsed).not.toHaveProperty("forged");
     expect(String(parsed.action)).not.toContain("\n");
     expect(String(parsed.errorClass)).not.toContain("\n");
+    expect(String(parsed.requestId)).not.toContain("\n");
   });
 
   it("falls back to a named action rather than omitting the field", () => {
