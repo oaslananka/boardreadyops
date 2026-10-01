@@ -99,15 +99,33 @@ jobs:
           bootstrap_legacy_inline="$2"
           deploy_root="/home/ubuntu/boardreadyops-cloud"
           policy_file="/opt/boardreadyops-cloud/release-repositories"
+          policy_override_file="${deploy_root}/compose.release-policy.yml"
           container_policy_path="/run/policies/repositories"
-          compose=(docker compose -p boardreadyops-cloud)
+          deploy_runbook="${deploy_root}/deploy.sh"
+          project_name="boardreadyops-cloud"
 
           fail() {
             printf 'cloud-commission: %s\n' "$1" >&2
             exit 78
           }
 
+          container_for_service() {
+            local service="$1"
+            local ids
+            local count
+            ids="$(
+              docker ps \
+                --filter "label=com.docker.compose.project=${project_name}" \
+                --filter "label=com.docker.compose.service=${service}" \
+                --format '{{.ID}}'
+            )"
+            count="$(printf '%s\n' "${ids}" | awk 'NF { count += 1 } END { print count + 0 }')"
+            test "${count}" = "1" || fail "expected exactly one running ${service} container"
+            printf '%s\n' "${ids}" | awk 'NF { print; exit }'
+          }
+
           test -d "${deploy_root}" || fail "deployment root is not commissioned"
+          test -x "${deploy_runbook}" || fail "deployment runbook is not commissioned"
           cd "${deploy_root}"
 
           case "${bootstrap_legacy_inline}" in
@@ -150,11 +168,6 @@ jobs:
             local worker_image_id
             local tagged_image_id
             local running_image_tag
-            local base_count=0
-            local base_file=""
-            local override_file=""
-            local entry
-            local candidate
             local policy_dir
             local policy_tmp=""
             local override_tmp=""
@@ -168,8 +181,8 @@ jobs:
               fail "non-secret rollout policy file is missing; legacy rollout bootstrap is disabled"
             fi
 
-            web_container="$("${compose[@]}" ps -q web)"
-            worker_container="$("${compose[@]}" ps -q worker)"
+            web_container="$(container_for_service web)"
+            worker_container="$(container_for_service worker)"
             test -n "${web_container}" || fail "web container is not running"
             test -n "${worker_container}" || fail "worker container is not running"
 
@@ -204,28 +217,8 @@ jobs:
             test "${tagged_image_id}" = "${web_image_id}" \
               || fail "running runtime image tag does not resolve to the live image"
 
-            for entry in \
-              "compose.yaml:compose.override.yaml" \
-              "compose.yml:compose.override.yml" \
-              "docker-compose.yaml:docker-compose.override.yaml" \
-              "docker-compose.yml:docker-compose.override.yml"; do
-              if [ -f "${entry%%:*}" ]; then
-                base_file="${entry%%:*}"
-                override_file="${entry#*:}"
-                break
-              fi
-            done
-            test -n "${base_file}" || fail "standard Compose base file is missing"
-
-            for candidate in \
-              compose.override.yaml compose.override.yml \
-              docker-compose.override.yaml docker-compose.override.yml; do
-              test ! -e "${candidate}" || fail "operator-managed Compose override already exists"
-            done
-
-            # Validate the legacy base before creating any bootstrap files.
-            BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" "${compose[@]}" config --quiet \
-              || fail "legacy Compose configuration is invalid"
+            test ! -e "${policy_override_file}" \
+              || fail "policy override already exists without a policy file"
 
             policy_dir="$(dirname "${policy_file}")"
 
@@ -234,7 +227,7 @@ jobs:
               policy_tmp=""
               override_tmp=""
               if [ "${created_override}" = "1" ]; then
-                rm -f "${override_file}" >/dev/null 2>&1 || true
+                rm -f "${policy_override_file}" >/dev/null 2>&1 || true
                 created_override=0
               fi
               if [ "${created_policy}" = "1" ]; then
@@ -247,7 +240,7 @@ jobs:
               fi
               if [ "${recreate_attempted}" = "1" ]; then
                 BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
-                  "${compose[@]}" up -d --no-deps --force-recreate web worker >/dev/null || true
+                  "${deploy_runbook}" up -d --no-deps --force-recreate web worker >/dev/null || true
               fi
             }
 
@@ -282,7 +275,7 @@ jobs:
             policy_tmp=""
             created_policy=1
 
-            override_tmp="$(mktemp "${override_file}.next.XXXXXX")" \
+            override_tmp="$(mktemp "${policy_override_file}.next.XXXXXX")" \
               || bootstrap_abort "cannot create Compose override staging file"
             if ! cat > "${override_tmp}" <<'ROLL_OUT_OVERRIDE'
           services:
@@ -300,11 +293,12 @@ jobs:
             then
               bootstrap_abort "cannot render Compose rollout override"
             fi
-            mv "${override_tmp}" "${override_file}" || bootstrap_abort "cannot install Compose rollout override"
+            mv "${override_tmp}" "${policy_override_file}" || bootstrap_abort "cannot install Compose rollout override"
             override_tmp=""
             created_override=1
 
-            if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" "${compose[@]}" config --quiet; then
+            if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
+              "${deploy_runbook}" -f "${policy_override_file}" config --quiet; then
               printf '%s\n' 'cloud-commission: policy override is invalid; restoring legacy topology' >&2
               rollback_legacy_bootstrap
               exit 1
@@ -312,7 +306,7 @@ jobs:
 
             recreate_attempted=1
             if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
-              "${compose[@]}" up -d --no-deps --force-recreate web worker >/dev/null; then
+              "${deploy_runbook}" -f "${policy_override_file}" up -d --no-deps --force-recreate web worker >/dev/null; then
               printf '%s\n' 'cloud-commission: legacy bootstrap recreate failed; restoring legacy topology' >&2
               rollback_legacy_bootstrap
               exit 1
@@ -321,7 +315,7 @@ jobs:
             for service in web worker; do
               local container
               local image_id
-              container="$("${compose[@]}" ps -q "${service}")"
+              container="$(container_for_service "${service}")"
               test -n "${container}" || {
                 printf 'cloud-commission: %s missing after legacy bootstrap; restoring legacy topology\n' "${service}" >&2
                 rollback_legacy_bootstrap
@@ -335,11 +329,13 @@ jobs:
               fi
             done
 
+            web_container="$(container_for_service web)"
+            worker_container="$(container_for_service worker)"
             for _ in $(seq 1 30); do
-              if "${compose[@]}" exec -T web node -e \
+              if docker exec "${web_container}" node -e \
                 "fetch('http://127.0.0.1:3000/api/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
                 >/dev/null 2>&1 \
-                && "${compose[@]}" exec -T worker node -e \
+                && docker exec "${worker_container}" node -e \
                 "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
                 >/dev/null 2>&1; then
                 healthy=1
@@ -354,7 +350,7 @@ jobs:
               exit 1
             fi
 
-            printf 'cloud-commission: legacy inline rollout migrated using %s and current runtime image\n' "${base_file}"
+            printf '%s\n' 'cloud-commission: legacy inline rollout migrated with dedicated release-policy override and current runtime image'
           }
 
           if [ ! -f "${policy_file}" ]; then
@@ -362,15 +358,23 @@ jobs:
           fi
 
           test -f "${policy_file}" || fail "non-secret rollout policy file is missing"
+          test -f "${policy_override_file}" || fail "release-policy Compose override is missing"
           test ! -L "${policy_file}" || fail "rollout policy file must not be a symlink"
+          test ! -L "${policy_override_file}" || fail "release-policy Compose override must not be a symlink"
+          test "$(stat -c '%u' "${policy_override_file}")" = "$(id -u)" \
+            || fail "release-policy Compose override ownership does not match the deploy account"
           test -w "${policy_file}" || fail "rollout policy file is not writable by the deploy account"
           test -w "$(dirname "${policy_file}")" || fail "rollout policy directory is not writable by the deploy account"
           test "$(stat -c '%u' "${policy_file}")" = "$(id -u)" || fail "rollout policy ownership does not match the deploy account"
           test "$(stat -c '%s' "${policy_file}")" -le 65536 || fail "rollout policy file exceeds 64 KiB"
 
+          web_container="$(container_for_service web)"
+          worker_container="$(container_for_service worker)"
           for service in web worker; do
-            container="$("${compose[@]}" ps -q "${service}")"
-            test -n "${container}" || fail "${service} container is not running"
+            case "${service}" in
+              web) container="${web_container}" ;;
+              worker) container="${worker_container}" ;;
+            esac
 
             configured_file="$(
               docker inspect "${container}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
@@ -417,10 +421,10 @@ jobs:
               mv "${previous_policy}" "${policy_file}"
               previous_policy=""
             fi
-            "${compose[@]}" restart web worker >/dev/null || true
+            docker restart "${web_container}" "${worker_container}" >/dev/null || true
           }
 
-          if ! "${compose[@]}" restart web worker >/dev/null; then
+          if ! docker restart "${web_container}" "${worker_container}" >/dev/null; then
             printf '%s\n' 'cloud-commission: consumers failed to restart; restoring previous rollout policy' >&2
             restore_previous_policy
             exit 1
@@ -428,10 +432,10 @@ jobs:
 
           healthy=0
           for _ in $(seq 1 30); do
-            if "${compose[@]}" exec -T web node -e \
+            if docker exec "${web_container}" node -e \
               "fetch('http://127.0.0.1:3000/api/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
               >/dev/null 2>&1 \
-              && "${compose[@]}" exec -T worker node -e \
+              && docker exec "${worker_container}" node -e \
               "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
               >/dev/null 2>&1; then
               healthy=1
@@ -446,7 +450,7 @@ jobs:
             exit 1
           fi
 
-          "${compose[@]}" ps web worker
+          docker inspect --format '{{.Name}} status={{.State.Status}}' "${web_container}" "${worker_container}"
           printf 'cloud-commission: repository commissioned successfully\n'
           REMOTE_COMMISSION
 
