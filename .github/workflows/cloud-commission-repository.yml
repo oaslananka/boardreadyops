@@ -1,0 +1,187 @@
+name: cloud-commission-repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Repository to add to the production release-readiness rollout (owner/repository).
+        required: true
+        type: string
+
+concurrency:
+  group: cloud-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  commission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
+
+      - name: Load SSH key from Doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          key_path="${RUNNER_TEMP}/cloud-commission-key"
+          doppler secrets get CLOUD_DEPLOY_SSH_PRIVATE_KEY --plain \
+            --project boardreadyops --config deploy > "${key_path}"
+          chmod 600 "${key_path}"
+          echo "CLOUD_COMMISSION_SSH_KEY_PATH=${key_path}" >> "$GITHUB_ENV"
+
+      - name: Load Tailscale OAuth credentials from Doppler
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        with:
+          script: |
+            const { execFileSync } = require("node:child_process");
+
+            function readDeploySecret(name) {
+              return execFileSync(
+                "doppler",
+                ["secrets", "get", name, "--plain", "--project", "boardreadyops", "--config", "deploy"],
+                { encoding: "utf8" },
+              ).trim();
+            }
+
+            const clientId = readDeploySecret("TAILSCALE_OAUTH_CLIENT_ID");
+            const clientSecret = readDeploySecret("TAILSCALE_OAUTH_CLIENT_SECRET");
+            core.setSecret(clientId);
+            core.setSecret(clientSecret);
+            core.exportVariable("TAILSCALE_OAUTH_CLIENT_ID", clientId);
+            core.exportVariable("TAILSCALE_OAUTH_CLIENT_SECRET", clientSecret);
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        with:
+          oauth-client-id: ${{ env.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ env.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          tags: tag:ci-deploy
+          version: 1.94.2
+
+      - name: Commission repository rollout
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          REPOSITORY: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+
+          repository="$(printf '%s' "${REPOSITORY}" | tr "[:upper:]" "[:lower:]")"
+          if ! [[ "${repository}" =~ ^[a-z0-9_.-]+/[a-z0-9_.-]+$ ]]; then
+            printf 'cloud-commission: invalid repository: %s\n' "${repository}" >&2
+            exit 64
+          fi
+
+          ssh_host="$(doppler secrets get CLOUD_DEPLOY_SSH_HOST --plain \
+            --project boardreadyops --config deploy)"
+
+          ssh -i "${CLOUD_COMMISSION_SSH_KEY_PATH}" \
+            -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 \
+            "ubuntu@${ssh_host}" \
+            "bash -s -- '${repository}'" <<'REMOTE_COMMISSION'
+          set -euo pipefail
+
+          repository="$1"
+          deploy_root="/home/ubuntu/boardreadyops-cloud"
+          policy_file="/opt/boardreadyops-cloud/release-repositories"
+          container_policy_path="/run/policies/repositories"
+          compose=(docker compose -p boardreadyops-cloud)
+
+          fail() {
+            printf 'cloud-commission: %s\n' "$1" >&2
+            exit 78
+          }
+
+          test -d "${deploy_root}" || fail "deployment root is not commissioned"
+          cd "${deploy_root}"
+
+          test -f "${policy_file}" || fail "non-secret rollout policy file is missing"
+          test ! -L "${policy_file}" || fail "rollout policy file must not be a symlink"
+          test -w "${policy_file}" || fail "rollout policy file is not writable by the deploy account"
+          test -w "$(dirname "${policy_file}")" || fail "rollout policy directory is not writable by the deploy account"
+          test "$(stat -c '%u' "${policy_file}")" = "$(id -u)" || fail "rollout policy ownership does not match the deploy account"
+          test "$(stat -c '%s' "${policy_file}")" -le 65536 || fail "rollout policy file exceeds 64 KiB"
+
+          for service in web worker; do
+            container="$("${compose[@]}" ps -q "${service}")"
+            test -n "${container}" || fail "${service} container is not running"
+
+            configured_file="$(
+              docker inspect "${container}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+                | awk -F= '$1 == "BOARDREADYOPS_RELEASE_REPOSITORIES_FILE" {sub(/^[^=]*=/, ""); print; exit}'
+            )"
+            test "${configured_file}" = "${container_policy_path}" \
+              || fail "${service} is not configured for the non-secret rollout policy mount"
+
+            mount_source="$(
+              docker inspect "${container}" --format '{{range .Mounts}}{{printf "%s|%s\n" .Source .Destination}}{{end}}' \
+                | awk -F'|' -v destination="${container_policy_path}" '$2 == destination {print $1; exit}'
+            )"
+            test "${mount_source}" = "${policy_file}" \
+              || fail "${service} rollout policy mount source does not match the commissioned host path"
+          done
+
+          next_policy="$(mktemp "${policy_file}.next.XXXXXX")"
+          previous_policy="$(mktemp "${policy_file}.previous.XXXXXX")"
+          cleanup() {
+            rm -f "${next_policy}" "${previous_policy}"
+          }
+          trap cleanup EXIT
+
+          cp --preserve=mode,timestamps "${policy_file}" "${previous_policy}"
+          {
+            tr ',' '\n' < "${policy_file}" \
+              | awk '{ for (i = 1; i <= NF; i += 1) print tolower($i) }'
+            printf '%s\n' "${repository}"
+          } | awk 'NF' | sort -u > "${next_policy}"
+
+          test "$(stat -c '%s' "${next_policy}")" -le 65536 || fail "updated rollout policy would exceed 64 KiB"
+          chmod --reference="${policy_file}" "${next_policy}"
+
+          if cmp -s "${policy_file}" "${next_policy}"; then
+            printf 'cloud-commission: repository already present; restarting consumers to reload policy\n'
+          else
+            mv "${next_policy}" "${policy_file}"
+            next_policy=""
+            printf 'cloud-commission: rollout policy updated atomically\n'
+          fi
+
+          "${compose[@]}" restart web worker >/dev/null
+
+          healthy=0
+          for _ in $(seq 1 30); do
+            if "${compose[@]}" exec -T web node -e \
+              "fetch('http://127.0.0.1:3000/api/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
+              >/dev/null 2>&1 \
+              && "${compose[@]}" exec -T worker node -e \
+              "fetch('http://127.0.0.1:3001/health/ready',{cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok||b?.ok!==true)process.exit(1)}).catch(()=>process.exit(1))" \
+              >/dev/null 2>&1; then
+              healthy=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "${healthy}" != "1" ]; then
+            printf '%s\n' 'cloud-commission: consumers failed readiness; restoring previous rollout policy' >&2
+            mv "${previous_policy}" "${policy_file}"
+            previous_policy=""
+            "${compose[@]}" restart web worker >/dev/null || true
+            exit 1
+          fi
+
+          "${compose[@]}" ps web worker
+          printf 'cloud-commission: repository commissioned successfully\n'
+          REMOTE_COMMISSION
+
+      - name: Remove temporary SSH key
+        if: always()
+        run: rm -f "${CLOUD_COMMISSION_SSH_KEY_PATH}"
