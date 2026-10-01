@@ -725,7 +725,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/helpers@7.29.7`
   - Description: Collection of helper functions used by Babel transforms.
   - Homepage: https://babel.dev/docs/en/next/babel-helpers
-- `@babel/parser@7.29.7`, `@babel/parser@7.29.8`
+- `@babel/parser@7.29.8`
   - Description: A JavaScript parser
   - Homepage: https://babel.dev/docs/en/next/babel-parser
 - `@babel/plugin-proposal-decorators@7.29.0`
@@ -761,7 +761,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@babel/traverse@7.29.7`
   - Description: The Babel Traverse module maintains the overall tree state, and is responsible for replacing, removing, and adding nodes
   - Homepage: https://babel.dev/docs/en/next/babel-traverse
-- `@babel/types@7.29.7`, `@babel/types@7.29.8`
+- `@babel/types@7.29.8`
   - Description: Babel Types is a Lodash-esque utility library for AST nodes
   - Homepage: https://babel.dev/docs/en/next/babel-types
 - `@bcoe/v8-coverage@1.0.2`
@@ -949,7 +949,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@modelcontextprotocol/sdk@1.30.0`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
-- `@next/env@16.3.3`
+- `@next/env@16.3.6`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
 - `@nodable/entities@2.1.0`
@@ -1630,7 +1630,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `accepts@2.0.0`
   - Description: Higher-level content negotiation
   - Homepage: https://github.com/jshttp/accepts#readme
-- `acorn@8.17.0`, `acorn@8.18.0`
+- `acorn@8.18.0`
   - Description: ECMAScript parser
   - Homepage: https://github.com/acornjs/acorn
 - `agent-base@6.0.2`, `agent-base@7.1.4`
@@ -1806,7 +1806,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `content-disposition@1.1.0`
   - Description: Create and parse Content-Disposition header
   - Homepage: https://github.com/jshttp/content-disposition#readme
-- `content-type@1.0.5`, `content-type@2.0.0`, `content-type@2.1.0`
+- `content-type@1.0.5`, `content-type@2.1.0`
   - Description: Create and parse HTTP Content-Type header
   - Homepage: https://github.com/jshttp/content-type#readme
 - `conventional-commits-parser@7.1.2`
@@ -2000,7 +2000,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `express-rate-limit@8.6.2`
   - Description: Basic IP rate-limiting middleware for Express. Use to limit repeated requests to public APIs and/or endpoints such as password reset.
   - Homepage: https://github.com/express-rate-limit/express-rate-limit
-- `exsolve@1.1.0`, `exsolve@1.1.1`
+- `exsolve@1.1.1`
   - Description: Module resolution utilities based on Node.js upstream implementation.
   - Homepage: https://github.com/unjs/exsolve#readme
 - `fancy-canvas@2.1.0`
@@ -2465,7 +2465,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `neo-async@2.6.2`
   - Description: Neo-Async is a drop-in replacement for Async, it almost fully covers its functionality and runs faster
   - Homepage: https://github.com/suguru03/neo-async
-- `next@16.3.3`
+- `next@16.3.6`
   - Description: The React Framework
   - Homepage: https://nextjs.org
 - `next-themes@0.4.6`
@@ -2505,7 +2505,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `ofetch@1.5.1`
   - Description: A better fetch API. Works on node, browser and workers.
   - Homepage: https://github.com/unjs/ofetch#readme
-- `ohash@2.0.11`, `ohash@2.0.12`
+- `ohash@2.0.12`
   - Description: Simple object hashing, serialization and comparison utils.
   - Homepage: https://github.com/unjs/ohash#readme
 - `on-finished@2.4.1`
@@ -2923,7 +2923,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `teex@1.0.1`
   - Description: Turn a readable stream into multiple readable streamx streams
   - Homepage: https://github.com/mafintosh/teex
-- `third-party-web@0.29.2`
+- `third-party-web@0.29.2`, `third-party-web@0.30.0`
   - Description: Categorized data on third party entities on the web.
   - Homepage: https://github.com/patrickhulce/third-party-web#readme
 - `tiny-inflate@1.0.3`
@@ -3005,7 +3005,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `underscore@1.13.8`
   - Description: JavaScript's functional programming helper library.
   - Homepage: https://underscorejs.org
-- `undici@8.11.0`
+- `undici@6.28.1`, `undici@8.11.0`
   - Description: An HTTP/1.1 client, written from scratch for Node.js
   - Homepage: https://undici.nodejs.org
 - `undici-types@7.18.2`
