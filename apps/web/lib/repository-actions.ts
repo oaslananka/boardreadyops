@@ -287,6 +287,8 @@ export async function handleRepositoryAction(
   const scope = await resolveRepositoryApiContext(auth, request, repositoryId);
   if (scope instanceof Response) return scope;
 
+  const requestId = parsed.requestId ?? dependencies.newId();
+
   try {
     const context = await loadSetupContext(scope.executor, scope.repositoryId);
     if (!context) return json({ ok: false, error: "Repository is unavailable" }, 404);
@@ -311,8 +313,6 @@ export async function handleRepositoryAction(
         }
       }
     }
-
-    const requestId = parsed.requestId ?? dependencies.newId();
 
     if (parsed.action === "setup") {
       return await handleRepositorySetupCreatePrForActor({
@@ -382,8 +382,17 @@ export async function handleRepositoryAction(
       outcome: "failed",
       errorClass: errorClassOf(error),
       errorCode: databaseErrorCode(error),
+      requestId,
     });
-    return json({ ok: false, error: "The action could not be queued. Please try again." }, 503);
+    return json(
+      {
+        ok: false,
+        error: "The action could not be queued. Please try again.",
+        code: "repository_action_queue_failed",
+        requestId,
+      },
+      503,
+    );
   } finally {
     await scope.executor.close();
   }

@@ -6,6 +6,7 @@ import {
   createSqlGitHubAppMetadataStore,
   lifecycleAuditEventForAction,
   parseReleaseRepositoryRolloutPolicy,
+  releaseRepositoryEnabled,
   releaseRepositoryRolloutEnvName,
   releaseRepositoryRolloutFileEnvName,
   releaseRepositoryRolloutPolicyFromEnvironment,
@@ -89,6 +90,17 @@ describe("SQL GitHub App metadata store", () => {
     expect(parseReleaseRepositoryRolloutPolicy("all")).toEqual({ allowAllRepositories: true });
     expect(parseReleaseRepositoryRolloutPolicy("*")).toEqual({ allowAllRepositories: true });
     expect(parseReleaseRepositoryRolloutPolicy(undefined)).toEqual({ repositories: [] });
+  });
+
+  it("uses the same normalized rollout predicate for workers and product surfaces", () => {
+    expect(releaseRepositoryEnabled("Oaslananka/BoardReadyOps", { repositories: ["oaslananka/boardreadyops"] })).toBe(
+      true,
+    );
+    expect(releaseRepositoryEnabled("oaslananka/not-enabled", { repositories: ["oaslananka/boardreadyops"] })).toBe(
+      false,
+    );
+    expect(releaseRepositoryEnabled("any/valid-repository", { allowAllRepositories: true })).toBe(true);
+    expect(releaseRepositoryEnabled("not-a-full-name", { repositories: ["not-a-full-name"] })).toBe(false);
   });
 
   it("upserts installations into the mapped installations table", async () => {

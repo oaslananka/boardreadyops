@@ -1,7 +1,7 @@
 import { Window } from "happy-dom";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ArtifactsView,
   AttemptsView,
@@ -155,6 +155,14 @@ async function axeViolations(markup: string, path: string): Promise<string[]> {
 }
 
 describe("run investigation accessibility", () => {
+  beforeEach(() => {
+    vi.stubEnv("BOARDREADYOPS_RELEASE_REPOSITORIES", "all");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("links GitHub Actions logs and repository-owned artifacts from the authoritative workflow run", () => {
     const run = sampleRun();
     run.attempts = [

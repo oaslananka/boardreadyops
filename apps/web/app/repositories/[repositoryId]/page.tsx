@@ -4,6 +4,7 @@ import { GuidedChecklist } from "../../../components/guided-checklist.js";
 import { type DataColumn, DataTable } from "../../../components/ui/data-table.js";
 import { AppShell, Definition, DefinitionGrid, EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
 import { ViewerNav } from "../../../components/viewer-nav.js";
+import { releaseRepositoryDispatchAvailability } from "../../../lib/release-rollout.js";
 import { loadRepositoryDetail, type RepositoryDetail } from "../../../lib/repository-dashboard.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 
@@ -96,6 +97,7 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
   if (!detail) return notFound();
 
   const { repository, runs, supplyFindings } = detail;
+  const dispatch = releaseRepositoryDispatchAvailability(`${repository.owner}/${repository.name}`);
 
   return (
     <AppShell
@@ -152,21 +154,27 @@ export default async function RepositoryPage({ params }: Readonly<PageProps>) {
 
         <Panel title="Recent runs">
           {runs.length === 0 ? (
-            <GuidedChecklist
-              heading="Trigger your first run on this repository"
-              steps={[
-                {
-                  id: "connected",
-                  label: `Repository ${repository.owner}/${repository.name} connected`,
-                  status: "done",
-                },
-                {
-                  id: "pr",
-                  label: "Open a pull request touching the hardware project to produce the first run",
-                  status: "current",
-                },
-              ]}
-            />
+            dispatch.enabled ? (
+              <GuidedChecklist
+                heading="Trigger your first run on this repository"
+                steps={[
+                  {
+                    id: "connected",
+                    label: `Repository ${repository.owner}/${repository.name} connected`,
+                    status: "done",
+                  },
+                  {
+                    id: "pr",
+                    label: "Open a pull request touching the hardware project to produce the first run",
+                    status: "current",
+                  },
+                ]}
+              />
+            ) : (
+              <EmptyState title="Readiness runs are not enabled yet">
+                <p>{dispatch.reason}</p>
+              </EmptyState>
+            )
           ) : (
             <DataTable
               caption="Recent runs for this repository"

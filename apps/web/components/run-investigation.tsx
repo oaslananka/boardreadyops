@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { releaseRepositoryDispatchAvailability } from "../lib/release-rollout.js";
 import type { RunDashboardFilters, RunDetail } from "../lib/run-dashboard.js";
 import { formatArtifactBytes, formatRunDate, formatRunDuration } from "../lib/run-dashboard.js";
 import { runVerdict } from "../lib/run-verdict.js";
@@ -61,6 +62,7 @@ function RunNavigation({ runId, active }: Readonly<{ runId: string; active: RunV
 }
 
 export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
+  const dispatch = releaseRepositoryDispatchAvailability(run.repository);
   return (
     <header className="flex flex-col gap-4 rounded-md border border-border bg-card p-5 shadow-lg sm:flex-row sm:items-start sm:justify-between">
       <div>
@@ -96,6 +98,7 @@ export function RunHeader({ run }: Readonly<{ run: RunDetail }>) {
           repositoryId={run.repositoryId}
           runId={run.id}
           hasPullRequest={run.pullRequestNumber !== undefined}
+          {...(dispatch.enabled ? {} : { dispatchBlockedReason: dispatch.reason })}
         />
       </div>
     </header>

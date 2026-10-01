@@ -21,7 +21,7 @@ function database() {
   return executor;
 }
 
-function action(commitSha: string) {
+function action(commitSha: string, baseCommitSha?: string) {
   return {
     type: "release_run.enqueue" as const,
     installation: { id: githubInstallationId },
@@ -36,6 +36,7 @@ function action(commitSha: string) {
     pullRequestNumber: 42,
     ref: "refs/pull/42/head",
     commitSha,
+    ...(baseCommitSha ? { baseCommitSha } : {}),
     triggerKind: "pr" as const,
   };
 }
@@ -268,6 +269,32 @@ describeDatabase("transactional release-run outbox producer", () => {
       completion_conclusion: "action_required",
       completion_setup_incomplete: "true",
     });
+  });
+
+  it("persists the exact PR base commit SHA for dashboard re-run and preserves null for legacy-shaped actions", async () => {
+    const withBaseStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-base-${suffix}`, `outbox-base-${suffix}`]),
+      now: () => new Date("2026-07-22T02:01:30.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const withBase = await withBaseStore.enqueueReleaseRunWithOutbox(action("d".repeat(40), "a".repeat(40)));
+
+    const withoutBaseStore = createSqlTransactionalGitHubAppLifecycleStore(database(), {
+      id: idSequence([`run-without-base-${suffix}`, `outbox-without-base-${suffix}`]),
+      now: () => new Date("2026-07-22T02:01:45.000Z"),
+      releaseRepositoryRolloutPolicy: { allowAllRepositories: true },
+    });
+    const withoutBase = await withoutBaseStore.enqueueReleaseRunWithOutbox(action("e".repeat(40)));
+
+    const state = rows(
+      await database().query("select id, base_commit_sha from release_runs where id in ($1, $2)", [
+        withBase.runId,
+        withoutBase.runId,
+      ]),
+    );
+    const baseById = new Map(state.map((row) => [row.id, row.base_commit_sha]));
+    expect(baseById.get(withBase.runId)).toBe("a".repeat(40));
+    expect(baseById.get(withoutBase.runId)).toBeNull();
   });
 
   it("persists the source webhook delivery id for traceability, and leaves it null when absent", async () => {

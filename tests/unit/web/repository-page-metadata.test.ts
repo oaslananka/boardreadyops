@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import * as repositoryDashboard from "../../../apps/web/lib/repository-dashboard.js";
 import * as viewerAuth from "../../../apps/web/lib/viewer-authorization.js";
@@ -5,6 +6,14 @@ import * as viewerAuth from "../../../apps/web/lib/viewer-authorization.js";
 const { generateMetadata } = await import("../../../apps/web/app/repositories/[repositoryId]/page.js");
 
 describe("Repository page metadata", () => {
+  it("does not promise a first readiness run when deployment rollout excludes the repository", () => {
+    const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
+    expect(source).toContain("releaseRepositoryDispatchAvailability");
+    expect(source).toContain("dispatch.enabled ? (");
+    expect(source).toContain('title="Readiness runs are not enabled yet"');
+    expect(source).toContain("<p>{dispatch.reason}</p>");
+  });
+
   it("uses the real owner/name instead of a generic 'Repository' title", async () => {
     vi.spyOn(viewerAuth, "viewerAuthorization").mockResolvedValue({
       status: "authenticated",

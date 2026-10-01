@@ -6,7 +6,7 @@ import type {
 import { releaseRunIdempotencyKey } from "@boardreadyops/cloud-core/lifecycle-executor";
 import {
   createSqlGitHubAppMetadataStore,
-  type ReleaseRepositoryRolloutPolicy,
+  releaseRepositoryEnabled,
   releaseRepositoryRolloutPolicyFromEnvironment,
   type SqlLifecycleStoreOptions,
   type SqlQueryExecutor,
@@ -22,17 +22,6 @@ function rows(result: unknown): readonly Record<string, unknown>[] {
 function text(row: Record<string, unknown> | undefined, column: string): string | undefined {
   const value = row?.[column];
   return typeof value === "string" ? value : undefined;
-}
-
-function normalizedRepository(fullName: string): string | undefined {
-  const normalized = fullName.trim().toLowerCase();
-  return normalized.includes("/") ? normalized : undefined;
-}
-
-function repositoryEnabled(fullName: string, policy: ReleaseRepositoryRolloutPolicy): boolean {
-  if (policy.allowAllRepositories === true) return true;
-  const normalized = normalizedRepository(fullName);
-  return normalized ? new Set(policy.repositories ?? []).has(normalized) : false;
 }
 
 export function createSqlTransactionalGitHubAppLifecycleStore(
@@ -54,7 +43,7 @@ export function createSqlTransactionalGitHubAppLifecycleStore(
 
     async enqueueReleaseRunWithOutbox(action): Promise<EnqueuedReleaseRunWithOutbox> {
       const idempotencyKey = releaseRunIdempotencyKey(action);
-      if (!repositoryEnabled(action.repository.fullName, rollout)) return { idempotencyKey };
+      if (!releaseRepositoryEnabled(action.repository.fullName, rollout)) return { idempotencyKey };
 
       const runId = id();
       const outboxId = id();

@@ -117,7 +117,21 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0067_notification_email_channels.sql",
       "0068_repository_firmware_snapshots.sql",
       "0069_firmware_advisory_watch.sql",
+      "0070_release_run_base_commit_sha.sql",
     ]);
+  });
+
+  it("persists the PR base commit SHA required by dashboard re-run in schema v70", async () => {
+    const sql = (await readFile(join(migrationsDir, "0070_release_run_base_commit_sha.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("add column if not exists base_commit_sha text");
+    expect(sql).toContain("release_runs_base_commit_sha_valid");
+    expect(sql).toContain("payload #>> '{action,basecommitsha}'");
+    expect(sql).toContain("effect_type = 'github.check_run.create'");
+    expect(sql).toContain("v_base_commit_sha := p_outbox_payload #>> '{action,basecommitsha}'");
+    expect(sql).toContain("base_commit_sha,");
+    expect(sql).toContain("v_base_commit_sha,");
+    expect(sql).toContain("'{action,setupincomplete}'");
   });
 
   it("scopes firmware snapshots to a repository and refuses a searchable row with no identifier in schema v68", async () => {

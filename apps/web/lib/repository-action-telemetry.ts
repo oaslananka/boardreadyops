@@ -22,6 +22,7 @@ export type RepositoryActionTelemetry = {
    * authorisation. A class name alone usually says only "error".
    */
   errorCode?: string | undefined;
+  requestId?: string | undefined;
 };
 
 type Write = (line: string) => unknown;
@@ -45,6 +46,7 @@ export function emitRepositoryActionTelemetry(
 ): void {
   const errorClass = boundedErrorClass(telemetry.errorClass);
   const errorCode = boundedErrorClass(telemetry.errorCode);
+  const requestId = boundedErrorClass(telemetry.requestId);
   write(
     `${JSON.stringify({
       timestamp: new Date().toISOString(),
@@ -55,6 +57,7 @@ export function emitRepositoryActionTelemetry(
       outcome: telemetry.outcome,
       ...(errorClass ? { errorClass } : {}),
       ...(errorCode ? { errorCode } : {}),
+      ...(requestId ? { requestId } : {}),
     })}\n`,
   );
 }
