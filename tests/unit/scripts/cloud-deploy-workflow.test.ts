@@ -64,7 +64,6 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("default: false");
     expect(workflow).toContain('retire_superseded_images="$2"');
     expect(workflow).toContain(`if [ "${retireOptIn}" = "1" ]; then`);
-    expect(workflow).toContain("retain=3");
     expect(workflow).toContain("docker compose -p boardreadyops-cloud images");
     expect(workflow).toContain("grep -vxF");
     expect(workflow).toContain("tail -n +$((retain + 1))");
@@ -81,7 +80,7 @@ describe("cloud-deploy topology preflight", () => {
     expect(optInCheck).toBeGreaterThan(cacheReclaim);
     expect(capacityFailure).toBeGreaterThan(optInCheck);
     expect(documentation).toContain("explicit operator opt-in");
-    expect(documentation).toMatch(/keeps the running image and the\s+three newest rollback targets/);
+    expect(documentation).toContain("bounded path defaults to three rollback images");
   });
 
   it("lets an opted-in low-space deploy keep one to three rollback images without weakening normal retention", () => {
