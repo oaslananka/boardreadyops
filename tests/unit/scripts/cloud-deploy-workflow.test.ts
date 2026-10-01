@@ -84,6 +84,16 @@ describe("cloud-deploy topology preflight", () => {
     expect(documentation).toMatch(/keeps the running image and the\s+three newest rollback targets/);
   });
 
+  it("emits aggregate-only disk diagnostics before a low-space preflight exits", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+
+    expect(workflow).toContain("cloud-deploy disk: docker system summary");
+    expect(workflow).toContain("docker system df");
+    expect(workflow).toContain("cloud-deploy disk: runtime images count=");
+    expect(workflow).toContain("docker image inspect");
+    expect(workflow).not.toContain("docker system df -v");
+  });
+
   it("documents the remote path as a commissioned contract, not a permanently live host claim", () => {
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
 

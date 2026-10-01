@@ -129,6 +129,36 @@ jobs:
           trim_build_cache() {
             docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
           }
+          report_disk_summary() {
+            local runtime_image_ids
+            local runtime_image_count=0
+            local runtime_image_bytes=0
+            local runtime_image_mib=0
+            local image_id
+            local image_size
+
+            printf '%s\n' 'cloud-deploy disk: docker system summary'
+            docker system df || true
+
+            runtime_image_ids="$(
+              docker image ls 'boardreadyops-web-runtime:*' --format '{{.ID}}' 2>/dev/null | sort -u
+            )"
+            if [ -n "${runtime_image_ids}" ]; then
+              while IFS= read -r image_id; do
+                [ -n "${image_id}" ] || continue
+                image_size="$(docker image inspect "${image_id}" --format '{{.Size}}' 2>/dev/null || printf '0')"
+                case "${image_size}" in
+                  ''|*[!0-9]*) image_size=0 ;;
+                esac
+                runtime_image_count=$((runtime_image_count + 1))
+                runtime_image_bytes=$((runtime_image_bytes + image_size))
+              done <<< "${runtime_image_ids}"
+            fi
+            runtime_image_mib=$(((runtime_image_bytes + 1048575) / 1048576))
+            printf 'cloud-deploy disk: runtime images count=%s total_mib=%s\n' \
+              "${runtime_image_count}" "${runtime_image_mib}"
+          }
+
           retire_superseded_runtime_images() {
             local running_images_file="/tmp/boardreadyops-running-images.${BASHPID}"
             local superseded
@@ -189,6 +219,7 @@ jobs:
           fi
 
           if [ "${available_mib}" -lt "${required_mib}" ]; then
+            report_disk_summary
             if [ "${retire_superseded_images}" = "1" ]; then
               printf '%s\n' \
                 "cloud-deploy preflight: only ${available_mib} MiB free on ${docker_root}, need ${required_mib} MiB after bounded runtime-image retirement." \
