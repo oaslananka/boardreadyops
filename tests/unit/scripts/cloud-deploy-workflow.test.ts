@@ -84,6 +84,26 @@ describe("cloud-deploy topology preflight", () => {
     expect(documentation).toMatch(/keeps the running image and the\s+three newest rollback targets/);
   });
 
+  it("lets an opted-in low-space deploy keep one to three rollback images without weakening normal retention", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+
+    expect(workflow).toContain("rollback_images_to_keep:");
+    expect(workflow).toContain('default: "3"');
+    expect(workflow).toContain('- "1"');
+    expect(workflow).toContain('- "2"');
+    expect(workflow).toContain('- "3"');
+    expect(workflow).toContain('preflight_rollback_images_to_keep="$3"');
+    expect(workflow).toContain('retire_superseded_runtime_images "${preflight_rollback_images_to_keep}"');
+    expect(workflow).toContain('retire_superseded_runtime_images "3"');
+    expect(workflow).toContain('local retain="$1"');
+    expect(workflow).toContain('1|2|3)');
+    expect(workflow).not.toContain('rollback_images_to_keep: "0"');
+
+    expect(documentation).toContain("defaults to three rollback images");
+    expect(documentation).toContain("may explicitly reduce that preflight keep-set to one");
+  });
+
   it("emits aggregate-only disk diagnostics before a low-space preflight exits", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
