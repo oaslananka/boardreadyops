@@ -108,7 +108,7 @@ describe("control-plane transition writer boundary", () => {
 
   it("tracks the setup-incomplete migration as the guarded enqueue owner", () => {
     expect(protectedFunctionOwners.boardreadyops_enqueue_release_run_with_outbox).toBe(
-      "0065_setup_incomplete_release_runs.sql",
+      "0070_release_run_base_commit_sha.sql",
     );
   });
 
