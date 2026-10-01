@@ -1,0 +1,126 @@
+name: cloud-rollout-commission
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: GitHub repository to add to the production cloud-readiness rollout (owner/name).
+        required: true
+        type: string
+
+concurrency:
+  group: cloud-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  commission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@4819d808ab99e5cde19a0637a16536a4038fad73 # v4.0.1
+
+      - name: Load SSH key from Doppler
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          key_path="${RUNNER_TEMP}/cloud-rollout-key"
+          doppler secrets get CLOUD_DEPLOY_SSH_PRIVATE_KEY --plain \
+            --project boardreadyops --config deploy > "${key_path}"
+          chmod 600 "${key_path}"
+          echo "CLOUD_DEPLOY_SSH_KEY_PATH=${key_path}" >> "$GITHUB_ENV"
+
+      - name: Load Tailscale OAuth credentials from Doppler
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        with:
+          script: |
+            const { execFileSync } = require("node:child_process");
+
+            function readDeploySecret(name) {
+              return execFileSync(
+                "doppler",
+                ["secrets", "get", name, "--plain", "--project", "boardreadyops", "--config", "deploy"],
+                { encoding: "utf8" },
+              ).trim();
+            }
+
+            const clientId = readDeploySecret("TAILSCALE_OAUTH_CLIENT_ID");
+            const clientSecret = readDeploySecret("TAILSCALE_OAUTH_CLIENT_SECRET");
+
+            core.setSecret(clientId);
+            core.setSecret(clientSecret);
+            core.exportVariable("TAILSCALE_OAUTH_CLIENT_ID", clientId);
+            core.exportVariable("TAILSCALE_OAUTH_CLIENT_SECRET", clientSecret);
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
+        with:
+          oauth-client-id: ${{ env.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ env.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          tags: tag:ci-deploy
+          version: 1.94.2
+
+      - name: Commission release repository
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          ROLLOUT_REPOSITORY: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+          repository="${ROLLOUT_REPOSITORY,,}"
+          if [[ ! "${repository}" =~ ^[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*$ ]]; then
+            printf '%s\n' 'cloud-rollout: repository must be a single owner/name identifier' >&2
+            exit 64
+          fi
+
+          ssh_host="$(doppler secrets get CLOUD_DEPLOY_SSH_HOST --plain \
+            --project boardreadyops --config deploy)"
+          ssh -i "${CLOUD_DEPLOY_SSH_KEY_PATH}" \
+            -o StrictHostKeyChecking=accept-new \
+            -o ConnectTimeout=15 \
+            "ubuntu@${ssh_host}" \
+            "bash -s -- '${repository}'" <<'REMOTE_COMMISSION'
+          set -euo pipefail
+          repository="$1"
+          policy_file=/opt/boardreadyops-cloud/release-repositories
+          max_policy_bytes=65536
+
+          sudo test -f "${policy_file}" || {
+            printf '%s\n' 'cloud-rollout: commissioned policy file is missing; refusing to create it automatically' >&2
+            exit 78
+          }
+
+          current_bytes="$(sudo stat -c '%s' "${policy_file}")"
+          if [ "${current_bytes}" -gt "${max_policy_bytes}" ]; then
+            printf '%s\n' 'cloud-rollout: existing policy exceeds the supported 64 KiB limit' >&2
+            exit 78
+          fi
+
+          if sudo grep -Fxiq -- "${repository}" "${policy_file}"; then
+            printf 'cloud-rollout: commissioned repository already present: %s\n' "${repository}"
+            exit 0
+          fi
+
+          next_bytes=$((current_bytes + ${#repository} + 2))
+          if [ "${next_bytes}" -gt "${max_policy_bytes}" ]; then
+            printf '%s\n' 'cloud-rollout: append would exceed the supported 64 KiB policy limit' >&2
+            exit 78
+          fi
+
+          printf '\n%s\n' "${repository}" | sudo tee -a "${policy_file}" >/dev/null
+          sudo grep -Fxiq -- "${repository}" "${policy_file}" || {
+            printf '%s\n' 'cloud-rollout: repository append verification failed' >&2
+            exit 70
+          }
+          printf 'cloud-rollout: commissioned repository %s\n' "${repository}"
+          REMOTE_COMMISSION
+
+      - name: Remove temporary SSH key
+        if: always()
+        run: rm -f "${CLOUD_DEPLOY_SSH_KEY_PATH}"
