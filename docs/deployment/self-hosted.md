@@ -273,8 +273,10 @@ still short after safe reclaim, the default behavior remains fail-closed with ex
 may explicitly enable `retire_superseded_images`; that bounded path keeps the running image and the
 three newest rollback targets, then removes only older `boardreadyops-web-runtime:<sha>` images.
 An image still referenced by a stopped container is kept. The workflow never broad-prunes volumes
-or arbitrary Docker images. If the host is still below the 12 GiB floor afterward, the run stops
-with exit 78 so volumes, logs, or the retained rollback set remain an explicit operator decision.
+or arbitrary Docker images. If the host is still below the 12 GiB floor afterward, it emits the
+aggregate `docker system df` summary plus only the BoardReadyOps runtime-image count and total MiB;
+it never emits `docker system df -v` or per-image, per-volume, or per-container names. The run then
+stops with exit 78 so volumes, logs, or the retained rollback set remain an explicit operator decision.
 
 To see what is holding the space:
 
