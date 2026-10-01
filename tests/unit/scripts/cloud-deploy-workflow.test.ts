@@ -81,7 +81,7 @@ describe("cloud-deploy topology preflight", () => {
     expect(optInCheck).toBeGreaterThan(cacheReclaim);
     expect(capacityFailure).toBeGreaterThan(optInCheck);
     expect(documentation).toContain("explicit operator opt-in");
-    expect(documentation).toContain("keeps the running image and the three newest rollback targets");
+    expect(documentation).toMatch(/keeps the running image and the\s+three newest rollback targets/);
   });
 
   it("documents the remote path as a commissioned contract, not a permanently live host claim", () => {
