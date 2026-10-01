@@ -44,6 +44,8 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain('BOARDREADYOPS_IMAGE_TAG="${running_image_tag}"');
     expect(workflow).toContain("up -d --no-deps --force-recreate web worker");
     expect(workflow).toContain("legacy bootstrap failed readiness; restoring legacy topology");
+    expect(workflow).toContain("bootstrap_abort");
+    expect(workflow).toContain('if [ "${recreate_attempted}" = "1" ]');
     expect(workflow).not.toContain("cat runtime-env");
     expect(workflow).not.toContain("grep BOARDREADYOPS_RELEASE_REPOSITORIES runtime-env");
     expect(documentation).toContain("bootstrap_legacy_inline");

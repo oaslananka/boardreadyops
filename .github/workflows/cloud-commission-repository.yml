@@ -161,6 +161,7 @@ jobs:
             local created_policy_dir=0
             local created_policy=0
             local created_override=0
+            local recreate_attempted=0
             local healthy=0
 
             if [ "${bootstrap_legacy_inline}" != "1" ]; then
@@ -227,29 +228,63 @@ jobs:
               || fail "legacy Compose configuration is invalid"
 
             policy_dir="$(dirname "${policy_file}")"
-            if [ ! -d "${policy_dir}" ]; then
-              sudo -n install -d -m 0755 -o "$(id -u)" -g "$(id -g)" "${policy_dir}" \
-                || fail "cannot create the non-secret rollout policy directory"
-              created_policy_dir=1
-            fi
-            test -w "${policy_dir}" || fail "rollout policy directory is not writable by the deploy account"
 
-            policy_tmp="$(mktemp "${policy_dir}/.release-repositories.bootstrap.XXXXXX")"
-            {
+            rollback_legacy_bootstrap() {
+              rm -f "${policy_tmp}" "${override_tmp}" >/dev/null 2>&1 || true
+              policy_tmp=""
+              override_tmp=""
+              if [ "${created_override}" = "1" ]; then
+                rm -f "${override_file}" >/dev/null 2>&1 || true
+                created_override=0
+              fi
+              if [ "${created_policy}" = "1" ]; then
+                rm -f "${policy_file}" >/dev/null 2>&1 || true
+                created_policy=0
+              fi
+              if [ "${created_policy_dir}" = "1" ]; then
+                rmdir "${policy_dir}" >/dev/null 2>&1 || true
+                created_policy_dir=0
+              fi
+              if [ "${recreate_attempted}" = "1" ]; then
+                BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
+                  "${compose[@]}" up -d --no-deps --force-recreate web worker >/dev/null || true
+              fi
+            }
+
+            bootstrap_abort() {
+              printf 'cloud-commission: %s; restoring legacy topology\n' "$1" >&2
+              rollback_legacy_bootstrap
+              exit 1
+            }
+
+            if [ ! -d "${policy_dir}" ]; then
+              created_policy_dir=1
+              sudo -n install -d -m 0755 -o "$(id -u)" -g "$(id -g)" "${policy_dir}" \
+                || bootstrap_abort "cannot create the non-secret rollout policy directory"
+            fi
+            test -w "${policy_dir}" \
+              || bootstrap_abort "rollout policy directory is not writable by the deploy account"
+
+            policy_tmp="$(mktemp "${policy_dir}/.release-repositories.bootstrap.XXXXXX")" \
+              || bootstrap_abort "cannot create rollout policy staging file"
+            if ! {
               printf '%s\n' "${web_inline}" \
                 | tr ',' '\n' \
                 | awk '{ for (i = 1; i <= NF; i += 1) print tolower($i) }'
-            } | awk 'NF' | sort -u > "${policy_tmp}"
-            test -s "${policy_tmp}" || fail "legacy inline rollout is empty"
+            } | awk 'NF' | sort -u > "${policy_tmp}"; then
+              bootstrap_abort "cannot normalize legacy inline rollout"
+            fi
+            test -s "${policy_tmp}" || bootstrap_abort "legacy inline rollout is empty"
             test "$(stat -c '%s' "${policy_tmp}")" -le 65536 \
-              || fail "legacy inline rollout exceeds 64 KiB"
-            chmod 0644 "${policy_tmp}"
-            mv "${policy_tmp}" "${policy_file}"
+              || bootstrap_abort "legacy inline rollout exceeds 64 KiB"
+            chmod 0644 "${policy_tmp}" || bootstrap_abort "cannot set rollout policy permissions"
+            mv "${policy_tmp}" "${policy_file}" || bootstrap_abort "cannot install rollout policy file"
             policy_tmp=""
             created_policy=1
 
-            override_tmp="$(mktemp "${override_file}.next.XXXXXX")"
-            cat > "${override_tmp}" <<'ROLL_OUT_OVERRIDE'
+            override_tmp="$(mktemp "${override_file}.next.XXXXXX")" \
+              || bootstrap_abort "cannot create Compose override staging file"
+            if ! cat > "${override_tmp}" <<'ROLL_OUT_OVERRIDE'
           services:
             web:
               environment:
@@ -262,26 +297,12 @@ jobs:
               volumes:
                 - /opt/boardreadyops-cloud/release-repositories:/run/policies/repositories:ro
           ROLL_OUT_OVERRIDE
-            mv "${override_tmp}" "${override_file}"
+            then
+              bootstrap_abort "cannot render Compose rollout override"
+            fi
+            mv "${override_tmp}" "${override_file}" || bootstrap_abort "cannot install Compose rollout override"
             override_tmp=""
             created_override=1
-
-            rollback_legacy_bootstrap() {
-              if [ "${created_override}" = "1" ]; then
-                rm -f "${override_file}"
-                created_override=0
-              fi
-              if [ "${created_policy}" = "1" ]; then
-                rm -f "${policy_file}"
-                created_policy=0
-              fi
-              if [ "${created_policy_dir}" = "1" ]; then
-                rmdir "${policy_dir}" >/dev/null 2>&1 || true
-                created_policy_dir=0
-              fi
-              BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
-                "${compose[@]}" up -d --no-deps --force-recreate web worker >/dev/null || true
-            }
 
             if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" "${compose[@]}" config --quiet; then
               printf '%s\n' 'cloud-commission: policy override is invalid; restoring legacy topology' >&2
@@ -289,6 +310,7 @@ jobs:
               exit 1
             fi
 
+            recreate_attempted=1
             if ! BOARDREADYOPS_IMAGE_TAG="${running_image_tag}" \
               "${compose[@]}" up -d --no-deps --force-recreate web worker >/dev/null; then
               printf '%s\n' 'cloud-commission: legacy bootstrap recreate failed; restoring legacy topology' >&2
