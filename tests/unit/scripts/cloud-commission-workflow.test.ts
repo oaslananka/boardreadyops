@@ -40,6 +40,8 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain(`cmp -s "${policyFile}" "${nextPolicy}"`);
     expect(workflow).toContain("docker compose -p boardreadyops-cloud");
     expect(workflow).toContain("restart web worker");
+    expect(workflow).toContain("consumers failed to restart; restoring previous rollout policy");
+    expect(workflow).toContain("consumers failed readiness; restoring previous rollout policy");
     expect(workflow).toContain("ps web worker");
     expect(workflow).toContain("http://127.0.0.1:3000/api/health/ready");
     expect(workflow).toContain("http://127.0.0.1:3001/health/ready");

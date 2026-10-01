@@ -154,7 +154,19 @@ jobs:
             printf 'cloud-commission: rollout policy updated atomically\n'
           fi
 
-          "${compose[@]}" restart web worker >/dev/null
+          restore_previous_policy() {
+            if [ -n "${previous_policy}" ] && [ -f "${previous_policy}" ]; then
+              mv "${previous_policy}" "${policy_file}"
+              previous_policy=""
+            fi
+            "${compose[@]}" restart web worker >/dev/null || true
+          }
+
+          if ! "${compose[@]}" restart web worker >/dev/null; then
+            printf '%s\n' 'cloud-commission: consumers failed to restart; restoring previous rollout policy' >&2
+            restore_previous_policy
+            exit 1
+          fi
 
           healthy=0
           for _ in $(seq 1 30); do
@@ -172,9 +184,7 @@ jobs:
 
           if [ "${healthy}" != "1" ]; then
             printf '%s\n' 'cloud-commission: consumers failed readiness; restoring previous rollout policy' >&2
-            mv "${previous_policy}" "${policy_file}"
-            previous_policy=""
-            "${compose[@]}" restart web worker >/dev/null || true
+            restore_previous_policy
             exit 1
           fi
 
