@@ -24,6 +24,11 @@ describe("cloud repository commissioning workflow", () => {
   it("bootstraps a legacy inline rollout only with explicit opt-in and a pinned running image", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    const deployRoot = "$" + "{deploy_root}";
+    const deployRunbook = "$" + "{deploy_runbook}";
+    const policyOverrideFile = "$" + "{policy_override_file}";
+    const runningImageTag = "$" + "{running_image_tag}";
+    const recreateAttempted = "$" + "{recreate_attempted}";
 
     expect(workflow).toContain("bootstrap_legacy_inline:");
     expect(workflow).toContain("default: false");
@@ -34,24 +39,22 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES");
     expect(workflow).toContain("legacy inline rollout differs between web and worker");
     expect(workflow).toContain("legacy inline rollout is empty");
-    expect(workflow).toContain('deploy_runbook="${deploy_root}/deploy.sh"');
-    expect(workflow).toContain('policy_override_file="${deploy_root}/compose.release-policy.yml"');
+    expect(workflow).toContain(`deploy_runbook="${deployRoot}/deploy.sh"`);
+    expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
     expect(workflow).toContain("policy override already exists without a policy file");
     expect(workflow).toContain("release-repositories:/run/policies/repositories:ro");
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories");
     expect(workflow).toContain("boardreadyops-web-runtime:");
     expect(workflow).toContain("legacy consumers are not running the same runtime image");
-    expect(workflow).toContain('BOARDREADYOPS_IMAGE_TAG="${running_image_tag}"');
-    expect(workflow).toContain('"${deploy_runbook}" -f "${policy_override_file}" config --quiet');
+    expect(workflow).toContain(`BOARDREADYOPS_IMAGE_TAG="${runningImageTag}"`);
+    expect(workflow).toContain(`"${deployRunbook}" -f "${policyOverrideFile}" config --quiet`);
     expect(workflow).toContain(
-      '"${deploy_runbook}" -f "${policy_override_file}" up -d --no-deps --force-recreate web worker',
+      `"${deployRunbook}" -f "${policyOverrideFile}" up -d --no-deps --force-recreate web worker`,
     );
-    expect(workflow).toContain(
-      '"${deploy_runbook}" up -d --no-deps --force-recreate web worker',
-    );
+    expect(workflow).toContain(`"${deployRunbook}" up -d --no-deps --force-recreate web worker`);
     expect(workflow).toContain("legacy bootstrap failed readiness; restoring legacy topology");
     expect(workflow).toContain("bootstrap_abort");
-    expect(workflow).toContain('if [ "${recreate_attempted}" = "1" ]');
+    expect(workflow).toContain(`if [ "${recreateAttempted}" = "1" ]`);
     expect(workflow).not.toContain("cat runtime-env");
     expect(workflow).not.toContain("grep BOARDREADYOPS_RELEASE_REPOSITORIES runtime-env");
     expect(documentation).toContain("bootstrap_legacy_inline");
@@ -61,6 +64,7 @@ describe("cloud repository commissioning workflow", () => {
   it("updates only the non-secret rollout policy and restarts the consumers fail-closed", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+    const deployRoot = "$" + "{deploy_root}";
     const policyFile = "$" + "{policy_file}";
     const nextPolicy = "$" + "{next_policy}";
 
@@ -75,7 +79,7 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("mktemp");
     expect(workflow).toContain("sort -u");
     expect(workflow).toContain(`cmp -s "${policyFile}" "${nextPolicy}"`);
-    expect(workflow).toContain('policy_override_file="${deploy_root}/compose.release-policy.yml"');
+    expect(workflow).toContain(`policy_override_file="${deployRoot}/compose.release-policy.yml"`);
     expect(workflow).toContain("docker restart");
     expect(workflow).toContain("consumers failed to restart; restoring previous rollout policy");
     expect(workflow).toContain("consumers failed readiness; restoring previous rollout policy");
