@@ -20,6 +20,24 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("deployment runbook is not commissioned");
   });
 
+  it("keeps a commissioned release-policy override attached on every future deploy", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    const documentation = fs.readFileSync(deploymentDocsPath, "utf8");
+
+    expect(workflow).toContain('policy_override_file="${deploy_root}/compose.release-policy.yml"');
+    expect(workflow).toContain("run_deploy()");
+    expect(workflow).toContain('if [ -f "${policy_override_file}" ]; then');
+    expect(workflow).toContain('./deploy.sh -f "${policy_override_file}" "$@"');
+    expect(workflow).toContain('./deploy.sh "$@"');
+    expect(workflow).toContain("run_deploy build migrate web worker");
+    expect(workflow).toContain("run_deploy up -d --build migrate web worker");
+    expect(workflow).toContain("verify_release_policy_mount");
+    expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE");
+    expect(workflow).not.toContain('sed -i');
+    expect(documentation).toContain("compose.release-policy.yml");
+    expect(documentation).toContain("automatically reuses");
+  });
+
   it("caps BuildKit cache by size before a low-space build and after every build", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
