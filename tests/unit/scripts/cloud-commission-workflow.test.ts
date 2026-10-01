@@ -37,6 +37,10 @@ describe("cloud repository commissioning workflow", () => {
     expect(workflow).toContain("docker-compose.override.yml");
     expect(workflow).toContain("compose.override.yaml");
     expect(workflow).toContain("operator-managed Compose override already exists");
+    expect(workflow).toContain("standard Compose base file is missing");
+    expect(workflow).toContain("break");
+    expect(workflow).not.toContain("expected exactly one standard Compose base file");
+
     expect(workflow).toContain("release-repositories:/run/policies/repositories:ro");
     expect(workflow).toContain("BOARDREADYOPS_RELEASE_REPOSITORIES_FILE: /run/policies/repositories");
     expect(workflow).toContain("boardreadyops-web-runtime:");
