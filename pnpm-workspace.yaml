@@ -3,7 +3,6 @@ minimumReleaseAgeExclude:
   - '@renovatebot/osv-offline-db@3.0.9'
   - '@renovatebot/osv-offline@3.0.9'
   - '@hono/node-server@2.0.12'
-  - 'brace-expansion@5.0.9'
   # GitHub advisory GHSA-ggr8-5vv4-36mx: first patched deepmerge-ts release
   - 'deepmerge-ts@8.0.0'
   # OSV security update: js-yaml@4.3.2
@@ -60,7 +59,7 @@ overrides:
   vite@<=6.4.1: '>=6.4.2'
   vite@^8.0.0: '8.0.16'
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
-  'brace-expansion@>=5 <5.0.9': 5.0.9
+  'brace-expansion@>=5 <5.0.12': 5.0.12
   'fast-uri@>=3 <3.1.8': 3.1.8
   'hono@<4.13.5': 4.13.5
   'ip-address@<10.7.1': 10.7.1

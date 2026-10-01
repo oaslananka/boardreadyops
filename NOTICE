@@ -1708,7 +1708,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `bottleneck@2.19.5`
   - Description: Distributed task scheduler and rate limiter
   - Homepage: https://github.com/SGrondin/bottleneck#readme
-- `brace-expansion@5.0.9`
+- `brace-expansion@5.0.12`
   - Description: Brace expansion as known from sh/bash
   - Homepage: https://github.com/juliangruber/brace-expansion#readme
 - `braces@3.0.3`

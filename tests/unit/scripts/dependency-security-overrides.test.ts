@@ -24,11 +24,12 @@ describe("dependency security overrides", () => {
     expect(lockfile).not.toContain("esbuild@0.27.7");
   });
 
-  it("keeps full OSV scans on patched fast-uri, ip-address, qs, and undici releases", async () => {
+  it("keeps full OSV scans on patched dependency security floors", async () => {
     const workspace = yaml.load(await readFile("pnpm-workspace.yaml", "utf8")) as WorkspacePolicy;
     const lockfile = await readFile("pnpm-lock.yaml", "utf8");
     const actionBundle = await readFile("dist/action/index.cjs", "utf8");
 
+    expect(workspace.overrides?.["brace-expansion@>=5 <5.0.12"]).toBe("5.0.12");
     expect(workspace.overrides?.["fast-uri@>=3 <3.1.8"]).toBe("3.1.8");
     expect(workspace.overrides?.["ip-address@<10.7.1"]).toBe("10.7.1");
     expect(workspace.overrides?.["undici@>=8.0.0 <8.11.0"]).toBe("8.11.0");
@@ -36,9 +37,12 @@ describe("dependency security overrides", () => {
     expect(workspace.minimumReleaseAgeExclude).toEqual(
       expect.arrayContaining(["fast-uri@3.1.8", "ip-address@10.7.1", "qs@6.16.0"]),
     );
+    expect(workspace.minimumReleaseAgeExclude).not.toContain("brace-expansion@5.0.9");
+    expect(workspace.minimumReleaseAgeExclude).not.toContain("brace-expansion@5.0.12");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("undici@8.9.0");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("undici@8.10.2");
     expect(workspace.minimumReleaseAgeExclude).not.toContain("undici@8.11.0");
+    expect(lockfile).not.toContain("brace-expansion@5.0.9");
     expect(lockfile).not.toContain("fast-uri@3.1.5");
     expect(lockfile).not.toContain("fast-uri@3.1.6");
     expect(lockfile).not.toContain("ip-address@10.3.1");
