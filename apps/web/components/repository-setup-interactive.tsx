@@ -4,7 +4,7 @@ import type { RepositorySetupPreset } from "@boardreadyops/cloud-core/repository
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
-import { Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
+import { Alert, Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
 export type SetupTargetRepository = {
@@ -30,6 +30,8 @@ export type RepositorySetupInteractiveProps = {
   signedIn?: boolean;
   /** Why the one-click path is unavailable for this installation, when it is. */
   blockedReason?: string;
+  /** Why setup readiness validation is unavailable for this installation, when it is. */
+  readinessBlockedReason?: string;
 };
 
 type SetupPrResult = {
@@ -40,6 +42,17 @@ type SetupPrResult = {
   error?: string;
   manageUrl?: string;
   setupRevision?: number;
+};
+
+type SetupProbeResult = {
+  ok: boolean;
+  outcome?: string;
+  probeId?: string;
+  status?: string;
+  workflowRunId?: string;
+  workflowRunUrl?: string;
+  error?: string;
+  manageUrl?: string;
 };
 
 /**
@@ -71,6 +84,34 @@ async function requestSetupPr(repositoryId: string, presetId: string): Promise<S
       ...(typeof data.pullRequestNumber === "number" ? { pullRequestNumber: data.pullRequestNumber } : {}),
       ...(typeof data.pullRequestUrl === "string" ? { pullRequestUrl: data.pullRequestUrl } : {}),
       ...(typeof data.setupRevision === "number" ? { setupRevision: data.setupRevision } : {}),
+    };
+  } catch {
+    return { ok: false, error: "The network request failed. Check your connection and try again." };
+  }
+}
+
+async function requestSetupProbe(repositoryId: string): Promise<SetupProbeResult> {
+  try {
+    const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "validate-setup", requestId: `ui-setup-probe-${Date.now()}` }),
+    });
+    const data = (await response.json()) as Record<string, unknown>;
+    if (!response.ok || data.ok !== true) {
+      return {
+        ok: false,
+        error: typeof data.error === "string" ? data.error : "Repository readiness could not be validated.",
+        ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
+      };
+    }
+    return {
+      ok: true,
+      ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
+      ...(typeof data.probeId === "string" ? { probeId: data.probeId } : {}),
+      ...(typeof data.status === "string" ? { status: data.status } : {}),
+      ...(typeof data.workflowRunId === "string" ? { workflowRunId: data.workflowRunId } : {}),
+      ...(typeof data.workflowRunUrl === "string" ? { workflowRunUrl: data.workflowRunUrl } : {}),
     };
   } catch {
     return { ok: false, error: "The network request failed. Check your connection and try again." };
@@ -127,10 +168,13 @@ export function RepositorySetupInteractive({
   repositories = [],
   signedIn = false,
   blockedReason,
+  readinessBlockedReason,
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [probeResult, setProbeResult] = useState<SetupProbeResult | null>(null);
   const [repositoryId, setRepositoryId] = useState(repositories[0]?.id ?? "");
   const [setupOverrides, setSetupOverrides] = useState<
     Record<
@@ -174,6 +218,15 @@ export function RepositorySetupInteractive({
     }
     setIsCreatingPr(false);
   }, [repositoryId, activePreset.id]);
+
+  const handleValidateReadiness = useCallback(async () => {
+    if (!repositoryId) return;
+    setIsValidating(true);
+    setProbeResult(null);
+    const result = await requestSetupProbe(repositoryId);
+    setProbeResult(result);
+    setIsValidating(false);
+  }, [repositoryId]);
 
   const selectedRepository = repositories.find((repository) => repository.id === repositoryId);
   const displayedRepository = selectedRepository
@@ -312,7 +365,142 @@ export function RepositorySetupInteractive({
           {...(prResult ? { result: prResult } : {})}
         />
       </Panel>
+
+      <SetupReadiness
+        signedIn={signedIn}
+        {...(displayedRepository ? { repository: displayedRepository } : {})}
+        isValidating={isValidating}
+        onValidate={handleValidateReadiness}
+        {...(readinessBlockedReason ? { blockedReason: readinessBlockedReason } : {})}
+        {...(probeResult ? { result: probeResult } : {})}
+      />
     </>
+  );
+}
+
+type SetupReadinessProps = {
+  signedIn: boolean;
+  repository?: SetupTargetRepository;
+  isValidating: boolean;
+  onValidate: () => void;
+  blockedReason?: string;
+  result?: SetupProbeResult;
+};
+
+function SetupReadiness({
+  signedIn,
+  repository,
+  isValidating,
+  onValidate,
+  blockedReason,
+  result,
+}: Readonly<SetupReadinessProps>) {
+  const noRevision = repository?.setupRevision === undefined;
+  const buttonDisabled = isValidating || !signedIn || !repository || noRevision || blockedReason !== undefined;
+
+  return (
+    <Panel
+      id="readiness"
+      title="4. Validate readiness in GitHub Actions"
+      description="Inspect the selected repository workflow, then dispatch the existing 15-minute persisted setup probe."
+    >
+      <div className="flex flex-col gap-4">
+        <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
+          <li>Confirm GitHub Actions is enabled and the workflow is active on the default branch.</li>
+          <li>Dispatch the setup probe with a persisted deadline and idempotency key.</li>
+          <li>
+            The workflow checks out its own default branch without persisted credentials and validates{" "}
+            <code>boardreadyops.yml</code> with a pinned BoardReadyOps CLI.
+          </li>
+          <li>
+            The result is posted with GitHub Actions OIDC bound to the repository ID, workflow ref, branch ref, and
+            probe ID.
+          </li>
+          <li>The verified preset revision is snapshotted onto newly accepted runs and shown in run history.</li>
+        </ol>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={buttonDisabled}
+            onClick={onValidate}
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+          >
+            {isValidating ? "Validating readiness…" : "Validate readiness"}
+          </button>
+          {repository ? <span className="text-sm text-muted-foreground">{repository.fullName}</span> : null}
+        </div>
+
+        {!signedIn ? (
+          <p className="text-sm text-muted-foreground">
+            Sign in with GitHub to validate a repository you are authorized to manage.
+          </p>
+        ) : null}
+        {signedIn && !repository ? (
+          <p className="text-sm text-muted-foreground">Connect a repository before validating readiness.</p>
+        ) : null}
+        {repository && noRevision ? (
+          <p className="text-sm text-muted-foreground">
+            Open the setup pull request first so BoardReadyOps has a persisted policy revision to validate.
+          </p>
+        ) : null}
+        {blockedReason ? (
+          <p className="rounded-md border border-warning/40 bg-warning-surface p-3 text-sm text-foreground">
+            {blockedReason}
+          </p>
+        ) : null}
+
+        {result ? <SetupProbeResultOutput result={result} /> : null}
+
+        <Alert title="Recovery and troubleshooting" tone="warning">
+          <p>
+            Missing workflow, disabled Actions, incompatible workflow metadata, missing configuration, invalid
+            configuration, expired probe, stale probe, and dispatch failure stay distinct persisted states.
+          </p>
+          <p>If validation does not dispatch or reports an error, verify:</p>
+          <ul className="flex list-disc flex-col gap-1 pl-5">
+            <li>
+              <strong>Actions permissions:</strong> Confirm GitHub Actions is enabled under Repository Settings &gt;
+              Actions &gt; General.
+            </li>
+            <li>
+              <strong>Default branch:</strong> Merge the reviewed setup pull request before validating.
+            </li>
+            <li>
+              <strong>OIDC configuration:</strong> Keep <code>permissions: id-token: write</code> in the canonical
+              workflow.
+            </li>
+          </ul>
+        </Alert>
+      </div>
+    </Panel>
+  );
+}
+
+function SetupProbeResultOutput({ result }: Readonly<{ result: SetupProbeResult }>) {
+  const tone = result.ok
+    ? "border-primary/40 bg-primary/10 text-foreground"
+    : "border-destructive/40 bg-destructive/10 text-destructive";
+  return (
+    <output className={`flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm ${tone}`}>
+      <span>
+        {result.ok
+          ? result.outcome === "replayed"
+            ? `Readiness probe ${result.status ?? "is already active"}.`
+            : "Readiness probe dispatched. The persisted setup state will update after the OIDC callback."
+          : result.error}
+      </span>
+      {result.workflowRunUrl ? (
+        <a
+          href={result.workflowRunUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-primary underline underline-offset-2"
+        >
+          View workflow run →
+        </a>
+      ) : null}
+    </output>
   );
 }
 
