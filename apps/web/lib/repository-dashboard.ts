@@ -37,6 +37,10 @@ export type RepositorySummary = {
   setupWorkflowStatus?: string;
   setupConfigStatus?: string;
   setupObservedSha?: string;
+  setupProbeId?: string;
+  setupProbeStatus?: string;
+  setupProbeWorkflowRunId?: string;
+  setupProbeExpiresAt?: string;
 };
 
 export type RepositoryGroup = {
@@ -95,11 +99,27 @@ const repositorySummaryQuery = `
            setup.preset as setup_preset,
            setup.workflow_status as setup_workflow_status,
            setup.config_status as setup_config_status,
-           setup.observed_sha as setup_observed_sha
+           setup.observed_sha as setup_observed_sha,
+           setup_probe.id as setup_probe_id,
+           setup_probe.status as setup_probe_status,
+           setup_probe.workflow_run_id as setup_probe_workflow_run_id,
+           setup_probe.expires_at as setup_probe_expires_at
       from repositories
       join installations on installations.id = repositories.installation_id
       left join repository_setup_revisions as setup
         on setup.id = repositories.current_setup_revision_id
+      left join lateral (
+        select probe.id,
+               probe.status,
+               probe.workflow_run_id,
+               probe.expires_at
+          from repository_setup_probes as probe
+         where probe.installation_id = repositories.installation_id
+           and probe.repository_id = repositories.id
+           and probe.setup_revision_id = repositories.current_setup_revision_id
+         order by probe.created_at desc, probe.id desc
+         limit 1
+      ) as setup_probe on true
      where installations.github_installation_id = any($1::bigint[])
        and repositories.disabled_at is null
        and installations.suspended_at is null
@@ -132,6 +152,10 @@ const repositorySummaryQuery = `
          visible.setup_workflow_status,
          visible.setup_config_status,
          visible.setup_observed_sha,
+         visible.setup_probe_id,
+         visible.setup_probe_status,
+         visible.setup_probe_workflow_run_id,
+         visible.setup_probe_expires_at,
          -- Waived findings are a decision someone already made; counting them would keep
          -- showing work that is closed.
          (select count(*) from findings
@@ -181,6 +205,10 @@ export async function loadViewerRepositories(
       const setupWorkflowStatus = text(row, "setup_workflow_status");
       const setupConfigStatus = text(row, "setup_config_status");
       const setupObservedSha = text(row, "setup_observed_sha");
+      const setupProbeId = text(row, "setup_probe_id");
+      const setupProbeStatus = text(row, "setup_probe_status");
+      const setupProbeWorkflowRunId = text(row, "setup_probe_workflow_run_id");
+      const setupProbeExpiresAt = text(row, "setup_probe_expires_at");
 
       const summary: RepositorySummary = {
         id,
@@ -203,6 +231,10 @@ export async function loadViewerRepositories(
         ...(setupWorkflowStatus ? { setupWorkflowStatus } : {}),
         ...(setupConfigStatus ? { setupConfigStatus } : {}),
         ...(setupObservedSha ? { setupObservedSha } : {}),
+        ...(setupProbeId ? { setupProbeId } : {}),
+        ...(setupProbeStatus ? { setupProbeStatus } : {}),
+        ...(setupProbeWorkflowRunId ? { setupProbeWorkflowRunId } : {}),
+        ...(setupProbeExpiresAt ? { setupProbeExpiresAt } : {}),
       };
 
       const group = groups.get(accountLogin) ?? { accountLogin, repositories: [] };

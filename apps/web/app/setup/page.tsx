@@ -8,7 +8,7 @@ import {
 } from "@boardreadyops/cloud-core/repository-setup";
 import { AppPermissionProfile } from "../../components/app-permission-profile.js";
 import { RepositorySetupInteractive } from "../../components/repository-setup-interactive.js";
-import { Alert, AppShell, Panel, StatusBadge } from "../../components/ui.js";
+import { Alert, AppShell, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { loadInstallationCapabilities } from "../../lib/installation-capabilities.js";
 import { loadViewerRepositories } from "../../lib/repository-dashboard.js";
@@ -50,6 +50,10 @@ async function setupTargets() {
       ...(repository.setupWorkflowStatus ? { setupWorkflowStatus: repository.setupWorkflowStatus } : {}),
       ...(repository.setupConfigStatus ? { setupConfigStatus: repository.setupConfigStatus } : {}),
       ...(repository.setupObservedSha ? { setupObservedSha: repository.setupObservedSha } : {}),
+      ...(repository.setupProbeId ? { setupProbeId: repository.setupProbeId } : {}),
+      ...(repository.setupProbeStatus ? { setupProbeStatus: repository.setupProbeStatus } : {}),
+      ...(repository.setupProbeWorkflowRunId ? { setupProbeWorkflowRunId: repository.setupProbeWorkflowRunId } : {}),
+      ...(repository.setupProbeExpiresAt ? { setupProbeExpiresAt: repository.setupProbeExpiresAt } : {}),
     })),
   );
 
@@ -70,6 +74,9 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
   // hiding it: a missing permission is a fixable state, and a button that vanished teaches nothing.
   const setupBlockedReason = installationGrants?.actions.find(
     (action) => action.id === "setup" && !action.satisfied,
+  )?.userExplanation;
+  const readinessBlockedReason = installationGrants?.actions.find(
+    (action) => action.id === "validate-setup" && !action.satisfied,
   )?.userExplanation;
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
@@ -138,51 +145,8 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
           repositories={targets.repositories}
           signedIn={targets.signedIn}
           {...(setupBlockedReason ? { blockedReason: setupBlockedReason } : {})}
+          {...(readinessBlockedReason ? { readinessBlockedReason } : {})}
         />
-
-        <Panel
-          id="readiness"
-          title="4. Validate readiness in GitHub Actions"
-          description="The control plane first inspects Actions and workflow metadata, then dispatches a short-lived probe owned by the target repository."
-        >
-          <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
-            <li>Confirm GitHub Actions is enabled and the workflow is active on the default branch.</li>
-            <li>Dispatch the setup probe with a 15-minute persisted deadline and idempotency key.</li>
-            <li>
-              The workflow checks out its own default branch without persisted credentials and validates{" "}
-              <code>boardreadyops.yml</code> with a pinned BoardReadyOps CLI.
-            </li>
-            <li>
-              The result is posted with GitHub Actions OIDC bound to the repository ID, workflow ref, branch ref, and
-              probe ID.
-            </li>
-            <li>The verified preset revision is snapshotted onto every newly accepted run and shown in run history.</li>
-          </ol>
-          <div className="mt-4">
-            <Alert title="Recovery and troubleshooting" tone="warning">
-              <p>
-                Missing workflow, disabled Actions, incompatible workflow metadata, missing configuration, invalid
-                configuration, expired probe, stale probe, and dispatch failure are distinct persisted states with
-                stable operator responses.
-              </p>
-              <p>If your initial readiness probe does not appear or reports an error, verify:</p>
-              <ul className="flex list-disc flex-col gap-1 pl-5">
-                <li>
-                  <strong>Actions permissions:</strong> Confirm GitHub Actions is enabled under Repository Settings &gt;
-                  Actions &gt; General.
-                </li>
-                <li>
-                  <strong>Local validation:</strong> Run <code>boardreadyops scan</code> locally before committing to
-                  verify <code>boardreadyops.yml</code> syntax.
-                </li>
-                <li>
-                  <strong>OIDC configuration:</strong> Verify your workflow includes{" "}
-                  <code>permissions: id-token: write</code> without manual credential overrides.
-                </li>
-              </ul>
-            </Alert>
-          </div>
-        </Panel>
 
         <AppPermissionProfile
           {...(installationGrants ? { granted: installationGrants.permissions } : {})}

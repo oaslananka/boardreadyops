@@ -3,6 +3,7 @@ import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-r
 import {
   handleRepositorySetupGet,
   handleRepositorySetupPost,
+  handleRepositorySetupProbeForActor,
   type RepositorySetupRouteDependencies,
 } from "../../../apps/web/lib/repository-setup-routes.js";
 import type { RepositorySetupStore } from "../../../packages/db/src/repository-setup-store.js";
@@ -326,6 +327,41 @@ describe("repository setup operator routes", () => {
     expect(failed.status).toBe(502);
     expect(failedStore.failProbe).toHaveBeenCalledWith(expect.objectContaining({ failureCode: "dispatch_failed" }));
     expect(JSON.stringify(await failed.json())).not.toContain("authorization");
+  });
+
+  it("dispatches a setup probe for an already-authorized dashboard actor on the caller executor", async () => {
+    const setupStore = store();
+    const callerExecutor = { query: vi.fn() };
+    const deps = dependencies(setupStore);
+    deps.queryExecutor = vi.fn(() => {
+      throw new Error("dashboard probe should reuse the caller executor");
+    });
+
+    const response = await handleRepositorySetupProbeForActor(
+      {
+        actorId: "viewer-1",
+        installationId,
+        repositoryId,
+        requestId: "ui-probe-1",
+        executor: callerExecutor,
+      },
+      deps,
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      outcome: "dispatched",
+      workflowRunId: "987",
+    });
+    expect(setupStore.createProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        installationId,
+        repositoryId,
+        requestedBy: "viewer-1",
+        requestId: "ui-probe-1",
+      }),
+    );
   });
 
   it("returns 429 with Retry-After after repeated operator authentication failures", async () => {
