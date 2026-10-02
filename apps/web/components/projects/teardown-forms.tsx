@@ -51,7 +51,14 @@ function ConfirmDelete({ idField, id, name, noun, cascade, action, trigger }: Re
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" className="button-delete" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="button-delete"
+        aria-label={`Delete ${noun} ${name}`}
+        onClick={() => setOpen(true)}
+      >
         {trigger}
       </Button>
       {open ? (
@@ -123,7 +130,14 @@ function RenameInline({ idField, id, currentName, noun, action }: Readonly<Renam
 
   if (!open) {
     return (
-      <Button type="button" variant="outline" size="sm" className="button-small" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="button-small"
+        aria-label={`Rename ${noun.toLowerCase()} ${currentName}`}
+        onClick={() => setOpen(true)}
+      >
         Rename
       </Button>
     );
