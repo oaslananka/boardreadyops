@@ -10,6 +10,7 @@ import {
 const sessionAuth: AuthenticatedApiContext = {
   ok: true,
   actorId: "alpha-admin",
+  githubUserId: 101,
   scopes: ["admin", "reviews:read", "reviews:write", "runs:write"],
   authType: "session",
   installationIds: [900001],
