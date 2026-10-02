@@ -29,7 +29,7 @@ vi.mock("../../../apps/web/lib/workspace-store-access.js", () => ({
 
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
   viewerAuthorization: vi.fn(async () => ({
-    session: { login: "octocat", installationIds: [1] },
+    session: { userId: 1, login: "octocat", installationIds: [1] },
     authorizeRepository: async () => true,
     authorizeInstallation: async () => true,
   })),
@@ -151,7 +151,7 @@ describe("delivery link revocation", () => {
     const result = await revokeDeliveryLinkAction(idle, form({ deliveryId: "del-1" }));
 
     expect(store.workspaceIdForDelivery).toHaveBeenCalledWith("del-1");
-    expect(store.workspaceRoleFor).toHaveBeenCalledWith("ws-1", "octocat");
+    expect(store.workspaceRoleFor).toHaveBeenCalledWith("ws-1", { githubUserId: 1, login: "octocat" });
     expect(result).toMatchObject({ status: "ok" });
   });
 

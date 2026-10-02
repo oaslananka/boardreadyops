@@ -9,6 +9,8 @@ export interface AuthenticatedApiContext {
   ok: true;
   repositoryId?: string;
   actorId: string;
+  /** Stable GitHub user id for session authentication; absent for repository bearer tokens. */
+  githubUserId?: number;
   scopes: ApiTokenScope[];
   authType: "bearer_token" | "session";
   installationIds?: number[];
@@ -82,6 +84,7 @@ export async function authenticateApiRequest(
     return {
       ok: true,
       actorId: viewer.session.login,
+      githubUserId: viewer.session.userId,
       scopes: ["runs:write", "reviews:read", "reviews:write", "admin"],
       authType: "session",
       installationIds: [...viewer.session.installationIds],

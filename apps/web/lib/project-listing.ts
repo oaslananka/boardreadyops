@@ -62,7 +62,7 @@ export async function loadViewerWorkspaces(
 
   const { store, executor } = await openWorkspaceStore(connectionString);
   try {
-    return await store.listWorkspacesForUser(session.login);
+    return await store.listWorkspacesForUser({ githubUserId: session.userId, login: session.login });
   } finally {
     await executor.close();
   }
@@ -82,7 +82,7 @@ export async function loadWorkspaceProjects(
 
   const { store, executor } = await openWorkspaceStore(connectionString);
   try {
-    const workspaces = await store.listWorkspacesForUser(session.login);
+    const workspaces = await store.listWorkspacesForUser({ githubUserId: session.userId, login: session.login });
     if (workspaces.length === 0) return { state: "no-workspaces" };
 
     // An unknown or unreachable id falls back to the first workspace rather than erroring: the

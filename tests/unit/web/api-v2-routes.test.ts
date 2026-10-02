@@ -61,6 +61,7 @@ describe("API v2 Routes", () => {
     vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
       ok: true,
       actorId: "user-1",
+      githubUserId: 1,
       scopes: ["admin", "runs:write", "reviews:read", "reviews:write"],
       authType: "session",
     });
@@ -347,6 +348,7 @@ describe("API v2 Routes", () => {
       vi.spyOn(apiAuth, "authenticateApiRequest").mockResolvedValue({
         ok: true,
         actorId: login,
+        githubUserId: 1,
         scopes: ["admin", "runs:write", "reviews:read", "reviews:write"],
         authType: "session",
       });

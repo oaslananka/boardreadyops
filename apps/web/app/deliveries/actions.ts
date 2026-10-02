@@ -43,7 +43,9 @@ export const createDeliveryLinkAction = defineAction(createSchema, async (input,
     // Same answer for "not a member" and "no such revision", so a guessed id cannot be used to
     // discover which revisions exist.
     const workspaceId = await store.workspaceIdForRevision(input.revisionId);
-    const role = workspaceId ? await store.workspaceRoleFor(workspaceId, session.login) : null;
+    const role = workspaceId
+      ? await store.workspaceRoleFor(workspaceId, { githubUserId: session.userId, login: session.login })
+      : null;
     if (!role) return fail("Revision not found.");
     if (role === "viewer") return fail("Viewers cannot create delivery links.");
 
@@ -87,7 +89,7 @@ export const revokeDeliveryLinkAction = defineAction(revokeSchema, async (input,
     // resolved server-side and membership re-read before the link is closed.
     const workspaceId = await store.workspaceIdForDelivery(input.deliveryId);
     if (!workspaceId) return fail("Delivery link not found.");
-    const role = await store.workspaceRoleFor(workspaceId, session.login);
+    const role = await store.workspaceRoleFor(workspaceId, { githubUserId: session.userId, login: session.login });
     if (!role) return fail("Delivery link not found.");
     if (role === "viewer") return fail("Viewers cannot revoke delivery links.");
 

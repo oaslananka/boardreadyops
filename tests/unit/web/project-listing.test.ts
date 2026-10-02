@@ -67,7 +67,7 @@ describe("loadWorkspaceProjects", () => {
 
     await loadWorkspaceProjects(session, undefined, postgres);
 
-    expect(listWorkspacesForUser).toHaveBeenCalledWith("octocat");
+    expect(listWorkspacesForUser).toHaveBeenCalledWith({ githubUserId: 1, login: "octocat" });
   });
 
   it("falls back to a workspace the viewer is in when the requested id is not theirs", async () => {
