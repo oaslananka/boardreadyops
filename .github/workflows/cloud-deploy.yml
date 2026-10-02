@@ -206,6 +206,9 @@ jobs:
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
           build_cache_max_used_space=3GB
+          reclaim_build_cache_for_preflight() {
+            docker builder prune --all --force || true
+          }
           trim_build_cache() {
             docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
           }
@@ -285,12 +288,11 @@ jobs:
             "${available_mib}" "${docker_root}" "${required_mib}"
 
           if [ "${available_mib}" -lt "${required_mib}" ]; then
-            # Bound BuildKit by size instead of age. This host can accumulate many GiB of recent
-            # cache in less than a day, so an age-only filter can leave the disk below the build
-            # threshold even though the cache is safe to reclaim. Tagged runtime images remain
-            # untouched because they are rollback targets.
-            printf '%s\n' 'cloud-deploy preflight: below threshold, capping build cache and reclaiming dangling layers'
-            trim_build_cache
+            # BuildKit cache is disposable. When the host is already below the safe build floor,
+            # reclaim all of it before considering tagged rollback images. After a successful
+            # build, trim_build_cache restores the normal bounded 3 GB cache policy.
+            printf '%s\n' 'cloud-deploy preflight: below threshold, fully reclaiming build cache and dangling layers'
+            reclaim_build_cache_for_preflight
             docker image prune --force || true
             available_mib="$(free_mib "${docker_root}")"
             printf 'cloud-deploy preflight: %s MiB free after reclaim\n' "${available_mib}"
