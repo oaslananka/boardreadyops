@@ -48,7 +48,7 @@ describe("settings pages and operational layout", () => {
   });
 
   it("contains setup progress index", async () => {
-    const setupPage = await readFile("apps/web/app/setup/page.tsx", "utf8");
-    expect(setupPage).toContain("setup-progress-index");
+    const setupInteractive = await readFile("apps/web/components/repository-setup-interactive.tsx", "utf8");
+    expect(setupInteractive).toContain("setup-progress-index");
   });
 });

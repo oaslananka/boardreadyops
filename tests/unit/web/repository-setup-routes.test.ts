@@ -145,6 +145,7 @@ describe("repository setup operator routes", () => {
       outcome: "created",
       pullRequestNumber: 15,
       pullRequestUrl: "https://github.test/octo/board/pull/15",
+      setupRevision: 1,
     });
 
     expect(executeMock).toHaveBeenCalledWith(
