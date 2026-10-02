@@ -1,3 +1,5 @@
+/* tsqllint-disable set-quoted-identifier */
+-- PostgreSQL migration: SQL Server SET QUOTED_IDENTIFIER is not valid here.
 -- 0072_validated_delivery_revisions.sql
 -- Binds a shareable workspace revision to the terminal BoardReadyOps run and persisted
 -- manufacturing archive that validated the package. A revision without both live evidence
