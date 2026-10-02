@@ -25,7 +25,7 @@ describe("ProjectUploadWizard", () => {
     delete runtime.IS_REACT_ACT_ENVIRONMENT;
   });
 
-  it("renders source selection tabs: Upload Package (Zip), Connect GitHub, Run Local CLI", async () => {
+  it("labels unavailable upload before click and keeps supported sources visible", async () => {
     await act(async () => {
       root.render(createElement(ProjectUploadWizard, { workspaceId: "ws_test_01" }));
     });
@@ -33,7 +33,7 @@ describe("ProjectUploadWizard", () => {
     const tabs = Array.from(container.querySelectorAll('[role="tab"]'));
     expect(tabs).toHaveLength(3);
     const labels = tabs.map((tab) => tab.textContent?.trim());
-    expect(labels).toContain("Upload Package (Zip)");
+    expect(labels).toContain("Upload Package (Zip) — Unavailable");
     expect(labels).toContain("Connect GitHub Repository");
     expect(labels).toContain("Run Local CLI");
   });
@@ -71,13 +71,33 @@ describe("ProjectUploadWizard", () => {
     expect(link?.textContent).toBe("Connect GitHub App");
   });
 
-  it("keeps hosted upload unavailable until ingestion is connected", async () => {
+  it("defaults to the supported GitHub path instead of hosted upload", async () => {
     await act(async () => {
       root.render(createElement(ProjectUploadWizard, { workspaceId: "ws_test_01" }));
     });
 
+    expect(container.querySelector('a[href="/setup"]')?.textContent).toBe("Connect GitHub App");
+    expect(container.querySelector('[role="tabpanel"]:not([hidden])')?.textContent).toContain(
+      "Connect your GitHub organization or personal repository",
+    );
     expect(container.querySelector('input[type="file"]')).toBeNull();
     expect(container.querySelector('button[type="submit"]')).toBeNull();
-    expect(container.querySelector('[role="tabpanel"]:not([hidden])')?.textContent).toContain("not available");
+  });
+
+  it("explains hosted upload only after the explicitly unavailable tab is selected", async () => {
+    await act(async () => {
+      root.render(createElement(ProjectUploadWizard, { workspaceId: "ws_test_01" }));
+    });
+
+    const uploadTab = Array.from(container.querySelectorAll('[role="tab"]')).find((tab) =>
+      tab.textContent?.includes("Upload Package"),
+    );
+    expect(uploadTab?.textContent).toContain("Unavailable");
+
+    await act(async () => {
+      uploadTab?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+    });
+
+    expect(container.querySelector('[role="tabpanel"]:not([hidden])')?.textContent).toContain("not available yet");
   });
 });
