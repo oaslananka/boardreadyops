@@ -1,4 +1,4 @@
-export type RepositorySetupStateId = "unconfigured" | "validation_pending" | "attention" | "ready";
+type RepositorySetupStateId = "unconfigured" | "validation_pending" | "attention" | "ready";
 
 export type RepositorySetupStateInput = {
   setupRevision?: number;
