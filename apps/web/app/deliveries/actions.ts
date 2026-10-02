@@ -18,6 +18,55 @@ import { openWorkspaceStore } from "../../lib/workspace-store-access.js";
  * only its hash is -- so a lost link cannot be recovered, only replaced.
  */
 
+const registerRevisionSchema = z.object({
+  workspaceId: z.string().min(1),
+  candidate: z.string().min(1).max(512),
+  revisionLabel: z.string().trim().min(1, "Give the revision a label.").max(64),
+});
+
+function parseValidatedCandidate(value: string): { projectId: string; runId: string; artifactId: string } | undefined {
+  const [projectId, runId, artifactId, ...extra] = value.split("|");
+  if (!projectId || !runId || !artifactId || extra.length > 0) return undefined;
+  return { projectId, runId, artifactId };
+}
+
+export const registerValidatedRevisionAction = defineAction(registerRevisionSchema, async (input, { session }) => {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return fail("This deployment has no database configured.");
+
+  const candidate = parseValidatedCandidate(input.candidate);
+  if (!candidate) return fail("That validated package candidate is invalid. Refresh and try again.");
+
+  const { store, executor } = await openWorkspaceStore(connectionString);
+  try {
+    const role = await store.workspaceRoleFor(input.workspaceId, {
+      githubUserId: session.userId,
+      login: session.login,
+    });
+    if (!role) return fail("Workspace not found.");
+    if (role === "viewer") return fail("Viewers cannot register revisions.");
+
+    const revision = await store.registerValidatedRevisionFromArtifact({
+      workspaceId: input.workspaceId,
+      projectId: candidate.projectId,
+      runId: candidate.runId,
+      artifactId: candidate.artifactId,
+      revisionLabel: input.revisionLabel,
+    });
+    if (!revision) {
+      return fail("That manufacturing archive is no longer eligible. Refresh the page and choose another run.");
+    }
+
+    revalidatePath("/deliveries");
+    return ok(
+      { revisionId: revision.id },
+      `Revision ${revision.revisionLabel} registered from validated manufacturing evidence.`,
+    );
+  } finally {
+    await executor.close();
+  }
+});
+
 const createSchema = z.object({
   revisionId: z.string().min(1, "Pick a revision to share."),
   signedArchiveUrl: z
@@ -48,6 +97,9 @@ export const createDeliveryLinkAction = defineAction(createSchema, async (input,
       : null;
     if (!role) return fail("Revision not found.");
     if (role === "viewer") return fail("Viewers cannot create delivery links.");
+    if (!(await store.revisionHasValidatedManufacturingEvidence(input.revisionId))) {
+      return fail("This revision is not backed by validated manufacturing evidence.");
+    }
 
     const expiresAt = new Date(Date.now() + input.expiresInDays * 86_400_000).toISOString();
     const { delivery, rawToken } = await store.createDeliveryLink({

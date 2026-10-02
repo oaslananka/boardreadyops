@@ -61,6 +61,12 @@ export async function POST(request: Request): Promise<Response> {
     if (!canWriteWorkspace(access.role)) {
       return Response.json({ ok: false, error: "Viewers cannot create delivery links" }, { status: 403 });
     }
+    if (!(await store.revisionHasValidatedManufacturingEvidence(revision.id))) {
+      return Response.json(
+        { ok: false, error: "Revision is not backed by validated manufacturing evidence" },
+        { status: 409 },
+      );
+    }
 
     const { delivery, rawToken } = await store.createDeliveryLink({
       revisionId: parsed.data.revisionId,

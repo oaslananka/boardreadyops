@@ -142,6 +142,7 @@ describe("DeliveriesListPage", () => {
       state: "ok",
       workspaces: [workspace],
       selected: workspace,
+      revisionCandidates: [],
       revisions: [{ id: "rev_a", projectName: "Gateway board", revisionLabel: "rev C" }],
       deliveries: [
         {
@@ -170,6 +171,7 @@ describe("DeliveriesListPage", () => {
       state: "ok",
       workspaces: [workspace],
       selected: workspace,
+      revisionCandidates: [],
       revisions: [],
       deliveries: [
         {
@@ -194,12 +196,13 @@ describe("DeliveriesListPage", () => {
       state: "ok",
       workspaces: [workspace],
       selected: workspace,
+      revisionCandidates: [],
       revisions: [],
       deliveries: [],
     });
 
     const markup = await render();
-    expect(markup).toContain("No revisions to share yet");
+    expect(markup).toContain("No validated revisions to share yet");
     // The form would be a control that cannot succeed, so it is absent rather than disabled.
     expect(markup).not.toContain("Create guest link");
   });
@@ -209,6 +212,7 @@ describe("DeliveriesListPage", () => {
       state: "ok",
       workspaces: [{ ...workspace, role: "viewer" as const }],
       selected: { ...workspace, role: "viewer" as const },
+      revisionCandidates: [],
       revisions: [{ id: "rev_a", projectName: "Gateway board", revisionLabel: "rev C" }],
       deliveries: [],
     });

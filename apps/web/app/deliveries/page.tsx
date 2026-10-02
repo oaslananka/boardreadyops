@@ -1,10 +1,11 @@
-import type { WorkspaceDeliveryRecord } from "@boardreadyops/db";
+import type { WorkspaceDeliveryRecord, WorkspaceRevisionRecord } from "@boardreadyops/db";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { AppShell } from "../../components/app-shell.js";
 import { DeliveryCreateForm } from "../../components/deliveries/delivery-create-form.js";
 import { DeliveryRevokeButton } from "../../components/deliveries/delivery-revoke-button.js";
+import { ValidatedRevisionRegisterForm } from "../../components/deliveries/validated-revision-register-form.js";
 import { Button } from "../../components/ui/button.js";
 import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { Alert, EmptyState, Pagination, Panel, StatusBadge } from "../../components/ui.js";
@@ -12,7 +13,7 @@ import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
 import { deliveryExpired, loadWorkspaceDeliveries } from "../../lib/delivery-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
-import { createDeliveryLinkAction, revokeDeliveryLinkAction } from "./actions.js";
+import { createDeliveryLinkAction, registerValidatedRevisionAction, revokeDeliveryLinkAction } from "./actions.js";
 
 export const metadata: Metadata = {
   title: "Release Deliveries & Fabrication Packages",
@@ -33,6 +34,56 @@ function first(value: string | string[] | undefined): string | undefined {
 function day(value: string): string {
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? "unknown" : new Date(parsed).toISOString().slice(0, 10);
+}
+
+function revisionSourceLabel(sourceKind: WorkspaceRevisionRecord["sourceKind"]): string {
+  if (sourceKind === "github_commit") return "GitHub";
+  if (sourceKind === "native_export") return "CLI";
+  return "Web/API";
+}
+
+function revisionColumns(): readonly DataColumn<WorkspaceRevisionRecord>[] {
+  return [
+    {
+      id: "revision",
+      header: "Revision",
+      rowHeader: true,
+      cell: (revision) => (
+        <span className="flex flex-col gap-0.5">
+          <span className="font-medium text-foreground">{revision.revisionLabel}</span>
+          <span className="text-meta text-muted-foreground">{revision.projectName}</span>
+        </span>
+      ),
+    },
+    {
+      id: "source",
+      header: "Source",
+      cell: (revision) => <span>{revisionSourceLabel(revision.sourceKind)}</span>,
+    },
+    {
+      id: "evidence",
+      header: "Package evidence",
+      cell: (revision) =>
+        revision.validationRunId && revision.validationArtifactId ? (
+          <span className="flex flex-col gap-0.5">
+            <StatusBadge value="success" label="Validated" />
+            <span className="font-mono text-meta text-muted-foreground">{revision.bundleSha256.slice(0, 12)}…</span>
+          </span>
+        ) : (
+          <StatusBadge value="warning" label="Not delivery-eligible" />
+        ),
+    },
+    {
+      id: "commit",
+      header: "Commit",
+      cell: (revision) =>
+        revision.commitSha ? (
+          <code className="text-meta">{revision.commitSha.slice(0, 12)}</code>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+  ];
 }
 
 function deliveryColumns(canRevoke: boolean): readonly DataColumn<WorkspaceDeliveryRecord>[] {
@@ -135,6 +186,36 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
           <>
             <WorkspaceSwitcher workspaces={result.workspaces} selectedId={result.selected.id} basePath="/deliveries" />
 
+            <Panel
+              title="Package revisions"
+              description="Revisions keep their ingestion provenance. Only evidence-backed revisions can be shared."
+            >
+              <DataTable
+                caption={`Package revisions in ${result.selected.name}`}
+                columns={revisionColumns()}
+                rows={result.revisions}
+                rowKey={(revision) => revision.id}
+                empty={
+                  <EmptyState title="No package revisions yet">
+                    <p>Register a validated manufacturing archive below when a passing run has produced one.</p>
+                  </EmptyState>
+                }
+              />
+            </Panel>
+
+            {result.selected.role !== "viewer" && result.revisionCandidates.length > 0 ? (
+              <Panel
+                title="Register validated revision"
+                description="Turn persisted manufacturing evidence from a passing BoardReadyOps run into a shareable revision."
+              >
+                <ValidatedRevisionRegisterForm
+                  workspaceId={result.selected.id}
+                  candidates={result.revisionCandidates}
+                  action={registerValidatedRevisionAction}
+                />
+              </Panel>
+            ) : null}
+
             <Panel title={result.selected.name} description="Newest first. An expired link stops working on its own.">
               <DataTable
                 caption={`Guest delivery links in ${result.selected.name}`}
@@ -168,11 +249,7 @@ export default async function DeliveriesListPage({ searchParams }: Readonly<Deli
   );
 }
 
-/**
- * The create form only appears when there is something to share. A revision exists once a package
- * has been uploaded, and that upload is API-only today -- so the empty case says that plainly
- * rather than showing a picker with nothing in it.
- */
+/** Public delivery creation is intentionally limited to revisions whose trusted evidence binding survives a fresh DB check. */
 function CreatePanel({
   result,
   origin,
@@ -180,18 +257,17 @@ function CreatePanel({
   result: Extract<Awaited<ReturnType<typeof loadWorkspaceDeliveries>>, { state: "ok" }>;
   origin: string;
 }>) {
-  if (result.revisions.length === 0) {
+  const validatedRevisions = result.revisions.filter(
+    (revision) => revision.validationRunId !== undefined && revision.validationArtifactId !== undefined,
+  );
+
+  if (validatedRevisions.length === 0) {
     return (
       <Panel title="Share a package">
-        <Alert tone="info" title="No revisions to share yet">
-          A guest link points at a revision, and a revision is recorded when a manufacturing package is uploaded for a
-          project. There is no upload form here yet, so produce and register one from the command line:{" "}
-          <code className="font-mono">boardreadyops release prepare . --output build/release</code>, then post the
-          bundle to <code className="font-mono">POST /api/v2/revisions/upload</code> with a{" "}
-          <Link href="/settings/tokens" className="text-primary underline underline-offset-2">
-            repository API token
-          </Link>
-          .
+        <Alert tone="info" title="No validated revisions to share yet">
+          Run BoardReadyOps on a connected GitHub project until it completes with a passing manufacturing archive, then
+          register that artifact as a revision above. Guest links are not issued for revision records without live
+          validation evidence.
         </Alert>
       </Panel>
     );
@@ -200,12 +276,12 @@ function CreatePanel({
   return (
     <Panel
       title="Share a package"
-      description="The link is shown once and only its hash is stored, so it cannot be recovered later."
+      description="Only validated revisions are selectable. The guest link is shown once and only its hash is stored."
     >
       <DeliveryCreateForm
-        revisions={result.revisions.map((revision) => ({
+        revisions={validatedRevisions.map((revision) => ({
           id: revision.id,
-          label: `${revision.projectName} · ${revision.revisionLabel}`,
+          label: `${revision.projectName} · ${revision.revisionLabel} · ${revisionSourceLabel(revision.sourceKind)}`,
         }))}
         origin={origin}
         action={createDeliveryLinkAction}

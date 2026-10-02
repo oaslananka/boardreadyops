@@ -65,7 +65,21 @@ export interface RevisionRecord {
   commitSha?: string | undefined;
   bundleSha256: string;
   normalizedSummary: Record<string, unknown>;
+  validationRunId?: string | undefined;
+  validationArtifactId?: string | undefined;
   createdAt: string;
+}
+
+/** A trusted manufacturing archive from a completed passing BoardReadyOps run. */
+export interface ValidatedRevisionCandidate {
+  projectId: string;
+  projectName: string;
+  runId: string;
+  commitSha: string;
+  completedAt: string;
+  artifactId: string;
+  artifactName: string;
+  bundleSha256: string;
 }
 
 /** A revision with the project it belongs to, for surfaces that list across a workspace. */
@@ -139,6 +153,8 @@ type RevisionRow = {
   commit_sha: string | null;
   bundle_sha256: string;
   normalized_summary: Record<string, unknown> | string;
+  validation_run_id: string | null;
+  validation_artifact_id: string | null;
   created_at: string | Date;
 };
 
@@ -202,6 +218,8 @@ function mapRevision(row: RevisionRow): RevisionRecord {
     ...(row.commit_sha !== null ? { commitSha: row.commit_sha } : {}),
     bundleSha256: row.bundle_sha256,
     normalizedSummary: summary,
+    ...(typeof row.validation_run_id === "string" ? { validationRunId: row.validation_run_id } : {}),
+    ...(typeof row.validation_artifact_id === "string" ? { validationArtifactId: row.validation_artifact_id } : {}),
     createdAt: new Date(row.created_at).toISOString(),
   };
 }
@@ -607,7 +625,8 @@ export class WorkspaceStore {
     const result = (await this.executor.query(
       `insert into revisions (id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary)
        values ($1, $2, $3, $4, $5, $6, $7::jsonb)
-       returning id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary, created_at`,
+       returning id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary,
+                 validation_run_id, validation_artifact_id, created_at`,
       [id, input.projectId, input.revisionLabel, sourceKind, input.commitSha ?? null, input.bundleSha256, summary],
     )) as { rows?: RevisionRow[] };
 
@@ -620,7 +639,8 @@ export class WorkspaceStore {
 
   async getRevisionById(id: string): Promise<RevisionRecord | null> {
     const result = (await this.executor.query(
-      `select id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary, created_at
+      `select id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary,
+              validation_run_id, validation_artifact_id, created_at
        from revisions
        where id = $1`,
       [id],
@@ -635,6 +655,7 @@ export class WorkspaceStore {
     const result = (await this.executor.query(
       `select revisions.id, revisions.project_id, revisions.revision_label, revisions.source_kind,
               revisions.commit_sha, revisions.bundle_sha256, revisions.normalized_summary,
+              revisions.validation_run_id, revisions.validation_artifact_id,
               revisions.created_at, projects.name as project_name
          from revisions
          join projects on projects.id = revisions.project_id
@@ -645,6 +666,167 @@ export class WorkspaceStore {
     )) as { rows?: (RevisionRow & { project_name: string })[] };
 
     return (result?.rows ?? []).map((row) => ({ ...mapRevision(row), projectName: row.project_name }));
+  }
+
+  /**
+   * Manufacturing archives that can become shareable revisions.
+   *
+   * The candidate is derived from persisted control-plane evidence, not from browser input: the
+   * run must be terminal/pass and the exact persisted artifact must be a non-empty manufacturing
+   * archive with a SHA-256 digest. Already registered artifacts are omitted.
+   */
+  async listValidatedRevisionCandidatesByWorkspace(
+    workspaceId: string,
+    limit = 200,
+  ): Promise<readonly ValidatedRevisionCandidate[]> {
+    const result = (await this.executor.query(
+      `select projects.id as project_id,
+              projects.name as project_name,
+              release_runs.id as run_id,
+              release_runs.commit_sha,
+              release_runs.completed_at,
+              artifacts.id as artifact_id,
+              artifacts.name as artifact_name,
+              artifacts.sha256 as bundle_sha256
+         from projects
+         join repositories
+           on lower(repositories.owner || '/' || repositories.name) = lower(projects.github_repo_full_name)
+         join release_runs
+           on release_runs.repository_id = repositories.id
+          and release_runs.status = 'completed'
+          and release_runs.decision = 'pass'
+          and release_runs.completed_at is not null
+         join artifacts
+           on artifacts.run_id = release_runs.id
+          and artifacts.role = 'manufacturing'
+          and artifacts.kind = 'archive'
+          and artifacts.bytes > 0
+          and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+        where projects.workspace_id = $1
+          and projects.github_repo_full_name is not null
+          and not exists (
+            select 1 from revisions where revisions.validation_artifact_id = artifacts.id
+          )
+        order by release_runs.completed_at desc, artifacts.id desc
+        limit $2`,
+      [workspaceId, limit],
+    )) as {
+      rows?: {
+        project_id: string;
+        project_name: string;
+        run_id: string;
+        commit_sha: string;
+        completed_at: string | Date;
+        artifact_id: string;
+        artifact_name: string;
+        bundle_sha256: string;
+      }[];
+    };
+
+    return (result?.rows ?? []).map((row) => ({
+      projectId: row.project_id,
+      projectName: row.project_name,
+      runId: row.run_id,
+      commitSha: row.commit_sha,
+      completedAt: new Date(row.completed_at).toISOString(),
+      artifactId: row.artifact_id,
+      artifactName: row.artifact_name,
+      bundleSha256: row.bundle_sha256,
+    }));
+  }
+
+  /**
+   * Registers one validated manufacturing artifact as a workspace revision.
+   *
+   * Every relationship is re-checked in this insert-select, so a forged form cannot bind an
+   * artifact from another repository/workspace or a run that did not complete with a pass.
+   */
+  async registerValidatedRevisionFromArtifact(input: {
+    workspaceId: string;
+    projectId: string;
+    runId: string;
+    artifactId: string;
+    revisionLabel: string;
+  }): Promise<RevisionRecord | null> {
+    const id = `rev_${randomUUID()}`;
+    const result = (await this.executor.query(
+      `insert into revisions (
+         id, project_id, revision_label, source_kind, commit_sha, bundle_sha256,
+         normalized_summary, validation_run_id, validation_artifact_id
+       )
+       select $1,
+              projects.id,
+              $6,
+              'github_commit',
+              release_runs.commit_sha,
+              artifacts.sha256,
+              jsonb_build_object(
+                'validation', jsonb_build_object(
+                  'source', 'release_run',
+                  'status', 'validated',
+                  'runId', release_runs.id,
+                  'artifactId', artifacts.id,
+                  'artifactName', artifacts.name
+                )
+              ),
+              release_runs.id,
+              artifacts.id
+         from projects
+         join repositories
+           on lower(repositories.owner || '/' || repositories.name) = lower(projects.github_repo_full_name)
+         join release_runs
+           on release_runs.repository_id = repositories.id
+          and release_runs.id = $4
+          and release_runs.status = 'completed'
+          and release_runs.decision = 'pass'
+          and release_runs.completed_at is not null
+         join artifacts
+           on artifacts.run_id = release_runs.id
+          and artifacts.id = $5
+          and artifacts.role = 'manufacturing'
+          and artifacts.kind = 'archive'
+          and artifacts.bytes > 0
+          and artifacts.sha256 ~ '^[0-9a-f]{64}$'
+        where projects.workspace_id = $2
+          and projects.id = $3
+          and projects.github_repo_full_name is not null
+          and not exists (
+            select 1 from revisions where revisions.validation_artifact_id = artifacts.id
+          )
+       returning id, project_id, revision_label, source_kind, commit_sha, bundle_sha256, normalized_summary,
+                 validation_run_id, validation_artifact_id, created_at`,
+      [id, input.workspaceId, input.projectId, input.runId, input.artifactId, input.revisionLabel],
+    )) as { rows?: RevisionRow[] };
+
+    const row = result?.rows?.[0];
+    return row ? mapRevision(row) : null;
+  }
+
+  /**
+   * Re-validates the evidence binding at delivery time rather than trusting revision metadata.
+   */
+  async revisionHasValidatedManufacturingEvidence(revisionId: string): Promise<boolean> {
+    const result = (await this.executor.query(
+      `select 1
+         from revisions
+         join release_runs
+           on release_runs.id = revisions.validation_run_id
+          and release_runs.status = 'completed'
+          and release_runs.decision = 'pass'
+          and release_runs.completed_at is not null
+         join artifacts
+           on artifacts.id = revisions.validation_artifact_id
+          and artifacts.run_id = release_runs.id
+          and artifacts.role = 'manufacturing'
+          and artifacts.kind = 'archive'
+          and artifacts.bytes > 0
+        where revisions.id = $1
+          and revisions.bundle_sha256 = artifacts.sha256
+          and revisions.commit_sha = release_runs.commit_sha
+        limit 1`,
+      [revisionId],
+    )) as { rows?: unknown[] };
+    return (result?.rows ?? []).length > 0;
   }
 
   /** Every delivery link in a workspace, newest first. Excludes the token hash by construction. */
