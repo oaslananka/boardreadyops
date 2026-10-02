@@ -31,8 +31,9 @@ The maintainer is responsible for:
 - Keeping generated docs, bundles, notices, and schemas in sync with source
   changes.
 
-Automation can run validation and merge eligible changes, but the maintainer owns
-policy decisions and external GitHub settings.
+Automation can run validation and apply routing labels, but merges require the
+maintainer decision described below; the maintainer also owns policy decisions and
+external GitHub settings.
 
 ## Maintainer Tracking Overlay
 
@@ -45,10 +46,11 @@ Public contribution status, discussion, review, and CI evidence remain on GitHub
 Every pull request targeting `main` must pass the required CI gates. Because the
 repository currently has one maintainer, the branch ruleset enforces zero
 required human approvals. All review conversations must still be resolved before
-merge. Eligible pull requests automatically enter the Mergify queue when they
-are not drafts and carry neither `manual-review` nor `do-not-merge`; GitHub
-Rulesets remain authoritative for the required checks before queue admission and
-again before merge.
+merge. GitHub Rulesets are the merge authority, and a maintainer makes an explicit maintainer
+merge decision after the required checks pass. Mergify is limited to lightweight
+pull-request labelling; it does not admit or merge pull requests. `manual-review`
+and `do-not-merge` remain explicit hold signals and must be cleared before a
+maintainer merges.
 
 When a second trusted maintainer with repository write access is onboarded,
 revisit this policy and consider requiring one independent approval. Until then,
@@ -64,10 +66,11 @@ and rollback plan. Record a retrospective review within two business days and
 open follow-up issues for any findings.
 
 Release Please, Renovate, and other automation may create and update pull
-requests. Their eligible pull requests automatically enter the Mergify queue
-under the same required checks and resolved-conversation rules. Maintainers use
-`manual-review` or `do-not-merge` whenever an explicit human decision is required
-before merge.
+requests. They are subject to the same GitHub Ruleset checks and resolved-
+conversation requirements as human-authored pull requests. Low-risk automation
+may be labelled for routing, but merge still requires an explicit maintainer
+decision. Maintainers use `manual-review` or `do-not-merge` to hold a pull request
+until the relevant exception or review is cleared.
 
 ## CODEOWNERS
 
@@ -107,9 +110,8 @@ The committed repository ruleset at `.github/rulesets/main.json` is the source
 of truth for `main`. It requires zero human approvals while the project is
 single-maintainer, stale-review dismissal, resolved review conversations, strict
 stable status checks, linear history, and squash-only merging. The administrator
-retains a PR-only emergency bypass. The Mergify GitHub App has an exempt automation
-bypass so it can operate the merge queue; `.mergify.yml` injects the GitHub ruleset
-requirements at queue admission and again before merge.
+retains a PR-only emergency bypass. Mergify has no merge-queue authority or ruleset
+bypass; `.mergify.yml` is intentionally limited to pull-request labelling.
 
 Apply or update the ruleset from an authenticated administrator context:
 
