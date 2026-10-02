@@ -320,7 +320,7 @@ describe("repository setup operator routes", () => {
       repositoryId,
       dependencies(failedStore, {
         dispatchProbe: vi.fn(async () => {
-          throw new Error("authorization=[REDACTED]
+          throw new Error("authorization=secret");
         }),
       }),
     );
