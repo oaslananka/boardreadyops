@@ -340,6 +340,7 @@ describe("dependency and security automation configuration", () => {
       "markdown-it",
       "mysql2",
       "nanoid",
+      "next",
       "postcss",
       "puppeteer",
       "qs",
