@@ -43,7 +43,9 @@ describe("repository setup preview page", () => {
     expect(markup).toContain("Open-source hardware");
     expect(markup).toContain("Prototype fabrication");
     expect(markup).toContain("Production release");
-    expect(markup).toContain("Contract design handoff");
+    expect(markup).not.toContain("Contract design handoff");
+    expect(markup).toContain("What changes");
+    expect(markup).toContain("Requires ERC plus complete fabrication");
     expect(markup).toContain("boardreadyops.yml");
     expect(markup).toContain(".github/workflows/readiness-runner.yml");
     // The page renders the profile declared in cloud-core rather than its own copy of the list,
@@ -101,7 +103,7 @@ describe("repository setup preview page", () => {
     window.document.write(markup);
     const presetLinks = [...window.document.querySelectorAll<HTMLAnchorElement>('a[href^="/setup?preset="]')];
 
-    expect(presetLinks).toHaveLength(4);
+    expect(presetLinks).toHaveLength(3);
     for (const link of presetLinks) {
       expect(link.classList.contains("min-h-11")).toBe(true);
     }
