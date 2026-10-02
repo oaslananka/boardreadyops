@@ -8,8 +8,9 @@ import {
 import {
   generateSetupPrPlan,
   isRepositorySetupPresetId,
-  repositorySetupPresets,
+  isRepositorySetupSelectablePresetId,
   repositorySetupPresetVersion,
+  repositorySetupSelectablePresets,
 } from "@boardreadyops/cloud-core/repository-setup";
 import type { SqlQueryExecutor } from "@boardreadyops/db/lifecycle-store";
 import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
@@ -139,7 +140,7 @@ async function requestBody(request: Request): Promise<Record<string, unknown> | 
 
 function setupResponseBase() {
   return {
-    presets: repositorySetupPresets,
+    presets: repositorySetupSelectablePresets,
     workflow: {
       path: ".github/workflows/readiness-runner.yml",
       configurationPath: "boardreadyops.yml",
@@ -229,7 +230,7 @@ async function selectPreset(
 ): Promise<Response> {
   const preset = body.preset;
   const requestId = body.requestId;
-  if (!isRepositorySetupPresetId(preset) || typeof requestId !== "string" || !validIdentifier(requestId)) {
+  if (!isRepositorySetupSelectablePresetId(preset) || typeof requestId !== "string" || !validIdentifier(requestId)) {
     return controlPlaneJsonError("preset and requestId are required", 400);
   }
   const applied = await store.applyRevision({
@@ -427,7 +428,15 @@ async function createSetupPr(
   const context = await store.getContext({ installationId, repositoryId });
   if (!context) return controlPlaneJsonError("repository is unavailable", 404);
 
-  const presetId = isRepositorySetupPresetId(body.preset) ? body.preset : (context.current?.preset ?? "open-source");
+  if (body.preset !== undefined && !isRepositorySetupSelectablePresetId(body.preset)) {
+    return controlPlaneJsonError("preset is not available for new setup revisions", 400);
+  }
+  const presetId =
+    body.preset !== undefined
+      ? body.preset
+      : isRepositorySetupPresetId(context.current?.preset)
+        ? context.current.preset
+        : "open-source";
 
   const cloudOrigin =
     dependencies.environment.BOARDREADYOPS_PUBLIC_URL?.trim() || dependencies.environment.NEXT_PUBLIC_APP_URL?.trim();
