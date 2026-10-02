@@ -59,6 +59,25 @@ describe("public discovery Next.js routing", () => {
     expect(mutation.headers.get("x-middleware-rewrite")).toBeNull();
   });
 
+  it("applies baseline browser security headers to every route", async () => {
+    const headers = await nextConfig.headers();
+    const baseline = headers.find((entry) => entry.source === "/:path*");
+    expect(baseline).toBeDefined();
+
+    const values = new Map(baseline?.headers.map((header) => [header.key.toLowerCase(), header.value]));
+    expect(values.get("strict-transport-security")).toContain("max-age=31536000");
+    expect(values.get("x-content-type-options")).toBe("nosniff");
+    expect(values.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(values.get("permissions-policy")).toContain("camera=()");
+    expect(values.get("x-frame-options")).toBe("DENY");
+
+    const csp = values.get("content-security-policy") ?? "";
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("base-uri 'self'");
+  });
+
   it("keeps request-aware homepage routing out of static next.config rewrites", async () => {
     expect(nextConfig.rewrites).toBeUndefined();
     const headers = await nextConfig.headers();
