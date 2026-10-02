@@ -1,5 +1,6 @@
 import type { WorkspaceMemberRecord } from "@boardreadyops/db";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   AddWorkspaceMemberForm,
@@ -11,7 +12,11 @@ import { Alert, EmptyState, Pagination, Panel, StatusBadge } from "../../../comp
 import { WorkspaceSwitcher } from "../../../components/workspace-switcher.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 import { canManageMembers, isLastOwner, loadWorkspaceMembers } from "../../../lib/workspace-members.js";
-import { removeWorkspaceMemberAction, upsertWorkspaceMemberAction } from "./actions.js";
+import {
+  removeWorkspaceMemberAction,
+  resolveWorkspaceMemberIdentityAction,
+  upsertWorkspaceMemberAction,
+} from "./actions.js";
 
 export const metadata: Metadata = {
   title: "Workspace Members",
@@ -45,9 +50,24 @@ const roleMeans: Record<string, string> = {
 
 function workspaceUserCell(member: WorkspaceMemberRecord, viewerLogin: string | undefined) {
   return (
-    <span className="flex items-center gap-2">
-      <span className="font-mono break-all">{member.userId}</span>
-      {member.userId === viewerLogin ? <span className="text-meta text-muted-foreground">(you)</span> : null}
+    <span className="flex items-center gap-3">
+      {member.githubAvatarUrl ? (
+        <Image
+          src={member.githubAvatarUrl}
+          alt=""
+          width={32}
+          height={32}
+          className="size-8 rounded-full border border-border"
+        />
+      ) : null}
+      <span className="flex min-w-0 flex-col">
+        <span className="font-medium text-foreground">{member.githubDisplayName ?? member.githubLogin}</span>
+        <span className="font-mono text-meta break-all text-muted-foreground">
+          @{member.githubLogin}
+          {member.githubUserId ? ` · GitHub ID ${member.githubUserId}` : " · legacy login-only identity"}
+        </span>
+      </span>
+      {member.githubLogin === viewerLogin ? <span className="text-meta text-muted-foreground">(you)</span> : null}
     </span>
   );
 }
@@ -95,7 +115,7 @@ function workspaceColumns(input: {
   const columns: DataColumn<WorkspaceMemberRecord>[] = [
     {
       id: "user",
-      header: "GitHub username",
+      header: "GitHub identity",
       rowHeader: true,
       cell: (member) => workspaceUserCell(member, input.viewerLogin),
     },
@@ -166,14 +186,15 @@ export default async function WorkspaceSettingsPage({ searchParams }: Readonly<W
 
       {manage ? (
         <Panel title="Grant access" description="Re-granting an existing member changes their role.">
-          <Alert tone="warning" title="This is a grant, not an invitation">
-            There is nothing for the person to accept and no notification is sent. The username is not checked against
-            GitHub either — a typo silently grants access to whoever holds that login.
+          <Alert tone="info" title="Verify the principal before granting access">
+            BoardReadyOps resolves the GitHub account first and shows its profile plus stable numeric GitHub user ID.
+            Access changes only after you review that identity and submit the confirmation step.
           </Alert>
           <div className="mt-4">
             <AddWorkspaceMemberForm
               workspaceId={result.selected.id}
               canGrantOwner={result.selected.role === "owner"}
+              resolveAction={resolveWorkspaceMemberIdentityAction}
               action={upsertWorkspaceMemberAction}
             />
           </div>
