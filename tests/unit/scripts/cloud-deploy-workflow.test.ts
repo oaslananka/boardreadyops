@@ -60,7 +60,7 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain(`test "${configuredFile}" = "${containerPolicyPath}"`);
   });
 
-  it("caps BuildKit cache by size before a low-space build and after every build", () => {
+  it("fully reclaims BuildKit cache before a low-space build and caps it after every build", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
     const buildCacheMaxUsedSpace = "$" + "{build_cache_max_used_space}";
@@ -70,21 +70,22 @@ describe("cloud-deploy topology preflight", () => {
     const deployArgs = "$" + "{deploy_args}";
 
     expect(workflow).toContain("build_cache_max_used_space=3GB");
+    expect(workflow).toContain("docker builder prune --all --force || true");
     expect(workflow).toContain(
       `docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}" || true`,
     );
     expect(workflow).not.toContain("--filter until=168h");
 
     const lowSpaceCheck = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`);
-    const preflightTrim = workflow.indexOf("            trim_build_cache", lowSpaceCheck);
+    const preflightReclaim = workflow.indexOf("            reclaim_build_cache_for_preflight", lowSpaceCheck);
     const checkout = workflow.indexOf(`cd "${repoDir}"`);
     const caseStart = workflow.indexOf(`case "${deployArgs}" in`);
     const caseEnd = workflow.indexOf("          esac", caseStart);
     const finalTrim = workflow.indexOf("          trim_build_cache", caseEnd);
 
     expect(lowSpaceCheck).toBeGreaterThan(0);
-    expect(preflightTrim).toBeGreaterThan(lowSpaceCheck);
-    expect(preflightTrim).toBeLessThan(checkout);
+    expect(preflightReclaim).toBeGreaterThan(lowSpaceCheck);
+    expect(preflightReclaim).toBeLessThan(checkout);
     expect(caseStart).toBeGreaterThan(checkout);
     expect(caseEnd).toBeGreaterThan(caseStart);
     expect(finalTrim).toBeGreaterThan(caseEnd);

@@ -259,18 +259,21 @@ still existing. Build cache accumulates alongside them. Left alone, the host eve
 and `docker compose build` fails part-way through the export with `no space left on device` —
 which reads as a build failure rather than a capacity problem, minutes into the run.
 
-The `cloud-deploy` workflow checks free space before it builds. Below 12 GiB it caps BuildKit
-cache at 3 GB and removes dangling image layers:
+The `cloud-deploy` workflow checks free space before it builds. Below 12 GiB it treats BuildKit
+cache as disposable and fully reclaims it before touching any tagged rollback image, then removes
+dangling image layers:
 
 ```bash
-docker builder prune --all --force --max-used-space 3GB
+docker builder prune --all --force
 docker image prune --force
 ```
 
-The same 3 GB cache cap runs after every successful build, including `dry_run`, because repeated
-rehearsals still build on the production host. This keeps useful recent cache without allowing a
-burst of same-day builds to consume the host. Tagged runtime images are
-not touched by cache GC and remain governed by the rollback retention policy below. If the host is
+After every successful build, including `dry_run`, the workflow restores the normal 3 GB BuildKit
+cache cap with `docker builder prune --all --force --max-used-space 3GB`. Repeated rehearsals still
+build on the production host, so this keeps useful recent cache during normal operation without
+letting a low-space preflight fail while safe-to-delete cache still occupies the build floor.
+Tagged runtime images are not touched by cache GC and remain governed by the rollback retention
+policy below. If the host is
 still short after safe reclaim, the default behavior remains fail-closed with exit 78. An operator
 may explicitly enable `retire_superseded_images`; that bounded path defaults to three rollback images.
 When capacity is still blocked, the operator may explicitly reduce that preflight keep-set to one or
