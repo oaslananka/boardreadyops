@@ -160,13 +160,17 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain("cloud-deploy security smoke");
     expect(workflow).toContain("for path in / /dashboard; do");
     expect(workflow).toContain("Content-Security-Policy");
-    expect(workflow).toContain("frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+    expect(workflow).toContain(`"frame-ancestors 'none'" "base-uri 'self'" "object-src 'none'"`);
     expect(workflow).toContain("Strict-Transport-Security");
     expect(workflow).toContain("max-age=31536000");
     expect(workflow).toContain("X-Content-Type-Options");
     expect(workflow).toContain("Referrer-Policy");
     expect(workflow).toContain("Permissions-Policy");
     expect(workflow).toContain("X-Frame-Options");
+    expect(workflow).toContain("require_header_directives");
+    expect(workflow).toContain(`"frame-ancestors 'none'" "base-uri 'self'" "object-src 'none'"`);
+    expect(workflow).toContain('"camera=()" "geolocation=()" "microphone=()" "usb=()"');
+    expect(workflow).not.toContain("grep -Fxiq");
     expect(workflow).not.toContain("https://boardreadyops.com");
   });
 
