@@ -90,7 +90,7 @@ describe("loadWorkspaceMembers", () => {
     listWorkspaceMembers.mockReset().mockResolvedValue([]);
 
     await loadWorkspaceMembers(session, undefined, postgres);
-    expect(listWorkspacesForUser).toHaveBeenCalledWith("octocat");
+    expect(listWorkspacesForUser).toHaveBeenCalledWith({ githubUserId: 1, login: "octocat" });
   });
 
   it("never reads the members of a workspace the viewer is not in", async () => {
