@@ -7,7 +7,7 @@ import {
 } from "@boardreadyops/cloud-core/github-mutation-service";
 import {
   generateSetupPrPlan,
-  isRepositorySetupPresetId,
+  isRepositorySetupSelectablePresetId,
   repositorySetupPresets,
   repositorySetupPresetVersion,
 } from "@boardreadyops/cloud-core/repository-setup";
@@ -229,7 +229,7 @@ async function selectPreset(
 ): Promise<Response> {
   const preset = body.preset;
   const requestId = body.requestId;
-  if (!isRepositorySetupPresetId(preset) || typeof requestId !== "string" || !validIdentifier(requestId)) {
+  if (!isRepositorySetupSelectablePresetId(preset) || typeof requestId !== "string" || !validIdentifier(requestId)) {
     return controlPlaneJsonError("preset and requestId are required", 400);
   }
   const applied = await store.applyRevision({
@@ -427,7 +427,12 @@ async function createSetupPr(
   const context = await store.getContext({ installationId, repositoryId });
   if (!context) return controlPlaneJsonError("repository is unavailable", 404);
 
-  const presetId = isRepositorySetupPresetId(body.preset) ? body.preset : (context.current?.preset ?? "open-source");
+  if (body.preset !== undefined && !isRepositorySetupSelectablePresetId(body.preset)) {
+    return controlPlaneJsonError("preset is not available for new setup changes", 400);
+  }
+  const presetId = isRepositorySetupSelectablePresetId(body.preset)
+    ? body.preset
+    : (context.current?.preset ?? "open-source");
 
   const cloudOrigin =
     dependencies.environment.BOARDREADYOPS_PUBLIC_URL?.trim() || dependencies.environment.NEXT_PUBLIC_APP_URL?.trim();
