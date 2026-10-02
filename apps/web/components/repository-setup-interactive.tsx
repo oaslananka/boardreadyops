@@ -491,7 +491,9 @@ function SetupReadiness({
               {effectiveProbeStatus?.replaceAll("_", " ") ?? "Not dispatched"}
             </Definition>
             <Definition label="Probe expires">
-              {repository.setupProbeExpiresAt ? new Date(repository.setupProbeExpiresAt).toLocaleString() : "Not scheduled"}
+              {repository.setupProbeExpiresAt
+                ? new Date(repository.setupProbeExpiresAt).toLocaleString()
+                : "Not scheduled"}
             </Definition>
           </DefinitionGrid>
         ) : null}

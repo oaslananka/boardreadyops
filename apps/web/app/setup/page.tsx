@@ -52,9 +52,7 @@ async function setupTargets() {
       ...(repository.setupObservedSha ? { setupObservedSha: repository.setupObservedSha } : {}),
       ...(repository.setupProbeId ? { setupProbeId: repository.setupProbeId } : {}),
       ...(repository.setupProbeStatus ? { setupProbeStatus: repository.setupProbeStatus } : {}),
-      ...(repository.setupProbeWorkflowRunId
-        ? { setupProbeWorkflowRunId: repository.setupProbeWorkflowRunId }
-        : {}),
+      ...(repository.setupProbeWorkflowRunId ? { setupProbeWorkflowRunId: repository.setupProbeWorkflowRunId } : {}),
       ...(repository.setupProbeExpiresAt ? { setupProbeExpiresAt: repository.setupProbeExpiresAt } : {}),
     })),
   );
