@@ -11,6 +11,7 @@ const mockClose = vi.fn();
 const mockMembershipQuery = vi.fn();
 const mockProjectQuery = vi.fn();
 const mockRevisionWorkspaceQuery = vi.fn();
+const mockValidatedEvidenceQuery = vi.fn();
 
 /**
  * The authorization lookups are routed to their own mocks so `mockQuery` keeps carrying only the
@@ -25,6 +26,9 @@ vi.mock("../../../packages/db/src/pg-executor.js", () => ({
   createPgQueryExecutor: vi.fn(() => ({
     query: (sql: string, params: readonly unknown[]) => {
       if (sql.includes("from workspace_members")) return mockMembershipQuery(sql, params);
+      if (sql.includes("from revisions") && sql.includes("join release_runs") && sql.includes("validation_run_id")) {
+        return mockValidatedEvidenceQuery(sql, params);
+      }
       if (sql.includes("from revisions") && sql.includes("join projects")) {
         return mockRevisionWorkspaceQuery(sql, params);
       }
@@ -41,6 +45,7 @@ describe("API v2 Routes", () => {
     mockClose.mockReset();
     mockMembershipQuery.mockReset().mockResolvedValue({ rows: [{ role: "owner" }] });
     mockRevisionWorkspaceQuery.mockReset().mockResolvedValue({ rows: [{ workspace_id: "ws_123" }] });
+    mockValidatedEvidenceQuery.mockReset().mockResolvedValue({ rows: [{}] });
     mockProjectQuery.mockReset().mockResolvedValue({
       rows: [
         {
@@ -313,6 +318,40 @@ describe("API v2 Routes", () => {
       expect(data.ok).toBe(true);
       expect(data.rawToken).toBeDefined();
       expect(data.delivery.id).toBe("del_001");
+    });
+
+    it("refuses a public guest link when the revision lacks validated manufacturing evidence", async () => {
+      mockValidatedEvidenceQuery.mockResolvedValue({ rows: [] });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: "rev_unvalidated",
+            project_id: "prj_001",
+            revision_label: "draft",
+            source_kind: "direct_upload",
+            commit_sha: null,
+            bundle_sha256: "a".repeat(64),
+            normalized_summary: {},
+            validation_run_id: null,
+            validation_artifact_id: null,
+            created_at: new Date(),
+          },
+        ],
+      });
+
+      const res = await createDelivery(
+        new Request("https://boardreadyops.test/api/v2/deliveries", {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://boardreadyops.test" },
+          body: JSON.stringify({
+            revisionId: "rev_unvalidated",
+            signedArchiveUrl: "https://storage.example.com/draft.zip",
+          }),
+        }),
+      );
+
+      expect(res.status).toBe(409);
+      expect(await res.text()).toContain("validated manufacturing evidence");
     });
 
     it("retrieves delivery by token", async () => {
