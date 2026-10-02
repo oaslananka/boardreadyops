@@ -1,8 +1,8 @@
 import {
-  isRepositorySetupPresetId,
+  isRepositorySetupSelectablePresetId,
   repositorySetupPreset,
-  repositorySetupPresets,
   repositorySetupPresetVersion,
+  repositorySetupSelectablePresets,
   repositorySetupWorkflowContractVersion,
   repositorySetupWorkflowPath,
 } from "@boardreadyops/cloud-core/repository-setup";
@@ -81,7 +81,8 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
   const selected =
-    repositorySetupPreset(isRepositorySetupPresetId(selectedValue) ? selectedValue : "prototype") ?? defaultPreset;
+    repositorySetupPreset(isRepositorySetupSelectablePresetId(selectedValue) ? selectedValue : "prototype") ??
+    defaultPreset;
   const workflowSource = `https://github.com/oaslananka/boardreadyops/blob/v1/.github/workflows/${repositorySetupWorkflowPath}`;
 
   return (
@@ -136,7 +137,7 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
         </Alert>
 
         <RepositorySetupInteractive
-          presets={repositorySetupPresets}
+          presets={repositorySetupSelectablePresets}
           initialPresetId={selected.id}
           presetVersion={repositorySetupPresetVersion}
           workflowPath={repositorySetupWorkflowPath}
