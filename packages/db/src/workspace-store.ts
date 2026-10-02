@@ -168,11 +168,13 @@ function mapWorkspaceMember(row: WorkspaceMemberRow): WorkspaceMemberRecord {
   return {
     workspaceId: row.workspace_id,
     userId: row.user_id,
-    ...(Number.isSafeInteger(githubUserId) && githubUserId > 0 ? { githubUserId } : {}),
+    ...(githubUserId !== undefined && Number.isSafeInteger(githubUserId) && githubUserId > 0 ? { githubUserId } : {}),
     githubLogin: row.github_login ?? row.user_id,
     ...(row.github_display_name ? { githubDisplayName: row.github_display_name } : {}),
     ...(row.github_avatar_url ? { githubAvatarUrl: row.github_avatar_url } : {}),
-    role: (row.role === "owner" || row.role === "admin" || row.role === "member" ? row.role : "viewer") as WorkspaceRole,
+    role: (row.role === "owner" || row.role === "admin" || row.role === "member"
+      ? row.role
+      : "viewer") as WorkspaceRole,
     createdAt: new Date(row.created_at).toISOString(),
   };
 }
@@ -298,9 +300,7 @@ export class WorkspaceStore {
               and (github_user_id = $2 or (github_user_id is null and lower(user_id) = lower($3)))
             order by (github_user_id = $2) desc
             limit 1`,
-      typeof principal === "string"
-        ? [workspaceId, principal]
-        : [workspaceId, principal.githubUserId, principal.login],
+      typeof principal === "string" ? [workspaceId, principal] : [workspaceId, principal.githubUserId, principal.login],
     )) as { rows?: { role: string }[] };
 
     const role = result?.rows?.[0]?.role;
@@ -495,22 +495,37 @@ export class WorkspaceStore {
    *
    * Returns whether a row was removed; `false` means either no such member or the last owner.
    */
-  async removeWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
+  async removeWorkspaceMember(input: {
+    workspaceId: string;
+    userId: string;
+    actor: WorkspacePrincipal;
+  }): Promise<boolean> {
     const result = (await this.executor.query(
-      `delete from workspace_members
-        where workspace_id = $1
-          and user_id = $2
-          and (
-            role <> 'owner'
-            or exists (
-              select 1 from workspace_members as others
-               where others.workspace_id = $1
-                 and others.user_id <> $2
-                 and others.role = 'owner'
+      `with removed as (
+         delete from workspace_members
+          where workspace_id = $1
+            and user_id = $2
+            and (
+              role <> 'owner'
+              or exists (
+                select 1 from workspace_members as others
+                 where others.workspace_id = $1
+                   and others.user_id <> $2
+                   and others.role = 'owner'
+              )
             )
-          )
-       returning user_id`,
-      [workspaceId, userId],
+         returning user_id, github_user_id, coalesce(github_login, user_id) as github_login, role
+       ), audited as (
+         insert into workspace_member_audit_events (
+           workspace_id, event_type, actor_github_user_id, actor_login,
+           subject_github_user_id, subject_login, previous_role, role
+         )
+         select $1, 'workspace_member.remove', $3, $4,
+                github_user_id, github_login, role, null
+           from removed
+       )
+       select user_id from removed`,
+      [input.workspaceId, input.userId, input.actor.githubUserId, input.actor.login],
     )) as { rows?: unknown[] };
 
     return (result?.rows ?? []).length > 0;
