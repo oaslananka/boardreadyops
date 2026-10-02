@@ -118,7 +118,24 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0068_repository_firmware_snapshots.sql",
       "0069_firmware_advisory_watch.sql",
       "0070_release_run_base_commit_sha.sql",
+      "0071_workspace_member_verified_identity.sql",
     ]);
+  });
+
+  it("pins new workspace grants to verified GitHub identities in schema v71", async () => {
+    const sql = (
+      await readFile(join(migrationsDir, "0071_workspace_member_verified_identity.sql"), "utf8")
+    ).toLowerCase();
+
+    expect(sql).toContain("add column if not exists github_user_id bigint");
+    expect(sql).toContain("add column if not exists github_login text");
+    expect(sql).toContain("workspace_members_github_identity_idx");
+    expect(sql).toContain("where github_user_id is not null");
+    expect(sql).toContain("create table if not exists workspace_member_audit_events");
+    expect(sql).toContain("actor_github_user_id");
+    expect(sql).toContain("subject_github_user_id");
+    expect(sql).toContain("previous_role");
+    expect(sql).toContain("workspace_member_audit_events is append-only");
   });
 
   it("persists the PR base commit SHA required by dashboard re-run in schema v70", async () => {
