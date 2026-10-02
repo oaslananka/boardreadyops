@@ -80,9 +80,12 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
   )?.userExplanation;
   const defaultPreset = repositorySetupPreset("prototype");
   if (!defaultPreset) throw new Error("prototype setup preset is unavailable");
-  const selected =
-    repositorySetupPreset(isRepositorySetupSelectablePresetId(selectedValue) ? selectedValue : "prototype") ??
-    defaultPreset;
+  const selectedPresetId = isRepositorySetupSelectablePresetId(selectedValue)
+    ? selectedValue
+    : selectedValue === "contract-design"
+      ? "production"
+      : "prototype";
+  const selected = repositorySetupPreset(selectedPresetId) ?? defaultPreset;
   const workflowSource = `https://github.com/oaslananka/boardreadyops/blob/v1/.github/workflows/${repositorySetupWorkflowPath}`;
 
   return (
