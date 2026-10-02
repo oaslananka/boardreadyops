@@ -119,7 +119,18 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0069_firmware_advisory_watch.sql",
       "0070_release_run_base_commit_sha.sql",
       "0071_workspace_member_verified_identity.sql",
+      "0072_validated_delivery_revisions.sql",
     ]);
+  });
+
+  it("binds delivery-eligible revisions to persisted validation evidence in schema v72", async () => {
+    const sql = (await readFile(join(migrationsDir, "0072_validated_delivery_revisions.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("validation_run_id text references release_runs(id) on delete set null");
+    expect(sql).toContain("validation_artifact_id text references artifacts(id) on delete set null");
+    expect(sql).toContain("revisions_validation_artifact_idx");
+    expect(sql).toContain("where validation_artifact_id is not null");
+    expect(sql).toContain("revisions_validation_run_idx");
   });
 
   it("pins new workspace grants to verified GitHub identities in schema v71", async () => {
