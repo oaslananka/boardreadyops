@@ -6,6 +6,7 @@ import { Button } from "./ui/button.js";
 type CopyButtonProps = Readonly<{
   label: string;
   value: string;
+  accessibleLabel?: string;
 }>;
 
 function copyStatusMessage(status: "copied" | "failed" | "idle"): string {
@@ -14,7 +15,7 @@ function copyStatusMessage(status: "copied" | "failed" | "idle"): string {
   return "";
 }
 
-export function CopyButton({ label, value }: CopyButtonProps) {
+export function CopyButton({ label, value, accessibleLabel }: CopyButtonProps) {
   const [status, setStatus] = useState<"copied" | "failed" | "idle">("idle");
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -57,7 +58,13 @@ export function CopyButton({ label, value }: CopyButtonProps) {
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button type="button" variant="secondary" size="sm" onClick={copy}>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={copy}
+        {...(accessibleLabel ? { "aria-label": accessibleLabel } : {})}
+      >
         {buttonLabel}
       </Button>
       <span className="sr-only" aria-live="polite">
