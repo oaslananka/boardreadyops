@@ -357,7 +357,7 @@ export function missingDeclaredPermissions(
  * `requirement` reuses the capability vocabulary `checkCapabilityRequirement` already validates,
  * so a button's enablement and the server's refusal reason can never disagree.
  */
-export type GitHubAppActionId = "fix" | "release-preview" | "rerun" | "setup" | "waive";
+export type GitHubAppActionId = "fix" | "release-preview" | "rerun" | "setup" | "validate-setup" | "waive";
 
 export type GitHubAppAction = {
   id: GitHubAppActionId;
@@ -384,6 +384,12 @@ export const githubAppActions: readonly GitHubAppAction[] = [
     label: "Open setup pull request",
     description: "Commit boardreadyops.yml and the readiness workflow to a reviewed branch.",
     requirement: "setup_pr",
+  },
+  {
+    id: "validate-setup",
+    label: "Validate readiness",
+    description: "Inspect the repository-owned readiness workflow and dispatch the persisted setup probe.",
+    requirement: "dispatch_analysis",
   },
   {
     id: "waive",

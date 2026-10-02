@@ -517,6 +517,45 @@ export async function handleRepositorySetupCreatePrForActor(
   }
 }
 
+/**
+ * Dispatches the existing repository setup probe for an already-authorized actor.
+ *
+ * The dashboard owns the executor lifecycle and passes the same viewer-scoped executor it used
+ * to resolve the repository. This keeps the browser action on the same persisted probe path as
+ * the operator API without opening a second database connection.
+ */
+export async function handleRepositorySetupProbeForActor(
+  input: Readonly<{
+    actorId: string;
+    installationId: string;
+    repositoryId: string;
+    requestId: string;
+    executor: SqlQueryExecutor;
+  }>,
+  dependencies: RepositorySetupRouteDependencies = createRepositorySetupRouteDependencies(),
+): Promise<Response> {
+  if (
+    !validIdentifier(input.installationId) ||
+    !validIdentifier(input.repositoryId) ||
+    !validIdentifier(input.requestId)
+  ) {
+    return controlPlaneJsonError("repository setup scope is invalid", 400);
+  }
+  const store = dependencies.createStore(input.executor);
+  try {
+    return await createProbe(
+      { requestId: input.requestId },
+      input.actorId,
+      input.installationId,
+      input.repositoryId,
+      store,
+      dependencies,
+    );
+  } catch {
+    return controlPlaneJsonError("repository setup operation failed", 503);
+  }
+}
+
 export async function handleRepositorySetupCreatePr(
   request: Request,
   installationId: string,
