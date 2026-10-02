@@ -282,6 +282,14 @@ export function RepositorySetupInteractive({
                   {isSelected ? "Current preview" : "Available release policy"}
                 </p>
                 <p className="text-sm text-muted-foreground">{preset.description}</p>
+                <div className="rounded-md border border-border/70 bg-muted/10 p-3">
+                  <p className="text-meta font-semibold uppercase tracking-wide text-muted-foreground">What changes</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                    {preset.semanticSummary.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
                 <DefinitionGrid>
                   <Definition label="Release mode">{preset.releaseMode}</Definition>
                   <Definition label="Fail threshold">{preset.failOn}</Definition>
