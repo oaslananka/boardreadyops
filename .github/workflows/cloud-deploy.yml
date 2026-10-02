@@ -358,6 +358,48 @@ jobs:
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
           REMOTE_DEPLOY
 
+      - name: Verify production browser security headers
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_origin="$(doppler secrets get BOARDREADYOPS_PUBLIC_URL --plain \
+            --project boardreadyops --config deploy)"
+          case "${public_origin}" in
+            https://*) ;;
+            *)
+              printf '%s\n' 'cloud-deploy security smoke: BOARDREADYOPS_PUBLIC_URL must be HTTPS' >&2
+              exit 78
+              ;;
+          esac
+          public_origin="${public_origin%/}"
+
+          require_header() {
+            local headers="$1"
+            local name="$2"
+            local expected="$3"
+            local path="$4"
+            if ! printf '%s\n' "${headers}" | grep -Fxiq "${name}: ${expected}"; then
+              printf 'cloud-deploy security smoke: %s missing or unexpected on %s\n' "${name}" "${path}" >&2
+              return 1
+            fi
+          }
+
+          for path in / /dashboard; do
+            headers="$(
+              curl --fail --silent --show-error --max-time 20 \
+                --dump-header - --output /dev/null "${public_origin}${path}" \
+                | tr -d '\r'
+            )"
+            require_header "${headers}" "Content-Security-Policy" "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" "${path}"
+            require_header "${headers}" "Strict-Transport-Security" "max-age=31536000" "${path}"
+            require_header "${headers}" "X-Content-Type-Options" "nosniff" "${path}"
+            require_header "${headers}" "Referrer-Policy" "strict-origin-when-cross-origin" "${path}"
+            require_header "${headers}" "Permissions-Policy" "camera=(), geolocation=(), microphone=(), usb=()" "${path}"
+            require_header "${headers}" "X-Frame-Options" "DENY" "${path}"
+          done
+
       - name: Remove temporary SSH key
         if: always()
         run: rm -f "${CLOUD_DEPLOY_SSH_KEY_PATH}"
