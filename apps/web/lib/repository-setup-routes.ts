@@ -431,12 +431,9 @@ async function createSetupPr(
   if (body.preset !== undefined && !isRepositorySetupSelectablePresetId(body.preset)) {
     return controlPlaneJsonError("preset is not available for new setup revisions", 400);
   }
+  const currentPreset = isRepositorySetupPresetId(context.current?.preset) ? context.current.preset : "open-source";
   const presetId =
-    body.preset !== undefined
-      ? body.preset
-      : isRepositorySetupPresetId(context.current?.preset)
-        ? context.current.preset
-        : "open-source";
+    body.preset !== undefined ? body.preset : currentPreset === "contract-design" ? "production" : currentPreset;
 
   const cloudOrigin =
     dependencies.environment.BOARDREADYOPS_PUBLIC_URL?.trim() || dependencies.environment.NEXT_PUBLIC_APP_URL?.trim();
