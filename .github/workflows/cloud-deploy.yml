@@ -358,6 +358,65 @@ jobs:
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
           REMOTE_DEPLOY
 
+      - name: Verify production browser security headers
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_origin="$(doppler secrets get BOARDREADYOPS_PUBLIC_URL --plain \
+            --project boardreadyops --config deploy)"
+          case "${public_origin}" in
+            https://*) ;;
+            *)
+              printf '%s\n' 'cloud-deploy security smoke: BOARDREADYOPS_PUBLIC_URL must be HTTPS' >&2
+              exit 78
+              ;;
+          esac
+          public_origin="${public_origin%/}"
+
+          require_header_directives() {
+            local headers="$1"
+            local name="$2"
+            local path="$3"
+            shift 3
+
+            local actual
+            actual="$(
+              printf '%s\n' "${headers}" \
+                | awk -v name="${name}" 'index(tolower($0), tolower(name ":")) == 1 { print; exit }'
+            )"
+            if [[ -z "${actual}" ]]; then
+              printf 'cloud-deploy security smoke: %s missing on %s\n' "${name}" "${path}" >&2
+              return 1
+            fi
+
+            local required
+            for required in "$@"; do
+              if ! printf '%s\n' "${actual}" | grep -Fiq -- "${required}"; then
+                printf 'cloud-deploy security smoke: %s missing required directive %s on %s\n' \
+                  "${name}" "${required}" "${path}" >&2
+                return 1
+              fi
+            done
+          }
+
+          for path in / /dashboard; do
+            headers="$(
+              curl --fail --silent --show-error --max-time 20 \
+                --dump-header - --output /dev/null "${public_origin}${path}" \
+                | tr -d '\r'
+            )"
+            require_header_directives "${headers}" "Content-Security-Policy" "${path}" \
+              "frame-ancestors 'none'" "base-uri 'self'" "object-src 'none'"
+            require_header_directives "${headers}" "Strict-Transport-Security" "${path}" "max-age=31536000"
+            require_header_directives "${headers}" "X-Content-Type-Options" "${path}" "nosniff"
+            require_header_directives "${headers}" "Referrer-Policy" "${path}" "strict-origin-when-cross-origin"
+            require_header_directives "${headers}" "Permissions-Policy" "${path}" \
+              "camera=()" "geolocation=()" "microphone=()" "usb=()"
+            require_header_directives "${headers}" "X-Frame-Options" "${path}" "DENY"
+          done
+
       - name: Remove temporary SSH key
         if: always()
         run: rm -f "${CLOUD_DEPLOY_SSH_KEY_PATH}"
