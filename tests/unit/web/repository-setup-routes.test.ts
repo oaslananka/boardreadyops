@@ -113,7 +113,7 @@ describe("repository setup operator routes", () => {
       permissions: { repository: { contents: "write", actions: "write", checks: "write" } },
       assistedInstallation: { available: true, explicitOptInRequired: false },
     });
-    expect(payload.presets as unknown[]).toHaveLength(4);
+    expect(payload.presets as unknown[]).toHaveLength(3);
     expect(JSON.stringify(payload)).not.toContain("installation-token");
   });
 
@@ -320,7 +320,7 @@ describe("repository setup operator routes", () => {
       repositoryId,
       dependencies(failedStore, {
         dispatchProbe: vi.fn(async () => {
-          throw new Error("authorization=secret");
+          throw new Error("dispatch fixture failure marker");
         }),
       }),
     );
@@ -394,6 +394,18 @@ describe("repository setup operator routes", () => {
     });
     expect((await handleRepositorySetupPost(oversized, installationId, repositoryId, deps)).status).toBe(400);
     expect(deps.queryExecutor).not.toHaveBeenCalled();
+  });
+
+  it("rejects the legacy contract-design preset for new setup selections", async () => {
+    const setupStore = store();
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "select_preset", preset: "contract-design", requestId: "legacy-contract" }),
+      installationId,
+      repositoryId,
+      dependencies(setupStore),
+    );
+    expect(response.status).toBe(400);
+    expect(setupStore.applyRevision).not.toHaveBeenCalled();
   });
 
   it("rejects unauthorized and malformed operations before database access", async () => {

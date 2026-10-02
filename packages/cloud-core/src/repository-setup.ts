@@ -4,6 +4,9 @@ import type { MutationFile } from "./github-mutation-service.js";
 export const repositorySetupPresetIds = ["open-source", "prototype", "production", "contract-design"] as const;
 export type RepositorySetupPresetId = (typeof repositorySetupPresetIds)[number];
 
+export const selectableRepositorySetupPresetIds = ["open-source", "prototype", "production"] as const;
+export type SelectableRepositorySetupPresetId = (typeof selectableRepositorySetupPresetIds)[number];
+
 export const repositorySetupPresetVersion = 1;
 export const repositorySetupWorkflowPath = "readiness-runner.yml";
 export const repositorySetupWorkflowContractVersion = 1;
@@ -16,6 +19,7 @@ export type RepositorySetupPreset = {
   description: string;
   releaseMode: "pilot" | "production" | "prototype";
   failOn: "high" | "medium";
+  changes: readonly string[];
   config: string;
 };
 
@@ -24,13 +28,17 @@ const header = (releaseMode: RepositorySetupPreset["releaseMode"], failOn: Repos
 
 const reports = `report:\n  sarif: boardreadyops.sarif.json\n  json: boardreadyops.findings.json\n  markdown: boardreadyops.report.md\n  html: boardreadyops.report.html\n`;
 
-export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
+const repositorySetupPresetCatalog: readonly RepositorySetupPreset[] = [
   {
     id: "open-source",
     name: "Open-source hardware",
     description: "Reproducible community releases with component traceability and release documentation.",
     releaseMode: "pilot",
     failOn: "high",
+    changes: [
+      "Pilot release mode with a high-severity failure threshold.",
+      "Keeps component traceability and release-document checks on without production assembly gates.",
+    ],
     config: `${header("pilot", "high")}rules:\n  bom.missing-mpn: true\n  bom.compliance: true\n  bom.lifecycle: true\n  bom.eol-detection: true\n  bom.unknown-lifecycle: true\n  bom.identity-conflicts: true\n  design.board-outline: true\n  design.unique-references: true\n  drc.kicad: true\n  manufacturing.fab-notes: true\n  manufacturing.layer-stackup: true\n  manufacturing.drill-coverage: true\n  release.revision-set: true\n  release.changelog-present: true\n  release.version-format: true\n  release.tag-matches-revision: true\n${reports}`,
   },
   {
@@ -39,6 +47,10 @@ export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
     description: "Low-friction first-build checks with critical supply-chain and design safeguards.",
     releaseMode: "prototype",
     failOn: "high",
+    changes: [
+      "Prototype release mode with a high-severity failure threshold.",
+      "Relaxes package completeness, fab notes, placement/drill coverage, changelog, and tag-matching checks.",
+    ],
     config: `${header("prototype", "high")}rules:\n  bom.missing-mpn: true\n  bom.compliance: true\n  bom.lifecycle: true\n  bom.risk-score: true\n  bom.eol-detection: true\n  bom.unknown-lifecycle: true\n  bom.single-source: false\n  design.board-outline: true\n  design.unique-references: true\n  drc.kicad: true\n  manufacturing.package-completeness: false\n  manufacturing.fab-notes: false\n  manufacturing.position-coverage: false\n  manufacturing.drill-coverage: false\n  release.revision-set: true\n  release.changelog-present: false\n  release.tag-matches-revision: false\n${reports}`,
   },
   {
@@ -47,6 +59,10 @@ export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
     description: "Strict fabrication, supply-chain, manufacturing, and release evidence gates.",
     releaseMode: "production",
     failOn: "medium",
+    changes: [
+      "Production release mode with the stricter medium-severity failure threshold.",
+      "Enables ERC, single-source BOM risk, full manufacturing package checks, and release evidence gates.",
+    ],
     config: `${header("production", "medium")}rules:\n  bom.missing-mpn: true\n  bom.compliance: true\n  bom.lifecycle: true\n  bom.risk-score: true\n  bom.eol-detection: true\n  bom.unknown-lifecycle: true\n  bom.single-source: true\n  bom.identity-conflicts: true\n  design.board-outline: true\n  design.unique-references: true\n  drc.kicad: true\n  erc.kicad: true\n  manufacturing.package-completeness: true\n  manufacturing.fab-notes: true\n  manufacturing.position-coverage: true\n  manufacturing.drill-coverage: true\n  manufacturing.tooling-holes: true\n  manufacturing.test-points: true\n  manufacturing.fiducials: true\n  manufacturing.assembly-sides: true\n  manufacturing.layer-stackup: true\n  manufacturing.pin1-markers: true\n  manufacturing.polarity-markers: true\n  manufacturing.silkscreen-over-pad: true\n  release.revision-set: true\n  release.changelog-present: true\n  release.tag-matches-revision: true\n  release.version-format: true\n${reports}`,
   },
   {
@@ -55,11 +71,20 @@ export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
     description: "Auditable client handoff with complete evidence, traceability, and signed-off release gates.",
     releaseMode: "production",
     failOn: "medium",
+    changes: [
+      "Legacy historical preset retained so existing setup revisions remain readable.",
+      "Generated policy is semantically identical to Production release, so it is no longer selectable.",
+    ],
     config: `${header("production", "medium")}rules:\n  bom.missing-mpn: true\n  bom.compliance: true\n  bom.lifecycle: true\n  bom.eol-detection: true\n  bom.unknown-lifecycle: true\n  bom.single-source: true\n  bom.risk-score: true\n  bom.identity-conflicts: true\n  design.board-outline: true\n  design.unique-references: true\n  drc.kicad: true\n  erc.kicad: true\n  manufacturing.package-completeness: true\n  manufacturing.fab-notes: true\n  manufacturing.position-coverage: true\n  manufacturing.drill-coverage: true\n  manufacturing.tooling-holes: true\n  manufacturing.test-points: true\n  manufacturing.fiducials: true\n  manufacturing.layer-stackup: true\n  manufacturing.assembly-sides: true\n  manufacturing.pin1-markers: true\n  manufacturing.polarity-markers: true\n  manufacturing.silkscreen-over-pad: true\n  release.revision-set: true\n  release.changelog-present: true\n  release.tag-matches-revision: true\n  release.version-format: true\n${reports}`,
   },
 ];
 
-const presetById = new Map(repositorySetupPresets.map((preset) => [preset.id, preset]));
+export const repositorySetupPresets: readonly RepositorySetupPreset[] = repositorySetupPresetCatalog.filter(
+  (preset) => preset.id !== "contract-design",
+);
+
+const presetById = new Map(repositorySetupPresetCatalog.map((preset) => [preset.id, preset]));
+const selectablePresetIds = new Set<string>(selectableRepositorySetupPresetIds);
 
 export function repositorySetupPreset(id: string): RepositorySetupPreset | undefined {
   return presetById.get(id as RepositorySetupPresetId);
@@ -67,6 +92,10 @@ export function repositorySetupPreset(id: string): RepositorySetupPreset | undef
 
 export function isRepositorySetupPresetId(value: unknown): value is RepositorySetupPresetId {
   return typeof value === "string" && presetById.has(value as RepositorySetupPresetId);
+}
+
+export function isSelectableRepositorySetupPresetId(value: unknown): value is SelectableRepositorySetupPresetId {
+  return typeof value === "string" && selectablePresetIds.has(value);
 }
 
 export const defaultReadinessWorkflowTemplate = `name: BoardReadyOps Readiness Runner
