@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/button.js";
 import { CursorPagination, type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { AppShell, EmptyState, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
+import { runCommitCopyAccessibleLabel } from "../../lib/accessibility-labels.js";
 import {
   decodeRunListingCursor,
   loadViewerRuns,
@@ -69,7 +70,11 @@ const columns: readonly DataColumn<RunListingEntry>[] = [
           <Link href={`/runs/${run.id}`} className="font-mono text-primary hover:underline">
             {run.commitSha.slice(0, 7)}
           </Link>
-          <CopyButton value={run.commitSha} label="Copy commit SHA" />
+          <CopyButton
+            value={run.commitSha}
+            label="Copy commit SHA"
+            accessibleLabel={runCommitCopyAccessibleLabel(run.repository, run.commitSha)}
+          />
         </span>
       ) : (
         <Link href={`/runs/${run.id}`} className="font-mono text-primary hover:underline">
