@@ -4,8 +4,8 @@ import { ProjectUploadWizard } from "../../../components/project-upload-wizard.j
 import { Panel } from "../../../components/ui.js";
 
 export const metadata: Metadata = {
-  title: "New Project & Package Upload",
-  description: "Upload a Multi-CAD manufacturing package or connect a repository for DFM pre-flight review.",
+  title: "Add a Project Source",
+  description: "Connect a repository or run BoardReadyOps locally for DFM pre-flight review.",
 };
 
 export default function NewProjectPage() {
@@ -19,13 +19,14 @@ export default function NewProjectPage() {
     >
       <main id="main-content" className="flex flex-col gap-5 px-6 py-6">
         <header>
-          <h1 className="text-2xl font-bold text-foreground">New Project</h1>
+          <h1 className="text-2xl font-bold text-foreground">Add a project source</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Directly ingest Gerber/drill zip packages, connect your repository, or run local CLI audits.
+            Connect a GitHub repository for automated checks, or run BoardReadyOps locally. Direct hosted zip upload is
+            not available yet.
           </p>
         </header>
 
-        <Panel title="Manufacturing Package Ingestion">
+        <Panel title="Choose an ingestion source">
           <ProjectUploadWizard />
         </Panel>
       </main>
