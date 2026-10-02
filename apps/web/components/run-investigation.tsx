@@ -396,6 +396,34 @@ function CategoryBreakdownPanel({ run }: Readonly<{ run: RunDetail }>) {
   );
 }
 
+function ReviewLifecyclePanel({ run }: Readonly<{ run: RunDetail }>) {
+  return (
+    <Panel
+      id="review-lifecycle"
+      title="Run → Review → Release"
+      description="A Run is execution evidence, a Review is an explicit decision context, and a Release is a separate publish action."
+      tone="section"
+    >
+      <p className="text-sm text-muted-foreground">
+        Normal readiness and GitHub Action runs stay in Runs. They do not automatically become Reviews. A Review exists
+        only after review evidence is explicitly published, and neither a Run nor a Review publishes a release by
+        itself.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+        {run.reviewId ? (
+          <Link href={`/reviews/${run.reviewId}`} className="text-primary underline underline-offset-2">
+            Open hardware review
+          </Link>
+        ) : (
+          <Link href="/reviews#publish-review" className="text-primary underline underline-offset-2">
+            How to publish a review
+          </Link>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
   const latestWorkflowRunUrl = run.attempts.find((attempt) => attempt.workflowRunUrl)?.workflowRunUrl;
   return (
@@ -420,6 +448,8 @@ export function SummaryView({ run }: Readonly<{ run: RunDetail }>) {
           <Definition label="Last activity">{formatRunDate(run.lastActivityAt)}</Definition>
         </DefinitionGrid>
       </Panel>
+
+      <ReviewLifecyclePanel run={run} />
 
       <CategoryBreakdownPanel run={run} />
 
