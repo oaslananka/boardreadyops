@@ -49,12 +49,12 @@ describe("dependency security overrides", () => {
     expect(lockfile).not.toContain("js-yaml@5.3.0");
     expect(lockfile).not.toContain("undici@8.9.0");
     expect(lockfile).not.toContain("undici@8.10.2");
+    expect(lockfile).toContain("undici@8.11.0");
     expect(actionBundle).not.toContain(
       "h2Options.maxConcurrentStreams != null && (!Number.isInteger(h2Options.connectionWindowSize)",
     );
-    expect(actionBundle).toContain(
-      "h2Options.maxConcurrentStreams != null && (!Number.isInteger(h2Options.maxConcurrentStreams)",
-    );
+    expect(actionBundle).toContain("node_modules/undici/lib/dispatcher/client.js");
+    expect(actionBundle).toContain("maxConcurrentStreams must be a positive integer, greater than 0");
     expect(lockfile).not.toContain("qs@6.15.3");
   });
 });

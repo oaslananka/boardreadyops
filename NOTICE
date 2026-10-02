@@ -949,7 +949,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `@modelcontextprotocol/sdk@1.30.0`
   - Description: Model Context Protocol implementation for TypeScript
   - Homepage: https://modelcontextprotocol.io
-- `@next/env@16.3.3`
+- `@next/env@16.3.6`
   - Description: Next.js dotenv file loading
   - Homepage: https://github.com/vercel/next.js#readme
 - `@nodable/entities@2.1.0`
@@ -2152,7 +2152,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `hey-listen@1.0.8`
   - Description: Warning and invariant dev-ex messaging.
   - Homepage: https://github.com/Popmotion/hey-listen#readme
-- `hono@4.13.5`
+- `hono@4.13.7`
   - Description: Web framework built on Web Standards
   - Homepage: https://hono.dev
 - `hookable@6.1.1`
@@ -2375,7 +2375,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `make-dir@4.0.0`
   - Description: Make a directory and its parents if needed - Think `mkdir -p`
   - Homepage: https://github.com/sindresorhus/make-dir#readme
-- `markdown-it@14.3.0`
+- `markdown-it@14.3.1`
   - Description: Markdown-it - modern pluggable markdown parser.
   - Homepage: https://github.com/markdown-it/markdown-it#readme
 - `marked@17.0.6`
@@ -2465,7 +2465,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `neo-async@2.6.2`
   - Description: Neo-Async is a drop-in replacement for Async, it almost fully covers its functionality and runs faster
   - Homepage: https://github.com/suguru03/neo-async
-- `next@16.3.3`
+- `next@16.3.6`
   - Description: The React Framework
   - Homepage: https://nextjs.org
 - `next-themes@0.4.6`
@@ -2923,7 +2923,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `teex@1.0.1`
   - Description: Turn a readable stream into multiple readable streamx streams
   - Homepage: https://github.com/mafintosh/teex
-- `third-party-web@0.29.2`
+- `third-party-web@0.29.2`, `third-party-web@0.30.0`
   - Description: Categorized data on third party entities on the web.
   - Homepage: https://github.com/patrickhulce/third-party-web#readme
 - `tiny-inflate@1.0.3`
@@ -3005,7 +3005,7 @@ The image preserves the KiCad package license text at `/usr/share/doc/boardready
 - `underscore@1.13.8`
   - Description: JavaScript's functional programming helper library.
   - Homepage: https://underscorejs.org
-- `undici@8.11.0`
+- `undici@6.29.0`, `undici@8.11.0`
   - Description: An HTTP/1.1 client, written from scratch for Node.js
   - Homepage: https://undici.nodejs.org
 - `undici-types@7.18.2`
