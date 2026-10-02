@@ -3,6 +3,34 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "upgrade-insecure-requests",
+].join("; ");
+
+export const securityHeaders = [
+  { key: "Content-Security-Policy", value: contentSecurityPolicy },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
+  },
+  { key: "X-Frame-Options", value: "DENY" },
+];
+
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: repositoryRoot,
@@ -11,6 +39,7 @@ const nextConfig = {
   async headers() {
     const noindex = { key: "X-Robots-Tag", value: "noindex, nofollow" };
     return [
+      { source: "/:path*", headers: securityHeaders },
       ...[
         "/setup",
         "/dashboard",
