@@ -34,7 +34,9 @@ export function ValidatedRevisionRegisterForm({
   return (
     <ActionForm
       action={action}
-      onSuccess={() => router.refresh()}
+      onSuccess={() => {
+        router.refresh();
+      }}
       className="grid max-w-3xl gap-4 md:grid-cols-[minmax(0,1fr)_minmax(12rem,0.45fr)_auto] md:items-end"
     >
       {({ state, pending }) => (
