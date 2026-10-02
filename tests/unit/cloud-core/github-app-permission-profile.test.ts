@@ -82,7 +82,14 @@ describe("declared GitHub App permission profile", () => {
   });
 
   it("maps every offered action onto a capability requirement the evaluator can check", () => {
-    expect(githubAppActions.map((action) => action.id)).toEqual(["rerun", "release-preview", "setup", "waive", "fix"]);
+    expect(githubAppActions.map((action) => action.id)).toEqual([
+      "rerun",
+      "release-preview",
+      "setup",
+      "validate",
+      "waive",
+      "fix",
+    ]);
     const requirements = new Set(githubAppActions.map((action) => action.requirement));
     expect([...requirements].sort()).toEqual(["dispatch_analysis", "remediation_pr", "setup_pr", "waiver_pr"]);
   });

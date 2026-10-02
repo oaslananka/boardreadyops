@@ -4,7 +4,7 @@ import type { RepositorySetupPreset } from "@boardreadyops/cloud-core/repository
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
-import { Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
+import { Alert, Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
 export type SetupTargetRepository = {
@@ -30,6 +30,8 @@ export type RepositorySetupInteractiveProps = {
   signedIn?: boolean;
   /** Why the one-click path is unavailable for this installation, when it is. */
   blockedReason?: string;
+  /** Why readiness validation is unavailable for this installation, when it is. */
+  validationBlockedReason?: string;
 };
 
 type SetupPrResult = {
@@ -41,6 +43,93 @@ type SetupPrResult = {
   manageUrl?: string;
   setupRevision?: number;
 };
+
+type SetupValidationResult = {
+  ok: boolean;
+  outcome?: string;
+  probeId?: string;
+  workflowRunId?: string;
+  workflowRunUrl?: string;
+  status?: string;
+  error?: string;
+  manageUrl?: string;
+};
+
+async function requestSetupValidation(repositoryId: string): Promise<SetupValidationResult> {
+  try {
+    const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "validate", requestId: `ui-validate-${Date.now()}` }),
+    });
+    const data = (await response.json()) as Record<string, unknown>;
+    if (!response.ok || data.ok !== true) {
+      return {
+        ok: false,
+        error: typeof data.error === "string" ? data.error : "Repository readiness could not be validated.",
+        ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
+      };
+    }
+    return {
+      ok: true,
+      ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
+      ...(typeof data.probeId === "string" ? { probeId: data.probeId } : {}),
+      ...(typeof data.workflowRunId === "string" ? { workflowRunId: data.workflowRunId } : {}),
+      ...(typeof data.workflowRunUrl === "string" ? { workflowRunUrl: data.workflowRunUrl } : {}),
+      ...(typeof data.status === "string" ? { status: data.status } : {}),
+    };
+  } catch {
+    return { ok: false, error: "The network request failed. Check your connection and try again." };
+  }
+}
+
+function SetupValidationResultOutput({ result }: Readonly<{ result: SetupValidationResult }>) {
+  const tone = result.ok
+    ? "border-primary/40 bg-primary/10 text-foreground"
+    : "border-destructive/40 bg-destructive/10 text-destructive";
+  return (
+    <output
+      aria-live="polite"
+      className={`flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm ${tone}`}
+    >
+      {result.ok ? (
+        <>
+          <span>
+            ✓ Readiness probe {result.outcome === "replayed" ? "reused" : "dispatched"}.
+            {result.status ? (
+              <>
+                {" Current status: "}
+                {result.status.replaceAll("_", " ")}.
+              </>
+            ) : null}
+          </span>
+          {result.workflowRunUrl ? (
+            <a
+              href={result.workflowRunUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-primary underline underline-offset-2"
+            >
+              View workflow run on GitHub →
+            </a>
+          ) : null}
+        </>
+      ) : (
+        <span>
+          {result.error}
+          {result.manageUrl ? (
+            <>
+              {" "}
+              <a href={result.manageUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                Review the installation on GitHub →
+              </a>
+            </>
+          ) : null}
+        </span>
+      )}
+    </output>
+  );
+}
 
 /**
  * Opens the setup pull request as the signed-in viewer.
@@ -127,10 +216,13 @@ export function RepositorySetupInteractive({
   repositories = [],
   signedIn = false,
   blockedReason,
+  validationBlockedReason,
 }: Readonly<RepositorySetupInteractiveProps>) {
   const [selectedId, setSelectedId] = useState(initialPresetId);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
+  const [validationResult, setValidationResult] = useState<SetupValidationResult | null>(null);
   const [repositoryId, setRepositoryId] = useState(repositories[0]?.id ?? "");
   const [setupOverrides, setSetupOverrides] = useState<
     Record<
@@ -174,6 +266,37 @@ export function RepositorySetupInteractive({
     }
     setIsCreatingPr(false);
   }, [repositoryId, activePreset.id]);
+
+  const handleValidate = useCallback(async () => {
+    if (!repositoryId) return;
+    setIsValidating(true);
+    setValidationResult(null);
+    const result = await requestSetupValidation(repositoryId);
+    setValidationResult(result);
+    if (result.ok) {
+      setSetupOverrides((current) => {
+        const repository = repositories.find((candidate) => candidate.id === repositoryId);
+        const setupRevision = current[repositoryId]?.setupRevision ?? repository?.setupRevision;
+        if (setupRevision === undefined) return current;
+        return {
+          ...current,
+          [repositoryId]: {
+            setupRevision,
+            setupPreset: current[repositoryId]?.setupPreset ?? repository?.setupPreset ?? activePreset.id,
+            setupWorkflowStatus: "unknown",
+            setupConfigStatus: "unknown",
+          },
+        };
+      });
+    }
+    setIsValidating(false);
+  }, [repositoryId, repositories, activePreset.id]);
+
+  const handleSelectRepository = useCallback((id: string) => {
+    setRepositoryId(id);
+    setPrResult(null);
+    setValidationResult(null);
+  }, []);
 
   const selectedRepository = repositories.find((repository) => repository.id === repositoryId);
   const displayedRepository = selectedRepository
@@ -304,13 +427,68 @@ export function RepositorySetupInteractive({
           signedIn={signedIn}
           repositories={repositories}
           repositoryId={repositoryId}
-          onSelectRepository={setRepositoryId}
+          onSelectRepository={handleSelectRepository}
           onCreate={handleCreateSetupPr}
           isCreating={isCreatingPr}
           workflowPath={workflowPath}
           {...(blockedReason ? { blockedReason } : {})}
           {...(prResult ? { result: prResult } : {})}
         />
+      </Panel>
+
+      <Panel
+        id="readiness"
+        title="4. Validate readiness in GitHub Actions"
+        description="Inspect the repository-owned workflow, dispatch a persisted setup probe, and verify the result through the existing OIDC callback."
+      >
+        <ReadinessValidation
+          signedIn={signedIn}
+          repositories={repositories}
+          {...(displayedRepository ? { repository: displayedRepository } : {})}
+          onValidate={handleValidate}
+          isValidating={isValidating}
+          {...(validationBlockedReason ? { blockedReason: validationBlockedReason } : {})}
+          {...(validationResult ? { result: validationResult } : {})}
+        />
+
+        <ol className="mt-4 flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground">
+          <li>Confirm GitHub Actions is enabled and the workflow is active on the default branch.</li>
+          <li>Dispatch the setup probe with a 15-minute persisted deadline and idempotency key.</li>
+          <li>
+            The workflow checks out its own default branch without persisted credentials and validates{" "}
+            <code>boardreadyops.yml</code> with a pinned BoardReadyOps CLI.
+          </li>
+          <li>
+            The result is posted with GitHub Actions OIDC bound to the repository ID, workflow ref, branch ref, and
+            probe ID.
+          </li>
+          <li>The verified preset revision is snapshotted onto every newly accepted run and shown in run history.</li>
+        </ol>
+
+        <div className="mt-4">
+          <Alert title="Recovery and troubleshooting" tone="warning">
+            <p>
+              Missing workflow, disabled Actions, incompatible workflow metadata, missing configuration, invalid
+              configuration, expired probe, stale probe, and dispatch failure are distinct persisted states with stable
+              responses.
+            </p>
+            <p>If your readiness probe does not appear or reports an error, verify:</p>
+            <ul className="flex list-disc flex-col gap-1 pl-5">
+              <li>
+                <strong>Actions permissions:</strong> Confirm GitHub Actions is enabled under Repository Settings &gt;
+                Actions &gt; General.
+              </li>
+              <li>
+                <strong>Local validation:</strong> Run <code>boardreadyops scan</code> locally before committing to
+                verify <code>boardreadyops.yml</code> syntax.
+              </li>
+              <li>
+                <strong>OIDC configuration:</strong> Verify your workflow includes{" "}
+                <code>permissions: id-token: write</code> without manual credential overrides.
+              </li>
+            </ul>
+          </Alert>
+        </div>
       </Panel>
     </>
   );
@@ -401,6 +579,92 @@ function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetReposi
         })}
       </nav>
     </section>
+  );
+}
+
+type ReadinessValidationProps = {
+  signedIn: boolean;
+  repositories: readonly SetupTargetRepository[];
+  repository?: SetupTargetRepository;
+  onValidate: () => void;
+  isValidating: boolean;
+  blockedReason?: string;
+  result?: SetupValidationResult;
+};
+
+function ReadinessValidation({
+  signedIn,
+  repositories,
+  repository,
+  onValidate,
+  isValidating,
+  blockedReason,
+  result,
+}: Readonly<ReadinessValidationProps>) {
+  if (!signedIn) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
+        <p className="text-sm text-muted-foreground">
+          Sign in to validate readiness against a repository connected to your GitHub App installation.
+        </p>
+        <a
+          href="/api/auth/github/login"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+        >
+          Sign in to validate readiness
+        </a>
+      </div>
+    );
+  }
+
+  if (repositories.length === 0) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-card p-4">
+        <p className="text-sm text-muted-foreground">
+          Connect a repository before validating its repository-owned readiness workflow.
+        </p>
+        <a
+          href="https://github.com/apps/boardreadyops/installations/new"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+        >
+          Install the GitHub App
+        </a>
+      </div>
+    );
+  }
+
+  const missingRevision = repository?.setupRevision === undefined;
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">{repository?.fullName ?? "Selected repository"}</p>
+          <p className="text-sm text-muted-foreground">
+            {missingRevision
+              ? "Open the setup pull request first so BoardReadyOps has a persisted policy revision to validate."
+              : "Runs the existing persisted setup probe against the selected repository's default branch."}
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={isValidating || blockedReason !== undefined || missingRevision}
+          onClick={onValidate}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+        >
+          {isValidating ? "Validating readiness…" : "Validate readiness now"}
+        </button>
+      </div>
+
+      {blockedReason ? (
+        <p className="rounded-md border border-warning/40 bg-warning-surface p-3 text-sm text-foreground">
+          {blockedReason}
+        </p>
+      ) : null}
+
+      {result ? <SetupValidationResultOutput result={result} /> : null}
+    </div>
   );
 }
 

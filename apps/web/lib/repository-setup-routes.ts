@@ -361,13 +361,15 @@ async function dispatchSetupProbe(
   }
 }
 
+type RepositorySetupProbeDependencies = Pick<RepositorySetupRouteDependencies, "githubClient" | "now">;
+
 async function createProbe(
   body: Record<string, unknown>,
   actorId: string,
   installationId: string,
   repositoryId: string,
   store: RepositorySetupStore,
-  dependencies: RepositorySetupRouteDependencies,
+  dependencies: RepositorySetupProbeDependencies,
 ): Promise<Response> {
   const requestId = body.requestId;
   if (typeof requestId !== "string" || !validIdentifier(requestId)) {
@@ -482,6 +484,40 @@ async function createSetupPr(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return controlPlaneJsonError(`failed to create setup pull request: ${message}`, 502);
+  }
+}
+
+/**
+ * Dispatches setup validation for an already-authorized actor.
+ *
+ * Session-authenticated callers pass the already viewer-scoped setup store. This reuses the
+ * operator probe implementation without exposing an operator bearer token to the browser or
+ * opening a second repository authorization path.
+ */
+export async function handleRepositorySetupProbeForActor(
+  input: Readonly<{
+    actorId: string;
+    installationId: string;
+    repositoryId: string;
+    requestId: string;
+  }>,
+  store: RepositorySetupStore,
+  dependencies: RepositorySetupProbeDependencies,
+): Promise<Response> {
+  if (!validIdentifier(input.installationId) || !validIdentifier(input.repositoryId)) {
+    return controlPlaneJsonError("repository setup scope is invalid", 400);
+  }
+  try {
+    return await createProbe(
+      { requestId: input.requestId },
+      input.actorId,
+      input.installationId,
+      input.repositoryId,
+      store,
+      dependencies,
+    );
+  } catch {
+    return controlPlaneJsonError("repository setup operation failed", 503);
   }
 }
 

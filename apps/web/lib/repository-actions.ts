@@ -13,7 +13,11 @@ import { authenticateApiRequest, resolveRepositoryApiContext } from "./api-auth.
 import { readBoundedRequestBody } from "./bounded-request-body.js";
 import { createInstallationCapabilitiesDependencies } from "./installation-capabilities.js";
 import { databaseErrorCode, emitRepositoryActionTelemetry, errorClassOf } from "./repository-action-telemetry.js";
-import { handleRepositorySetupCreatePrForActor } from "./repository-setup-routes.js";
+import { createRepositorySetupGitHubClient } from "./repository-setup-github.js";
+import {
+  handleRepositorySetupCreatePrForActor,
+  handleRepositorySetupProbeForActor,
+} from "./repository-setup-routes.js";
 
 /**
  * The dashboard's action surface, and the reason it exists.
@@ -27,6 +31,7 @@ import { handleRepositorySetupCreatePrForActor } from "./repository-setup-routes
  * This module adds that entry point without a second implementation of any of it:
  *
  * - `setup` reuses the synchronous `createSetupPr` path the operator API already calls.
+ * - `validate` reuses the persisted setup-probe inspection and dispatch path.
  * - `rerun`, `release-preview`, and `waive` enqueue the exact lifecycle actions
  *   `executeParsedCommand` builds, through the same `acceptGitHubWebhook` intake the webhook
  *   uses. They therefore inherit its idempotency, retry, dead-lettering, and audit trail, and
@@ -322,6 +327,22 @@ export async function handleRepositoryAction(
         ...(parsed.preset ? { preset: parsed.preset } : {}),
         requestId,
       });
+    }
+
+    if (parsed.action === "validate") {
+      return await handleRepositorySetupProbeForActor(
+        {
+          actorId: auth.actorId,
+          installationId: context.installationId,
+          repositoryId: scope.repositoryId,
+          requestId,
+        },
+        createSqlRepositorySetupStore(scope.executor),
+        {
+          githubClient: () => createRepositorySetupGitHubClient({ environment: dependencies.environment }),
+          now: dependencies.now,
+        },
+      );
     }
 
     const target = parsed.runId ? await loadRunTarget(scope.executor, scope.repositoryId, parsed.runId) : undefined;

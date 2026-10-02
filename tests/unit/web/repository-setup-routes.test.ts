@@ -3,6 +3,7 @@ import { resetOperatorRateLimitForTests } from "../../../apps/web/lib/operator-r
 import {
   handleRepositorySetupGet,
   handleRepositorySetupPost,
+  handleRepositorySetupProbeForActor,
   type RepositorySetupRouteDependencies,
 } from "../../../apps/web/lib/repository-setup-routes.js";
 import type { RepositorySetupStore } from "../../../packages/db/src/repository-setup-store.js";
@@ -183,6 +184,38 @@ describe("repository setup operator routes", () => {
         actorId: "operator.primary",
         workflowStatus: "unknown",
         configStatus: "unknown",
+      }),
+    );
+  });
+
+  it("dispatches a setup probe for an already-authorized viewer actor", async () => {
+    const setupStore = store();
+    const deps = dependencies(setupStore);
+
+    const response = await handleRepositorySetupProbeForActor(
+      {
+        actorId: "viewer.github.42",
+        installationId,
+        repositoryId,
+        requestId: "ui-validate-1",
+      },
+      setupStore,
+      { githubClient: deps.githubClient, now: deps.now },
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: true,
+      outcome: "dispatched",
+      probeId: "22222222-2222-4222-8222-222222222222",
+      workflowRunId: "987",
+    });
+    expect(setupStore.createProbe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        installationId,
+        repositoryId,
+        requestedBy: "viewer.github.42",
+        requestId: "ui-validate-1",
       }),
     );
   });
