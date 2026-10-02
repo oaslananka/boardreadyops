@@ -1,4 +1,9 @@
-import type { WorkspaceDeliveryRecord, WorkspaceMembershipRecord, WorkspaceRevisionRecord } from "@boardreadyops/db";
+import type {
+  ValidatedRevisionCandidate,
+  WorkspaceDeliveryRecord,
+  WorkspaceMembershipRecord,
+  WorkspaceRevisionRecord,
+} from "@boardreadyops/db";
 import { parseListingPage, workspaceListingPageSize } from "./project-listing.js";
 import { reviewFixturesEnabled } from "./review-listing.js";
 import type { UserSession } from "./user-session.js";
@@ -31,6 +36,7 @@ export type DeliveryListingResult =
        * exists once a package has been uploaded, and that upload is API-only today.
        */
       revisions: readonly WorkspaceRevisionRecord[];
+      revisionCandidates: readonly ValidatedRevisionCandidate[];
       total: number;
       page: number;
       totalPages: number;
@@ -60,13 +66,24 @@ export async function loadWorkspaceDeliveries(
     const total = counts.deliveries;
     const totalPages = Math.max(1, Math.ceil(total / workspaceListingPageSize));
     const page = parseListingPage(requestedPage, totalPages);
-    const [deliveries, revisions] = await Promise.all([
+    const [deliveries, revisions, revisionCandidates] = await Promise.all([
       store.listDeliveriesByWorkspace(selected.id, workspaceListingPageSize, (page - 1) * workspaceListingPageSize),
       // The revision picker in the create form is unpaged on purpose: it is a dropdown of things
       // you might share, not a listing, and a paged dropdown cannot be searched.
       store.listRevisionsByWorkspace(selected.id),
+      store.listValidatedRevisionCandidatesByWorkspace(selected.id),
     ]);
-    return { state: "ok", workspaces, selected, deliveries, revisions, total, page, totalPages };
+    return {
+      state: "ok",
+      workspaces,
+      selected,
+      deliveries,
+      revisions,
+      revisionCandidates,
+      total,
+      page,
+      totalPages,
+    };
   } finally {
     await executor.close();
   }
