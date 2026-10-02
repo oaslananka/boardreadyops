@@ -59,6 +59,20 @@ export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
   },
 ];
 
+/**
+ * Presets offered for new setup revisions.
+ *
+ * `contract-design` remains resolvable for historical revisions, but is intentionally not
+ * selectable: its version-one config is semantically identical to `production`. Keeping the
+ * legacy identifier readable avoids invalidating provenance while we stop advertising a fake
+ * product distinction.
+ */
+export const repositorySetupSelectablePresets: readonly RepositorySetupPreset[] = repositorySetupPresets.filter(
+  (preset) => preset.id !== "contract-design",
+);
+
+const selectablePresetIds = new Set(repositorySetupSelectablePresets.map((preset) => preset.id));
+
 const presetById = new Map(repositorySetupPresets.map((preset) => [preset.id, preset]));
 
 export function repositorySetupPreset(id: string): RepositorySetupPreset | undefined {
@@ -67,6 +81,10 @@ export function repositorySetupPreset(id: string): RepositorySetupPreset | undef
 
 export function isRepositorySetupPresetId(value: unknown): value is RepositorySetupPresetId {
   return typeof value === "string" && presetById.has(value as RepositorySetupPresetId);
+}
+
+export function isRepositorySetupSelectablePresetId(value: unknown): value is RepositorySetupPresetId {
+  return typeof value === "string" && selectablePresetIds.has(value as RepositorySetupPresetId);
 }
 
 export const defaultReadinessWorkflowTemplate = `name: BoardReadyOps Readiness Runner
