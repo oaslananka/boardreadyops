@@ -24,7 +24,7 @@ describe("repository setup documentation", () => {
       "open-source hardware",
       "prototype fabrication",
       "production release",
-      "contract-design handoff",
+      "legacy `contract-design` identifier",
       "Contents write",
       "setup revision",
       "GitHub Actions OIDC",
