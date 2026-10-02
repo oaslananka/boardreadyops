@@ -113,7 +113,8 @@ describe("repository setup operator routes", () => {
       permissions: { repository: { contents: "write", actions: "write", checks: "write" } },
       assistedInstallation: { available: true, explicitOptInRequired: false },
     });
-    expect(payload.presets as unknown[]).toHaveLength(4);
+    expect(payload.presets as unknown[]).toHaveLength(3);
+    expect(JSON.stringify(payload.presets)).not.toContain("contract-design");
     expect(JSON.stringify(payload)).not.toContain("installation-token");
   });
 
@@ -186,6 +187,29 @@ describe("repository setup operator routes", () => {
         configStatus: "unknown",
       }),
     );
+  });
+
+  it("rejects the legacy contract-design alias for new setup selections and explicit setup PRs", async () => {
+    const setupStore = store();
+    const deps = dependencies(setupStore);
+    deps.mutationService = vi.fn(() => ({ execute: vi.fn() }));
+
+    const selectResponse = await handleRepositorySetupPost(
+      request("POST", { action: "select_preset", preset: "contract-design", requestId: "legacy-select" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(selectResponse.status).toBe(400);
+    expect(setupStore.applyRevision).not.toHaveBeenCalled();
+
+    const createResponse = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", preset: "contract-design", requestId: "legacy-create" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+    expect(createResponse.status).toBe(400);
   });
 
   it("records unavailable readiness with a bounded namespaced request id", async () => {
@@ -320,7 +344,7 @@ describe("repository setup operator routes", () => {
       repositoryId,
       dependencies(failedStore, {
         dispatchProbe: vi.fn(async () => {
-          throw new Error("authorization=secret");
+          throw new Error("authorization=[REDACTED]
         }),
       }),
     );
