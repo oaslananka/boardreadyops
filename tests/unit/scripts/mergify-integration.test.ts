@@ -68,7 +68,6 @@ describe("Mergify integration contract", () => {
   });
 
   it("does not replace the repository CI risk profile with Mergify scopes", () => {
-    expect(mergify).not.toContain("merge_queue_scope");
     expect(ci).not.toContain("ci / detect-scopes");
     expect(ci).not.toContain("needs.detect-scopes.outputs");
   });

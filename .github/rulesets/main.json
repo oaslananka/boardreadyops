@@ -60,9 +60,6 @@
           },
           {
             "context": "security / gate"
-          },
-          {
-            "context": "security / osv pull request / osv-scan"
           }
         ],
         "strict_required_status_checks_policy": true

@@ -71,7 +71,6 @@ describe("main branch governance ruleset", () => {
       "ci / coverage-gate",
       "SonarCloud Code Analysis",
       "security / gate",
-      "security / osv pull request / osv-scan",
     ]);
   });
 
