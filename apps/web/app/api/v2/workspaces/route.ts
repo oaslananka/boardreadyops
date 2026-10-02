@@ -3,7 +3,7 @@ import { createPgQueryExecutor } from "@boardreadyops/db/pg-executor";
 import { z } from "zod";
 import { authenticateApiRequest } from "../../../../lib/api-auth.js";
 import { resolveCloudPersistenceConfiguration } from "../../../../lib/cloud-runtime-config.js";
-import { authorizeWorkspace, workspaceUserIdFor } from "../../../../lib/workspace-authorization.js";
+import { authorizeWorkspace, workspacePrincipalFor } from "../../../../lib/workspace-authorization.js";
 
 export const runtime = "nodejs";
 
@@ -47,8 +47,8 @@ export async function POST(request: Request): Promise<Response> {
 
   // The creator becomes the workspace owner, so a workspace is never left with no member able
   // to reach it -- and never reachable by everyone for want of one.
-  const ownerUserId = workspaceUserIdFor(auth);
-  if (!ownerUserId) {
+  const owner = workspacePrincipalFor(auth);
+  if (!owner) {
     return Response.json(
       { ok: false, error: "API tokens are scoped to a repository and cannot create workspaces." },
       { status: 403 },
@@ -80,7 +80,9 @@ export async function POST(request: Request): Promise<Response> {
     const workspace = await store.createWorkspace({
       name: parsed.data.name,
       slug: parsed.data.slug,
-      ownerUserId,
+      ownerUserId: owner.login,
+      ownerGitHubUserId: owner.githubUserId,
+      ownerGitHubLogin: owner.login,
       planTier: parsed.data.planTier as WorkspacePlanTier | undefined,
     });
     return Response.json({ ok: true, workspace }, { status: 201 });

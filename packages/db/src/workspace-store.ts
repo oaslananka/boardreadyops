@@ -6,6 +6,16 @@ export type WorkspacePlanTier = "community" | "team" | "business" | "pilot";
 /** Matches the `workspace_members.role` check constraint in migration 0064. */
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
 
+export type WorkspacePrincipal = {
+  githubUserId: number;
+  login: string;
+};
+
+export type VerifiedWorkspacePrincipal = WorkspacePrincipal & {
+  displayName?: string;
+  avatarUrl?: string;
+};
+
 export interface WorkspaceRecord {
   id: string;
   name: string;
@@ -15,10 +25,20 @@ export interface WorkspaceRecord {
   createdAt: string;
 }
 
-/** One person's membership of a workspace. `userId` is a GitHub login, the membership key. */
+/**
+ * One person's membership of a workspace.
+ *
+ * `userId` remains the legacy storage key for migration compatibility. New grants are pinned to
+ * `githubUserId`; authorization prefers that stable id so a later GitHub login rename does not
+ * transfer access to a different account.
+ */
 export interface WorkspaceMemberRecord {
   workspaceId: string;
   userId: string;
+  githubUserId?: number;
+  githubLogin: string;
+  githubDisplayName?: string;
+  githubAvatarUrl?: string;
   role: WorkspaceRole;
   createdAt: string;
 }
@@ -90,6 +110,17 @@ type WorkspaceRow = {
   created_at: string | Date;
 };
 
+type WorkspaceMemberRow = {
+  workspace_id: string;
+  user_id: string;
+  github_user_id: number | string | null;
+  github_login: string | null;
+  github_display_name: string | null;
+  github_avatar_url: string | null;
+  role: string;
+  created_at: string | Date;
+};
+
 type ProjectRow = {
   id: string;
   workspace_id: string;
@@ -128,6 +159,22 @@ function mapWorkspace(row: WorkspaceRow): WorkspaceRecord {
     slug: row.slug,
     planTier: row.plan_tier as WorkspacePlanTier,
     ...(row.stripe_customer_id !== null ? { stripeCustomerId: row.stripe_customer_id } : {}),
+    createdAt: new Date(row.created_at).toISOString(),
+  };
+}
+
+function mapWorkspaceMember(row: WorkspaceMemberRow): WorkspaceMemberRecord {
+  const githubUserId = row.github_user_id === null ? undefined : Number(row.github_user_id);
+  return {
+    workspaceId: row.workspace_id,
+    userId: row.user_id,
+    ...(githubUserId !== undefined && Number.isSafeInteger(githubUserId) && githubUserId > 0 ? { githubUserId } : {}),
+    githubLogin: row.github_login ?? row.user_id,
+    ...(row.github_display_name ? { githubDisplayName: row.github_display_name } : {}),
+    ...(row.github_avatar_url ? { githubAvatarUrl: row.github_avatar_url } : {}),
+    role: (row.role === "owner" || row.role === "admin" || row.role === "member"
+      ? row.role
+      : "viewer") as WorkspaceRole,
     createdAt: new Date(row.created_at).toISOString(),
   };
 }
@@ -187,6 +234,8 @@ export class WorkspaceStore {
     name: string;
     slug: string;
     ownerUserId: string;
+    ownerGitHubUserId?: number | undefined;
+    ownerGitHubLogin?: string | undefined;
     planTier?: WorkspacePlanTier | undefined;
     stripeCustomerId?: string | undefined;
   }): Promise<WorkspaceRecord> {
@@ -198,11 +247,20 @@ export class WorkspaceStore {
          values ($1, $2, $3, $4, $5)
          returning id, name, slug, plan_tier, stripe_customer_id, created_at
        ), owner_membership as (
-         insert into workspace_members (workspace_id, user_id, role)
-         select created.id, $6, 'owner' from created
+         insert into workspace_members (workspace_id, user_id, github_user_id, github_login, role)
+         select created.id, $6, $7, coalesce($8, $6), 'owner' from created
        )
        select id, name, slug, plan_tier, stripe_customer_id, created_at from created`,
-      [id, input.name, input.slug, planTier, input.stripeCustomerId ?? null, input.ownerUserId],
+      [
+        id,
+        input.name,
+        input.slug,
+        planTier,
+        input.stripeCustomerId ?? null,
+        input.ownerUserId,
+        input.ownerGitHubUserId ?? null,
+        input.ownerGitHubLogin ?? null,
+      ],
     )) as { rows?: WorkspaceRow[] };
 
     const row = result?.rows?.[0];
@@ -212,11 +270,37 @@ export class WorkspaceStore {
     return mapWorkspace(row);
   }
 
+  /** Binds a pre-0071 login-only membership to a verified stable GitHub identity. */
+  private async bindLegacyWorkspaceIdentity(principal: WorkspacePrincipal): Promise<void> {
+    await this.executor.query(
+      `update workspace_members as legacy
+          set github_user_id = $1,
+              github_login = $2
+        where legacy.github_user_id is null
+          and lower(legacy.user_id) = lower($2)
+          and not exists (
+            select 1
+              from workspace_members as stable
+             where stable.workspace_id = legacy.workspace_id
+               and stable.github_user_id = $1
+          )`,
+      [principal.githubUserId, principal.login],
+    );
+  }
+
   /** The caller's role in a workspace, or `null` when they are not a member of it. */
-  async workspaceRoleFor(workspaceId: string, userId: string): Promise<WorkspaceRole | null> {
+  async workspaceRoleFor(workspaceId: string, principal: string | WorkspacePrincipal): Promise<WorkspaceRole | null> {
+    if (typeof principal !== "string") await this.bindLegacyWorkspaceIdentity(principal);
     const result = (await this.executor.query(
-      `select role from workspace_members where workspace_id = $1 and user_id = $2`,
-      [workspaceId, userId],
+      typeof principal === "string"
+        ? `select role from workspace_members where workspace_id = $1 and lower(user_id) = lower($2)`
+        : `select role
+             from workspace_members
+            where workspace_id = $1
+              and (github_user_id = $2 or (github_user_id is null and lower(user_id) = lower($3)))
+            order by (github_user_id = $2) desc
+            limit 1`,
+      typeof principal === "string" ? [workspaceId, principal] : [workspaceId, principal.githubUserId, principal.login],
     )) as { rows?: { role: string }[] };
 
     const role = result?.rows?.[0]?.role;
@@ -224,15 +308,24 @@ export class WorkspaceStore {
   }
 
   /** Every workspace the user belongs to, newest first. */
-  async listWorkspacesForUser(userId: string): Promise<readonly WorkspaceMembershipRecord[]> {
+  async listWorkspacesForUser(principal: string | WorkspacePrincipal): Promise<readonly WorkspaceMembershipRecord[]> {
+    if (typeof principal !== "string") await this.bindLegacyWorkspaceIdentity(principal);
     const result = (await this.executor.query(
-      `select workspaces.id, workspaces.name, workspaces.slug, workspaces.plan_tier,
-              workspaces.stripe_customer_id, workspaces.created_at, workspace_members.role
-         from workspace_members
-         join workspaces on workspaces.id = workspace_members.workspace_id
-        where workspace_members.user_id = $1
-        order by workspaces.created_at desc, workspaces.id desc`,
-      [userId],
+      typeof principal === "string"
+        ? `select workspaces.id, workspaces.name, workspaces.slug, workspaces.plan_tier,
+                  workspaces.stripe_customer_id, workspaces.created_at, workspace_members.role
+             from workspace_members
+             join workspaces on workspaces.id = workspace_members.workspace_id
+            where lower(workspace_members.user_id) = lower($1)
+            order by workspaces.created_at desc, workspaces.id desc`
+        : `select workspaces.id, workspaces.name, workspaces.slug, workspaces.plan_tier,
+                  workspaces.stripe_customer_id, workspaces.created_at, workspace_members.role
+             from workspace_members
+             join workspaces on workspaces.id = workspace_members.workspace_id
+            where workspace_members.github_user_id = $1
+               or (workspace_members.github_user_id is null and lower(workspace_members.user_id) = lower($2))
+            order by workspaces.created_at desc, workspaces.id desc`,
+      typeof principal === "string" ? [principal] : [principal.githubUserId, principal.login],
     )) as { rows?: (WorkspaceRow & { role: string })[] };
 
     return (result?.rows ?? []).map((row) => ({
@@ -242,7 +335,6 @@ export class WorkspaceStore {
         : "viewer") as WorkspaceRole,
     }));
   }
-
   /**
    * A workspace by slug, with the logins that own it.
    *
@@ -308,7 +400,8 @@ export class WorkspaceStore {
     page?: { limit: number; offset: number },
   ): Promise<readonly WorkspaceMemberRecord[]> {
     const result = (await this.executor.query(
-      `select workspace_id, user_id, role, created_at
+      `select workspace_id, user_id, github_user_id, github_login, github_display_name,
+              github_avatar_url, role, created_at
          from workspace_members
         where workspace_id = $1
         order by case role
@@ -320,49 +413,79 @@ export class WorkspaceStore {
                  user_id
         ${page ? "limit $2 offset $3" : ""}`,
       page ? [workspaceId, page.limit, page.offset] : [workspaceId],
-    )) as { rows?: { workspace_id: string; user_id: string; role: string; created_at: string | Date }[] };
+    )) as { rows?: WorkspaceMemberRow[] };
 
-    return (result?.rows ?? []).map((row) => ({
-      workspaceId: row.workspace_id,
-      userId: row.user_id,
-      role: (row.role === "owner" || row.role === "admin" || row.role === "member"
-        ? row.role
-        : "viewer") as WorkspaceRole,
-      createdAt: new Date(row.created_at).toISOString(),
-    }));
+    return (result?.rows ?? []).map(mapWorkspaceMember);
   }
 
   /**
-   * Grants or changes access. Idempotent on the primary key, so re-adding someone updates their
-   * role rather than failing -- which is what "add them as an admin" means when they are already
-   * a member.
-   *
-   * There is no invitation step: `workspace_members.user_id` is a GitHub login, and the row takes
-   * effect the moment that person signs in. Callers must say so.
+   * Grants or changes access to a GitHub principal resolved immediately before this write.
+   * Stable GitHub user id is authoritative; login/profile fields are display metadata.
+   * The role mutation and audit row are one SQL statement.
    */
   async upsertWorkspaceMember(input: {
     workspaceId: string;
-    userId: string;
+    subject: VerifiedWorkspacePrincipal;
+    actor: WorkspacePrincipal;
     role: WorkspaceRole;
   }): Promise<WorkspaceMemberRecord> {
     const result = (await this.executor.query(
-      `insert into workspace_members (workspace_id, user_id, role)
-       values ($1, $2, $3)
-       on conflict (workspace_id, user_id) do update set role = excluded.role
-       returning workspace_id, user_id, role, created_at`,
-      [input.workspaceId, input.userId, input.role],
-    )) as { rows?: { workspace_id: string; user_id: string; role: string; created_at: string | Date }[] };
+      `with existing as (
+         select user_id, role
+           from workspace_members
+          where workspace_id = $1
+            and (github_user_id = $2 or (github_user_id is null and lower(user_id) = lower($3)))
+          order by (github_user_id = $2) desc
+          limit 1
+          for update
+       ), updated as (
+         update workspace_members
+            set github_user_id = $2,
+                github_login = $3,
+                github_display_name = $4,
+                github_avatar_url = $5,
+                role = $6
+          where workspace_id = $1
+            and user_id = (select user_id from existing)
+         returning workspace_id, user_id, github_user_id, github_login, github_display_name,
+                   github_avatar_url, role, created_at
+       ), inserted as (
+         insert into workspace_members (
+           workspace_id, user_id, github_user_id, github_login, github_display_name, github_avatar_url, role
+         )
+         select $1, $3, $2, $3, $4, $5, $6
+          where not exists (select 1 from updated)
+         returning workspace_id, user_id, github_user_id, github_login, github_display_name,
+                   github_avatar_url, role, created_at
+       ), member as (
+         select * from updated
+         union all
+         select * from inserted
+       ), audited as (
+         insert into workspace_member_audit_events (
+           workspace_id, event_type, actor_github_user_id, actor_login,
+           subject_github_user_id, subject_login, previous_role, role
+         )
+         select $1, 'workspace_member.upsert', $7, $8, $2, $3, (select role from existing), $6
+          from member
+       )
+       select * from member`,
+      [
+        input.workspaceId,
+        input.subject.githubUserId,
+        input.subject.login,
+        input.subject.displayName ?? null,
+        input.subject.avatarUrl ?? null,
+        input.role,
+        input.actor.githubUserId,
+        input.actor.login,
+      ],
+    )) as { rows?: WorkspaceMemberRow[] };
 
     const row = result?.rows?.[0];
     if (!row) throw new Error("Failed to upsert workspace member");
-    return {
-      workspaceId: row.workspace_id,
-      userId: row.user_id,
-      role: input.role,
-      createdAt: new Date(row.created_at).toISOString(),
-    };
+    return mapWorkspaceMember(row);
   }
-
   /**
    * Removes a member, refusing to remove the last owner.
    *
@@ -372,22 +495,37 @@ export class WorkspaceStore {
    *
    * Returns whether a row was removed; `false` means either no such member or the last owner.
    */
-  async removeWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
+  async removeWorkspaceMember(input: {
+    workspaceId: string;
+    userId: string;
+    actor: WorkspacePrincipal;
+  }): Promise<boolean> {
     const result = (await this.executor.query(
-      `delete from workspace_members
-        where workspace_id = $1
-          and user_id = $2
-          and (
-            role <> 'owner'
-            or exists (
-              select 1 from workspace_members as others
-               where others.workspace_id = $1
-                 and others.user_id <> $2
-                 and others.role = 'owner'
+      `with removed as (
+         delete from workspace_members
+          where workspace_id = $1
+            and user_id = $2
+            and (
+              role <> 'owner'
+              or exists (
+                select 1 from workspace_members as others
+                 where others.workspace_id = $1
+                   and others.user_id <> $2
+                   and others.role = 'owner'
+              )
             )
-          )
-       returning user_id`,
-      [workspaceId, userId],
+         returning user_id, github_user_id, coalesce(github_login, user_id) as github_login, role
+       ), audited as (
+         insert into workspace_member_audit_events (
+           workspace_id, event_type, actor_github_user_id, actor_login,
+           subject_github_user_id, subject_login, previous_role, role
+         )
+         select $1, 'workspace_member.remove', $3, $4,
+                github_user_id, github_login, role, null
+           from removed
+       )
+       select user_id from removed`,
+      [input.workspaceId, input.userId, input.actor.githubUserId, input.actor.login],
     )) as { rows?: unknown[] };
 
     return (result?.rows ?? []).length > 0;

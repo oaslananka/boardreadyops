@@ -41,7 +41,7 @@ export async function loadWorkspaceMembers(
 
   const { store, executor } = await openWorkspaceStore(connectionString);
   try {
-    const workspaces = await store.listWorkspacesForUser(session.login);
+    const workspaces = await store.listWorkspacesForUser({ githubUserId: session.userId, login: session.login });
     if (workspaces.length === 0) return { state: "no-workspaces" };
 
     const selected = workspaces.find((workspace) => workspace.id === requestedWorkspaceId) ?? workspaces[0];

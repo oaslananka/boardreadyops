@@ -84,6 +84,8 @@ export const createWorkspaceAction = defineAction(createWorkspaceSchema, async (
       name: input.name,
       slug: input.slug,
       ownerUserId: session.login,
+      ownerGitHubUserId: session.userId,
+      ownerGitHubLogin: session.login,
     });
     revalidatePath("/projects");
     return ok({ workspaceId: workspace.id }, `Created ${workspace.name}.`);
@@ -101,7 +103,10 @@ export const createProjectAction = defineAction(createProjectSchema, async (inpu
     // Re-authorized here rather than trusted from the form: the workspace id is a hidden input,
     // and a hidden input is a suggestion. Same answer for "not a member" and "does not exist",
     // so a guessed id cannot be used to discover which ids are real.
-    const role = await store.workspaceRoleFor(input.workspaceId, session.login);
+    const role = await store.workspaceRoleFor(input.workspaceId, {
+      githubUserId: session.userId,
+      login: session.login,
+    });
     if (!role) return fail("Workspace not found.");
     if (role === "viewer") return fail("Viewers cannot create projects.");
 
@@ -129,7 +134,7 @@ export const renameProjectAction = defineAction(renameProjectSchema, async (inpu
     // and the caller's membership re-read before anything is written.
     const workspaceId = await store.workspaceIdForProject(input.projectId);
     if (!workspaceId) return fail("Project not found.");
-    const role = await store.workspaceRoleFor(workspaceId, session.login);
+    const role = await store.workspaceRoleFor(workspaceId, { githubUserId: session.userId, login: session.login });
     if (!role) return fail("Project not found.");
     if (role === "viewer") return fail("Viewers cannot rename projects.");
 
@@ -151,7 +156,7 @@ export const deleteProjectAction = defineAction(deleteProjectSchema, async (inpu
   try {
     const workspaceId = await store.workspaceIdForProject(input.projectId);
     if (!workspaceId) return fail("Project not found.");
-    const role = await store.workspaceRoleFor(workspaceId, session.login);
+    const role = await store.workspaceRoleFor(workspaceId, { githubUserId: session.userId, login: session.login });
     if (!role) return fail("Project not found.");
     if (role !== "owner") return fail("Only a workspace owner can delete a project.");
 
@@ -181,7 +186,10 @@ export const renameWorkspaceAction = defineAction(renameWorkspaceSchema, async (
 
   const { store, executor } = await openWorkspaceStore(connectionString);
   try {
-    const role = await store.workspaceRoleFor(input.workspaceId, session.login);
+    const role = await store.workspaceRoleFor(input.workspaceId, {
+      githubUserId: session.userId,
+      login: session.login,
+    });
     if (!role) return fail("Workspace not found.");
     if (role !== "owner" && role !== "admin") return fail("Only owners and admins can rename a workspace.");
 
@@ -207,7 +215,10 @@ export const deleteWorkspaceAction = defineAction(deleteWorkspaceSchema, async (
 
   const { store, executor } = await openWorkspaceStore(connectionString);
   try {
-    const role = await store.workspaceRoleFor(input.workspaceId, session.login);
+    const role = await store.workspaceRoleFor(input.workspaceId, {
+      githubUserId: session.userId,
+      login: session.login,
+    });
     if (!role) return fail("Workspace not found.");
     if (role !== "owner") return fail("Only a workspace owner can delete it.");
 

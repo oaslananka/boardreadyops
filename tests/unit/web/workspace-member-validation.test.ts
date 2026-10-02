@@ -1,18 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * Adding a member grants access to a GitHub login typed into a box.
- *
- * A typo therefore grants access to an account that may not exist, or — the case nothing can
- * detect — to a different real person whose name is one character away. Refusing the first
- * catches most of it; these cover that the check runs after authorization, and that GitHub being
- * unreachable does not block member management.
- */
-
 const store = vi.hoisted(() => ({
   workspaceRoleFor: vi.fn(),
   listWorkspaceMembers: vi.fn(async () => []),
-  upsertWorkspaceMember: vi.fn(async () => ({ userId: "octocat", role: "member" })),
+  upsertWorkspaceMember: vi.fn(async (input: { subject: { githubUserId: number; login: string }; role: string }) => ({
+    userId: input.subject.login,
+    githubUserId: input.subject.githubUserId,
+    githubLogin: input.subject.login,
+    role: input.role,
+  })),
   removeWorkspaceMember: vi.fn(async () => true),
 }));
 
@@ -22,7 +18,7 @@ vi.mock("../../../apps/web/lib/workspace-store-access.js", () => ({
 
 vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
   viewerAuthorization: vi.fn(async () => ({
-    session: { login: "owner-person", installationIds: [1] },
+    session: { userId: 4711, login: "owner-person", installationIds: [1] },
     authorizeRepository: async () => true,
     authorizeInstallation: async () => true,
   })),
@@ -30,7 +26,9 @@ vi.mock("../../../apps/web/lib/viewer-authorization.js", () => ({
 
 process.env.DATABASE_URL = "postgres://test_user:test_secret@test_db_host:5432/test_db";
 
-const { upsertWorkspaceMemberAction } = await import("../../../apps/web/app/settings/workspace/actions.js");
+const { resolveWorkspaceMemberIdentityAction, upsertWorkspaceMemberAction } = await import(
+  "../../../apps/web/app/settings/workspace/actions.js"
+);
 
 function form(values: Record<string, string>): FormData {
   const data = new FormData();
@@ -39,58 +37,102 @@ function form(values: Record<string, string>): FormData {
 }
 
 const idle = { status: "idle" } as never;
-const add = () => form({ workspaceId: "ws-1", userId: "typoo", role: "member" });
+const lookup = () => form({ workspaceId: "ws-1", userId: "octocat" });
+const grant = (githubUserId = "583231") =>
+  form({ workspaceId: "ws-1", userId: "octocat", githubUserId, role: "member" });
+
+function githubUser(id = 583231) {
+  return new Response(
+    JSON.stringify({
+      id,
+      login: "octocat",
+      name: "The Octocat",
+      avatar_url: "https://avatars.githubusercontent.com/u/583231?v=4",
+      type: "User",
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  store.workspaceRoleFor.mockResolvedValue("owner");
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
 });
 
-describe("workspace member validation", () => {
-  it("refuses a login GitHub does not know, and names it", async () => {
-    store.workspaceRoleFor.mockResolvedValue("owner");
-    fetchMock.mockResolvedValue(new Response("", { status: 404 }));
+describe("workspace member identity verification", () => {
+  it("resolves identity metadata without granting access", async () => {
+    fetchMock.mockResolvedValue(githubUser());
 
-    const result = await upsertWorkspaceMemberAction(idle, add());
+    const result = await resolveWorkspaceMemberIdentityAction(idle, lookup());
 
-    expect(result).toMatchObject({ status: "error" });
-    expect(JSON.stringify(result)).toContain("typoo");
+    expect(result).toMatchObject({
+      status: "ok",
+      data: {
+        githubUserId: 583231,
+        login: "octocat",
+        displayName: "The Octocat",
+      },
+    });
     expect(store.upsertWorkspaceMember).not.toHaveBeenCalled();
   });
 
-  it("grants when GitHub knows the login", async () => {
-    store.workspaceRoleFor.mockResolvedValue("owner");
-    fetchMock.mockResolvedValue(new Response(JSON.stringify({ login: "typoo" }), { status: 200 }));
+  it("refuses a login GitHub does not know", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 404 }));
 
-    const result = await upsertWorkspaceMemberAction(idle, add());
+    const result = await resolveWorkspaceMemberIdentityAction(idle, lookup());
 
-    expect(result).toMatchObject({ status: "ok" });
-    expect(store.upsertWorkspaceMember).toHaveBeenCalled();
+    expect(result).toMatchObject({ status: "error" });
+    expect(JSON.stringify(result)).toContain("octocat");
+    expect(store.upsertWorkspaceMember).not.toHaveBeenCalled();
   });
 
-  it("grants anyway when GitHub cannot answer, rather than blocking on an outage", async () => {
-    store.workspaceRoleFor.mockResolvedValue("owner");
-    for (const outage of [new Response("", { status: 403 }), new Response("", { status: 500 })]) {
+  it("fails closed when GitHub cannot verify the principal", async () => {
+    for (const failure of [
+      () => Promise.resolve(new Response("", { status: 403 })),
+      () => Promise.resolve(new Response("", { status: 500 })),
+      () => Promise.reject(new Error("ETIMEDOUT")),
+    ]) {
       vi.clearAllMocks();
       store.workspaceRoleFor.mockResolvedValue("owner");
-      fetchMock.mockResolvedValue(outage);
-      expect(await upsertWorkspaceMemberAction(idle, add())).toMatchObject({ status: "ok" });
-    }
+      fetchMock.mockImplementation(failure);
 
-    vi.clearAllMocks();
-    store.workspaceRoleFor.mockResolvedValue("owner");
-    fetchMock.mockRejectedValue(new Error("ETIMEDOUT"));
-    expect(await upsertWorkspaceMemberAction(idle, add())).toMatchObject({ status: "ok" });
+      expect(await upsertWorkspaceMemberAction(idle, grant())).toMatchObject({ status: "error" });
+      expect(store.upsertWorkspaceMember).not.toHaveBeenCalled();
+    }
   });
 
-  it("does not call GitHub at all for a caller who may not manage members", async () => {
-    // Otherwise the form becomes a way for anyone to probe which logins exist.
+  it("requires the confirmed stable GitHub user id to match the write-time lookup", async () => {
+    fetchMock.mockResolvedValue(githubUser(999999));
+
+    const result = await upsertWorkspaceMemberAction(idle, grant("583231"));
+
+    expect(result).toMatchObject({ status: "error" });
+    expect(JSON.stringify(result)).toContain("identity changed");
+    expect(store.upsertWorkspaceMember).not.toHaveBeenCalled();
+  });
+
+  it("grants the re-verified stable principal and records the actor identity in the store call", async () => {
+    fetchMock.mockResolvedValue(githubUser());
+
+    const result = await upsertWorkspaceMemberAction(idle, grant());
+
+    expect(result).toMatchObject({ status: "ok" });
+    expect(store.upsertWorkspaceMember).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      subject: expect.objectContaining({ githubUserId: 583231, login: "octocat" }),
+      actor: { githubUserId: 4711, login: "owner-person" },
+      role: "member",
+    });
+  });
+
+  it("does not call GitHub for a caller who may not manage members", async () => {
     store.workspaceRoleFor.mockResolvedValue("viewer");
 
-    const result = await upsertWorkspaceMemberAction(idle, add());
+    const result = await resolveWorkspaceMemberIdentityAction(idle, lookup());
 
     expect(result).toMatchObject({ status: "error" });
     expect(fetchMock).not.toHaveBeenCalled();
