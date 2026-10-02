@@ -2,6 +2,16 @@
 
 The review app is an app-style pull request review experience for release checks. Instead of the full Markdown report, BoardReadyOps posts a compact, sticky review comment: a single release decision, a severity breakdown, the top findings grouped by severity, and links to the full reports. It is part of the [BoardReadyOps v2 roadmap](https://github.com/oaslananka/boardreadyops/issues/192).
 
+## Decision lifecycle
+
+BoardReadyOps keeps three related records separate:
+
+1. **Run** — execution history and evidence for one analyzed commit. Normal readiness and GitHub Action runs appear in **Runs** and do **not** automatically create a Review.
+2. **Review** — an explicit decision context created when review evidence is published (for example with `boardreadyops review publish`). A Review can point at the run that supplied its head evidence.
+3. **Release** — a separate publish/release action. A Run or Review existing in the dashboard does not itself publish a tag, GitHub Release, or manufacturer handoff.
+
+When a Run already has a linked Review, the Run summary links directly to it. Otherwise the Run summary links to the Reviews publish guidance instead of implying that a missing Review is a failed Run.
+
 ## Comment format
 
 The review comment is designed to be scannable in a code review:
