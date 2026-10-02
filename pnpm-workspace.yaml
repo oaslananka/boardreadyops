@@ -9,7 +9,12 @@ minimumReleaseAgeExclude:
   - 'js-yaml@5.2.2 || 4.3.2'
   # OSV security update: nanoid@3.3.17 || 3.3.18
   - 'nanoid@3.3.17 || 3.3.18'
-  - 'hono@4.13.5'
+  # OSV security update: hono@4.13.7
+  - 'hono@4.13.7'
+  # OSV security update: markdown-it@14.3.1
+  - 'markdown-it@14.3.1'
+  # OSV security update: next@16.3.6
+  - 'next@16.3.6'
   # Renovate security update: ip-address@10.7.1
   - 'ip-address@10.7.1'
   - 'valibot@1.4.2'
@@ -61,7 +66,8 @@ overrides:
   '@babel/core@>=7.0.0 <7.29.1': '>=7.29.1'
   'brace-expansion@>=5 <5.0.12': 5.0.12
   'fast-uri@>=3 <3.1.8': 3.1.8
-  'hono@<4.13.5': 4.13.5
+  'hono@<4.13.7': 4.13.7
+  'markdown-it@<14.3.1': 14.3.1
   'ip-address@<10.7.1': 10.7.1
   'nanoid@<3.3.17': 3.3.18
   js-yaml@>=4 <4.3.2: 4.3.2
