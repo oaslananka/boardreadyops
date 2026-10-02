@@ -6,6 +6,7 @@ const workspaceListingCounts = vi.fn(async () => ({ projects: 0, deliveries: 0, 
 const listWorkspacesForUser = vi.fn();
 const listDeliveriesByWorkspace = vi.fn();
 const listRevisionsByWorkspace = vi.fn();
+const listValidatedRevisionCandidatesByWorkspace = vi.fn();
 const close = vi.fn();
 
 vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
@@ -15,6 +16,7 @@ vi.mock("../../../packages/db/src/index.js", async (importOriginal) => ({
     listWorkspacesForUser = listWorkspacesForUser;
     listDeliveriesByWorkspace = listDeliveriesByWorkspace;
     listRevisionsByWorkspace = listRevisionsByWorkspace;
+    listValidatedRevisionCandidatesByWorkspace = listValidatedRevisionCandidatesByWorkspace;
   },
 }));
 
@@ -67,6 +69,7 @@ describe("loadWorkspaceDeliveries", () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a", "Alpha"), workspace("ws_b", "Beta")]);
     listDeliveriesByWorkspace.mockReset().mockResolvedValue([{ id: "del_1" }]);
     listRevisionsByWorkspace.mockReset().mockResolvedValue([{ id: "rev_1" }]);
+    listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);
 
     const result = await loadWorkspaceDeliveries(session, "ws_b", postgres);
 
@@ -74,12 +77,14 @@ describe("loadWorkspaceDeliveries", () => {
     expect(result.state === "ok" && result.selected.id).toBe("ws_b");
     expect(listDeliveriesByWorkspace).toHaveBeenCalledWith("ws_b", 25, 0);
     expect(listRevisionsByWorkspace).toHaveBeenCalledWith("ws_b");
+    expect(listValidatedRevisionCandidatesByWorkspace).toHaveBeenCalledWith("ws_b");
   });
 
   it("keys the workspace list on the viewer's login", async () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a")]);
     listDeliveriesByWorkspace.mockReset().mockResolvedValue([]);
     listRevisionsByWorkspace.mockReset().mockResolvedValue([]);
+    listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);
 
     await loadWorkspaceDeliveries(session, undefined, postgres);
 
@@ -90,18 +95,21 @@ describe("loadWorkspaceDeliveries", () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a", "Alpha")]);
     listDeliveriesByWorkspace.mockReset().mockResolvedValue([]);
     listRevisionsByWorkspace.mockReset().mockResolvedValue([]);
+    listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);
 
     const result = await loadWorkspaceDeliveries(session, "ws_someone_elses", postgres);
 
     expect(result.state === "ok" && result.selected.id).toBe("ws_a");
     expect(listDeliveriesByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses", 25, 0);
     expect(listRevisionsByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses");
+    expect(listValidatedRevisionCandidatesByWorkspace).not.toHaveBeenCalledWith("ws_someone_elses");
   });
 
   it("reports no-workspaces without listing anything", async () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([]);
     listDeliveriesByWorkspace.mockReset();
     listRevisionsByWorkspace.mockReset();
+    listValidatedRevisionCandidatesByWorkspace.mockReset();
 
     await expect(loadWorkspaceDeliveries(session, undefined, postgres)).resolves.toEqual({
       state: "no-workspaces",
@@ -124,6 +132,7 @@ describe("loadWorkspaceDeliveries", () => {
     listWorkspacesForUser.mockReset().mockResolvedValue([workspace("ws_a")]);
     listDeliveriesByWorkspace.mockReset().mockRejectedValue(new Error("connection reset"));
     listRevisionsByWorkspace.mockReset().mockResolvedValue([]);
+    listValidatedRevisionCandidatesByWorkspace.mockReset().mockResolvedValue([]);
 
     await expect(loadWorkspaceDeliveries(session, undefined, postgres)).rejects.toThrow("connection reset");
     expect(close).toHaveBeenCalledTimes(1);
