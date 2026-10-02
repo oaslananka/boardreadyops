@@ -285,6 +285,7 @@ export function RepositorySetupInteractive({
                 <DefinitionGrid>
                   <Definition label="Release mode">{preset.releaseMode}</Definition>
                   <Definition label="Fail threshold">{preset.failOn}</Definition>
+                  <Definition label="Intent-specific policy effect">{preset.policyEffect}</Definition>
                 </DefinitionGrid>
                 <Link
                   className={`mt-2 inline-flex min-h-11 w-fit items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] ${

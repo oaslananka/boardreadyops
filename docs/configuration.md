@@ -6,12 +6,12 @@ The primary configuration file is `boardreadyops.yml`. The loader also accepts `
 
 The `/setup` preview and operator setup API provide four versioned starting points:
 
-| Preset | Intended use | Release mode | Default failure threshold |
-| --- | --- | --- | --- |
-| Open-source hardware | Reproducible community releases and component traceability | `pilot` | `high` |
-| Prototype fabrication | First-build safeguards with lower manufacturing-document overhead | `prototype` | `high` |
-| Production release | Strict fabrication, supply-chain, manufacturing, and release evidence | `production` | `medium` |
-| Contract design handoff | Auditable client handoff with complete evidence and traceability | `production` | `medium` |
+| Preset | Intended use | Release mode | Default failure threshold | Intent-specific policy effect |
+| --- | --- | --- | --- | --- |
+| Open-source hardware | Reproducible community releases and component traceability | `pilot` | `high` | Community release evidence without production-only manufacturing evidence requirements |
+| Prototype fabrication | First-build safeguards with lower manufacturing-document overhead | `prototype` | `high` | Relaxes package-completeness, output-coverage, changelog, and release-tag checks |
+| Production release | Strict fabrication, supply-chain, manufacturing, and release evidence | `production` | `medium` | Full production manufacturing/release rules without an explicit output-freshness requirement |
+| Contract design handoff | Auditable client handoff with complete evidence and traceability | `production` | `medium` | Production rules plus required fresh Gerber, drill, position/CPL, and BOM outputs |
 
 The generated YAML is a reviewable starting point, not a hidden server-side policy. Commit it through the repository's normal branch protections. Changing the selected preset creates a new append-only setup revision; existing runs keep the setup revision captured when they were accepted.
 

@@ -44,6 +44,9 @@ describe("repository setup preview page", () => {
     expect(markup).toContain("Prototype fabrication");
     expect(markup).toContain("Production release");
     expect(markup).toContain("Contract design handoff");
+    expect(markup).toContain("Intent-specific policy effect");
+    expect(markup).toContain("without an explicit output-freshness requirement");
+    expect(markup).toContain("required fresh Gerber, drill, position/CPL, and BOM outputs");
     expect(markup).toContain("boardreadyops.yml");
     expect(markup).toContain(".github/workflows/readiness-runner.yml");
     // The page renders the profile declared in cloud-core rather than its own copy of the list,
