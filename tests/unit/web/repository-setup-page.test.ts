@@ -82,6 +82,8 @@ describe("repository setup preview page", () => {
     expect(markup).toContain('href="#proposed-files"');
     expect(markup).toContain('href="#automated-setup"');
     expect(markup).toContain('href="#readiness"');
+    expect(markup).toContain("Repository onboarding state");
+    expect(markup).toContain("Preview only");
   });
 
   it("offers the one-click step to a signed-out visitor instead of hiding it", async () => {

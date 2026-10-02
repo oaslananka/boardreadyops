@@ -31,6 +31,12 @@ export type RepositorySummary = {
   openFindings: number;
   watchedBoards: number;
   openSupplyFindings: number;
+  /** Latest persisted repository setup revision, if onboarding has started. */
+  setupRevision?: number;
+  setupPreset?: string;
+  setupWorkflowStatus?: string;
+  setupConfigStatus?: string;
+  setupObservedSha?: string;
 };
 
 export type RepositoryGroup = {
@@ -70,6 +76,12 @@ function count(row: Record<string, unknown>, name: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function integer(row: Record<string, unknown>, name: string): number | undefined {
+  const value = row[name];
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
 const repositorySummaryQuery = `
   with visible as (
     select repositories.id,
@@ -78,9 +90,16 @@ const repositorySummaryQuery = `
            repositories.private,
            repositories.installation_id,
            installations.account_login,
-           installations.github_installation_id
+           installations.github_installation_id,
+           setup.revision as setup_revision,
+           setup.preset as setup_preset,
+           setup.workflow_status as setup_workflow_status,
+           setup.config_status as setup_config_status,
+           setup.observed_sha as setup_observed_sha
       from repositories
       join installations on installations.id = repositories.installation_id
+      left join repository_setup_revisions as setup
+        on setup.id = repositories.current_setup_revision_id
      where installations.github_installation_id = any($1::bigint[])
        and repositories.disabled_at is null
        and installations.suspended_at is null
@@ -108,6 +127,11 @@ const repositorySummaryQuery = `
          latest.status,
          latest.decision,
          latest.started_at,
+         visible.setup_revision,
+         visible.setup_preset,
+         visible.setup_workflow_status,
+         visible.setup_config_status,
+         visible.setup_observed_sha,
          -- Waived findings are a decision someone already made; counting them would keep
          -- showing work that is closed.
          (select count(*) from findings
@@ -152,6 +176,11 @@ export async function loadViewerRepositories(
       const installationId = text(row, "installation_id");
       if (!id || !owner || !name || !installationId) continue;
       const accountLogin = text(row, "account_login") ?? owner;
+      const setupRevision = integer(row, "setup_revision");
+      const setupPreset = text(row, "setup_preset");
+      const setupWorkflowStatus = text(row, "setup_workflow_status");
+      const setupConfigStatus = text(row, "setup_config_status");
+      const setupObservedSha = text(row, "setup_observed_sha");
 
       const summary: RepositorySummary = {
         id,
@@ -169,6 +198,11 @@ export async function loadViewerRepositories(
         openFindings: count(row, "open_findings"),
         watchedBoards: count(row, "watched_boards"),
         openSupplyFindings: count(row, "open_supply_findings"),
+        ...(setupRevision === undefined ? {} : { setupRevision }),
+        ...(setupPreset ? { setupPreset } : {}),
+        ...(setupWorkflowStatus ? { setupWorkflowStatus } : {}),
+        ...(setupConfigStatus ? { setupConfigStatus } : {}),
+        ...(setupObservedSha ? { setupObservedSha } : {}),
       };
 
       const group = groups.get(accountLogin) ?? { accountLogin, repositories: [] };

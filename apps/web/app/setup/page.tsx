@@ -45,6 +45,11 @@ async function setupTargets() {
       fullName: `${repository.owner}/${repository.name}`,
       accountLogin: repository.accountLogin,
       githubInstallationId: repository.githubInstallationId,
+      ...(repository.setupRevision === undefined ? {} : { setupRevision: repository.setupRevision }),
+      ...(repository.setupPreset ? { setupPreset: repository.setupPreset } : {}),
+      ...(repository.setupWorkflowStatus ? { setupWorkflowStatus: repository.setupWorkflowStatus } : {}),
+      ...(repository.setupConfigStatus ? { setupConfigStatus: repository.setupConfigStatus } : {}),
+      ...(repository.setupObservedSha ? { setupObservedSha: repository.setupObservedSha } : {}),
     })),
   );
 
@@ -96,53 +101,6 @@ export default async function SetupPage({ searchParams }: Readonly<SetupPageProp
             branch. Step 3 is where you choose between copying the files yourself and having them opened for you.
           </p>
         </Alert>
-
-        <nav className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Repository setup steps">
-          <a
-            href="#policy-preset"
-            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
-          >
-            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-bold transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              01
-            </span>
-            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
-              1. Choose a release policy
-            </strong>
-          </a>
-          <a
-            href="#proposed-files"
-            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
-          >
-            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground border border-border text-sm font-bold transition-colors group-hover:border-primary/40 group-hover:text-foreground">
-              02
-            </span>
-            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
-              2. Review repository-owned files
-            </strong>
-          </a>
-          <a
-            href="#automated-setup"
-            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
-          >
-            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground border border-border text-sm font-bold transition-colors group-hover:border-primary/40 group-hover:text-foreground">
-              03
-            </span>
-            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
-              3. Open the pull request
-            </strong>
-          </a>
-          <a
-            href="#readiness"
-            className="group flex items-center gap-3.5 rounded-md border border-border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99]"
-          >
-            <span className="setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground border border-border text-sm font-bold transition-colors group-hover:border-primary/40 group-hover:text-foreground">
-              04
-            </span>
-            <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
-              4. Validate readiness in GitHub Actions
-            </strong>
-          </a>
-        </nav>
 
         {hasInstallationHandoff ? (
           <Alert title="GitHub App installation handoff" tone="success">

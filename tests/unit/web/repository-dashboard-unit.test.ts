@@ -63,6 +63,11 @@ describe("repository dashboard and viewer loader branches", () => {
           open_findings: "2",
           watched_boards: "1",
           open_supply_findings: "0",
+          setup_revision: "3",
+          setup_preset: "production",
+          setup_workflow_status: "ready",
+          setup_config_status: "ready",
+          setup_observed_sha: "a".repeat(40),
         },
       ],
     });
@@ -73,6 +78,13 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(groups[0]?.accountLogin).toBe("acme-corp");
     expect(groups[0]?.repositories[0]?.name).toBe("gateway");
     expect(groups[0]?.repositories[0]?.openFindings).toBe(2);
+    expect(groups[0]?.repositories[0]).toMatchObject({
+      setupRevision: 3,
+      setupPreset: "production",
+      setupWorkflowStatus: "ready",
+      setupConfigStatus: "ready",
+      setupObservedSha: "a".repeat(40),
+    });
   });
 
   it("summarizes only repository facts already present in the viewer groups", () => {

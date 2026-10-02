@@ -454,7 +454,7 @@ async function createSetupPr(
       requestId,
     });
 
-    await store.applyRevision({
+    const setupRevision = await store.applyRevision({
       installationId: context.installationId,
       repositoryId: context.repositoryId,
       preset: plan.preset.id,
@@ -475,6 +475,7 @@ async function createSetupPr(
         pullRequestUrl: result.pullRequestUrl,
         branchName: result.branchName,
         commitSha: result.commitSha,
+        ...(setupRevision.revision === undefined ? {} : { setupRevision: setupRevision.revision }),
       },
       result.outcome === "created" ? 201 : 200,
     );

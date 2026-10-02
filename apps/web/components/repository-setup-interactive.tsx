@@ -3,6 +3,7 @@
 import type { RepositorySetupPreset } from "@boardreadyops/cloud-core/repository-setup";
 import Link from "next/link";
 import { useCallback, useState } from "react";
+import { deriveRepositorySetupState } from "../lib/repository-setup-state.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "./ui.js";
 import { YamlSyntaxHighlighter } from "./yaml-syntax-highlighter.js";
 
@@ -10,6 +11,11 @@ export type SetupTargetRepository = {
   id: string;
   fullName: string;
   accountLogin: string;
+  setupRevision?: number;
+  setupPreset?: string;
+  setupWorkflowStatus?: string;
+  setupConfigStatus?: string;
+  setupObservedSha?: string;
 };
 
 export type RepositorySetupInteractiveProps = {
@@ -33,6 +39,7 @@ type SetupPrResult = {
   pullRequestUrl?: string;
   error?: string;
   manageUrl?: string;
+  setupRevision?: number;
 };
 
 /**
@@ -63,6 +70,7 @@ async function requestSetupPr(repositoryId: string, presetId: string): Promise<S
       ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
       ...(typeof data.pullRequestNumber === "number" ? { pullRequestNumber: data.pullRequestNumber } : {}),
       ...(typeof data.pullRequestUrl === "string" ? { pullRequestUrl: data.pullRequestUrl } : {}),
+      ...(typeof data.setupRevision === "number" ? { setupRevision: data.setupRevision } : {}),
     };
   } catch {
     return { ok: false, error: "The network request failed. Check your connection and try again." };
@@ -124,6 +132,14 @@ export function RepositorySetupInteractive({
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [prResult, setPrResult] = useState<SetupPrResult | null>(null);
   const [repositoryId, setRepositoryId] = useState(repositories[0]?.id ?? "");
+  const [setupOverrides, setSetupOverrides] = useState<
+    Record<
+      string,
+      Required<
+        Pick<SetupTargetRepository, "setupRevision" | "setupPreset" | "setupWorkflowStatus" | "setupConfigStatus">
+      >
+    >
+  >({});
 
   const fallback = presets[0];
   if (!fallback) throw new Error("At least one preset must be provided");
@@ -144,11 +160,30 @@ export function RepositorySetupInteractive({
     setPrResult(null);
     const result = await requestSetupPr(repositoryId, activePreset.id);
     setPrResult(result);
+    const setupRevision = result.setupRevision;
+    if (result.ok && setupRevision !== undefined) {
+      setSetupOverrides((current) => ({
+        ...current,
+        [repositoryId]: {
+          setupRevision,
+          setupPreset: activePreset.id,
+          setupWorkflowStatus: "unknown",
+          setupConfigStatus: "unknown",
+        },
+      }));
+    }
     setIsCreatingPr(false);
   }, [repositoryId, activePreset.id]);
 
+  const selectedRepository = repositories.find((repository) => repository.id === repositoryId);
+  const displayedRepository = selectedRepository
+    ? { ...selectedRepository, ...(setupOverrides[repositoryId] ?? {}) }
+    : undefined;
+
   return (
     <>
+      <SetupProgress {...(displayedRepository ? { repository: displayedRepository } : {})} />
+
       <Panel
         id="policy-preset"
         title="1. Choose a release policy"
@@ -278,6 +313,94 @@ export function RepositorySetupInteractive({
         />
       </Panel>
     </>
+  );
+}
+
+const setupSteps = [
+  { id: "policy-preset", label: "1. Choose a release policy" },
+  { id: "proposed-files", label: "2. Review repository-owned files" },
+  { id: "automated-setup", label: "3. Open the pull request" },
+  { id: "readiness", label: "4. Validate readiness in GitHub Actions" },
+] as const;
+
+function SetupProgress({ repository }: Readonly<{ repository?: SetupTargetRepository }>) {
+  const state = deriveRepositorySetupState(repository ?? {});
+  const label = repository ? state.label : "Preview only";
+  const description = repository
+    ? state.description
+    : "Preview the policy and repository-owned files now. After you sign in and select a repository, this tracker follows the persisted setup state.";
+  const badgeValue = state.id === "ready" ? "ready" : state.id === "attention" ? "warning" : "pending";
+
+  return (
+    <section
+      aria-labelledby="repository-setup-progress-title"
+      className="flex flex-col gap-4 rounded-md border border-border bg-card p-4"
+      data-setup-state={repository ? state.id : "preview"}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase text-muted-foreground">Repository onboarding state</p>
+          <h2 id="repository-setup-progress-title" className="text-base font-bold text-foreground">
+            {repository?.fullName ?? "Choose a repository to persist setup progress"}
+          </h2>
+        </div>
+        <StatusBadge value={badgeValue} label={label} />
+      </div>
+
+      <p className="text-sm text-muted-foreground">{description}</p>
+
+      {repository ? (
+        <DefinitionGrid>
+          <Definition label="Setup revision">
+            {repository.setupRevision === undefined ? "Not created" : `#${repository.setupRevision}`}
+          </Definition>
+          <Definition label="Persisted policy">
+            {repository.setupPreset?.replaceAll("-", " ") ?? "Not recorded"}
+          </Definition>
+          <Definition label="Workflow">
+            {repository.setupWorkflowStatus?.replaceAll("_", " ") ?? "Not checked"}
+          </Definition>
+          <Definition label="Configuration">
+            {repository.setupConfigStatus?.replaceAll("_", " ") ?? "Not checked"}
+          </Definition>
+          <Definition label="Verified commit">
+            {state.id === "ready" && repository.setupObservedSha
+              ? repository.setupObservedSha.slice(0, 8)
+              : "Not verified"}
+          </Definition>
+        </DefinitionGrid>
+      ) : null}
+
+      <nav className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Repository setup steps">
+        {setupSteps.map((step, index) => {
+          const stepNumber = (index + 1) as 1 | 2 | 3 | 4;
+          const current = state.currentStep === stepNumber;
+          return (
+            <a
+              href={`#${step.id}`}
+              key={step.id}
+              aria-current={current ? "step" : undefined}
+              className={`group flex items-center gap-3.5 rounded-md border bg-card p-3.5 shadow-xs transition-all duration-150 hover:border-primary/60 hover:shadow-sm hover:shadow-primary/5 active:scale-[0.99] ${
+                current ? "border-primary/60 ring-1 ring-primary/30" : "border-border"
+              }`}
+            >
+              <span
+                className={`setup-progress-index flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors ${
+                  current
+                    ? "border-primary/20 bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+                    : "border-border bg-muted text-muted-foreground group-hover:border-primary/40 group-hover:text-foreground"
+                }`}
+              >
+                {String(stepNumber).padStart(2, "0")}
+              </span>
+              <strong className="text-sm text-foreground transition-colors group-hover:text-primary">
+                {step.label}
+              </strong>
+            </a>
+          );
+        })}
+      </nav>
+    </section>
   );
 }
 
