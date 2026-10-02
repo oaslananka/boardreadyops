@@ -55,6 +55,35 @@ type SetupProbeResult = {
   manageUrl?: string;
 };
 
+type RepositoryActionResponse =
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; error: string; manageUrl?: string };
+
+async function requestRepositoryAction(
+  repositoryId: string,
+  payload: Record<string, unknown>,
+  fallbackError: string,
+): Promise<RepositoryActionResponse> {
+  try {
+    const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = (await response.json()) as Record<string, unknown>;
+    if (!response.ok || data.ok !== true) {
+      return {
+        ok: false,
+        error: typeof data.error === "string" ? data.error : fallbackError,
+        ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
+      };
+    }
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "The network request failed. Check your connection and try again." };
+  }
+}
+
 /**
  * Opens the setup pull request as the signed-in viewer.
  *
@@ -64,58 +93,38 @@ type SetupProbeResult = {
  * the viewer's installations cover this repository before it writes anything.
  */
 async function requestSetupPr(repositoryId: string, presetId: string): Promise<SetupPrResult> {
-  try {
-    const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "setup", preset: presetId, requestId: `ui-setup-${Date.now()}` }),
-    });
-    const data = (await response.json()) as Record<string, unknown>;
-    if (!response.ok || data.ok !== true) {
-      return {
-        ok: false,
-        error: typeof data.error === "string" ? data.error : "The setup pull request could not be opened.",
-        ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
-      };
-    }
-    return {
-      ok: true,
-      ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
-      ...(typeof data.pullRequestNumber === "number" ? { pullRequestNumber: data.pullRequestNumber } : {}),
-      ...(typeof data.pullRequestUrl === "string" ? { pullRequestUrl: data.pullRequestUrl } : {}),
-      ...(typeof data.setupRevision === "number" ? { setupRevision: data.setupRevision } : {}),
-    };
-  } catch {
-    return { ok: false, error: "The network request failed. Check your connection and try again." };
-  }
+  const response = await requestRepositoryAction(
+    repositoryId,
+    { action: "setup", preset: presetId, requestId: `ui-setup-${Date.now()}` },
+    "The setup pull request could not be opened.",
+  );
+  if (!response.ok) return response;
+  const { data } = response;
+  return {
+    ok: true,
+    ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
+    ...(typeof data.pullRequestNumber === "number" ? { pullRequestNumber: data.pullRequestNumber } : {}),
+    ...(typeof data.pullRequestUrl === "string" ? { pullRequestUrl: data.pullRequestUrl } : {}),
+    ...(typeof data.setupRevision === "number" ? { setupRevision: data.setupRevision } : {}),
+  };
 }
 
 async function requestSetupProbe(repositoryId: string): Promise<SetupProbeResult> {
-  try {
-    const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "validate-setup", requestId: `ui-setup-probe-${Date.now()}` }),
-    });
-    const data = (await response.json()) as Record<string, unknown>;
-    if (!response.ok || data.ok !== true) {
-      return {
-        ok: false,
-        error: typeof data.error === "string" ? data.error : "Repository readiness could not be validated.",
-        ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
-      };
-    }
-    return {
-      ok: true,
-      ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
-      ...(typeof data.probeId === "string" ? { probeId: data.probeId } : {}),
-      ...(typeof data.status === "string" ? { status: data.status } : {}),
-      ...(typeof data.workflowRunId === "string" ? { workflowRunId: data.workflowRunId } : {}),
-      ...(typeof data.workflowRunUrl === "string" ? { workflowRunUrl: data.workflowRunUrl } : {}),
-    };
-  } catch {
-    return { ok: false, error: "The network request failed. Check your connection and try again." };
-  }
+  const response = await requestRepositoryAction(
+    repositoryId,
+    { action: "validate-setup", requestId: `ui-setup-probe-${Date.now()}` },
+    "Repository readiness could not be validated.",
+  );
+  if (!response.ok) return response;
+  const { data } = response;
+  return {
+    ok: true,
+    ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
+    ...(typeof data.probeId === "string" ? { probeId: data.probeId } : {}),
+    ...(typeof data.status === "string" ? { status: data.status } : {}),
+    ...(typeof data.workflowRunId === "string" ? { workflowRunId: data.workflowRunId } : {}),
+    ...(typeof data.workflowRunUrl === "string" ? { workflowRunUrl: data.workflowRunUrl } : {}),
+  };
 }
 
 function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
