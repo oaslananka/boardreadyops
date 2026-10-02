@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { SqlQueryExecutor } from "../../../packages/db/src/lifecycle-store.js";
 import { WorkspaceStore } from "../../../packages/db/src/workspace-store.js";
 
@@ -312,6 +312,102 @@ describe("WorkspaceStore", () => {
 
     const fetched = await store.getRevisionById(rev.id);
     expect(fetched).toEqual(rev);
+  });
+
+  it("derives validated revision candidates only through the trusted evidence query", async () => {
+    const query = vi.fn(async (_sql: string, _params: readonly unknown[] = []) => ({
+      rows: [
+        {
+          project_id: "prj-1",
+          project_name: "Gateway board",
+          run_id: "run-1",
+          commit_sha: "a".repeat(40),
+          completed_at: "2026-10-02T03:00:00.000Z",
+          artifact_id: "art-1",
+          artifact_name: "gerbers.zip",
+          bundle_sha256: "b".repeat(64),
+        },
+      ],
+    }));
+    const store = new WorkspaceStore({ query });
+
+    await expect(store.listValidatedRevisionCandidatesByWorkspace("ws-1")).resolves.toEqual([
+      {
+        projectId: "prj-1",
+        projectName: "Gateway board",
+        runId: "run-1",
+        commitSha: "a".repeat(40),
+        completedAt: "2026-10-02T03:00:00.000Z",
+        artifactId: "art-1",
+        artifactName: "gerbers.zip",
+        bundleSha256: "b".repeat(64),
+      },
+    ]);
+
+    const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
+    expect(sql).toContain("release_runs.status = 'completed'");
+    expect(sql).toContain("release_runs.decision = 'pass'");
+    expect(sql).toContain("artifacts.role = 'manufacturing'");
+    expect(sql).toContain("artifacts.kind = 'archive'");
+    expect(sql).toContain("revisions.validation_artifact_id = artifacts.id");
+  });
+
+  it("registers a validated revision through one evidence-rechecking insert-select", async () => {
+    const query = vi.fn(async (_sql: string, _params: readonly unknown[] = []) => ({
+      rows: [
+        {
+          id: "rev-1",
+          project_id: "prj-1",
+          revision_label: "rev C",
+          source_kind: "github_commit",
+          commit_sha: "a".repeat(40),
+          bundle_sha256: "b".repeat(64),
+          normalized_summary: { validation: { status: "validated" } },
+          validation_run_id: "run-1",
+          validation_artifact_id: "art-1",
+          created_at: "2026-10-02T03:00:00.000Z",
+        },
+      ],
+    }));
+    const store = new WorkspaceStore({ query });
+
+    const revision = await store.registerValidatedRevisionFromArtifact({
+      workspaceId: "ws-1",
+      projectId: "prj-1",
+      runId: "run-1",
+      artifactId: "art-1",
+      revisionLabel: "rev C",
+    });
+
+    expect(revision).toMatchObject({
+      projectId: "prj-1",
+      sourceKind: "github_commit",
+      validationRunId: "run-1",
+      validationArtifactId: "art-1",
+    });
+    const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
+    expect(sql).toContain("insert into revisions");
+    expect(sql).toContain("release_runs.status = 'completed'");
+    expect(sql).toContain("release_runs.decision = 'pass'");
+    expect(sql).toContain("artifacts.role = 'manufacturing'");
+    expect(sql).toContain("artifacts.kind = 'archive'");
+    expect(sql).toContain("projects.workspace_id = $2");
+  });
+
+  it("revalidates live manufacturing evidence before a revision may be delivered", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({ rows: [] });
+    const store = new WorkspaceStore({ query });
+
+    await expect(store.revisionHasValidatedManufacturingEvidence("rev-valid")).resolves.toBe(true);
+    await expect(store.revisionHasValidatedManufacturingEvidence("rev-stale")).resolves.toBe(false);
+
+    const sql = String(query.mock.calls[0]?.[0]).toLowerCase();
+    expect(sql).toContain("revisions.bundle_sha256 = artifacts.sha256");
+    expect(sql).toContain("revisions.commit_sha = release_runs.commit_sha");
+    expect(sql).toContain("artifacts.role = 'manufacturing'");
   });
 
   it("creates and retrieves delivery links with token hashing and expiration", async () => {
