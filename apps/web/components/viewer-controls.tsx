@@ -52,7 +52,7 @@ export function ViewerControls({ login }: Readonly<{ login: string | undefined }
         <DropdownMenuLabel>Signed in as {login}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <a href="/settings/billing">Workspace settings</a>
+          <a href="/settings/workspace">Workspace settings</a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a href="https://docs.boardreadyops.com" target="_blank" rel="noreferrer">
