@@ -55,32 +55,61 @@ type SetupValidationResult = {
   manageUrl?: string;
 };
 
-async function requestSetupValidation(repositoryId: string): Promise<SetupValidationResult> {
+type RepositoryActionEnvelope = {
+  ok: boolean;
+  data?: Record<string, unknown>;
+  error?: string;
+  manageUrl?: string;
+};
+
+async function requestRepositoryAction(
+  repositoryId: string,
+  body: Record<string, unknown>,
+  defaultError: string,
+): Promise<RepositoryActionEnvelope> {
   try {
     const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "validate", requestId: `ui-validate-${Date.now()}` }),
+      body: JSON.stringify(body),
     });
     const data = (await response.json()) as Record<string, unknown>;
     if (!response.ok || data.ok !== true) {
       return {
         ok: false,
-        error: typeof data.error === "string" ? data.error : "Repository readiness could not be validated.",
+        error: typeof data.error === "string" ? data.error : defaultError,
         ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
       };
     }
-    return {
-      ok: true,
-      ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
-      ...(typeof data.probeId === "string" ? { probeId: data.probeId } : {}),
-      ...(typeof data.workflowRunId === "string" ? { workflowRunId: data.workflowRunId } : {}),
-      ...(typeof data.workflowRunUrl === "string" ? { workflowRunUrl: data.workflowRunUrl } : {}),
-      ...(typeof data.status === "string" ? { status: data.status } : {}),
-    };
+    return { ok: true, data };
   } catch {
     return { ok: false, error: "The network request failed. Check your connection and try again." };
   }
+}
+
+async function requestSetupValidation(repositoryId: string): Promise<SetupValidationResult> {
+  const response = await requestRepositoryAction(
+    repositoryId,
+    { action: "validate", requestId: `ui-validate-${Date.now()}` },
+    "Repository readiness could not be validated.",
+  );
+  if (!response.ok || !response.data) {
+    return {
+      ok: false,
+      ...(response.error ? { error: response.error } : {}),
+      ...(response.manageUrl ? { manageUrl: response.manageUrl } : {}),
+    };
+  }
+
+  const data = response.data;
+  return {
+    ok: true,
+    ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
+    ...(typeof data.probeId === "string" ? { probeId: data.probeId } : {}),
+    ...(typeof data.workflowRunId === "string" ? { workflowRunId: data.workflowRunId } : {}),
+    ...(typeof data.workflowRunUrl === "string" ? { workflowRunUrl: data.workflowRunUrl } : {}),
+    ...(typeof data.status === "string" ? { status: data.status } : {}),
+  };
 }
 
 function SetupValidationResultOutput({ result }: Readonly<{ result: SetupValidationResult }>) {
@@ -140,30 +169,27 @@ function SetupValidationResultOutput({ result }: Readonly<{ result: SetupValidat
  * the viewer's installations cover this repository before it writes anything.
  */
 async function requestSetupPr(repositoryId: string, presetId: string): Promise<SetupPrResult> {
-  try {
-    const response = await fetch(`/api/v1/repositories/${encodeURIComponent(repositoryId)}/actions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "setup", preset: presetId, requestId: `ui-setup-${Date.now()}` }),
-    });
-    const data = (await response.json()) as Record<string, unknown>;
-    if (!response.ok || data.ok !== true) {
-      return {
-        ok: false,
-        error: typeof data.error === "string" ? data.error : "The setup pull request could not be opened.",
-        ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
-      };
-    }
+  const response = await requestRepositoryAction(
+    repositoryId,
+    { action: "setup", preset: presetId, requestId: `ui-setup-${Date.now()}` },
+    "The setup pull request could not be opened.",
+  );
+  if (!response.ok || !response.data) {
     return {
-      ok: true,
-      ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
-      ...(typeof data.pullRequestNumber === "number" ? { pullRequestNumber: data.pullRequestNumber } : {}),
-      ...(typeof data.pullRequestUrl === "string" ? { pullRequestUrl: data.pullRequestUrl } : {}),
-      ...(typeof data.setupRevision === "number" ? { setupRevision: data.setupRevision } : {}),
+      ok: false,
+      ...(response.error ? { error: response.error } : {}),
+      ...(response.manageUrl ? { manageUrl: response.manageUrl } : {}),
     };
-  } catch {
-    return { ok: false, error: "The network request failed. Check your connection and try again." };
   }
+
+  const data = response.data;
+  return {
+    ok: true,
+    ...(typeof data.outcome === "string" ? { outcome: data.outcome } : {}),
+    ...(typeof data.pullRequestNumber === "number" ? { pullRequestNumber: data.pullRequestNumber } : {}),
+    ...(typeof data.pullRequestUrl === "string" ? { pullRequestUrl: data.pullRequestUrl } : {}),
+    ...(typeof data.setupRevision === "number" ? { setupRevision: data.setupRevision } : {}),
+  };
 }
 
 function SetupPrResultOutput({ result }: Readonly<{ result: SetupPrResult }>) {
