@@ -4,14 +4,15 @@ The primary configuration file is `boardreadyops.yml`. The loader also accepts `
 
 ## Hosted setup presets
 
-The `/setup` preview and operator setup API provide four versioned starting points:
+The `/setup` preview and operator setup API provide three selectable versioned starting points:
 
 | Preset | Intended use | Release mode | Default failure threshold |
 | --- | --- | --- | --- |
 | Open-source hardware | Reproducible community releases and component traceability | `pilot` | `high` |
 | Prototype fabrication | First-build safeguards with lower manufacturing-document overhead | `prototype` | `high` |
 | Production release | Strict fabrication, supply-chain, manufacturing, and release evidence | `production` | `medium` |
-| Contract design handoff | Auditable client handoff with complete evidence and traceability | `production` | `medium` |
+
+`contract-design` remains a recognized legacy setup identifier so historical revisions keep their provenance, but it is not offered for new setup revisions. Its version-one configuration is semantically identical to **Production release**, so advertising both would imply a distinction that does not exist yet. Teams that need a contract-specific handoff policy can start from Production release and layer reviewed repository policy until a differentiated hosted preset is defined.
 
 The generated YAML is a reviewable starting point, not a hidden server-side policy. Commit it through the repository's normal branch protections. Changing the selected preset creates a new append-only setup revision; existing runs keep the setup revision captured when they were accepted.
 
