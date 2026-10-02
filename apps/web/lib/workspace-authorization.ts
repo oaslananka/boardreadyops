@@ -1,4 +1,4 @@
-import type { WorkspaceRole, WorkspaceStore } from "@boardreadyops/db";
+import type { WorkspacePrincipal, WorkspaceRole, WorkspaceStore } from "@boardreadyops/db";
 import type { AuthenticatedApiContext } from "./api-auth.js";
 
 /**
@@ -30,6 +30,11 @@ export function workspaceUserIdFor(auth: AuthenticatedApiContext): string | unde
   return auth.authType === "session" ? auth.actorId : undefined;
 }
 
+export function workspacePrincipalFor(auth: AuthenticatedApiContext): WorkspacePrincipal | undefined {
+  if (auth.authType !== "session" || auth.githubUserId === undefined) return undefined;
+  return { githubUserId: auth.githubUserId, login: auth.actorId };
+}
+
 const bearerTokenNotSupported =
   "API tokens are scoped to a repository and cannot access workspaces. Use a signed-in session.";
 
@@ -38,13 +43,13 @@ export async function authorizeWorkspace(
   store: WorkspaceStore,
   workspaceId: string | null,
 ): Promise<WorkspaceAuthorization> {
-  const userId = workspaceUserIdFor(auth);
-  if (!userId) return { ok: false, status: 403, error: bearerTokenNotSupported };
+  const principal = workspacePrincipalFor(auth);
+  if (!principal) return { ok: false, status: 403, error: bearerTokenNotSupported };
   if (!workspaceId) return { ok: false, status: 404, error: "Workspace not found" };
 
-  const role = await store.workspaceRoleFor(workspaceId, userId);
+  const role = await store.workspaceRoleFor(workspaceId, principal);
   if (!role) return { ok: false, status: 404, error: "Workspace not found" };
-  return { ok: true, userId, role };
+  return { ok: true, userId: principal.login, role };
 }
 
 /** Roles allowed to change a workspace's contents. `viewer` may read but not write. */

@@ -27,14 +27,44 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       };
       this.workspaces.push(row);
       if (s.includes("insert into workspace_members")) {
-        this.members.push({ workspace_id: params[0], user_id: params[5], role: "owner" });
+        this.members.push({
+          workspace_id: params[0],
+          user_id: params[5],
+          github_user_id: params[6] ?? null,
+          github_login: params[7] ?? params[5],
+          github_display_name: null,
+          github_avatar_url: null,
+          role: "owner",
+        });
       }
       return { rows: [row] };
     }
 
+    if (s.includes("update workspace_members as legacy")) {
+      for (const member of this.members) {
+        if (
+          member.github_user_id == null &&
+          String(member.user_id).toLowerCase() === String(params[1]).toLowerCase() &&
+          !this.members.some(
+            (candidate) => candidate.workspace_id === member.workspace_id && candidate.github_user_id === params[0],
+          )
+        ) {
+          member.github_user_id = params[0];
+          member.github_login = params[1];
+        }
+      }
+      return { rows: [] };
+    }
+
     if (s.includes("from workspace_members") && s.includes("join workspaces")) {
+      const stable = s.includes("workspace_members.github_user_id = $1");
       const rows = this.members
-        .filter((m) => m.user_id === params[0])
+        .filter((m) =>
+          stable
+            ? m.github_user_id === params[0] ||
+              (m.github_user_id == null && String(m.user_id).toLowerCase() === String(params[1]).toLowerCase())
+            : String(m.user_id).toLowerCase() === String(params[0]).toLowerCase(),
+        )
         .flatMap((m) => {
           const workspace = this.workspaces.find((w) => w.id === m.workspace_id);
           return workspace ? [{ ...workspace, role: m.role }] : [];
@@ -42,13 +72,27 @@ class MockWorkspaceDb implements SqlQueryExecutor {
       return { rows };
     }
 
-    if (s.includes("insert into workspace_members") && s.includes("on conflict")) {
-      const existing = this.members.find((m) => m.workspace_id === params[0] && m.user_id === params[1]);
-      if (existing) existing.role = params[2];
-      else this.members.push({ workspace_id: params[0], user_id: params[1], role: params[2] });
-      return {
-        rows: [{ workspace_id: params[0], user_id: params[1], role: params[2], created_at: new Date().toISOString() }],
+    if (s.includes("with existing as") && s.includes("workspace_member_audit_events")) {
+      const existing = this.members.find(
+        (m) =>
+          m.workspace_id === params[0] &&
+          (m.github_user_id === params[1] ||
+            (m.github_user_id == null && String(m.user_id).toLowerCase() === String(params[2]).toLowerCase())),
+      );
+      const row = existing ?? {
+        workspace_id: params[0],
+        user_id: params[2],
+        created_at: new Date().toISOString(),
       };
+      Object.assign(row, {
+        github_user_id: params[1],
+        github_login: params[2],
+        github_display_name: params[3],
+        github_avatar_url: params[4],
+        role: params[5],
+      });
+      if (!existing) this.members.push(row);
+      return { rows: [row] };
     }
 
     if (s.includes("delete from workspace_members")) {
@@ -72,7 +116,15 @@ class MockWorkspaceDb implements SqlQueryExecutor {
     }
 
     if (s.includes("from workspace_members")) {
-      const match = this.members.find((m) => m.workspace_id === params[0] && m.user_id === params[1]);
+      const stable = s.includes("github_user_id = $2");
+      const match = this.members.find(
+        (m) =>
+          m.workspace_id === params[0] &&
+          (stable
+            ? m.github_user_id === params[1] ||
+              (m.github_user_id == null && String(m.user_id).toLowerCase() === String(params[2]).toLowerCase())
+            : String(m.user_id).toLowerCase() === String(params[1]).toLowerCase()),
+      );
       return { rows: match ? [{ role: match.role }] : [] };
     }
 
@@ -398,11 +450,21 @@ describe("WorkspaceStore", () => {
     const store = new WorkspaceStore(db);
     const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
 
-    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "member" });
+    await store.upsertWorkspaceMember({
+      workspaceId: ws.id,
+      subject: { githubUserId: 2002, login: "bob" },
+      actor: { githubUserId: 1001, login: "alice" },
+      role: "member",
+    });
     expect(await store.workspaceRoleFor(ws.id, "bob")).toBe("member");
 
     // "Add them as an admin" when they are already a member has to mean promote, not error.
-    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "admin" });
+    await store.upsertWorkspaceMember({
+      workspaceId: ws.id,
+      subject: { githubUserId: 2002, login: "bob" },
+      actor: { githubUserId: 1001, login: "alice" },
+      role: "admin",
+    });
     expect(await store.workspaceRoleFor(ws.id, "bob")).toBe("admin");
     expect(await store.listWorkspaceMembers(ws.id)).toHaveLength(2);
   });
@@ -411,11 +473,22 @@ describe("WorkspaceStore", () => {
     const db = new MockWorkspaceDb();
     const store = new WorkspaceStore(db);
     const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
-    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "admin" });
+    await store.upsertWorkspaceMember({
+      workspaceId: ws.id,
+      subject: { githubUserId: 2002, login: "bob" },
+      actor: { githubUserId: 1001, login: "alice" },
+      role: "admin",
+    });
 
     // Only owners and admins manage members, and an admin cannot promote themselves, so an
     // ownerless workspace is permanently unadministrable.
-    expect(await store.removeWorkspaceMember(ws.id, "alice")).toBe(false);
+    expect(
+      await store.removeWorkspaceMember({
+        workspaceId: ws.id,
+        userId: "alice",
+        actor: { githubUserId: 1001, login: "alice" },
+      }),
+    ).toBe(false);
     expect(await store.workspaceRoleFor(ws.id, "alice")).toBe("owner");
   });
 
@@ -423,9 +496,20 @@ describe("WorkspaceStore", () => {
     const db = new MockWorkspaceDb();
     const store = new WorkspaceStore(db);
     const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
-    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "owner" });
+    await store.upsertWorkspaceMember({
+      workspaceId: ws.id,
+      subject: { githubUserId: 2002, login: "bob" },
+      actor: { githubUserId: 1001, login: "alice" },
+      role: "owner",
+    });
 
-    expect(await store.removeWorkspaceMember(ws.id, "alice")).toBe(true);
+    expect(
+      await store.removeWorkspaceMember({
+        workspaceId: ws.id,
+        userId: "alice",
+        actor: { githubUserId: 1001, login: "alice" },
+      }),
+    ).toBe(true);
     expect(await store.workspaceRoleFor(ws.id, "alice")).toBeNull();
     expect(await store.workspaceRoleFor(ws.id, "bob")).toBe("owner");
   });
@@ -434,9 +518,26 @@ describe("WorkspaceStore", () => {
     const db = new MockWorkspaceDb();
     const store = new WorkspaceStore(db);
     const ws = await store.createWorkspace({ name: "Acme", slug: "acme", ownerUserId: "alice" });
-    await store.upsertWorkspaceMember({ workspaceId: ws.id, userId: "bob", role: "viewer" });
+    await store.upsertWorkspaceMember({
+      workspaceId: ws.id,
+      subject: { githubUserId: 2002, login: "bob" },
+      actor: { githubUserId: 1001, login: "alice" },
+      role: "viewer",
+    });
 
-    expect(await store.removeWorkspaceMember(ws.id, "bob")).toBe(true);
-    expect(await store.removeWorkspaceMember(ws.id, "never-a-member")).toBe(false);
+    expect(
+      await store.removeWorkspaceMember({
+        workspaceId: ws.id,
+        userId: "bob",
+        actor: { githubUserId: 1001, login: "alice" },
+      }),
+    ).toBe(true);
+    expect(
+      await store.removeWorkspaceMember({
+        workspaceId: ws.id,
+        userId: "never-a-member",
+        actor: { githubUserId: 1001, login: "alice" },
+      }),
+    ).toBe(false);
   });
 });
