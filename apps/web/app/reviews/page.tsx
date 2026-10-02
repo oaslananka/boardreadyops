@@ -81,10 +81,19 @@ function NoMatchingReviews() {
 
 function NoReviews() {
   return (
-    <Panel title="No Reviews">
+    <Panel id="publish-review" title="No Reviews">
       <EmptyState title="No hardware reviews found">
         <p>
-          Publish a review via GitHub Action or CLI: <code>boardreadyops review publish</code>
+          Runs do not automatically appear here. Runs are execution history and evidence; a Review is created only by an
+          explicit review publish step.
+        </p>
+        <p>
+          Publish from a configured Action path or CLI with <code>boardreadyops review publish</code>.
+        </p>
+        <p>
+          <Link href="/runs" className="text-primary underline underline-offset-2">
+            Browse run history
+          </Link>
         </p>
       </EmptyState>
     </Panel>
