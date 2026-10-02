@@ -25,6 +25,14 @@ const header = (releaseMode: RepositorySetupPreset["releaseMode"], failOn: Repos
 
 const reports = `report:\n  sarif: boardreadyops.sarif.json\n  json: boardreadyops.findings.json\n  markdown: boardreadyops.report.md\n  html: boardreadyops.report.html\n`;
 
+const productionRules = `  bom.missing-mpn: true\n  bom.compliance: true\n  bom.lifecycle: true\n  bom.risk-score: true\n  bom.eol-detection: true\n  bom.unknown-lifecycle: true\n  bom.single-source: true\n  bom.identity-conflicts: true\n  design.board-outline: true\n  design.unique-references: true\n  drc.kicad: true\n  erc.kicad: true\n  manufacturing.package-completeness: true\n  manufacturing.fab-notes: true\n  manufacturing.position-coverage: true\n  manufacturing.drill-coverage: true\n  manufacturing.tooling-holes: true\n  manufacturing.test-points: true\n  manufacturing.fiducials: true\n  manufacturing.assembly-sides: true\n  manufacturing.layer-stackup: true\n  manufacturing.pin1-markers: true\n  manufacturing.polarity-markers: true\n  manufacturing.silkscreen-over-pad: true\n  release.revision-set: true\n  release.changelog-present: true\n  release.tag-matches-revision: true\n  release.version-format: true\n`;
+
+const contractHandoffEvidenceRules = `  manufacturing.outputs-present:\n    enabled: true\n    required: [gerber, drill, position, bom]\n`;
+
+function productionConfig(additionalRules = ""): string {
+  return `${header("production", "medium")}rules:\n${productionRules}${additionalRules}${reports}`;
+}
+
 export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
   {
     id: "open-source",
@@ -54,7 +62,7 @@ export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
       "Production policy enables the full manufacturing and release rule set at medium severity without an explicit output-freshness requirement.",
     releaseMode: "production",
     failOn: "medium",
-    config: `${header("production", "medium")}rules:\n  bom.missing-mpn: true\n  bom.compliance: true\n  bom.lifecycle: true\n  bom.risk-score: true\n  bom.eol-detection: true\n  bom.unknown-lifecycle: true\n  bom.single-source: true\n  bom.identity-conflicts: true\n  design.board-outline: true\n  design.unique-references: true\n  drc.kicad: true\n  erc.kicad: true\n  manufacturing.package-completeness: true\n  manufacturing.fab-notes: true\n  manufacturing.position-coverage: true\n  manufacturing.drill-coverage: true\n  manufacturing.tooling-holes: true\n  manufacturing.test-points: true\n  manufacturing.fiducials: true\n  manufacturing.assembly-sides: true\n  manufacturing.layer-stackup: true\n  manufacturing.pin1-markers: true\n  manufacturing.polarity-markers: true\n  manufacturing.silkscreen-over-pad: true\n  release.revision-set: true\n  release.changelog-present: true\n  release.tag-matches-revision: true\n  release.version-format: true\n${reports}`,
+    config: productionConfig(),
   },
   {
     id: "contract-design",
@@ -64,7 +72,7 @@ export const repositorySetupPresets: readonly RepositorySetupPreset[] = [
       "Everything in Production release plus required fresh Gerber, drill, position/CPL, and BOM outputs for client handoff evidence.",
     releaseMode: "production",
     failOn: "medium",
-    config: `${header("production", "medium")}rules:\n  bom.missing-mpn: true\n  bom.compliance: true\n  bom.lifecycle: true\n  bom.eol-detection: true\n  bom.unknown-lifecycle: true\n  bom.single-source: true\n  bom.risk-score: true\n  bom.identity-conflicts: true\n  design.board-outline: true\n  design.unique-references: true\n  drc.kicad: true\n  erc.kicad: true\n  manufacturing.outputs-present:\n    enabled: true\n    required: [gerber, drill, position, bom]\n  manufacturing.package-completeness: true\n  manufacturing.fab-notes: true\n  manufacturing.position-coverage: true\n  manufacturing.drill-coverage: true\n  manufacturing.tooling-holes: true\n  manufacturing.test-points: true\n  manufacturing.fiducials: true\n  manufacturing.layer-stackup: true\n  manufacturing.assembly-sides: true\n  manufacturing.pin1-markers: true\n  manufacturing.polarity-markers: true\n  manufacturing.silkscreen-over-pad: true\n  release.revision-set: true\n  release.changelog-present: true\n  release.tag-matches-revision: true\n  release.version-format: true\n${reports}`,
+    config: productionConfig(contractHandoffEvidenceRules),
   },
 ];
 

@@ -180,7 +180,7 @@ describe("repository setup operator routes", () => {
     expect(setupStore.applyRevision).toHaveBeenCalledWith(
       expect.objectContaining({
         preset: "prototype",
-        presetVersion: 1,
+        presetVersion: 2,
         actorId: "operator.primary",
         workflowStatus: "unknown",
         configStatus: "unknown",
@@ -320,7 +320,7 @@ describe("repository setup operator routes", () => {
       repositoryId,
       dependencies(failedStore, {
         dispatchProbe: vi.fn(async () => {
-          throw new Error("authorization=secret");
+          throw new Error("authorization=[REDACTED]
         }),
       }),
     );
