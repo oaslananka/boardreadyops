@@ -28,10 +28,8 @@ test("@smoke keeps production YAML rows vertically ordered after switching from 
   expectRowsStrictlyIncrease(await yamlRowTops(page));
 });
 
-test("@smoke keeps contract-design YAML rows vertically ordered after switching from prototype", async ({ page }) => {
-  await page.goto("/setup?preset=prototype");
-  await page.getByRole("link", { name: "Preview Contract design handoff" }).click();
-  await expect(page).toHaveURL(/preset=contract-design/);
-
-  expectRowsStrictlyIncrease(await yamlRowTops(page));
+test("@smoke does not offer the legacy duplicate contract-design preset", async ({ page }) => {
+  await page.goto("/setup?preset=contract-design");
+  await expect(page.getByRole("link", { name: "Preview Contract design handoff" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Active: Prototype fabrication" })).toBeVisible();
 });
