@@ -10,9 +10,9 @@ export type ProjectUploadWizardProps = Readonly<{
 
 export function ProjectUploadWizard({ workspaceId: _workspaceId = "default" }: ProjectUploadWizardProps) {
   return (
-    <Tabs defaultValue="zip">
+    <Tabs defaultValue="github">
       <TabsList aria-label="Ingestion Source">
-        <TabsTrigger value="zip">Upload Package (Zip)</TabsTrigger>
+        <TabsTrigger value="zip">Upload Package (Zip) — Unavailable</TabsTrigger>
         <TabsTrigger value="github">Connect GitHub Repository</TabsTrigger>
         <TabsTrigger value="cli">Run Local CLI</TabsTrigger>
       </TabsList>
