@@ -337,6 +337,7 @@ describe("dependency and security automation configuration", () => {
       "ip-address",
       "js-yaml",
       "linkify-it",
+      "markdown-it",
       "mysql2",
       "nanoid",
       "postcss",
