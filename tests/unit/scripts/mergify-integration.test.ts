@@ -19,50 +19,25 @@ const stableRequiredChecks =
     .find((rule) => rule.type === "required_status_checks")
     ?.parameters?.required_status_checks?.map(({ context }) => context) ?? [];
 
-function readQueueConditionList(name: "queue_conditions" | "merge_conditions"): string[] {
-  const lines = mergify.split(/\r?\n/u);
-  const markerIndex = lines.indexOf(`    ${name}:`);
-  if (markerIndex < 0) return [];
-
-  const prefix = "      - ";
-  const values: string[] = [];
-  for (const line of lines.slice(markerIndex + 1)) {
-    if (!line.startsWith(prefix)) break;
-    values.push(line.slice(prefix.length));
-  }
-  return values;
-}
-
 describe("Mergify integration contract", () => {
-  it("automatically queues eligible pull requests while preserving manual review escapes", () => {
-    expect(mergify).not.toContain("label = queue-me");
-    expect(mergify).toContain("-label = manual-review");
-    expect(mergify).toContain("-label = do-not-merge");
+  it("does not configure paid Mergify merge-queue features", () => {
+    const config = yaml.load(mergify) as Record<string, unknown>;
+    expect(config).not.toHaveProperty("merge_queue");
+    expect(config).not.toHaveProperty("queue_rules");
+    expect(config).not.toHaveProperty("scopes");
+    expect(mergify).not.toContain("merge_queue_scope");
+    expect(mergify).not.toContain("branch_protection_injection_mode");
+    expect(mergify).not.toMatch(/\bqueue:\s*(?:$|\n)/mu);
+    expect(mergify).not.toContain("auto-queue eligible pull requests");
   });
 
-  it("delegates stable required checks to GitHub ruleset injection", () => {
+  it("keeps GitHub rulesets authoritative for merge gates", () => {
     expect(stableRequiredChecks.length).toBeGreaterThan(0);
-    expect(mergify).toContain("branch_protection_injection_mode: queue");
+    const statusChecksRule = mainRuleset.rules.find((rule) => rule.type === "required_status_checks");
+    expect(statusChecksRule?.parameters?.strict_required_status_checks_policy).toBe(true);
     for (const check of stableRequiredChecks) {
       expect(mergify).not.toContain(`check-success = ${check}`);
     }
-  });
-
-  it("uses serial in-place queue checks with the strict required-check ruleset", () => {
-    expect(mergify).toContain("mode: serial");
-    expect(mergify).not.toContain("mode: parallel");
-    expect(mergify).toContain("max_parallel_checks: 1");
-    expect(mergify).toContain("batch_size: 1");
-    expect(mergify).toContain("max_checks_retries: 0");
-    expect(mergify).toContain("update_method: merge");
-    expect(mergify).toContain("merge_method: squash");
-    expect(mergify).toContain("checks_timeout: null");
-    const statusChecksRule = mainRuleset.rules.find((rule) => rule.type === "required_status_checks");
-    expect(statusChecksRule?.parameters?.strict_required_status_checks_policy).toBe(true);
-    const queueConditions = readQueueConditionList("queue_conditions");
-    const mergeConditions = readQueueConditionList("merge_conditions");
-    expect(queueConditions).toEqual(["-draft", "-label = manual-review", "-label = do-not-merge"]);
-    expect(mergeConditions).toEqual(queueConditions);
   });
 
   it("does not use unsupported Mergify condition attributes", () => {
@@ -92,8 +67,8 @@ describe("Mergify integration contract", () => {
     }
   });
 
-  it("keeps queue scopes in Mergify without replacing the repository CI risk profile", () => {
-    expect(mergify).toContain("merge_queue_scope: merge-queue");
+  it("does not replace the repository CI risk profile with Mergify scopes", () => {
+    expect(mergify).not.toContain("merge_queue_scope");
     expect(ci).not.toContain("ci / detect-scopes");
     expect(ci).not.toContain("needs.detect-scopes.outputs");
   });

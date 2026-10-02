@@ -60,6 +60,9 @@
           },
           {
             "context": "security / gate"
+          },
+          {
+            "context": "security / osv pull request / osv-scan"
           }
         ],
         "strict_required_status_checks_policy": true
@@ -71,11 +74,6 @@
       "actor_id": 5,
       "actor_type": "RepositoryRole",
       "bypass_mode": "pull_request"
-    },
-    {
-      "actor_id": 10562,
-      "actor_type": "Integration",
-      "bypass_mode": "exempt"
     }
   ]
 }
