@@ -241,6 +241,12 @@ export function RepositorySetupInteractive({
     setIsValidating(false);
   }, [repositoryId]);
 
+  const handleSelectRepository = useCallback((id: string) => {
+    setRepositoryId(id);
+    setPrResult(null);
+    setProbeResult(null);
+  }, []);
+
   const selectedRepository = repositories.find((repository) => repository.id === repositoryId);
   const displayedRepository = selectedRepository
     ? { ...selectedRepository, ...(setupOverrides[repositoryId] ?? {}) }
@@ -370,9 +376,10 @@ export function RepositorySetupInteractive({
           signedIn={signedIn}
           repositories={repositories}
           repositoryId={repositoryId}
-          onSelectRepository={setRepositoryId}
+          onSelectRepository={handleSelectRepository}
           onCreate={handleCreateSetupPr}
           isCreating={isCreatingPr}
+          selectionDisabled={isCreatingPr || isValidating}
           workflowPath={workflowPath}
           {...(blockedReason ? { blockedReason } : {})}
           {...(prResult ? { result: prResult } : {})}
@@ -556,6 +563,14 @@ function SetupProbeResultOutput({ result }: Readonly<{ result: SetupProbeResult 
             ? `Readiness probe ${result.status ?? "is already active"}.`
             : "Readiness probe dispatched. The persisted setup state will update after the OIDC callback."
           : result.error}
+        {!result.ok && result.manageUrl ? (
+          <>
+            {" "}
+            <a href={result.manageUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+              Review the installation on GitHub →
+            </a>
+          </>
+        ) : null}
       </span>
       {result.workflowRunUrl ? (
         <a
@@ -666,6 +681,7 @@ type OneClickSetupProps = {
   onSelectRepository: (id: string) => void;
   onCreate: () => void;
   isCreating: boolean;
+  selectionDisabled: boolean;
   workflowPath: string;
   blockedReason?: string;
   result?: SetupPrResult;
@@ -686,6 +702,7 @@ function OneClickSetup({
   onSelectRepository,
   onCreate,
   isCreating,
+  selectionDisabled,
   workflowPath,
   blockedReason,
   result,
@@ -738,6 +755,7 @@ function OneClickSetup({
           <select
             id={selectId}
             value={repositoryId}
+            disabled={selectionDisabled}
             onChange={(event) => onSelectRepository(event.currentTarget.value)}
             className="mt-1 min-h-11 w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
