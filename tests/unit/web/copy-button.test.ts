@@ -9,6 +9,7 @@ import { CopyButton } from "../../../apps/web/components/copy-button.js";
 
 type TestButton = {
   click(): void;
+  getAttribute(name: string): string | null;
   textContent: string | null;
 };
 
@@ -69,6 +70,21 @@ describe("CopyButton component", () => {
       await Promise.resolve();
     });
   }
+
+  it("supports a contextual accessible label without expanding visible copy", async () => {
+    await act(async () => {
+      root.render(
+        createElement(CopyButton, {
+          label: "Copy commit SHA",
+          value: "abcdef123456",
+          accessibleLabel: "Copy commit abcdef1 for oaslananka/boardreadyops",
+        }),
+      );
+    });
+
+    expect(button().textContent).toBe("Copy commit SHA");
+    expect(button().getAttribute("aria-label")).toBe("Copy commit abcdef1 for oaslananka/boardreadyops");
+  });
 
   it("shows copied feedback and resets it after two seconds", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
