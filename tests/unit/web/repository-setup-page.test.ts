@@ -60,11 +60,11 @@ describe("repository setup preview page", () => {
     expect(markup).not.toContain("installation-token");
   });
 
-  it("does not advertise the legacy contract-design alias because it duplicates production semantics", async () => {
+  it("maps legacy contract-design links to Production without advertising the duplicate alias", async () => {
     const markup = await render({ preset: "contract-design" });
     expect(markup).not.toContain("Contract design handoff");
     expect(markup).toContain("Prototype fabrication");
-    expect(markup).toContain("Production release");
+    expect(markup).toContain("Active: Production release");
   });
 
   it("treats the GitHub setup redirect as an untrusted installation handoff", async () => {
