@@ -146,6 +146,30 @@ describe("cloud-deploy topology preflight", () => {
     expect(documentation).toContain("may explicitly reduce that preflight keep-set to one");
   });
 
+  it("verifies the browser security baseline after a real deploy but not during dry-run", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+
+    const remoteDeployEnd = workflow.indexOf("          REMOTE_DEPLOY");
+    const securitySmoke = workflow.indexOf("      - name: Verify production browser security headers");
+    const cleanup = workflow.indexOf("      - name: Remove temporary SSH key");
+
+    expect(securitySmoke).toBeGreaterThan(remoteDeployEnd);
+    expect(cleanup).toBeGreaterThan(securitySmoke);
+    expect(workflow).toContain("if: $" + "{{ !inputs.dry_run }}");
+    expect(workflow).toContain("BOARDREADYOPS_PUBLIC_URL");
+    expect(workflow).toContain("cloud-deploy security smoke");
+    expect(workflow).toContain("for path in / /dashboard; do");
+    expect(workflow).toContain("Content-Security-Policy");
+    expect(workflow).toContain("frame-ancestors 'none'; base-uri 'self'; object-src 'none'");
+    expect(workflow).toContain("Strict-Transport-Security");
+    expect(workflow).toContain("max-age=31536000");
+    expect(workflow).toContain("X-Content-Type-Options");
+    expect(workflow).toContain("Referrer-Policy");
+    expect(workflow).toContain("Permissions-Policy");
+    expect(workflow).toContain("X-Frame-Options");
+    expect(workflow).not.toContain("https://boardreadyops.com");
+  });
+
   it("emits aggregate-only disk diagnostics before a low-space preflight exits", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
