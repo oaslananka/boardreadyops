@@ -113,7 +113,8 @@ describe("repository setup operator routes", () => {
       permissions: { repository: { contents: "write", actions: "write", checks: "write" } },
       assistedInstallation: { available: true, explicitOptInRequired: false },
     });
-    expect(payload.presets as unknown[]).toHaveLength(4);
+    expect(payload.presets as unknown[]).toHaveLength(3);
+    expect(JSON.stringify(payload.presets)).not.toContain("contract-design");
     expect(JSON.stringify(payload)).not.toContain("installation-token");
   });
 
@@ -186,6 +187,38 @@ describe("repository setup operator routes", () => {
         configStatus: "unknown",
       }),
     );
+  });
+
+  it("rejects the legacy contract preset for new setup selections", async () => {
+    const setupStore = store();
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "select_preset", preset: "contract-design", requestId: "select-contract" }),
+      installationId,
+      repositoryId,
+      dependencies(setupStore),
+    );
+
+    expect(response.status).toBe(400);
+    expect(setupStore.applyRevision).not.toHaveBeenCalled();
+  });
+
+  it("rejects an explicit legacy contract preset when opening a new setup PR", async () => {
+    const setupStore = store();
+    const executeMock = vi.fn();
+    const deps = dependencies(setupStore);
+    deps.mutationService = vi.fn(() => ({ execute: executeMock }));
+
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", preset: "contract-design", requestId: "contract-pr" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "preset is not available for new setup changes" });
+    expect(executeMock).not.toHaveBeenCalled();
+    expect(setupStore.applyRevision).not.toHaveBeenCalled();
   });
 
   it("records unavailable readiness with a bounded namespaced request id", async () => {
@@ -320,7 +353,7 @@ describe("repository setup operator routes", () => {
       repositoryId,
       dependencies(failedStore, {
         dispatchProbe: vi.fn(async () => {
-          throw new Error("authorization=secret");
+          throw new Error("authorization=[REDACTED]
         }),
       }),
     );
