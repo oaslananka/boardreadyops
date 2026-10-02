@@ -169,6 +169,33 @@ describe("repository setup operator routes", () => {
     );
   });
 
+  it("migrates a historical contract-design revision to Production when creating a new setup PR", async () => {
+    const legacyCurrent = { ...current, preset: "contract-design" as const };
+    const setupStore = store({
+      getContext: vi.fn(async () => ({ ...context, current: legacyCurrent })),
+      listRevisions: vi.fn(async () => [legacyCurrent]),
+    });
+    const executeMock = vi.fn(async () => ({
+      outcome: "created" as const,
+      branchName: "boardreadyops/setup",
+      commitSha: "commit-sha-legacy",
+      pullRequestNumber: 16,
+      pullRequestUrl: "https://github.test/octo/board/pull/16",
+    }));
+    const deps = dependencies(setupStore);
+    deps.mutationService = vi.fn(() => ({ execute: executeMock }));
+
+    const response = await handleRepositorySetupPost(
+      request("POST", { action: "create_pr", requestId: "legacy-current-create" }),
+      installationId,
+      repositoryId,
+      deps,
+    );
+
+    expect(response.status).toBe(201);
+    expect(setupStore.applyRevision).toHaveBeenCalledWith(expect.objectContaining({ preset: "production" }));
+  });
+
   it("selects a versioned preset idempotently", async () => {
     const setupStore = store();
     const response = await handleRepositorySetupPost(
