@@ -16,6 +16,10 @@ export type SetupTargetRepository = {
   setupWorkflowStatus?: string;
   setupConfigStatus?: string;
   setupObservedSha?: string;
+  setupProbeId?: string;
+  setupProbeStatus?: string;
+  setupProbeWorkflowRunId?: string;
+  setupProbeExpiresAt?: string;
 };
 
 export type RepositorySetupInteractiveProps = {
@@ -405,7 +409,30 @@ function SetupReadiness({
   result,
 }: Readonly<SetupReadinessProps>) {
   const noRevision = repository?.setupRevision === undefined;
-  const buttonDisabled = isValidating || !signedIn || !repository || noRevision || blockedReason !== undefined;
+  const persistedProbeStatus = repository?.setupProbeStatus;
+  const effectiveProbeStatus = result?.ok
+    ? result.outcome === "dispatched"
+      ? "dispatched"
+      : (result.status ?? persistedProbeStatus)
+    : persistedProbeStatus;
+  const probeInProgress = effectiveProbeStatus === "pending" || effectiveProbeStatus === "dispatched";
+  const workflowRunId = result?.workflowRunId ?? repository?.setupProbeWorkflowRunId;
+  const workflowRunUrl =
+    result?.workflowRunUrl ??
+    (repository && workflowRunId
+      ? `https://github.com/${repository.fullName}/actions/runs/${workflowRunId}`
+      : undefined);
+  const buttonDisabled =
+    isValidating || !signedIn || !repository || noRevision || blockedReason !== undefined || probeInProgress;
+  const actionLabel = isValidating
+    ? "Validating readiness…"
+    : probeInProgress
+      ? "Probe in progress"
+      : effectiveProbeStatus === "failed" || effectiveProbeStatus === "expired"
+        ? "Retry readiness"
+        : effectiveProbeStatus === "completed"
+          ? "Validate again"
+          : "Validate readiness";
 
   return (
     <Panel
@@ -435,10 +462,39 @@ function SetupReadiness({
             onClick={onValidate}
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-xs transition-all duration-150 hover:bg-primary/90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
           >
-            {isValidating ? "Validating readiness…" : "Validate readiness"}
+            {actionLabel}
           </button>
-          {repository ? <span className="text-sm text-muted-foreground">{repository.fullName}</span> : null}
+          <button
+            type="button"
+            disabled={!repository}
+            onClick={() => window.location.reload()}
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-all duration-150 hover:border-primary/50 hover:bg-muted/20 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+          >
+            Refresh status
+          </button>
+          {workflowRunUrl ? (
+            <a
+              href={workflowRunUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-primary underline underline-offset-2"
+            >
+              Open Actions
+            </a>
+          ) : null}
         </div>
+
+        {repository ? (
+          <DefinitionGrid>
+            <Definition label="Repository">{repository.fullName}</Definition>
+            <Definition label="Probe status">
+              {effectiveProbeStatus?.replaceAll("_", " ") ?? "Not dispatched"}
+            </Definition>
+            <Definition label="Probe expires">
+              {repository.setupProbeExpiresAt ? new Date(repository.setupProbeExpiresAt).toLocaleString() : "Not scheduled"}
+            </Definition>
+          </DefinitionGrid>
+        ) : null}
 
         {!signedIn ? (
           <p className="text-sm text-muted-foreground">

@@ -68,6 +68,10 @@ describe("repository dashboard and viewer loader branches", () => {
           setup_workflow_status: "ready",
           setup_config_status: "ready",
           setup_observed_sha: "a".repeat(40),
+          setup_probe_id: "22222222-2222-4222-8222-222222222222",
+          setup_probe_status: "dispatched",
+          setup_probe_workflow_run_id: "987654321",
+          setup_probe_expires_at: "2026-10-02T02:00:00.000Z",
         },
       ],
     });
@@ -84,6 +88,10 @@ describe("repository dashboard and viewer loader branches", () => {
       setupWorkflowStatus: "ready",
       setupConfigStatus: "ready",
       setupObservedSha: "a".repeat(40),
+      setupProbeId: "22222222-2222-4222-8222-222222222222",
+      setupProbeStatus: "dispatched",
+      setupProbeWorkflowRunId: "987654321",
+      setupProbeExpiresAt: "2026-10-02T02:00:00.000Z",
     });
   });
 

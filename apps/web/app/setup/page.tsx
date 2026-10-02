@@ -50,6 +50,12 @@ async function setupTargets() {
       ...(repository.setupWorkflowStatus ? { setupWorkflowStatus: repository.setupWorkflowStatus } : {}),
       ...(repository.setupConfigStatus ? { setupConfigStatus: repository.setupConfigStatus } : {}),
       ...(repository.setupObservedSha ? { setupObservedSha: repository.setupObservedSha } : {}),
+      ...(repository.setupProbeId ? { setupProbeId: repository.setupProbeId } : {}),
+      ...(repository.setupProbeStatus ? { setupProbeStatus: repository.setupProbeStatus } : {}),
+      ...(repository.setupProbeWorkflowRunId
+        ? { setupProbeWorkflowRunId: repository.setupProbeWorkflowRunId }
+        : {}),
+      ...(repository.setupProbeExpiresAt ? { setupProbeExpiresAt: repository.setupProbeExpiresAt } : {}),
     })),
   );
 
