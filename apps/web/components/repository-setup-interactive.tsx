@@ -442,7 +442,9 @@ function setupReadinessView({
   const workflowRunId = result?.workflowRunId ?? repository?.setupProbeWorkflowRunId;
   const workflowRunUrl =
     result?.workflowRunUrl ??
-    (repository && workflowRunId ? `https://github.com/${repository.fullName}/actions/runs/${workflowRunId}` : undefined);
+    (repository && workflowRunId
+      ? `https://github.com/${repository.fullName}/actions/runs/${workflowRunId}`
+      : undefined);
   return {
     noRevision,
     effectiveProbeStatus: status,
@@ -463,7 +465,8 @@ function SetupReadinessSteps() {
         <code>boardreadyops.yml</code> with a pinned BoardReadyOps CLI.
       </li>
       <li>
-        The result is posted with GitHub Actions OIDC bound to the repository ID, workflow ref, branch ref, and probe ID.
+        The result is posted with GitHub Actions OIDC bound to the repository ID, workflow ref, branch ref, and probe
+        ID.
       </li>
       <li>The verified preset revision is snapshotted onto newly accepted runs and shown in run history.</li>
     </ol>
