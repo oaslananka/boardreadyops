@@ -43,6 +43,8 @@ function ConfirmDelete({ idField, id, name, noun, cascade, action, trigger }: Re
   const [typed, setTyped] = useState("");
   const titleId = useId();
   const inputId = useId();
+  const confirmationHintId = useId();
+  const confirmed = typed === name;
 
   function close() {
     setOpen(false);
@@ -72,7 +74,14 @@ function ConfirmDelete({ idField, id, name, noun, cascade, action, trigger }: Re
                 ? `This also removes ${cascade}. Anyone holding a delivery link loses access. This cannot be undone.`
                 : "This cannot be undone."}
             </p>
-            <ActionForm action={action} onSuccess={close} className="flex flex-col gap-3">
+            <ActionForm
+              action={action}
+              onSuccess={close}
+              className="flex flex-col gap-3"
+              onSubmit={(event) => {
+                if (!confirmed) event.preventDefault();
+              }}
+            >
               {({ state, pending }) => (
                 <>
                   <input type="hidden" name={idField} value={id} />
@@ -86,11 +95,17 @@ function ConfirmDelete({ idField, id, name, noun, cascade, action, trigger }: Re
                       value={typed}
                       onChange={(event) => setTyped(event.currentTarget.value)}
                       autoComplete="off"
+                      aria-describedby={confirmationHintId}
                       className="mt-1 w-full"
                     />
                     {fieldError(state, "confirmName") ? (
                       <p className="mt-1 text-meta text-danger">{fieldError(state, "confirmName")}</p>
                     ) : null}
+                    <p id={confirmationHintId} className="mt-1 text-meta text-muted-foreground">
+                      {confirmed
+                        ? "Confirmation matches. The delete action can now be submitted."
+                        : "Delete stays disabled until the name matches exactly; pressing Enter cannot bypass this confirmation."}
+                    </p>
                   </div>
                   <div className="modal-footer flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={close}>
@@ -100,8 +115,8 @@ function ConfirmDelete({ idField, id, name, noun, cascade, action, trigger }: Re
                       type="submit"
                       variant="destructive"
                       className="button-delete"
-                      // The server re-checks the typed name; this only stops the obvious misfire.
-                      disabled={pending || typed !== name}
+                      // The server re-checks the typed name; the form guard also blocks implicit keyboard submits.
+                      disabled={pending || !confirmed}
                     >
                       {pending ? "Deleting…" : `Delete ${noun}`}
                     </Button>
