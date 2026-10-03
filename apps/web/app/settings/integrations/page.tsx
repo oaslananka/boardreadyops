@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "../../../components/ui/button.js";
 import { EmptyState, Panel, StatusBadge } from "../../../components/ui.js";
+import { customerPlanLabel, customerStatusLabel } from "../../../lib/customer-nomenclature.js";
 import { loadIntegrationHealth } from "../../../lib/integration-health.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 
@@ -42,7 +43,7 @@ export default async function IntegrationsSettingsPage() {
   return (
     <div className="flex flex-col gap-5">
       <Panel title="Deployment readiness" description="Live control-plane configuration and database readiness.">
-        <StatusBadge value={badgeValue(snapshot.deployment.status)} label={snapshot.deployment.status} />
+        <StatusBadge value={badgeValue(snapshot.deployment.status)} label={customerStatusLabel(snapshot.deployment.status)} />
         {snapshot.deployment.reason ? (
           <p className="mt-2 text-meta text-muted-foreground">{snapshot.deployment.reason}</p>
         ) : null}
@@ -59,7 +60,7 @@ export default async function IntegrationsSettingsPage() {
         </Panel>
       ) : (
         snapshot.installations.map((installation) => (
-          <Panel key={installation.id} title={installation.accountLogin} description={`Plan: ${installation.planTier}`}>
+          <Panel key={installation.id} title={installation.accountLogin} description={`Plan: ${customerPlanLabel(installation.planTier)}`}>
             <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div>
                 <dt className="text-meta font-medium text-muted-foreground">GitHub App</dt>
@@ -80,7 +81,7 @@ export default async function IntegrationsSettingsPage() {
                 <dd className="mt-1">
                   <StatusBadge
                     value={badgeValue(installation.componentIntelligence)}
-                    label={installation.componentIntelligence.replaceAll("_", " ")}
+                    label={customerStatusLabel(installation.componentIntelligence)}
                   />
                 </dd>
               </div>
@@ -89,7 +90,7 @@ export default async function IntegrationsSettingsPage() {
                 <dd className="mt-1">
                   <StatusBadge
                     value={badgeValue(installation.runner.status)}
-                    label={installation.runner.status.replaceAll("_", " ")}
+                    label={customerStatusLabel(installation.runner.status)}
                   />
                   <span className="ml-2 text-meta text-muted-foreground">
                     {installation.runner.online}/{installation.runner.active} online · {installation.runner.pendingJobs}{" "}
