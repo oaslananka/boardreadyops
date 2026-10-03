@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oaslananka/boardreadyops/schemas/review-publish-result-v1.json",
+  "title": "BoardReadyOps review publish result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "tool", "success", "dryRun", "evidenceDigest"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "boardreadyops" },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "success": { "const": true },
+    "dryRun": { "type": "boolean" },
+    "evidenceDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "reviewUrl": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "dryRun": { "const": false } },
+        "required": ["dryRun"]
+      },
+      "then": { "required": ["reviewUrl"] }
+    }
+  ]
+}

@@ -55017,6 +55017,9 @@ function mapFindingsForCloud(findings) {
   return findings.map((finding2) => mapFindingForCloud(finding2, categoryByRuleId));
 }
 
+// src/cli/commands/review.ts
+init_version();
+
 // src/kicad/snapshots.ts
 var import_node_crypto13 = require("node:crypto");
 init_src();
@@ -55090,6 +55093,47 @@ async function generateSnapshots(options) {
 }
 
 // src/cli/commands/review.ts
+function nonEmptyString(value) {
+  if (typeof value !== "string") return void 0;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : void 0;
+}
+function resolvePublishedReview(server, value) {
+  if (!value || typeof value !== "object") return void 0;
+  const response = value;
+  if (response.ok !== true) return void 0;
+  const reviewUrl = nonEmptyString(response.reviewUrl);
+  const runId = nonEmptyString(response.runId);
+  if (!reviewUrl && !runId) return void 0;
+  if (reviewUrl) {
+    try {
+      const serverUrl = new URL(`${server}/`);
+      const resolved = new URL(reviewUrl, serverUrl);
+      if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return void 0;
+      if (resolved.origin !== serverUrl.origin) return void 0;
+      return { reviewUrl: resolved.toString(), ...runId ? { runId } : {} };
+    } catch {
+      return void 0;
+    }
+  }
+  if (!runId) return void 0;
+  return { reviewUrl: `${server}/runs/${encodeURIComponent(runId)}`, runId };
+}
+function publishResult(evidenceDigest, dryRun, published) {
+  return {
+    schemaVersion: 1,
+    tool: { name: "boardreadyops", version: boardReadyVersion },
+    success: true,
+    dryRun,
+    evidenceDigest,
+    ...published ? { reviewUrl: published.reviewUrl } : {},
+    ...published?.runId ? { runId: published.runId } : {}
+  };
+}
+function writePublishResult(result, streams) {
+  streams.stdout.write(`${JSON.stringify(result, null, 2)}
+`);
+}
 function getGitCommitSha(ref = "HEAD") {
   try {
     const gitExec = resolveGitExecutable();
@@ -55113,6 +55157,7 @@ function getGitOriginRepo() {
 }
 async function reviewPublishCommand(target, options, streams) {
   const root = target ?? process.cwd();
+  const jsonOutput = options.format === "json";
   const loaded = await loadConfig(root, options.config);
   const config2 = loaded.config;
   const headSha = options.head ?? getGitCommitSha("HEAD");
@@ -55124,7 +55169,7 @@ async function reviewPublishCommand(target, options, streams) {
     ""
   );
   const token = options.token ?? process.env.BOARDREADYOPS_TOKEN;
-  streams.stdout.write(`
+  if (!jsonOutput) streams.stdout.write(`
 \u{1F50D} Analyzing hardware preflight evidence in ${root}...
 `);
   const result = await runPipeline({
@@ -55140,7 +55185,7 @@ async function reviewPublishCommand(target, options, streams) {
   const rulePackDigest = (0, import_node_crypto14.createHash)("sha256").update("boardreadyops-v1").digest("hex");
   const configDigest = (0, import_node_crypto14.createHash)("sha256").update(JSON.stringify(config2)).digest("hex");
   const evidenceDigest = computeEvidenceDigest({
-    toolVersion: "1.34.0",
+    toolVersion: boardReadyVersion,
     rulePackDigest,
     configDigest,
     headCommitSha: headSha,
@@ -55148,9 +55193,15 @@ async function reviewPublishCommand(target, options, streams) {
     findingFingerprints: findings.map((f) => f.fingerprint),
     artifactDigests: []
   });
-  streams.stdout.write(`\u{1F4CA} Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)
+  if (!jsonOutput) {
+    streams.stdout.write(`\u{1F4CA} Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)
 `);
+  }
   if (options.dryRun) {
+    if (jsonOutput) {
+      writePublishResult(publishResult(evidenceDigest, true), streams);
+      return 0;
+    }
     streams.stdout.write(`
 [DRY RUN] Review publish simulation:
 `);
@@ -55187,7 +55238,7 @@ async function reviewPublishCommand(target, options, streams) {
       message: f.message
     }))
   });
-  streams.stdout.write(`\u{1F680} Publishing review to ${server}...
+  if (!jsonOutput) streams.stdout.write(`\u{1F680} Publishing review to ${server}...
 `);
   try {
     const response = await fetch(`${server}/api/v1/runs`, {
@@ -55212,29 +55263,39 @@ async function reviewPublishCommand(target, options, streams) {
       })
     });
     if (!response.ok) {
-      const errText = await response.text();
-      streams.stderr.write(`\u274C Server error (${response.status}): ${errText}
+      streams.stderr.write(`\u274C Server error (${response.status}).
 `);
       return 1;
     }
-    const data = await response.json();
-    if (data.ok) {
-      const url2 = data.reviewUrl ? `${server}${data.reviewUrl}` : `${server}/runs/${data.runId}`;
-      streams.stdout.write(`
-\u2714 Hardware review published successfully!
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      streams.stderr.write(`\u274C Unexpected server response.
 `);
-      streams.stdout.write(`\u{1F517} Review URL: ${url2}
+      return 1;
+    }
+    const published = resolvePublishedReview(server, data);
+    if (!published) {
+      streams.stderr.write(`\u274C Unexpected server response.
 `);
-      streams.stdout.write(`\u{1F512} Evidence Digest: ${evidenceDigest}
-
-`);
+      return 1;
+    }
+    if (jsonOutput) {
+      writePublishResult(publishResult(evidenceDigest, false, published), streams);
       return 0;
     }
-    streams.stderr.write(`\u274C Unexpected server response.
+    streams.stdout.write(`
+\u2714 Hardware review published successfully!
 `);
-    return 1;
-  } catch (error51) {
-    streams.stderr.write(`\u274C Network error: ${error51 instanceof Error ? error51.message : String(error51)}
+    streams.stdout.write(`\u{1F517} Review URL: ${published.reviewUrl}
+`);
+    streams.stdout.write(`\u{1F512} Evidence Digest: ${evidenceDigest}
+
+`);
+    return 0;
+  } catch {
+    streams.stderr.write(`\u274C Network error while publishing review. Check connectivity and try again.
 `);
     return 1;
   }
@@ -59067,6 +59128,42 @@ var pinmap_schema_default = {
   }
 };
 
+// schemas/review-publish-result.schema.json
+var review_publish_result_schema_default = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://github.com/oaslananka/boardreadyops/schemas/review-publish-result-v1.json",
+  title: "BoardReadyOps review publish result",
+  type: "object",
+  additionalProperties: false,
+  required: ["schemaVersion", "tool", "success", "dryRun", "evidenceDigest"],
+  properties: {
+    schemaVersion: { const: 1 },
+    tool: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "version"],
+      properties: {
+        name: { const: "boardreadyops" },
+        version: { type: "string", minLength: 1 }
+      }
+    },
+    success: { const: true },
+    dryRun: { type: "boolean" },
+    evidenceDigest: { type: "string", pattern: "^[a-f0-9]{64}$" },
+    reviewUrl: { type: "string", minLength: 1 },
+    runId: { type: "string", minLength: 1 }
+  },
+  allOf: [
+    {
+      if: {
+        properties: { dryRun: { const: false } },
+        required: ["dryRun"]
+      },
+      then: { required: ["reviewUrl"] }
+    }
+  ]
+};
+
 // src/cli/commands/schema.ts
 var SCHEMAS = {
   "agent-plan": agent_plan_schema_default,
@@ -59075,6 +59172,8 @@ var SCHEMAS = {
   findings: findings_schema_default,
   hbom: hbom_schema_default,
   pinmap: pinmap_schema_default,
+  "review-publish": review_publish_result_schema_default,
+  "review-publish-result": review_publish_result_schema_default,
   generate: generate_recipe_schema_default
 };
 function schemaCommand(name, streams) {
@@ -59189,7 +59288,7 @@ function registerAllCommands(program2, streams) {
   program2.command("explain").argument("<rule-id>", "rule identifier").argument("[path]", "directory to inspect").action(async (ruleId6, pathInput) => {
     process.exitCode = await explainCommand(ruleId6, pathInput, streams);
   });
-  program2.command("schema").argument("[name]", "agent-plan, config, doctor, findings, generate, hbom, or pinmap", "config").action((name) => {
+  program2.command("schema").argument("[name]", "agent-plan, config, doctor, findings, generate, hbom, pinmap, or review-publish", "config").action((name) => {
     process.exitCode = schemaCommand(name, streams);
   });
   function registerHandoffCommand(cmd) {

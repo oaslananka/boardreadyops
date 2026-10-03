@@ -52,8 +52,10 @@ function resolvePublishedReview(server: string, value: unknown): PublishedReview
 
   if (reviewUrl) {
     try {
-      const resolved = new URL(reviewUrl, server + "/");
+      const serverUrl = new URL(`${server}/`);
+      const resolved = new URL(reviewUrl, serverUrl);
       if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return undefined;
+      if (resolved.origin !== serverUrl.origin) return undefined;
       return { reviewUrl: resolved.toString(), ...(runId ? { runId } : {}) };
     } catch {
       return undefined;
@@ -61,14 +63,10 @@ function resolvePublishedReview(server: string, value: unknown): PublishedReview
   }
 
   if (!runId) return undefined;
-  return { reviewUrl: server + "/runs/" + encodeURIComponent(runId), runId };
+  return { reviewUrl: `${server}/runs/${encodeURIComponent(runId)}`, runId };
 }
 
-function publishResult(
-  evidenceDigest: string,
-  dryRun: boolean,
-  published?: PublishedReview,
-): ReviewPublishResult {
+function publishResult(evidenceDigest: string, dryRun: boolean, published?: PublishedReview): ReviewPublishResult {
   return {
     schemaVersion: 1,
     tool: { name: "boardreadyops", version: boardReadyVersion },
@@ -81,8 +79,9 @@ function publishResult(
 }
 
 function writePublishResult(result: ReviewPublishResult, streams: { stdout: NodeJS.WritableStream }): void {
-  streams.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  streams.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
+
 function getGitCommitSha(ref = "HEAD"): string {
   try {
     const gitExec = resolveGitExecutable();
@@ -152,7 +151,10 @@ export async function reviewPublishCommand(
     artifactDigests: [],
   });
 
-  if (!jsonOutput) {\n    streams.stdout.write(`📊 Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)\\n`);\n  }\n
+  if (!jsonOutput) {
+    streams.stdout.write(`📊 Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)\n`);
+  }
+
   if (options.dryRun) {
     if (jsonOutput) {
       writePublishResult(publishResult(evidenceDigest, true), streams);

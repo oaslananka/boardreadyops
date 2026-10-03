@@ -5,6 +5,7 @@ import findingsSchema from "../../../schemas/findings.schema.json" with { type: 
 import generateRecipeSchema from "../../../schemas/generate-recipe.schema.json" with { type: "json" };
 import hbomSchema from "../../../schemas/hbom.schema.json" with { type: "json" };
 import pinmapSchema from "../../../schemas/pinmap.schema.json" with { type: "json" };
+import reviewPublishResultSchema from "../../../schemas/review-publish-result.schema.json" with { type: "json" };
 
 const SCHEMAS: Record<string, unknown> = {
   "agent-plan": agentPlanSchema,
@@ -13,6 +14,8 @@ const SCHEMAS: Record<string, unknown> = {
   findings: findingsSchema,
   hbom: hbomSchema,
   pinmap: pinmapSchema,
+  "review-publish": reviewPublishResultSchema,
+  "review-publish-result": reviewPublishResultSchema,
   generate: generateRecipeSchema,
 };
 
