@@ -48,22 +48,21 @@ function resolvePublishedReview(server: string, value: unknown): PublishedReview
 
   const reviewUrl = nonEmptyString(response.reviewUrl);
   const runId = nonEmptyString(response.runId);
-  if (!reviewUrl && !runId) return undefined;
 
-  if (reviewUrl) {
-    try {
-      const serverUrl = new URL(`${server}/`);
-      const resolved = new URL(reviewUrl, serverUrl);
-      if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return undefined;
-      if (resolved.origin !== serverUrl.origin) return undefined;
-      return { reviewUrl: resolved.toString(), ...(runId ? { runId } : {}) };
-    } catch {
-      return undefined;
-    }
+  if (!reviewUrl) {
+    if (!runId) return undefined;
+    return { reviewUrl: `${server}/runs/${encodeURIComponent(runId)}`, runId };
   }
 
-  if (!runId) return undefined;
-  return { reviewUrl: `${server}/runs/${encodeURIComponent(runId)}`, runId };
+  try {
+    const serverUrl = new URL(`${server}/`);
+    const resolved = new URL(reviewUrl, serverUrl);
+    if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return undefined;
+    if (resolved.origin !== serverUrl.origin) return undefined;
+    return { reviewUrl: resolved.toString(), ...(runId ? { runId } : {}) };
+  } catch {
+    return undefined;
+  }
 }
 
 function publishResult(evidenceDigest: string, dryRun: boolean, published?: PublishedReview): ReviewPublishResult {

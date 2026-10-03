@@ -55104,20 +55104,19 @@ function resolvePublishedReview(server, value) {
   if (response.ok !== true) return void 0;
   const reviewUrl = nonEmptyString(response.reviewUrl);
   const runId = nonEmptyString(response.runId);
-  if (!reviewUrl && !runId) return void 0;
-  if (reviewUrl) {
-    try {
-      const serverUrl = new URL(`${server}/`);
-      const resolved = new URL(reviewUrl, serverUrl);
-      if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return void 0;
-      if (resolved.origin !== serverUrl.origin) return void 0;
-      return { reviewUrl: resolved.toString(), ...runId ? { runId } : {} };
-    } catch {
-      return void 0;
-    }
+  if (!reviewUrl) {
+    if (!runId) return void 0;
+    return { reviewUrl: `${server}/runs/${encodeURIComponent(runId)}`, runId };
   }
-  if (!runId) return void 0;
-  return { reviewUrl: `${server}/runs/${encodeURIComponent(runId)}`, runId };
+  try {
+    const serverUrl = new URL(`${server}/`);
+    const resolved = new URL(reviewUrl, serverUrl);
+    if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return void 0;
+    if (resolved.origin !== serverUrl.origin) return void 0;
+    return { reviewUrl: resolved.toString(), ...runId ? { runId } : {} };
+  } catch {
+    return void 0;
+  }
 }
 function publishResult(evidenceDigest, dryRun, published) {
   return {
