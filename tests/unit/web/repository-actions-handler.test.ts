@@ -229,5 +229,4 @@ describe("repository action failure contract", () => {
     });
     expect(close).toHaveBeenCalledOnce();
   });
-
 });
