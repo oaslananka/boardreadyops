@@ -39,7 +39,7 @@ describe("customer-facing nomenclature", () => {
     const content = (await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
 
     expect(content).not.toContain("{installation.planTier}</Definition>");
-    expect(content).not.toContain("Plan: ${installation.planTier}");
+    expect(content).not.toMatch(/Plan:\\s*\\$\\{installation\\.planTier\\}/u);
     expect(content).not.toContain("{admin.selected.planTier}</dd>");
     expect(content).not.toContain("label={snapshot.deployment.status}");
     expect(content).not.toContain('replaceAll("_", " ")');
