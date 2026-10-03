@@ -20,13 +20,13 @@ BoardReadyOps owns its weekday schedule, managed package managers, generated `NO
 
 ## Automatic path
 
-Low-risk development dependency and `@types/*` non-major updates remain eligible for the normal Mergify queue. Same-version GitHub Action digest refreshes are also eligible when they do not touch security, release, provenance, publication, container-release, or binary-release workflows.
+Low-risk development dependency and `@types/*` non-major updates remain the routine path. Same-version GitHub Action digest refreshes are also routine when they do not touch security, release, provenance, publication, container-release, or binary-release workflows.
 
-Eligibility never bypasses GitHub Rulesets. Required checks must pass before queue admission and again before merge. The `automerge` label on low-risk dependency groups is classification metadata; BoardReadyOps does not enable Renovate's own `automerge: true` path.
+Routine classification never bypasses GitHub Rulesets. Required checks must pass and review conversations must be resolved before an explicit maintainer squash merge. The `automerge` label on low-risk dependency groups is classification metadata only; BoardReadyOps does not enable Renovate's own `automerge: true` path and Mergify does not queue or merge these pull requests.
 
 ## Exception path
 
-Major updates, TypeScript, core runtime/GitHub integration dependencies, self-hosted Renovate runtime/validator upgrades, vulnerability-remediation PRs, non-digest GitHub Action updates, Actions changes in protected workflows, and Dockerfile/Docker Compose updates carry `manual-review` and remain outside the automatic queue until a maintainer clears the exception.
+Major updates, TypeScript, core runtime/GitHub integration dependencies, self-hosted Renovate runtime/validator upgrades, vulnerability-remediation PRs, non-digest GitHub Action updates, Actions changes in protected workflows, and Dockerfile/Docker Compose updates carry `manual-review` and remain on hold until a maintainer clears the exception.
 
 GitHub Actions and container references remain digest-pinned. Security vulnerability remediation bypasses the routine schedule and release-age wait, requests the lowest known-safe version, and remains manual-review only.
 
@@ -38,12 +38,13 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 
 - `renovate.json` controls project-specific Renovate behavior.
 - `.github/workflows/renovate.yml` validates and runs the pinned self-hosted Renovate release.
-- `.mergify.yml` is the post-CI merge authority.
+- `.mergify.yml` provides pull-request classification labels only; the GitHub `main` ruleset is the merge authority.
 - `tests/unit/scripts/security-automation-config.test.ts` prevents accidental weakening of the automation contract.
 - Version-update PR configuration must not be duplicated in another dependency updater.
 
 ## Last verification
 
+- On October 2, 2026, paid Mergify merge-queue/scopes automation was removed. GitHub Rulesets remain authoritative, Mergify is limited to labels, and routine dependency PRs require an explicit maintainer merge decision.
 - On July 20, 2026, Renovate `43.272.4` completed a full dry-run under Node.js `24.18.0`.
 - The repository reported `activated`, `enabled`, and `onboarded`, and Renovate discovered 269 dependencies across npm, GitHub Actions, Dockerfiles, and Docker Compose.
 - After the workflow reached `main`, manual workflow run `29767533207` completed both `renovate / validate` and `renovate / run` successfully.
@@ -61,7 +62,7 @@ Routine minimum-age waiting is enforced by Renovate's strict internal checks bef
 2. Run `corepack pnpm run renovate:validate` after policy changes.
 3. Confirm `security-automation-config.test.ts` and `mergify-integration.test.ts` pass.
 4. Confirm `manual-review` is present on protected updates and absent from an eligible low-risk update.
-5. Confirm the PR receives the repository's required Ruleset checks before Mergify admits it.
-6. Treat any low-risk PR that stays open after green required checks as an automation defect.
+5. Confirm the PR receives the repository's required Ruleset checks and that review conversations are resolved.
+6. Merge routine low-risk pull requests explicitly after those gates pass; an open green PR is not an automation defect by itself.
 7. Run the Renovate workflow manually after first installation or credential rotation and confirm the Dependency Dashboard can be updated.
 8. Rotate `GH_AUTH_TOKEN` immediately if its owner or permissions change unexpectedly.

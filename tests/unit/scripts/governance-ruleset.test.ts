@@ -50,10 +50,7 @@ describe("main branch governance ruleset", () => {
       required_approving_review_count: 0,
       required_review_thread_resolution: true,
     });
-    expect(ruleset.bypass_actors).toEqual([
-      { actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" },
-      { actor_id: 10562, actor_type: "Integration", bypass_mode: "exempt" },
-    ]);
+    expect(ruleset.bypass_actors).toEqual([{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "pull_request" }]);
   });
 
   it("keeps the committed stable merge gates aligned with the live baseline", async () => {
@@ -116,15 +113,20 @@ describe("main branch governance ruleset", () => {
     },
   );
 
-  it("keeps Mergify queue enforcement delegated to the GitHub ruleset", async () => {
-    const mergify = await repositoryFile(".mergify.yml");
+  it("keeps merge enforcement GitHub-native without Mergify queue automation", async () => {
+    const mergifySource = await repositoryFile(".mergify.yml");
+    const mergify = (await import("js-yaml")).load(mergifySource) as Record<string, unknown>;
     const ruleset = JSON.parse(await repositoryFile(".github/rulesets/main.json")) as {
+      rules: Array<{ type: string }>;
       bypass_actors: Array<{ actor_id: number; actor_type: string; bypass_mode: string }>;
     };
 
-    expect(mergify).toContain("branch_protection_injection_mode: queue");
-    expect(mergify).not.toMatch(/check-success\s*=/u);
-    expect(ruleset.bypass_actors).toContainEqual({ actor_id: 10562, actor_type: "Integration", bypass_mode: "exempt" });
+    expect(mergify).not.toHaveProperty("merge_queue");
+    expect(mergify).not.toHaveProperty("queue_rules");
+    expect(mergify).not.toHaveProperty("scopes");
+    expect(ruleset.rules.some((rule) => rule.type === "pull_request")).toBe(true);
+    expect(ruleset.rules.some((rule) => rule.type === "required_status_checks")).toBe(true);
+    expect(ruleset.bypass_actors.some((actor) => actor.actor_type === "Integration")).toBe(false);
   });
 
   it("keeps the public contribution path GitHub-native and security reports private", async () => {
@@ -153,7 +155,7 @@ describe("main branch governance ruleset", () => {
     expect(security).toContain(advisoryUrl);
   });
 
-  it("documents the solo-maintainer auto-queue and PR-only emergency bypass policy", async () => {
+  it("documents the solo-maintainer GitHub-native merge and PR-only emergency bypass policy", async () => {
     const governance = await repositoryFile("GOVERNANCE.md");
     const detailedGovernance = await repositoryFile("docs/governance.md");
     const setup = await repositoryFile("scripts/setup-branch-protection.sh");
@@ -162,11 +164,10 @@ describe("main branch governance ruleset", () => {
       const normalized = document.replace(/\s+/g, " ");
       expect(normalized).toContain("zero required human approvals");
       expect(normalized).not.toContain("signed commits");
-      expect(normalized).toContain("Mergify");
-      expect(normalized).toContain("automatically enter the Mergify queue");
+      expect(normalized).toContain("explicit maintainer merge decision");
       expect(normalized).toContain("manual-review");
       expect(normalized).toContain("do-not-merge");
-      expect(normalized).not.toContain("explicit maintainer merge decision");
+      expect(normalized).not.toContain("automatically enter the Mergify queue");
       expect(normalized).toContain("PR-only emergency bypass");
       expect(normalized).toContain("retrospective review");
     }

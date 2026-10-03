@@ -111,6 +111,7 @@ describe("dependency and security automation configuration", () => {
     expect(workflow).toContain("github.event.pull_request.head.repo.full_name == github.repository");
     expect(workflow).not.toMatch(/pull_request:\n\s+paths-ignore:/u);
     expect(required).toContain("security / gate");
+    expect(required).not.toContain("security / osv pull request / osv-scan");
     expect(required).not.toContain("ci / security");
     expect(required).not.toContain("dependency-review");
   });
@@ -336,8 +337,10 @@ describe("dependency and security automation configuration", () => {
       "ip-address",
       "js-yaml",
       "linkify-it",
+      "markdown-it",
       "mysql2",
       "nanoid",
+      "next",
       "postcss",
       "puppeteer",
       "qs",

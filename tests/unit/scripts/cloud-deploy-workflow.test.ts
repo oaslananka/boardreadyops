@@ -60,7 +60,7 @@ describe("cloud-deploy topology preflight", () => {
     expect(workflow).toContain(`test "${configuredFile}" = "${containerPolicyPath}"`);
   });
 
-  it("caps BuildKit cache by size before a low-space build and after every build", () => {
+  it("fully reclaims BuildKit cache before a low-space build and caps it after every build", () => {
     const workflow = fs.readFileSync(workflowPath, "utf8");
 
     const buildCacheMaxUsedSpace = "$" + "{build_cache_max_used_space}";
@@ -70,21 +70,22 @@ describe("cloud-deploy topology preflight", () => {
     const deployArgs = "$" + "{deploy_args}";
 
     expect(workflow).toContain("build_cache_max_used_space=3GB");
+    expect(workflow).toContain("docker builder prune --all --force || true");
     expect(workflow).toContain(
       `docker builder prune --all --force --max-used-space "${buildCacheMaxUsedSpace}" || true`,
     );
     expect(workflow).not.toContain("--filter until=168h");
 
     const lowSpaceCheck = workflow.indexOf(`if [ "${availableMib}" -lt "${requiredMib}" ]; then`);
-    const preflightTrim = workflow.indexOf("            trim_build_cache", lowSpaceCheck);
+    const preflightReclaim = workflow.indexOf("            reclaim_build_cache_for_preflight", lowSpaceCheck);
     const checkout = workflow.indexOf(`cd "${repoDir}"`);
     const caseStart = workflow.indexOf(`case "${deployArgs}" in`);
     const caseEnd = workflow.indexOf("          esac", caseStart);
     const finalTrim = workflow.indexOf("          trim_build_cache", caseEnd);
 
     expect(lowSpaceCheck).toBeGreaterThan(0);
-    expect(preflightTrim).toBeGreaterThan(lowSpaceCheck);
-    expect(preflightTrim).toBeLessThan(checkout);
+    expect(preflightReclaim).toBeGreaterThan(lowSpaceCheck);
+    expect(preflightReclaim).toBeLessThan(checkout);
     expect(caseStart).toBeGreaterThan(checkout);
     expect(caseEnd).toBeGreaterThan(caseStart);
     expect(finalTrim).toBeGreaterThan(caseEnd);
@@ -143,6 +144,34 @@ describe("cloud-deploy topology preflight", () => {
 
     expect(documentation).toContain("defaults to three rollback images");
     expect(documentation).toContain("may explicitly reduce that preflight keep-set to one");
+  });
+
+  it("verifies the browser security baseline after a real deploy but not during dry-run", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+
+    const remoteDeployEnd = workflow.indexOf("          REMOTE_DEPLOY");
+    const securitySmoke = workflow.indexOf("      - name: Verify production browser security headers");
+    const cleanup = workflow.indexOf("      - name: Remove temporary SSH key");
+
+    expect(securitySmoke).toBeGreaterThan(remoteDeployEnd);
+    expect(cleanup).toBeGreaterThan(securitySmoke);
+    expect(workflow).toContain("if: $" + "{{ !inputs.dry_run }}");
+    expect(workflow).toContain("BOARDREADYOPS_PUBLIC_URL");
+    expect(workflow).toContain("cloud-deploy security smoke");
+    expect(workflow).toContain("for path in / /dashboard; do");
+    expect(workflow).toContain("Content-Security-Policy");
+    expect(workflow).toContain(`"frame-ancestors 'none'" "base-uri 'self'" "object-src 'none'"`);
+    expect(workflow).toContain("Strict-Transport-Security");
+    expect(workflow).toContain("max-age=31536000");
+    expect(workflow).toContain("X-Content-Type-Options");
+    expect(workflow).toContain("Referrer-Policy");
+    expect(workflow).toContain("Permissions-Policy");
+    expect(workflow).toContain("X-Frame-Options");
+    expect(workflow).toContain("require_header_directives");
+    expect(workflow).toContain(`"frame-ancestors 'none'" "base-uri 'self'" "object-src 'none'"`);
+    expect(workflow).toContain('"camera=()" "geolocation=()" "microphone=()" "usb=()"');
+    expect(workflow).not.toContain("grep -Fxiq");
+    expect(workflow).not.toContain("https://boardreadyops.com");
   });
 
   it("emits aggregate-only disk diagnostics before a low-space preflight exits", () => {

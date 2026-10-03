@@ -32,11 +32,11 @@ Security vulnerabilities and sensitive security details are not part of public i
 
 Every pull request targeting `main` must pass the required checks. While
 `@oaslananka` is the sole maintainer, the ruleset uses zero required human
-approvals. Unresolved review conversations still block merge. Eligible pull
-requests automatically enter the Mergify queue when they are not drafts and
-carry neither `manual-review` nor `do-not-merge`; GitHub Rulesets remain the
-source of truth for required checks before queue admission and again before
-merge.
+approvals. Unresolved review conversations still block merge. GitHub Rulesets
+remain the source of truth, and a maintainer makes an explicit maintainer merge
+decision after required checks pass. Mergify is limited to pull-request labels;
+it does not queue or merge pull requests. `manual-review` and `do-not-merge` are
+explicit hold signals that must be cleared before merge.
 
 `CODEOWNERS` continues to identify responsible ownership. CODEOWNERS review is
 not required while `@oaslananka` is both the sole code owner and sole maintainer,
@@ -45,10 +45,10 @@ CODEOWNERS review and a one-approval rule when another trusted maintainer or
 dedicated security owner is onboarded.
 
 Release Please, Renovate, Dependabot, GitHub Actions, and other automation may
-create or update pull requests. Eligible pull requests automatically enter the
-Mergify queue after the same required checks and resolved-conversation rules are
-satisfied. Maintainers apply `manual-review` or `do-not-merge` when an explicit
-human decision is required before merge.
+create or update pull requests. Those pull requests use the same required checks
+and resolved-conversation rules as all other changes. Mergify may add routing
+labels, but merge remains an explicit maintainer action. Maintainers apply
+`manual-review` or `do-not-merge` whenever a change must stay on hold.
 
 ## Branch Protection Baseline
 
@@ -61,8 +61,10 @@ source of truth. The active baseline requires:
 - strict required status checks and an up-to-date branch;
 - squash-only merges and linear history;
 - no force pushes or branch deletion; and
-- a PR-only emergency bypass for the repository administrator role; and
-- an exempt Mergify GitHub App bypass used only to operate the configured merge queue.
+- a PR-only emergency bypass for the repository administrator role.
+
+Mergify has no ruleset bypass and no merge-queue role; its repository config is
+limited to pull-request labelling.
 
 The stable required checks are:
 
@@ -88,11 +90,9 @@ branch-protection contracts.
 
 The human emergency bypass is the repository administrator role with
 `bypass_mode: pull_request`. This PR-only emergency bypass preserves the pull
-request and audit trail and cannot be used for a direct push. The Mergify GitHub
-App is separately configured with `bypass_mode: exempt` solely for merge-queue
-operation. Mergify must continue to use `branch_protection_injection_mode: queue`
-so the GitHub ruleset requirements are enforced by the queue before admission and
-again before merge.
+request and audit trail and cannot be used for a direct push. No integration has
+an automation bypass for normal merges; required checks and conversation
+resolution stay authoritative until the explicit maintainer merge decision.
 
 Use it only when a ruleset or CI infrastructure failure blocks a material
 security, release, or availability fix. Before merge:

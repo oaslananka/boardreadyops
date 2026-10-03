@@ -15,7 +15,7 @@ env:
 
 jobs:
   audit:
-    name: authenticated-ui / unlighthouse
+    name: authenticated-ui / lighthouse
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:

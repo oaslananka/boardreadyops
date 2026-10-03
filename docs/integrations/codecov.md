@@ -35,7 +35,7 @@ The `ci / coverage-gate` job uploads both reports through the SHA-pinned Codecov
 
 ## Bundle analysis
 
-After the production Next.js build, the official `@codecov/bundle-analyzer` CLI scans `apps/web/.next/static`. The bundle is named `boardreadyops-web`; source maps are excluded from the report.
+After the production Next.js build, the BoardReadyOps wrapper scans `apps/web/.next/static` with `tinyglobby` and builds the report through the official `@codecov/bundler-plugin-core` API. The bundle is named `boardreadyops-web`; source maps are excluded from the report.
 
 The generic analyzer is used because the current Next.js-specific Codecov plugin declares peer support only for Next.js 14 and 15, while BoardReadyOps uses Next.js 16. Internal builds use the `CODECOV_TOKEN` repository secret. Public fork pull requests omit the token argument and use Codecov's GitHub tokenless behavior. Analyzer telemetry is disabled.
 

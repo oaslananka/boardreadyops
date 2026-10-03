@@ -38,12 +38,14 @@ async function axeViolations(markup: string): Promise<string[]> {
 }
 
 describe("repository setup preview page", () => {
-  it("renders all presets, exact file paths, the declared permission profile and validation steps", async () => {
+  it("renders only distinct selectable presets, exact file paths, the declared permission profile and validation steps", async () => {
     const markup = await render({ preset: "production" });
     expect(markup).toContain("Open-source hardware");
     expect(markup).toContain("Prototype fabrication");
     expect(markup).toContain("Production release");
-    expect(markup).toContain("Contract design handoff");
+    expect(markup).not.toContain("Contract design handoff");
+    expect(markup).toContain("What changes");
+    expect(markup).toContain("Relaxes package completeness");
     expect(markup).toContain("boardreadyops.yml");
     expect(markup).toContain(".github/workflows/readiness-runner.yml");
     // The page renders the profile declared in cloud-core rather than its own copy of the list,
@@ -58,6 +60,12 @@ describe("repository setup preview page", () => {
     expect(markup).toContain("Enabled findings below medium severity");
     expect(markup).toContain("Rules explicitly set to false in the preview");
     expect(markup).not.toContain("installation-token");
+  });
+
+  it("does not revive the legacy contract-design preset through a query parameter", async () => {
+    const markup = await render({ preset: "contract-design" });
+    expect(markup).toContain("Active: Prototype fabrication");
+    expect(markup).not.toContain("Contract design handoff");
   });
 
   it("treats the GitHub setup redirect as an untrusted installation handoff", async () => {
@@ -101,7 +109,7 @@ describe("repository setup preview page", () => {
     window.document.write(markup);
     const presetLinks = [...window.document.querySelectorAll<HTMLAnchorElement>('a[href^="/setup?preset="]')];
 
-    expect(presetLinks).toHaveLength(4);
+    expect(presetLinks).toHaveLength(3);
     for (const link of presetLinks) {
       expect(link.classList.contains("min-h-11")).toBe(true);
     }

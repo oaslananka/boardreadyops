@@ -11,34 +11,34 @@ export interface AuthenticatedManifest {
   routes: string[];
 }
 
-export interface AuthenticatedRouteReport {
-  route?: { path?: string };
-  tasks?: { runLighthouseTask?: string };
-  report?: {
-    categories?: Record<string, { score?: number }>;
-  };
+export interface AuthenticatedLighthouseFlags {
+  port: number;
+  logLevel: string;
+  output: string;
+  onlyCategories: string[];
+  disableStorageReset: boolean;
+  formFactor: string;
+  screenEmulation: { disabled: boolean };
+  extraHeaders: { Cookie: string };
+  throttlingMethod?: string;
 }
 
-export interface AuthenticatedUnlighthouseConfig {
+export interface AuthenticatedAuditSummary {
   site: string;
-  urls: string[];
-  discovery: boolean;
-  outputPath: string;
-  cache: boolean;
-  cookies: Array<{ name: string; value: string; domain: string; path: string }>;
-  scanner: Record<string, unknown>;
-  puppeteerClusterOptions: { maxConcurrency: number };
-  puppeteerOptions: { headless: boolean };
-  chrome: { useSystem: boolean; useDownloadFallback: boolean };
-  lighthouseOptions: Record<string, unknown>;
-  ci: { budget: Record<string, number>; buildStatic: boolean };
+  generatedAt: string;
+  routes: Array<{
+    path: string;
+    scores: Record<string, number | null>;
+  }>;
+  scanFailures: Array<{ path: string; status: string }>;
+  budgetFailures: Array<{ path: string; category: string; score: number; minimum: number }>;
 }
 
 export interface AuthenticatedAuditResult {
   exitCode: number;
   manifest: AuthenticatedManifest;
   budgetFailures: Array<{ path: string; category: string; score: number; minimum: number }>;
-  scanFailures?: Array<{ path: string; status: string }>;
+  scanFailures: Array<{ path: string; status: string }>;
   reportPath?: string;
 }
 
@@ -47,32 +47,28 @@ export function parseAuthenticatedAuditOptions(
   argv?: string[],
 ): AuthenticatedAuditOptions;
 
-export function buildAuthenticatedUnlighthouseConfig(input: {
-  site: string;
+export function buildAuthenticatedLighthouseFlags(input: {
   session: string;
-  routes: string[];
+  port: number;
   headful?: boolean;
-}): AuthenticatedUnlighthouseConfig;
-export function waitForWorkerCompletion(
-  worker: {
-    reports(): AuthenticatedRouteReport[];
-    monitor?: () => { status: string };
-  },
-  expectedRoutes: string[],
-  options?: {
-    timeoutMs?: number;
-    pollMs?: number;
-    sleep?: (ms: number) => Promise<unknown>;
-    now?: () => number;
-  },
-): Promise<AuthenticatedRouteReport[]>;
+}): AuthenticatedLighthouseFlags;
 
-export function closeWorkerCluster(cluster: { display?: object | null; close(): Promise<void> }): Promise<void>;
+export function evaluateBudgetFailures(
+  routeReports: Array<{ path: string; scores?: Record<string, number | null> }>,
+): Array<{ path: string; category: string; score: number; minimum: number }>;
+
+export function detectInstalledChrome(paths?: string[]): Promise<string | undefined>;
 
 export function runAuthenticatedAudit(options?: {
   environment?: NodeJS.ProcessEnv | Record<string, string | undefined>;
   argv?: string[];
   discoverImpl?: (input: { site: string; session: string }) => Promise<AuthenticatedManifest>;
   writeManifestImpl?: (payload: string) => Promise<unknown>;
-  coreImpl?: unknown;
+  writeAuditSummaryImpl?: (summary: AuthenticatedAuditSummary) => Promise<unknown>;
+  lighthouseImpl?: (url: string, flags: AuthenticatedLighthouseFlags) => Promise<{ lhr?: unknown } | undefined>;
+  launchChromeImpl?: (options: {
+    chromePath: string;
+    chromeFlags: string[];
+  }) => Promise<{ port: number; kill(): Promise<unknown> }>;
+  detectChromeImpl?: () => Promise<string | undefined>;
 }): Promise<AuthenticatedAuditResult>;

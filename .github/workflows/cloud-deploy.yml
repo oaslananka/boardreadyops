@@ -206,6 +206,9 @@ jobs:
           free_mib() { df -Pm "$1" | awk 'NR==2 {print $4}'; }
           required_mib=12288
           build_cache_max_used_space=3GB
+          reclaim_build_cache_for_preflight() {
+            docker builder prune --all --force || true
+          }
           trim_build_cache() {
             docker builder prune --all --force --max-used-space "${build_cache_max_used_space}" || true
           }
@@ -285,12 +288,11 @@ jobs:
             "${available_mib}" "${docker_root}" "${required_mib}"
 
           if [ "${available_mib}" -lt "${required_mib}" ]; then
-            # Bound BuildKit by size instead of age. This host can accumulate many GiB of recent
-            # cache in less than a day, so an age-only filter can leave the disk below the build
-            # threshold even though the cache is safe to reclaim. Tagged runtime images remain
-            # untouched because they are rollback targets.
-            printf '%s\n' 'cloud-deploy preflight: below threshold, capping build cache and reclaiming dangling layers'
-            trim_build_cache
+            # BuildKit cache is disposable. When the host is already below the safe build floor,
+            # reclaim all of it before considering tagged rollback images. After a successful
+            # build, trim_build_cache restores the normal bounded 3 GB cache policy.
+            printf '%s\n' 'cloud-deploy preflight: below threshold, fully reclaiming build cache and dangling layers'
+            reclaim_build_cache_for_preflight
             docker image prune --force || true
             available_mib="$(free_mib "${docker_root}")"
             printf 'cloud-deploy preflight: %s MiB free after reclaim\n' "${available_mib}"
@@ -355,6 +357,65 @@ jobs:
           trim_build_cache
           printf 'cloud-deploy cache: %s MiB free after cache cap\n' "$(free_mib "${docker_root}")"
           REMOTE_DEPLOY
+
+      - name: Verify production browser security headers
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          set -euo pipefail
+          public_origin="$(doppler secrets get BOARDREADYOPS_PUBLIC_URL --plain \
+            --project boardreadyops --config deploy)"
+          case "${public_origin}" in
+            https://*) ;;
+            *)
+              printf '%s\n' 'cloud-deploy security smoke: BOARDREADYOPS_PUBLIC_URL must be HTTPS' >&2
+              exit 78
+              ;;
+          esac
+          public_origin="${public_origin%/}"
+
+          require_header_directives() {
+            local headers="$1"
+            local name="$2"
+            local path="$3"
+            shift 3
+
+            local actual
+            actual="$(
+              printf '%s\n' "${headers}" \
+                | awk -v name="${name}" 'index(tolower($0), tolower(name ":")) == 1 { print; exit }'
+            )"
+            if [[ -z "${actual}" ]]; then
+              printf 'cloud-deploy security smoke: %s missing on %s\n' "${name}" "${path}" >&2
+              return 1
+            fi
+
+            local required
+            for required in "$@"; do
+              if ! printf '%s\n' "${actual}" | grep -Fiq -- "${required}"; then
+                printf 'cloud-deploy security smoke: %s missing required directive %s on %s\n' \
+                  "${name}" "${required}" "${path}" >&2
+                return 1
+              fi
+            done
+          }
+
+          for path in / /dashboard; do
+            headers="$(
+              curl --fail --silent --show-error --max-time 20 \
+                --dump-header - --output /dev/null "${public_origin}${path}" \
+                | tr -d '\r'
+            )"
+            require_header_directives "${headers}" "Content-Security-Policy" "${path}" \
+              "frame-ancestors 'none'" "base-uri 'self'" "object-src 'none'"
+            require_header_directives "${headers}" "Strict-Transport-Security" "${path}" "max-age=31536000"
+            require_header_directives "${headers}" "X-Content-Type-Options" "${path}" "nosniff"
+            require_header_directives "${headers}" "Referrer-Policy" "${path}" "strict-origin-when-cross-origin"
+            require_header_directives "${headers}" "Permissions-Policy" "${path}" \
+              "camera=()" "geolocation=()" "microphone=()" "usb=()"
+            require_header_directives "${headers}" "X-Frame-Options" "${path}" "DENY"
+          done
 
       - name: Remove temporary SSH key
         if: always()
