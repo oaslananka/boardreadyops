@@ -83,10 +83,7 @@ function NoReviews() {
   return (
     <Panel title="No Reviews">
       <EmptyState title="No hardware reviews found">
-        <p>
-          Runs do not automatically appear here. Runs are execution history and evidence; a Review is created only by an
-          explicit review publish step.
-        </p>
+        <p>Historical Runs remain in run history; this list contains only explicitly published Reviews.</p>
         <p>
           <Link href="/runs" className="text-primary underline underline-offset-2">
             Browse run history
