@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { customerStatusLabel } from "../lib/customer-nomenclature.js";
 import { AlertDescription, AlertRoot, AlertTitle } from "./ui/alert.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
@@ -46,11 +47,7 @@ const infoValues = new Set([
 ]);
 
 export function humanize(value: string | undefined): string {
-  if (!value) return "Unknown";
-  return value
-    .replaceAll("_", " ")
-    .replaceAll("-", " ")
-    .replace(/\b\w/gu, (letter) => letter.toUpperCase());
+  return customerStatusLabel(value);
 }
 
 export function statusTone(value: string | undefined): StatusTone {

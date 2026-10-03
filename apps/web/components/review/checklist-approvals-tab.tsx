@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoApproval, DemoChecklistItem } from "../../lib/demo-data.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
@@ -140,7 +141,7 @@ export function ChecklistApprovalsTab({
                         ) : null}
                       </td>
                       <td className="py-2 pr-3">
-                        <StatusBadge value={approvalStatusTone(app.status)} label={app.status} />
+                        <StatusBadge value={approvalStatusTone(app.status)} label={customerStatusLabel(app.status)} />
                       </td>
                       <td className="py-2 pr-3">
                         {app.reason ?? "—"}

@@ -10,6 +10,7 @@ import { type DataColumn, DataTable } from "../../components/ui/data-table.js";
 import { EmptyState, Pagination, Panel, StatusBadge } from "../../components/ui.js";
 import { ViewerNav } from "../../components/viewer-nav.js";
 import { WorkspaceSwitcher } from "../../components/workspace-switcher.js";
+import { customerPlanLabel, customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import { loadWorkspaceProjects, type WorkspaceProjectsImpact } from "../../lib/project-listing.js";
 import { viewerAuthorization } from "../../lib/viewer-authorization.js";
 import {
@@ -146,7 +147,7 @@ export default async function ProjectsPage({ searchParams }: Readonly<ProjectsPa
 
             <Panel
               title={result.selected.name}
-              description={`You are ${result.selected.role} of this workspace · ${result.selected.planTier} plan`}
+              description={`You are ${customerStatusLabel(result.selected.role)} of this workspace · ${customerPlanLabel(result.selected.planTier)} plan`}
             >
               <DataTable
                 caption={`Projects in ${result.selected.name}`}

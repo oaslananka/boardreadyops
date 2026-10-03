@@ -1,3 +1,4 @@
+import { customerStatusLabel } from "../../lib/customer-nomenclature.js";
 import type { DemoReview } from "../../lib/demo-data.js";
 import { Button } from "../ui/button.js";
 import { Definition, DefinitionGrid, Panel, StatusBadge } from "../ui.js";
@@ -113,7 +114,9 @@ export function OverviewTab({
   } else {
     changedFilesContent = review.changedFiles.map((file) => (
       <div key={file.path} className="flex items-center gap-3 border-b border-border py-2 text-sm last:border-b-0">
-        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs uppercase text-muted-foreground">{file.status}</span>
+        <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs uppercase text-muted-foreground">
+          {customerStatusLabel(file.status)}
+        </span>
         <code className="flex-1 truncate">{file.path}</code>
         <span className="text-muted-foreground">+{file.changesCount} lines</span>
       </div>

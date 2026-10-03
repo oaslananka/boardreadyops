@@ -53,9 +53,7 @@ export function deriveRepositorySetupState(input: RepositorySetupStateInput): Re
     return {
       id: "attention",
       label: "Setup needs attention",
-      description: `The latest persisted setup revision reports workflow ${humanize(
-        input.setupWorkflowStatus,
-      )} and configuration ${humanize(input.setupConfigStatus)}. Resolve the setup condition, then validate again.`,
+      description: `The latest persisted setup revision reports workflow ${humanize(input.setupWorkflowStatus)} and configuration ${humanize(input.setupConfigStatus)}. Resolve the setup condition, then validate again.`,
       currentStep: 4,
     };
   }
