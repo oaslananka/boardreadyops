@@ -6,6 +6,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
     "additionalProperties": false,
     "properties": {
       "exitCode": {
+        "minimum": 0,
         "type": "integer",
       },
       "generatedAt": {
@@ -17,6 +18,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
           "properties": {
             "commandsToVerify": {
               "items": {
+                "minLength": 1,
                 "type": "string",
               },
               "type": "array",
@@ -37,10 +39,12 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "object",
                 },
                 "message": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "references": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
@@ -55,10 +59,12 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "additionalProperties": false,
               "properties": {
                 "description": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "steps": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
@@ -71,6 +77,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "object",
             },
             "id": {
+              "minLength": 1,
               "type": "string",
             },
             "location": {
@@ -103,24 +110,30 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "object",
                 },
                 "column": {
+                  "minimum": 1,
                   "type": "integer",
                 },
                 "line": {
+                  "minimum": 1,
                   "type": "integer",
                 },
                 "region": {
                   "additionalProperties": false,
                   "properties": {
                     "endColumn": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                     "endLine": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                     "startColumn": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                     "startLine": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                   },
@@ -148,6 +161,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   ],
                 },
                 "path": {
+                  "minLength": 1,
                   "type": "string",
                 },
               },
@@ -158,6 +172,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "object",
             },
             "ruleId": {
+              "minLength": 1,
               "type": "string",
             },
             "safeAutoFixPossible": {
@@ -173,9 +188,11 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               ],
             },
             "title": {
+              "minLength": 1,
               "type": "string",
             },
             "whyItMatters": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -196,6 +213,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "type": "array",
       },
       "projectRoot": {
+        "minLength": 1,
         "type": "string",
       },
       "releaseActions": {
@@ -204,6 +222,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
           "properties": {
             "commandsToVerify": {
               "items": {
+                "minLength": 1,
                 "type": "string",
               },
               "type": "array",
@@ -224,10 +243,12 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "object",
                 },
                 "message": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "references": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
@@ -242,10 +263,12 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "additionalProperties": false,
               "properties": {
                 "description": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "steps": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
@@ -258,6 +281,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "object",
             },
             "id": {
+              "minLength": 1,
               "type": "string",
             },
             "location": {
@@ -290,24 +314,30 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "object",
                 },
                 "column": {
+                  "minimum": 1,
                   "type": "integer",
                 },
                 "line": {
+                  "minimum": 1,
                   "type": "integer",
                 },
                 "region": {
                   "additionalProperties": false,
                   "properties": {
                     "endColumn": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                     "endLine": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                     "startColumn": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                     "startLine": {
+                      "minimum": 1,
                       "type": "integer",
                     },
                   },
@@ -335,6 +365,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   ],
                 },
                 "path": {
+                  "minLength": 1,
                   "type": "string",
                 },
               },
@@ -345,6 +376,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "object",
             },
             "ruleId": {
+              "minLength": 1,
               "type": "string",
             },
             "safeAutoFixPossible": {
@@ -360,9 +392,11 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               ],
             },
             "title": {
+              "minLength": 1,
               "type": "string",
             },
             "whyItMatters": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -395,18 +429,22 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "additionalProperties": false,
         "properties": {
           "critical": {
+            "minimum": 0,
             "type": "integer",
           },
           "failed": {
             "type": "boolean",
           },
           "high": {
+            "minimum": 0,
             "type": "integer",
           },
           "info": {
+            "minimum": 0,
             "type": "integer",
           },
           "low": {
+            "minimum": 0,
             "type": "integer",
           },
           "maxSeverity": {
@@ -420,9 +458,11 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             ],
           },
           "medium": {
+            "minimum": 0,
             "type": "integer",
           },
           "total": {
+            "minimum": 0,
             "type": "integer",
           },
         },
@@ -445,6 +485,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "const": "boardreadyops",
           },
           "version": {
+            "minLength": 1,
             "type": "string",
           },
         },
@@ -475,6 +516,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "additionalProperties": false,
         "properties": {
           "file": {
+            "minLength": 1,
             "type": "string",
           },
           "mode": {
@@ -502,12 +544,15 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                     "additionalProperties": false,
                     "properties": {
                       "manufacturer": {
+                        "minLength": 1,
                         "type": "string",
                       },
                       "mpn": {
+                        "minLength": 1,
                         "type": "string",
                       },
                       "note": {
+                        "minLength": 1,
                         "type": "string",
                       },
                     },
@@ -519,6 +564,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "array",
                 },
                 "mpn": {
+                  "minLength": 1,
                   "type": "string",
                 },
               },
@@ -549,6 +595,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "pinAssignments": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -558,6 +605,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "pinAssignments": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -567,6 +615,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "pinAssignments": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -576,9 +625,11 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "mcuDesignator": {
+                "minLength": 1,
                 "type": "string",
               },
               "project": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -588,6 +639,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "pinAssignments": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -601,6 +653,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "properties": {
           "allow": {
             "items": {
+              "minLength": 1,
               "type": "string",
             },
             "type": "array",
@@ -667,6 +720,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                 ],
               },
               "webhookEnv": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -679,6 +733,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                 "type": "boolean",
               },
               "from": {
+                "minLength": 1,
                 "type": "string",
               },
               "minSeverity": {
@@ -692,11 +747,13 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               },
               "recipients": {
                 "items": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "type": "array",
               },
               "smtpEnv": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -718,6 +775,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                 ],
               },
               "webhookEnv": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -739,6 +797,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                 ],
               },
               "webhookEnv": {
+                "minLength": 1,
                 "type": "string",
               },
             },
@@ -748,9 +807,11 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "botTokenEnv": {
+                "minLength": 1,
                 "type": "string",
               },
               "chatId": {
+                "minLength": 1,
                 "type": "string",
               },
               "enabled": {
@@ -821,6 +882,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
       },
       "plugins": {
         "items": {
+          "minLength": 1,
           "type": "string",
         },
         "type": "array",
@@ -836,18 +898,23 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "additionalProperties": false,
               "properties": {
                 "id": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "max": {
+                  "minimum": 0,
                   "type": "integer",
                 },
                 "rules": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
                 },
                 "score": {
+                  "maximum": 100,
+                  "minimum": 0,
                   "type": "integer",
                 },
                 "severity": {
@@ -907,6 +974,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "additionalProperties": false,
                   "properties": {
                     "pinAssignments": {
+                      "minLength": 1,
                       "type": "string",
                     },
                   },
@@ -916,6 +984,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "additionalProperties": false,
                   "properties": {
                     "pinAssignments": {
+                      "minLength": 1,
                       "type": "string",
                     },
                   },
@@ -925,6 +994,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "additionalProperties": false,
                   "properties": {
                     "pinAssignments": {
+                      "minLength": 1,
                       "type": "string",
                     },
                   },
@@ -934,9 +1004,11 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "additionalProperties": false,
                   "properties": {
                     "mcuDesignator": {
+                      "minLength": 1,
                       "type": "string",
                     },
                     "project": {
+                      "minLength": 1,
                       "type": "string",
                     },
                   },
@@ -946,6 +1018,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "additionalProperties": false,
                   "properties": {
                     "pinAssignments": {
+                      "minLength": 1,
                       "type": "string",
                     },
                   },
@@ -961,6 +1034,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               ],
             },
             "path": {
+              "minLength": 1,
               "type": "string",
             },
             "pinmap": {
@@ -1019,6 +1093,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                         "type": "object",
                       },
                       "timeout": {
+                        "minimum": 1,
                         "type": "integer",
                       },
                     },
@@ -1036,6 +1111,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                     "type": "string",
                   },
                   "name": {
+                    "minLength": 1,
                     "type": "string",
                   },
                 },
@@ -1073,12 +1149,14 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "properties": {
                     "finish": {
                       "items": {
+                        "minLength": 1,
                         "type": "string",
                       },
                       "type": "array",
                     },
                     "layers": {
                       "items": {
+                        "minimum": 1,
                         "type": "integer",
                       },
                       "type": "array",
@@ -1093,10 +1171,12 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "object",
                 },
                 "profile": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "required": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
@@ -1203,6 +1283,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                 "patterns": {
                   "additionalProperties": {
                     "items": {
+                      "minLength": 1,
                       "type": "string",
                     },
                     "type": "array",
@@ -1237,6 +1318,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "object",
                 },
                 "timeout": {
+                  "minimum": 1,
                   "type": "integer",
                 },
               },
@@ -1254,21 +1336,26 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "string",
             },
             "fingerprint": {
+              "pattern": "^[a-fA-F0-9]{64}$",
               "type": "string",
             },
             "project": {
+              "minLength": 1,
               "type": "string",
             },
             "reason": {
+              "minLength": 1,
               "type": "string",
             },
             "refs": {
               "items": {
+                "minLength": 1,
                 "type": "string",
               },
               "type": "array",
             },
             "rule": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -1307,12 +1394,14 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "properties": {
               "finish": {
                 "items": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "type": "array",
               },
               "layers": {
                 "items": {
+                  "minimum": 1,
                   "type": "integer",
                 },
                 "type": "array",
@@ -1327,10 +1416,12 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "object",
           },
           "profile": {
+            "minLength": 1,
             "type": "string",
           },
           "required": {
             "items": {
+              "minLength": 1,
               "type": "string",
             },
             "type": "array",
@@ -1353,27 +1444,34 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
           "additionalProperties": false,
           "properties": {
             "approvedBy": {
+              "minLength": 1,
               "type": "string",
             },
             "evidence": {
+              "minLength": 1,
               "type": "string",
             },
             "expires": {
               "type": "string",
             },
             "fingerprint": {
+              "pattern": "^[a-fA-F0-9]{64}$",
               "type": "string",
             },
             "owner": {
+              "minLength": 1,
               "type": "string",
             },
             "project": {
+              "minLength": 1,
               "type": "string",
             },
             "reason": {
+              "minLength": 1,
               "type": "string",
             },
             "rule": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -1491,6 +1589,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
           "additionalProperties": false,
           "properties": {
             "bytes": {
+              "minimum": 0,
               "type": "integer",
             },
             "kind": {
@@ -1509,6 +1608,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "string",
             },
             "sha256": {
+              "pattern": "^[a-f0-9]{64}$",
               "type": "string",
             },
             "sourcePath": {
@@ -1652,6 +1752,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "const": "sha256",
           },
           "artifactCount": {
+            "minimum": 0,
             "type": "integer",
           },
         },
@@ -1756,21 +1857,27 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               ],
             },
             "critical": {
+              "minimum": 0,
               "type": "integer",
             },
             "high": {
+              "minimum": 0,
               "type": "integer",
             },
             "info": {
+              "minimum": 0,
               "type": "integer",
             },
             "low": {
+              "minimum": 0,
               "type": "integer",
             },
             "medium": {
+              "minimum": 0,
               "type": "integer",
             },
             "total": {
+              "minimum": 0,
               "type": "integer",
             },
           },
@@ -1797,12 +1904,15 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "array",
           },
           "exact": {
+            "minimum": 0,
             "type": "integer",
           },
           "heuristic": {
+            "minimum": 0,
             "type": "integer",
           },
           "unclassified": {
+            "minimum": 0,
             "type": "integer",
           },
         },
@@ -1815,6 +1925,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "type": "object",
       },
       "exitCode": {
+        "minimum": 0,
         "type": "integer",
       },
       "fabrication": {
@@ -1874,6 +1985,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                     "additionalProperties": false,
                     "properties": {
                       "digest": {
+                        "pattern": "^[a-f0-9]{64}$",
                         "type": "string",
                       },
                       "path": {
@@ -1911,15 +2023,263 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "items": {
           "additionalProperties": false,
           "allOf": [
-            {},
-            {},
-            {},
-            {},
-            {},
-            {},
-            {},
-            {},
-            {},
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "const": "bom.missing-mpn",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "reference": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "reference",
+                    ],
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "const": "bom.single-source",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "mpn": {
+                        "type": "string",
+                      },
+                      "supplier": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "mpn",
+                      "supplier",
+                    ],
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "const": "bom.eol-detection",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "lifecycle": {
+                        "type": "string",
+                      },
+                      "mpn": {
+                        "type": "string",
+                      },
+                      "reference": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "reference",
+                    ],
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "const": "bom.footprint-mismatch",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "bom": {
+                        "type": "string",
+                      },
+                      "pcb": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "bom",
+                      "pcb",
+                    ],
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "const": "bom.dnp-consistency",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "bomDnp": {
+                        "type": "boolean",
+                      },
+                      "pcbDnp": {
+                        "type": "boolean",
+                      },
+                    },
+                    "required": [
+                      "bomDnp",
+                      "pcbDnp",
+                    ],
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "pattern": "^pinmap\\.",
+                    "type": "string",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "designator": {
+                        "type": "string",
+                      },
+                      "entry": {
+                        "type": "object",
+                      },
+                      "net": {
+                        "type": "string",
+                      },
+                      "pin": {
+                        "type": "string",
+                      },
+                    },
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "const": "manufacturing.outputs-present",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "required": {
+                        "type": "string",
+                      },
+                    },
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "const": "manufacturing.drill-coverage",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "drillSize": {
+                        "type": "string",
+                      },
+                    },
+                    "type": "object",
+                  },
+                },
+              },
+            },
+            {
+              "if": {
+                "properties": {
+                  "ruleId": {
+                    "pattern": "^release\\.",
+                    "type": "string",
+                  },
+                },
+              },
+              "then": {
+                "properties": {
+                  "details": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "missingRevisions": {
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "revision": {
+                        "type": [
+                          "string",
+                          "null",
+                        ],
+                      },
+                      "tag": {
+                        "type": "string",
+                      },
+                      "tagPattern": {
+                        "type": "string",
+                      },
+                    },
+                    "type": "object",
+                  },
+                },
+              },
+            },
           ],
           "properties": {
             "confidence": {
@@ -1934,6 +2294,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               "type": "object",
             },
             "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
               "type": "string",
             },
             "fix": {
@@ -1943,16 +2304,19 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "boolean",
                 },
                 "description": {
+                  "minLength": 1,
                   "type": "string",
                 },
                 "references": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
                 },
                 "steps": {
                   "items": {
+                    "minLength": 1,
                     "type": "string",
                   },
                   "type": "array",
@@ -2046,6 +2410,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   ],
                 },
                 {
+                  "pattern": "^(drc|erc)\\.[A-Za-z0-9_.-]+$",
                   "type": "string",
                 },
               ],
@@ -2291,6 +2656,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "additionalProperties": false,
         "properties": {
           "blocking": {
+            "minimum": 0,
             "type": "integer",
           },
           "evidence": {
@@ -2332,6 +2698,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "array",
           },
           "nonBlocking": {
+            "minimum": 0,
             "type": "integer",
           },
           "profile": {
@@ -2355,6 +2722,8 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "object",
           },
           "score": {
+            "maximum": 100,
+            "minimum": 0,
             "type": "integer",
           },
           "status": {
@@ -2431,6 +2800,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "string",
                 },
                 "matched": {
+                  "minimum": 0,
                   "type": "integer",
                 },
                 "owner": {
@@ -2465,6 +2835,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "type": "string",
                 },
                 "matched": {
+                  "minimum": 0,
                   "type": "integer",
                 },
                 "owner": {
@@ -2508,6 +2879,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
     "additionalProperties": false,
     "properties": {
       "outputDir": {
+        "minLength": 1,
         "type": "string",
       },
       "schemaVersion": {
@@ -2531,6 +2903,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               ],
             },
             "output": {
+              "minLength": 1,
               "type": "string",
             },
           },
@@ -2577,6 +2950,8 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                         "type": "string",
                       },
                       "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
                         "type": "number",
                       },
                       "field": {
@@ -2590,6 +2965,8 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                           "additionalProperties": false,
                           "properties": {
                             "confidence": {
+                              "maximum": 1,
+                              "minimum": 0,
                               "type": "number",
                             },
                             "technique": {
@@ -2828,6 +3205,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "const": "1.7",
       },
       "version": {
+        "minimum": 1,
         "type": "integer",
       },
     },
@@ -2917,12 +3295,14 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
           "additionalProperties": false,
           "properties": {
             "bytes": {
+              "minimum": 0,
               "type": "integer",
             },
             "output": {
               "type": "string",
             },
             "sha256": {
+              "pattern": "^[0-9a-f]{64}$",
               "type": "string",
             },
             "source": {
@@ -3021,6 +3401,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
           "additionalProperties": false,
           "properties": {
             "approverId": {
+              "minLength": 1,
               "type": "string",
             },
             "isBreakGlass": {
@@ -3055,6 +3436,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "componentCount": {
+                "minimum": 0,
                 "type": [
                   "integer",
                   "null",
@@ -3067,6 +3449,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                 ],
               },
               "hash": {
+                "pattern": "^([a-f0-9]{64})?$",
                 "type": [
                   "string",
                   "null",
@@ -3085,12 +3468,14 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "additionalProperties": false,
             "properties": {
               "componentCount": {
+                "minimum": 0,
                 "type": [
                   "integer",
                   "null",
                 ],
               },
               "hash": {
+                "pattern": "^([a-f0-9]{64})?$",
                 "type": [
                   "string",
                   "null",
@@ -3113,12 +3498,14 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "additionalProperties": false,
                   "properties": {
                     "bytes": {
+                      "minimum": 0,
                       "type": "integer",
                     },
                     "path": {
                       "type": "string",
                     },
                     "sha256": {
+                      "pattern": "^[a-f0-9]{64}$",
                       "type": "string",
                     },
                   },
@@ -3136,12 +3523,14 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
                   "additionalProperties": false,
                   "properties": {
                     "bytes": {
+                      "minimum": 0,
                       "type": "integer",
                     },
                     "path": {
                       "type": "string",
                     },
                     "sha256": {
+                      "pattern": "^[a-f0-9]{64}$",
                       "type": "string",
                     },
                   },
@@ -3224,6 +3613,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "string",
           },
           "ledgerDigest": {
+            "pattern": "^([a-f0-9]{64})?$",
             "type": [
               "string",
               "null",
@@ -3236,6 +3626,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             ],
           },
           "manifestHash": {
+            "pattern": "^([a-f0-9]{64})?$",
             "type": [
               "string",
               "null",
@@ -3265,6 +3656,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "string",
           },
           "ruleCount": {
+            "minimum": 0,
             "type": "integer",
           },
           "rules": {
@@ -3274,6 +3666,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "array",
           },
           "rulesetHash": {
+            "pattern": "^[a-f0-9]{64}$",
             "type": "string",
           },
         },
@@ -3303,6 +3696,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "object",
           },
           "id": {
+            "minLength": 1,
             "type": "string",
           },
         },
@@ -3340,6 +3734,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "const": "sha256",
           },
           "passportDigest": {
+            "pattern": "^[a-f0-9]{64}$",
             "type": "string",
           },
         },
@@ -3363,6 +3758,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
               ],
             },
             "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
               "type": "string",
             },
             "owner": {
@@ -3400,6 +3796,76 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
     ],
     "type": "object",
   },
+  "review-publish-result.schema.json": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "dryRun": {
+              "const": false,
+            },
+          },
+          "required": [
+            "dryRun",
+          ],
+        },
+        "then": {
+          "required": [
+            "reviewUrl",
+          ],
+        },
+      },
+    ],
+    "properties": {
+      "dryRun": {
+        "type": "boolean",
+      },
+      "evidenceDigest": {
+        "pattern": "^[a-f0-9]{64}$",
+        "type": "string",
+      },
+      "reviewUrl": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "runId": {
+        "minLength": 1,
+        "type": "string",
+      },
+      "schemaVersion": {
+        "const": 1,
+      },
+      "success": {
+        "const": true,
+      },
+      "tool": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "const": "boardreadyops",
+          },
+          "version": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+          "version",
+        ],
+        "type": "object",
+      },
+    },
+    "required": [
+      "dryRun",
+      "evidenceDigest",
+      "schemaVersion",
+      "success",
+      "tool",
+    ],
+    "type": "object",
+  },
   "rule-pack.schema.json": {
     "additionalProperties": false,
     "properties": {
@@ -3430,18 +3896,22 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "type": "object",
       },
       "description": {
+        "minLength": 1,
         "type": "string",
       },
       "homepage": {
         "type": "string",
       },
       "id": {
+        "minLength": 3,
+        "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9-]*)*$",
         "type": "string",
       },
       "license": {
         "type": "string",
       },
       "name": {
+        "minLength": 1,
         "type": "string",
       },
       "releaseMode": {
@@ -3491,6 +3961,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "type": "string",
       },
       "version": {
+        "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.+-]+)?(\\+[a-zA-Z0-9.+-]+)?$",
         "type": "string",
       },
     },
@@ -3551,6 +4022,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
         "additionalProperties": false,
         "properties": {
           "activeWaivers": {
+            "minimum": 0,
             "type": "integer",
           },
           "baselineStatus": {
@@ -3564,12 +4036,15 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "boolean",
           },
           "blocking": {
+            "minimum": 0,
             "type": "integer",
           },
           "durationMs": {
+            "minimum": 0,
             "type": "integer",
           },
           "expiredWaivers": {
+            "minimum": 0,
             "type": "integer",
           },
           "failingChecks": {
@@ -3579,12 +4054,14 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "array",
           },
           "findingsTotal": {
+            "minimum": 0,
             "type": "integer",
           },
           "materialChange": {
             "type": "boolean",
           },
           "outputCount": {
+            "minimum": 0,
             "type": "integer",
           },
           "profile": {
@@ -3600,6 +4077,7 @@ exports[`public schema shape snapshots > keeps the public contract shape of ever
             "type": "string",
           },
           "ruleCount": {
+            "minimum": 0,
             "type": "integer",
           },
           "signed": {

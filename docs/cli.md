@@ -20,6 +20,19 @@ Use `--format json` with `run` or `check` when another tool should consume diagn
 
 See [Exit Codes & Finding Severities](reference/exit-codes.md) for the full nonzero exit code and severity reference shared across these commands.
 
+## Review publishing
+
+`boardreadyops review publish [path]` publishes the local review evidence to BoardReadyOps Cloud. Text output remains the default for interactive use. Pass `--format json` for integrations that need a stable machine-readable result without parsing display text.
+
+```bash
+BOARDREADYOPS_TOKEN=... boardreadyops review publish . --format json
+boardreadyops schema review-publish > review-publish-result.schema.json
+```
+
+Successful JSON stdout is one schema-versioned document containing the BoardReadyOps tool name/version, `success`, `dryRun`, the full `evidenceDigest`, the resolved same-origin `reviewUrl` for live publishes, and `runId` when the service supplies one. Dry runs omit `reviewUrl` and `runId`. Human diagnostics and failures are written to stderr; failed JSON-mode publishes leave stdout empty. Validate consumers against `schemas/review-publish-result.schema.json` or `boardreadyops schema review-publish`.
+
+The result intentionally excludes API tokens, authorization headers, uploaded source contents, internal trace fields, and unrelated service response data. A successful service response must contain either a same-origin `reviewUrl` or a `runId`; otherwise the command fails closed.
+
 ## Self-hosted runner operations
 
 `boardreadyops runner` provides the customer-worker lifecycle for the self-hosted execution plane.

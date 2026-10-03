@@ -51,6 +51,11 @@ function extractShape(node: unknown, defs: Record<string, unknown>, seen: readon
   const shape: Record<string, unknown> = {};
   if (record.type !== undefined) shape.type = record.type;
   if (record.const !== undefined) shape.const = record.const;
+  if (typeof record.pattern === "string") shape.pattern = record.pattern;
+  if (typeof record.minLength === "number") shape.minLength = record.minLength;
+  if (typeof record.maxLength === "number") shape.maxLength = record.maxLength;
+  if (typeof record.minimum === "number") shape.minimum = record.minimum;
+  if (typeof record.maximum === "number") shape.maximum = record.maximum;
   if (Array.isArray(record.enum)) shape.enum = [...record.enum].sort();
   if (Array.isArray(record.required)) shape.required = [...record.required].sort();
   if (record.additionalProperties !== undefined) {
@@ -71,6 +76,12 @@ function extractShape(node: unknown, defs: Record<string, unknown>, seen: readon
     const value = record[combinator];
     if (Array.isArray(value)) {
       shape[combinator] = value.map((entry) => extractShape(entry, defs, seen));
+    }
+  }
+  for (const conditional of ["if", "then", "else"] as const) {
+    const value = record[conditional];
+    if (value !== undefined) {
+      shape[conditional] = extractShape(value, defs, seen);
     }
   }
   return shape;

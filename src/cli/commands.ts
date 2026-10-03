@@ -115,7 +115,7 @@ export function registerAllCommands(
 
   program
     .command("schema")
-    .argument("[name]", "agent-plan, config, doctor, findings, generate, hbom, or pinmap", "config")
+    .argument("[name]", "agent-plan, config, doctor, findings, generate, hbom, pinmap, or review-publish", "config")
     .action((name: string | undefined) => {
       process.exitCode = schemaCommand(name, streams);
     });
