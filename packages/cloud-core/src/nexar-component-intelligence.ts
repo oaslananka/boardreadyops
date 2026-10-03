@@ -85,6 +85,7 @@ export function nexarLifecycleStatus(value: string | undefined): ComponentLifecy
 
 type NexarOffer = {
   prices?: { quantity?: number; price?: number; currency?: string }[];
+  factoryLeadDays?: number;
 };
 
 type NexarSeller = {
@@ -94,6 +95,7 @@ type NexarSeller = {
 
 type NexarPart = {
   mpn?: string;
+  totalAvail?: number;
   manufacturer?: { name?: string };
   specs?: { attribute?: { shortname?: string }; displayValue?: string }[];
   sellers?: NexarSeller[];
@@ -153,6 +155,43 @@ function nexarPriceBreaks(sellers: readonly NexarSeller[] | undefined): PriceBre
   return [];
 }
 
+function nonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
+/**
+ * Nexar documents Part.totalAvail as total component availability for the selected/default
+ * market. Keep it as a quantity instead of collapsing it to a boolean: whether it is sufficient
+ * depends on the build quantity, which this provider lookup does not know.
+ */
+function nexarAvailableUnits(part: NexarPart): number | undefined {
+  return nonNegativeInteger(part.totalAvail);
+}
+
+/**
+ * Picks the shortest valid factory lead time from authorized sellers when any authorized seller
+ * carries a lead-time signal; otherwise falls back to the shortest signal from any seller.
+ *
+ * This mirrors the pricing trust rule: marketplace data may fill a gap, but never displaces a
+ * usable authorized-channel signal.
+ */
+function nexarLeadTimeDays(sellers: readonly NexarSeller[] | undefined): number | undefined {
+  if (!sellers) return undefined;
+  const values = (candidateSellers: readonly NexarSeller[]) =>
+    candidateSellers.flatMap((seller) =>
+      (seller.offers ?? []).flatMap((offer) => {
+        const days = nonNegativeInteger(offer.factoryLeadDays);
+        return days === undefined ? [] : [days];
+      }),
+    );
+
+  const authorized = values(sellers.filter((seller) => seller.isAuthorized === true));
+  if (authorized.length > 0) return Math.min(...authorized);
+
+  const any = values(sellers);
+  return any.length > 0 ? Math.min(...any) : undefined;
+}
+
 function chunked<T>(items: readonly T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) chunks.push(items.slice(index, index + size));
@@ -164,11 +203,13 @@ const lifecycleQuery = `query BoardReadyOpsLifecycle($queries: [SupPartMatchQuer
     reference
     parts {
       mpn
+      totalAvail
       manufacturer { name }
       specs { attribute { shortname } displayValue }
       sellers {
         isAuthorized
         offers {
+          factoryLeadDays
           prices { quantity price currency }
         }
       }
@@ -188,16 +229,35 @@ function parseNexarMatches(
     const part = selectPart(match.parts ?? [], query);
     if (!part) continue;
     const status = nexarLifecycleStatus(specValue(part, "lifecyclestatus"));
-    if (status === "unknown") continue;
     const priceBreaks = nexarPriceBreaks(part.sellers);
+    const distributorClassification = nexarDistributorClassification(part.sellers);
+    const availableUnits = nexarAvailableUnits(part);
+    const leadTimeDays = nexarLeadTimeDays(part.sellers);
+
+    // A matched part may carry useful supply data even when its lifecycle vocabulary is unknown.
+    // Preserve that observation rather than throwing availability/lead-time evidence away. A
+    // match with no usable lifecycle or supply signal is still omitted so "identified but no
+    // answer" does not become a false observation.
+    if (
+      status === "unknown" &&
+      availableUnits === undefined &&
+      leadTimeDays === undefined &&
+      priceBreaks.length === 0 &&
+      distributorClassification === "unknown"
+    ) {
+      continue;
+    }
+
     observations.push({
       mpn: query.mpn,
       ...(query.manufacturer === undefined ? {} : { manufacturer: query.manufacturer }),
       status,
       source: "nexar",
       observedAt,
-      distributorClassification: nexarDistributorClassification(part.sellers),
+      distributorClassification,
       ...(priceBreaks.length > 0 ? { priceBreaks } : {}),
+      ...(availableUnits === undefined ? {} : { availableUnits }),
+      ...(leadTimeDays === undefined ? {} : { leadTimeDays }),
     });
   }
   return observations;

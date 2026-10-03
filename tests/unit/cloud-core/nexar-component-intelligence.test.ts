@@ -17,11 +17,17 @@ function part(
   manufacturer?: string,
   sellers?: {
     isAuthorized?: boolean;
-    offers?: { prices?: { quantity?: number; price?: number; currency?: string }[] }[];
+    offers?: {
+      prices?: { quantity?: number; price?: number; currency?: string }[];
+      inventoryLevel?: number;
+      factoryLeadDays?: number;
+    }[];
   }[],
+  totalAvail?: number,
 ) {
   return {
     mpn,
+    ...(totalAvail === undefined ? {} : { totalAvail }),
     ...(manufacturer ? { manufacturer: { name: manufacturer } } : {}),
     specs: [
       { attribute: { shortname: "lifecyclestatus" }, displayValue: lifecycle },
@@ -62,7 +68,8 @@ describe("nexar lifecycle mapping", () => {
 
   it("treats an unfamiliar or missing status as unknown rather than healthy", () => {
     // Reporting a board clean on the strength of a value nobody has read is the failure to
-    // avoid; unknown is dropped by the caller instead.
+    // avoid. The provider may still preserve an unknown lifecycle when independent supply
+    // signals such as availability or lead time are present.
     expect(nexarLifecycleStatus("Preliminary")).toBe("unknown");
     expect(nexarLifecycleStatus(undefined)).toBe("unknown");
     expect(nexarLifecycleStatus("")).toBe("unknown");
@@ -394,6 +401,140 @@ describe("nexar distributor classification and pricing", () => {
 
     const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
     expect(observed[0]?.priceBreaks).toEqual([{ quantity: 1, price: 2.5, currency: "USD" }]);
+  });
+
+  it("requests documented total availability and factory lead-time fields", async () => {
+    const fetchImpl = stubFetch(() => jsonResponse({ data: { supMultiMatch: [] } }));
+    const nexar = provider(fetchImpl);
+
+    await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+
+    const graphqlCall = vi
+      .mocked(fetchImpl)
+      .mock.calls.find(([url]) => new URL(String(url)).hostname === "api.nexar.com");
+    const body = JSON.parse(String(graphqlCall?.[1]?.body ?? "{}")) as { query?: string };
+    expect(body.query).toContain("totalAvail");
+    expect(body.query).toContain("factoryLeadDays");
+  });
+
+  it("normalizes total availability as units without guessing project sufficiency", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              { reference: "0", parts: [part("STM32F103C8T6", "Production", undefined, undefined, 4200)] },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.availableUnits).toBe(4200);
+  });
+
+  it("prefers the shortest authorized factory lead time over marketplace lead time", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    { isAuthorized: false, offers: [{ factoryLeadDays: 5 }] },
+                    { isAuthorized: true, offers: [{ factoryLeadDays: 42 }, { factoryLeadDays: 28 }] },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.leadTimeDays).toBe(28);
+  });
+
+  it("falls back to marketplace lead time when no authorized lead-time signal exists", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("STM32F103C8T6", "Production", undefined, [
+                    { isAuthorized: true, offers: [] },
+                    { isAuthorized: false, offers: [{ factoryLeadDays: 14 }, { factoryLeadDays: 21 }] },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.leadTimeDays).toBe(14);
+  });
+
+  it("keeps supply evidence when lifecycle is unknown but availability is known", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [{ reference: "0", parts: [part("MYSTERY-1", "Preliminary", undefined, undefined, 75)] }],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "MYSTERY-1" }]);
+    expect(observed).toEqual([
+      {
+        mpn: "MYSTERY-1",
+        status: "unknown",
+        source: "nexar",
+        observedAt: now,
+        distributorClassification: "unknown",
+        availableUnits: 75,
+      },
+    ]);
+  });
+
+  it("drops invalid negative or fractional availability and lead-time values", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part(
+                    "STM32F103C8T6",
+                    "Production",
+                    undefined,
+                    [{ isAuthorized: true, offers: [{ factoryLeadDays: -1 }, { factoryLeadDays: 2.5 }] }],
+                    -10,
+                  ),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "STM32F103C8T6" }]);
+    expect(observed[0]?.availableUnits).toBeUndefined();
+    expect(observed[0]?.leadTimeDays).toBeUndefined();
   });
 
   it("omits priceBreaks rather than reporting an empty list when no seller carries priced offers", async () => {
