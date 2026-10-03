@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { access, readdir } from "node:fs/promises";
 import path from "node:path";
 export async function listFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -12,4 +12,16 @@ export async function listFiles(directory) {
     }
   }
   return output;
+}
+
+export async function firstAccessiblePath(candidates) {
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return undefined;
 }

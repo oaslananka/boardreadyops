@@ -1,8 +1,9 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { launch as launchChrome } from "chrome-launcher";
 import lighthouse from "lighthouse";
+import { firstAccessiblePath } from "./lib/files.mjs";
 import { discoverAuthenticatedRoutes } from "./unlighthouse-auth-routes.mjs";
 
 const defaultSite = "https://boardreadyops.com";
@@ -82,15 +83,7 @@ async function defaultWriteAuditSummary(summary) {
 }
 
 export async function detectInstalledChrome(paths = knownChromePaths) {
-  for (const candidate of paths) {
-    try {
-      await access(candidate);
-      return candidate;
-    } catch {
-      // Try the next known system browser.
-    }
-  }
-  return undefined;
+  return firstAccessiblePath(paths);
 }
 
 function scoreCategories(lhr) {
