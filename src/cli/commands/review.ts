@@ -6,6 +6,7 @@ import type { SnapshotArtifact, UploadMode } from "@boardreadyops/contracts";
 import { mapFindingsForCloud } from "../../core/cloud-findings.js";
 import { loadConfig } from "../../core/config.js";
 import { runPipeline } from "../../core/pipeline.js";
+import { boardReadyVersion } from "../../generated/version.js";
 import { generateSnapshots } from "../../kicad/snapshots.js";
 import { resolveGitExecutable } from "../../util/git-resolver.js";
 import type { CommonCliOptions } from "./run.js";
@@ -22,6 +23,66 @@ export interface ReviewPublishOptions extends CommonCliOptions {
   pr?: number;
 }
 
+export interface ReviewPublishResult {
+  schemaVersion: 1;
+  tool: { name: "boardreadyops"; version: string };
+  success: true;
+  dryRun: boolean;
+  evidenceDigest: string;
+  reviewUrl?: string;
+  runId?: string;
+}
+
+type PublishedReview = { reviewUrl: string; runId?: string };
+
+function nonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function resolvePublishedReview(server: string, value: unknown): PublishedReview | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const response = value as { ok?: unknown; reviewUrl?: unknown; runId?: unknown };
+  if (response.ok !== true) return undefined;
+
+  const reviewUrl = nonEmptyString(response.reviewUrl);
+  const runId = nonEmptyString(response.runId);
+  if (!reviewUrl && !runId) return undefined;
+
+  if (reviewUrl) {
+    try {
+      const resolved = new URL(reviewUrl, server + "/");
+      if (resolved.protocol !== "https:" && resolved.protocol !== "http:") return undefined;
+      return { reviewUrl: resolved.toString(), ...(runId ? { runId } : {}) };
+    } catch {
+      return undefined;
+    }
+  }
+
+  if (!runId) return undefined;
+  return { reviewUrl: server + "/runs/" + encodeURIComponent(runId), runId };
+}
+
+function publishResult(
+  evidenceDigest: string,
+  dryRun: boolean,
+  published?: PublishedReview,
+): ReviewPublishResult {
+  return {
+    schemaVersion: 1,
+    tool: { name: "boardreadyops", version: boardReadyVersion },
+    success: true,
+    dryRun,
+    evidenceDigest,
+    ...(published ? { reviewUrl: published.reviewUrl } : {}),
+    ...(published?.runId ? { runId: published.runId } : {}),
+  };
+}
+
+function writePublishResult(result: ReviewPublishResult, streams: { stdout: NodeJS.WritableStream }): void {
+  streams.stdout.write(JSON.stringify(result, null, 2) + "\n");
+}
 function getGitCommitSha(ref = "HEAD"): string {
   try {
     const gitExec = resolveGitExecutable();
@@ -51,6 +112,7 @@ export async function reviewPublishCommand(
   streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream },
 ): Promise<number> {
   const root = target ?? process.cwd();
+  const jsonOutput = options.format === "json";
   const loaded = await loadConfig(root, options.config);
   const config = loaded.config;
   const headSha = options.head ?? getGitCommitSha("HEAD");
@@ -63,7 +125,7 @@ export async function reviewPublishCommand(
   );
   const token = options.token ?? process.env.BOARDREADYOPS_TOKEN;
 
-  streams.stdout.write(`\n🔍 Analyzing hardware preflight evidence in ${root}...\n`);
+  if (!jsonOutput) streams.stdout.write(`\n🔍 Analyzing hardware preflight evidence in ${root}...\n`);
 
   const result = await runPipeline({
     cwd: root,
@@ -81,7 +143,7 @@ export async function reviewPublishCommand(
   const configDigest = createHash("sha256").update(JSON.stringify(config)).digest("hex");
 
   const evidenceDigest = computeEvidenceDigest({
-    toolVersion: "1.34.0",
+    toolVersion: boardReadyVersion,
     rulePackDigest,
     configDigest,
     headCommitSha: headSha,
@@ -90,9 +152,12 @@ export async function reviewPublishCommand(
     artifactDigests: [],
   });
 
-  streams.stdout.write(`📊 Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)\n`);
-
+  if (!jsonOutput) {\n    streams.stdout.write(`📊 Found ${findings.length} findings (Evidence Digest: ${evidenceDigest.slice(0, 16)}...)\\n`);\n  }\n
   if (options.dryRun) {
+    if (jsonOutput) {
+      writePublishResult(publishResult(evidenceDigest, true), streams);
+      return 0;
+    }
     streams.stdout.write(`\n[DRY RUN] Review publish simulation:\n`);
     streams.stdout.write(`  Repository: ${repositoryId}\n`);
     streams.stdout.write(`  Commit:     ${headSha.slice(0, 8)}\n`);
@@ -122,7 +187,7 @@ export async function reviewPublishCommand(
     })),
   });
 
-  streams.stdout.write(`🚀 Publishing review to ${server}...\n`);
+  if (!jsonOutput) streams.stdout.write(`🚀 Publishing review to ${server}...\n`);
 
   try {
     const response = await fetch(`${server}/api/v1/runs`, {
@@ -148,24 +213,35 @@ export async function reviewPublishCommand(
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      streams.stderr.write(`❌ Server error (${response.status}): ${errText}\n`);
+      streams.stderr.write(`❌ Server error (${response.status}).\n`);
       return 1;
     }
 
-    const data = (await response.json()) as { ok: boolean; reviewUrl?: string; runId?: string };
-    if (data.ok) {
-      const url = data.reviewUrl ? `${server}${data.reviewUrl}` : `${server}/runs/${data.runId}`;
-      streams.stdout.write(`\n✔ Hardware review published successfully!\n`);
-      streams.stdout.write(`🔗 Review URL: ${url}\n`);
-      streams.stdout.write(`🔒 Evidence Digest: ${evidenceDigest}\n\n`);
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      streams.stderr.write(`❌ Unexpected server response.\n`);
+      return 1;
+    }
+
+    const published = resolvePublishedReview(server, data);
+    if (!published) {
+      streams.stderr.write(`❌ Unexpected server response.\n`);
+      return 1;
+    }
+
+    if (jsonOutput) {
+      writePublishResult(publishResult(evidenceDigest, false, published), streams);
       return 0;
     }
 
-    streams.stderr.write(`❌ Unexpected server response.\n`);
-    return 1;
-  } catch (error) {
-    streams.stderr.write(`❌ Network error: ${error instanceof Error ? error.message : String(error)}\n`);
+    streams.stdout.write(`\n✔ Hardware review published successfully!\n`);
+    streams.stdout.write(`🔗 Review URL: ${published.reviewUrl}\n`);
+    streams.stdout.write(`🔒 Evidence Digest: ${evidenceDigest}\n\n`);
+    return 0;
+  } catch {
+    streams.stderr.write(`❌ Network error while publishing review. Check connectivity and try again.\n`);
     return 1;
   }
 }
