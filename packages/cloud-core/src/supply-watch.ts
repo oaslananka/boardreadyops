@@ -45,6 +45,8 @@ export type RiskyComponentFinding = {
   reference?: string | undefined;
   status: ComponentLifecycleStatus;
   severity: ReturnType<typeof supplyFindingSeverity>;
+  /** Provider identifier that justified this finding; raw provider payloads are not retained here. */
+  source: string;
 };
 
 export type SupplyWatchStore = {
@@ -86,6 +88,7 @@ export type SupplyWatchStore = {
       reference?: string | undefined;
       status: "nrnd" | "eol" | "obsolete";
       severity: "critical" | "high" | "medium";
+      source: string;
     }[],
     now: Date,
   ): Promise<{ opened: number; resolved: number }>;
@@ -160,10 +163,12 @@ export function constantComponentIntelligence(provider: ComponentIntelligencePro
   return async () => provider;
 }
 
+type RiskObservation = { status: ComponentLifecycleStatus; source: string };
+
 function buildOpenRiskyFindings(
   board: WatchBoard,
   parts: readonly ComponentQuery[],
-  statuses: Map<string, ComponentLifecycleStatus>,
+  observations: Map<string, RiskObservation>,
 ) {
   const referenceByKey = new Map<string, string>();
   for (const component of board.components) {
@@ -174,16 +179,17 @@ function buildOpenRiskyFindings(
 
   return parts.flatMap((part) => {
     const key = componentKey(part);
-    const status = statuses.get(key);
-    if (!status || !isRiskyLifecycleStatus(status)) return [];
+    const observation = observations.get(key);
+    if (!observation || !isRiskyLifecycleStatus(observation.status)) return [];
     return [
       {
         boardId: board.boardId,
         mpn: part.mpn,
         ...(part.manufacturer ? { manufacturer: part.manufacturer } : {}),
         ...(referenceByKey.get(key) ? { reference: referenceByKey.get(key) } : {}),
-        status,
-        severity: supplyFindingSeverity(status),
+        status: observation.status,
+        severity: supplyFindingSeverity(observation.status),
+        source: observation.source,
       },
     ];
   });
@@ -196,7 +202,7 @@ async function queryMissingObservations(
   observationTtlMs: number,
   store: SupplyWatchStore,
   now: Date,
-  statuses: Map<string, ComponentLifecycleStatus>,
+  observations: Map<string, RiskObservation>,
 ): Promise<{ partsQueried: number; observationsRecorded: number }> {
   if (missing.length === 0) return { partsQueried: 0, observationsRecorded: 0 };
   const partsQueried = missing.length;
@@ -211,7 +217,9 @@ async function queryMissingObservations(
       })),
     );
   }
-  for (const observation of observed) statuses.set(componentKey(observation), observation.status);
+  for (const observation of observed) {
+    observations.set(componentKey(observation), { status: observation.status, source: observation.source });
+  }
   return { partsQueried, observationsRecorded };
 }
 
@@ -254,8 +262,10 @@ async function evaluateSingleBoard(
     return { skipped: true, partsQueried: 0, observationsRecorded: 0, findingsOpened: 0, findingsResolved: 0 };
   }
 
-  const statuses = new Map<string, ComponentLifecycleStatus>();
-  for (const [key, observation] of cached) statuses.set(key, observation.status as ComponentLifecycleStatus);
+  const observations = new Map<string, RiskObservation>();
+  for (const [key, observation] of cached) {
+    observations.set(key, { status: observation.status as ComponentLifecycleStatus, source: observation.source });
+  }
 
   const { partsQueried, observationsRecorded } = await queryMissingObservations(
     missing,
@@ -264,10 +274,10 @@ async function evaluateSingleBoard(
     observationTtlMs,
     store,
     now,
-    statuses,
+    observations,
   );
 
-  const open = buildOpenRiskyFindings(board, parts, statuses);
+  const open = buildOpenRiskyFindings(board, parts, observations);
   const reconciled = await store.reconcileFindings(board.boardId, open, now);
   await store.completeEvaluation(board.boardId, "evaluated", now, new Date(now.getTime() + intervalMs));
 

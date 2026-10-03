@@ -6,6 +6,14 @@ import * as viewerAuth from "../../../apps/web/lib/viewer-authorization.js";
 const { generateMetadata } = await import("../../../apps/web/app/repositories/[repositoryId]/page.js");
 
 describe("Repository page metadata", () => {
+  it("shows the persisted provider source beside open supply findings", () => {
+    const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
+
+    expect(source).toContain('id: "source"');
+    expect(source).toContain('header: "Source"');
+    expect(source).toContain("customerStatusLabel(finding.source)");
+  });
+
   it("does not promise a first readiness run when deployment rollout excludes the repository", () => {
     const source = readFileSync("apps/web/app/repositories/[repositoryId]/page.tsx", "utf8");
     expect(source).toContain("releaseRepositoryDispatchAvailability");

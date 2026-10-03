@@ -78,7 +78,13 @@ describe("supply watch pass", () => {
 
     expect(report.boardsEvaluated).toBe(1);
     expect(reconciled[0]?.open).toEqual([
-      expect.objectContaining({ mpn: "STM32F103C8T6", status: "eol", severity: "high", reference: "U1" }),
+      expect.objectContaining({
+        mpn: "STM32F103C8T6",
+        status: "eol",
+        severity: "high",
+        reference: "U1",
+        source: "test-provider",
+      }),
     ]);
   });
 
@@ -108,6 +114,26 @@ describe("supply watch pass", () => {
 
     expect(report.partsQueried).toBe(1);
     expect(lookup.mock.calls[0]?.[0]).toEqual([{ mpn: "RC0603FR-0710KL", manufacturer: "Yageo" }]);
+  });
+
+  it("propagates the source of a risky cached observation into the durable finding", async () => {
+    const cached = new Map([
+      [
+        componentKey({ mpn: "STM32F103C8T6", manufacturer: "ST" }),
+        { status: "eol", source: "cached-provider", observedAt: now.toISOString() },
+      ],
+    ]);
+    const { store, reconciled } = storeWith([board()], cached);
+
+    await runSupplyWatchPass(
+      store,
+      constantComponentIntelligence(providerReturning({ "RC0603FR-0710KL": "active" })),
+      now,
+    );
+
+    expect(reconciled[0]?.open).toEqual([
+      expect.objectContaining({ mpn: "STM32F103C8T6", status: "eol", source: "cached-provider" }),
+    ]);
   });
 
   it("records no_provider instead of reporting a clean board when nothing is configured", async () => {
@@ -322,8 +348,8 @@ describe("supply watch pass", () => {
     expect(report.partsQueried).toBe(2);
     expect(report.boardsEvaluated).toBe(1);
   });
-  it("stores nothing for a provider whose terms forbid retaining results", async () => {
-    const { store } = storeWith([board()]);
+  it("stores no provider cache for a no-retention provider while preserving minimal finding provenance", async () => {
+    const { store, reconciled } = storeWith([board()]);
     const provider: ComponentIntelligenceProvider = {
       name: "no-retention",
       // Some distributor terms forbid caching, recording or storing any portion of the content.
@@ -338,7 +364,12 @@ describe("supply watch pass", () => {
     // Writing a row and expiring it immediately would still be storing it.
     expect(store.freshObservations).not.toHaveBeenCalled();
     expect(store.recordObservations).not.toHaveBeenCalled();
-    // The finding is still raised: the watch works, it just cannot keep the evidence cached.
+    // The finding is still raised: the watch works, it just cannot keep the provider response cached.
+    // Its durable decision record carries only the provider identifier plus the already-required
+    // lifecycle decision, never the raw observation payload.
     expect(report.findingsOpened).toBe(2);
+    expect(reconciled[0]?.open).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: "eol", source: "no-retention" })]),
+    );
   });
 });

@@ -120,7 +120,20 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0070_release_run_base_commit_sha.sql",
       "0071_workspace_member_verified_identity.sql",
       "0072_validated_delivery_revisions.sql",
+      "0073_supply_finding_provenance.sql",
     ]);
+  });
+
+  it("snapshots minimal provider provenance on supply findings in schema v73", async () => {
+    const sql = (await readFile(join(migrationsDir, "0073_supply_finding_provenance.sql"), "utf8")).toLowerCase();
+
+    expect(sql).toContain("alter table board_supply_findings");
+    expect(sql).toContain("add column if not exists observation_source text");
+    expect(sql).toContain("board_supply_findings_observation_source_valid");
+    expect(sql).toContain("char_length(observation_source) between 1 and 64");
+    expect(sql).not.toContain("add column if not exists evidence_url");
+    expect(sql).not.toContain("add column if not exists price_breaks");
+    expect(sql).not.toContain("add column if not exists inventory");
   });
 
   it("binds delivery-eligible revisions to persisted validation evidence in schema v72", async () => {

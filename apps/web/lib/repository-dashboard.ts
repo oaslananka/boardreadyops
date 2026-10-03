@@ -269,6 +269,7 @@ export type RepositoryDetail = {
     reference: string | undefined;
     status: string;
     severity: string;
+    source: string | undefined;
     detectedAt: string | undefined;
   }[];
 };
@@ -322,6 +323,7 @@ export async function loadRepositoryDetail(
               board_supply_findings.reference,
               board_supply_findings.status,
               board_supply_findings.severity,
+              board_supply_findings.observation_source,
               board_supply_findings.detected_at
          from board_supply_findings
          join boards on boards.id = board_supply_findings.board_id
@@ -364,6 +366,7 @@ export async function loadRepositoryDetail(
             reference: text(row, "reference"),
             status: text(row, "status") ?? "unknown",
             severity: text(row, "severity") ?? "medium",
+            source: text(row, "observation_source"),
             detectedAt: text(row, "detected_at"),
           },
         ];

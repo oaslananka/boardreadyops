@@ -179,6 +179,7 @@ describe("repository dashboard and viewer loader branches", () => {
             reference: "U1",
             status: "active",
             severity: "low",
+            observation_source: "nexar",
             detected_at: "2026-08-20T10:00:00.000Z",
           },
         ],
@@ -191,6 +192,7 @@ describe("repository dashboard and viewer loader branches", () => {
     expect(detail?.runs[0]?.pullRequestNumber).toBe(42);
     expect(detail?.supplyFindings.length).toBe(1);
     expect(detail?.supplyFindings[0]?.mpn).toBe("STM32F401RET6");
+    expect(detail?.supplyFindings[0]?.source).toBe("nexar");
   });
 
   it("loads viewer installations from database rows", async () => {
