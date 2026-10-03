@@ -121,7 +121,31 @@ describe("BoardReadyOps Cloud migrations", () => {
       "0071_workspace_member_verified_identity.sql",
       "0072_validated_delivery_revisions.sql",
       "0073_supply_finding_provenance.sql",
+      "0074_installation_component_observations.sql",
     ]);
+  });
+
+  it("adds installation-scoped component observation caching in schema v74", async () => {
+    const sql = (
+      await readFile(join(migrationsDir, "0074_installation_component_observations.sql"), "utf8")
+    ).toLowerCase();
+
+    expect(sql).toContain("create table if not exists installation_component_observations");
+    expect(sql).toContain("installation_id text not null references installations(id) on delete cascade");
+    expect(sql).toContain("provider text not null");
+    expect(sql).toContain("installation_id, provider, lower(mpn), lower(coalesce(manufacturer, ''))");
+    expect(sql).toContain("installation_component_observations_refresh_idx");
+    expect(sql).toContain("add column if not exists provider text");
+    expect(sql).toContain("set provider = source");
+    expect(sql).toContain("alter column provider set not null");
+    expect(sql).toContain("component_lifecycle_observations_provider_valid");
+    expect(sql).toContain("component_lifecycle_observations_available_units_valid");
+    expect(sql).toContain("component_lifecycle_observations_lead_time_days_valid");
+    expect(sql).not.toContain("drop index if exists component_lifecycle_observations_part_idx");
+    expect(sql).not.toContain("create unique index concurrently");
+    expect(sql).toContain("installation_component_observations_available_units_valid");
+    expect(sql).toContain("installation_component_observations_lead_time_days_valid");
+    expect(sql).toContain("expires_at is null or expires_at >= observed_at");
   });
 
   it("snapshots minimal provider provenance on supply findings in schema v73", async () => {
