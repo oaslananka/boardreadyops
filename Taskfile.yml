@@ -7,6 +7,9 @@ tasks:
   doctor:
     cmds:
       - corepack pnpm run toolchain:doctor
+  dev:
+    cmds:
+      - corepack pnpm run cloud:dev
   lint:
     cmds:
       - corepack pnpm run lint
@@ -69,30 +72,22 @@ tasks:
       - corepack pnpm run gc
   verify:
     cmds:
-      - corepack pnpm run lint
-      - corepack pnpm run typecheck
-      - corepack pnpm run knip
-      - corepack pnpm run build
-      - corepack pnpm run verify:dist
-      - corepack pnpm run verify:version
-      - corepack pnpm run test:unit
-      - corepack pnpm run test:property
-      - corepack pnpm run test:snapshot
-      - corepack pnpm run test:action
-      - corepack pnpm run coverage
-      - corepack pnpm run gc
-      - corepack pnpm run verify:structure
-      - corepack pnpm run docs
-      - corepack pnpm audit --audit-level moderate
+      - corepack pnpm run verify
   verify:all:
     cmds:
       - corepack pnpm run verify:all
+  backup:verify:
+    cmds:
+      - corepack pnpm run cloud:backup:verify
+  deploy:self-hosted:
+    cmds:
+      - corepack pnpm run cloud:deploy:self-hosted
   docs:
     cmds:
       - corepack pnpm run docs
   docs:serve:
     cmds:
-      - corepack pnpm run docs
+      - corepack pnpm run docs:serve
   clean:
     cmds:
       - corepack pnpm exec node -e "for (const p of ['coverage','.tsbuild','.cache']) require('node:fs').rmSync(p,{recursive:true,force:true})"
