@@ -23,7 +23,7 @@ export interface ReviewPublishOptions extends CommonCliOptions {
   pr?: number;
 }
 
-export interface ReviewPublishResult {
+interface ReviewPublishResult {
   schemaVersion: 1;
   tool: { name: "boardreadyops"; version: string };
   success: true;
