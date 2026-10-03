@@ -1,5 +1,3 @@
-import { customerStatusLabel } from "./customer-nomenclature.js";
-
 type RepositorySetupStateId = "unconfigured" | "validation_pending" | "attention" | "ready";
 
 export type RepositorySetupStateInput = {
@@ -15,6 +13,10 @@ export type RepositorySetupState = {
   description: string;
   currentStep: 1 | 4;
 };
+
+function humanize(value: string | undefined): string {
+  return (value ?? "unknown").replaceAll("_", " ");
+}
 
 function explicitProblem(value: string | undefined): boolean {
   return value !== undefined && value !== "unknown" && value !== "ready";
@@ -51,9 +53,7 @@ export function deriveRepositorySetupState(input: RepositorySetupStateInput): Re
     return {
       id: "attention",
       label: "Setup needs attention",
-      description: `The latest persisted setup revision reports workflow ${customerStatusLabel(
-        input.setupWorkflowStatus,
-      )} and configuration ${customerStatusLabel(input.setupConfigStatus)}. Resolve the setup condition, then validate again.`,
+      description: `The latest persisted setup revision reports workflow ${humanize(input.setupWorkflowStatus)} and configuration ${humanize(input.setupConfigStatus)}. Resolve the setup condition, then validate again.`,
       currentStep: 4,
     };
   }

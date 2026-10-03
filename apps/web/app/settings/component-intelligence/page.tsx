@@ -89,8 +89,8 @@ export default async function ComponentIntelligencePage({ searchParams }: Readon
           {!limits.supplyWatch ? (
             <div className="mt-3">
               <Alert tone="info" title="Supply watch is not on this plan">
-                Supply watch is not included on the {customerPlanLabel(installation.planTier)} plan. You can store a credential now; boards
-                will start being checked when the plan includes it.
+                Supply watch is not included on the {customerPlanLabel(installation.planTier)} plan. You can store a
+                credential now; boards will start being checked when the plan includes it.
               </Alert>
             </div>
           ) : undefined}

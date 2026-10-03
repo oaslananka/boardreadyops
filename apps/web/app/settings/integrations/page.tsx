@@ -43,7 +43,10 @@ export default async function IntegrationsSettingsPage() {
   return (
     <div className="flex flex-col gap-5">
       <Panel title="Deployment readiness" description="Live control-plane configuration and database readiness.">
-        <StatusBadge value={badgeValue(snapshot.deployment.status)} label={customerStatusLabel(snapshot.deployment.status)} />
+        <StatusBadge
+          value={badgeValue(snapshot.deployment.status)}
+          label={customerStatusLabel(snapshot.deployment.status)}
+        />
         {snapshot.deployment.reason ? (
           <p className="mt-2 text-meta text-muted-foreground">{snapshot.deployment.reason}</p>
         ) : null}
@@ -60,7 +63,11 @@ export default async function IntegrationsSettingsPage() {
         </Panel>
       ) : (
         snapshot.installations.map((installation) => (
-          <Panel key={installation.id} title={installation.accountLogin} description={`Plan: ${customerPlanLabel(installation.planTier)}`}>
+          <Panel
+            key={installation.id}
+            title={installation.accountLogin}
+            description={`Plan: ${customerPlanLabel(installation.planTier)}`}
+          >
             <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div>
                 <dt className="text-meta font-medium text-muted-foreground">GitHub App</dt>

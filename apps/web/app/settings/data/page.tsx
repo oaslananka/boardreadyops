@@ -155,7 +155,9 @@ export default async function DataSettingsPage({ searchParams }: Readonly<DataSe
                   <dl className="grid gap-3 sm:grid-cols-3">
                     <div>
                       <dt className="text-meta uppercase tracking-wide text-muted-foreground">Plan</dt>
-                      <dd className="mt-1 text-sm font-medium text-foreground">{customerPlanLabel(admin.selected.planTier)}</dd>
+                      <dd className="mt-1 text-sm font-medium text-foreground">
+                        {customerPlanLabel(admin.selected.planTier)}
+                      </dd>
                     </div>
                     <div>
                       <dt className="text-meta uppercase tracking-wide text-muted-foreground">Evidence retention</dt>

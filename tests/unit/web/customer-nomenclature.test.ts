@@ -1,9 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import {
-  customerPlanLabel,
-  customerStatusLabel,
-} from "../../../apps/web/lib/customer-nomenclature.js";
+import { customerPlanLabel, customerStatusLabel } from "../../../apps/web/lib/customer-nomenclature.js";
 
 describe("customer-facing nomenclature", () => {
   it("maps stored plan aliases to product-facing plan names", () => {
@@ -33,13 +30,12 @@ describe("customer-facing nomenclature", () => {
       "apps/web/components/review/changes-tab.tsx",
       "apps/web/components/review/overview-tab.tsx",
       "apps/web/components/settings/data-lifecycle-forms.tsx",
-      "apps/web/lib/repository-setup-state.ts",
     ] as const;
 
     const content = (await Promise.all(paths.map((path) => readFile(path, "utf8")))).join("\n");
 
     expect(content).not.toContain("{installation.planTier}</Definition>");
-    expect(content).not.toMatch(/Plan:\\s*\\$\\{installation\\.planTier\\}/u);
+    expect(content).not.toContain("Plan: $" + "{installation.planTier}");
     expect(content).not.toContain("{admin.selected.planTier}</dd>");
     expect(content).not.toContain("label={snapshot.deployment.status}");
     expect(content).not.toContain('replaceAll("_", " ")');

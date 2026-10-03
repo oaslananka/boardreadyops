@@ -684,7 +684,9 @@ function SetupProgressDetails({
         {repository.setupRevision === undefined ? "Not created" : `#${repository.setupRevision}`}
       </Definition>
       <Definition label="Persisted policy">{repository.setupPreset?.replaceAll("-", " ") ?? "Not recorded"}</Definition>
-      <Definition label="Workflow">{repository.setupWorkflowStatus ? customerStatusLabel(repository.setupWorkflowStatus) : "Not checked"}</Definition>
+      <Definition label="Workflow">
+        {repository.setupWorkflowStatus ? customerStatusLabel(repository.setupWorkflowStatus) : "Not checked"}
+      </Definition>
       <Definition label="Configuration">
         {repository.setupConfigStatus ? customerStatusLabel(repository.setupConfigStatus) : "Not checked"}
       </Definition>

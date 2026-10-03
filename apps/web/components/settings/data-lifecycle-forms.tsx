@@ -203,7 +203,9 @@ export function ErasureRequestForm({
 
           {outcome ? (
             <AlertRoot variant={outcome.dryRun ? "info" : "warning"}>
-              <AlertTitle>{outcome.dryRun ? "Preview recorded" : `Erasure ${customerStatusLabel(outcome.status)}`}</AlertTitle>
+              <AlertTitle>
+                {outcome.dryRun ? "Preview recorded" : `Erasure ${customerStatusLabel(outcome.status)}`}
+              </AlertTitle>
               <AlertDescription>
                 {outcome.dryRun
                   ? "Nothing was deleted. Uncheck the preview box to run it for real."
