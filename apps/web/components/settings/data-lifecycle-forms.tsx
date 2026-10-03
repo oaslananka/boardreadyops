@@ -10,14 +10,29 @@ import { checkboxClassName } from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import { NativeSelect } from "../ui/native-select.js";
 
-function ScopeFields({ idPrefix }: Readonly<{ idPrefix: string }>) {
+type DataScope = "organization" | "repository" | "user";
+
+type ScopeFieldsProps = {
+  idPrefix: string;
+  scope?: DataScope;
+  scopeId?: string;
+  onScopeChange?: (scope: DataScope) => void;
+  onScopeIdChange?: (scopeId: string) => void;
+};
+
+function ScopeFields({ idPrefix, scope, scopeId, onScopeChange, onScopeIdChange }: Readonly<ScopeFieldsProps>) {
   return (
     <>
       <div className="flex flex-col gap-1.5">
         <label className="text-meta font-medium text-foreground" htmlFor={`${idPrefix}-scope`}>
           Scope
         </label>
-        <NativeSelect id={`${idPrefix}-scope`} name="scope" defaultValue="organization">
+        <NativeSelect
+          id={`${idPrefix}-scope`}
+          name="scope"
+          {...(scope === undefined ? { defaultValue: "organization" } : { value: scope })}
+          onChange={onScopeChange ? (event) => onScopeChange(event.currentTarget.value as DataScope) : undefined}
+        >
           <option value="organization">Whole organization</option>
           <option value="repository">One repository</option>
           <option value="user">One user</option>
@@ -27,7 +42,13 @@ function ScopeFields({ idPrefix }: Readonly<{ idPrefix: string }>) {
         <label className="text-meta font-medium text-foreground" htmlFor={`${idPrefix}-scope-id`}>
           Scope id <span className="font-normal text-muted-foreground">(optional for organization)</span>
         </label>
-        <Input id={`${idPrefix}-scope-id`} name="scopeId" placeholder="repository id or login" />
+        <Input
+          id={`${idPrefix}-scope-id`}
+          name="scopeId"
+          placeholder="repository id or login"
+          {...(scopeId === undefined ? {} : { value: scopeId })}
+          onChange={onScopeIdChange ? (event) => onScopeIdChange(event.currentTarget.value) : undefined}
+        />
       </div>
     </>
   );
@@ -83,13 +104,33 @@ export function ErasureRequestForm({
 }: Readonly<{ installationId: string; action: typeof requestErasureAction; defaultScopeLabel: string }>) {
   const idPrefix = useId();
   const [outcome, setOutcome] = useState<{ status: string; dryRun: boolean } | null>(null);
+  const [scope, setScope] = useState<DataScope>("organization");
+  const [scopeId, setScopeId] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const normalizedScopeId = scopeId.trim();
+  const confirmationTarget = scope === "organization" ? defaultScopeLabel : normalizedScopeId;
+  const confirmationReady = confirmationTarget.length > 0 && confirmation.trim() === confirmationTarget;
+  const confirmationHintId = `${idPrefix}-confirm-hint`;
 
   return (
-    <ActionForm action={action} className="flex flex-col gap-4" onSuccess={setOutcome}>
+    <ActionForm
+      action={action}
+      className="flex flex-col gap-4"
+      onSuccess={setOutcome}
+      onSubmit={(event) => {
+        if (!confirmationReady) event.preventDefault();
+      }}
+    >
       {({ state, pending }) => (
         <>
           <input type="hidden" name="installationId" value={installationId} />
-          <ScopeFields idPrefix={idPrefix} />
+          <ScopeFields
+            idPrefix={idPrefix}
+            scope={scope}
+            scopeId={scopeId}
+            onScopeChange={setScope}
+            onScopeIdChange={setScopeId}
+          />
 
           {/* An explicit htmlFor/id pair rather than containment: the text sits two <span> levels
               deep, which is ambiguous to a checker and leaves the accessible name to the browser's
@@ -116,26 +157,45 @@ export function ErasureRequestForm({
 
           <div className="flex flex-col gap-1.5">
             <label className="text-meta font-medium text-foreground" htmlFor={`${idPrefix}-confirm`}>
-              Type <code className="font-mono">{defaultScopeLabel}</code> to confirm
+              {confirmationTarget ? (
+                <>
+                  Type <code className="font-mono">{confirmationTarget}</code> to confirm
+                </>
+              ) : (
+                "Enter a scope id above before confirming"
+              )}
             </label>
             <Input
               id={`${idPrefix}-confirm`}
               name="confirm"
               required
               autoComplete="off"
-              aria-invalid={fieldError(state, "confirm") ? true : undefined}
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.currentTarget.value)}
+              aria-describedby={confirmationHintId}
+              aria-invalid={
+                fieldError(state, "confirm") || (confirmation.length > 0 && !confirmationReady) ? true : undefined
+              }
             />
             {fieldError(state, "confirm") ? (
               <p className="text-meta text-danger">{fieldError(state, "confirm")}</p>
-            ) : (
-              <p className="text-meta text-muted-foreground">
-                Use the scope id if you set one above, otherwise your own login.
-              </p>
-            )}
+            ) : null}
+            <p id={confirmationHintId} className="text-meta text-muted-foreground">
+              {confirmationTarget
+                ? confirmationReady
+                  ? "Confirmation matches. The request can now be submitted."
+                  : `The request stays disabled until you type "${confirmationTarget}" exactly.`
+                : "Choose a repository or user scope id first; the request stays disabled until that value is confirmed exactly."}
+            </p>
           </div>
 
           <div>
-            <Button type="submit" variant="destructive" className="button-delete" disabled={pending}>
+            <Button
+              type="submit"
+              variant="destructive"
+              className="button-delete"
+              disabled={pending || !confirmationReady}
+            >
               {pending ? "Submitting…" : "Submit erasure request"}
             </Button>
           </div>
