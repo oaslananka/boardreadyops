@@ -30,7 +30,24 @@ type ActionState =
   | { status: "idle" }
   | { status: "working"; action: string }
   | { status: "done"; message: string }
-  | { status: "error"; message: string; manageUrl?: string; requestId?: string };
+  | { status: "error"; message: string; manageUrl?: string; recovery?: string; requestId?: string };
+
+function recoveryTitle(recovery: string | undefined): string {
+  switch (recovery) {
+    case "github_access":
+      return "GitHub access needs attention.";
+    case "open_pull_request":
+      return "Open a pull request to continue.";
+    case "refresh":
+      return "Refresh and try again.";
+    case "retry":
+      return "Try again.";
+    case "network":
+      return "Connection problem.";
+    default:
+      return "Action could not be completed.";
+  }
+}
 
 const labels: Record<string, { pending: string; done: string }> = {
   rerun: { pending: "Queueing re-run…", done: "Re-run queued. The new run appears in this repository's history." },
@@ -63,6 +80,7 @@ export function RunActionBar({
             status: "error",
             message: typeof data.error === "string" ? data.error : "The request could not be completed.",
             ...(typeof data.manageUrl === "string" ? { manageUrl: data.manageUrl } : {}),
+            ...(typeof data.recovery === "string" ? { recovery: data.recovery } : {}),
             ...(typeof data.requestId === "string" ? { requestId: data.requestId } : {}),
           });
           return;
@@ -75,7 +93,11 @@ export function RunActionBar({
             : (labels[action]?.done ?? "Request queued."),
         });
       } catch {
-        setState({ status: "error", message: "The network request failed. Check your connection and try again." });
+        setState({
+          status: "error",
+          recovery: "network",
+          message: "The network request failed. Check your connection and try again.",
+        });
       }
     },
     [repositoryId, runId],
@@ -111,6 +133,11 @@ export function RunActionBar({
               : "border-danger/40 bg-danger-surface text-foreground"
           }`}
         >
+          {state.status === "error" ? (
+            <>
+              <span className="font-medium">{recoveryTitle(state.recovery)}</span>{" "}
+            </>
+          ) : null}
           {state.message}
           {state.status === "error" && state.requestId ? (
             <>
