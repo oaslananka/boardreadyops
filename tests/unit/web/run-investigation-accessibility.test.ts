@@ -218,6 +218,25 @@ describe("run investigation accessibility", () => {
     expect(markup).not.toContain("Decision: Pass");
   });
 
+  it("links an unreviewed run to persistent review publishing guidance", () => {
+    const run = sampleRun();
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+
+    expect(markup).toContain("Run → Review → Release");
+    expect(markup).toContain('href="/reviews#publish-review"');
+    expect(markup).toContain("How to publish a review");
+  });
+
+  it("links a reviewed run directly to its hardware review", () => {
+    const run = sampleRun();
+    run.reviewId = "review-123";
+    const markup = renderToStaticMarkup(createElement(SummaryView, { run }));
+
+    expect(markup).toContain('href="/reviews/review-123"');
+    expect(markup).toContain("Open hardware review");
+    expect(markup).not.toContain('href="/reviews#publish-review"');
+  });
+
   it("renders a per-domain findings breakdown on the summary view, independent of the findings table", () => {
     const markup = viewMarkup("summary");
     expect(markup).toContain("Findings by domain");
