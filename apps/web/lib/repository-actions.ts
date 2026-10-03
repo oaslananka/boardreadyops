@@ -57,6 +57,8 @@ export type RepositoryActionRequest = {
   requestId?: string;
 };
 
+type RepositoryActionRecovery = "github_access" | "open_pull_request" | "refresh" | "retry";
+
 export type RepositoryActionDependencies = {
   environment: Readonly<Record<string, string | undefined>>;
   readPermissions(githubInstallationId: number): Promise<Readonly<Record<string, string>> | undefined>;
@@ -288,10 +290,10 @@ export async function handleRepositoryAction(
   const parsed = parseRepositoryActionRequest(body);
   if ("error" in parsed) return json({ ok: false, error: parsed.error }, 400);
 
+  const requestId = parsed.requestId ?? dependencies.newId();
+
   const scope = await resolveRepositoryApiContext(auth, request, repositoryId);
   if (scope instanceof Response) return scope;
-
-  const requestId = parsed.requestId ?? dependencies.newId();
 
   try {
     const context = await loadSetupContext(scope.executor, scope.repositoryId);
@@ -309,6 +311,9 @@ export async function handleRepositoryAction(
             {
               ok: false,
               error: capability.userExplanation ?? "This action requires additional GitHub App permissions.",
+              code: "repository_action_permission_required",
+              recovery: "github_access" satisfies RepositoryActionRecovery,
+              requestId,
               missingPermissions: capability.missingPermissions,
               manageUrl: `https://github.com/settings/installations/${context.githubInstallationId}`,
             },
@@ -339,20 +344,45 @@ export async function handleRepositoryAction(
     }
 
     const target = parsed.runId ? await loadRunTarget(scope.executor, scope.repositoryId, parsed.runId) : undefined;
-    if (parsed.runId && !target) return json({ ok: false, error: "That run is no longer available." }, 404);
+    if (parsed.runId && !target) {
+      return json(
+        {
+          ok: false,
+          error: "That run is no longer available.",
+          code: "repository_action_run_unavailable",
+          recovery: "refresh" satisfies RepositoryActionRecovery,
+          requestId,
+        },
+        404,
+      );
+    }
     if (target && target.pullRequestNumber === undefined) {
       return json(
         {
           ok: false,
           error:
             "This run came from a branch push rather than a pull request, so there is nowhere to report a re-run. Open a pull request for the branch and try again.",
+          code: "repository_action_requires_pull_request",
+          recovery: "open_pull_request" satisfies RepositoryActionRecovery,
+          requestId,
         },
         409,
       );
     }
 
     const actions = lifecycleActionsFor(parsed, context, target);
-    if (actions.length === 0) return json({ ok: false, error: "That action could not be prepared." }, 400);
+    if (actions.length === 0) {
+      return json(
+        {
+          ok: false,
+          error: "That action is not available for the current repository state.",
+          code: "repository_action_unavailable",
+          recovery: "refresh" satisfies RepositoryActionRecovery,
+          requestId,
+        },
+        409,
+      );
+    }
 
     const deliveryId = actionDeliveryId(scope.repositoryId, parsed, requestId);
     const accepted = await createSqlControlPlaneJobStore(scope.executor).acceptGitHubWebhook({
@@ -403,6 +433,7 @@ export async function handleRepositoryAction(
         ok: false,
         error: "The action could not be queued. Please try again.",
         code: "repository_action_queue_failed",
+        recovery: "retry" satisfies RepositoryActionRecovery,
         requestId,
       },
       503,
