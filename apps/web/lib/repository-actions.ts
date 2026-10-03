@@ -57,7 +57,7 @@ export type RepositoryActionRequest = {
   requestId?: string;
 };
 
-export type RepositoryActionRecovery = "github_access" | "open_pull_request" | "refresh" | "retry";
+type RepositoryActionRecovery = "github_access" | "open_pull_request" | "refresh" | "retry";
 
 export type RepositoryActionDependencies = {
   environment: Readonly<Record<string, string | undefined>>;
