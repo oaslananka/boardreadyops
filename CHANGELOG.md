@@ -4,6 +4,35 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.68.3](https://github.com/oaslananka/boardreadyops/compare/v1.68.2...v1.68.3) (2026-10-03)
+
+
+### Bug Fixes
+
+* **ci:** add bounded cloud repository commissioning ([#910](https://github.com/oaslananka/boardreadyops/issues/910)) ([e957b75](https://github.com/oaslananka/boardreadyops/commit/e957b7521e59802e7f73e614afa88c7672cc358d))
+* **ci:** bootstrap legacy rollout policy safely ([#911](https://github.com/oaslananka/boardreadyops/issues/911)) ([a68635c](https://github.com/oaslananka/boardreadyops/commit/a68635c92e5bfa517bafb2e99d224c9a6713b5de))
+* **ci:** expose aggregate deploy disk diagnostics ([#907](https://github.com/oaslananka/boardreadyops/issues/907)) ([8df1080](https://github.com/oaslananka/boardreadyops/commit/8df10802423a6213396bdf9c1223604aabda0578))
+* **ci:** follow Compose base-file precedence ([#912](https://github.com/oaslananka/boardreadyops/issues/912)) ([ae184cb](https://github.com/oaslananka/boardreadyops/commit/ae184cb99ea2da0197ff50da23fe488d7515594a))
+* **ci:** harden release-policy mount verification ([#914](https://github.com/oaslananka/boardreadyops/issues/914)) ([621fd85](https://github.com/oaslananka/boardreadyops/commit/621fd85887ef02f29b5ff9a1761fbbd81bd4630c))
+* **ci:** make low-space rollback retention selectable ([#908](https://github.com/oaslananka/boardreadyops/issues/908)) ([a642074](https://github.com/oaslananka/boardreadyops/commit/a642074d7a3a86b59d2b637d47a7f29e7b34ed81))
+* **ci:** persist commissioned release policy across deploys ([#913](https://github.com/oaslananka/boardreadyops/issues/913)) ([430ca08](https://github.com/oaslananka/boardreadyops/commit/430ca087356645c38c07a23c12d414c3dace1989))
+* **ci:** reclaim build cache before low-disk deploy ([#932](https://github.com/oaslananka/boardreadyops/issues/932)) ([fc026e3](https://github.com/oaslananka/boardreadyops/commit/fc026e36269d8fb626175747f53ef437217c9512))
+* **ci:** unblock cloud deploy with opt-in rollback retention ([#906](https://github.com/oaslananka/boardreadyops/issues/906)) ([6df9326](https://github.com/oaslananka/boardreadyops/commit/6df93265a8870adf1762d91bf8035bc8fee1fc7b))
+* **ci:** verify security headers after production deploy ([#933](https://github.com/oaslananka/boardreadyops/issues/933)) ([7c66f7a](https://github.com/oaslananka/boardreadyops/commit/7c66f7a740476e833458fc96dac93f0edf12d241))
+* **cloud:** repair repository action dispatch path ([#904](https://github.com/oaslananka/boardreadyops/issues/904)) ([f616b53](https://github.com/oaslananka/boardreadyops/commit/f616b53379d241ae9688e625463171c29f731b36))
+* **deps:** remediate current security advisories ([#931](https://github.com/oaslananka/boardreadyops/issues/931)) ([e7735e9](https://github.com/oaslananka/boardreadyops/commit/e7735e9a3d172f78347f969cd813e60c6345a95f))
+* **deps:** remove unpatched dev-only transitive advisories ([#934](https://github.com/oaslananka/boardreadyops/issues/934)) ([6fc0bce](https://github.com/oaslananka/boardreadyops/commit/6fc0bce82642c04c57a123cdf5658eed97caf1f0))
+* **web:** add baseline browser security headers ([#923](https://github.com/oaslananka/boardreadyops/issues/923)) ([c945397](https://github.com/oaslananka/boardreadyops/commit/c945397b1b13c392f1eeaf343b97cea69017fdcb))
+* **web:** avoid unsupported ingestion default ([#919](https://github.com/oaslananka/boardreadyops/issues/919)) ([932db3b](https://github.com/oaslananka/boardreadyops/commit/932db3b744c818159a3fff15cb1ebb2f91aa210a))
+* **web:** collapse duplicate contract setup preset ([#929](https://github.com/oaslananka/boardreadyops/issues/929)) ([7963a49](https://github.com/oaslananka/boardreadyops/commit/7963a49ce9ed2227ef1e98292a5e703b659b1545))
+* **web:** contextualize repeated action labels ([#925](https://github.com/oaslananka/boardreadyops/issues/925)) ([31869f4](https://github.com/oaslananka/boardreadyops/commit/31869f4d2411b903b8f9ab1c03b3f1d35b73b872))
+* **web:** explain run review release lifecycle ([#935](https://github.com/oaslananka/boardreadyops/issues/935)) ([43c20ed](https://github.com/oaslananka/boardreadyops/commit/43c20ede98fb8643472f09f830e999addaa0986b))
+* **web:** gate deliveries on validated revisions ([#921](https://github.com/oaslananka/boardreadyops/issues/921)) ([765c9ad](https://github.com/oaslananka/boardreadyops/commit/765c9ad3e98481c24523a22ebb3b19bba0b756d6))
+* **web:** make setup readiness actionable ([#917](https://github.com/oaslananka/boardreadyops/issues/917)) ([1156d98](https://github.com/oaslananka/boardreadyops/commit/1156d983aebd3592b6390f06eada35c934d78304))
+* **web:** persist repository onboarding state ([#915](https://github.com/oaslananka/boardreadyops/issues/915)) ([fca265c](https://github.com/oaslananka/boardreadyops/commit/fca265cc4fe4e25e468f1a7080b50801db2b4441))
+* **web:** route Workspace settings to access settings ([#924](https://github.com/oaslananka/boardreadyops/issues/924)) ([a80146a](https://github.com/oaslananka/boardreadyops/commit/a80146a7f5ccac5c8ddf43ffa58862b38c323f9d))
+* **web:** verify workspace member identities ([#918](https://github.com/oaslananka/boardreadyops/issues/918)) ([d203dcf](https://github.com/oaslananka/boardreadyops/commit/d203dcfdb26f0ef4347df01f4e9bbe8718e260e4))
+
 ## [1.68.2](https://github.com/oaslananka/boardreadyops/compare/v1.68.1...v1.68.2) (2026-09-25)
 
 
