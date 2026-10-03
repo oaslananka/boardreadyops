@@ -30,6 +30,15 @@ describe("ReviewsListPage", () => {
     expect(markup).toContain("PR #42");
   });
 
+  it("keeps review publishing guidance addressable when reviews already exist", async () => {
+    loadViewerReviews.mockResolvedValue({ state: "fixtures", reviews: DEMO_REVIEWS });
+    const markup = await render();
+
+    expect(markup).toContain('id="publish-review"');
+    expect(markup).toContain("Runs are execution history and evidence");
+    expect(markup).toContain("boardreadyops review publish");
+  });
+
   it("counts only decision-pending reviews as awaiting a decision, not the whole list", async () => {
     loadViewerReviews.mockResolvedValue({ state: "fixtures", reviews: DEMO_REVIEWS });
     const nonPendingCount = DEMO_REVIEWS.filter((r) => r.decision !== "pending").length;
@@ -115,5 +124,7 @@ describe("ReviewsListPage", () => {
     const markup = await render();
     expect(markup).not.toContain("Review filters");
     expect(markup).toContain("No hardware reviews found");
+    expect(markup).toContain("Runs do not automatically appear here");
+    expect(markup).toContain('href="/runs"');
   });
 });
