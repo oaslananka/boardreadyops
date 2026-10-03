@@ -525,6 +525,10 @@ export function formatArtifactBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function reviewLink(reviewId: string | undefined): Pick<RunDetail, "reviewId"> {
+  return reviewId ? { reviewId } : {};
+}
+
 export async function lookupRunDashboard(
   runId: string,
   executor: RunDashboardQueryExecutor,
@@ -868,7 +872,6 @@ export async function lookupRunDashboard(
   const setupWorkflowContractVersion = numberValue(runRow, "setup_workflow_contract_version");
   const setupWorkflowStatus = stringValue(runRow, "setup_workflow_status");
   const setupConfigStatus = stringValue(runRow, "setup_config_status");
-  const reviewId = stringValue(runRow, "review_id");
   const now = options.now?.() ?? new Date();
 
   return {
@@ -899,7 +902,7 @@ export async function lookupRunDashboard(
       repository: repositoryName,
       repositoryId: repository.id,
       repositoryPrivate: repository.private,
-      ...(reviewId ? { reviewId } : {}),
+      ...reviewLink(stringValue(runRow, "review_id")),
       trustMode,
       safeModeReasons,
       ...(setupPreset ? { setupPreset } : {}),
