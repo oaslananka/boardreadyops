@@ -20,13 +20,7 @@ type ScopeFieldsProps = {
   onScopeIdChange?: (scopeId: string) => void;
 };
 
-function ScopeFields({
-  idPrefix,
-  scope,
-  scopeId,
-  onScopeChange,
-  onScopeIdChange,
-}: Readonly<ScopeFieldsProps>) {
+function ScopeFields({ idPrefix, scope, scopeId, onScopeChange, onScopeIdChange }: Readonly<ScopeFieldsProps>) {
   return (
     <>
       <div className="flex flex-col gap-1.5">
@@ -37,11 +31,7 @@ function ScopeFields({
           id={`${idPrefix}-scope`}
           name="scope"
           {...(scope === undefined ? { defaultValue: "organization" } : { value: scope })}
-          onChange={
-            onScopeChange
-              ? (event) => onScopeChange(event.currentTarget.value as DataScope)
-              : undefined
-          }
+          onChange={onScopeChange ? (event) => onScopeChange(event.currentTarget.value as DataScope) : undefined}
         >
           <option value="organization">Whole organization</option>
           <option value="repository">One repository</option>
@@ -57,11 +47,7 @@ function ScopeFields({
           name="scopeId"
           placeholder="repository id or login"
           {...(scopeId === undefined ? {} : { value: scopeId })}
-          onChange={
-            onScopeIdChange
-              ? (event) => onScopeIdChange(event.currentTarget.value)
-              : undefined
-          }
+          onChange={onScopeIdChange ? (event) => onScopeIdChange(event.currentTarget.value) : undefined}
         />
       </div>
     </>
@@ -123,8 +109,7 @@ export function ErasureRequestForm({
   const [confirmation, setConfirmation] = useState("");
   const normalizedScopeId = scopeId.trim();
   const confirmationTarget = scope === "organization" ? defaultScopeLabel : normalizedScopeId;
-  const confirmationReady =
-    confirmationTarget.length > 0 && confirmation.trim() === confirmationTarget;
+  const confirmationReady = confirmationTarget.length > 0 && confirmation.trim() === confirmationTarget;
   const confirmationHintId = `${idPrefix}-confirm-hint`;
 
   return (
@@ -189,9 +174,7 @@ export function ErasureRequestForm({
               onChange={(event) => setConfirmation(event.currentTarget.value)}
               aria-describedby={confirmationHintId}
               aria-invalid={
-                fieldError(state, "confirm") || (confirmation.length > 0 && !confirmationReady)
-                  ? true
-                  : undefined
+                fieldError(state, "confirm") || (confirmation.length > 0 && !confirmationReady) ? true : undefined
               }
             />
             {fieldError(state, "confirm") ? (

@@ -58,9 +58,7 @@ describe("destructive confirmation forms", () => {
   });
 
   it("keeps erasure disabled until the visible scope confirmation matches and blocks implicit submit", async () => {
-    const action = vi.fn(async () =>
-      ok({ erasureId: "erase-1", status: "requested", dryRun: true }),
-    ) as never;
+    const action = vi.fn(async () => ok({ erasureId: "erase-1", status: "requested", dryRun: true })) as never;
 
     await act(async () => {
       root.render(
