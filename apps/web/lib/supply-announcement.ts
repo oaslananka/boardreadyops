@@ -30,7 +30,11 @@ type AnnouncedBoard = Pick<AffectedBoard, "displayName" | "repositoryFullName" |
 
 export function composeSupplyAnnouncement(
   parts: readonly RiskyComponentFinding[],
-  affected: { boards: readonly AnnouncedBoard[]; truncated: boolean },
+  affected: {
+    boards: readonly AnnouncedBoard[];
+    affectedReleaseRunCount: number;
+    truncated: boolean;
+  },
 ): SupplyAnnouncement | undefined {
   const sorted = [...parts].sort((a, b) => a.mpn.localeCompare(b.mpn));
   const worst = sorted.find((part) => part.severity === "critical") ?? sorted[0];
@@ -56,11 +60,15 @@ export function composeSupplyAnnouncement(
     boardLines.push("This list is capped; open the parts page for the full set.");
   }
 
+  const releaseLines =
+    affected.affectedReleaseRunCount > 0 ? [`Affected tracked release runs: ${affected.affectedReleaseRunCount}.`] : [];
+
   return {
     headline: headline(sorted.length, worst, affected.boards.length, stillBuilt),
     details: [
       ...partLines,
       "Source data was fresh under the provider cache policy when BoardReadyOps evaluated this alert.",
+      ...releaseLines,
       ...(boardLines.length > 0 ? ["Affected boards:", ...boardLines] : []),
     ],
     repositoryFullName: affected.boards[0]?.repositoryFullName,

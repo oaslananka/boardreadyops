@@ -28,6 +28,7 @@ function row(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     commit_sha: "8ae31f0",
     captured_at: new Date("2026-08-01T10:00:00.000Z"),
     in_current_revision: true,
+    affected_release_run_count: 3,
     refs: ["U7"],
     ...overrides,
   };
@@ -41,6 +42,7 @@ describe("resolveAffectedBoards", () => {
     const result = await store.resolveAffectedBoards("inst_1", [{ mpn: "TPS62840" }]);
 
     expect(result.truncated).toBe(false);
+    expect(result.affectedReleaseRunCount).toBe(3);
     expect(result.boards).toEqual([
       {
         boardId: "brd_1",
@@ -65,7 +67,7 @@ describe("resolveAffectedBoards", () => {
 
     // A lifecycle pass with nothing risky must not send a query that matches every component.
     expect(query).not.toHaveBeenCalled();
-    expect(result).toEqual({ boards: [], truncated: false });
+    expect(result).toEqual({ boards: [], affectedReleaseRunCount: 0, truncated: false });
   });
 
   it("scopes every query to the installation", async () => {
@@ -118,6 +120,18 @@ describe("resolveAffectedBoards", () => {
       ["brd_current", true],
       ["brd_superseded", false],
     ]);
+  });
+
+  it("counts distinct affected release runs before the board limit is applied", async () => {
+    const { executor, query } = executorReturning([row({ affected_release_run_count: 7 })]);
+    const store = createSqlAffectedBoardsStore(executor);
+
+    const result = await store.resolveAffectedBoards("inst_1", [{ mpn: "TPS62840" }], { limit: 1 });
+
+    expect(result.affectedReleaseRunCount).toBe(7);
+    const sql = String(query.mock.calls[0]?.[0] ?? "");
+    expect(sql).toContain("count(distinct run_id)::int as affected_release_run_count");
+    expect(sql.indexOf("release_summary")).toBeLessThan(sql.indexOf("limit $4"));
   });
 
   it("reports truncation instead of presenting a partial set as complete", async () => {

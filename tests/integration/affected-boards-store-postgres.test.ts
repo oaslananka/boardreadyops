@@ -128,6 +128,7 @@ describeDatabase("resolveAffectedBoards against Postgres", () => {
     const result = await store.resolveAffectedBoards(installationId, [{ mpn: "TPS62840DLCR" }]);
 
     expect(result.truncated).toBe(false);
+    expect(result.affectedReleaseRunCount).toBe(2);
     const byName = new Map(result.boards.map((board) => [board.displayName, board]));
     expect([...byName.keys()].sort()).toEqual(["current", "superseded"]);
 
@@ -186,6 +187,8 @@ describeDatabase("resolveAffectedBoards against Postgres", () => {
 
     expect(result.boards).toHaveLength(1);
     expect(result.truncated).toBe(true);
+    // The board list is capped, but the SQL summary is computed from every matching snapshot.
+    expect(result.affectedReleaseRunCount).toBe(2);
   });
 
   it("resolves several parts in one pass", async () => {
@@ -204,6 +207,6 @@ describeDatabase("resolveAffectedBoards against Postgres", () => {
   it("returns nothing for a part nobody uses", async () => {
     const store = createSqlAffectedBoardsStore(database());
     const result = await store.resolveAffectedBoards(installationId, [{ mpn: "NOT-A-REAL-PART" }]);
-    expect(result).toEqual({ boards: [], truncated: false });
+    expect(result).toEqual({ boards: [], affectedReleaseRunCount: 0, truncated: false });
   });
 });

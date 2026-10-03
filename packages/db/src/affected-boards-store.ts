@@ -49,6 +49,8 @@ export type AffectedBoard = {
 
 export type AffectedBoardsResult = {
   boards: readonly AffectedBoard[];
+  /** Distinct release runs whose captured BOM contained at least one requested part. */
+  affectedReleaseRunCount: number;
   /** True when more boards matched than the limit allowed, so a caller never reports a partial set as complete. */
   truncated: boolean;
 };
@@ -86,6 +88,16 @@ function timestampText(row: Row, key: string): string {
   throw new Error(`expected timestamp column ${key}`);
 }
 
+function integer(row: Row, key: string): number {
+  const value = row[key];
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
+  if (typeof value === "string" && /^\d+$/u.test(value)) {
+    const parsed = Number(value);
+    if (Number.isSafeInteger(parsed) && parsed >= 0) return parsed;
+  }
+  throw new Error(`expected non-negative integer column ${key}`);
+}
+
 function references(row: Row, key: string): readonly string[] {
   const value = row[key];
   if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === "string");
@@ -96,7 +108,7 @@ function references(row: Row, key: string): readonly string[] {
 export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): AffectedBoardsStore {
   return {
     async resolveAffectedBoards(installationId, parts, options) {
-      if (parts.length === 0) return { boards: [], truncated: false };
+      if (parts.length === 0) return { boards: [], affectedReleaseRunCount: 0, truncated: false };
 
       const limit = Math.min(Math.max(options?.limit ?? defaultLimit, 1), maximumLimit);
       // Matching is case-insensitive on MPN, and on manufacturer only when the caller gave one:
@@ -126,6 +138,7 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
                   repositories.id      as repository_id,
                   repositories.owner || '/' || repositories.name as repository_full_name,
                   snapshots.id         as snapshot_id,
+                  snapshots.run_id     as run_id,
                   snapshots.commit_sha as commit_sha,
                   snapshots.captured_at as captured_at,
                   array_agg(distinct components.reference order by components.reference) as refs
@@ -141,8 +154,12 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
               and components.mpn is not null
               and components.dnp = false
             group by boards.id, boards.display_name, boards.project_path, repositories.id,
-                     repositories.owner, repositories.name, snapshots.id, snapshots.commit_sha,
+                     repositories.owner, repositories.name, snapshots.id, snapshots.run_id, snapshots.commit_sha,
                      snapshots.captured_at
+         ),
+         release_summary as (
+           select count(distinct run_id)::int as affected_release_run_count
+             from hits
          ),
          ranked as (
            select hits.*,
@@ -152,8 +169,10 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
              join current_snapshot on current_snapshot.board_id = hits.board_id
          )
          select board_id, display_name, project_path, repository_id, repository_full_name,
-                snapshot_id, commit_sha, captured_at, refs, in_current_revision
+                snapshot_id, commit_sha, captured_at, refs, in_current_revision,
+                release_summary.affected_release_run_count
            from ranked
+           cross join release_summary
           where rank = 1
           order by in_current_revision desc, captured_at desc, board_id
           limit $4`,
@@ -174,8 +193,12 @@ export function createSqlAffectedBoardsStore(executor: SqlQueryExecutor): Affect
         inCurrentRevision: row.in_current_revision === true,
       }));
 
+      const affectedReleaseRunCount = found.length === 0 ? 0 : integer(found[0] as Row, "affected_release_run_count");
+
       // One row over the limit was requested so truncation is known rather than guessed.
-      return { boards, truncated: found.length > limit };
+      // The release-run summary is computed before this limit, so it remains complete even when
+      // the named board list is capped.
+      return { boards, affectedReleaseRunCount, truncated: found.length > limit };
     },
   };
 }
