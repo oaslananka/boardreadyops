@@ -4,6 +4,24 @@ All notable changes to BoardReadyOps are recorded here.
 
 ## Unreleased
 
+## [1.69.0](https://github.com/oaslananka/boardreadyops/compare/v1.68.3...v1.69.0) (2026-10-03)
+
+
+### Features
+
+* **bom:** add tenant-scoped component observation cache ([#944](https://github.com/oaslananka/boardreadyops/issues/944)) ([93be112](https://github.com/oaslananka/boardreadyops/commit/93be1124b1657fbb1e25b2d62f69903c92902799))
+* **bom:** normalize supply availability signals ([#943](https://github.com/oaslananka/boardreadyops/issues/943)) ([71de654](https://github.com/oaslananka/boardreadyops/commit/71de654f55268026b0d1ac9f8ef403f3e5baaf84))
+* **bom:** preserve supply finding provenance ([#942](https://github.com/oaslananka/boardreadyops/issues/942)) ([5e56789](https://github.com/oaslananka/boardreadyops/commit/5e56789c79a48de089e638cc37ad093a26bad27e))
+* **bom:** report affected release runs ([#945](https://github.com/oaslananka/boardreadyops/issues/945)) ([d024a98](https://github.com/oaslananka/boardreadyops/commit/d024a98870f9e70c8fefa477c09e251a2915632f))
+* **cli:** add versioned review publish JSON result ([#941](https://github.com/oaslananka/boardreadyops/issues/941)) ([76d1065](https://github.com/oaslananka/boardreadyops/commit/76d1065720df14eb68e70ca80a2841e6c29a92e3))
+
+
+### Bug Fixes
+
+* **web:** categorize repository action recovery ([#937](https://github.com/oaslananka/boardreadyops/issues/937)) ([370a084](https://github.com/oaslananka/boardreadyops/commit/370a084458085601685fda2769c1327c855d79e6))
+* **web:** enforce destructive confirmation preconditions ([#939](https://github.com/oaslananka/boardreadyops/issues/939)) ([e426102](https://github.com/oaslananka/boardreadyops/commit/e4261029bda83e56267b39ec30400e2e23e8df69))
+* **web:** normalize customer-facing plan and status labels ([#940](https://github.com/oaslananka/boardreadyops/issues/940)) ([dea2ddf](https://github.com/oaslananka/boardreadyops/commit/dea2ddf11af5d078acc29af35a075f5c9e1af8e9))
+
 ## [1.68.3](https://github.com/oaslananka/boardreadyops/compare/v1.68.2...v1.68.3) (2026-10-03)
 
 
