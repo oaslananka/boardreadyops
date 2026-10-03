@@ -19,7 +19,6 @@ function part(
     isAuthorized?: boolean;
     offers?: {
       prices?: { quantity?: number; price?: number; currency?: string }[];
-      inventoryLevel?: number;
       factoryLeadDays?: number;
     }[];
   }[],
@@ -506,6 +505,53 @@ describe("nexar distributor classification and pricing", () => {
         availableUnits: 75,
       },
     ]);
+  });
+
+  it("keeps supply evidence when lifecycle is unknown but lead time is known", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [
+              {
+                reference: "0",
+                parts: [
+                  part("MYSTERY-LEAD", "Preliminary", undefined, [
+                    { isAuthorized: true, offers: [{ factoryLeadDays: 35 }] },
+                  ]),
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const observed = await nexar.lookup([{ mpn: "MYSTERY-LEAD" }]);
+    expect(observed).toEqual([
+      {
+        mpn: "MYSTERY-LEAD",
+        status: "unknown",
+        source: "nexar",
+        observedAt: now,
+        distributorClassification: "authorized-distributor",
+        leadTimeDays: 35,
+      },
+    ]);
+  });
+
+  it("drops a matched part when lifecycle and every independent supply signal are unusable", async () => {
+    const nexar = provider(
+      stubFetch(() =>
+        jsonResponse({
+          data: {
+            supMultiMatch: [{ reference: "0", parts: [part("NO-SIGNAL", "Preliminary")] }],
+          },
+        }),
+      ),
+    );
+
+    expect(await nexar.lookup([{ mpn: "NO-SIGNAL" }])).toEqual([]);
   });
 
   it("drops invalid negative or fractional availability and lead-time values", async () => {
