@@ -6,6 +6,7 @@ import { Button } from "../../../components/ui/button.js";
 import { Input } from "../../../components/ui/input.js";
 import { Alert, Definition, DefinitionGrid, EmptyState, Panel, type StatusTone } from "../../../components/ui.js";
 import { nexarProviderName } from "../../../lib/component-intelligence-resolver.js";
+import { customerPlanLabel } from "../../../lib/customer-nomenclature.js";
 import { issueSettingsFormToken } from "../../../lib/settings-form-token.js";
 import { viewerAuthorization } from "../../../lib/viewer-authorization.js";
 import { viewerInstallations } from "../../../lib/viewer-installations.js";
@@ -78,7 +79,7 @@ export default async function ComponentIntelligencePage({ searchParams }: Readon
       return (
         <Panel key={installation.id} title={installation.accountLogin}>
           <DefinitionGrid>
-            <Definition label="Plan">{installation.planTier}</Definition>
+            <Definition label="Plan">{customerPlanLabel(installation.planTier)}</Definition>
             <Definition label="Supply watch">
               {limits.supplyWatch ? "Included" : "Not included on this plan"}
             </Definition>
@@ -88,7 +89,7 @@ export default async function ComponentIntelligencePage({ searchParams }: Readon
           {!limits.supplyWatch ? (
             <div className="mt-3">
               <Alert tone="info" title="Supply watch is not on this plan">
-                Supply watch is not included on the {installation.planTier} plan. You can store a credential now; boards
+                Supply watch is not included on the {customerPlanLabel(installation.planTier)} plan. You can store a credential now; boards
                 will start being checked when the plan includes it.
               </Alert>
             </div>
