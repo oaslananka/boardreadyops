@@ -8,12 +8,18 @@ function executor(rows: Record<string, unknown>[]) {
 }
 
 const now = new Date("2026-08-24T12:00:00.000Z");
+const sharedScope = { kind: "shared" as const, providerName: "nexar" };
+const tenantScope = {
+  kind: "installation" as const,
+  installationId: "installation-1",
+  providerName: "nexar",
+};
 
 describe("board supply watch store: distributor classification and price breaks", () => {
   it("writes distributor classification and price breaks alongside an observation", async () => {
     const { store, query } = executor([{ id: "obs-1" }]);
 
-    await store.recordObservations([
+    await store.recordObservations(sharedScope, [
       {
         mpn: "STM32F103C8T6",
         manufacturer: "ST",
@@ -25,6 +31,8 @@ describe("board supply watch store: distributor classification and price breaks"
           { quantity: 1, price: 2.5, currency: "USD" },
           { quantity: 100, price: 1.9, currency: "USD" },
         ],
+        availableUnits: 4200,
+        leadTimeDays: 28,
       },
     ]);
 
@@ -41,13 +49,15 @@ describe("board supply watch store: distributor classification and price breaks"
         { quantity: 1, price: 2.5, currency: "USD" },
         { quantity: 100, price: 1.9, currency: "USD" },
       ],
+      available_units: 4200,
+      lead_time_days: 28,
     });
   });
 
   it("writes a null classification and an empty price-break array when the observation carries neither", async () => {
     const { store, query } = executor([{ id: "obs-2" }]);
 
-    await store.recordObservations([
+    await store.recordObservations(sharedScope, [
       { mpn: "RC0603FR-0710KL", manufacturer: "Yageo", status: "active", source: "nexar", observedAt: now },
     ]);
 
@@ -69,7 +79,7 @@ describe("board supply watch store: distributor classification and price breaks"
       },
     ]);
 
-    const fresh = await store.freshObservations(now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+    const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
     const entry = [...fresh.values()][0];
 
     expect(entry).toEqual({
@@ -94,7 +104,7 @@ describe("board supply watch store: distributor classification and price breaks"
       },
     ]);
 
-    const fresh = await store.freshObservations(now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+    const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
     const entry = [...fresh.values()][0];
 
     expect(entry?.distributorClassification).toBe("marketplace");
@@ -114,7 +124,7 @@ describe("board supply watch store: distributor classification and price breaks"
       },
     ]);
 
-    const fresh = await store.freshObservations(now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+    const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
     const entry = [...fresh.values()][0];
 
     expect(entry?.distributorClassification).toBeUndefined();
@@ -137,10 +147,91 @@ describe("board supply watch store: distributor classification and price breaks"
       },
     ]);
 
-    const fresh = await store.freshObservations(now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+    const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
     const entry = [...fresh.values()][0];
 
     expect(entry?.priceBreaks).toEqual([{ quantity: 1, price: 2.5, currency: "USD" }]);
+  });
+});
+
+describe("board supply watch store: cache scope", () => {
+  it("filters shared cache reads by provider namespace and returns normalized availability fields", async () => {
+    const { store, query } = executor([
+      {
+        mpn: "STM32F103C8T6",
+        manufacturer: "ST",
+        status: "active",
+        source: "nexar",
+        observed_at: now,
+        distributor_classification: null,
+        price_breaks: [],
+        available_units: 4200,
+        lead_time_days: 28,
+      },
+    ]);
+
+    const fresh = await store.freshObservations(sharedScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("from component_lifecycle_observations");
+    expect(sql).toContain("source = $3");
+    expect(params[2]).toBe("nexar");
+    expect([...fresh.values()][0]).toMatchObject({
+      status: "active",
+      source: "nexar",
+      availableUnits: 4200,
+      leadTimeDays: 28,
+    });
+  });
+
+  it("upserts shared observations inside the provider namespace", async () => {
+    const { store, query } = executor([{ id: "shared-obs-1" }]);
+
+    await store.recordObservations(sharedScope, [
+      { mpn: "STM32F103C8T6", manufacturer: "ST", status: "active", source: "nexar", observedAt: now },
+    ]);
+
+    const [sql] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("on conflict (source, lower(mpn), lower(coalesce(manufacturer, ''))) do update");
+  });
+
+  it("reads a non-transferable provider only from its owning installation and provider", async () => {
+    const { store, query } = executor([]);
+
+    await store.freshObservations(tenantScope, now, [{ mpn: "STM32F103C8T6", manufacturer: "ST" }]);
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("from installation_component_observations");
+    expect(sql).toContain("installation_id = $1");
+    expect(sql).toContain("provider = $2");
+    expect(params[0]).toBe("installation-1");
+    expect(params[1]).toBe("nexar");
+  });
+
+  it("writes normalized observations into the installation-scoped cache", async () => {
+    const { store, query } = executor([{ id: "tenant-obs-1" }]);
+
+    await store.recordObservations(tenantScope, [
+      {
+        mpn: "STM32F103C8T6",
+        manufacturer: "ST",
+        status: "active",
+        source: "nexar",
+        observedAt: now,
+        availableUnits: 4200,
+        leadTimeDays: 28,
+      },
+    ]);
+
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain("insert into installation_component_observations");
+    expect(sql).toContain("installation_id, provider");
+    expect(sql).toContain("available_units");
+    expect(sql).toContain("lead_time_days");
+    expect(params[0]).toBe("installation-1");
+    expect(params[1]).toBe("nexar");
+    const payload = JSON.parse(String(params[2])) as Record<string, unknown>[];
+    expect(payload[0]).toMatchObject({ available_units: 4200, lead_time_days: 28 });
   });
 });
 

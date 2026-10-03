@@ -187,6 +187,66 @@ describeDatabase("board supply watch", () => {
     expect(report.boardsEvaluated).toBe(1);
   });
 
+  it("reuses a non-transferable provider only through the owning installation cache", async () => {
+    const store = createSqlBoardSupplyWatchStore(database());
+    const firstPassAt = new Date(now.getTime() + 90_000);
+    const secondPassAt = new Date(now.getTime() + 91_000);
+    await database().query("delete from installation_component_observations where installation_id = $1", [
+      installationId,
+    ]);
+    await database().query("delete from component_lifecycle_observations where source = $1", ["tenant-provider"]);
+    await database().query("update board_supply_watch set next_due_at = $2 where board_id = $1", [
+      boardId,
+      firstPassAt.toISOString(),
+    ]);
+
+    let lookups = 0;
+    const tenantProvider = constantComponentIntelligence({
+      name: "tenant-provider",
+      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: false },
+      async lookup(parts) {
+        lookups += parts.length;
+        return parts.map((part) => ({
+          ...part,
+          status: "active" as const,
+          source: "tenant-provider",
+          observedAt: firstPassAt,
+          availableUnits: 1000,
+          leadTimeDays: 21,
+        }));
+      },
+    });
+
+    await runSupplyWatchPass(store, tenantProvider, firstPassAt);
+    const firstLookupCount = lookups;
+    expect(firstLookupCount).toBe(2);
+
+    const tenantRows = rows(
+      await database().query(
+        `select installation_id, provider, available_units, lead_time_days
+           from installation_component_observations
+          where installation_id = $1 and provider = $2`,
+        [installationId, "tenant-provider"],
+      ),
+    );
+    expect(tenantRows).toHaveLength(2);
+    expect(tenantRows[0]?.installation_id).toBe(installationId);
+    expect(tenantRows[0]?.available_units).toBe(1000);
+    expect(tenantRows[0]?.lead_time_days).toBe(21);
+
+    const sharedRows = rows(
+      await database().query("select id from component_lifecycle_observations where source = $1", ["tenant-provider"]),
+    );
+    expect(sharedRows).toHaveLength(0);
+
+    await database().query("update board_supply_watch set next_due_at = $2 where board_id = $1", [
+      boardId,
+      secondPassAt.toISOString(),
+    ]);
+    await runSupplyWatchPass(store, tenantProvider, secondPassAt);
+    expect(lookups).toBe(firstLookupCount);
+  });
+
   it("resolves the finding once the part is reported active again", async () => {
     const store = createSqlBoardSupplyWatchStore(database());
     const later = new Date(now.getTime() + 120_000);

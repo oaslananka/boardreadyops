@@ -1,6 +1,7 @@
 // The evaluator looks these observations up by componentKey, so the store must key them
 // with the same function. Two spellings of "the same part" silently miss every cache hit.
 import { type ComponentDistributorClassification, componentKey, type PriceBreak } from "@boardreadyops/cloud-core";
+import type { ObservationCacheScope } from "@boardreadyops/cloud-core/supply-watch";
 import type { SqlQueryExecutor, SqlQueryResult } from "./lifecycle-store.js";
 
 export type DueBoard = {
@@ -24,6 +25,8 @@ export type ObservationInput = {
   expiresAt?: Date | undefined;
   distributorClassification?: ComponentDistributorClassification | undefined;
   priceBreaks?: readonly PriceBreak[] | undefined;
+  availableUnits?: number | undefined;
+  leadTimeDays?: number | undefined;
 };
 
 export type SupplyFindingInput = {
@@ -44,6 +47,7 @@ export type BoardSupplyWatchStore = {
   claimDueBoards(now: Date, limit: number): Promise<DueBoard[]>;
   /** Cached observations for the supplied part keys that have not expired. */
   freshObservations(
+    scope: ObservationCacheScope,
     now: Date,
     keys: readonly { mpn: string; manufacturer?: string | undefined }[],
   ): Promise<
@@ -55,10 +59,12 @@ export type BoardSupplyWatchStore = {
         observedAt: string;
         distributorClassification?: ComponentDistributorClassification | undefined;
         priceBreaks?: readonly PriceBreak[] | undefined;
+        availableUnits?: number | undefined;
+        leadTimeDays?: number | undefined;
       }
     >
   >;
-  recordObservations(observations: readonly ObservationInput[]): Promise<number>;
+  recordObservations(scope: ObservationCacheScope, observations: readonly ObservationInput[]): Promise<number>;
   /** Opens findings that are newly risky and resolves ones no longer risky. */
   reconcileFindings(
     boardId: string,
@@ -107,6 +113,16 @@ function distributorClassification(
 ): ComponentDistributorClassification | undefined {
   const value = row[key];
   return value === "authorized-distributor" || value === "marketplace" || value === "unknown" ? value : undefined;
+}
+
+function optionalInteger(row: Record<string, unknown>, key: string): number | undefined {
+  const value = row[key];
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return value;
+  if (typeof value === "string" && /^\d+$/u.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 /** node-postgres decodes `jsonb` to a native array; a mocked executor may hand back a JSON string instead. */
@@ -196,16 +212,30 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
       });
     },
 
-    async freshObservations(now, keys) {
+    async freshObservations(scope, now, keys) {
       if (keys.length === 0) return new Map();
       const mpns = [...new Set(keys.map((key) => key.mpn.trim().toLowerCase()))];
-      const result = await executor.query(
-        `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks
-         from component_lifecycle_observations
-         where lower(mpn) = any($1::text[])
-           and (expires_at is null or expires_at > $2::timestamptz)`,
-        [mpns, now.toISOString()],
-      );
+      const result =
+        scope.kind === "shared"
+          ? await executor.query(
+              `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks,
+                      available_units, lead_time_days
+                 from component_lifecycle_observations
+                where lower(mpn) = any($1::text[])
+                  and source = $3
+                  and (expires_at is null or expires_at > $2::timestamptz)`,
+              [mpns, now.toISOString(), scope.providerName],
+            )
+          : await executor.query(
+              `select mpn, manufacturer, status, source, observed_at, distributor_classification, price_breaks,
+                      available_units, lead_time_days
+                 from installation_component_observations
+                where installation_id = $1
+                  and provider = $2
+                  and lower(mpn) = any($3::text[])
+                  and (expires_at is null or expires_at > $4::timestamptz)`,
+              [scope.installationId, scope.providerName, mpns, now.toISOString()],
+            );
 
       const fresh = new Map<
         string,
@@ -215,22 +245,30 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           observedAt: string;
           distributorClassification?: ComponentDistributorClassification | undefined;
           priceBreaks?: readonly PriceBreak[] | undefined;
+          availableUnits?: number | undefined;
+          leadTimeDays?: number | undefined;
         }
       >();
       for (const row of rows(result)) {
         const key = componentKey({ mpn: required(row, "mpn"), manufacturer: text(row, "manufacturer") });
+        const classification = distributorClassification(row, "distributor_classification");
+        const breaks = priceBreaks(row, "price_breaks");
+        const availableUnits = optionalInteger(row, "available_units");
+        const leadTimeDays = optionalInteger(row, "lead_time_days");
         fresh.set(key, {
           status: required(row, "status"),
           source: required(row, "source"),
           observedAt: timestampText(row, "observed_at"),
-          distributorClassification: distributorClassification(row, "distributor_classification"),
-          priceBreaks: priceBreaks(row, "price_breaks"),
+          ...(classification === undefined ? {} : { distributorClassification: classification }),
+          ...(breaks === undefined ? {} : { priceBreaks: breaks }),
+          ...(availableUnits === undefined ? {} : { availableUnits }),
+          ...(leadTimeDays === undefined ? {} : { leadTimeDays }),
         });
       }
       return fresh;
     },
 
-    async recordObservations(observations) {
+    async recordObservations(scope, observations) {
       if (observations.length === 0) return 0;
       const payload = JSON.stringify(
         observations.map((observation) => ({
@@ -243,33 +281,70 @@ export function createSqlBoardSupplyWatchStore(executor: SqlQueryExecutor): Boar
           expires_at: observation.expiresAt?.toISOString() ?? null,
           distributor_classification: observation.distributorClassification ?? null,
           price_breaks: observation.priceBreaks ?? [],
+          available_units: observation.availableUnits ?? null,
+          lead_time_days: observation.leadTimeDays ?? null,
         })),
       );
-      const result = await executor.query(
-        `insert into component_lifecycle_observations (
-           mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
-           distributor_classification, price_breaks
-         )
-         select entry.mpn, entry.manufacturer, entry.status, entry.source,
-                entry.evidence_url, entry.observed_at, entry.expires_at,
-                entry.distributor_classification, entry.price_breaks
-         from jsonb_to_recordset($1::jsonb) as entry(
-           mpn text, manufacturer text, status text, source text,
-           evidence_url text, observed_at timestamptz, expires_at timestamptz,
-           distributor_classification text, price_breaks jsonb
-         )
-         on conflict (lower(mpn), lower(coalesce(manufacturer, ''))) do update
-           set status = excluded.status,
-               source = excluded.source,
-               evidence_url = excluded.evidence_url,
-               observed_at = excluded.observed_at,
-               expires_at = excluded.expires_at,
-               distributor_classification = excluded.distributor_classification,
-               price_breaks = excluded.price_breaks
-           where excluded.observed_at >= component_lifecycle_observations.observed_at
-         returning id`,
-        [payload],
-      );
+
+      const result =
+        scope.kind === "shared"
+          ? await executor.query(
+              `insert into component_lifecycle_observations (
+                 mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
+                 distributor_classification, price_breaks, available_units, lead_time_days
+               )
+               select entry.mpn, entry.manufacturer, entry.status, entry.source,
+                      entry.evidence_url, entry.observed_at, entry.expires_at,
+                      entry.distributor_classification, entry.price_breaks,
+                      entry.available_units, entry.lead_time_days
+               from jsonb_to_recordset($1::jsonb) as entry(
+                 mpn text, manufacturer text, status text, source text,
+                 evidence_url text, observed_at timestamptz, expires_at timestamptz,
+                 distributor_classification text, price_breaks jsonb,
+                 available_units integer, lead_time_days integer
+               )
+               on conflict (source, lower(mpn), lower(coalesce(manufacturer, ''))) do update
+                 set status = excluded.status,
+                     evidence_url = excluded.evidence_url,
+                     observed_at = excluded.observed_at,
+                     expires_at = excluded.expires_at,
+                     distributor_classification = excluded.distributor_classification,
+                     price_breaks = excluded.price_breaks,
+                     available_units = excluded.available_units,
+                     lead_time_days = excluded.lead_time_days
+                 where excluded.observed_at >= component_lifecycle_observations.observed_at
+               returning id`,
+              [payload],
+            )
+          : await executor.query(
+              `insert into installation_component_observations (
+                 installation_id, provider, mpn, manufacturer, status, source, evidence_url, observed_at, expires_at,
+                 distributor_classification, price_breaks, available_units, lead_time_days
+               )
+               select $1, $2, entry.mpn, entry.manufacturer, entry.status, entry.source,
+                      entry.evidence_url, entry.observed_at, entry.expires_at,
+                      entry.distributor_classification, entry.price_breaks,
+                      entry.available_units, entry.lead_time_days
+               from jsonb_to_recordset($3::jsonb) as entry(
+                 mpn text, manufacturer text, status text, source text,
+                 evidence_url text, observed_at timestamptz, expires_at timestamptz,
+                 distributor_classification text, price_breaks jsonb,
+                 available_units integer, lead_time_days integer
+               )
+               on conflict (installation_id, provider, lower(mpn), lower(coalesce(manufacturer, ''))) do update
+                 set status = excluded.status,
+                     source = excluded.source,
+                     evidence_url = excluded.evidence_url,
+                     observed_at = excluded.observed_at,
+                     expires_at = excluded.expires_at,
+                     distributor_classification = excluded.distributor_classification,
+                     price_breaks = excluded.price_breaks,
+                     available_units = excluded.available_units,
+                     lead_time_days = excluded.lead_time_days
+                 where excluded.observed_at >= installation_component_observations.observed_at
+               returning id`,
+              [scope.installationId, scope.providerName, payload],
+            );
       return rows(result).length;
     },
 

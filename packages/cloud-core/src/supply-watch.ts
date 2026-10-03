@@ -49,9 +49,14 @@ export type RiskyComponentFinding = {
   source: string;
 };
 
+export type ObservationCacheScope =
+  | { kind: "shared"; providerName: string }
+  | { kind: "installation"; installationId: string; providerName: string };
+
 export type SupplyWatchStore = {
   claimDueBoards(now: Date, limit: number): Promise<WatchBoard[]>;
   freshObservations(
+    scope: ObservationCacheScope,
     now: Date,
     keys: readonly { mpn: string; manufacturer?: string | undefined }[],
   ): Promise<
@@ -63,10 +68,13 @@ export type SupplyWatchStore = {
         observedAt: string;
         distributorClassification?: ComponentDistributorClassification | undefined;
         priceBreaks?: readonly PriceBreak[] | undefined;
+        availableUnits?: number | undefined;
+        leadTimeDays?: number | undefined;
       }
     >
   >;
   recordObservations(
+    scope: ObservationCacheScope,
     observations: readonly {
       mpn: string;
       manufacturer?: string | undefined;
@@ -77,6 +85,8 @@ export type SupplyWatchStore = {
       expiresAt?: Date | undefined;
       distributorClassification?: ComponentDistributorClassification | undefined;
       priceBreaks?: readonly PriceBreak[] | undefined;
+      availableUnits?: number | undefined;
+      leadTimeDays?: number | undefined;
     }[],
   ): Promise<number>;
   reconcileFindings(
@@ -198,7 +208,7 @@ function buildOpenRiskyFindings(
 async function queryMissingObservations(
   missing: readonly ComponentQuery[],
   provider: ComponentIntelligenceProvider,
-  cacheUsable: boolean,
+  cacheScope: ObservationCacheScope | undefined,
   observationTtlMs: number,
   store: SupplyWatchStore,
   now: Date,
@@ -208,9 +218,10 @@ async function queryMissingObservations(
   const partsQueried = missing.length;
   const observed = await provider.lookup(missing);
   let observationsRecorded = 0;
-  if (cacheUsable) {
+  if (cacheScope) {
     const expiresAt = new Date(now.getTime() + observationTtlMs);
     observationsRecorded = await store.recordObservations(
+      cacheScope,
       observed.map((observation) => ({
         ...observation,
         expiresAt: new Date(Math.min((observation.expiresAt ?? expiresAt).getTime(), expiresAt.getTime())),
@@ -252,9 +263,14 @@ async function evaluateSingleBoard(
     options.observationTtlMs ?? defaultObservationTtlMs,
     provider.cachePolicy.maximumCacheAgeMs,
   );
-  const cacheUsable = provider.cachePolicy.shareableAcrossTenants && provider.cachePolicy.maximumCacheAgeMs > 0;
+  const cacheScope: ObservationCacheScope | undefined =
+    provider.cachePolicy.maximumCacheAgeMs <= 0
+      ? undefined
+      : provider.cachePolicy.shareableAcrossTenants
+        ? { kind: "shared", providerName: provider.name }
+        : { kind: "installation", installationId: board.installationId, providerName: provider.name };
   const parts = queryablePartsOf(board.components);
-  const cached = cacheUsable ? await store.freshObservations(now, parts) : new Map();
+  const cached = cacheScope ? await store.freshObservations(cacheScope, now, parts) : new Map();
   const missing = parts.filter((part) => !cached.has(componentKey(part)));
 
   if (missing.length > 0 && provider.name === "none") {
@@ -270,7 +286,7 @@ async function evaluateSingleBoard(
   const { partsQueried, observationsRecorded } = await queryMissingObservations(
     missing,
     provider,
-    cacheUsable,
+    cacheScope,
     observationTtlMs,
     store,
     now,

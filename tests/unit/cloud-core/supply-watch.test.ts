@@ -37,8 +37,8 @@ function storeWith(
   const reconciled: Array<{ boardId: string; open: readonly { mpn: string; status: string }[] }> = [];
   const store: SupplyWatchStore = {
     claimDueBoards: vi.fn(async () => boards),
-    freshObservations: vi.fn(async () => cached),
-    recordObservations: vi.fn(async (observations) => observations.length),
+    freshObservations: vi.fn(async (scope) => (scope.kind === "shared" ? cached : new Map())),
+    recordObservations: vi.fn(async (_scope, observations) => observations.length),
     reconcileFindings: vi.fn(async (boardId, open) => {
       reconciled.push({ boardId, open });
       return { opened: open.length, resolved: 0 };
@@ -318,7 +318,7 @@ describe("supply watch pass", () => {
       observationTtlMs: 30 * 24 * 60 * 60 * 1000,
     });
 
-    const recorded = (store.recordObservations as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] ?? [];
+    const recorded = (store.recordObservations as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] ?? [];
     for (const observation of recorded) {
       expect(observation.expiresAt.getTime()).toBeLessThanOrEqual(now.getTime() + 24 * 60 * 60 * 1000);
     }
@@ -341,13 +341,55 @@ describe("supply watch pass", () => {
 
     const report = await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
 
-    // The shared observation cache is bypassed entirely rather than serving one licensee's
-    // answer to another, so every part is looked up and nothing is written to it.
-    expect(store.freshObservations).not.toHaveBeenCalled();
-    expect(store.recordObservations).not.toHaveBeenCalled();
+    // The provider may retain results, but only inside the owning installation's cache scope.
+    // Nothing from a shared cache can satisfy this lookup.
+    expect(store.freshObservations).toHaveBeenCalledWith(
+      { kind: "installation", installationId: "installation-1", providerName: "non-transferable" },
+      now,
+      expect.any(Array),
+    );
+    expect(store.recordObservations).toHaveBeenCalledWith(
+      { kind: "installation", installationId: "installation-1", providerName: "non-transferable" },
+      expect.any(Array),
+    );
     expect(report.partsQueried).toBe(2);
     expect(report.boardsEvaluated).toBe(1);
   });
+  it("isolates non-transferable cache hits by installation", async () => {
+    const provider: ComponentIntelligenceProvider = {
+      ...providerReturning({ STM32F103C8T6: "eol", "RC0603FR-0710KL": "eol" }),
+      name: "non-transferable",
+      cachePolicy: { maximumCacheAgeMs: 24 * 60 * 60 * 1000, shareableAcrossTenants: false },
+    };
+    const { store, reconciled } = storeWith([
+      board({ boardId: "board-a", installationId: "installation-a" }),
+      board({ boardId: "board-b", installationId: "installation-b" }),
+    ]);
+    const cachedForA = new Map([
+      [
+        componentKey({ mpn: "STM32F103C8T6", manufacturer: "ST" }),
+        { status: "active", source: "non-transferable", observedAt: now.toISOString() },
+      ],
+      [
+        componentKey({ mpn: "RC0603FR-0710KL", manufacturer: "Yageo" }),
+        { status: "active", source: "non-transferable", observedAt: now.toISOString() },
+      ],
+    ]);
+    vi.mocked(store.freshObservations).mockImplementation(async (scope) =>
+      scope.kind === "installation" && scope.installationId === "installation-a" ? cachedForA : new Map(),
+    );
+
+    await runSupplyWatchPass(store, constantComponentIntelligence(provider), now);
+
+    expect(provider.lookup).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(store.freshObservations).mock.calls.map(([scope]) => scope)).toEqual([
+      { kind: "installation", installationId: "installation-a", providerName: "non-transferable" },
+      { kind: "installation", installationId: "installation-b", providerName: "non-transferable" },
+    ]);
+    expect(reconciled.find((entry) => entry.boardId === "board-a")?.open).toEqual([]);
+    expect(reconciled.find((entry) => entry.boardId === "board-b")?.open).toHaveLength(2);
+  });
+
   it("stores no provider cache for a no-retention provider while preserving minimal finding provenance", async () => {
     const { store, reconciled } = storeWith([board()]);
     const provider: ComponentIntelligenceProvider = {
