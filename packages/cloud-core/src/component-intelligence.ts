@@ -58,6 +58,18 @@ export type ComponentObservation = {
   distributorClassification?: ComponentDistributorClassification | undefined;
   /** Quantity-price tiers the provider returned. Absent or empty when it returned none. */
   priceBreaks?: readonly PriceBreak[] | undefined;
+  /**
+   * Total units the provider reports available in its configured/default market.
+   *
+   * This is an observed stock quantity, not a claim that the quantity is sufficient for a
+   * particular build. Project-specific sufficiency is evaluated separately against BOM demand.
+   */
+  availableUnits?: number | undefined;
+  /**
+   * Indicative factory lead time in days from the provider's preferred trustworthy channel.
+   * Absent means the provider returned no usable lead-time signal.
+   */
+  leadTimeDays?: number | undefined;
 };
 
 /**
