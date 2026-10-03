@@ -348,7 +348,7 @@ export async function handleRepositoryAction(
       return json(
         {
           ok: false,
-          error: "That run is no longer available. Refresh the page and choose an available run.",
+          error: "That run is no longer available.",
           code: "repository_action_run_unavailable",
           recovery: "refresh" satisfies RepositoryActionRecovery,
           requestId,
@@ -375,7 +375,7 @@ export async function handleRepositoryAction(
       return json(
         {
           ok: false,
-          error: "That action is not available for the current repository state. Refresh the page and try again.",
+          error: "That action is not available for the current repository state.",
           code: "repository_action_unavailable",
           recovery: "refresh" satisfies RepositoryActionRecovery,
           requestId,
